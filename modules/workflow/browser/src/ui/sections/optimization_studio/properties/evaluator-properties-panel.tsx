@@ -1,5 +1,5 @@
 import { Button, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { useAvailableEvaluators } from "@langwatch/evaluator-browser/available-evaluators";
 import DynamicZodForm from "@langwatch/evaluator-browser/dynamic-zod-form";
 import { EvaluatorEditorContent } from "@langwatch/evaluator-browser/evaluator-editor-content";
@@ -63,7 +63,47 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
 // New format: DB-backed evaluator panel
 // ---------------------------------------------------------------------------
 
+type EvaluatorRecord = RouterOutputs["evaluators"]["getById"] | undefined;
+
 function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evaluatorRef: string }) {
+  const { project } = useOrganizationTeamProject();
+  const evaluatorId = extractEvaluatorId(evaluatorRef);
+  const evaluatorQuery = api.evaluators.getById.useQuery(
+    { id: evaluatorId, projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+
+  if (evaluatorQuery.isLoading) {
+    return (
+      <HStack justify="center" paddingY={8} width="full">
+        <Spinner size="md" />
+      </HStack>
+    );
+  }
+
+  // A saved evaluator has a new updatedAt, which remounts the form onto it.
+  return (
+    <DbEvaluatorForm
+      key={String(evaluatorQuery.data?.updatedAt ?? "")}
+      node={node}
+      evaluatorId={evaluatorId}
+      evaluator={evaluatorQuery.data}
+      refetchEvaluator={evaluatorQuery.refetch}
+    />
+  );
+}
+
+function DbEvaluatorForm({
+  node,
+  evaluatorId,
+  evaluator,
+  refetchEvaluator,
+}: {
+  node: Node<Evaluator>;
+  evaluatorId: string;
+  evaluator: EvaluatorRecord;
+  refetchEvaluator: () => Promise<unknown>;
+}) {
   const { project } = useOrganizationTeamProject();
   const updateNodeInternals = useUpdateNodeInternals();
   const { nodes, edges, setNode, setEdges, getWorkflow, deselectAllNodes } = useWorkflowStore(
@@ -76,23 +116,15 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
       deselectAllNodes,
     })),
   );
-  const evaluatorId = extractEvaluatorId(evaluatorRef);
-
-  const evaluatorQuery = api.evaluators.getById.useQuery(
-    { id: evaluatorId, projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
-
   const updateMutation = api.evaluators.update.useMutation();
-  const { refetch: refetchEvaluator } = evaluatorQuery;
 
-  const config = evaluatorQuery.data?.config as {
+  const config = evaluator?.config as {
     evaluatorType?: string;
     settings?: Record<string, unknown>;
   } | null;
 
   const evaluatorType = config?.evaluatorType;
-  const dbName = evaluatorQuery.data?.name ?? "";
+  const dbName = evaluator?.name ?? "";
   const dbSettings = useMemo(() => config?.settings ?? {}, [config?.settings]);
 
   const evaluatorDef = evaluatorType
@@ -110,51 +142,36 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
     Object.keys(settingsSchema.shape).length > 0;
 
   const effectiveEvaluatorDef = useMemo(() => {
-    const fields = evaluatorQuery.data?.fields;
+    const fields = evaluator?.fields;
     if (fields && fields.length > 0) {
       const requiredFields = fields.filter((f: any) => !f.optional).map((f: any) => f.identifier);
       const optionalFields = fields.filter((f: any) => f.optional).map((f: any) => f.identifier);
       return { requiredFields, optionalFields };
     }
     return evaluatorDef;
-  }, [evaluatorQuery.data?.fields, evaluatorDef]);
+  }, [evaluator?.fields, evaluatorDef]);
 
-  const isWorkflowEvaluator = evaluatorQuery.data?.type === "workflow";
+  const isWorkflowEvaluator = evaluator?.type === "workflow";
 
   const workflow =
-    isWorkflowEvaluator && evaluatorQuery.data?.workflowId
+    isWorkflowEvaluator && evaluator?.workflowId
       ? {
-          id: evaluatorQuery.data.workflowId,
-          name: evaluatorQuery.data.workflowName ?? "Workflow",
-          icon: evaluatorQuery.data.workflowIcon,
-          updatedAt: evaluatorQuery.data.updatedAt,
+          id: evaluator.workflowId,
+          name: evaluator.workflowName ?? "Workflow",
+          icon: evaluator.workflowIcon,
+          updatedAt: evaluator.updatedAt,
           projectSlug: project?.slug ?? "",
         }
       : undefined;
 
-  // Local config from node data (unsaved changes)
+  // Unsaved changes live on the node, so they win over the saved evaluator.
   const localConfig = node.data.localConfig;
-  const initialName = localConfig?.name ?? dbName;
-  const initialSettings = localConfig?.settings ?? dbSettings;
-
-  // Form for name + settings
   const form = useForm<{ name: string; settings: Record<string, unknown> }>({
     defaultValues: {
-      name: initialName,
-      settings: initialSettings,
+      name: localConfig?.name ?? dbName,
+      settings: localConfig?.settings ?? dbSettings,
     },
   });
-
-  // Reset form when evaluator data loads, respecting localConfig
-  useEffect(() => {
-    if (evaluatorQuery.data) {
-      const lc = node.data.localConfig;
-      form.reset({
-        name: lc?.name ?? evaluatorQuery.data.name,
-        settings: lc?.settings ?? (evaluatorQuery.data.config as any)?.settings ?? {},
-      });
-    }
-  }, [evaluatorQuery.data, form]);
 
   // Watch form changes and persist to node.data.localConfig (debounced to
   // avoid flooding the store on every keystroke).
@@ -313,14 +330,6 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
     [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
   useRegisterDrawerFooter(footerContent);
-
-  if (evaluatorQuery.isLoading) {
-    return (
-      <HStack justify="center" paddingY={8} width="full">
-        <Spinner size="md" />
-      </HStack>
-    );
-  }
 
   return (
     <EvaluatorEditorContent

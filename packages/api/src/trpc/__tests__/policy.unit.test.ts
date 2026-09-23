@@ -14,7 +14,7 @@ import {
   PermissionDeniedError,
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
 import {
   createDeclaredAuthzMiddlewares,
@@ -43,7 +43,7 @@ function makePorts(
     >;
   } = {},
 ): TrpcDeclaredAuthzMembers<TrpcDeclaredAuthzContext> & {
-  decisions: TrpcAuthorizationDecisions;
+  decisions: { [K in keyof TrpcAuthorizationDecisions]-?: Mock<TrpcAuthorizationDecisions[K]> };
 } {
   const actorId = "actorId" in options ? options.actorId : "alice";
 
@@ -62,7 +62,7 @@ function makePorts(
   const checkScopeLineage =
     vi.fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>();
 
-  const decisions: TrpcAuthorizationDecisions = {
+  const decisions = {
     getDecision,
     getProjectAnyDecision,
     checkScopeLineage,

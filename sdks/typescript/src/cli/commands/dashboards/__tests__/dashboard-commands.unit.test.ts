@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { DashboardsApiError,DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+
+import {
+  DashboardsApiError,
+  DashboardsApiService,
+} from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -25,9 +29,9 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listDashboardsCommand } from "../list";
 import { createDashboardCommand } from "../create";
 import { deleteDashboardCommand } from "../delete";
+import { listDashboardsCommand } from "../list";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -39,8 +43,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
+let exitSpy: MockInstance<typeof process.exit>;
+
 const mockProcessExit = () => {
-  vi.spyOn(process, "exit").mockImplementation((code) => {
+  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
 };
@@ -92,7 +98,7 @@ describe("listDashboardsCommand()", () => {
 
       await listDashboardsCommand();
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import { TracesApiError, TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 
@@ -64,8 +64,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
+let exitSpy: MockInstance<typeof process.exit>;
+
 const mockProcessExit = () => {
-  vi.spyOn(process, "exit").mockImplementation((code) => {
+  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
 };
@@ -139,7 +141,7 @@ describe("searchTracesCommand()", () => {
 
       await searchTracesCommand({});
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 

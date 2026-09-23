@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { createApp } from "../src/application.ts";
 import { defineServerModule, moduleApi, type FeatureSetup } from "../src/index.ts";
-import { memberSourceOf } from "./member-source.ts";
 import {
   assertRepositoryOwnership,
   RepositoryOwnershipConflictError,
 } from "../src/repository-ownership.ts";
+import { memberSourceOf } from "./member-source.ts";
 
 const userTables = { store: "prisma", tables: ["User"] };
 const created = vi.fn();
@@ -108,6 +109,6 @@ describe("repository ownership", () => {
   ])("rejects an empty claim %j", (tables) => {
     expect(() =>
       assertRepositoryOwnership([{ name: "user", repositories: { rows: { tables } } }]),
-    ).toThrow();
+    ).toThrow(Error);
   });
 });

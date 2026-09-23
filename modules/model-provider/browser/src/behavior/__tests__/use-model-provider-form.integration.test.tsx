@@ -139,6 +139,34 @@ describe("useModelProviderForm()", () => {
     });
   });
 
+  describe("given the same provider object across renders", () => {
+    it("keeps what the user typed, because nothing re-runs the reset", () => {
+      const provider = createOpenAIProvider();
+      let renders = 0;
+      const { result, rerender } = renderHook(
+        ({ current }) => {
+          renders += 1;
+          return useModelProviderForm({
+            provider: current,
+            projectId: "test-project-id",
+            enabledProvidersCount: 2,
+          });
+        },
+        { initialProps: { current: provider } },
+      );
+      act(() => {
+        result.current[1].setCustomKey("OPENAI_API_KEY", "sk-openai-key");
+      });
+      const rendersAfterTyping = renders;
+
+      rerender({ current: provider });
+      rerender({ current: provider });
+
+      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("sk-openai-key");
+      expect(renders).toBe(rendersAfterTyping + 2);
+    });
+  });
+
   describe("given the initial state", () => {
     it("initializes with empty customKeys for new provider", () => {
       const provider = createOpenAIProvider();

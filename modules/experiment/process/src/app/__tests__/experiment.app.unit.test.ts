@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * The experiment application: the rules that moved off its two doors onto it.
@@ -11,7 +12,6 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import type { WorkflowService } from "@langwatch/workflow-process";
 import { describe, expect, it, vi } from "vitest";
@@ -138,9 +138,10 @@ function harness({
     createdAt: NOW,
     updatedAt: NOW,
   };
+  const archiveWorkflow = vi.fn(async () => workflowRow);
   const workflowService = createApiFixture<WorkflowApi>({
     getById: vi.fn(async () => workflowRow),
-    archive: vi.fn(async () => workflowRow),
+    archive: archiveWorkflow,
     ...workflows,
   });
   const workflowExecutionService = createApiFixture<WorkflowService>();
@@ -198,6 +199,7 @@ function harness({
   return {
     experiments: experimentService,
     workflows: workflowService,
+    archiveWorkflow,
     monitors,
     workbenchObserver,
     runLoop,
@@ -396,7 +398,7 @@ describe("ExperimentApp", () => {
   describe("when an experiment is archived", () => {
     /** @scenario Archiving cascades to the associated workflow and hard-deletes the monitor */
     it("archives the workflow it wrote versions into and drops its monitor", async () => {
-      const { app, experiments, workflows, monitors } = harness({
+      const { app, experiments, archiveWorkflow, monitors } = harness({
         experiments: { findById: vi.fn(async () => workflowBacked) },
       });
 
@@ -407,7 +409,7 @@ describe("ExperimentApp", () => {
         id: "experiment-2",
         projectId: "project-1",
       });
-      expect(workflows.archive).toHaveBeenCalledWith({
+      expect(archiveWorkflow).toHaveBeenCalledWith({
         id: "workflow-1",
         projectId: "project-1",
       });
@@ -419,22 +421,22 @@ describe("ExperimentApp", () => {
 
     /** @scenario Archiving without a workflow or monitor still succeeds */
     it("leaves the workflow alone when the experiment was backed by none", async () => {
-      const { app, workflows, monitors } = harness();
+      const { app, archiveWorkflow, monitors } = harness();
 
       await app.archive({ id: "experiment-1", projectId: "project-1" });
 
-      expect(workflows.archive).not.toHaveBeenCalled();
+      expect(archiveWorkflow).not.toHaveBeenCalled();
       expect(monitors.deleteForExperiment).toHaveBeenCalled();
     });
 
     it("cascades into nothing when the project had no such experiment", async () => {
-      const { app, workflows, monitors } = harness({
+      const { app, archiveWorkflow, monitors } = harness({
         experiments: { findById: vi.fn(async () => null) },
       });
 
       await app.archive({ id: "ghost", projectId: "project-1" });
 
-      expect(workflows.archive).not.toHaveBeenCalled();
+      expect(archiveWorkflow).not.toHaveBeenCalled();
       expect(monitors.deleteForExperiment).not.toHaveBeenCalled();
     });
   });

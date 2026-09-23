@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import { AgentsApiError, AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 
@@ -42,8 +42,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
+let exitSpy: MockInstance<typeof process.exit>;
+
 const mockProcessExit = () => {
-  vi.spyOn(process, "exit").mockImplementation((code) => {
+  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
 };
@@ -100,7 +102,7 @@ describe("listAgentsCommand()", () => {
 
       await listAgentsCommand();
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 

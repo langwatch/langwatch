@@ -1,12 +1,12 @@
+import { readdirSync } from "node:fs";
 // Renders the README images in this folder with Playwright's Chromium, at 2x.
 //   node .github/readme/render.mjs                 # every page below
 //   node .github/readme/render.mjs cover           # one page
 // Edit the HTML, run this, commit the HTML and the image together. Playwright
 // comes from the workspace install at the repo root.
 import { createRequire } from "node:module";
-import { pathToFileURL, fileURLToPath } from "node:url";
-import { readdirSync } from "node:fs";
 import path from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..", "..");
@@ -24,13 +24,18 @@ function loadPlaywright() {
   const store = path.join(root, "node_modules/.pnpm");
   try {
     for (const dir of readdirSync(store)) {
-      if (dir.startsWith("playwright@")) candidates.push(path.join(store, dir, "node_modules/playwright/package.json"));
+      if (dir.startsWith("playwright@"))
+        candidates.push(path.join(store, dir, "node_modules/playwright/package.json"));
     }
-  } catch {}
+  } catch {
+    // No pnpm store here; the candidates found so far are all there is.
+  }
   for (const from of candidates) {
     try {
       return createRequire(from)("playwright");
-    } catch {}
+    } catch {
+      // Not resolvable from this candidate; try the next.
+    }
   }
   throw new Error("playwright is not installed; run pnpm install at the repo root");
 }
@@ -43,7 +48,9 @@ const opt = (name) => {
   if (value === undefined || value.startsWith("--")) throw new Error(`--${name} needs a value`);
   return value;
 };
-const names = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")));
+const names = args.filter(
+  (a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--")),
+);
 const selected = names.length ? names : Object.keys(PAGES);
 if (opt("out") && selected.length !== 1) throw new Error("--out requires exactly one page");
 
@@ -57,7 +64,10 @@ for (const name of selected) {
   if (opt("bg")) url.searchParams.set("bg", opt("bg"));
   if (opt("theme")) url.searchParams.set("theme", opt("theme"));
 
-  const tab = await browser.newPage({ viewport: { width: page.width, height: page.height }, deviceScaleFactor: 2 });
+  const tab = await browser.newPage({
+    viewport: { width: page.width, height: page.height },
+    deviceScaleFactor: 2,
+  });
   await tab.goto(url.href, { waitUntil: "networkidle" });
   await tab.evaluate(() => document.fonts.ready);
   await tab.waitForTimeout(300);

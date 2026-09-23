@@ -24,7 +24,8 @@ const trace = traceSchema.parse({
 
 function harness() {
   const traces = createAnnotationTestTraces();
-  traces.loadTraces = vi.fn(async () => [trace]);
+  const loadTraces = vi.fn(async () => [trace]);
+  traces.loadTraces = loadTraces;
   traces.findExistingTraceIds = vi.fn(async () => ["trace-1"]);
   const users = createAnnotationTestUsers();
 
@@ -56,7 +57,7 @@ function harness() {
     },
   });
 
-  return { app, traces };
+  return { app, traces, loadTraces };
 }
 
 describe("AnnotationApp review reads", () => {
@@ -100,7 +101,7 @@ describe("AnnotationApp review reads", () => {
   });
 
   it("loads each queue trace once and retains queue order", async () => {
-    const { app, traces } = harness();
+    const { app, loadTraces } = harness();
 
     await app.queueTraces({
       projectId: "project-1",
@@ -111,7 +112,7 @@ describe("AnnotationApp review reads", () => {
 
     const result = await app.listReviewQueueItems({ projectId: "project-1", userId: "user-1" });
 
-    expect(traces.loadTraces).toHaveBeenCalledWith({
+    expect(loadTraces).toHaveBeenCalledWith({
       projectId: "project-1",
       userId: "user-1",
       traceIds: ["trace-1"],

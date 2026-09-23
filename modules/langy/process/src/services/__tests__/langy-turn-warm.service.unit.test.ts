@@ -33,6 +33,11 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     apiKeyId: "key-warm",
   }));
   const checkPermit = vi.fn(async () => ({ allowed: true }));
+  const reservePermit = vi.fn(async () => ({
+    reserved: false,
+    allowed: true,
+    resetAt: 0,
+  }));
   const getOrProvision = vi.fn(async (): Promise<Record<string, unknown>> => ({
     organizationId: "org-1",
     llmVirtualKey: "vk",
@@ -58,11 +63,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     worker: { probe, warm, dispatch, cancel },
     tokenBuffer: null,
     permits: {
-      reserve: vi.fn(async () => ({
-        reserved: false,
-        allowed: true,
-        resetAt: 0,
-      })),
+      reserve: reservePermit,
       release: vi.fn(async () => {}),
       check: checkPermit,
     },
@@ -84,6 +85,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       dispatch,
       mintSessionKey,
       checkPermit,
+      reservePermit,
       getOrProvision,
       getModelsAllowed,
     },
@@ -185,7 +187,7 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
       await service.warmConversationWorker(warmInput());
 
       // Check-only: the permit view, never the reserving one.
-      expect(deps.permits.reserve).not.toHaveBeenCalled();
+      expect(mocks.reservePermit).not.toHaveBeenCalled();
       const probeArgs = mocks.probe.mock.calls[0]![0];
       expect(probeArgs.hasGithubAuth).toBe(false);
       const warmArgs = mocks.warm.mock.calls[0]![0] as {

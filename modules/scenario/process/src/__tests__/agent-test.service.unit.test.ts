@@ -55,19 +55,21 @@ function httpAgent(overrides: Partial<AgentWithFields> = {}): AgentWithFields {
   } as AgentWithFields;
 }
 
-function fakeAgents(namesById: Record<string, string> = {}): AgentApi {
-  return createApiFixture<AgentApi>({
+function fakeAgents(namesById: Record<string, string> = {}) {
+  const callConnected = vi.fn<AgentApi["callConnected"]>().mockResolvedValue({
+    output: "answer",
+    durationMs: 1,
+    instance: { instanceId: "instance_1", hostname: "host", label: null },
+  });
+  const agents = createApiFixture<AgentApi>({
     getNamesByIds: vi
       .fn<AgentApi["getNamesByIds"]>()
       .mockResolvedValue(Object.entries(namesById).map(([id, name]) => ({ id, name }))),
     ownersOf: async () =>
       new Map(Object.entries(namesById).map(([userId, name]) => [userId, { userId, name }])),
-    callConnected: vi.fn<AgentApi["callConnected"]>().mockResolvedValue({
-      output: "answer",
-      durationMs: 1,
-      instance: { instanceId: "instance_1", hostname: "host", label: null },
-    }),
+    callConnected,
   });
+  return { agents, callConnected };
 }
 
 function serviceFor(options: {
@@ -75,7 +77,7 @@ function serviceFor(options: {
   namesById?: Record<string, string>;
 }) {
   const queueRun = options.queueRun ?? vi.fn().mockResolvedValue(undefined);
-  const agents = fakeAgents(options.namesById);
+  const { agents, callConnected } = fakeAgents(options.namesById);
   const service = AgentTestService.create({
     agents,
     projects: { findById: vi.fn().mockResolvedValue(null) } as never,
@@ -92,7 +94,7 @@ function serviceFor(options: {
     },
     maxCallTimeoutMs: 300_000,
   });
-  return { service, queueRun, agents };
+  return { service, queueRun, callConnected };
 }
 
 const actor = { id: "user_1", label: "user" as const };
@@ -108,7 +110,7 @@ beforeEach(() => {
 
 describe("AgentTestService.sendTurn", () => {
   it("dispatches connected tests through the composed Agent API with the capped call budget", async () => {
-    const { service, agents } = serviceFor({});
+    const { service, callConnected } = serviceFor({});
     const result = await service.sendTurn({
       projectId: "proj_1",
       agent: httpAgent({
@@ -125,7 +127,7 @@ describe("AgentTestService.sendTurn", () => {
       params: { region: "eu" },
     });
 
-    expect(agents.callConnected).toHaveBeenCalledWith({
+    expect(callConnected).toHaveBeenCalledWith({
       projectId: "proj_1",
       agent: expect.objectContaining({ timeoutMs: 300_000, isSticky: true }),
       call: expect.objectContaining({

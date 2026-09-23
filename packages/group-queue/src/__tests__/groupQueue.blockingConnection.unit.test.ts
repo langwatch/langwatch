@@ -5,6 +5,7 @@
 
 import { Cluster, Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 
@@ -64,13 +65,13 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
       it("duplicates the connection with maxRetriesPerRequest: null for the blocking connection", () => {
         const conn = track(new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }));
         const dupSentinel = {} as IORedis;
-        vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
+        const duplicate = vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
 
         const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
           consumerEnabled: true,
         });
 
-        expect(conn.duplicate).toHaveBeenCalledWith({
+        expect(duplicate).toHaveBeenCalledWith({
           maxRetriesPerRequest: null,
         });
         expect((processor as any).blockingConnection).toBe(dupSentinel);
@@ -86,13 +87,13 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
           }),
         );
         const dupSentinel = {} as Cluster;
-        vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
+        const duplicate = vi.spyOn(conn, "duplicate").mockReturnValue(dupSentinel as any);
 
         const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
           consumerEnabled: true,
         });
 
-        expect(conn.duplicate).toHaveBeenCalled();
+        expect(duplicate).toHaveBeenCalled();
         expect((processor as any).blockingConnection).toBe(dupSentinel);
       });
     });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { TenantId } from "../../domain/tenantId.ts";
 import type { Projection } from "../../domain/types.ts";
 import type { ProjectionStore } from "../../stores/projectionStore.types.ts";
@@ -20,19 +21,23 @@ function makeContext(overrides: Partial<ProjectionStoreContext> = {}): Projectio
   };
 }
 
-function makeMockRepo(): ProjectionStore<Projection<TestData>> & {
-  storedProjections: Projection<TestData>[];
-  getResult: Projection<TestData> | null;
-} {
-  const mock = {
-    storedProjections: [] as Projection<TestData>[],
-    getResult: null as Projection<TestData> | null,
+function makeMockRepo() {
+  const storedProjections: Projection<TestData>[] = [];
+  const mock: {
+    storedProjections: Projection<TestData>[];
+    getResult: Projection<TestData> | null;
+    storeProjection: ReturnType<typeof vi.fn<(projection: Projection<TestData>) => Promise<void>>>;
+    findProjection: ReturnType<typeof vi.fn<() => Promise<Projection<TestData> | null>>>;
+    storeProjectionBatch?: (projections: Projection<TestData>[]) => Promise<void>;
+  } = {
+    storedProjections,
+    getResult: null,
     storeProjection: vi.fn(async (projection: Projection<TestData>) => {
-      mock.storedProjections.push(projection);
+      storedProjections.push(projection);
     }),
     findProjection: vi.fn(async () => mock.getResult),
   };
-  return mock;
+  return mock satisfies ProjectionStore<Projection<TestData>>;
 }
 
 describe("RepositoryFoldStore", () => {

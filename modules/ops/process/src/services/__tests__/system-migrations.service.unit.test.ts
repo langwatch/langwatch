@@ -549,9 +549,7 @@ describe("SystemMigrationsService enrollment", () => {
         });
 
         await expect(attempt).rejects.toThrow(MigrationEnrollmentOrganizationNotFoundError);
-        await attempt.catch((error: MigrationEnrollmentOrganizationNotFoundError) => {
-          expect(error.code).toBe("organization_not_found");
-        });
+        await expect(attempt).rejects.toMatchObject({ code: "organization_not_found" });
         expect(enrollments.create).not.toHaveBeenCalled();
       });
     });

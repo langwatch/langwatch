@@ -9,6 +9,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -84,13 +85,25 @@ function launchWithStubbedPnpm(): { argv: string[]; env: Record<string, string> 
     ].join("\n"),
   );
   chmodSync(stub, 0o755);
+  // The go lane is only planned when a Go toolchain is on PATH; a stand-in
+  // makes that deterministic, and the stubbed pnpm never runs it.
+  const go = path.join(bin, "go");
+  writeFileSync(go, "#!/bin/bash\nexit 0\n");
+  chmodSync(go, 0o755);
 
   // Absent, not blank. A variable inherited from the environment keeps its
   // export flag when bash reassigns it, so passing these through as "" would
   // export the derived value for the script and hide the very bug this test
   // exists for.
   const inherited = { ...process.env };
-  for (const key of ["API_PORT", "WORKER_METRICS_PORT", "GATEWAY_PORT", "LANGWATCH_API_PORT"]) {
+  for (const key of [
+    "API_PORT",
+    "WORKER_METRICS_PORT",
+    "GATEWAY_PORT",
+    "LANGWATCH_API_PORT",
+    "LANGWATCH_SKIP_AIGATEWAY",
+    "LANGWATCH_GO_AIGATEWAY_ADDR",
+  ]) {
     delete inherited[key];
   }
 
@@ -107,7 +120,8 @@ function launchWithStubbedPnpm(): { argv: string[]; env: Record<string, string> 
     maxBuffer: 8 * 1024 * 1024,
   });
 
-  const argvBlock = stdout.slice(stdout.indexOf("__ARGV__") + "__ARGV__\n".length);
+  // pnpm runs the db prep first; the lanes are its last invocation.
+  const argvBlock = stdout.slice(stdout.lastIndexOf("__ARGV__") + "__ARGV__\n".length);
   const argv = argvBlock.slice(0, argvBlock.indexOf("__ENV__")).split("\n").filter(Boolean);
   const envBlock = argvBlock.slice(argvBlock.indexOf("__ENV__") + "__ENV__\n".length);
   const env = Object.fromEntries(
@@ -133,10 +147,9 @@ describe("given a dev launcher deriving its ports from PORT", () => {
         expect(env.GATEWAY_PORT).toBe(String(SLOT + 3));
         // The gateway reads an address, not a port number, and the launcher
         // announces the port it checked was free — so the two have to agree.
-        const gatewayLane = argv.find((arg) => arg.includes("svc=aigateway"));
-        if (gatewayLane !== undefined) {
-          expect(gatewayLane).toContain(`SERVER_ADDR=":${SLOT + 3}"`);
-        }
+        expect(env.LANGWATCH_GO_AIGATEWAY_ADDR).toBe(`:${SLOT + 3}`);
+        const goLane = argv.find((arg) => arg.includes("svc=combined"));
+        expect(goLane).toContain("aigateway");
       },
     );
 

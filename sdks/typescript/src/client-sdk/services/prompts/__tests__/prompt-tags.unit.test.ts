@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PromptsApiService } from "../prompts-api.service";
-import { PromptsFacade } from "../prompts.facade";
-import { PromptsApiError } from "../errors";
+import { describe, it, expect, beforeEach, type Mock, vi } from "vitest";
 import { mock, type MockProxy } from "vitest-mock-extended";
+
 import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
+
+import { PromptsApiError } from "../errors";
 import type { LocalPromptsService } from "../local-prompts.service";
+import { PromptsApiService } from "../prompts-api.service";
+import { PromptsFacade } from "../prompts.facade";
 
 describe("Prompt Tags", () => {
   describe("tags.assign()", () => {
@@ -114,9 +116,11 @@ describe("Prompt Tags", () => {
       let promptsApiService: MockProxy<PromptsApiService>;
       let facade: PromptsFacade;
       let localPromptsService: MockProxy<LocalPromptsService>;
+      let assignTag: Mock;
 
       beforeEach(() => {
-        promptsApiService = mock<PromptsApiService>();
+        assignTag = vi.fn();
+        promptsApiService = mock<PromptsApiService>({ assignTag });
         localPromptsService = mock<LocalPromptsService>();
         facade = new PromptsFacade({
           promptsApiService,
@@ -133,14 +137,14 @@ describe("Prompt Tags", () => {
           tag: "production",
           updatedAt: "2026-01-01T00:00:00.000Z",
         };
-        promptsApiService.assignTag.mockResolvedValue(expectedResult);
+        assignTag.mockResolvedValue(expectedResult);
 
         const result = await facade.tags.assign("pizza-prompt", {
           tag: "production",
           versionId: "prompt_version_abc123",
         });
 
-        expect(promptsApiService.assignTag).toHaveBeenCalledWith({
+        expect(assignTag).toHaveBeenCalledWith({
           id: "pizza-prompt",
           tag: "production",
           versionId: "prompt_version_abc123",

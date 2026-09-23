@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach,vi } from "vitest";
-import { PromptsApiService } from "../prompts-api.service";
-import { PromptsFacade } from "../prompts.facade";
-import { PromptsApiError } from "../errors";
+import { describe, it, expect, beforeEach, type Mock, vi } from "vitest";
 import { mock, type MockProxy } from "vitest-mock-extended";
+
 import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
+
+import { PromptsApiError } from "../errors";
 import type { LocalPromptsService } from "../local-prompts.service";
+import { PromptsApiService } from "../prompts-api.service";
+import { PromptsFacade } from "../prompts.facade";
 
 describe("Tag CRUD", () => {
   describe("PromptsApiService", () => {
@@ -162,9 +164,15 @@ describe("Tag CRUD", () => {
     let promptsApiService: MockProxy<PromptsApiService>;
     let facade: PromptsFacade;
     let localPromptsService: MockProxy<LocalPromptsService>;
+    let listTags: Mock;
+    let createTag: Mock;
+    let deleteTag: Mock;
 
     beforeEach(() => {
-      promptsApiService = mock<PromptsApiService>();
+      listTags = vi.fn();
+      createTag = vi.fn();
+      deleteTag = vi.fn();
+      promptsApiService = mock<PromptsApiService>({ listTags, createTag, deleteTag });
       localPromptsService = mock<LocalPromptsService>();
       facade = new PromptsFacade({
         promptsApiService,
@@ -179,11 +187,11 @@ describe("Tag CRUD", () => {
         const expectedTags = [
           { id: "ptag_prod", name: "production", createdAt: "2026-01-01T00:00:00.000Z" },
         ];
-        promptsApiService.listTags.mockResolvedValue(expectedTags);
+        listTags.mockResolvedValue(expectedTags);
 
         const result = await facade.tags.list();
 
-        expect(promptsApiService.listTags).toHaveBeenCalled();
+        expect(listTags).toHaveBeenCalled();
         expect(result).toEqual(expectedTags);
       });
     });
@@ -195,22 +203,22 @@ describe("Tag CRUD", () => {
           name: "canary",
           createdAt: "2026-01-01T00:00:00.000Z",
         };
-        promptsApiService.createTag.mockResolvedValue(expectedTag);
+        createTag.mockResolvedValue(expectedTag);
 
         const result = await facade.tags.create({ name: "canary" });
 
-        expect(promptsApiService.createTag).toHaveBeenCalledWith({ name: "canary" });
+        expect(createTag).toHaveBeenCalledWith({ name: "canary" });
         expect(result).toEqual(expectedTag);
       });
     });
 
     describe("tags.delete()", () => {
       it("delegates to PromptsApiService.deleteTag with tag name", async () => {
-        promptsApiService.deleteTag.mockResolvedValue(undefined);
+        deleteTag.mockResolvedValue(undefined);
 
         await facade.tags.delete("my-tag");
 
-        expect(promptsApiService.deleteTag).toHaveBeenCalledWith("my-tag");
+        expect(deleteTag).toHaveBeenCalledWith("my-tag");
       });
     });
   });

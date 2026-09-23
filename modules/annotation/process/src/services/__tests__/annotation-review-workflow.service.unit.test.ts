@@ -59,7 +59,8 @@ function harness() {
 describe("AnnotationService review workflow", () => {
   it("persists a denied suggestion without writing to the overlay", async () => {
     const harnessed = harness();
-    harnessed.permissions.hasProjectPermission = vi.fn(async () => false);
+    const hasProjectPermission = vi.fn(async () => false);
+    harnessed.permissions.hasProjectPermission = hasProjectPermission;
 
     const created = await harnessed.app.createReview(createInput);
 
@@ -69,7 +70,7 @@ describe("AnnotationService review workflow", () => {
       harnessed.repository.findById({ id: created.id, projectId: "project-1" }),
     ).resolves.toMatchObject({ id: created.id });
 
-    expect(harnessed.permissions.hasProjectPermission).toHaveBeenCalledWith({
+    expect(hasProjectPermission).toHaveBeenCalledWith({
       userId: "actor-1",
       projectId: "project-1",
       permission: "annotations:update",

@@ -1,4 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+
+const logger = createLogger("langwatch:presence:broadcast-rate-limit");
 
 export interface BucketConfig {
   /** Maximum tokens (burst size). */
@@ -78,9 +81,7 @@ export class BroadcastTenantRateLimiterAdapter {
     // Rate-limited — emit a single warning per tenant
     if (!this.warnedTenants.has(tenantId)) {
       this.warnedTenants.add(tenantId);
-      console.warn(
-        `[BroadcastTenantRateLimiterAdapter] Rate limit hit for tenant "${tenantId}" on tier "${tier}"`,
-      );
+      logger.warn({ tenantId, tier }, "broadcast rate limit hit for tenant");
     }
 
     return false;

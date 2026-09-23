@@ -51,7 +51,7 @@ function makeService(failure: LedgerFailure) {
     activate: vi.fn(async () => ({ ...existing, id: "key_new", revokedAt: null })),
     update: vi.fn(async () => existing),
     findByIdInOrganization: vi.fn(async () => existing),
-  } as unknown as ApiKeyRepository;
+  } satisfies Partial<ApiKeyRepository>;
 
   const grantCalls: Record<string, unknown>[] = [];
   const dependencies = {

@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ModelProvidersApiError,ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
+import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+
+import {
+  ModelProvidersApiError,
+  ModelProvidersApiService,
+} from "@/client-sdk/services/model-providers/model-providers-api.service";
 
 vi.mock(
   "@/client-sdk/services/model-providers/model-providers-api.service",
@@ -41,8 +45,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
+let exitSpy: MockInstance<typeof process.exit>;
+
 const mockProcessExit = () => {
-  vi.spyOn(process, "exit").mockImplementation((code) => {
+  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
 };
@@ -82,7 +88,7 @@ describe("listModelProvidersCommand()", () => {
 
       await listModelProvidersCommand();
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 

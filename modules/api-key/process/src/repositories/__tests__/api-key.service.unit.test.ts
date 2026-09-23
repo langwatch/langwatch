@@ -420,7 +420,8 @@ describe("API-key service", () => {
   it("falls back to the deprecated project credential after a current-shape miss", async () => {
     const memory = new MemoryProjects();
     memory.legacyProjectId = resolvedProject.id;
-    const projects = projectPeer(memory);
+    const findIdentity = vi.fn().mockResolvedValue(resolvedIdentity);
+    const projects = { ...projectPeer(memory), findIdentity };
     const service = createService(new MemoryApiKeys(), dependencies({ projects }));
     const token = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
 
@@ -428,7 +429,7 @@ describe("API-key service", () => {
       type: "legacyProjectKey",
       project: { id: "project-1" },
     });
-    expect(projects.findIdentity).toHaveBeenCalledWith(resolvedProject.id);
+    expect(findIdentity).toHaveBeenCalledWith(resolvedProject.id);
   });
 
   it("keeps a deprecated project credential bound to its resolved project", async () => {
@@ -774,8 +775,9 @@ describe("API-key service", () => {
 
   it("returns all projects when the key and owner ceiling allow organization view", async () => {
     const repository = new MemoryApiKeys();
+    const listActiveByScopes = vi.fn();
     const projects = {
-      listActiveByScopes: vi.fn(),
+      listActiveByScopes,
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
     } as unknown as ProjectApi;
     const service = createService(repository, dependencies({ projects }));
@@ -792,7 +794,7 @@ describe("API-key service", () => {
         organizationId: "org-1",
       }),
     ).resolves.toEqual({ kind: "all" });
-    expect(projects.listActiveByScopes).not.toHaveBeenCalled();
+    expect(listActiveByScopes).not.toHaveBeenCalled();
   });
 
   it("refuses to silently truncate a visibility decision", async () => {
@@ -829,7 +831,8 @@ describe("API key verification", () => {
   describe("when a legacy key verifies", () => {
     /** @scenario "A legacy service key states its access the first time it is used" */
     it("mints its grant on the resolution path", async () => {
-      const legacyGrants = { mint: vi.fn() } as unknown as ApiKeyDependencies["legacyGrants"];
+      const mint = vi.fn();
+      const legacyGrants = { mint } as unknown as ApiKeyDependencies["legacyGrants"];
       const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
       const created = await service.create({
         name: "legacy",
@@ -841,25 +844,25 @@ describe("API key verification", () => {
       const verified = await service.findVerifiedToken({ token: created.token });
 
       expect(verified?.id).toBe(created.apiKey.id);
-      expect(legacyGrants.mint).toHaveBeenCalledWith(
-        expect.objectContaining({ id: created.apiKey.id }),
-      );
+      expect(mint).toHaveBeenCalledWith(expect.objectContaining({ id: created.apiKey.id }));
     });
   });
 
   describe("when the credential does not resolve", () => {
     it("mints nothing", async () => {
-      const legacyGrants = { mint: vi.fn() } as unknown as ApiKeyDependencies["legacyGrants"];
+      const mint = vi.fn();
+      const legacyGrants = { mint } as unknown as ApiKeyDependencies["legacyGrants"];
       const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
 
       expect(await service.findVerifiedToken({ token: "sk-lw-x_y" })).toBeNull();
-      expect(legacyGrants.mint).not.toHaveBeenCalled();
+      expect(mint).not.toHaveBeenCalled();
     });
   });
 
   describe("when a revoked key is presented", () => {
     it("mints nothing", async () => {
-      const legacyGrants = { mint: vi.fn() } as unknown as ApiKeyDependencies["legacyGrants"];
+      const mint = vi.fn();
+      const legacyGrants = { mint } as unknown as ApiKeyDependencies["legacyGrants"];
       const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
       const created = await service.create({
         name: "revoked",
@@ -875,7 +878,7 @@ describe("API key verification", () => {
       });
 
       expect(await service.findVerifiedToken({ token: created.token })).toBeNull();
-      expect(legacyGrants.mint).not.toHaveBeenCalled();
+      expect(mint).not.toHaveBeenCalled();
     });
   });
 });

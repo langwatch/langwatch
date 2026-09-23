@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   JUDGE_MODEL_FEATURE_KEY,
@@ -17,11 +18,10 @@ const projectId = "project-1";
 function buildScenarios(
   rows: { id: string; simulatorModel: string | null; judgeModel: string | null }[],
 ) {
-  return {
-    getModelChoices: vi.fn(async ({ ids }: { ids: string[] }) =>
-      rows.filter((row) => ids.includes(row.id)),
-    ),
-  } as unknown as ScenarioApi;
+  const getModelChoices = vi.fn(async ({ ids }: { ids: string[] }) =>
+    rows.filter((row) => ids.includes(row.id)),
+  );
+  return { scenarios: createApiFixture<ScenarioApi>({ getModelChoices }), getModelChoices };
 }
 
 function buildModelProviders(defaults: Record<string, string>) {
@@ -36,7 +36,7 @@ function buildModelProviders(defaults: Record<string, string>) {
 describe("SuiteRunModelsService.resolve", () => {
   describe("when a batch names many scenarios", () => {
     it("reads their model choices in one call", async () => {
-      const scenarios = buildScenarios([
+      const { scenarios, getModelChoices } = buildScenarios([
         { id: "a", simulatorModel: "openai/gpt-5-mini", judgeModel: null },
         { id: "b", simulatorModel: null, judgeModel: "openai/gpt-5" },
       ]);
@@ -54,8 +54,8 @@ describe("SuiteRunModelsService.resolve", () => {
         plan: {},
       });
 
-      expect(scenarios.getModelChoices).toHaveBeenCalledTimes(1);
-      expect(scenarios.getModelChoices).toHaveBeenCalledWith({
+      expect(getModelChoices).toHaveBeenCalledTimes(1);
+      expect(getModelChoices).toHaveBeenCalledWith({
         ids: ["a", "b"],
         projectId,
       });
@@ -66,7 +66,7 @@ describe("SuiteRunModelsService.resolve", () => {
 
   describe("when a named scenario has no row", () => {
     it("still resolves it from the project default", async () => {
-      const scenarios = buildScenarios([]);
+      const { scenarios } = buildScenarios([]);
       const service = SuiteRunModelsService.create({
         scenarios,
         modelProviders: buildModelProviders({
@@ -90,7 +90,7 @@ describe("SuiteRunModelsService.resolve", () => {
 
   describe("when the project has no model set for a role", () => {
     it("records no models rather than throwing", async () => {
-      const scenarios = buildScenarios([{ id: "a", simulatorModel: null, judgeModel: null }]);
+      const { scenarios } = buildScenarios([{ id: "a", simulatorModel: null, judgeModel: null }]);
       const service = SuiteRunModelsService.create({
         scenarios,
         modelProviders: buildModelProviders({}),

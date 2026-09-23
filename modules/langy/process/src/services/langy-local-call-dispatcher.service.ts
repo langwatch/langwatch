@@ -4,6 +4,8 @@
  * pending -> running -> [awaiting_permission -> running ->] done (terminal).
  */
 
+import { setTimeout as sleep } from "node:timers/promises";
+
 import {
   CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
@@ -138,7 +140,9 @@ export class LocalCallDispatcherService {
     };
     let call = await look();
     while (call && call.state !== "done" && this.now() < until && !signal?.aborted) {
-      await sleep(this.pollIntervalMs, signal);
+      await sleep(this.pollIntervalMs, undefined, { signal }).catch((error: unknown) => {
+        if (!(error instanceof Error && error.name === "AbortError")) throw error;
+      });
       call = await look();
     }
     return call ? toPollResponse(call) : null;
@@ -497,16 +501,4 @@ function toPollResponse(call: StoredLocalCall): PollCallResponse {
     ...(call.output !== undefined ? { output: call.output } : {}),
     ...(call.error !== undefined ? { error: call.error } : {}),
   };
-}
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(done, ms);
-    function done(): void {
-      signal?.removeEventListener("abort", done);
-      clearTimeout(timer);
-      resolve();
-    }
-    signal?.addEventListener("abort", done, { once: true });
-  });
 }

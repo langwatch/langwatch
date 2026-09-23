@@ -41,12 +41,12 @@ function makeDeps({
 }: {
   graphs: CustomGraph[];
   timeseries: AnalyticsTimeseriesResult;
-}): ReportChartDeps {
+}) {
   return {
     findCustomGraph: vi.fn(async () => graphs[0] ?? null),
     loadDashboardGraphs: vi.fn(async () => graphs),
     getTimeseries: vi.fn(async () => timeseries),
-  };
+  } satisfies ReportChartDeps;
 }
 
 const WINDOW = { from: 0, to: 3_600_000 };

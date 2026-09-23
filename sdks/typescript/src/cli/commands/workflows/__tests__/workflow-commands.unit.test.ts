@@ -1,5 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { WorkflowsApiError,WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
+import { beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+
+import {
+  WorkflowsApiError,
+  WorkflowsApiService,
+} from "@/client-sdk/services/workflows/workflows-api.service";
 
 vi.mock("@/client-sdk/services/workflows/workflows-api.service", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -25,9 +29,9 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listWorkflowsCommand } from "../list";
-import { getWorkflowCommand } from "../get";
 import { deleteWorkflowCommand } from "../delete";
+import { getWorkflowCommand } from "../get";
+import { listWorkflowsCommand } from "../list";
 import { updateWorkflowCommand } from "../update";
 
 class ProcessExitError extends Error {
@@ -40,8 +44,10 @@ const noop = () => {
   // intentionally empty — suppresses output during tests
 };
 
+let exitSpy: MockInstance<typeof process.exit>;
+
 const mockProcessExit = () => {
-  vi.spyOn(process, "exit").mockImplementation((code) => {
+  exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
 };
@@ -92,7 +98,7 @@ describe("listWorkflowsCommand()", () => {
 
       await listWorkflowsCommand();
 
-      expect(process.exit).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
     });
   });
 

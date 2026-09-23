@@ -92,10 +92,10 @@ function harness({
       memberOf ? memberOf.includes(organizationId) : isMember,
     ),
   };
-  const settings: JoinSetting = {
+  const settings = {
     read: vi.fn(async () => setting),
     write: vi.fn(async () => undefined),
-  };
+  } satisfies JoinSetting;
   const rejectedAt = lastRejectionAt
     ? Temporal.Instant.fromEpochMilliseconds(lastRejectionAt.getTime())
     : null;
@@ -108,11 +108,11 @@ function harness({
     findAutomaticJoinsForOrganization: vi.fn(async () => []),
     findApprovedForMembers: vi.fn(async () => []),
   };
-  const dismissals: JoinOfferDismissals = {
+  const dismissals = {
     dismissedDomains: vi.fn(async () => dismissedDomains),
     dismiss: vi.fn(async () => undefined),
-  };
-  const audit: JoinSettingAudit = { joiningChanged: vi.fn(async () => undefined) };
+  } satisfies JoinOfferDismissals;
+  const audit = { joiningChanged: vi.fn(async () => undefined) } satisfies JoinSettingAudit;
   const autoJoinLicensed = vi.fn(async () => licensed);
   const joinPolicyEntitled = vi.fn(async () => policyEntitled);
 

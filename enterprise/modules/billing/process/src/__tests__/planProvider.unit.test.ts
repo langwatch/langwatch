@@ -34,18 +34,17 @@ const createMockDb = ({
   findFirstResult?: unknown;
   orgFindUniqueResult?: unknown;
 } = {}) => {
-  return {
-    subscription: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue(
-          findFirstResult ? { createdAt: EPOCH, ...(findFirstResult as object) } : findFirstResult,
-        ),
-    },
-    organization: {
-      findUnique: vi.fn().mockResolvedValue(orgFindUniqueResult),
-    },
+  const findFirst = vi
+    .fn()
+    .mockResolvedValue(
+      findFirstResult ? { createdAt: EPOCH, ...(findFirstResult as object) } : findFirstResult,
+    );
+  const findUnique = vi.fn().mockResolvedValue(orgFindUniqueResult);
+  const client = {
+    subscription: { findFirst },
+    organization: { findUnique },
   } as unknown as PrismaClient;
+  return Object.assign(client, { mocks: { findFirst, findUnique } });
 };
 
 /**
@@ -227,7 +226,7 @@ describe("createSaaSPlanProvider", () => {
           const plan = await provider.getActivePlan("org_1");
 
           expect(plan.type).toBe(PlanTypes.LAUNCH);
-          expect(db.organization.findUnique).not.toHaveBeenCalled();
+          expect(db.mocks.findUnique).not.toHaveBeenCalled();
         });
       });
     });
@@ -483,7 +482,7 @@ describe("createSaaSPlanProvider", () => {
         expect(plan.maxMessagesPerMonth).toBe(50_000);
 
         // Lock in the query filter: only ACTIVE subscriptions are fetched
-        expect(db.subscription.findFirst).toHaveBeenCalledWith(
+        expect(db.mocks.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
               status: SubscriptionStatus.ACTIVE,

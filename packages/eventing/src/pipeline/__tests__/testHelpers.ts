@@ -1,19 +1,23 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 import { z } from "zod";
+
 import type { Command } from "../../commands/command.ts";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass.ts";
 import type { CommandSchema } from "../../commands/commandSchema.ts";
 import { defineCommandSchema } from "../../commands/commandSchema.ts";
 import type { AggregateType } from "../../domain/aggregateType.ts";
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
 import type { CommandType } from "../../domain/commandType.ts";
+import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event, Projection } from "../../domain/types.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
 } from "../../projections/foldProjection.types.ts";
-import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types.ts";
 import type { EventSourcedQueueProcessor } from "../../queues/index.ts";
 import {
   createTestEvent,
@@ -25,9 +29,11 @@ import type { EventStore } from "../../stores/eventStore.types.ts";
 import { definePipeline } from "../staticBuilder.ts";
 
 /**
- * Creates a mock EventStore with spyable methods.
+ * Creates a mock EventStore; each member is returned as its mock.
  */
-export function createMockEventStore<T extends Event>(): EventStore<T> {
+export function createMockEventStore<T extends Event>(): {
+  [K in keyof EventStore<T>]: Mock<NonNullable<EventStore<T>[K]>>;
+} {
   const mockStore = {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvent: vi.fn(),
@@ -45,7 +51,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
         return allEvents.slice(0, upToIndex + 1);
       }),
     countEventsBefore: vi.fn().mockResolvedValue(0),
-  };
+  } satisfies EventStore<T>;
   return mockStore;
 }
 

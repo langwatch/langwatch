@@ -1,5 +1,6 @@
 import type { Logger } from "@langwatch/observability";
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
+
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { EventType } from "../../domain/eventType.ts";
 import type { TenantId } from "../../domain/tenantId.ts";
@@ -9,7 +10,10 @@ import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
 } from "../../projections/foldProjection.types.ts";
-import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types.ts";
 import type { EventStore, EventStoreReadContext } from "../../stores/eventStore.types.ts";
 import type { QueueManager } from "../queues/queueManager.ts";
 
@@ -47,9 +51,12 @@ export function createMockQueueManager(overrides?: {
 }
 
 /**
- * Creates a mock EventStore with default implementations.
+ * Creates a mock EventStore with default implementations. Each member is
+ * returned as its mock, so a test asserts on it directly.
  */
-export function createMockEventStore<T extends Event>(): EventStore<T> {
+export function createMockEventStore<T extends Event>(): {
+  [K in keyof EventStore<T>]: Mock<NonNullable<EventStore<T>[K]>>;
+} {
   const mockStore = {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvent: vi.fn(),
@@ -67,7 +74,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
         return allEvents.slice(0, upToIndex + 1);
       }),
     countEventsBefore: vi.fn().mockResolvedValue(0),
-  };
+  } satisfies EventStore<T>;
   return mockStore;
 }
 

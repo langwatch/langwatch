@@ -26,12 +26,12 @@ function buildWorker(options?: {
   conversation?: ElevenLabsConversationReader;
   sessions?: (typeof session)[];
 }) {
-  const repository: RealtimeSessionReconciliationRepository = {
+  const repository = {
     expireStaleSessions: vi.fn().mockResolvedValue(2),
     listOpenElevenLabsSessions: vi.fn().mockResolvedValue(options?.sessions ?? [session]),
     releaseMissingVendorConversation: vi.fn().mockResolvedValue(void 0),
     confirmSession: vi.fn().mockResolvedValue(void 0),
-  };
+  } satisfies RealtimeSessionReconciliationRepository;
   const conversations: ElevenLabsConversationReader = options?.conversation ?? {
     readConversation: vi.fn().mockResolvedValue({
       report: { status: "done", metadata: { call_duration_secs: 4.2 } },

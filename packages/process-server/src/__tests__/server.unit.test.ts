@@ -134,7 +134,7 @@ describe("Server", () => {
 
         await server.close();
 
-        await expect(fetch(`http://127.0.0.1:${address.port}/healthz`)).rejects.toThrow();
+        await expect(fetch(`http://127.0.0.1:${address.port}/healthz`)).rejects.toThrow(TypeError);
       });
     });
   });

@@ -68,12 +68,10 @@ describe("LangyMessageService", () => {
           createdAt: new Date(),
         },
       ];
-      const messages = makeMessageRepo({
-        findAllByConversation: vi.fn().mockResolvedValue(rows),
-      });
-      const conversations = makeConversationRepo({
-        tryFindVisibleById: vi.fn().mockResolvedValue(conversation),
-      });
+      const findAllByConversation = vi.fn().mockResolvedValue(rows);
+      const messages = makeMessageRepo({ findAllByConversation });
+      const tryFindVisibleById = vi.fn().mockResolvedValue(conversation);
+      const conversations = makeConversationRepo({ tryFindVisibleById });
       const service = LangyMessageService.create(messages, conversations);
 
       await expect(
@@ -84,12 +82,12 @@ describe("LangyMessageService", () => {
         }),
       ).resolves.toEqual(rows);
 
-      expect(conversations.tryFindVisibleById).toHaveBeenCalledWith({
+      expect(tryFindVisibleById).toHaveBeenCalledWith({
         id: "conversation-1",
         projectId: "project-1",
         userId: "user-1",
       });
-      expect(messages.findAllByConversation).toHaveBeenCalledWith({
+      expect(findAllByConversation).toHaveBeenCalledWith({
         conversationId: "conversation-1",
         projectId: "project-1",
       });
@@ -100,7 +98,8 @@ describe("LangyMessageService", () => {
     "when the target is a %s",
     () => {
       it("reports the same not-found result without reading its messages", async () => {
-        const messages = makeMessageRepo();
+        const findAllByConversation = vi.fn().mockResolvedValue([]);
+        const messages = makeMessageRepo({ findAllByConversation });
         const conversations = makeConversationRepo({
           // The visibility repository deliberately collapses private and absent.
           tryFindVisibleById: vi.fn().mockResolvedValue(null),
@@ -117,7 +116,7 @@ describe("LangyMessageService", () => {
           code: "langy_conversation_not_found",
           meta: { conversationId: "conversation-1" },
         });
-        expect(messages.findAllByConversation).not.toHaveBeenCalled();
+        expect(findAllByConversation).not.toHaveBeenCalled();
       });
     },
   );

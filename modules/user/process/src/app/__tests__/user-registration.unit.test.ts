@@ -29,14 +29,15 @@ describe("registering a credential account", () => {
   describe("when registration succeeds", () => {
     /** @scenario Email-mode registration tracks the PostHog signed_up milestone exactly once */
     it("tracks the signed_up analytics event with the new account id", async () => {
-      const members = createUserTestInfrastructure();
+      const trackServerEvent = vi.fn();
+      const members = createUserTestInfrastructure({ analytics: { trackServerEvent } });
       const app = createUserTestApp({ members });
 
       const created = await register(app);
 
       expect(created.id).toEqual(expect.any(String));
-      expect(members.analytics.trackServerEvent).toHaveBeenCalledTimes(1);
-      expect(members.analytics.trackServerEvent).toHaveBeenCalledWith({
+      expect(trackServerEvent).toHaveBeenCalledTimes(1);
+      expect(trackServerEvent).toHaveBeenCalledWith({
         userId: created.id,
         event: "signed_up",
       });
@@ -46,14 +47,15 @@ describe("registering a credential account", () => {
   describe("when the email is already registered", () => {
     /** @scenario A rejected registration tracks no PostHog signed_up milestone */
     it("refuses and tracks no signed_up analytics event", async () => {
-      const members = createUserTestInfrastructure();
+      const trackServerEvent = vi.fn();
+      const members = createUserTestInfrastructure({ analytics: { trackServerEvent } });
       const app = createUserTestApp({ members });
 
       await register(app);
-      vi.mocked(members.analytics.trackServerEvent).mockClear();
+      trackServerEvent.mockClear();
 
       await expect(register(app)).rejects.toBeInstanceOf(EmailAlreadyRegisteredError);
-      expect(members.analytics.trackServerEvent).not.toHaveBeenCalled();
+      expect(trackServerEvent).not.toHaveBeenCalled();
     });
   });
 

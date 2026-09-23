@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+
+import { parsePrismaDatamodel } from "./datamodel.ts";
 import { prismaTables } from "./ownership.ts";
 import { prismaTableCatalogue } from "./table-catalogue.ts";
-import { parsePrismaDatamodel } from "./datamodel.ts";
 
 describe("Prisma table claims", () => {
   it("keeps the generated model catalogue in sync with the schema", () => {
@@ -22,7 +23,7 @@ describe("Prisma table claims", () => {
   it.each([[], ["MissingModel"], ["__proto__"], ["constructor"]])(
     "rejects invalid untyped input %j",
     (models) => {
-      expect(() => Reflect.apply(prismaTables, null, models)).toThrow();
+      expect(() => Reflect.apply(prismaTables, null, models)).toThrow(Error);
     },
   );
 });

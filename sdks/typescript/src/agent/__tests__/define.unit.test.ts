@@ -290,6 +290,6 @@ describe("normalizeReply()", () => {
     expect(() => normalizeReply(42)).toThrow(
       /must return a string, a message, a list of messages, or/,
     );
-    expect(() => normalizeReply({ text: "no" })).toThrow();
+    expect(() => normalizeReply({ text: "no" })).toThrow(Error);
   });
 });

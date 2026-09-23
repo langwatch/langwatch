@@ -444,28 +444,29 @@ export function useModelProviderForm(
   );
 
   // --- Single reset effect ---
+  // `provider` is memoized at its source (model-provider-form.tsx), so its
+  // identity changes only when the edited row or the provider key does.
+  const { reset: resetCredentialKeys } = credentialKeysHook;
+  const { reset: resetExtraHeaders } = extraHeadersHook;
+  const { reset: resetCustomModels } = customModelsHook;
+  const { reset: resetDefaultProvider } = defaultProviderHook;
+  const { reset: resetFormSubmit } = formSubmitHook;
   useEffect(() => {
-    const nextUseApiGateway = credentialKeysHook.reset(provider);
-    extraHeadersHook.reset(provider, nextUseApiGateway);
-    customModelsHook.reset(provider);
-    defaultProviderHook.reset(provider, enabledProvidersCount);
-    formSubmitHook.reset();
+    const nextUseApiGateway = resetCredentialKeys(provider);
+    resetExtraHeaders(provider, nextUseApiGateway);
+    resetCustomModels(provider);
+    resetDefaultProvider(provider, enabledProvidersCount);
+    resetFormSubmit();
     setName((provider as { name?: string }).name ?? humanizeProviderName(provider.provider));
     setRoutingHandle((provider as { routingHandle?: string | null }).routingHandle ?? "");
   }, [
-    provider.provider,
-    provider.id,
-    provider.enabled,
-    provider.customKeys,
-    provider.customModels,
-    provider.customEmbeddingsModels,
-    provider.extraHeaders,
-    // The reset re-fires when provider mutations propagate; the
-    // resolved default models come from
-    // `api.modelProvider.getResolvedDefault` at the actual consumer of
-    // each role chip, so we don't need to subscribe at the reducer
-    // level any more.
+    provider,
     enabledProvidersCount,
+    resetCredentialKeys,
+    resetExtraHeaders,
+    resetCustomModels,
+    resetDefaultProvider,
+    resetFormSubmit,
   ]);
 
   // --- Assemble public interface ---

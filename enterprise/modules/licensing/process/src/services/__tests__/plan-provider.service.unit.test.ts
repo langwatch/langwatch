@@ -93,9 +93,8 @@ describe("PlanProviderService", () => {
 
   describe("when created with a SaaS-style source", () => {
     it("delegates getActivePlan with organizationId and user", async () => {
-      const source: PlanProvider = {
-        getActivePlan: vi.fn().mockResolvedValue(STUB_PLAN),
-      };
+      const getActivePlan = vi.fn().mockResolvedValue(STUB_PLAN);
+      const source: PlanProvider = { getActivePlan };
       const service = PlanProviderService.create(source);
 
       const user: PlanProviderUser = {
@@ -109,16 +108,15 @@ describe("PlanProviderService", () => {
       });
 
       expect(result).toBe(STUB_PLAN);
-      expect(source.getActivePlan).toHaveBeenCalledWith({
+      expect(getActivePlan).toHaveBeenCalledWith({
         organizationId: "org_1",
         user,
       });
     });
 
     it("forwards user with impersonator field", async () => {
-      const source: PlanProvider = {
-        getActivePlan: vi.fn().mockResolvedValue(STUB_PLAN),
-      };
+      const getActivePlan = vi.fn().mockResolvedValue(STUB_PLAN);
+      const source: PlanProvider = { getActivePlan };
       const service = PlanProviderService.create(source);
 
       const user: PlanProviderUser = {
@@ -128,16 +126,15 @@ describe("PlanProviderService", () => {
       };
       await service.getActivePlan({ organizationId: "org_1", user });
 
-      expect(source.getActivePlan).toHaveBeenCalledWith({
+      expect(getActivePlan).toHaveBeenCalledWith({
         organizationId: "org_1",
         user,
       });
     });
 
     it("handles undefined user", async () => {
-      const source: PlanProvider = {
-        getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN),
-      };
+      const getActivePlan = vi.fn().mockResolvedValue(FREE_PLAN);
+      const source: PlanProvider = { getActivePlan };
       const service = PlanProviderService.create(source);
 
       const result = await service.getActivePlan({
@@ -145,7 +142,7 @@ describe("PlanProviderService", () => {
       });
 
       expect(result).toBe(FREE_PLAN);
-      expect(source.getActivePlan).toHaveBeenCalledWith({
+      expect(getActivePlan).toHaveBeenCalledWith({
         organizationId: "org_1",
       });
     });
@@ -154,9 +151,8 @@ describe("PlanProviderService", () => {
   describe("when source throws an error", () => {
     it("propagates the error unchanged", async () => {
       const error = new Error("plan resolution failed");
-      const source: PlanProvider = {
-        getActivePlan: vi.fn().mockRejectedValue(error),
-      };
+      const getActivePlan = vi.fn().mockRejectedValue(error);
+      const source: PlanProvider = { getActivePlan };
       const service = PlanProviderService.create(source);
 
       await expect(service.getActivePlan({ organizationId: "org_1" })).rejects.toBe(error);

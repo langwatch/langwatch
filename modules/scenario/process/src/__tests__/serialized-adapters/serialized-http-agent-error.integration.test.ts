@@ -330,31 +330,34 @@ describe("given a request that sets Authorization and x-api-key headers", () => 
 
   describe("when the adapter formats those request headers for logging or error context", () => {
     /** @scenario HTTP agent error redacts sensitive request headers */
-    it("replaces the values of Authorization and x-api-key with a redacted placeholder", async () => {
+    it("keeps both headers out of the thrown error and redacts their values in the failure log line", async () => {
+      const logger = makeFakeLogger();
       const config = makeConfig(stub.url, {
         headers: [{ key: "x-api-key", value: "my-secret-key" }],
         auth: { type: "bearer", token: "super-secret-token" },
       });
       const adapter = createNativeHttpAgentAdapter({
         config,
-        logger: loggerArg(makeFakeLogger()),
+        logger: loggerArg(logger),
       });
 
-      let message = "";
-      try {
-        await adapter.call(baseInput);
-      } catch (e) {
-        message = (e as Error).message;
-      }
+      const error = await adapter.call(baseInput).then(
+        () => undefined,
+        (thrown: unknown) => thrown,
+      );
 
-      // Secret values must NOT appear in the error message
-      expect(message).not.toContain("super-secret-token");
-      expect(message).not.toContain("my-secret-key");
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toHaveProperty("message", expect.stringContaining("HTTP 422"));
+      expect(error).toHaveProperty(
+        "message",
+        expect.not.stringMatching(/authorization|x-api-key|super-secret-token|my-secret-key/i),
+      );
 
-      // If the error includes those header names, it must show the redacted placeholder
-      if (message.includes("Authorization") || message.includes("x-api-key")) {
-        expect(message).toContain(REDACTED);
-      }
+      const failureLine = collectEntries(logger).find((entry) => entry.msg === "http call failed");
+      expect(failureLine?.headers).toMatchObject({
+        Authorization: REDACTED,
+        "x-api-key": REDACTED,
+      });
     });
   });
 });
@@ -614,10 +617,7 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
     });
 
     it("includes the redacted placeholder in place of sensitive header values", async () => {
-      // Only assert the placeholder if the log includes the header names at all
-      if (serialized.includes("Authorization") || serialized.includes("x-api-key")) {
-        expect(serialized).toContain(REDACTED);
-      }
+      expect(serialized).toContain(REDACTED);
     });
   });
 });

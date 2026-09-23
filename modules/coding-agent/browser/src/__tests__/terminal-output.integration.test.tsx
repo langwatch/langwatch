@@ -92,13 +92,14 @@ describe("TerminalOutput", () => {
     });
 
     it("copies the complete text even while collapsed", () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, "clipboard", {
-        value: { writeText: vi.fn().mockResolvedValue(undefined) },
+        value: { writeText },
         configurable: true,
       });
       const { container } = render(<TerminalOutput text={BLOB} />, { wrapper });
       fireEvent.click(container.firstChild as Element);
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(BLOB);
+      expect(writeText).toHaveBeenCalledWith(BLOB);
     });
 
     it("caps what expanding renders and says the copy is still complete", () => {
@@ -113,9 +114,12 @@ describe("TerminalOutput", () => {
   });
 
   describe("when the block is clicked outside a text selection", () => {
+    let writeText: ReturnType<typeof vi.fn>;
+
     beforeEach(() => {
+      writeText = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, "clipboard", {
-        value: { writeText: vi.fn().mockResolvedValue(undefined) },
+        value: { writeText },
         configurable: true,
       });
     });
@@ -125,9 +129,7 @@ describe("TerminalOutput", () => {
         wrapper,
       });
       fireEvent.click(container.firstChild as Element);
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "On branch main\n\tmodified:   file.ts",
-      );
+      expect(writeText).toHaveBeenCalledWith("On branch main\n\tmodified:   file.ts");
     });
   });
 

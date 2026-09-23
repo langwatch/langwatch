@@ -96,6 +96,7 @@ describe("EvaluatorApp", () => {
     it("runs the evaluator on the project's resolved default", async () => {
       const { app, repository, modelProviders } = harness();
       const create = vi.spyOn(repository, "create");
+      const resolveModelForFeature = vi.spyOn(modelProviders, "resolveModelForFeature");
 
       await app.createWithResolvedDefaults({
         projectId: "project-1",
@@ -103,7 +104,7 @@ describe("EvaluatorApp", () => {
         config: { evaluatorType: "ragas/faithfulness" },
       });
 
-      expect(modelProviders.resolveModelForFeature).toHaveBeenCalledWith({
+      expect(resolveModelForFeature).toHaveBeenCalledWith({
         projectId: "project-1",
         featureKey: "evaluator.create_default",
       });

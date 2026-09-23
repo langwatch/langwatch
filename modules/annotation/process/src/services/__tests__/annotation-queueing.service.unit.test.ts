@@ -17,7 +17,8 @@ import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.a
 
 function appWithExistingTraces(traceIds: readonly string[] = []) {
   const traces = createAnnotationTestTraces();
-  traces.findExistingTraceIds = vi.fn(async () => [...traceIds]);
+  const findExistingTraceIds = vi.fn(async () => [...traceIds]);
+  traces.findExistingTraceIds = findExistingTraceIds;
   const repositories = MemoryAnnotationRepositories.create();
 
   const app = createAnnotationTestApp({
@@ -31,12 +32,12 @@ function appWithExistingTraces(traceIds: readonly string[] = []) {
     },
   });
 
-  return { app, traces };
+  return { app, findExistingTraceIds };
 }
 
 describe("AnnotationApp queue workflow", () => {
   it("queues each existing trace once when it is sent twice", async () => {
-    const { app, traces } = appWithExistingTraces(["trace-1"]);
+    const { app, findExistingTraceIds } = appWithExistingTraces(["trace-1"]);
 
     await expect(
       app.queueTraces({
@@ -47,7 +48,7 @@ describe("AnnotationApp queue workflow", () => {
       }),
     ).resolves.toEqual({ created: 1, skipped: 1 });
 
-    expect(traces.findExistingTraceIds).toHaveBeenCalledWith({
+    expect(findExistingTraceIds).toHaveBeenCalledWith({
       projectId: "project-1",
       traceIds: ["trace-1"],
     });

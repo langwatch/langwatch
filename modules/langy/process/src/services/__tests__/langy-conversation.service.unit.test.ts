@@ -347,14 +347,14 @@ describe("LangyConversationService", () => {
 
   describe("when ensureConversation is called with no id", () => {
     it("mints a fresh conversation id without writing", async () => {
-      const repo = makeRepo();
-      const svc = LangyConversationService.create(makeCommands(), repo);
+      const findOwnership = vi.fn(async () => "missing" as const);
+      const svc = LangyConversationService.create(makeCommands(), makeRepo({ findOwnership }));
       const result = await svc.ensureConversation({
         projectId: "p1",
         userId: "alice",
       });
       expect(result.id).toBeTruthy();
-      expect(repo.findOwnership).not.toHaveBeenCalled();
+      expect(findOwnership).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,7 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
 import { HttpRequest, HttpResponse, type HttpHandlerOptions } from "@smithy/core/protocols";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
 import {
   AwsClientConfiguration,
   OutboundProxyResolver,
@@ -16,8 +17,10 @@ type HandlerOptions = {
 };
 
 type RecordedNodeHttpHandler = {
-  destroy(): void;
-  handle(request: HttpRequest, options?: HttpHandlerOptions): Promise<{ response: HttpResponse }>;
+  destroy: Mock<() => void>;
+  handle: Mock<
+    (request: HttpRequest, options?: HttpHandlerOptions) => Promise<{ response: HttpResponse }>
+  >;
   metadata: { handlerProtocol: string };
   options: HandlerOptions;
 };

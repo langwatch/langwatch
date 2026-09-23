@@ -324,9 +324,8 @@ describe("SuiteService", () => {
 
   /** @scenario "Running a test suite with no target is refused with suite_targets_required" */
   it("refuses a test suite run without targets before resolving membership", async () => {
-    const scenarios = mockScenarioService({
-      getTestSuiteRunDefinition: vi.fn(),
-    });
+    const getTestSuiteRunDefinition = vi.fn();
+    const scenarios = mockScenarioService({ getTestSuiteRunDefinition });
     const service = SuiteService.create({
       ...serviceOptions(
         repository({
@@ -346,7 +345,7 @@ describe("SuiteService", () => {
         idempotencyKey: "testSuite-no-target",
       }),
     ).rejects.toBeInstanceOf(SuiteTargetsRequiredError);
-    expect(scenarios.getTestSuiteRunDefinition).not.toHaveBeenCalled();
+    expect(getTestSuiteRunDefinition).not.toHaveBeenCalled();
   });
 
   it("refuses a test suite run when every filed scenario is archived", async () => {
@@ -496,17 +495,13 @@ describe("SuiteService", () => {
   /** @scenario "Suite run succeeds when prompt config is org-scoped" */
   it("batches target checks, filters archived references, and preserves the run idempotency key", async () => {
     const execution = new CapturingExecution();
-    const agents = mockAgentService({
-      getReferenceStates: vi.fn().mockResolvedValue([
-        { id: "agent_active", archivedAt: null },
-        { id: "agent_archived", archivedAt: new Date() },
-      ]),
-      getNamesByIds: vi.fn(),
-    });
-    const prompts = mockPromptService({
-      getExistingIds: vi.fn().mockResolvedValue(["prompt_active"]),
-      getNamesByIds: vi.fn(),
-    });
+    const getReferenceStates = vi.fn().mockResolvedValue([
+      { id: "agent_active", archivedAt: null },
+      { id: "agent_archived", archivedAt: new Date() },
+    ]);
+    const agents = mockAgentService({ getReferenceStates, getNamesByIds: vi.fn() });
+    const getExistingIds = vi.fn().mockResolvedValue(["prompt_active"]);
+    const prompts = mockPromptService({ getExistingIds, getNamesByIds: vi.fn() });
     const service = SuiteService.create({
       repository: repository({
         findById: vi.fn().mockResolvedValue(
@@ -558,11 +553,11 @@ describe("SuiteService", () => {
         targets: ["agent_archived"],
       },
     });
-    expect(agents.getReferenceStates).toHaveBeenCalledWith({
+    expect(getReferenceStates).toHaveBeenCalledWith({
       ids: ["agent_active", "agent_archived"],
       projectId: "project_1",
     });
-    expect(prompts.getExistingIds).toHaveBeenCalledWith({
+    expect(getExistingIds).toHaveBeenCalledWith({
       ids: ["prompt_active"],
       projectId: "project_1",
       organizationId: "org_1",
@@ -875,11 +870,12 @@ describe("SuiteService", () => {
       scenarioIds: [],
       targets: [{ type: "prompt", referenceId: "prompt_1" }],
     });
+    const getTestSuiteRunDefinition = vi.fn().mockResolvedValue({
+      testSuite,
+      scenarioIds: ["scenario_1", "scenario_archived"],
+    });
     const scenarios = mockScenarioService({
-      getTestSuiteRunDefinition: vi.fn().mockResolvedValue({
-        testSuite,
-        scenarioIds: ["scenario_1", "scenario_archived"],
-      }),
+      getTestSuiteRunDefinition,
       getReferenceStates: vi.fn().mockResolvedValue([
         { id: "scenario_1", archivedAt: null },
         { id: "scenario_archived", archivedAt: new Date() },
@@ -918,7 +914,7 @@ describe("SuiteService", () => {
         activeScenarioIds: ["scenario_1"],
       }),
     );
-    expect(scenarios.getTestSuiteRunDefinition).toHaveBeenCalledWith({
+    expect(getTestSuiteRunDefinition).toHaveBeenCalledWith({
       testSuiteId: testSuite.id,
       projectId: testSuite.projectId,
     });

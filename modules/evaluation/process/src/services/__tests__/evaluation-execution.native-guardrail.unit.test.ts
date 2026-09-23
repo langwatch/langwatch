@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   API_KEYS_AND_SECRETS_DETECTION,
   type EvaluatorApi,
@@ -5,7 +6,6 @@ import {
   type NativeEvaluatorExecutionInput,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -31,11 +31,11 @@ function createFakeEvaluatorApi() {
     (input: EvaluatorResultAugmentationInput): SingleEvaluationResult => input.result,
   );
 
-  return createApiFixture<EvaluatorApi>({ executeNative, augmentResult });
+  return { api: createApiFixture<EvaluatorApi>({ executeNative, augmentResult }), executeNative };
 }
 
 function buildService(langevalsEvaluate: ReturnType<typeof vi.fn>) {
-  const evaluators = createFakeEvaluatorApi();
+  const { api: evaluators, executeNative } = createFakeEvaluatorApi();
   const deps = {
     traceService: {} as never,
     spanDigest: {} as never,
@@ -47,7 +47,7 @@ function buildService(langevalsEvaluate: ReturnType<typeof vi.fn>) {
     installEnvironment: {} as never,
   } as unknown as EvaluationExecutionDeps;
 
-  return { service: EvaluationExecutionService.create(deps), evaluators };
+  return { service: EvaluationExecutionService.create(deps), executeNative };
 }
 
 describe("EvaluationExecutionService guardrail dispatch", () => {
@@ -55,7 +55,7 @@ describe("EvaluationExecutionService guardrail dispatch", () => {
     /** @scenario The secrets evaluator runs in-process as a guardrail */
     it("responds with a failed evaluation without calling the analysis service", async () => {
       const langevalsEvaluate = vi.fn();
-      const { service, evaluators } = buildService(langevalsEvaluate);
+      const { service, executeNative } = buildService(langevalsEvaluate);
 
       const result = await service.executeForData({
         projectId: "test-project-id",
@@ -69,7 +69,7 @@ describe("EvaluationExecutionService guardrail dispatch", () => {
       expect(result.status).toBe("processed");
       if (result.status !== "processed") throw new Error("unreachable");
       expect(result.passed).toBe(false);
-      expect(evaluators.executeNative).toHaveBeenCalledWith(
+      expect(executeNative).toHaveBeenCalledWith(
         expect.objectContaining({ evaluatorType: API_KEYS_AND_SECRETS_DETECTION }),
       );
       expect(langevalsEvaluate).not.toHaveBeenCalled();

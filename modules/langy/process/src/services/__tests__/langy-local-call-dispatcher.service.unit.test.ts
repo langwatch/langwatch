@@ -133,6 +133,36 @@ describe("given a folder connected to the conversation", () => {
     });
   });
 
+  describe("when the poll request is aborted while the call is still running", () => {
+    it("stops waiting at once and answers with the call's current state", async () => {
+      const slowDispatcher = LocalCallDispatcherService.create({
+        store,
+        presence,
+        now: () => now,
+        offlineWaitMs: 0,
+        pollIntervalMs: 60_000,
+      });
+      const call = await slowDispatcher.start({
+        projectId,
+        conversationId,
+        turnId,
+        call: listCall(),
+        timeoutMs: 60_000,
+      });
+      await slowDispatcher.ack(call.callId);
+      const controller = new AbortController();
+
+      const polling = slowDispatcher.tryPoll({
+        callId: call.callId,
+        holdMs: 60_000,
+        signal: controller.signal,
+      });
+      controller.abort();
+
+      await expect(polling).resolves.toMatchObject({ state: "running" });
+    });
+  });
+
   describe("when the command line asks for the developer's permission", () => {
     it("holds the call in awaiting_permission until the answer arrives", async () => {
       const nudges = await collectNudges();

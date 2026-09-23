@@ -500,11 +500,7 @@ describe("given a Genie source with the paid bill read switched on", () => {
         // its window whole, so the watermark moved and nothing is held.
         expect(cursor.sinceMs).toBeGreaterThan(Date.now() - HOUR_MS);
         expect(cursor.costHeldSinceMs).toBeNull();
-        if (stop.reported) {
-          expect(result.notices).toContain(PAID_GENIE_BILL_UNREADABLE);
-        } else {
-          expect(result.notices ?? []).not.toContain(PAID_GENIE_BILL_UNREADABLE);
-        }
+        expect((result.notices ?? []).includes(PAID_GENIE_BILL_UNREADABLE)).toBe(stop.reported);
       });
     }
 

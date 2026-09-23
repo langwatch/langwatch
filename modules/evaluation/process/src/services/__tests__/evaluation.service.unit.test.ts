@@ -1,6 +1,6 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
@@ -86,7 +86,7 @@ class FakeMonitorPerformanceRepository extends MonitorPerformanceRepository {
 
 function createTestWorkflowApi() {
   const assertInProject = vi.fn<WorkflowApi["assertInProject"]>(async () => {});
-  return createApiFixture<WorkflowApi>({ assertInProject });
+  return { api: createApiFixture<WorkflowApi>({ assertInProject }), assertInProject };
 }
 
 describe("EvaluationService", () => {
@@ -100,7 +100,7 @@ describe("EvaluationService", () => {
       execution,
       inputResolution: new FakeInputsResolution(),
       monitorPerformance,
-      workflows: createTestWorkflowApi(),
+      workflows: createTestWorkflowApi().api,
     });
 
   /** @scenario "Evaluation runs use private ClickHouse persistence" */
@@ -137,7 +137,7 @@ describe("EvaluationService", () => {
 
   /** @scenario "Evaluation execution is delegated through one capability" */
   it("validates workflow scope before dispatch", async () => {
-    const workflows = createTestWorkflowApi();
+    const { api: workflows, assertInProject } = createTestWorkflowApi();
     const execution = new FakeExecution();
     const value = new FakeRepository();
     const evaluation = EvaluationService.create({
@@ -155,7 +155,7 @@ describe("EvaluationService", () => {
       mappings: null,
       workflowId: "workflow_1",
     });
-    expect(workflows.assertInProject).toHaveBeenCalledWith({
+    expect(assertInProject).toHaveBeenCalledWith({
       workflowId: "workflow_1",
       projectId: "project_1",
     });
@@ -190,7 +190,7 @@ describe("EvaluationService", () => {
       execution: new FakeExecution(),
       inputResolution,
       monitorPerformance: new FakeMonitorPerformanceRepository(),
-      workflows: createTestWorkflowApi(),
+      workflows: createTestWorkflowApi().api,
     });
 
     await expect(
