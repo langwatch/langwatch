@@ -1,18 +1,26 @@
-import { InvalidColumnError } from "@langwatch/dataset-contract";
+import {
+  InvalidColumnError,
+  type Dataset,
+  type DatasetColumns,
+  type DatasetRecord,
+  type DatasetRecordInput,
+} from "@langwatch/dataset-contract";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
 
 import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
-import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
-import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import type { DatasetUpdateInput } from "../../repositories/dataset.repository.ts";
+import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
+import { MemoryDatasetRepository } from "../../repositories/memory/memory.dataset.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
 
 const PROJECT_ID = "project-1";
 const NULL_BYTE = String.fromCharCode(0);
 
-const dataset = {
+const dataset: Dataset = {
   id: "dataset-1",
   projectId: PROJECT_ID,
   name: "Feedback",
@@ -21,33 +29,69 @@ const dataset = {
     { name: "input", type: "string" },
     { name: "output", type: "string" },
   ],
-  contentLayout: "inline",
+  contentLayout: "postgres",
   status: "ready",
   createdAt: new Date(0),
   updatedAt: new Date(0),
+  archivedAt: null,
+  mapping: null,
+  useS3: false,
+  s3RecordCount: null,
+  statusError: null,
+  stagingKey: null,
+  uploadFilename: null,
+  rowCount: null,
+  sizeBytes: null,
+  chunkCount: null,
+  chunkOffsets: null,
 };
 
-function service(overrides: { columnTypes?: { name: string; type: string }[] } = {}) {
-  const row = { ...dataset, columnTypes: overrides.columnTypes ?? dataset.columnTypes };
-  const update = vi.fn(async (input: Record<string, unknown>) => ({ ...row, ...input }));
-  const createMany = vi.fn(async ({ entries }: { entries: Record<string, unknown>[] }) =>
-    entries.map((entry) => ({ id: String(entry.id), entry })),
-  );
-  const updateRecord = vi.fn(async (input: { id: string; entry: Record<string, unknown> }) => ({
-    id: input.id,
-    entry: input.entry,
+const storedRecord = (
+  input: Pick<DatasetRecord, "id" | "datasetId" | "projectId" | "entry">,
+): DatasetRecord => ({ ...input, createdAt: new Date(0), updatedAt: new Date(0) });
+
+function service(overrides: { columnTypes?: DatasetColumns } = {}) {
+  const row: Dataset = { ...dataset, columnTypes: overrides.columnTypes ?? dataset.columnTypes };
+  const update = vi.fn(async (input: DatasetUpdateInput): Promise<Dataset> => ({
+    ...row,
+    ...input,
   }));
+  const createMany = vi.fn(
+    async (input: {
+      datasetId: string;
+      projectId: string;
+      entries: (DatasetRecordInput & { id: string })[];
+    }): Promise<DatasetRecord[]> =>
+      input.entries.map((entry) =>
+        storedRecord({
+          id: entry.id,
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          entry,
+        }),
+      ),
+  );
+  const updateRecord = vi.fn(
+    async (input: {
+      id: string;
+      datasetId: string;
+      projectId: string;
+      entry: Record<string, unknown>;
+    }): Promise<DatasetRecord> => storedRecord(input),
+  );
 
-  const repository = {
-    findById: async ({ id }: { id: string }) => (id === row.id ? row : null),
-    findBySlug: async ({ slug }: { slug: string }) => (slug === row.slug ? row : null),
+  const database = MemoryDatasetDatabase.create();
+  const repository = Object.assign(MemoryDatasetRepository.create({ database }), {
+    findById: async ({ id }: { id: string; projectId: string }) => (id === row.id ? row : null),
+    findBySlug: async ({ slug }: { slug: string; projectId: string }) =>
+      slug === row.slug ? row : null,
     update,
-  } as unknown as DatasetRepository;
+  });
 
-  const records = {
+  const records = Object.assign(MemoryDatasetRecordRepository.create({ database }), {
     createMany,
     update: updateRecord,
-  } as unknown as DatasetRecordRepository;
+  });
 
   return {
     service: DatasetService.create({

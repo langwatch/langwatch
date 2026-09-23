@@ -142,7 +142,7 @@ describe("given a deployment whose dataset destination is Azure Blob", () => {
   describe("when the backfill migrates a postgres-layout dataset", () => {
     /** @scenario "The dataset-content backfill task migrates a postgres-layout dataset onto azure" */
     it("writes the chunk objects into the Azure container rather than a bucket", async () => {
-      const put = vi.fn(async () => undefined);
+      const put = vi.fn<DatasetBlobDriver["put"]>(async () => undefined);
       const driver: DatasetBlobDriver = {
         put,
         get: async () => Readable.from([]),
@@ -172,7 +172,7 @@ describe("given a deployment whose dataset destination is Azure Blob", () => {
       ).resolves.toBe("migrated");
 
       expect(put).toHaveBeenCalledTimes(1);
-      const [uri, body, contentType] = put.mock.calls[0]! as unknown as [string, Buffer, string];
+      const [uri, body, contentType] = put.mock.calls[0]!;
       expect(uri).toMatch(/^azure-blob:\/\/lwacct\/datasets\//);
       expect(body.toString("utf-8")).toContain('"record_1"');
       expect(contentType).toBe("application/x-ndjson");

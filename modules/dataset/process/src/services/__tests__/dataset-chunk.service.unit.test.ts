@@ -7,11 +7,39 @@ import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 
 import type { DatasetStorage } from "../../app/dataset.app.ts";
-import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
+import type {
+  DatasetContentRepository,
+  DatasetContentUpdate,
+} from "../../repositories/dataset-content.repository.ts";
+import type { DatasetRow } from "../../repositories/dataset.repository.ts";
+import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { type DatasetMutationRecord } from "../../rules/dataset-chunk-lines.rules.ts";
 import { DatasetChunkService } from "../dataset-chunk.service.ts";
 
-type Update = { id: string; content: Record<string, unknown>; transactional: boolean };
+type Update = { id: string; content: DatasetContentUpdate; transactional: boolean };
+
+const unwired = (member: string) => () => {
+  throw new Error(`storage.${member} is not wired in this test`);
+};
+
+function storedRow(record: DatasetMutationRecord): DatasetRow {
+  return {
+    projectId: "project-1",
+    name: "Dataset",
+    slug: "dataset",
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    archivedAt: null,
+    mapping: null,
+    useS3: false,
+    s3RecordCount: null,
+    contentLayout: "s3_jsonl",
+    stagingKey: null,
+    uploadFilename: null,
+    ...record,
+  };
+}
 
 /**
  * A repository whose `withDatasetLock` hands the callback a DIFFERENT instance,
@@ -20,14 +48,19 @@ type Update = { id: string; content: Record<string, unknown>; transactional: boo
 function fakeRepository(record: DatasetMutationRecord) {
   const updates: Update[] = [];
   const locks: string[] = [];
-  let current = record;
+  let current = storedRow(record);
+  const database = MemoryDatasetDatabase.create();
 
   const make = (transactional: boolean): DatasetContentRepository =>
-    ({
+    Object.assign(MemoryDatasetContentRepository.create({ database }), {
       getOne: async () => current,
-      updateContent: async (input: { id: string; content: Record<string, unknown> }) => {
+      updateContent: async (input: {
+        id: string;
+        projectId: string;
+        content: DatasetContentUpdate;
+      }) => {
         updates.push({ id: input.id, content: input.content, transactional });
-        current = { ...current, ...(input.content as Partial<DatasetMutationRecord>) };
+        current = { ...current, ...input.content };
         return current;
       },
       withDatasetLock: async <T>(
@@ -37,7 +70,7 @@ function fakeRepository(record: DatasetMutationRecord) {
         locks.push(datasetId);
         return mutate(make(true));
       },
-    }) as unknown as DatasetContentRepository;
+    });
 
   const datasets = make(false);
   return { chunks: DatasetChunkService.create({ datasets }), updates, locks };
@@ -45,20 +78,34 @@ function fakeRepository(record: DatasetMutationRecord) {
 
 /** Chunks as a plain array of arrays, which is what the real storage stores. */
 function fakeStorage(chunks: unknown[][] = []) {
-  const storage = {
-    writeChunks: async ({ records, fromIndex = 0 }: { records: unknown[]; fromIndex?: number }) => {
+  const storage: DatasetStorage = {
+    writeChunks: async ({ records, fromIndex = 0 }) => {
       chunks[fromIndex] = records;
-      return [{ index: fromIndex, rowCount: records.length, byteSize: records.length * 10 }];
+      return [
+        {
+          index: fromIndex,
+          jsonl: "",
+          rowCount: records.length,
+          byteSize: records.length * 10,
+          startRow: 0,
+          endRow: records.length,
+        },
+      ];
     },
-    readChunk: async ({ index }: { index: number }) => chunks[index] ?? [],
-    rewriteChunk: async ({ index, records }: { index: number; records: unknown[] }) => {
+    readChunk: async ({ index }) => chunks[index] ?? [],
+    rewriteChunk: async ({ index, records }) => {
       chunks[index] = records;
-      return { index, rowCount: records.length, byteSize: records.length * 10 };
+      return { index, startRow: 0, endRow: records.length, byteSize: records.length * 10 };
     },
-    deleteChunksFrom: async ({ fromIndex }: { fromIndex: number }) => {
+    deleteChunksFrom: async ({ fromIndex }) => {
       chunks.length = Math.min(chunks.length, fromIndex);
     },
-  } as unknown as DatasetStorage;
+    readChunks: unwired("readChunks"),
+    createPresignedUpload: unwired("createPresignedUpload"),
+    headStagedObjectSize: unwired("headStagedObjectSize"),
+    streamStaged: unwired("streamStaged"),
+    deleteStaged: unwired("deleteStaged"),
+  };
   return { storage, chunks };
 }
 

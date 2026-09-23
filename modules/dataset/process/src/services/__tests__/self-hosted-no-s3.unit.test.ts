@@ -7,8 +7,10 @@ import { nanoid } from "nanoid";
 import { describe, expect, it } from "vitest";
 
 import type { DatasetStorageResolver } from "../../app/dataset.app.ts";
-import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
-import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
+import type { CreateDatasetInput } from "../../repositories/dataset-content.repository.ts";
+import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
+import { MemoryDatasetRecordContentRepository } from "../../repositories/memory/memory.dataset-record-content.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { DatasetUploadService } from "../dataset-upload.service.ts";
 import { LocalDatasetStorage } from "../local.dataset-storage.service.ts";
 
@@ -16,7 +18,7 @@ import { LocalDatasetStorage } from "../local.dataset-storage.service.ts";
  * real LocalDatasetStorage on a temp filesystem root — no S3 configured. */
 function localOnlyResolver(root: string): DatasetStorageResolver {
   const storage = new LocalDatasetStorage(root);
-  return { forProject: async () => storage } as unknown as DatasetStorageResolver;
+  return { forProject: async () => storage };
 }
 
 describe("Dataset self-hosted storage", () => {
@@ -32,14 +34,16 @@ describe("Dataset self-hosted storage", () => {
       /** @scenario "Datasets work on a minimal self-hosted install" */
       it("creates the dataset directly on local storage and reads its rows back", async () => {
         const root = path.join(os.tmpdir(), `lw-ds-selfhost-${nanoid()}`);
-        const created: Record<string, unknown>[] = [];
-        const datasets = {
-          create: async (input: Record<string, unknown>) => {
+        const created: CreateDatasetInput[] = [];
+        const database = MemoryDatasetDatabase.create();
+        const stored = MemoryDatasetContentRepository.create({ database });
+        const datasets = Object.assign(MemoryDatasetContentRepository.create({ database }), {
+          create: async (input: CreateDatasetInput) => {
             created.push(input);
-            return { ...input, createdAt: new Date(), updatedAt: new Date() };
+            return stored.create(input);
           },
-        } as unknown as DatasetContentRepository;
-        const records = {} as unknown as DatasetRecordContentRepository;
+        });
+        const records = MemoryDatasetRecordContentRepository.create({ database });
         const adapter = DatasetUploadService.create({
           datasets,
           records,
@@ -69,19 +73,9 @@ describe("Dataset self-hosted storage", () => {
       /** @scenario "A large file uploads on a self-hosted install with no object storage" */
       it("accepts the upload without requiring object storage and streams it to local disk", async () => {
         const root = path.join(os.tmpdir(), `lw-ds-selfhost-large-${nanoid()}`);
-        let createdRow: Record<string, unknown> | undefined;
-        const datasets = {
-          findBySlug: async () => null,
-          findOne: async ({ id }: { id: string }) => (createdRow?.id === id ? createdRow : null),
-          create: async (input: Record<string, unknown>) => {
-            createdRow = { ...input, createdAt: new Date(), updatedAt: new Date() };
-            return createdRow;
-          },
-          findPendingUploadByStagingKey: async ({ stagingKey }: { stagingKey: string }) =>
-            createdRow?.stagingKey === stagingKey ? createdRow : null,
-          claimForProcessing: async () => 1,
-        } as unknown as DatasetContentRepository;
-        const records = {} as unknown as DatasetRecordContentRepository;
+        const database = MemoryDatasetDatabase.create();
+        const datasets = MemoryDatasetContentRepository.create({ database });
+        const records = MemoryDatasetRecordContentRepository.create({ database });
         const adapter = DatasetUploadService.create({
           datasets,
           records,
@@ -99,7 +93,8 @@ describe("Dataset self-hosted storage", () => {
         const body = new Readable({ read() {} });
         body.push(Buffer.from("question,answer\nWhat is 2+2?,4\n", "utf8"));
         body.push(null);
-        const uploadId = (createdRow!.stagingKey as string).split("/").pop()!;
+        const { stagingKey } = await datasets.getOne({ id: pending.datasetId, projectId: "p1" });
+        const uploadId = stagingKey!.split("/").pop()!;
         await adapter.writeStagedUpload({ projectId: "p1", uploadId, body });
 
         const finalized = await adapter.finalizeUpload({

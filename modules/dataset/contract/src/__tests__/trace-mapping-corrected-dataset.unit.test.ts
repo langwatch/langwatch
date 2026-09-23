@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import { extractTracesFields, mapTraceToDatasetEntry } from "../trace-mapping.ts";
 
-const capturedTrace = {
+const capturedTrace: Trace = {
   trace_id: "trace-1",
   project_id: "project-1",
   metadata: {},
@@ -20,7 +20,7 @@ const capturedTrace = {
   input: { value: "what is the capital of the Netherlands?" },
   output: { value: "Rotterdam" },
   spans: [],
-} as unknown as Trace;
+};
 
 const correctedOutputPatch: TraceEditOverlayPatch = {
   version: 1,
@@ -69,10 +69,10 @@ describe("mapping a corrected trace into a dataset", () => {
   });
 
   describe("given a trace whose metadata was corrected", () => {
-    const capturedMetadataTrace = {
+    const capturedMetadataTrace: Trace = {
       ...capturedTrace,
       metadata: { environment: "staging", reviewer: "unassigned" },
-    } as unknown as Trace;
+    };
 
     /** @scenario "Corrected metadata reaches the dataset mapping" */
     it("fills the metadata column with the correction", () => {
