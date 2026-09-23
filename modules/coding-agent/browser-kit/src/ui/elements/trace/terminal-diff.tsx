@@ -1,0 +1,132 @@
+import { Box, HStack, Text } from "@chakra-ui/react";
+import { memo, useMemo } from "react";
+
+import {
+  computeLineDiff,
+  type DiffLine,
+  diffStat,
+} from "../../../model/trace/terminal-line-diff.ts";
+import {
+  DIFF_TOKENS,
+  TERMINAL_FONT_STACK,
+  TERMINAL_TOKENS,
+} from "../../../model/trace/terminal-palette.ts";
+
+interface TerminalDiffProps {
+  /** File contents before the edit. Empty for a freshly written file. */
+  oldText: string;
+  /** File contents after the edit. */
+  newText: string;
+  /** Path shown above the diff. */
+  filePath?: string;
+}
+
+/**
+ * Claude Code-style diff (removed/added/context on colored blocks with line numbers);
+ * synthesizes from Edit tool's old_string/new_string when no structured patch exists.
+ */
+export const TerminalDiff = memo(function TerminalDiff({
+  oldText,
+  newText,
+  filePath,
+}: TerminalDiffProps) {
+  const lines = useMemo(() => computeLineDiff(oldText, newText), [oldText, newText]);
+  const stat = useMemo(() => diffStat(lines), [lines]);
+
+  return (
+    <Box>
+      <HStack gap={2} paddingBottom={1}>
+        {filePath && (
+          <Text
+            fontFamily={TERMINAL_FONT_STACK}
+            fontSize="13px"
+            color={TERMINAL_TOKENS.faint}
+            truncate
+            minWidth={0}
+          >
+            {filePath}
+          </Text>
+        )}
+        <Text
+          fontFamily={TERMINAL_FONT_STACK}
+          fontSize="13px"
+          color={DIFF_TOKENS.addFg}
+          flexShrink={0}
+        >
+          +{stat.added}
+        </Text>
+        <Text
+          fontFamily={TERMINAL_FONT_STACK}
+          fontSize="13px"
+          color={DIFF_TOKENS.removeFg}
+          flexShrink={0}
+        >
+          -{stat.removed}
+        </Text>
+      </HStack>
+      <Box
+        as="pre"
+        margin={0}
+        fontFamily={TERMINAL_FONT_STACK}
+        fontSize="13px"
+        lineHeight="1.5"
+        userSelect="text"
+      >
+        {lines.map((line, index) => (
+          <DiffRow key={index} line={line} />
+        ))}
+      </Box>
+    </Box>
+  );
+});
+
+/** The gutter background, foreground color and sign for one diff line kind. */
+function diffRowVisuals(kind: DiffLine["kind"]): {
+  bg: string | undefined;
+  gutterColor: string;
+  sign: string;
+} {
+  if (kind === "add") {
+    return { bg: DIFF_TOKENS.addBg, gutterColor: DIFF_TOKENS.addFg, sign: "+" };
+  }
+  if (kind === "remove") {
+    return { bg: DIFF_TOKENS.removeBg, gutterColor: DIFF_TOKENS.removeFg, sign: "-" };
+  }
+  return { bg: undefined, gutterColor: TERMINAL_TOKENS.faint, sign: " " };
+}
+
+function DiffRow({ line }: { line: DiffLine }) {
+  const isAdd = line.kind === "add";
+  const { bg, gutterColor, sign } = diffRowVisuals(line.kind);
+  const lineNo = isAdd ? line.newLineNo : line.oldLineNo;
+
+  return (
+    <HStack as="span" display="flex" gap={0} align="stretch" bg={bg}>
+      <Text
+        as="span"
+        color={TERMINAL_TOKENS.faint}
+        opacity={0.7}
+        textAlign="right"
+        width="3.5em"
+        flexShrink={0}
+        paddingRight={2}
+        userSelect="none"
+      >
+        {lineNo ?? ""}
+      </Text>
+      <Text as="span" color={gutterColor} width="1.2em" flexShrink={0} userSelect="none">
+        {sign}
+      </Text>
+      <Text
+        as="span"
+        color={line.kind !== "context" ? gutterColor : TERMINAL_TOKENS.screenFg}
+        whiteSpace="pre-wrap"
+        wordBreak="break-word"
+        flex={1}
+        minWidth={0}
+      >
+        {line.text || " "}
+      </Text>
+    </HStack>
+  );
+}

@@ -136,6 +136,9 @@
       "path": "modules/coding-agent/browser/tsconfig.json"
     },
     {
+      "path": "modules/coding-agent/browser-kit/tsconfig.json"
+    },
+    {
       "path": "modules/coding-agent/contract/tsconfig.json"
     },
     {
@@ -446,6 +449,9 @@
     },
     {
       "path": "modules/onboarding/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/onboarding/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/onboarding/contract/tsconfig.json"

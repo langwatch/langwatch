@@ -21,6 +21,7 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "react-icons": "catalog:"
   },
   "devDependencies": {

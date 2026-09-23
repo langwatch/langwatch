@@ -19,9 +19,19 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/design-system": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
-    "@langwatch/handled-error": "workspace:*"
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@tanstack/react-table": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "lucide-react": "catalog:",
+    "numeral": "catalog:",
+    "react-icons": "catalog:",
+    "recharts": "catalog:",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

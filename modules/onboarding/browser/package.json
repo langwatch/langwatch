@@ -116,6 +116,7 @@
     "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/onboarding-browser-kit": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

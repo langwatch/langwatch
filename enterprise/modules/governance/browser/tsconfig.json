@@ -40,6 +40,9 @@
       "path": "../../../../modules/coding-agent/browser/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/coding-agent/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {

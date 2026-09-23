@@ -10,10 +10,16 @@
   "exclude": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

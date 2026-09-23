@@ -131,6 +131,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/dataset-browser": "workspace:*",
+    "@langwatch/dataset-browser-kit": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",

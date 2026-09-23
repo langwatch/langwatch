@@ -58,6 +58,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/coding-agent-browser-kit": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",

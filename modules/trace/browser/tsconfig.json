@@ -35,10 +35,16 @@
       "path": "../../coding-agent/browser/tsconfig.build.json"
     },
     {
+      "path": "../../coding-agent/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {
       "path": "../../data-privacy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../dataset/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
@@ -51,6 +57,9 @@
     },
     {
       "path": "../../evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../evaluator/contract/tsconfig.build.json"
@@ -80,6 +89,9 @@
       "path": "../../onboarding/browser/tsconfig.build.json"
     },
     {
+      "path": "../../onboarding/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../presence/browser/tsconfig.build.json"
     },
     {
@@ -102,6 +114,9 @@
     },
     {
       "path": "../../suite/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../suite/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

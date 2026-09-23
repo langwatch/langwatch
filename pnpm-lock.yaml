@@ -1424,6 +1424,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../modules/feature-flag/contract
+      '@langwatch/onboarding-browser-kit':
+        specifier: workspace:*
+        version: link:../../modules/onboarding/browser-kit
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
@@ -2312,6 +2315,9 @@ importers:
       '@langwatch/coding-agent-browser':
         specifier: workspace:*
         version: link:../../../../modules/coding-agent/browser
+      '@langwatch/coding-agent-browser-kit':
+        specifier: workspace:*
+        version: link:../../../../modules/coding-agent/browser-kit
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -3769,21 +3775,36 @@ importers:
 
   modules/analytics/browser-kit:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      numeral:
+        specifier: 'catalog:'
+        version: 2.0.6
+      qs:
+        specifier: 'catalog:'
+        version: 6.16.0
       react-feather:
         specifier: 'catalog:'
         version: 2.0.10(react@19.2.8)
       react-icons:
         specifier: 'catalog:'
         version: 5.7.0(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -5124,6 +5145,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
+      '@langwatch/coding-agent-browser-kit':
+        specifier: workspace:*
+        version: link:../browser-kit
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../contract
@@ -5182,6 +5206,52 @@ importers:
       jsdom:
         specifier: 'catalog:'
         version: 30.0.1(@noble/hashes@2.2.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/coding-agent/browser-kit:
+    dependencies:
+      '@langwatch/coding-agent-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
+    devDependencies:
+      '@chakra-ui/react':
+        specifier: 'catalog:'
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -6470,6 +6540,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       react-icons:
         specifier: 'catalog:'
         version: 5.7.0(react@19.2.8)
@@ -6831,6 +6904,9 @@ importers:
 
   modules/experiment/browser-kit:
     dependencies:
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../../../packages/error-presentation
@@ -6840,6 +6916,33 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      '@tanstack/react-table':
+        specifier: 'catalog:'
+        version: 8.21.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@tanstack/react-virtual':
+        specifier: 'catalog:'
+        version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
+      numeral:
+        specifier: 'catalog:'
+        version: 2.0.6
+      react-icons:
+        specifier: 'catalog:'
+        version: 5.7.0(react@19.2.8)
+      recharts:
+        specifier: 'catalog:'
+        version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
+      usehooks-ts:
+        specifier: 'catalog:'
+        version: 3.1.1(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -8143,6 +8246,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract
@@ -8152,9 +8258,15 @@ importers:
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
+      motion:
+        specifier: 'catalog:'
+        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-feather:
         specifier: 'catalog:'
         version: 2.0.10(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -9265,6 +9377,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/onboarding-browser-kit':
+        specifier: workspace:*
+        version: link:../browser-kit
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../contract
@@ -9341,6 +9456,73 @@ importers:
       jsdom:
         specifier: 'catalog:'
         version: 30.0.1(@noble/hashes@2.2.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/onboarding/browser-kit:
+    dependencies:
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
+      '@langwatch/onboarding-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
+      motion:
+        specifier: 'catalog:'
+        version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-contextual-analytics:
+        specifier: 'catalog:'
+        version: 1.1.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-feather:
+        specifier: 'catalog:'
+        version: 2.0.10(react@19.2.8)
+      shiki:
+        specifier: 'catalog:'
+        version: 4.3.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@chakra-ui/react':
+        specifier: 'catalog:'
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: 'catalog:'
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -10287,6 +10469,9 @@ importers:
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:../../onboarding/browser
+      '@langwatch/onboarding-browser-kit':
+        specifier: workspace:*
+        version: link:../../onboarding/browser-kit
       '@langwatch/organization-browser':
         specifier: workspace:*
         version: link:../../organization/browser
@@ -10542,6 +10727,9 @@ importers:
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:../../onboarding/browser
+      '@langwatch/onboarding-browser-kit':
+        specifier: workspace:*
+        version: link:../../onboarding/browser-kit
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../browser-kit
@@ -12183,6 +12371,9 @@ importers:
       '@langwatch/coding-agent-browser':
         specifier: workspace:*
         version: link:../../coding-agent/browser
+      '@langwatch/coding-agent-browser-kit':
+        specifier: workspace:*
+        version: link:../../coding-agent/browser-kit
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
@@ -12192,6 +12383,9 @@ importers:
       '@langwatch/dataset-browser':
         specifier: workspace:*
         version: link:../../dataset/browser
+      '@langwatch/dataset-browser-kit':
+        specifier: workspace:*
+        version: link:../../dataset/browser-kit
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -12207,6 +12401,9 @@ importers:
       '@langwatch/evaluator-browser':
         specifier: workspace:*
         version: link:../../evaluator/browser
+      '@langwatch/evaluator-browser-kit':
+        specifier: workspace:*
+        version: link:../../evaluator/browser-kit
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -12234,6 +12431,9 @@ importers:
       '@langwatch/onboarding-browser':
         specifier: workspace:*
         version: link:../../onboarding/browser
+      '@langwatch/onboarding-browser-kit':
+        specifier: workspace:*
+        version: link:../../onboarding/browser-kit
       '@langwatch/presence-browser':
         specifier: workspace:*
         version: link:../../presence/browser
@@ -12261,6 +12461,9 @@ importers:
       '@langwatch/suite-browser':
         specifier: workspace:*
         version: link:../../suite/browser
+      '@langwatch/suite-browser-kit':
+        specifier: workspace:*
+        version: link:../../suite/browser-kit
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -12448,9 +12651,15 @@ importers:
       liqe:
         specifier: 'catalog:'
         version: 3.8.7
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
       react-icons:
         specifier: 'catalog:'
         version: 5.7.0(react@19.2.8)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -12748,6 +12957,9 @@ importers:
       '@langwatch/coding-agent-browser':
         specifier: workspace:*
         version: link:../../coding-agent/browser
+      '@langwatch/coding-agent-browser-kit':
+        specifier: workspace:*
+        version: link:../../coding-agent/browser-kit
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
@@ -13110,6 +13322,9 @@ importers:
       '@langwatch/dataset-browser':
         specifier: workspace:*
         version: link:../../dataset/browser
+      '@langwatch/dataset-browser-kit':
+        specifier: workspace:*
+        version: link:../../dataset/browser-kit
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -13318,21 +13533,51 @@ importers:
 
   modules/workflow/browser-kit:
     dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
+      '@langwatch/browser-host':
+        specifier: workspace:*
+        version: link:../../../packages/browser-host
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/error-presentation':
+        specifier: workspace:*
+        version: link:../../../packages/error-presentation
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../contract
+      '@monaco-editor/react':
+        specifier: 'catalog:'
+        version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@xyflow/react':
+        specifier: 'catalog:'
+        version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      emoji-picker-react:
+        specifier: ^4.19.1
+        version: 4.19.1(react@19.2.8)
+      langwatch:
+        specifier: workspace:*
+        version: link:../../../sdks/typescript
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
+      monaco-editor:
+        specifier: 'catalog:'
+        version: 0.55.1
+      monacopilot:
+        specifier: 'catalog:'
+        version: 1.2.12(monaco-editor@0.55.1)
       react-feather:
         specifier: 'catalog:'
         version: 2.0.10(react@19.2.8)
+      react-icons:
+        specifier: 'catalog:'
+        version: 5.7.0(react@19.2.8)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -27705,7 +27950,7 @@ snapshots:
       '@babel/helpers': 7.29.7
       '@babel/parser': 7.29.8
       '@babel/template': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
       '@babel/types': 7.29.8
       '@jridgewell/remapping': 2.3.5
       convert-source-map: 2.0.0
@@ -27752,7 +27997,7 @@ snapshots:
       '@babel/helper-optimise-call-expression': 7.29.7
       '@babel/helper-replace-supers': 7.29.7(@babel/core@7.29.7)
       '@babel/helper-skip-transparent-expression-wrappers': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
       semver: 6.3.1
     transitivePeerDependencies:
       - supports-color
@@ -27779,7 +28024,7 @@ snapshots:
 
   '@babel/helper-member-expression-to-functions@7.29.7':
     dependencies:
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
       '@babel/types': 7.29.8
     transitivePeerDependencies:
       - supports-color
@@ -27811,7 +28056,7 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/helper-annotate-as-pure': 7.29.7
       '@babel/helper-wrap-function': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -27820,13 +28065,13 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/helper-member-expression-to-functions': 7.29.7
       '@babel/helper-optimise-call-expression': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
   '@babel/helper-skip-transparent-expression-wrappers@7.29.7':
     dependencies:
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
       '@babel/types': 7.29.8
     transitivePeerDependencies:
       - supports-color
@@ -27840,7 +28085,7 @@ snapshots:
   '@babel/helper-wrap-function@7.29.7':
     dependencies:
       '@babel/template': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
       '@babel/types': 7.29.8
     transitivePeerDependencies:
       - supports-color
@@ -27858,7 +28103,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -27893,7 +28138,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -27951,7 +28196,7 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
       '@babel/helper-remap-async-to-generator': 7.29.7(@babel/core@7.29.7)
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -27998,7 +28243,7 @@ snapshots:
       '@babel/helper-globals': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
       '@babel/helper-replace-supers': 7.29.7(@babel/core@7.29.7)
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -28012,7 +28257,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -28069,7 +28314,7 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/helper-compilation-targets': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -28155,7 +28400,7 @@ snapshots:
       '@babel/helper-plugin-utils': 7.29.7
       '@babel/plugin-transform-destructuring': 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-parameters': 7.29.7(@babel/core@7.29.7)
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 
@@ -33654,7 +33899,7 @@ snapshots:
       '@babel/core': 7.29.7
       '@babel/helper-plugin-utils': 7.29.7
       '@babel/plugin-syntax-typescript': 7.29.7(@babel/core@7.29.7)
-      '@babel/traverse': 7.29.7
+      '@babel/traverse': 7.29.8
     transitivePeerDependencies:
       - supports-color
 

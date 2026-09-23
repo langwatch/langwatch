@@ -186,6 +186,9 @@
       "path": "../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {
+      "path": "../../modules/onboarding/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/prisma-client/tsconfig.build.json"
     },
     {

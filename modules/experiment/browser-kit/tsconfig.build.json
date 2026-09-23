@@ -19,6 +19,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {
@@ -26,6 +29,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
     }
   ]
 }

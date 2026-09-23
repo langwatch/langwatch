@@ -19,11 +19,21 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@monaco-editor/react": "catalog:",
+    "@xyflow/react": "catalog:",
+    "emoji-picker-react": "^4.19.1",
+    "langwatch": "workspace:*",
     "lucide-react": "catalog:",
+    "monaco-editor": "catalog:",
+    "monacopilot": "catalog:",
     "react-feather": "catalog:",
+    "react-icons": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

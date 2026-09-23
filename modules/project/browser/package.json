@@ -44,6 +44,7 @@
     "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/navigation-browser": "workspace:*",
     "@langwatch/onboarding-browser": "workspace:*",
+    "@langwatch/onboarding-browser-kit": "workspace:*",
     "@langwatch/organization-browser": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

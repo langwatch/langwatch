@@ -19,11 +19,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "numeral": "catalog:",
+    "qs": "catalog:",
     "react-feather": "catalog:",
-    "react-icons": "catalog:"
+    "react-icons": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

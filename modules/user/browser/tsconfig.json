@@ -42,6 +42,9 @@
       "path": "../../coding-agent/browser/tsconfig.build.json"
     },
     {
+      "path": "../../coding-agent/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {

@@ -47,6 +47,9 @@
       "path": "../../onboarding/browser/tsconfig.build.json"
     },
     {
+      "path": "../../onboarding/browser-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../organization/browser/tsconfig.build.json"
     },
     {

@@ -63,6 +63,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-browser": "workspace:*",
+    "@langwatch/onboarding-browser-kit": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
