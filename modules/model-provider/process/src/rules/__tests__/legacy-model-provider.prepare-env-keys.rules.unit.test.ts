@@ -9,14 +9,32 @@ import { prepareEnvKeys } from "../legacy-model-provider.rules.ts";
 // the zod shape one level down. A shape reader that does not unwrap it returns no keys at
 // all and the provider dispatches with no credentials.
 describe("prepareEnvKeys", () => {
-  // Typed as what `prepareEnvKeys` takes, not as the editor value it was
-  // aliased to: the two are different shapes, and the cast was hiding that the
-  // row handed to the function under test could never be one it accepts.
+  // A whole execution row, the shape `prepareEnvKeys` takes, not the editor value.
   const providerRow = (
     provider: string,
     customKeys: Record<string, string>,
-  ): LegacyModelProviderExecution =>
-    ({ provider, customKeys }) as unknown as LegacyModelProviderExecution;
+  ): LegacyModelProviderExecution => ({
+    id: `provider-${provider}`,
+    organizationId: "organization-1",
+    provider,
+    name: provider,
+    enabled: true,
+    routingHandle: null,
+    scopes: [],
+    customKeys,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
+    isSystem: false,
+    embeddingsUnsupported: false,
+  });
 
   describe("given a provider whose credentials allow either a key or a base URL", () => {
     it("returns the anthropic credentials stored on the row", () => {

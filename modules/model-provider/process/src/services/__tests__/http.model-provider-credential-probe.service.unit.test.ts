@@ -1022,9 +1022,9 @@ describe("given a check that never reached the provider", () => {
   describe("when deciding where the credential may be sent", () => {
     /** @scenario "A credential is never carried to an address we have not vetted" */
     it("goes out through the validated fetch, and nothing slips past it", async () => {
-      const bareFetch = vi.fn();
+      const bareFetch = vi.fn<typeof global.fetch>();
       const originalFetch = global.fetch;
-      global.fetch = bareFetch as unknown as typeof global.fetch;
+      global.fetch = bareFetch;
       mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
 
       try {

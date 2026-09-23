@@ -16,7 +16,7 @@ function plantColumn(targetId: string) {
   header.setAttribute("data-target-column", targetId);
   const scrollIntoView = vi.fn();
   // jsdom has no layout, so the method does not exist to spy on.
-  (header as unknown as { scrollIntoView: unknown }).scrollIntoView = scrollIntoView;
+  header.scrollIntoView = scrollIntoView;
   document.body.append(header);
   return scrollIntoView;
 }

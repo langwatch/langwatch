@@ -58,21 +58,25 @@ function renderHeader(target: TargetConfig) {
   return render(<TargetHeader target={target} />, { wrapper: Wrapper });
 }
 
-const WORKFLOW_AGENT = {
+const WORKFLOW_AGENT: TargetConfig = {
   id: "target_1",
   type: "agent",
   agentType: "workflow",
-  agentId: "agent_1",
+  dbAgentId: "agent_1",
   mappings: { dataset_1: {} },
-} as unknown as TargetConfig;
+  inputs: [],
+  outputs: [],
+};
 
-const CODE_AGENT = {
+const CODE_AGENT: TargetConfig = {
   id: "target_2",
   type: "agent",
   agentType: "code",
-  agentId: "agent_2",
+  dbAgentId: "agent_2",
   mappings: { dataset_1: {} },
-} as unknown as TargetConfig;
+  inputs: [],
+  outputs: [],
+};
 
 describe("given an experiment target that is a workflow agent", () => {
   afterEach(() => {
@@ -118,9 +122,11 @@ describe("given an experiment target that is a connected agent", () => {
         id: "target_3",
         type: "agent",
         agentType: "connected",
-        agentId: "agent_3",
+        dbAgentId: "agent_3",
         mappings: { dataset_1: {} },
-      } as unknown as TargetConfig);
+        inputs: [],
+        outputs: [],
+      });
 
       expect(screen.getByTestId("icon-connected")).toBeInTheDocument();
       expect(screen.queryByTestId("icon-code")).not.toBeInTheDocument();
@@ -144,9 +150,11 @@ describe("given an experiment target that is a connected agent", () => {
           id: "target_4",
           type: "agent",
           agentType,
-          agentId: "agent_4",
+          dbAgentId: "agent_4",
           mappings: { dataset_1: {} },
-        } as unknown as TargetConfig);
+          inputs: [],
+          outputs: [],
+        });
 
         expect(
           screen.getByTestId(EXPECTED_ICON[agentType]),

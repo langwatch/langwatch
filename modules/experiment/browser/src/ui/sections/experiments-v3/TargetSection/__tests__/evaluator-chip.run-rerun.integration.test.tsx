@@ -18,12 +18,12 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
 import type { EvaluatorConfig } from "../../../../../model/experiments-v3/types.ts";
 import { EvaluatorChip } from "../evaluator-chip.tsx";
 
-const evaluator = {
+const evaluator: EvaluatorConfig = {
   id: "evaluator_1",
   evaluatorType: "langevals/exact_match",
   inputs: [],
   mappings: {},
-} as unknown as EvaluatorConfig;
+};
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

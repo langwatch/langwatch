@@ -114,8 +114,7 @@ describe("an agent edit reaching the server", () => {
   });
 
   describe("when the handler asks for the save before answering", () => {
-    /** @scenario An agent edit is on the server before the action reports success */
-    it("has already saved by the time the call resolves, without the debounce", async () => {
+    beforeEach(async () => {
       render(<TestComponent />, { wrapper: Wrapper });
       applyAgentEdit();
 
@@ -124,7 +123,10 @@ describe("an agent edit reaching the server", () => {
       await act(async () => {
         await autosave?.saveNow();
       });
+    });
 
+    /** @scenario An agent edit is on the server before the action reports success */
+    it("has already saved by the time the call resolves, without the debounce", () => {
       expect(mockMutateAsync).toHaveBeenCalledTimes(1);
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -136,25 +138,12 @@ describe("an agent edit reaching the server", () => {
     });
 
     /** @scenario An agent edit is on the server before the action reports success */
-    it("leaves the page holding the version the save returned", async () => {
-      render(<TestComponent />, { wrapper: Wrapper });
-      applyAgentEdit();
-
-      await act(async () => {
-        await autosave?.saveNow();
-      });
-
+    it("leaves the page holding the version the save returned", () => {
       expect(useEvaluationsV3Store.getState().workbenchVersion).toBe(7);
     });
 
     /** @scenario An agent edit is on the server before the action reports success */
     it("does not save the same state twice when the debounce follows", async () => {
-      render(<TestComponent />, { wrapper: Wrapper });
-      applyAgentEdit();
-
-      await act(async () => {
-        await autosave?.saveNow();
-      });
       await act(async () => {
         vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
       });
