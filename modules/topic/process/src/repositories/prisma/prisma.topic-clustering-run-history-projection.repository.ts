@@ -80,7 +80,7 @@ export class PrismaTopicClusteringRunHistoryProjectionRepository implements Stat
   ): Promise<void> {
     const projectId = String(context.tenantId);
     const data = {
-      Runs: projection.state.Runs as unknown as Prisma.InputJsonValue,
+      Runs: projection.state.Runs,
       CreatedAt: projection.createdAt,
       UpdatedAt: projection.updatedAt,
       OccurredAt: projection.occurredAt,

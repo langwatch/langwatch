@@ -31,12 +31,13 @@ class RecordingAuditTrailStore extends AuthzAuditTrailStore {
   }
 }
 
-function event(
-  type: string,
-  aggregateId: string,
-  data: Record<string, unknown>,
-  id = "evt_2Zk",
-): AuthzGrantsEvent {
+type AuthzGrantsEventBody = AuthzGrantsEvent extends infer E
+  ? E extends AuthzGrantsEvent
+    ? Pick<E, "type" | "data">
+    : never
+  : never;
+
+function event(body: AuthzGrantsEventBody, aggregateId: string, id = "evt_2Zk"): AuthzGrantsEvent {
   return {
     id,
     aggregateId,
@@ -44,34 +45,45 @@ function event(
     tenantId: createTenantId(TENANT_ID),
     createdAt: OCCURRED_AT + 1_000,
     occurredAt: OCCURRED_AT,
-    type,
     version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-    data,
-  } as unknown as AuthzGrantsEvent;
+    ...body,
+  };
 }
 
 function attached(overrides: Record<string, unknown> = {}): AuthzGrantsEvent {
-  return event(GRANT_ATTACHED_EVENT_TYPE, "grant_1", {
-    grantId: "grant_1",
-    principal: { type: "user", id: "user_alice" },
-    roleKey: "member",
-    scope: { type: "TEAM", id: "team_1" },
-    source: "grants-service",
-    actor: USER_ACTOR,
-    ...overrides,
-  });
+  return event(
+    {
+      type: GRANT_ATTACHED_EVENT_TYPE,
+      data: {
+        grantId: "grant_1",
+        principal: { type: "user", id: "user_alice" },
+        roleKey: "member",
+        scope: { type: "TEAM", id: "team_1" },
+        source: "grants-service",
+        actor: USER_ACTOR,
+        ...overrides,
+      },
+    },
+    "grant_1",
+  );
 }
 
 function roleDefined(
   actor: { type: "user" | "system"; id: string | null } = USER_ACTOR,
 ): AuthzGrantsEvent {
-  return event(ROLE_DEFINED_EVENT_TYPE, "role_1", {
-    roleId: "role_1",
-    name: "Auditor",
-    permissions: ["traces:view"],
-    kind: "custom",
-    actor,
-  });
+  return event(
+    {
+      type: ROLE_DEFINED_EVENT_TYPE,
+      data: {
+        roleId: "role_1",
+        name: "Auditor",
+        permissions: ["traces:view"],
+        kind: "custom",
+        actor,
+      },
+    },
+    "role_1",
+  );
 }
 
 describe("EventingAuthzAuditAdapter", () => {
@@ -176,11 +188,17 @@ describe("EventingAuthzAuditAdapter", () => {
     const adapter = EventingAuthzAuditAdapter.create({ store });
 
     await adapter.handler(
-      event(GRANT_REVOKED_EVENT_TYPE, "grant_1", {
-        grantId: "grant_1",
-        reason: "offboarded:user_dave",
-        actor: { type: "system", id: SYSTEM_ACTORS.scim },
-      }),
+      event(
+        {
+          type: GRANT_REVOKED_EVENT_TYPE,
+          data: {
+            grantId: "grant_1",
+            reason: "offboarded:user_dave",
+            actor: { type: "system", id: SYSTEM_ACTORS.scim },
+          },
+        },
+        "grant_1",
+      ),
     );
 
     expect(store.attempts).toHaveLength(1);

@@ -23,12 +23,18 @@ const uniqueSuffix = () => randomUUID().replaceAll("-", "").slice(0, 12);
 const LEDGER_REACHED = "the grants ledger must not be reached on a personal scope";
 
 /** Any write that gets past the guard fails here, and says so. */
-const refusingLedger = new Proxy(
-  {},
-  {
-    get: () => () => Promise.reject(new Error(LEDGER_REACHED)),
-  },
-) as unknown as AuthzCompatibilityLedger;
+const refuse = () => Promise.reject(new Error(LEDGER_REACHED));
+const refusingLedger: AuthzCompatibilityLedger = {
+  attachBindings: refuse,
+  attachResourceGrant: refuse,
+  revokeResourceGrants: refuse,
+  changeBindingRole: refuse,
+  revokeBindings: refuse,
+  revokeBindingsWhere: refuse,
+  offboardMember: refuse,
+  defineRole: refuse,
+  deleteRole: refuse,
+};
 
 describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => {
   const prisma = new PrismaClient({

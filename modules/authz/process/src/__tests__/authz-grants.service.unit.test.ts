@@ -102,7 +102,7 @@ function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger
   const epoch = new StubAuthzEpoch();
   const service = AuthzGrantsService.create({
     repository: repository as unknown as AuthzGrantRepository,
-    ledger: ledger as unknown as EventingAuthzLedgerAdapter,
+    ledger,
     epoch,
     newBindingId: () => "rb_test_ksuid",
     bindings: new StubAuthzBindingRepository(),

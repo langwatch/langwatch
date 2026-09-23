@@ -25,9 +25,14 @@ class NullAuthzGrantProjectionRepository extends AuthzGrantProjectionRepository 
   async append(_write: GrantProjectionWrite, _context: ProjectionStoreContext): Promise<void> {}
 }
 
+type AuthzGrantsEventBody = AuthzGrantsEvent extends infer E
+  ? E extends AuthzGrantsEvent
+    ? Pick<E, "type" | "data">
+    : never
+  : never;
+
 function event(
-  type: string,
-  data: Record<string, unknown>,
+  body: AuthzGrantsEventBody,
   aggregateId: string,
   occurredAt: number,
 ): AuthzGrantsEvent {
@@ -38,10 +43,9 @@ function event(
     tenantId: createTenantId(TENANT_ID),
     createdAt: occurredAt,
     occurredAt,
-    type,
     version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-    data,
-  } as unknown as AuthzGrantsEvent;
+    ...body,
+  };
 }
 
 const projection = AuthzGrantProjection.create(new NullAuthzGrantProjectionRepository());
@@ -50,14 +54,16 @@ describe("AuthzGrantProjection", () => {
   it("takes grant and role ownership from tenantId, never aggregateId", () => {
     const grant = projection.map(
       event(
-        GRANT_ATTACHED_EVENT_TYPE,
         {
-          grantId: "grant_1",
-          principal: { type: "user", id: "user_1" },
-          roleKey: "member",
-          scope: { type: "TEAM", id: "team_1" },
-          source: "grants-service",
-          actor: ACTOR,
+          type: GRANT_ATTACHED_EVENT_TYPE,
+          data: {
+            grantId: "grant_1",
+            principal: { type: "user", id: "user_1" },
+            roleKey: "member",
+            scope: { type: "TEAM", id: "team_1" },
+            source: "grants-service",
+            actor: ACTOR,
+          },
         },
         "grant_1",
         1,
@@ -65,13 +71,15 @@ describe("AuthzGrantProjection", () => {
     );
     const role = projection.map(
       event(
-        ROLE_DEFINED_EVENT_TYPE,
         {
-          roleId: "role_1",
-          name: "Auditor",
-          permissions: ["traces:view"],
-          kind: "custom",
-          actor: ACTOR,
+          type: ROLE_DEFINED_EVENT_TYPE,
+          data: {
+            roleId: "role_1",
+            name: "Auditor",
+            permissions: ["traces:view"],
+            kind: "custom",
+            actor: ACTOR,
+          },
         },
         "role_1",
         2,
@@ -92,15 +100,17 @@ describe("AuthzGrantProjection", () => {
   it("carries a USER membership lifetime into the guarded write", () => {
     const write = projection.map(
       event(
-        GRANT_ATTACHED_EVENT_TYPE,
         {
-          grantId: "grant_1",
-          principal: { type: "user", id: "user_1" },
-          roleKey: "member",
-          scope: { type: "TEAM", id: "team_1" },
-          source: "grants-service",
-          actor: ACTOR,
-          membershipStamp: "membership_1",
+          type: GRANT_ATTACHED_EVENT_TYPE,
+          data: {
+            grantId: "grant_1",
+            principal: { type: "user", id: "user_1" },
+            roleKey: "member",
+            scope: { type: "TEAM", id: "team_1" },
+            source: "grants-service",
+            actor: ACTOR,
+            membershipStamp: "membership_1",
+          },
         },
         "grant_1",
         1,
@@ -114,14 +124,16 @@ describe("AuthzGrantProjection", () => {
     const writes = [
       projection.map(
         event(
-          GRANT_ATTACHED_EVENT_TYPE,
           {
-            grantId: "grant_1",
-            principal: { type: "user", id: "user_1" },
-            roleKey: "member",
-            scope: { type: "TEAM", id: "team_1" },
-            source: "grants-service",
-            actor: ACTOR,
+            type: GRANT_ATTACHED_EVENT_TYPE,
+            data: {
+              grantId: "grant_1",
+              principal: { type: "user", id: "user_1" },
+              roleKey: "member",
+              scope: { type: "TEAM", id: "team_1" },
+              source: "grants-service",
+              actor: ACTOR,
+            },
           },
           "grant_1",
           1,
@@ -129,12 +141,14 @@ describe("AuthzGrantProjection", () => {
       ),
       projection.map(
         event(
-          GRANT_ROLE_CHANGED_EVENT_TYPE,
           {
-            grantId: "grant_1",
-            from: "member",
-            to: "admin",
-            actor: ACTOR,
+            type: GRANT_ROLE_CHANGED_EVENT_TYPE,
+            data: {
+              grantId: "grant_1",
+              from: "member",
+              to: "admin",
+              actor: ACTOR,
+            },
           },
           "grant_1",
           2,
@@ -142,21 +156,25 @@ describe("AuthzGrantProjection", () => {
       ),
       projection.map(
         event(
-          GRANT_REVOKED_EVENT_TYPE,
-          { grantId: "grant_1", reason: "offboard", actor: ACTOR },
+          {
+            type: GRANT_REVOKED_EVENT_TYPE,
+            data: { grantId: "grant_1", reason: "offboard", actor: ACTOR },
+          },
           "grant_1",
           3,
         ),
       ),
       projection.map(
         event(
-          ROLE_DEFINED_EVENT_TYPE,
           {
-            roleId: "role_1",
-            name: "Auditor",
-            permissions: ["traces:view"],
-            kind: "custom",
-            actor: ACTOR,
+            type: ROLE_DEFINED_EVENT_TYPE,
+            data: {
+              roleId: "role_1",
+              name: "Auditor",
+              permissions: ["traces:view"],
+              kind: "custom",
+              actor: ACTOR,
+            },
           },
           "role_1",
           4,
@@ -164,18 +182,24 @@ describe("AuthzGrantProjection", () => {
       ),
       projection.map(
         event(
-          ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
           {
-            roleId: "role_1",
-            permissions: ["traces:view"],
-            actor: ACTOR,
+            type: ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
+            data: {
+              roleId: "role_1",
+              permissions: ["traces:view"],
+              actor: ACTOR,
+            },
           },
           "role_1",
           5,
         ),
       ),
       projection.map(
-        event(ROLE_DELETED_EVENT_TYPE, { roleId: "role_1", actor: ACTOR }, "role_1", 6),
+        event(
+          { type: ROLE_DELETED_EVENT_TYPE, data: { roleId: "role_1", actor: ACTOR } },
+          "role_1",
+          6,
+        ),
       ),
     ];
 
@@ -199,14 +223,16 @@ describe("AuthzGrantProjection", () => {
   it("takes the owning organization from the event's tenant", () => {
     const write = projection.map(
       event(
-        GRANT_ATTACHED_EVENT_TYPE,
         {
-          grantId: "grant_1",
-          principal: { type: "user", id: "user_1" },
-          roleKey: "custom:cr_ops",
-          scope: { type: "TEAM", id: "team_1" },
-          source: "genesis-import",
-          actor: ACTOR,
+          type: GRANT_ATTACHED_EVENT_TYPE,
+          data: {
+            grantId: "grant_1",
+            principal: { type: "user", id: "user_1" },
+            roleKey: "custom:cr_ops",
+            scope: { type: "TEAM", id: "team_1" },
+            source: "migration",
+            actor: ACTOR,
+          },
         },
         "grant_1",
         1,
@@ -231,15 +257,17 @@ describe("AuthzGrantProjection", () => {
   it("does not carry the imported role onto the reassignment", () => {
     const imported = projection.map(
       event(
-        GRANT_ATTACHED_EVENT_TYPE,
         {
-          grantId: "grant_1",
-          principal: { type: "user", id: "user_1" },
-          roleKey: "custom:cr_ops",
-          legacyRole: "ADMIN",
-          scope: { type: "TEAM", id: "team_1" },
-          source: "genesis-import",
-          actor: ACTOR,
+          type: GRANT_ATTACHED_EVENT_TYPE,
+          data: {
+            grantId: "grant_1",
+            principal: { type: "user", id: "user_1" },
+            roleKey: "custom:cr_ops",
+            legacyRole: "ADMIN",
+            scope: { type: "TEAM", id: "team_1" },
+            source: "migration",
+            actor: ACTOR,
+          },
         },
         "grant_1",
         1,
@@ -249,12 +277,14 @@ describe("AuthzGrantProjection", () => {
 
     const reassigned = projection.map(
       event(
-        GRANT_ROLE_CHANGED_EVENT_TYPE,
         {
-          grantId: "grant_1",
-          from: "custom:cr_ops",
-          to: "custom:cr_sre",
-          actor: ACTOR,
+          type: GRANT_ROLE_CHANGED_EVENT_TYPE,
+          data: {
+            grantId: "grant_1",
+            from: "custom:cr_ops",
+            to: "custom:cr_sre",
+            actor: ACTOR,
+          },
         },
         "grant_1",
         2,

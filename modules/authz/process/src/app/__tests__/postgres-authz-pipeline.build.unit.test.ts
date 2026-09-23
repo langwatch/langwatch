@@ -18,7 +18,9 @@ const GRANT = "grant_1";
 const ACTOR = { type: "user", id: "user_admin" } as const;
 
 function recordingDatabase(options: { guard?: number; grantRow?: unknown } = {}) {
-  const executeRaw = vi.fn(async () => options.guard ?? 1);
+  const executeRaw = vi.fn(
+    async (_statement: TemplateStringsArray, ..._values: unknown[]) => options.guard ?? 1,
+  );
   const grantFindUnique = vi.fn(async () => options.grantRow ?? null);
   const roleBindingUpsert = vi.fn(async () => undefined);
   const roleBindingDeleteMany = vi.fn(async () => ({ count: 0 }));
@@ -83,7 +85,13 @@ function grantsProjection(pipeline: ReturnType<typeof compose>["pipeline"]): Aut
   return registered!.definition as unknown as AuthzGrantProjection;
 }
 
-function event(type: string, data: Record<string, unknown>, occurredAt: number): AuthzGrantsEvent {
+type AuthzGrantsEventBody = AuthzGrantsEvent extends infer E
+  ? E extends AuthzGrantsEvent
+    ? Pick<E, "type" | "data">
+    : never
+  : never;
+
+function event(body: AuthzGrantsEventBody, occurredAt: number): AuthzGrantsEvent {
   return {
     id: `event_${occurredAt}`,
     aggregateId: GRANT,
@@ -91,22 +99,23 @@ function event(type: string, data: Record<string, unknown>, occurredAt: number):
     tenantId: createTenantId(ORGANIZATION),
     createdAt: occurredAt,
     occurredAt,
-    type,
     version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
-    data,
-  } as unknown as AuthzGrantsEvent;
+    ...body,
+  };
 }
 
 function attachedEvent(): AuthzGrantsEvent {
   return event(
-    GRANT_ATTACHED_EVENT_TYPE,
     {
-      grantId: GRANT,
-      principal: { type: "user", id: "user_sam" },
-      roleKey: "member",
-      scope: { type: "TEAM", id: "team_1" },
-      source: "grants-service",
-      actor: ACTOR,
+      type: GRANT_ATTACHED_EVENT_TYPE,
+      data: {
+        grantId: GRANT,
+        principal: { type: "user", id: "user_sam" },
+        roleKey: "member",
+        scope: { type: "TEAM", id: "team_1" },
+        source: "grants-service",
+        actor: ACTOR,
+      },
     },
     1_700_000_000_000,
   );
@@ -189,7 +198,7 @@ describe("PostgresAuthzPipelineAdapter", () => {
       await applyAttached(composed);
 
       expect(composed.executeRaw).toHaveBeenCalledTimes(1);
-      const [statement] = composed.executeRaw.mock.calls[0] as unknown as [string[]];
+      const statement = composed.executeRaw.mock.calls[0]?.[0] ?? [];
       expect(statement.join("?")).toContain('INSERT INTO "Grant"');
       // The guard is part of the statement, never a read-then-write.
       expect(statement.join("?")).toContain('WHERE "Grant"."occurredAt" < EXCLUDED."occurredAt"');
@@ -280,8 +289,10 @@ describe("PostgresAuthzPipelineAdapter", () => {
 
       await subscriber.handle(
         event(
-          GRANT_REVOKED_EVENT_TYPE,
-          { grantId: GRANT, reason: "offboard", actor: ACTOR },
+          {
+            type: GRANT_REVOKED_EVENT_TYPE,
+            data: { grantId: GRANT, reason: "offboard", actor: ACTOR },
+          },
           1_700_000_000_000,
         ),
         {} as never,

@@ -157,7 +157,7 @@ describe("EventingAuthzAdapter", () => {
   ])(
     "preserves aggregate, tenant, version, and retry identity for %s",
     async (_label, handler, data, aggregateId) => {
-      const [event] = await emit(handler as unknown as EventEmitter, data);
+      const [event] = await emit(handler, data);
 
       expect(event).toMatchObject({
         aggregateType: "authz_grant",
@@ -172,12 +172,12 @@ describe("EventingAuthzAdapter", () => {
 
   /** @scenario "Two grants under one action never collide" */
   it("gives two grants distinct idempotency keys even under one action", async () => {
-    const [first] = await emit(new AttachGrantCommand() as unknown as EventEmitter, {
+    const [first] = await emit(new AttachGrantCommand(), {
       ...IDENTITY,
       commandId: "cmd_1:grant_1",
       grant: GRANT,
     });
-    const [second] = await emit(new AttachGrantCommand() as unknown as EventEmitter, {
+    const [second] = await emit(new AttachGrantCommand(), {
       ...IDENTITY,
       commandId: "cmd_1:grant_2",
       grant: { ...GRANT, grantId: "grant_2" },
