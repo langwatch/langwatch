@@ -52,6 +52,39 @@ function latestRunOf<T extends { timestamps: { createdAt: number } }>(
   return runs.slice().toSorted((a, b) => b.timestamps.createdAt - a.timestamps.createdAt)[0];
 }
 
+const copySavedDatasets = async ({
+  app,
+  datasets,
+  sourceProjectId,
+  targetProjectId,
+}: {
+  app: ExperimentApi;
+  datasets: readonly { type: string; datasetId?: string }[];
+  sourceProjectId: string;
+  targetProjectId: string;
+}): Promise<Record<string, string>> => {
+  const datasetIdMap: Record<string, string> = {};
+
+  for (const entry of datasets) {
+    if (entry.type === "saved" && entry.datasetId) {
+      try {
+        const newDataset = await app.copyDataset({
+          sourceDatasetId: entry.datasetId,
+          sourceProjectId,
+          targetProjectId,
+        });
+        datasetIdMap[entry.datasetId] = newDataset.id;
+      } catch {
+        // A dataset that cannot be copied (for example one already removed)
+        // keeps its original reference rather than failing the whole copy.
+        continue;
+      }
+    }
+  }
+
+  return datasetIdMap;
+};
+
 /**
  * Copies an EVALUATIONS_V3 experiment to another project: the state in
  * `workbenchState` plus, optionally, the saved datasets it references.
@@ -83,28 +116,16 @@ const copyEvaluationsV3Experiment = async ({
   delete workbenchState.results;
 
   if (copyDatasets && Array.isArray(workbenchState.datasets)) {
-    const datasetIdMap: Record<string, string> = {};
-
-    for (const entry of workbenchState.datasets as {
-      id: string;
-      type: string;
-      datasetId?: string;
-    }[]) {
-      if (entry.type === "saved" && entry.datasetId) {
-        try {
-          const newDataset = await app.copyDataset({
-            sourceDatasetId: entry.datasetId,
-            sourceProjectId,
-            targetProjectId,
-          });
-          datasetIdMap[entry.datasetId] = newDataset.id;
-        } catch {
-          // A dataset that cannot be copied (for example one already removed)
-          // keeps its original reference rather than failing the whole copy.
-          continue;
-        }
-      }
-    }
+    const datasetIdMap = await copySavedDatasets({
+      app,
+      datasets: workbenchState.datasets as {
+        id: string;
+        type: string;
+        datasetId?: string;
+      }[],
+      sourceProjectId,
+      targetProjectId,
+    });
 
     for (const entry of workbenchState.datasets as {
       id: string;

@@ -78,10 +78,12 @@ function filterMatches(key: string, files: string[]): boolean {
 }
 
 function holdsAtLeastOneFile(dir: string): boolean {
-  if (!existsSync(dir) || !statSync(dir).isDirectory()) return false;
+  if (!existsSync(dir)) return false;
+  if (!statSync(dir).isDirectory()) return false;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isFile()) return true;
-    if (entry.isDirectory() && holdsAtLeastOneFile(path.join(dir, entry.name))) return true;
+    if (!entry.isDirectory()) continue;
+    if (holdsAtLeastOneFile(path.join(dir, entry.name))) return true;
   }
   return false;
 }

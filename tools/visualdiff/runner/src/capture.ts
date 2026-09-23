@@ -56,12 +56,10 @@ export class Side {
       });
     });
     page.on("requestfailed", (request: Request) => {
-      this.tracker.settled({
-        url: request.url(),
-        resourceType: request.resourceType(),
-        now: Date.now(),
-      });
-      if (shouldIgnoreRequest({ url: request.url(), resourceType: request.resourceType() })) return;
+      const url = request.url();
+      const resourceType = request.resourceType();
+      this.tracker.settled({ url, resourceType, now: Date.now() });
+      if (shouldIgnoreRequest({ url, resourceType })) return;
       this.recorder.failedRequest(
         `FAIL ${request.method()} ${this.relative(request.url())} ${request.failure()?.errorText ?? ""}`,
       );
@@ -69,7 +67,9 @@ export class Side {
     page.on("response", (response: Response) => {
       const request = response.request();
       if (response.status() < 400) return;
-      if (shouldIgnoreRequest({ url: request.url(), resourceType: request.resourceType() })) return;
+      const url = request.url();
+      const resourceType = request.resourceType();
+      if (shouldIgnoreRequest({ url, resourceType })) return;
       this.recorder.failedRequest(
         `${response.status()} ${request.method()} ${this.relative(request.url())}`,
       );
