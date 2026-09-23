@@ -136,16 +136,20 @@ const isNonEmptyStringList = (value: unknown): boolean => {
 // deliberately do NOT accept `organizationId: { in: [...] }` here: a list of
 // org ids would target several organizations, which the single-organization
 // invariant forbids, and no call-site needs it.
-const hasOrganizationId = (clause: any): boolean => typeof clause?.organizationId === "string";
+const hasOrganizationId = (clause: unknown): boolean =>
+  typeof clauseField(clause, "organizationId") === "string";
 
-const hasRowId = (clause: any): boolean =>
-  typeof clause?.id === "string" ||
-  (clause?.id && Array.isArray(clause.id.in) && clause.id.in.length > 0);
+const hasRowId = (clause: unknown): boolean => {
+  const id = clauseField(clause, "id");
+  if (typeof id === "string") return true;
+  const ids = clauseField(id, "in");
+  return Array.isArray(ids) && ids.length > 0;
+};
 
 // Prisma names a compound unique key by joining its field names with "_"
 // (e.g. `userId_organizationId`, `organizationId_name`). A WHERE that targets
 // such a key embeds organizationId and therefore bounds to one org + one row.
-const hasCompositeOrgKey = (clause: any): boolean => {
+const hasCompositeOrgKey = (clause: unknown): boolean => {
   if (!clause || typeof clause !== "object") return false;
   return Object.keys(clause).some((key) => {
     const value = clauseField(clause, key);
@@ -155,11 +159,15 @@ const hasCompositeOrgKey = (clause: any): boolean => {
 
 // An inline (scopeType, scopeId) target. scopeId is a globally-unique entity
 // id (a team or project id), so it resolves to exactly one organization.
-const hasInlineScope = (clause: any): boolean =>
-  typeof clause?.scopeType === "string" &&
-  (typeof clause?.scopeId === "string" || isNonEmptyStringList(clause?.scopeId));
+const hasInlineScope = (clause: unknown): boolean => {
+  const scopeId = clauseField(clause, "scopeId");
+  return (
+    typeof clauseField(clause, "scopeType") === "string" &&
+    (typeof scopeId === "string" || isNonEmptyStringList(scopeId))
+  );
+};
 
-const boundsToSingleOrg = (clause: any): boolean =>
+const boundsToSingleOrg = (clause: unknown): boolean =>
   hasOrganizationId(clause) || hasRowId(clause) || hasCompositeOrgKey(clause);
 
 /**
@@ -405,9 +413,10 @@ export const ORG_BEARING_MODEL_NAMES: readonly string[] = [
   ...ORG_TENANCY_EXEMPT,
 ];
 
-const collectOrganizationIds = (where: any, acc: Set<string>): void => {
+const collectOrganizationIds = (where: unknown, acc: Set<string>): void => {
   if (!where || typeof where !== "object") return;
-  if (typeof where.organizationId === "string") acc.add(where.organizationId);
+  const organizationId = clauseField(where, "organizationId");
+  if (typeof organizationId === "string") acc.add(organizationId);
   for (const key of ["AND", "OR", "NOT"] as const) {
     const branch = clauseField(where, key);
     if (Array.isArray(branch)) {
@@ -418,11 +427,12 @@ const collectOrganizationIds = (where: any, acc: Set<string>): void => {
   }
 };
 
-const validateRecursive = (where: any, passes: (clause: any) => boolean): boolean => {
+const validateRecursive = (where: unknown, passes: (clause: unknown) => boolean): boolean => {
   if (!where || typeof where !== "object") return false;
   if (passes(where)) return true;
-  if (Array.isArray(where.AND)) {
-    for (const clause of where.AND) {
+  const andClauses = clauseField(where, "AND");
+  if (Array.isArray(andClauses)) {
+    for (const clause of andClauses) {
       if (validateRecursive(clause, passes)) return true;
     }
   }
@@ -479,7 +489,7 @@ function assertOrganizationPredicate({
   config: OrgScopedModelConfig;
   where: unknown;
 }): void {
-  const passes = (clause: any) =>
+  const passes = (clause: unknown) =>
     boundsToSingleOrg(clause) ||
     (config.extraBound ? config.extraBound({ clause, action: params.action }) : false);
 

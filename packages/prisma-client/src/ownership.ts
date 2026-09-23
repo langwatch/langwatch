@@ -147,6 +147,22 @@ function assertRelationAccess({
     return;
   }
 
+  assertRelationEntries({ value, model, operation, claimedModels, exceptions });
+}
+
+function assertRelationEntries({
+  value,
+  model,
+  operation,
+  claimedModels,
+  exceptions,
+}: {
+  value: object;
+  model: PrismaTableModel;
+  operation: string;
+  claimedModels: ReadonlySet<PrismaTableModel>;
+  exceptions: readonly PrismaRelationException[];
+}): void {
   const modelRelations = relations.get(model);
   const modelFields = fields.get(model);
   for (const [key, child] of Object.entries(value)) {
