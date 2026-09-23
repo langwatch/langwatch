@@ -256,7 +256,7 @@ test_clickhouse_url_secret() {
   pw=$(kc get secret "$secret_name" -o jsonpath='{.data.password}' | base64 -d)
   url=$(kc get secret "$secret_name" -o jsonpath='{.data.url}' | base64 -d)
 
-  if echo "$url" | grep -qF "$pw"; then
+  if grep -qF "$pw" <<<"$url"; then
     pass "URL contains the password"
   else
     fail "URL does not contain the password: url=$url"
@@ -264,7 +264,7 @@ test_clickhouse_url_secret() {
 
   # URL must point at the chart-managed ClickHouse service
   local expected_host="${RELEASE}-clickhouse:8123"
-  if echo "$url" | grep -qF "$expected_host"; then
+  if grep -qF "$expected_host" <<<"$url"; then
     pass "URL points at $expected_host"
   else
     fail "URL does not contain $expected_host: url=$url"
@@ -569,7 +569,7 @@ $provision_out"
   # "LWQL not configured, skipping" and did nothing — every assertion here passed
   # against a feature that never ran. If that line reappears, the connection env
   # regressed and this whole suite is meaningless, so fail on it explicitly.
-  if printf '%s' "$provision_out" | grep -qiE 'LWQL not configured, skipping|skipping provisioning this boot'; then
+  if grep -qiE 'LWQL not configured, skipping|skipping provisioning this boot' <<<"$provision_out"; then
     fail "lwql:provision skipped as unconfigured — the full LWQL_* connection is not wired to the app pod (regression of the P1 fix)"
   else
     pass "lwql:provision ran (did not skip as unconfigured)"
@@ -652,13 +652,13 @@ $bridge_out"
     fail "sql-mode lwql:provision failed on a single node:
 $sql_provision_out"
   fi
-  if printf '%s' "$sql_provision_out" | grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError'; then
+  if grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError' <<<"$sql_provision_out"; then
     fail "AC9 guard refused sql mode on a SINGLE node — it must only refuse on a multi-host cluster:
 $sql_provision_out"
   else
     pass "AC9 guard permits sql mode on a single node (no refusal)"
   fi
-  if printf '%s' "$sql_provision_out" | grep -qiE 'defined in the ClickHouse config store|read-only'; then
+  if grep -qiE 'defined in the ClickHouse config store|read-only' <<<"$sql_provision_out"; then
     pass "sql-mode DDL ran and yielded to the mounted users_xml access model (non-vacuous)"
   else
     fail "sql-mode converge showed no config-store yield — the sql DDL path may not have run:
@@ -815,7 +815,7 @@ test_lwql_replicas() {
   # task still exits 0; `|| true` guards either way).
   local refuse_out
   refuse_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1) || true
-  if printf '%s' "$refuse_out" | grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError'; then
+  if grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError' <<<"$refuse_out"; then
     pass "AC9 guard refuses sql mode on a multi-host cluster"
   else
     fail "expected the AC9 sql-mode cluster refusal in the app log, found none:
