@@ -155,9 +155,7 @@ function findCustomKeysRefusal({
         .nullable()
     : managedOnly;
   const keysToValidate: Record<string, unknown> = { ...customKeys };
-  const parsed = (keysSchema as any).safeParse
-    ? (keysSchema as any).safeParse(keysToValidate)
-    : { success: true };
+  const parsed = keysSchema.safeParse(keysToValidate);
   if (parsed.success) return null;
 
   return fromZodError(parsed.error as ZodError).message;
@@ -438,7 +436,7 @@ export function useProviderFormSubmit({
           organizationId: snapshot.organizationId,
           provider: snapshot.provider.provider,
           enabled: newEnabled,
-          customKeys: snapshot.provider.customKeys as any,
+          customKeys: snapshot.provider.customKeys,
           customModels: snapshot.provider.customModels ?? [],
           customEmbeddingsModels: snapshot.provider.customEmbeddingsModels ?? [],
         });

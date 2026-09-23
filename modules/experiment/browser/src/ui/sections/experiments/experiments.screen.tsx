@@ -80,6 +80,59 @@ type ExperimentsListQuery = {
   refetch: () => unknown;
 };
 
+function experimentsPageState(
+  experiments: ExperimentsListQuery,
+): "loading" | "error" | "empty" | "list" {
+  if (experiments.isLoading) return "loading";
+  if (experiments.isError) return "error";
+  if (experiments.data?.experiments.length === 0) return "empty";
+  return "list";
+}
+
+const RUNNING_WINDOW_MS = 5 * 60 * 1000;
+
+function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["runsSummary"] }) {
+  const timestamps = runsSummary.latestRun?.timestamps;
+  if (timestamps?.finishedAt) {
+    return (
+      <>
+        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-500)" />
+        <Text fontSize="sm">Completed</Text>
+      </>
+    );
+  }
+  if (timestamps?.stoppedAt) {
+    return (
+      <>
+        <LuCircleX size={14} color="var(--chakra-colors-red-500)" />
+        <Text fontSize="sm">Stopped</Text>
+      </>
+    );
+  }
+  const updatedAt = timestamps?.updatedAt;
+  if (updatedAt && nowInstant().epochMilliseconds - updatedAt < RUNNING_WINDOW_MS) {
+    return (
+      <>
+        <Spinner size="xs" />
+        <Text fontSize="sm">Running</Text>
+      </>
+    );
+  }
+  if (runsSummary.count > 0) {
+    return (
+      <>
+        <LuCircleCheckBig size={14} color="var(--chakra-colors-green-500)" />
+        <Text fontSize="sm">Completed</Text>
+      </>
+    );
+  }
+  return (
+    <Text fontSize="sm" color="fg.muted">
+      -
+    </Text>
+  );
+}
+
 export function ExperimentsPage() {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
@@ -156,6 +209,8 @@ export function ExperimentsPage() {
     EVALUATIONS_V3: "Experiment (UI)",
   };
 
+  const pageState = experimentsPageState(experiments);
+
   return (
     <Box width="full">
       <PageLayout.Header>
@@ -165,15 +220,17 @@ export function ExperimentsPage() {
           <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
         </HStack>
       </PageLayout.Header>
-      {experiments.isLoading ? (
+      {pageState === "loading" && (
         <Box display="flex" justifyContent="center" py={8}>
           <Spinner />
         </Box>
-      ) : experiments.isError ? (
+      )}
+      {pageState === "error" && (
         <Box padding={6}>
           <Text color="red.500">Error loading experiments</Text>
         </Box>
-      ) : experiments.data?.experiments.length === 0 ? (
+      )}
+      {pageState === "empty" && (
         <PageLayout.Container>
           <PageLayout.Content>
             <NoDataInfoBlock
@@ -202,7 +259,8 @@ export function ExperimentsPage() {
             </NoDataInfoBlock>
           </PageLayout.Content>
         </PageLayout.Container>
-      ) : (
+      )}
+      {pageState === "list" && (
         <FullWidthListPageContent>
           <VStack width="full" gap={4} align="stretch">
             <Text color="fg.muted">Compare configurations and analyze batch test results</Text>
@@ -250,213 +308,176 @@ export function ExperimentsPage() {
                           </Table.Cell>
                         </Table.Row>
                       ))
-                    : experiments.data
-                      ? experiments.data.experiments.map((experiment) => (
-                          // Point Langy at an experiment. Same chip id the
-                          // `/experiments/<slug>` route derives, so pointing
-                          // at a row and then opening it yields one chip, not
-                          // two. Closed, this is the plain clickable row.
-                          <LangyContextTarget
-                            key={experiment.id}
-                            target={experimentContextChip({
-                              slug: experiment.slug,
-                              name: experiment.name,
-                            })}
+                    : experiments.data?.experiments.map((experiment) => (
+                        // Point Langy at an experiment. Same chip id the
+                        // `/experiments/<slug>` route derives, so pointing
+                        // at a row and then opening it yields one chip, not
+                        // two. Closed, this is the plain clickable row.
+                        <LangyContextTarget
+                          key={experiment.id}
+                          target={experimentContextChip({
+                            slug: experiment.slug,
+                            name: experiment.name,
+                          })}
+                        >
+                          <Table.Row
+                            cursor="pointer"
+                            onClick={() => {
+                              // Workbench-backed experiments (current and
+                              // legacy wizard) open in the workbench;
+                              // everything else in the experiment view.
+                              if (
+                                experiment.type === "EVALUATIONS_V3" ||
+                                experiment.workbenchState
+                              ) {
+                                void router.push({
+                                  pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
+                                });
+                              } else {
+                                void router.push({
+                                  pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                                });
+                              }
+                            }}
                           >
-                            <Table.Row
-                              cursor="pointer"
-                              onClick={() => {
-                                // Workbench-backed experiments (current and
-                                // legacy wizard) open in the workbench;
-                                // everything else in the experiment view.
-                                if (
-                                  experiment.type === "EVALUATIONS_V3" ||
-                                  experiment.workbenchState
-                                ) {
-                                  void router.push({
-                                    pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                  });
-                                } else {
-                                  void router.push({
-                                    pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                                  });
-                                }
-                              }}
-                            >
-                              <Table.Cell>
-                                <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
-                                  {experiment.name ?? experiment.slug}
-                                </OverflownTextWithTooltip>
-                              </Table.Cell>
-                              <Table.Cell whiteSpace="nowrap">
-                                <Badge colorPalette="gray" variant="outline">
-                                  {experiment.workbenchState?.task
-                                    ? taskTypeToLabel[experiment.workbenchState.task]
-                                    : experimentTypeToLabel[experiment.type]}
-                                </Badge>
-                              </Table.Cell>
-                              <Table.Cell>
-                                <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
-                                  {experiment.dataset?.name ?? "-"}
-                                </OverflownTextWithTooltip>
-                              </Table.Cell>
-                              <Table.Cell>
-                                {experiment.runsSummary.primaryMetric ? (
-                                  <>
-                                    <Text as="span" fontSize="xs" color="fg.muted">
-                                      {experiment.runsSummary.primaryMetric.name}: &nbsp;
-                                    </Text>
-                                    <Text as="span" fontWeight="semibold">
-                                      {formatEvaluationSummary(
-                                        experiment.runsSummary.primaryMetric,
-                                        true,
-                                      )}
-                                    </Text>
-                                  </>
-                                ) : (
-                                  "-"
-                                )}
-                              </Table.Cell>
-                              <Table.Cell>{experiment.runsSummary.count ?? "-"}</Table.Cell>
-                              <Table.Cell>
-                                <HStack gap={1}>
-                                  {experiment.runsSummary.latestRun?.timestamps?.finishedAt ? (
-                                    <>
-                                      <LuCircleCheckBig
-                                        size={14}
-                                        color="var(--chakra-colors-green-500)"
-                                      />
-                                      <Text fontSize="sm">Completed</Text>
-                                    </>
-                                  ) : experiment.runsSummary.latestRun?.timestamps?.stoppedAt ? (
-                                    <>
-                                      <LuCircleX size={14} color="var(--chakra-colors-red-500)" />
-                                      <Text fontSize="sm">Stopped</Text>
-                                    </>
-                                  ) : experiment.runsSummary.latestRun?.timestamps?.updatedAt &&
-                                    nowInstant().epochMilliseconds -
-                                      experiment.runsSummary.latestRun.timestamps.updatedAt <
-                                      5 * 60 * 1000 ? (
-                                    <>
-                                      <Spinner size="xs" />
-                                      <Text fontSize="sm">Running</Text>
-                                    </>
-                                  ) : experiment.runsSummary.count > 0 ? (
-                                    <>
-                                      <LuCircleCheckBig
-                                        size={14}
-                                        color="var(--chakra-colors-green-500)"
-                                      />
-                                      <Text fontSize="sm">Completed</Text>
-                                    </>
-                                  ) : (
-                                    <Text fontSize="sm" color="fg.muted">
-                                      -
-                                    </Text>
-                                  )}
-                                </HStack>
-                              </Table.Cell>
-                              <Table.Cell whiteSpace="nowrap">
-                                {readableDate(experiment.updatedAt).toLocaleString()}
-                              </Table.Cell>
-                              <Table.Cell>
-                                <Box width="full" height="full" display="flex" justifyContent="end">
-                                  <Menu.Root>
-                                    <Menu.Trigger
-                                      aria-label={`Actions for ${
-                                        experiment.name ?? experiment.slug
-                                      }`}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      <MoreVertical size={16} />
-                                    </Menu.Trigger>
-                                    <Menu.Content>
-                                      {hasPermission("workflows:create") &&
-                                        experiment.type === "EVALUATIONS_V3" && (
-                                          <Menu.Item
-                                            value="edit"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              void router.push(
-                                                `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                              );
-                                            }}
-                                          >
-                                            <LuPencil size={16} />
-                                            Edit
-                                          </Menu.Item>
-                                        )}
-                                      {hasPermission("workflows:create") &&
-                                        experiment.type !== "EVALUATIONS_V3" &&
-                                        experiment.type !== "BATCH_EVALUATION_V2" &&
-                                        experiment.workbenchState && (
-                                          <Menu.Item
-                                            value="edit"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              void router.push(
-                                                `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                              );
-                                            }}
-                                          >
-                                            <LuPencil size={16} />
-                                            Edit
-                                          </Menu.Item>
-                                        )}
-                                      <Menu.Item
-                                        value="view-results"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          void router.push(
-                                            `/${project?.slug}/experiments/${experiment.slug}`,
-                                          );
-                                        }}
-                                      >
-                                        <LuEye size={16} />
-                                        View Results
-                                      </Menu.Item>
-                                      {hasPermission("evaluations:manage") && (
+                            <Table.Cell>
+                              <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
+                                {experiment.name ?? experiment.slug}
+                              </OverflownTextWithTooltip>
+                            </Table.Cell>
+                            <Table.Cell whiteSpace="nowrap">
+                              <Badge colorPalette="gray" variant="outline">
+                                {experiment.workbenchState?.task
+                                  ? taskTypeToLabel[experiment.workbenchState.task]
+                                  : experimentTypeToLabel[experiment.type]}
+                              </Badge>
+                            </Table.Cell>
+                            <Table.Cell>
+                              <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
+                                {experiment.dataset?.name ?? "-"}
+                              </OverflownTextWithTooltip>
+                            </Table.Cell>
+                            <Table.Cell>
+                              {experiment.runsSummary.primaryMetric ? (
+                                <>
+                                  <Text as="span" fontSize="xs" color="fg.muted">
+                                    {experiment.runsSummary.primaryMetric.name}: &nbsp;
+                                  </Text>
+                                  <Text as="span" fontWeight="semibold">
+                                    {formatEvaluationSummary(
+                                      experiment.runsSummary.primaryMetric,
+                                      true,
+                                    )}
+                                  </Text>
+                                </>
+                              ) : (
+                                "-"
+                              )}
+                            </Table.Cell>
+                            <Table.Cell>{experiment.runsSummary.count ?? "-"}</Table.Cell>
+                            <Table.Cell>
+                              <HStack gap={1}>
+                                <ExperimentRunStatus runsSummary={experiment.runsSummary} />
+                              </HStack>
+                            </Table.Cell>
+                            <Table.Cell whiteSpace="nowrap">
+                              {readableDate(experiment.updatedAt).toLocaleString()}
+                            </Table.Cell>
+                            <Table.Cell>
+                              <Box width="full" height="full" display="flex" justifyContent="end">
+                                <Menu.Root>
+                                  <Menu.Trigger
+                                    aria-label={`Actions for ${experiment.name ?? experiment.slug}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                    }}
+                                  >
+                                    <MoreVertical size={16} />
+                                  </Menu.Trigger>
+                                  <Menu.Content>
+                                    {hasPermission("workflows:create") &&
+                                      experiment.type === "EVALUATIONS_V3" && (
                                         <Menu.Item
-                                          value="replicate"
+                                          value="edit"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            setCopyDialogState({
-                                              open: true,
-                                              experimentId: experiment.id,
-                                              experimentName: experiment.name ?? experiment.slug,
-                                            });
-                                          }}
-                                        >
-                                          <Copy size={16} />
-                                          Replicate to another project
-                                        </Menu.Item>
-                                      )}
-                                      {hasPermission("workflows:delete") && (
-                                        <Menu.Item
-                                          value="delete"
-                                          color="red.500"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteExperiment(
-                                              experiment.id,
-                                              experiment.name ?? experiment.slug,
+                                            void router.push(
+                                              `/${project?.slug}/experiments/workbench/${experiment.slug}`,
                                             );
                                           }}
                                         >
-                                          <LuTrash size={16} />
-                                          Delete
+                                          <LuPencil size={16} />
+                                          Edit
                                         </Menu.Item>
                                       )}
-                                    </Menu.Content>
-                                  </Menu.Root>
-                                </Box>
-                              </Table.Cell>
-                            </Table.Row>
-                          </LangyContextTarget>
-                        ))
-                      : null}
+                                    {hasPermission("workflows:create") &&
+                                      experiment.type !== "EVALUATIONS_V3" &&
+                                      experiment.type !== "BATCH_EVALUATION_V2" &&
+                                      experiment.workbenchState && (
+                                        <Menu.Item
+                                          value="edit"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void router.push(
+                                              `/${project?.slug}/experiments/workbench/${experiment.slug}`,
+                                            );
+                                          }}
+                                        >
+                                          <LuPencil size={16} />
+                                          Edit
+                                        </Menu.Item>
+                                      )}
+                                    <Menu.Item
+                                      value="view-results"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void router.push(
+                                          `/${project?.slug}/experiments/${experiment.slug}`,
+                                        );
+                                      }}
+                                    >
+                                      <LuEye size={16} />
+                                      View Results
+                                    </Menu.Item>
+                                    {hasPermission("evaluations:manage") && (
+                                      <Menu.Item
+                                        value="replicate"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCopyDialogState({
+                                            open: true,
+                                            experimentId: experiment.id,
+                                            experimentName: experiment.name ?? experiment.slug,
+                                          });
+                                        }}
+                                      >
+                                        <Copy size={16} />
+                                        Replicate to another project
+                                      </Menu.Item>
+                                    )}
+                                    {hasPermission("workflows:delete") && (
+                                      <Menu.Item
+                                        value="delete"
+                                        color="red.500"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteExperiment(
+                                            experiment.id,
+                                            experiment.name ?? experiment.slug,
+                                          );
+                                        }}
+                                      >
+                                        <LuTrash size={16} />
+                                        Delete
+                                      </Menu.Item>
+                                    )}
+                                  </Menu.Content>
+                                </Menu.Root>
+                              </Box>
+                            </Table.Cell>
+                          </Table.Row>
+                        </LangyContextTarget>
+                      ))}
                 </Table.Body>
               </ListTable>
               {experiments.data && experiments.data.experiments.length > 0 && (

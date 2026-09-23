@@ -68,6 +68,24 @@ const pulseAnimation = keyframes`
   50% { transform: scale(1.2); }
 `;
 
+function targetTypeNoun(type: TargetConfig["type"]): string {
+  if (type === "prompt") return "Prompt";
+  if (type === "evaluator") return "Evaluator";
+  return "Agent";
+}
+
+function runButtonTooltip({
+  isRunning,
+  hasMissingMappings,
+}: {
+  isRunning: boolean;
+  hasMissingMappings: boolean;
+}): string {
+  if (isRunning) return "Stop evaluation";
+  if (hasMissingMappings) return "Configure missing mappings first";
+  return "Run evaluation";
+}
+
 type TargetHeaderProps = {
   target: TargetConfig;
   /** Hands the prompt to Langy for the improvement loop. Prompt targets only. */
@@ -346,19 +364,9 @@ export const TargetHeader = memo(function TargetHeader({
     return "cyan.emphasized";
   };
 
-  const editLabel =
-    target.type === "prompt"
-      ? "Edit Prompt"
-      : target.type === "evaluator"
-        ? "Edit Evaluator"
-        : "Edit Agent";
+  const editLabel = `Edit ${targetTypeNoun(target.type)}`;
 
-  const switchLabel =
-    target.type === "prompt"
-      ? "Switch Prompt"
-      : target.type === "evaluator"
-        ? "Switch Evaluator"
-        : "Switch Agent";
+  const switchLabel = `Switch ${targetTypeNoun(target.type)}`;
 
   const headerRow = (
     <HStack
@@ -547,19 +555,15 @@ export const TargetHeader = memo(function TargetHeader({
             <TargetSummary aggregates={aggregates} evaluators={evaluators} isRunning={isRunning} />
           )}
         </HStack>
-      ) : hasAggregates ? (
-        <TargetSummary aggregates={aggregates} evaluators={evaluators} isRunning={isRunning} />
-      ) : null}
+      ) : (
+        hasAggregates && (
+          <TargetSummary aggregates={aggregates} evaluators={evaluators} isRunning={isRunning} />
+        )
+      )}
 
       {/* Play/Stop button on far right */}
       <Tooltip
-        content={
-          isRunning
-            ? "Stop evaluation"
-            : hasMissingMappings
-              ? "Configure missing mappings first"
-              : "Run evaluation"
-        }
+        content={runButtonTooltip({ isRunning, hasMissingMappings })}
         positioning={{ placement: "top" }}
         openDelay={200}
       >

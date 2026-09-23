@@ -109,9 +109,9 @@ vi.mock("@langwatch/design-system/menu", () => ({
       value?: string;
       onClick?: (event: { stopPropagation: () => void }) => void;
     }) => (
-      <div data-menu-item={value} onClick={onClick}>
+      <button type="button" data-menu-item={value} onClick={onClick}>
         {children}
-      </div>
+      </button>
     ),
   },
 }));

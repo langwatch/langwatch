@@ -964,11 +964,8 @@ export function EvaluationsV3Table({
     const targetMatch = evaluatorId
       ? state.targets.find((t) => t.targetEvaluatorId === evaluatorId)
       : undefined;
-    const initialComparison = evaluatorMatch
-      ? toComparisonConfig(evaluatorMatch)
-      : targetMatch
-        ? toComparisonConfig(targetMatch)
-        : undefined;
+    const comparisonSource = evaluatorMatch ?? targetMatch;
+    const initialComparison = comparisonSource ? toComparisonConfig(comparisonSource) : undefined;
     const comparisonContext = {
       ...(initialComparison ? { initialComparison } : {}),
       targets: variantOptions,
