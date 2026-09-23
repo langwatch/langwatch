@@ -63,7 +63,7 @@ tenant filters), and the
 `lwql_postgres` PostgreSQL-bridge named collection via SQL DDL on every
 deployment, against whichever ClickHouse it is pointed at — chart-managed or
 BYO/external, with no distinction between the two paths any more. See
-[ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md).
+[ADR-142](../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md).
 
 What this chart still renders is the two prerequisites that DDL needs from the
 server itself: the `default` user is granted `access_management` and

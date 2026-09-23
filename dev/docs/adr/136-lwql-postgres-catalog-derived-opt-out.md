@@ -142,7 +142,7 @@ change and is a known manual step, not an oversight.
 - **Positive.** Topics, datasets, workflows, gateway objects, and governance
   objects become queryable. `docs/api-reference/query/overview.mdx` is
   regenerated from the catalog rather than hand-maintained, and the app
-  catalog is the single source of truth for all deployments (per [ADR-141](./141-the-app-owns-the-lwql-access-model.md)), so the published docs cannot drift from what the catalog actually contains.
+  catalog is the single source of truth for all deployments (per [ADR-142](./142-the-app-owns-the-lwql-access-model.md)), so the published docs cannot drift from what the catalog actually contains.
 - **Negative.** The provisioning surface is bigger: more approved views, more
   engine tables, more row policies, all generated per model instead of
   hand-counted at six. The PostgreSQL connection budget grows with the

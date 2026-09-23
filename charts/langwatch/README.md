@@ -240,7 +240,7 @@ restricted `langwatch_lwql` user, the `<database>_profile` settings profile
 (`langwatch_profile` by default), row policies, a `lwql_postgres`
 PostgreSQL-bridge named collection, and the caller-facing views. **The
 application owns the access model in code** — see
-[ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md) for the
+[ADR-142](../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md) for the
 full contract. How the model reaches ClickHouse depends on the posture:
 
 - **Chart-managed ClickHouse (the default): rendered delivery.** The app renders
@@ -942,7 +942,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 
 | Name           | Description                                                                                                        | Value  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
-| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, named collection, views). On chart-managed ClickHouse the access model is DELIVERED as rendered config files mounted on every replica (default `rendered` mode); on bring-your-own ClickHouse the app self-provisions it via SQL DDL (`sql` mode). See [LangWatchQL (LWQL) prerequisites](#langwatchql-lwql-prerequisites) and [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md). The feature flag still gates the endpoint. | `true` |
+| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, named collection, views). On chart-managed ClickHouse the access model is DELIVERED as rendered config files mounted on every replica (default `rendered` mode); on bring-your-own ClickHouse the app self-provisions it via SQL DDL (`sql` mode). See [LangWatchQL (LWQL) prerequisites](#langwatchql-lwql-prerequisites) and [ADR-142](../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md). The feature flag still gates the endpoint. | `true` |
 
 ### Redis
 

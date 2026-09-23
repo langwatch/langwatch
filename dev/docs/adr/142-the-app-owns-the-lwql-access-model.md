@@ -1,4 +1,4 @@
-# ADR-141: The app owns the LangWatchQL access model — one definition, two emitters, delivered to every pod
+# ADR-142: The app owns the LangWatchQL access model — one definition, two emitters, delivered to every pod
 
 **Date:** 2026-09-22 (updated 2026-09-23, tasks#889)
 

@@ -10,7 +10,7 @@ values the database cannot compute.
 [ADR-083](083-lwql-diagnostics-read-the-single-parse.md): the validator's one
 walk is where facts about a statement are recorded; the hydration plan is
 recorded the same way, for the same reason.
-[ADR-141](141-the-app-owns-the-lwql-access-model.md): the app self-provisions
+[ADR-142](142-the-app-owns-the-lwql-access-model.md): the app self-provisions
 the LangWatchQL access model on every deployment, and app functions follow
 that same provisioning path. There is no config-time XML form for SQL UDFs, so
 provisioning is always application-driven; §4 explains the constraint.
@@ -171,7 +171,7 @@ pins that no such grant appears.
 
 ## 4. They are SQL, next to an access model the app self-provisions
 
-ADR-141 records that the app self-provisions the whole LangWatchQL access model
+ADR-142 records that the app self-provisions the whole LangWatchQL access model
 on every deployment. App functions run under that same app-owned path: they are
 SQL provisioned by the application at boot, not config. There is no XML form of
 `CREATE FUNCTION` for a SQL UDF; the only config-time UDF form,

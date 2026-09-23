@@ -13,7 +13,7 @@
  *
  * The application owns the LangWatchQL access model on every deployment and
  * converges the ClickHouse side — restricted user, settings profile, grants,
- * row policies, views — through `selfProvisioning.ts` at boot (ADR-141). What
+ * row policies, views — through `selfProvisioning.ts` at boot (ADR-142). What
  * remains here is the PostgreSQL half and the key map: this module composes
  * the PostgreSQL-side approved views
  * ({@link productionPostgresApprovedViewStatements}) and the key-map backfill

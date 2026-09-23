@@ -15,7 +15,7 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
   scale-up or disk rebuild alike, with no per-pod app action.
 
   SQL DDL is kept only for bring-your-own ClickHouse (`LWQL_ACCESS_MODEL_MODE=sql`),
-  where the chart cannot write the server's config files. See ADR-141.
+  where the chart cannot write the server's config files. See ADR-142.
 
   # ── AC7: existing patterns, no new machinery ──────────────────────────────
 
@@ -64,12 +64,12 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
   # ── AC9: sql mode is fail-closed on clusters, permitted on one node ─────────
   # The chart never selects sql mode for chart-managed ClickHouse, but an
   # operator can, so both branches of the AC9 cluster guard are exercised live
-  # against a chart-managed deployment. See ADR-141 and
+  # against a chart-managed deployment. See ADR-142 and
   # platform/app/src/server/analytics/lwql/provisioning/sqlModeClusterGuard.ts.
 
   # This asserts permit + DDL-path-ran + config-store yield, not a SQL-store
   # user: rendered delivery owns langwatch_lwql in users_xml, so sql mode yields
-  # (495). See ADR-141, the AC8 deviation "The AC9 'one node provisions' e2e half".
+  # (495). See ADR-142, the AC8 deviation "The AC9 'one node provisions' e2e half".
   @e2e
   Scenario: On a single node, sql mode is permitted and provisions the access model
     Given the single-replica chart-managed release is upgraded to LWQL_ACCESS_MODEL_MODE=sql

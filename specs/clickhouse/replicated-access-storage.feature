@@ -6,7 +6,7 @@ Feature: Chart-managed ClickHouse renders no LangWatchQL access model
   stays enabled for the boot-time convergence, and no keeper-backed access store
   is needed
 
-  # Issue #8258 / ADR-141: the application owns the LangWatchQL access model on
+  # Issue #8258 / ADR-142: the application owns the LangWatchQL access model on
   # every distribution and converges it at boot over SQL. The chart-managed
   # server therefore renders none of it — no restricted user, profile, grants,
   # tenant row filters or lwql_postgres named collection — and instead keeps SQL

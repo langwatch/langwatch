@@ -5,7 +5,7 @@
  * 1. The PostgreSQL-side approved views compose in the schema the connection
  *    URL names, not a hardcoded `public`, and only for PostgreSQL-resident
  *    datasets. (The app owns the ClickHouse access model and converges it at
- *    boot through `selfProvisioning.ts`, ADR-141 — not this module.)
+ *    boot through `selfProvisioning.ts`, ADR-142 — not this module.)
  * 2. `lwqlKeyMapTableQualifiedName` always resolves the key-map table under
  *    `sourceDatabase` (migration 00084's database), never `names.database`.
  *    A backfill using the wrong database writes rows a query never sees.

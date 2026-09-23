@@ -21,7 +21,7 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `BACKUP_ENABLED` | `false` | Enable S3 disk for native `BACKUP`/`RESTORE` SQL |
 | `S3_ENDPOINT` | — | S3-compatible endpoint (e.g. `https://s3.us-east-1.amazonaws.com/bucket/`) |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | — | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA) |
-| `CH_REPLICATED` | `false` | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is never stored in Keeper: on chart-managed ClickHouse it is delivered to every pod as rendered `users.d`/`config.d` files, and on bring-your-own ClickHouse the app provisions it via SQL; see [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md) |
+| `CH_REPLICATED` | `false` | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is never stored in Keeper: on chart-managed ClickHouse it is delivered to every pod as rendered `users.d`/`config.d` files, and on bring-your-own ClickHouse the app provisions it via SQL; see [ADR-142](../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md) |
 
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
@@ -33,7 +33,7 @@ For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverle
 restricted `langwatch_lwql` user, the `<database>_profile` settings profile,
 row policies, and the `lwql_postgres` PostgreSQL-bridge named collection). How
 that model reaches this ClickHouse depends on the posture (see
-[ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md)):
+[ADR-142](../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md)):
 
 - **Chart-managed ClickHouse (rendered mode, the default).** The app renders the
   model to `users.d/lwql-access.yaml` and `config.d/lwql-named-collection.yaml`,

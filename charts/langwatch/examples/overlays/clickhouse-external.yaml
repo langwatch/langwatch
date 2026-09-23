@@ -26,8 +26,8 @@ clickhouse:
 # access_control_improvements.settings_constraints_replace_previous set to true,
 # and the app's administrative user granted access_management +
 # named_collection_control. See "LangWatchQL (LWQL) prerequisites"
-# (../../README.md#langwatchql-lwql-prerequisites), and ADR-141
-# (../../../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md).
+# (../../README.md#langwatchql-lwql-prerequisites), and ADR-142
+# (../../../../dev/docs/adr/142-the-app-owns-the-lwql-access-model.md).
 #
 # AC9 — sql mode is fail-closed on clusters: before any access statement the app
 # reads system.user_directories and system.clusters. If access storage is NOT
