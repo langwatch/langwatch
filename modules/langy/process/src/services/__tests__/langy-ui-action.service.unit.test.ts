@@ -3,7 +3,7 @@ import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
  * The UI-action dispatch/claim/complete protocol, against fakes (specs/langy/langy-ui-
  * actions.feature).
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
@@ -542,11 +542,17 @@ describe("LangyUiActionService", () => {
     });
 
     describe("when the result is over the size ceiling", () => {
-      it("replaces an oversized result with a typed failure", async () => {
-        const { redis, store } = makeRedis();
-        seedClaimed(store);
-        const service = makeService({ redis });
+      let store: ReturnType<typeof makeRedis>["store"];
+      let service: ReturnType<typeof makeService>;
 
+      beforeEach(() => {
+        const made = makeRedis();
+        store = made.store;
+        seedClaimed(store);
+        service = makeService({ redis: made.redis });
+      });
+
+      it("replaces an oversized result with a typed failure", async () => {
         await service.complete({
           projectId: "project-1",
           userId: "user-1",
@@ -563,10 +569,6 @@ describe("LangyUiActionService", () => {
 
       /** @scenario A result over the ceiling is measured by its encoded bytes */
       it("measures multi-byte characters by their encoded size", async () => {
-        const { redis, store } = makeRedis();
-        seedClaimed(store);
-        const service = makeService({ redis });
-
         // 30k characters, three bytes each: under the ceiling counted as UTF-16
         // code units, 90KB once encoded.
         await service.complete({

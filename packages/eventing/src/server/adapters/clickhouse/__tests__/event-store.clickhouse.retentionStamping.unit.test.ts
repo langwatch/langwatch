@@ -5,7 +5,7 @@ import {
   EventingClickHouseEventStore,
   type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 /**
  * Stands in for whatever default the composing process injects. A literal on
@@ -30,14 +30,14 @@ describe("EventStoreClickHouse retention stamping", () => {
   const aggregateType = "trace" as const;
 
   let mockClient: EventingClickHouseClient;
-  let insertSpy: ReturnType<typeof vi.fn>;
+  let insertSpy: Mock<EventingClickHouseClient["insert"]>;
 
   beforeEach(() => {
-    insertSpy = vi.fn().mockResolvedValue(undefined);
+    insertSpy = vi.fn<EventingClickHouseClient["insert"]>().mockResolvedValue(undefined);
     mockClient = {
       query: vi.fn(),
       insert: insertSpy,
-    } as unknown as EventingClickHouseClient;
+    };
   });
 
   const makeEvent = () => ({

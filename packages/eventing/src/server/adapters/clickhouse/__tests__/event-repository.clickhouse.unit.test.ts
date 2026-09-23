@@ -40,7 +40,8 @@ function createMockClient(payload: unknown) {
       const projected = Object.fromEntries(selected.map((column) => [column, storedRow[column]]));
       return { json: vi.fn().mockResolvedValue([projected]) };
     }),
-  } as unknown as EventingClickHouseClient;
+    insert: vi.fn(),
+  };
 }
 
 /** Everything between `SELECT` and the `FROM` that closes it. */

@@ -3,7 +3,10 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 
 import type { Event } from "../../domain/types.ts";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
-import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types.ts";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
@@ -33,6 +36,9 @@ import type {
 const PAUSED_SET_KEY = "{event-sourcing/jobs}:gq:paused-jobs";
 const PIPELINE = "test_pipeline";
 const BASE_MS = 1_700_000_000_000;
+
+type ReplayRecord = { src: string; type: string };
+type BulkAppend = NonNullable<AppendStore<ReplayRecord>["bulkAppend"]>;
 
 /** An in-memory event history answering the reads the engine makes. */
 class MemoryEventSource implements ReplayEventSource {
@@ -179,8 +185,14 @@ function mapProjectionOver({
 }: {
   name: string;
   eventTypes?: string[];
-  bulkAppend: (...args: never[]) => Promise<void>;
+  bulkAppend: BulkAppend;
 }): RegisteredMapProjection {
+  const definition: MapProjectionDefinition<ReplayRecord, Event> = {
+    name,
+    eventTypes,
+    map: (event) => ({ src: event.aggregateId, type: event.type }),
+    store: { append: async () => undefined, bulkAppend },
+  };
   return {
     projectionName: name,
     pipelineName: PIPELINE,
@@ -188,12 +200,7 @@ function mapProjectionOver({
     source: "pipeline",
     pauseKey: `${PIPELINE}/handler/${name}`,
     kind: "map",
-    definition: {
-      name,
-      eventTypes,
-      map: (event: ReplayEvent) => ({ src: event.aggregateId, type: event.type }),
-      store: { append: async () => undefined, bulkAppend },
-    } as unknown as MapProjectionDefinition<any, Event>,
+    definition,
   };
 }
 
@@ -242,7 +249,7 @@ describe("ReplayService", () => {
       // defer the batch's aggregates.
       let pausedDuringWrite: number | null = null;
       let cutoffsDuringWrite: Record<string, string> | null = null;
-      const bulkAppend = vi.fn(async () => {
+      const bulkAppend = vi.fn<BulkAppend>(async () => {
         pausedDuringWrite = await redis.sismember(PAUSED_SET_KEY, pauseKey);
         cutoffsDuringWrite = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${name}`);
       });
@@ -273,14 +280,9 @@ describe("ReplayService", () => {
       // aggregates — never one awaited call per aggregate, which is the
       // per-trace grouping that made large replays take weeks.
       expect(bulkAppend).toHaveBeenCalledTimes(1);
-      const appended = (bulkAppend.mock.calls as unknown as [{ src: string }[], unknown][]).flatMap(
-        ([records]) => records,
-      );
+      const appended = bulkAppend.mock.calls.flatMap(([records]) => records);
       expect(appended.map((record) => record.src).toSorted()).toEqual(["trace-a1", "trace-a2"]);
-      for (const [, context] of bulkAppend.mock.calls as unknown as [
-        unknown,
-        { tenantId: string },
-      ][]) {
+      for (const [, context] of bulkAppend.mock.calls) {
         expect(context.tenantId).toBe(tenant);
       }
 
@@ -304,7 +306,7 @@ describe("ReplayService", () => {
       const tenant = `tenant-union-${Date.now()}`;
       const name = `unionFilter_${Date.now()}`;
       trackMarkers(name);
-      const bulkAppend = vi.fn(async () => undefined);
+      const bulkAppend = vi.fn<BulkAppend>(async () => undefined);
 
       const service = serviceOver([
         makeEvent({ id: "evt-c-001", tenantId: tenant, aggregateId: "trace-c1" }),
@@ -330,9 +332,7 @@ describe("ReplayService", () => {
       // Only the consumed event was read and processed — the noise event never
       // left the history.
       expect(result.totalEvents).toBe(1);
-      const records = (bulkAppend.mock.calls as unknown as [{ type: string }[], unknown][]).flatMap(
-        ([recs]) => recs,
-      );
+      const records = bulkAppend.mock.calls.flatMap(([recs]) => recs);
       expect(records.map((record) => record.type)).toEqual(["trace.upserted"]);
     });
   });
@@ -350,6 +350,15 @@ describe("ReplayService", () => {
       trackMarkers(stateName);
 
       const foldStore = vi.fn(async () => undefined);
+      const foldDefinition: FoldProjectionDefinition<{ count: number }, Event> = {
+        name: foldName,
+        version: "v1",
+        eventTypes: ["trace.upserted"],
+        LastEventOccurredAtKey: "LastEventOccurredAt",
+        init: () => ({ count: 0 }),
+        apply: (state) => ({ count: state.count + 1 }),
+        store: { store: foldStore, tryGet: vi.fn(async () => null) },
+      };
       const foldProjection: RegisteredFoldProjection = {
         projectionName: foldName,
         pipelineName: PIPELINE,
@@ -357,26 +366,26 @@ describe("ReplayService", () => {
         source: "pipeline",
         pauseKey: `${PIPELINE}/projection/${foldName}`,
         kind: "fold",
-        definition: {
-          name: foldName,
-          version: "v1",
-          eventTypes: ["trace.upserted"],
-          LastEventOccurredAtKey: "LastEventOccurredAt",
-          init: () => ({ count: 0 }),
-          apply: (state: { count: number }) => ({ count: state.count + 1 }),
-          store: { store: foldStore, get: vi.fn().mockResolvedValue(null) },
-        } as unknown as FoldProjectionDefinition<any, Event>,
+        definition: foldDefinition,
       };
 
-      const bulkAppend = vi.fn(async () => undefined);
+      const bulkAppend = vi.fn<BulkAppend>(async () => undefined);
 
       const stateWrites: unknown[] = [];
-      const stateStore = {
-        load: vi.fn(async () => null),
-        store: vi.fn(async (stored: unknown) => {
+      const stateStore: StateProjectionStore<{ seen: number }> = {
+        tryLoad: vi.fn(async () => null),
+        store: vi.fn(async (stored) => {
           stateWrites.push(stored);
         }),
-      } as unknown as StateProjectionStore<{ seen: number }>;
+      };
+      const stateDefinition: StateProjectionDefinition<{ seen: number }, Event> = {
+        name: stateName,
+        version: "v1",
+        eventTypes: ["trace.upserted"],
+        init: () => ({ seen: 0 }),
+        apply: (state) => ({ seen: state.seen + 1 }),
+        store: stateStore,
+      };
       const stateProjection: RegisteredStateProjection = {
         projectionName: stateName,
         pipelineName: PIPELINE,
@@ -384,14 +393,7 @@ describe("ReplayService", () => {
         source: "pipeline",
         pauseKey: `${PIPELINE}/stateProjection/${stateName}`,
         kind: "state",
-        definition: {
-          name: stateName,
-          version: "v1",
-          eventTypes: ["trace.upserted"],
-          init: () => ({ seen: 0 }),
-          apply: (state: { seen: number }) => ({ seen: state.seen + 1 }),
-          store: stateStore,
-        } as unknown as StateProjectionDefinition<any, Event>,
+        definition: stateDefinition,
       };
 
       const service = serviceOver([
@@ -433,7 +435,7 @@ describe("ReplayService", () => {
       const pauseKey = `${PIPELINE}/handler/${name}`;
 
       const pausedDuringWrite: number[] = [];
-      const bulkAppend = vi.fn(async () => {
+      const bulkAppend = vi.fn<BulkAppend>(async () => {
         pausedDuringWrite.push(await redis.sismember(PAUSED_SET_KEY, pauseKey));
       });
 

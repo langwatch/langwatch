@@ -74,17 +74,17 @@ function makeProjection({
  * which is decided before the queue implementation matters.
  */
 function makeQueuedRouter(projection: MapProjectionDefinition<SeamRecord, Event>) {
-  const sent: Event[][] = [];
-  const globalQueue = {
+  const sent: Record<string, unknown>[][] = [];
+  const globalQueue: EventSourcedQueueProcessor<Record<string, unknown>> = {
     send: async (payload: Record<string, unknown>) => {
-      sent.push([payload as unknown as Event]);
+      sent.push([payload]);
     },
     sendBatch: async (payloads: Record<string, unknown>[]) => {
-      sent.push(payloads as unknown as Event[]);
+      sent.push(payloads);
     },
     close: async () => undefined,
     waitUntilReady: async () => undefined,
-  } as unknown as EventSourcedQueueProcessor<Record<string, unknown>>;
+  };
 
   const queueManager = new QueueManager<Event>({
     aggregateType,

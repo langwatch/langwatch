@@ -10,7 +10,7 @@ import {
   EventingClickHouseEventStore,
   type EventingClickHouseClient,
 } from "@langwatch/eventing/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 /**
  * Verify re-fold partition pruning: EventOccurredAt bound required for
@@ -20,26 +20,38 @@ const tenantId = createTenantId("test-tenant");
 const OCCURRED_AT = 1_700_000_000_000;
 const TIME_LOCAL: AggregateType = "trace";
 
-let queryMock: ReturnType<typeof vi.fn>;
+let queryMock: Mock<EventingClickHouseClient["query"]>;
 let store: EventingClickHouseEventStore;
 
 beforeEach(() => {
-  queryMock = vi.fn().mockResolvedValue({ json: async () => [] });
+  queryMock = vi
+    .fn<EventingClickHouseClient["query"]>()
+    .mockResolvedValue({ json: async () => [] });
   const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
   store = EventingClickHouseEventStore.create({
     repository: EventingClickHouseEventRepository.create({
-      resolveClient: async () => ({ query: queryMock }) as unknown as EventingClickHouseClient,
+      resolveClient: async () => ({ query: queryMock, insert: vi.fn() }),
       retention,
     }),
     retention,
   });
 });
 
-const upToEvent = {
-  id: "event-1",
-  createdAt: 1000,
-  occurredAt: OCCURRED_AT,
-} as unknown as Event;
+function eventOccurredAt(occurredAt: number): Event {
+  return {
+    id: "event-1",
+    aggregateId: "trace-1",
+    aggregateType: TIME_LOCAL,
+    tenantId,
+    createdAt: 1000,
+    occurredAt,
+    type: "test.event",
+    version: "2025-12-17",
+    data: {},
+  };
+}
+
+const upToEvent = eventOccurredAt(OCCURRED_AT);
 
 // Genuinely the LAST call, not `calls[0]`: today each test issues exactly one
 // query so the two coincide, but a helper named `lastCall` that silently
@@ -134,11 +146,7 @@ describe("re-fold reads prune partitions — event with no usable occurred time"
   it("issues no lower bound rather than anchoring on zero", async () => {
     // Anchoring on 0 would produce a bound in 1970 and prune nothing, or
     // worse, a negative bound. Better to skip it.
-    await store.getEventsUpTo("trace-1", { tenantId }, TIME_LOCAL, {
-      id: "event-1",
-      createdAt: 1000,
-      occurredAt: 0,
-    } as unknown as Event);
+    await store.getEventsUpTo("trace-1", { tenantId }, TIME_LOCAL, eventOccurredAt(0));
 
     expect(lastCall().query).not.toContain("EventOccurredAt >=");
     expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();

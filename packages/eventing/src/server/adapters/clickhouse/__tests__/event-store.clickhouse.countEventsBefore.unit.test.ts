@@ -19,7 +19,8 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
     // Mock ClickHouse client
     mockClickHouseClient = {
       query: vi.fn(),
-    } as unknown as EventingClickHouseClient;
+      insert: vi.fn(),
+    };
 
     const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
     store = EventingClickHouseEventStore.create({

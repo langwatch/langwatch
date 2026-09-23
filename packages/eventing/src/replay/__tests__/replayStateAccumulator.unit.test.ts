@@ -303,7 +303,7 @@ describe("StateAccumulator", () => {
       const resolved: RetentionPolicy = { retentionDays: 90 };
       const resolver: RetentionPolicyResolver = {
         resolve: vi.fn(async () => resolved),
-      } as unknown as RetentionPolicyResolver;
+      };
 
       const { store, writes } = spyStore();
       const acc = new StateAccumulator(projection(store), {

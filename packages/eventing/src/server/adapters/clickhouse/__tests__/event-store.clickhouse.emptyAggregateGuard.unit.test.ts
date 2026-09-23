@@ -22,7 +22,8 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
   beforeEach(() => {
     mockClickHouseClient = {
       query: vi.fn(),
-    } as unknown as EventingClickHouseClient;
+      insert: vi.fn(),
+    };
 
     const retention = createEventingRetentionConfiguration({ defaultRetentionDays: 49 });
     store = EventingClickHouseEventStore.create({
@@ -34,10 +35,17 @@ describe("EventStoreClickHouse - empty aggregateId guard", () => {
     });
   });
 
-  const upToEvent = {
+  const upToEvent: Event = {
     id: "event-1",
+    aggregateId: "trace-123",
+    aggregateType,
+    tenantId,
     createdAt: 1000,
-  } as unknown as Event;
+    occurredAt: 1000,
+    type: "test.event",
+    version: "2025-12-17",
+    data: {},
+  };
 
   describe.each([
     { label: "an empty aggregateId", aggregateId: "" },

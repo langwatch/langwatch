@@ -31,14 +31,14 @@ describe("continuation forwarding", () => {
         globalJobRegistry: registry as never,
       });
 
-      const seenContexts: Record<string, unknown>[] = [];
+      const seenContexts: unknown[] = [];
       queueManager.initializeProjectionQueues(
         {
           myFold: { name: "myFold", coalesceMaxBatch: 10 },
         },
         async () => {},
         async (_name, _events, context) => {
-          seenContexts.push(context as unknown as Record<string, unknown>);
+          seenContexts.push(context);
         },
       );
 

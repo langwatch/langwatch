@@ -10,11 +10,7 @@ import { z } from "zod";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../../app/langy.members.ts";
-import {
-  LangyUiActionService,
-  type UiActionRedis,
-  uiActionKeys,
-} from "../langy-ui-action.service.ts";
+import { LangyUiActionService, uiActionKeys } from "../langy-ui-action.service.ts";
 
 const FAKE_DEFINITIONS: Record<string, LangyUiActionDefinition> = {
   "workbench.duplicateTarget": {
@@ -49,7 +45,7 @@ function makeService({
   backendRunner?: (args: { kind: string }) => Promise<unknown>;
 }) {
   return LangyUiActionService.create({
-    redis: redis as unknown as UiActionRedis,
+    redis,
     conversations: {
       findByIdVisible: async () => ({ currentTurnId: IDS.turnId }),
     },

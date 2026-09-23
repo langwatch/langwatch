@@ -1,5 +1,5 @@
 import type { CodingAgentSessionEvent } from "@langwatch/coding-agent-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   TEST_NOW_MS,
@@ -355,14 +355,21 @@ describe("Coding Agent session reads", () => {
     });
 
     describe("when the session outlived the window we guessed", () => {
-      /** @scenario a session longer than the guessed window still answers in full */
-      it("pushes the upper edge out to now rather than answering empty", async () => {
-        const sessions = new TestSessions();
-        const row = session({
+      let sessions: TestSessions;
+      let row: ReturnType<typeof session>;
+      let events: TestEvents;
+
+      beforeEach(() => {
+        sessions = new TestSessions();
+        row = session({
           startedAtMs: TEST_NOW_MS - CODING_AGENT_SESSION_READ_WINDOW_MS - 10_000,
         });
         sessions.rows = [row];
-        const events = new TestEvents();
+        events = new TestEvents();
+      });
+
+      /** @scenario a session longer than the guessed window still answers in full */
+      it("pushes the upper edge out to now rather than answering empty", async () => {
         const stubEvent = {
           sessionId: SESSION,
           timeUnixMs: row.startedAtMs,
@@ -389,12 +396,6 @@ describe("Coding Agent session reads", () => {
 
       /** @scenario a session longer than the guessed window still answers in full */
       it("stays bounded when a kinds filter is what emptied the page", async () => {
-        const sessions = new TestSessions();
-        const row = session({
-          startedAtMs: TEST_NOW_MS - CODING_AGENT_SESSION_READ_WINDOW_MS - 10_000,
-        });
-        sessions.rows = [row];
-        const events = new TestEvents();
         const service = serviceWith({ sessions, events });
 
         const page = await service.getSessionEvents({

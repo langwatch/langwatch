@@ -127,9 +127,14 @@ const CONTEXT: ProjectionStoreContext = {
 };
 const CACHE_KEY = `fold:test_table:${String(TENANT)}:agg-1`;
 
-function createStore<
-  Inner extends { store: FoldProjectionStore<TestState> } = ReturnType<typeof createInnerStore>,
->(redis: ReturnType<typeof createRedis>, inner: Inner = createInnerStore() as unknown as Inner) {
+function createStore(redis: ReturnType<typeof createRedis>) {
+  return createStoreOver(redis, createInnerStore());
+}
+
+function createStoreOver<Inner extends { store: FoldProjectionStore<TestState> }>(
+  redis: ReturnType<typeof createRedis>,
+  inner: Inner,
+) {
   return {
     inner,
     store: new RedisCachedFoldStore<TestState>(inner.store, redis as never, {
@@ -399,7 +404,7 @@ describe("RedisCachedFoldStore", () => {
         const inner = createDurableInnerStore({
           appliedEventIds: ["e1", "e2"],
         });
-        const { store } = createStore(redis, inner);
+        const { store } = createStoreOver(redis, inner);
 
         const result = await store.getWithApplied("agg-1", {
           ...CONTEXT,
@@ -420,7 +425,7 @@ describe("RedisCachedFoldStore", () => {
 
         const redis = createRedis();
         const inner = createDurableInnerStore({ appliedEventIds: [] });
-        const { store } = createStore(redis, inner);
+        const { store } = createStoreOver(redis, inner);
 
         const result = await store.getWithApplied("agg-1", {
           ...CONTEXT,

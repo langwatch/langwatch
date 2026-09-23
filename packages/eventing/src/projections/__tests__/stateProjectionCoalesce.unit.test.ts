@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
-import { TEST_CONSTANTS } from "../../services/__tests__/testHelpers.ts";
+import { createTestTenantId, TEST_CONSTANTS } from "../../services/__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
 import { QueueManager } from "../../services/queues/queueManager.ts";
 import { ProjectionRouter } from "../projectionRouter.ts";
@@ -61,10 +61,17 @@ describe("state projection coalescing wiring", () => {
       // Business time a day in the past, appended now: without a createdAt
       // score this event jumps the group's queue, and the cursor its drain
       // commits silently drops everything appended before it.
-      const backdated = {
+      const backdated: Event = {
+        id: "event-backdated",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId: createTestTenantId(),
         createdAt: 2_000,
         occurredAt: 1_000,
-      } as unknown as Event;
+        type: "test.event",
+        version: "2025-12-17",
+        data: {},
+      };
       expect(defs?.batched?.scoreFn?.(backdated)).toBe(2_000);
     });
   });
