@@ -54,6 +54,7 @@ import {
   kindNeedsReason,
   type RestProducedFor,
   type RestProducerFor,
+  type RestProtocolRefusal,
   type RestResponseDeclaration,
   type RestResponseDeclared,
   type RestResponseKind,
@@ -337,12 +338,14 @@ export type RestResponseOptions<
   Produces extends string | readonly string[],
 > = Readonly<{ produces?: Produces; because?: string }> &
   (Kind extends "bytes" | "protocol" ? Readonly<{ produces: Produces }> : unknown) &
-  (Kind extends "protocol" | "forwarded" ? Readonly<{ because: string }> : unknown);
+  (Kind extends "protocol" | "forwarded" ? Readonly<{ because: string }> : unknown) &
+  (Kind extends "protocol" ? Readonly<{ refusal?: RestProtocolRefusal }> : unknown);
 
 /** Those same options once the kind is gone: what the declaration reads off them. */
 type DeclaredResponseOptions = Readonly<{
   produces?: string | readonly string[];
   because?: string;
+  refusal?: RestProtocolRefusal;
 }>;
 
 function declaredProduces(options: DeclaredResponseOptions): readonly string[] | undefined {
@@ -353,6 +356,10 @@ function declaredProduces(options: DeclaredResponseOptions): readonly string[] |
 
 function declaredReason(options: DeclaredResponseOptions): string | undefined {
   return options.because;
+}
+
+function declaredRefusal(options: DeclaredResponseOptions): RestProtocolRefusal | undefined {
+  return options.refusal;
 }
 
 /**
@@ -937,6 +944,7 @@ class RouteBuilder<Api, S extends RouteShape> {
           kind,
           produces: [...named],
           ...(declaredReason(options) === undefined ? {} : { because: declaredReason(options) }),
+          ...(declaredRefusal(options) === undefined ? {} : { refusal: declaredRefusal(options) }),
         },
       },
     );

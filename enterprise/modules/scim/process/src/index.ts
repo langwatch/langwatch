@@ -9,7 +9,7 @@ export { scimServer, type ScimBespokeMembers } from "./scim.server.ts";
 // inert until a process mounts it on its own runtime.
 export { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
 export { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
-export { scimProtocolErrorHandler, scimProtocolRest } from "./transport/scim-protocol.rest.ts";
+export { scimProtocolRest } from "./transport/scim-protocol.rest.ts";
 export { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 
 export type {

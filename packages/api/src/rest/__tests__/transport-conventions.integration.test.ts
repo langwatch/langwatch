@@ -180,9 +180,27 @@ describe("a declared action called with a body", () => {
       body,
     });
 
-    expect(response.ok).toBe(false);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: "malformed_request" });
     expect(run).not.toHaveBeenCalled();
   });
+
+  /** @scenario "Malformed JSON under a JSON content type is refused as a handled 400" */
+  it.each(["{", '{"name": "dup', "not json"])(
+    "refuses %j with 400 malformed_request, never a 500",
+    async (body) => {
+      const { app, run } = actionsApp();
+      const response = await app.request(`${BASE}/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body,
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ code: "malformed_request" });
+      expect(run).not.toHaveBeenCalled();
+    },
+  );
 
   /** @scenario "A body that was sent is parsed as sent, never read as the empty object" */
   it("hands the handler the fields a body carried", async () => {

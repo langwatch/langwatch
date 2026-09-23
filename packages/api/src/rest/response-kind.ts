@@ -118,6 +118,21 @@ export type RestProtocolProducer<Produces extends string | readonly string[] = s
   ): RestAnswer<"protocol">;
 }>;
 
+/**
+ * How a foreign protocol answers a refusal: every failure its route raises,
+ * the door's and the parser's included, written in the protocol's own document.
+ */
+export type RestProtocolRefusal = (
+  refused: Readonly<{ failure: Error; response: RestRefusalProducer }>,
+) => RestAnswer<"protocol">;
+
+/** What a refusal writes: a failure carries its status as a plain number, not a declared one. */
+export type RestRefusalProducer = Readonly<{
+  write(
+    options: Readonly<{ status: number; mediaType: string; body: string }>,
+  ): RestAnswer<"protocol">;
+}>;
+
 /** What a route that answers with someone else's response hands over. */
 export type RestForwardedProducer = Readonly<{
   pass(response: Response): RestAnswer<"forwarded">;
@@ -157,6 +172,8 @@ export type RestResponseDeclaration = Readonly<{
   produces: readonly string[];
   /** Why a wire we do not own is written here; required of the two escape kinds. */
   because?: string;
+  /** A protocol route's own refusal document, in place of the family's error boundary. */
+  refusal?: RestProtocolRefusal;
 }>;
 
 function answer<Kind extends RestResponseKind>(
@@ -310,6 +327,26 @@ const PRODUCERS = {
   protocol: PROTOCOL_PRODUCER,
   forwarded: FORWARDED_PRODUCER,
 } as const satisfies Record<RestResponseKind, unknown>;
+
+/** An HTTP status a response can carry; anything else a refusal names is a 500. */
+function isStatusCode(status: number): status is StatusCode {
+  return Number.isInteger(status) && status >= 100 && status <= 599;
+}
+
+const REFUSAL_PRODUCER: RestRefusalProducer = Object.freeze({
+  write(options) {
+    return PROTOCOL_PRODUCER.write({
+      status: isStatusCode(options.status) ? options.status : 500,
+      mediaType: options.mediaType,
+      body: options.body,
+    });
+  },
+});
+
+/** The producer a protocol route's refusal writes through. */
+export function refusalProducer(): RestRefusalProducer {
+  return REFUSAL_PRODUCER;
+}
 
 /** The producer for a declared kind, as the runtime hands it to the handler. */
 export function producerFor(kind: RestResponseKind): (typeof PRODUCERS)[RestResponseKind] {

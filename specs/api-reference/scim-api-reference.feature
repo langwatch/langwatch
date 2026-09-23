@@ -47,4 +47,4 @@ Feature: SCIM 2.0 is published in the API reference
     Given a provisioning route mounted on the process's own error boundary
     When it is called with no bearer token
     Then the response status is 401
-    And the body carries the refusal's stable code
+    And the body is SCIM's own error document, as application/scim+json

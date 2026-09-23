@@ -266,6 +266,17 @@ function build(
     return undefined;
   }) as never);
 
+  return refusingMalformedBody({ target, validate });
+}
+
+/** A body that does not parse is the handled 400 `malformed_request`, never Hono's bare 400. */
+export function refusingMalformedBody({
+  target,
+  validate,
+}: {
+  target: keyof ValidationTargets;
+  validate: MiddlewareHandler;
+}): MiddlewareHandler {
   const guarded: MiddlewareHandler = async (c, next) => {
     // A failure raised before the route ran is the validator's; anything after
     // `next()` belongs to the handler and passes through untouched.

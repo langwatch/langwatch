@@ -71,6 +71,7 @@ import {
   isBodyAbsent,
   loggerMiddleware,
   multipartMiddleware,
+  refusingMalformedBody,
   requestValidationErrorFrom,
   restCacheKey,
   restRateLimitKey,
@@ -81,7 +82,13 @@ import {
   type RestTransportMiddlewareBinding,
   type RestTransportMiddleware,
 } from "./request.ts";
-import { isProducedAnswer, producedKind, producerFor, type RestEvent } from "./response-kind.ts";
+import {
+  isProducedAnswer,
+  producedKind,
+  producerFor,
+  refusalProducer,
+  type RestEvent,
+} from "./response-kind.ts";
 import {
   DECLARED_ANSWER,
   ENDPOINT_ROUTE,
@@ -331,10 +338,41 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
 
       if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
 
-      app.onError(withRetryAfter(options.onError));
+      app.onError(withRetryAfter(protocolRefusals(options.onError)));
 
       return app;
     },
+  };
+}
+
+/** The protocol route a request reached, when that route renders its own refusals. */
+const refusingRoutes = new WeakMap<Context, RestTransportRoute<unknown>>();
+
+/** Marks the request as one whose every refusal the route's protocol renders. */
+function protocolRefusalScope(route: RestTransportRoute<unknown>): MiddlewareHandler {
+  return async (context, next) => {
+    refusingRoutes.set(context, route);
+    await next();
+  };
+}
+
+/**
+ * The family's error boundary, except on a route whose protocol declared its own
+ * refusal: there the door's, the parser's and the handler's refusals all answer in
+ * that protocol's document (ARCHITECTURE.md §8).
+ */
+function protocolRefusals(onError: ErrorHandler): ErrorHandler {
+  return (error, context) => {
+    const route = refusingRoutes.get(context);
+    const refusal = route?.response?.refusal;
+
+    if (!route || !refusal) return onError(error, context);
+
+    return respondProduced({
+      context,
+      route,
+      result: refusal({ failure: error, response: refusalProducer() }),
+    });
   };
 }
 
@@ -522,6 +560,7 @@ function routeStack<Api>({
   const documents = documented && publishable;
 
   return [
+    ...(route.response?.refusal ? [protocolRefusalScope(route)] : []),
     versionContext({ route, family, version, status }),
     ...(documents
       ? [
@@ -680,13 +719,16 @@ function validators({
   const add = (target: "param" | "query" | "json", schema: z.ZodType | undefined): void => {
     if (!schema) return;
 
-    const validate = openApiValidator(target, schema, (result) => {
-      // The typed refusal, raised here rather than left for a boundary to
-      // recognise: a family with an `onError` of its own must not answer 500
-      // for a request every other family answers 422 for.
-      if (!result.success) {
-        throw requestValidationErrorFrom({ target, error: result.error, input: result.data });
-      }
+    const validate = refusingMalformedBody({
+      target,
+      validate: openApiValidator(target, schema, (result) => {
+        // The typed refusal, raised here rather than left for a boundary to
+        // recognise: a family with an `onError` of its own must not answer 500
+        // for a request every other family answers 422 for.
+        if (!result.success) {
+          throw requestValidationErrorFrom({ target, error: result.error, input: result.data });
+        }
+      }),
     });
 
     const middleware = readingAbsentBody({ route, target, schema, validate });
@@ -1736,7 +1778,7 @@ function respondProduced({
   if (context.req.method === "HEAD" || carrying === null) {
     if (result.body.form === "stream") void result.body.stream.cancel();
 
-    return context.body(null, result.status, headers);
+    return context.body(null, result.status, carrying === null ? contentless(headers) : headers);
   }
 
   if (result.body.form === "events") {
@@ -1750,6 +1792,13 @@ function respondProduced({
   return bytes === null
     ? context.body(null, result.status, headers)
     : context.body(bytes, carrying, headers);
+}
+
+/** An answer that carries no content names no media type for it. */
+function contentless(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).filter(([name]) => name.toLowerCase() !== "content-type"),
+  );
 }
 
 /** The statuses that carry no body at all, so nothing may be written under them. */

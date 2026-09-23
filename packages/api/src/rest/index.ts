@@ -247,7 +247,9 @@ export type {
   RestProducedFor,
   RestProducerFor,
   RestProtocolProducer,
+  RestProtocolRefusal,
   RestRedirectProducer,
+  RestRefusalProducer,
   RestResponseKind,
 } from "./response-kind.ts";
 

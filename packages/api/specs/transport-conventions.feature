@@ -23,8 +23,49 @@ Feature: The REST runtime renders what a transport may not hand-roll
     Scenario: A body that was sent is parsed as sent, never read as the empty object
       Given a route whose input schema accepts the empty object
       When the body is an explicit null, an empty JSON string, malformed JSON or whitespace
-      Then it is refused exactly as before, and the handler is not reached
+      Then it is refused, and the handler is not reached
       And a body carrying fields hands the handler those fields
+
+  Rule: A body that does not parse is the caller's mistake, never ours
+
+    @integration
+    Scenario: Malformed JSON under a JSON content type is refused as a handled 400
+      Given a route that declares a JSON input
+      When it is called with a JSON content type and a body that is not JSON
+      Then it is refused with 400 and the code malformed_request, never a 500
+      And the handler is not reached
+
+  Rule: A protocol route renders every refusal in its protocol's own document
+
+    @integration
+    Scenario: A refusal raised at the door answers in the protocol's document
+      Given a protocol route that declares how its protocol renders a refusal
+      When its door refuses the caller
+      Then the answer is the protocol's document at the door's status, not the canonical envelope
+
+    @integration
+    Scenario: A refusal raised while parsing the request answers in the protocol's document
+      Given a protocol route that declares how its protocol renders a refusal
+      When the body is malformed JSON or does not match the declared input
+      Then the answer is the protocol's document at the parser's status, not the canonical envelope
+
+    @integration
+    Scenario: A refusal the handler throws answers in the protocol's document
+      Given a protocol route that declares how its protocol renders a refusal
+      When its handler throws a handled refusal, or fails with an unhandled error
+      Then the answer is the protocol's document the renderer wrote for that failure
+
+    @integration
+    Scenario: A route that declares no refusal renderer keeps the family's boundary
+      Given a family mounting a protocol route with a renderer beside routes without one
+      When a route without one refuses
+      Then it answers the family's canonical envelope exactly as before
+
+    @integration
+    Scenario: A protocol answer with no content names no media type
+      Given a protocol route whose handler writes a 204 with no body
+      When it answers
+      Then the answer carries no Content-Type
 
   Rule: A handled refusal's wait is rendered as Retry-After
 

@@ -304,3 +304,46 @@ Feature: Enterprise SCIM package boundary
       Given a token issued against a connection that has been torn down
       When the provisioning tokens are read
       Then the token still names the connection it was issued against
+
+  Rule: Every refusal answers in SCIM's own error document, byte for byte as main answered it
+
+    An identity provider reads `status` and `detail` off RFC 7644's error resource and
+    nothing else, so a refusal in any other shape reads as an outage. The route renders
+    it, whichever stage refused: the directory door, the body, or the operation.
+
+    @unit
+    Scenario: A provisioning call with no bearer, or one this deployment never minted, is refused as SCIM's 401
+      Given the SCIM family mounted behind the process's own error boundary
+      When a provisioning route is called with no bearer, or with a bearer that names no token
+      Then the answer is application/scim+json at 401 with main's error document for that case
+
+    @unit
+    Scenario: A token whose organization lost the plan is refused as SCIM's 403
+      Given a valid token for an organization whose plan no longer includes directory sync
+      When a provisioning route is called with it
+      Then the answer is application/scim+json at 403 naming the plan the feature needs
+
+    @unit
+    Scenario: A body that is not JSON, or not a resource we accept, is refused as SCIM's 400
+      Given the SCIM family mounted behind the process's own error boundary
+      When a directory pushes a body that does not parse, or a resource missing a field
+      Then the answer is application/scim+json at 400 with main's detail for that case
+
+    @unit
+    Scenario: A refusal the operation raises answers in SCIM's document at its own status
+      Given an operation that refuses with a protocol refusal, or with any other handled error
+      When a directory calls the route
+      Then a protocol refusal is answered as its own document
+      And any other handled refusal carries its code in scimType beside its message
+
+    @unit
+    Scenario: A failure nobody handled is SCIM's 500 and says nothing more
+      Given an operation that fails with an unhandled error
+      When a directory calls the route
+      Then the answer is application/scim+json at 500 saying only that the request could not be completed
+
+    @unit
+    Scenario: A deprovisioning answers 204 with no body and no media type
+      Given a member the directory deprovisions
+      When the delete succeeds
+      Then the answer is 204 with no body and no Content-Type

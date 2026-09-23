@@ -7,21 +7,19 @@
  * The /Schemas discovery copy is what an identity-provider administrator reads
  * when wiring provisioning, so it must name the right resource.
  */
-import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
-import type {
-  ScimListResponse,
-  ScimTokenEntitlement,
-  ScimUser,
+import { bindRestMiddleware, RestHost, type RestIdentity } from "@langwatch/api/rest";
+import {
+  ScimProtocolError,
+  ScimWriteOutsideConnectionError,
+  type ScimListResponse,
+  type ScimTokenEntitlement,
+  type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/entitlement-contract";
 import type { OrganizationSsoConnection } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  scimProtocolErrorHandler,
-  scimProtocolRest,
-  scimRestCredential,
-} from "../scim-protocol.rest.ts";
+import { scimProtocolRest, scimRestCredential } from "../scim-protocol.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
 
 const ORGANIZATION_ID = "org_acme";
@@ -65,36 +63,52 @@ class RetiredConnectionDirectory extends DirectoryFake {
   );
 }
 
+/**
+ * The family mounted the way the process mounts it: through RestHost, whose own
+ * boundary is the canonical envelope, so every SCIM document below is the route's.
+ */
 function mount(
-  onError = scimProtocolErrorHandler,
   options: { scim?: ScimServiceFake; connections?: OrganizationSsoConnection[] } = {},
 ) {
   const scim = options.scim ?? new DirectoryFake();
   const { app } = scimTestApp({ scim, connections: options.connections });
   const directories = new WeakMap<Request, { connectionId: string | null }>();
-
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("This family resolves its own credential.");
-      },
-      identify: ({ request }) =>
-        app
-          .authenticateDirectory({ authorization: request.headers.get("authorization") })
-          .then((directory) => {
-            directories.set(request, { connectionId: directory.connectionId });
-
-            return {
-              actor: { type: "api_key" as const, id: directory.id },
-              scope: { tier: "organization" as const, id: directory.organizationId },
-            };
-          }),
+  const closed: RestIdentity = {
+    authenticate: () => {
+      throw new Error("Only the directory door answers this family.");
     },
+  };
+  const door: RestIdentity = {
+    authenticate: () => {
+      throw new Error("This family resolves its own credential.");
+    },
+    identify: ({ request }) =>
+      app
+        .authenticateDirectory({ authorization: request.headers.get("authorization") })
+        .then((directory) => {
+          directories.set(request, { connectionId: directory.connectionId });
+
+          return {
+            actor: { type: "api_key" as const, id: directory.id },
+            scope: { tier: "organization" as const, id: directory.organizationId },
+          };
+        }),
+  };
+
+  const host = RestHost.create({
+    identities: {
+      project: closed,
+      organization: closed,
+      apiKey: closed,
+      scimToken: door,
+      "instance-admin": closed,
+      browser: closed,
+    },
+    bearers: () => closed,
+    audit: { record: async () => {} },
   });
 
-  const hono = runtime.mount(scimProtocolRest.router(), {
-    app: () => app,
-    onError,
+  host.mount(scimProtocolRest.router(), () => app, {
     facts: [
       bindRestMiddleware(scimRestCredential, (c) => {
         const directory = directories.get(c.req.raw);
@@ -105,22 +119,20 @@ function mount(
     ],
   });
 
+  const send = (path: string, init: RequestInit = {}) =>
+    host.app.fetch(new Request(`http://api.test${path}`, init));
+
   return {
     scim,
+    send,
     get: (path: string, authorization?: string) =>
-      hono.fetch(
-        new Request(`http://api.test${path}`, {
-          headers: authorization ? { authorization } : {},
-        }),
-      ),
+      send(path, { headers: authorization ? { authorization } : {} }),
     post: (path: string, body: string) =>
-      hono.fetch(
-        new Request(`http://api.test${path}`, {
-          method: "POST",
-          headers: { authorization: BEARER, "content-type": "application/scim+json" },
-          body,
-        }),
-      ),
+      send(path, {
+        method: "POST",
+        headers: { authorization: BEARER, "content-type": "application/scim+json" },
+        body,
+      }),
   };
 }
 
@@ -218,13 +230,18 @@ describe("given a directory holding this organization's SCIM bearer token", () =
 
   describe("when a provisioning route refuses at the process's own error boundary", () => {
     /** @scenario "A directory refusal answers its own status, never an unattributed 500" */
-    it("answers the refusal's status, because the refusal is handled", async () => {
-      const api = mount((error, context) => canonicalErrorResponse(error, context));
+    it("answers the refusal's status in the protocol's own document", async () => {
+      const api = mount();
 
       const response = await api.get("/api/scim/v2/Users");
 
       expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toMatchObject({ code: "scim_protocol_refusal" });
+      expect(response.headers.get("content-type")).toBe("application/scim+json");
+      await expect(response.json()).resolves.toEqual({
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "401",
+        detail: "Bearer token is required",
+      });
     });
   });
 
@@ -245,7 +262,7 @@ describe("given a directory holding this organization's SCIM bearer token", () =
     /** @scenario "Removing a connection ends the tokens issued against it" */
     it("refuses the push and retires every token issued against that connection", async () => {
       const scim = new RetiredConnectionDirectory();
-      const api = mount(scimProtocolErrorHandler, { scim, connections: [] });
+      const api = mount({ scim, connections: [] });
 
       const response = await api.get("/api/scim/v2/Users", BEARER);
 
@@ -269,7 +286,7 @@ describe("given a directory holding this organization's SCIM bearer token", () =
 
     it("leaves a live connection's directory provisioning exactly as it was", async () => {
       const scim = new RetiredConnectionDirectory();
-      const api = mount(scimProtocolErrorHandler, {
+      const api = mount({
         scim,
         connections: [
           {
@@ -301,34 +318,9 @@ describe("given a directory holding this organization's SCIM bearer token", () =
           }),
         );
       }
-      const { app } = scimTestApp({ scim: new UnentitledDirectory() });
-      const runtime = createRestRuntime({
-        identity: {
-          authenticate: () => {
-            throw new Error("This family resolves its own credential.");
-          },
-          identify: ({ request }) =>
-            app
-              .authenticateDirectory({ authorization: request.headers.get("authorization") })
-              .then((scope) => ({
-                actor: { type: "api_key" as const, id: "scim-directory-token" },
-                scope: { tier: "organization" as const, id: scope.organizationId },
-              })),
-        },
-      });
-      const hono = runtime.mount(scimProtocolRest.router(), {
-        app: () => app,
-        onError: scimProtocolErrorHandler,
-        facts: [
-          bindRestMiddleware(scimRestCredential, () => {
-            throw new Error("The plan gate refuses before a handler ever reads this fact");
-          }),
-        ],
-      });
+      const api = mount({ scim: new UnentitledDirectory() });
 
-      const response = await hono.fetch(
-        new Request("http://api.test/api/scim/v2/Users", { headers: { authorization: BEARER } }),
-      );
+      const response = await api.get("/api/scim/v2/Users", BEARER);
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({
@@ -336,6 +328,174 @@ describe("given a directory holding this organization's SCIM bearer token", () =
         status: "403",
         detail: ENTERPRISE_FEATURE_ERRORS.SCIM,
       });
+    });
+  });
+});
+
+/**
+ * Main's bytes, transcribed from origin/main:platform/app/ee/scim/routes.ts (`scimError`,
+ * `malformedBody`, `invalidResource`, `scimAuth` and the family's `onError`).
+ */
+const MAIN_WIRE = {
+  missingBearer:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"401","detail":"Bearer token is required"}',
+  unknownBearer:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"401","detail":"Bearer token is not valid"}',
+  planLapsed:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"403","detail":"SCIM provisioning requires an Enterprise plan"}',
+  malformedBody:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"400","detail":"The request body could not be read as JSON"}',
+  invalidGroup:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"400","detail":"The resource is not valid: displayName"}',
+  invalidFilter:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"400","detail":"Only eq filters are supported","scimType":"invalidFilter"}',
+  writeOutsideConnection:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"403","scimType":"scim_write_outside_connection","detail":"This directory token cannot change resources provisioned by another connection"}',
+  unhandled:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"500","detail":"The request could not be completed"}',
+} as const;
+
+async function expectMainWire(response: Response, status: number, body: string) {
+  expect(response.status).toBe(status);
+  expect(response.headers.get("content-type")).toBe("application/scim+json");
+  expect(await response.text()).toBe(body);
+}
+
+describe("given the SCIM family behind the process's own error boundary", () => {
+  describe("when the directory door refuses the caller", () => {
+    /** @scenario "A provisioning call with no bearer, or one this deployment never minted, is refused as SCIM's 401" */
+    it("answers main's 401 documents for a missing and an unknown bearer", async () => {
+      const api = mount();
+
+      await expectMainWire(await api.get("/api/scim/v2/Users"), 401, MAIN_WIRE.missingBearer);
+      await expectMainWire(
+        await api.get("/api/scim/v2/Groups", "Basic c2NpbTp0b2tlbg=="),
+        401,
+        MAIN_WIRE.missingBearer,
+      );
+      await expectMainWire(
+        await api.get("/api/scim/v2/Users", "Bearer not-a-token"),
+        401,
+        MAIN_WIRE.unknownBearer,
+      );
+    });
+
+    /** @scenario "A provisioning call with no bearer, or one this deployment never minted, is refused as SCIM's 401" */
+    it("refuses at the door before it reads a body, as main did", async () => {
+      const api = mount();
+
+      const response = await api.send("/api/scim/v2/Users", {
+        method: "POST",
+        headers: { "content-type": "application/scim+json" },
+        body: "{not json",
+      });
+
+      await expectMainWire(response, 401, MAIN_WIRE.missingBearer);
+      expect(api.scim.recordRequest).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A token whose organization lost the plan is refused as SCIM's 403" */
+    it("answers main's 403 document for a lapsed plan", async () => {
+      class UnentitledDirectory extends ScimServiceFake {
+        override readonly verifyToken = vi.fn(
+          async (_input: { token: string }): Promise<ScimTokenEntitlement> => ({
+            status: "plan_not_entitled",
+            organizationId: ORGANIZATION_ID,
+            connectionId: null,
+          }),
+        );
+      }
+      const api = mount({ scim: new UnentitledDirectory() });
+
+      await expectMainWire(await api.get("/api/scim/v2/Users", BEARER), 403, MAIN_WIRE.planLapsed);
+    });
+  });
+
+  describe("when a directory pushes a body we cannot take", () => {
+    /** @scenario "A body that is not JSON, or not a resource we accept, is refused as SCIM's 400" */
+    it("answers main's 400 documents for a body that is not JSON and a resource missing a field", async () => {
+      const api = mount();
+
+      await expectMainWire(
+        await api.post("/api/scim/v2/Users", "{not json"),
+        400,
+        MAIN_WIRE.malformedBody,
+      );
+      await expectMainWire(await api.post("/api/scim/v2/Users", ""), 400, MAIN_WIRE.malformedBody);
+      await expectMainWire(
+        await api.post("/api/scim/v2/Groups", JSON.stringify({ schemas: [] })),
+        400,
+        MAIN_WIRE.invalidGroup,
+      );
+    });
+  });
+
+  describe("when the operation refuses", () => {
+    /** @scenario "A refusal the operation raises answers in SCIM's document at its own status" */
+    it("answers a protocol refusal as its own document", async () => {
+      const api = mount();
+      api.scim.listUsers.mockRejectedValue(
+        new ScimProtocolError({
+          schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+          status: "400",
+          detail: "Only eq filters are supported",
+          scimType: "invalidFilter",
+        }),
+      );
+
+      await expectMainWire(
+        await api.get("/api/scim/v2/Users?filter=userName%20sw%20%22a%22", BEARER),
+        400,
+        MAIN_WIRE.invalidFilter,
+      );
+    });
+
+    /** @scenario "A refusal the operation raises answers in SCIM's document at its own status" */
+    it("answers any other handled refusal with its code in scimType", async () => {
+      const api = mount();
+      api.scim.listUsers.mockRejectedValue(new ScimWriteOutsideConnectionError());
+
+      await expectMainWire(
+        await api.get("/api/scim/v2/Users", BEARER),
+        403,
+        MAIN_WIRE.writeOutsideConnection,
+      );
+    });
+
+    /** @scenario "A failure nobody handled is SCIM's 500 and says nothing more" */
+    it("answers an unhandled failure as main's opaque 500", async () => {
+      const api = mount();
+      api.scim.listUsers.mockRejectedValue(new Error("connection to the store was reset"));
+
+      await expectMainWire(await api.get("/api/scim/v2/Users", BEARER), 500, MAIN_WIRE.unhandled);
+    });
+  });
+
+  describe("when a member is deprovisioned", () => {
+    /** @scenario "A deprovisioning answers 204 with no body and no media type" */
+    it("answers 204 with no body and no Content-Type, as main did", async () => {
+      const api = mount();
+      api.scim.deleteUser.mockResolvedValue(undefined);
+
+      const response = await api.send("/api/scim/v2/Users/user_1", {
+        method: "DELETE",
+        headers: { authorization: BEARER },
+      });
+
+      expect(response.status).toBe(204);
+      expect(response.headers.has("content-type")).toBe(false);
+      expect(await response.text()).toBe("");
+    });
+  });
+
+  describe("when discovery is read", () => {
+    it("still answers plain JSON without a credential", async () => {
+      const api = mount();
+
+      const response = await api.get("/api/scim/v2/ServiceProviderConfig");
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("application/json");
     });
   });
 });

@@ -23,11 +23,11 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   type DocumentedRouteResponse,
-  type RestErrorHandler,
+  type RestProtocolProducer,
+  type RestProtocolRefusal,
 } from "@langwatch/api/rest";
 import {
   ScimApi,
-  ScimProtocolError,
   scimCreateGroupRequestSchema,
   scimCreateUserRequestSchema,
   scimGroupSchema,
@@ -40,6 +40,8 @@ import {
   scimUserSchema,
 } from "@langwatch/enterprise-scim-contract";
 import { z } from "zod";
+
+import { scimRefusalDocument } from "../rules/scim-refusal.rules.ts";
 
 const SCIM_MEDIA_TYPE = "application/scim+json";
 const MAX_PAGE_SIZE = 100;
@@ -316,37 +318,58 @@ const RESOURCE_TYPES_DOCUMENT = {
 };
 
 /**
- * The family's own refusals, in the protocol's own document. Exported because
- * the mount installs the family's error boundary and this is the wording the
- * module owns: the door raises these too, from `authenticateDirectory`.
- * Everything else leaves the family exactly as it did before — rethrown to the
- * process boundary rather than rendered here.
+ * Every refusal on the family, the door's included, in RFC 7644's own error
+ * document: an identity provider reads `status` and `detail`, and a shape it
+ * cannot parse reads as an outage.
  */
-export const scimProtocolErrorHandler: RestErrorHandler = (error) => {
-  if (error instanceof ScimProtocolError) {
-    return scimJson(error.response, Number(error.response.status));
-  }
+const scimRefusal: RestProtocolRefusal = ({ failure, response }) => {
+  const document = scimRefusalDocument(failure);
 
-  throw error;
+  return response.write({
+    status: Number(document.status),
+    mediaType: SCIM_MEDIA_TYPE,
+    body: JSON.stringify(document),
+  });
 };
 
-function scimJson(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": SCIM_MEDIA_TYPE },
-  });
+const SCIM_WIRE =
+  "SCIM 2.0 is RFC 7644's wire, read by identity providers: its documents and its errors are the protocol's, not the platform's envelope";
+
+/** Every answer on the twelve provisioning routes is the protocol's own document. */
+const SCIM_PROTOCOL = { produces: SCIM_ANSWER, because: SCIM_WIRE, refusal: scimRefusal } as const;
+
+/** Discovery answers plain JSON, as it always has, and refuses as the rest of the family does. */
+const DISCOVERY_PROTOCOL = {
+  produces: DISCOVERY_ANSWER,
+  because: SCIM_WIRE,
+  refusal: scimRefusal,
+} as const;
+
+function scimJson({
+  response,
+  data,
+  status = 200,
+}: {
+  response: RestProtocolProducer<typeof SCIM_ANSWER>;
+  data: unknown;
+  status?: 200 | 201;
+}) {
+  return response.write({ status, mediaType: SCIM_MEDIA_TYPE, body: JSON.stringify(data) });
 }
 
-function discoveryJson(data: unknown): Response {
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+function discoveryJson({
+  response,
+  data,
+}: {
+  response: RestProtocolProducer<typeof DISCOVERY_ANSWER>;
+  data: unknown;
+}) {
+  return response.write({ status: 200, mediaType: "application/json", body: JSON.stringify(data) });
 }
 
 /** The bodyless answer a deprovisioning gives. */
-function deprovisioned(): Response {
-  return new Response(null, { status: 204 });
+function deprovisioned({ response }: { response: RestProtocolProducer<typeof SCIM_ANSWER> }) {
+  return response.write({ status: 204, mediaType: SCIM_MEDIA_TYPE, body: null });
 }
 
 function positiveInteger(raw: string | undefined, fallback: number): number {
@@ -386,7 +409,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
   .get("/ServiceProviderConfig", "scimGetServiceProviderConfig")
   .withAccess(publicRoute({ reason: DISCOVERY_IS_PRE_CREDENTIAL }))
-  .withRawResponse({ produces: DISCOVERY_ANSWER })
+  .withResponse("protocol", DISCOVERY_PROTOCOL)
   .withDocs({
     summary: "Get the SCIM service provider configuration",
     description:
@@ -394,11 +417,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     tags: SCIM_TAGS,
     responses: scimAnswer(200, "The supported capabilities.", scimServiceProviderConfigSchema),
   })
-  .handle(() => discoveryJson(SERVICE_PROVIDER_CONFIG))
+  .handle(({ response }) => discoveryJson({ response, data: SERVICE_PROVIDER_CONFIG }))
 
   .get("/ResourceTypes", "scimListResourceTypes")
   .withAccess(publicRoute({ reason: DISCOVERY_IS_PRE_CREDENTIAL }))
-  .withRawResponse({ produces: DISCOVERY_ANSWER })
+  .withResponse("protocol", DISCOVERY_PROTOCOL)
   .withDocs({
     summary: "List the SCIM resource types",
     description:
@@ -410,11 +433,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       scimListResponseSchema(scimResourceTypeSchema),
     ),
   })
-  .handle(() => discoveryJson(RESOURCE_TYPES_DOCUMENT))
+  .handle(({ response }) => discoveryJson({ response, data: RESOURCE_TYPES_DOCUMENT }))
 
   .get("/Schemas", "scimListSchemas")
   .withAccess(publicRoute({ reason: DISCOVERY_IS_PRE_CREDENTIAL }))
-  .withRawResponse({ produces: DISCOVERY_ANSWER })
+  .withResponse("protocol", DISCOVERY_PROTOCOL)
   .withDocs({
     summary: "List the SCIM resource schemas",
     description:
@@ -426,7 +449,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       scimListResponseSchema(scimSchemaDefinitionSchema),
     ),
   })
-  .handle(() => discoveryJson(SCIM_SCHEMAS_DOCUMENT))
+  .handle(({ response }) => discoveryJson({ response, data: SCIM_SCHEMAS_DOCUMENT }))
 
   // ── Users ─────────────────────────────────────────────────────────────────
 
@@ -434,7 +457,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withQuery(listQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "List provisioned users",
     description:
@@ -447,22 +470,23 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     ),
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED],
   })
-  .handle(async ({ app, input, scope }, { connectionId }) =>
-    scimJson(
-      await app.listUsers({
+  .handle(async ({ app, input, scope, response }, { connectionId }) =>
+    scimJson({
+      response,
+      data: await app.listUsers({
         organizationId: scope.id,
         connectionId,
         filter: input.filter,
         startIndex: positiveInteger(input.startIndex, 1),
         count: pageSize(input.count),
       }),
-    ),
+    }),
   )
 
   .post("/Users", "scimCreateUser")
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Provision a user",
     description:
@@ -479,7 +503,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       },
     ],
   })
-  .handle(async ({ app, scope, request }, { connectionId }) => {
+  .handle(async ({ app, scope, request, response }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null)
@@ -502,17 +526,18 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       });
     }
 
-    return scimJson(
-      await app.createUser({ organizationId: scope.id, connectionId, request: parsed.data }),
-      201,
-    );
+    return scimJson({
+      response,
+      data: await app.createUser({ organizationId: scope.id, connectionId, request: parsed.data }),
+      status: 201,
+    });
   })
 
   .get("/Users/:id", "scimGetUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Get a provisioned user",
     description:
@@ -521,15 +546,15 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The user.", scimUserSchema),
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }) =>
-    scimJson(await app.getUser({ id: input.id, organizationId: scope.id })),
+  .handle(async ({ app, input, scope, response }) =>
+    scimJson({ response, data: await app.getUser({ id: input.id, organizationId: scope.id }) }),
   )
 
   .put("/Users/:id", "scimReplaceUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Replace a provisioned user",
     description:
@@ -538,7 +563,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated user.", scimUserSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }, { connectionId }) => {
+  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null)
@@ -561,21 +586,22 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       });
     }
 
-    return scimJson(
-      await app.replaceUser({
+    return scimJson({
+      response,
+      data: await app.replaceUser({
         id: input.id,
         organizationId: scope.id,
         connectionId,
         request: parsed.data,
       }),
-    );
+    });
   })
 
   .patch("/Users/:id", "scimPatchUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Update a provisioned user",
     description:
@@ -584,7 +610,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated user.", scimUserSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }, { connectionId }) => {
+  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null)
@@ -607,21 +633,22 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       });
     }
 
-    return scimJson(
-      await app.updateUser({
+    return scimJson({
+      response,
+      data: await app.updateUser({
         id: input.id,
         organizationId: scope.id,
         connectionId,
         patchRequest: parsed.data,
       }),
-    );
+    });
   })
 
   .delete("/Users/:id", "scimDeleteUser")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Deprovision a user",
     description:
@@ -630,10 +657,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: DEPROVISIONED,
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }, { connectionId }) => {
+  .handle(async ({ app, input, scope, response }, { connectionId }) => {
     await app.deleteUser({ id: input.id, organizationId: scope.id, connectionId });
 
-    return deprovisioned();
+    return deprovisioned({ response });
   })
 
   // ── Groups ────────────────────────────────────────────────────────────────
@@ -642,7 +669,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withQuery(groupListQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "List provisioned groups",
     description:
@@ -655,9 +682,10 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     ),
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED],
   })
-  .handle(async ({ app, input, scope }, { connectionId }) =>
-    scimJson(
-      await app.listGroups({
+  .handle(async ({ app, input, scope, response }, { connectionId }) =>
+    scimJson({
+      response,
+      data: await app.listGroups({
         organizationId: scope.id,
         connectionId,
         filter: input.filter,
@@ -665,13 +693,13 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
         count: pageSize(input.count),
         excludeMembers: excludesMembers(input.excludedAttributes),
       }),
-    ),
+    }),
   )
 
   .post("/Groups", "scimCreateGroup")
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Provision a group",
     description:
@@ -689,7 +717,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       },
     ],
   })
-  .handle(async ({ app, scope, request }, { connectionId }) => {
+  .handle(async ({ app, scope, request, response }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null)
@@ -712,10 +740,11 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       });
     }
 
-    return scimJson(
-      await app.createGroup({ organizationId: scope.id, connectionId, request: parsed.data }),
-      201,
-    );
+    return scimJson({
+      response,
+      data: await app.createGroup({ organizationId: scope.id, connectionId, request: parsed.data }),
+      status: 201,
+    });
   })
 
   .get("/Groups/:id", "scimGetGroup")
@@ -723,7 +752,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .withQuery(excludedAttributesQuery)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Get a provisioned group",
     description:
@@ -732,22 +761,23 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The group.", scimGroupSchema),
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }, { connectionId }) =>
-    scimJson(
-      await app.getGroup({
+  .handle(async ({ app, input, scope, response }, { connectionId }) =>
+    scimJson({
+      response,
+      data: await app.getGroup({
         externalScimId: input.id,
         organizationId: scope.id,
         connectionId,
         excludeMembers: excludesMembers(input.excludedAttributes),
       }),
-    ),
+    }),
   )
 
   .put("/Groups/:id", "scimReplaceGroup")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Replace a provisioned group",
     description:
@@ -756,7 +786,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated group.", scimGroupSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }, { connectionId }) => {
+  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null)
@@ -779,21 +809,22 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       });
     }
 
-    return scimJson(
-      await app.replaceGroup({
+    return scimJson({
+      response,
+      data: await app.replaceGroup({
         externalScimId: input.id,
         organizationId: scope.id,
         connectionId,
         request: parsed.data,
       }),
-    );
+    });
   })
 
   .patch("/Groups/:id", "scimPatchGroup")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Update a provisioned group",
     description:
@@ -802,7 +833,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated group.", scimGroupSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request }, { connectionId }) => {
+  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
     const body = await posted(request);
 
     if (body === null)
@@ -825,21 +856,22 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       });
     }
 
-    return scimJson(
-      await app.updateGroup({
+    return scimJson({
+      response,
+      data: await app.updateGroup({
         externalScimId: input.id,
         organizationId: scope.id,
         connectionId,
         patchRequest: parsed.data,
       }),
-    );
+    });
   })
 
   .delete("/Groups/:id", "scimDeleteGroup")
   .withParams(idParams)
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
-  .withRawResponse({ produces: SCIM_ANSWER })
+  .withResponse("protocol", SCIM_PROTOCOL)
   .withDocs({
     summary: "Deprovision a group",
     description:
@@ -848,9 +880,9 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: DEPROVISIONED,
     errors: [UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope }, { connectionId }) => {
+  .handle(async ({ app, input, scope, response }, { connectionId }) => {
     await app.deleteGroup({ externalScimId: input.id, organizationId: scope.id, connectionId });
 
-    return deprovisioned();
+    return deprovisioned({ response });
   })
   .build();
