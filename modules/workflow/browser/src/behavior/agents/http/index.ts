@@ -20,7 +20,7 @@ export {
   type HttpTestResult,
   messagesToJson,
   OutputPathInput,
-  type HttpOutputPathInputProps as OutputPathInputProps,
+  type HttpOutputPathInputProps,
   type TestMessage,
   TestMessagesBuilder,
   type TestMessagesBuilderProps,

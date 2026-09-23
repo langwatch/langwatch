@@ -58,22 +58,34 @@ export class BrowserBundle {
     security: SecurityHeaders;
     authorizeDocument?: DocumentAccess;
   }): BrowserBundle {
-    return new BrowserBundle(
-      options.dist,
-      options.publicConfig,
-      options.sessionReader,
-      options.security,
-      options.authorizeDocument,
-    );
+    return new BrowserBundle(options);
   }
 
-  private constructor(
-    private readonly dist: string | undefined,
-    private readonly publicConfig: PublicConfigHead,
-    private readonly sessionReader: SessionReader,
-    private readonly security: SecurityHeaders,
-    private readonly authorizeDocument: DocumentAccess | undefined,
-  ) {}
+  private readonly dist: string | undefined;
+  private readonly publicConfig: PublicConfigHead;
+  private readonly sessionReader: SessionReader;
+  private readonly security: SecurityHeaders;
+  private readonly authorizeDocument: DocumentAccess | undefined;
+
+  private constructor({
+    dist,
+    publicConfig,
+    sessionReader,
+    security,
+    authorizeDocument,
+  }: {
+    dist: string | undefined;
+    publicConfig: PublicConfigHead;
+    sessionReader: SessionReader;
+    security: SecurityHeaders;
+    authorizeDocument?: DocumentAccess;
+  }) {
+    this.dist = dist;
+    this.publicConfig = publicConfig;
+    this.sessionReader = sessionReader;
+    this.security = security;
+    this.authorizeDocument = authorizeDocument;
+  }
 
   /** Whether this deployment carries a build at all. */
   get serves(): boolean {

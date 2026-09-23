@@ -80,14 +80,21 @@ function getHttpConfig(config: AgentComponentConfig): HttpComponentConfig {
   return config as HttpComponentConfig;
 }
 
-function buildHttpConfig(
-  url: string,
-  method: HttpMethod,
-  bodyTemplate: string,
-  outputPath: string,
-  headers: HttpHeader[],
-  auth: HttpAuth | undefined,
-): HttpComponentConfig {
+function buildHttpConfig({
+  url,
+  method,
+  bodyTemplate,
+  outputPath,
+  headers,
+  auth,
+}: {
+  url: string;
+  method: HttpMethod;
+  bodyTemplate: string;
+  outputPath: string;
+  headers: HttpHeader[];
+  auth: HttpAuth | undefined;
+}): HttpComponentConfig {
   return {
     name: "HTTP",
     description: "HTTP API endpoint",
@@ -441,7 +448,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
 
     let config: AgentComponentConfig | undefined;
     if (agentType === "http") {
-      config = buildHttpConfig(url, method, bodyTemplate, outputPath, headers, auth);
+      config = buildHttpConfig({ url, method, bodyTemplate, outputPath, headers, auth });
     } else if (agentType === "code") {
       config = buildCodeConfig({
         code,

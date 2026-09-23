@@ -176,12 +176,17 @@ export type RestResponseDeclaration = Readonly<{
   refusal?: RestProtocolRefusal;
 }>;
 
-function answer<Kind extends RestResponseKind>(
-  kind: Kind,
-  status: StatusCode,
-  headers: Record<string, string>,
-  body: RestAnswerBody,
-): RestAnswer<Kind> {
+function answer<Kind extends RestResponseKind>({
+  kind,
+  status,
+  headers,
+  body,
+}: {
+  kind: Kind;
+  status: StatusCode;
+  headers: Record<string, string>;
+  body: RestAnswerBody;
+}): RestAnswer<Kind> {
   return Object.freeze({ [PRODUCED]: kind, status, headers, body });
 }
 
@@ -221,23 +226,23 @@ const BYTES_PRODUCER: RestBytesProducer = Object.freeze({
     const length =
       typeof bytes === "string" ? new TextEncoder().encode(bytes).byteLength : bytes.byteLength;
 
-    return answer(
-      "bytes",
-      200,
-      {
+    return answer({
+      kind: "bytes",
+      status: 200,
+      headers: {
         "Content-Type": options.mediaType,
         "Content-Length": String(length),
         ...disposition(options.filename ?? ""),
         ...caching(options.cacheSeconds),
       },
-      { form: "bytes", bytes: bytesOf(bytes) },
-    );
+      body: { form: "bytes", bytes: bytesOf(bytes) },
+    });
   },
   stream(stream, options) {
-    return answer(
-      "bytes",
-      options.status ?? 200,
-      {
+    return answer({
+      kind: "bytes",
+      status: options.status ?? 200,
+      headers: {
         ...options.headers,
         "Content-Type": options.mediaType,
         ...(options.byteLength === undefined
@@ -246,35 +251,40 @@ const BYTES_PRODUCER: RestBytesProducer = Object.freeze({
         ...disposition(options.filename ?? "", options.disposition),
         ...caching(options.cacheSeconds),
       },
-      { form: "stream", stream: readableByteStream(stream, options.onCancel) },
-    );
+      body: { form: "stream", stream: readableByteStream(stream, options.onCancel) },
+    });
   },
   storedAt(url, options) {
-    return answer(
-      "bytes",
-      302,
-      { Location: url, "Cache-Control": `private, max-age=${options.seconds}` },
-      { form: "bytes", bytes: null },
-    );
+    return answer({
+      kind: "bytes",
+      status: 302,
+      headers: { Location: url, "Cache-Control": `private, max-age=${options.seconds}` },
+      body: { form: "bytes", bytes: null },
+    });
   },
   notModified(options) {
-    return answer("bytes", 304, { ...options?.headers }, { form: "bytes", bytes: null });
+    return answer({
+      kind: "bytes",
+      status: 304,
+      headers: { ...options?.headers },
+      body: { form: "bytes", bytes: null },
+    });
   },
 });
 
 const EVENTS_PRODUCER: RestEventsProducer = Object.freeze({
   events(source) {
-    return answer(
-      "sse",
-      200,
-      {
+    return answer({
+      kind: "sse",
+      status: 200,
+      headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
       },
-      { form: "events", events: source },
-    );
+      body: { form: "events", events: source },
+    });
   },
 });
 
@@ -291,23 +301,23 @@ function redirectStatus(permanent: boolean, preserveMethod: boolean): StatusCode
 
 const REDIRECT_PRODUCER: RestRedirectProducer = Object.freeze({
   to(location, options) {
-    return answer(
-      "redirect",
-      redirectStatus(options?.permanent === true, options?.preserveMethod === true),
-      { Location: location },
-      { form: "bytes", bytes: null },
-    );
+    return answer({
+      kind: "redirect",
+      status: redirectStatus(options?.permanent === true, options?.preserveMethod === true),
+      headers: { Location: location },
+      body: { form: "bytes", bytes: null },
+    });
   },
 });
 
 const PROTOCOL_PRODUCER: RestProtocolProducer = Object.freeze({
   write(options) {
-    return answer(
-      "protocol",
-      options.status,
-      { "Content-Type": options.mediaType, ...options.headers },
-      { form: "bytes", bytes: options.body === null ? null : bytesOf(options.body) },
-    );
+    return answer({
+      kind: "protocol",
+      status: options.status,
+      headers: { "Content-Type": options.mediaType, ...options.headers },
+      body: { form: "bytes", bytes: options.body === null ? null : bytesOf(options.body) },
+    });
   },
 });
 
@@ -315,7 +325,12 @@ const FORWARDED_PRODUCER: RestForwardedProducer = Object.freeze({
   // The forwarded response carries its own status and headers, so the answer's
   // are never read: the runtime writes the response it was handed, verbatim.
   pass(response) {
-    return answer("forwarded", 200, {}, { form: "response", response });
+    return answer({
+      kind: "forwarded",
+      status: 200,
+      headers: {},
+      body: { form: "response", response },
+    });
   },
   decline: declined,
 });

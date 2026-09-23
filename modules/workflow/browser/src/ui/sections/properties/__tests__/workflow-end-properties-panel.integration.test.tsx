@@ -27,7 +27,7 @@ vi.mock("@xyflow/react", () => ({
 }));
 
 import { EndPropertiesPanel, EVALUATOR_RESULT_FIELDS } from "../workflow-end-properties-panel.tsx";
-import type { WorkflowVariablesProps } from "../workflow-properties.ports.ts";
+import type { WorkflowVariablesProps } from "../workflow-properties-panel-props.ts";
 
 const createEndNode = (overrides: Partial<End> = {}): Node<End> => ({
   id: "end",

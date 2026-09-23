@@ -26,7 +26,7 @@ import type {
   WorkflowOutputsProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports.ts";
+} from "./workflow-properties-panel-props.ts";
 
 const CODE_OUTPUT_TYPES: DslField["type"][] = ["str", "float", "bool", "dict", "list", "image"];
 

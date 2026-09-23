@@ -33,7 +33,7 @@ import {
   type WorkflowHttpTestConfig,
   type WorkflowOutputsProps,
   type WorkflowVariablesProps,
-} from "../../properties/workflow-properties.ports.ts";
+} from "../../properties/workflow-properties-panel-props.ts";
 import { RetrievePropertiesPanel as WorkflowRetrievePropertiesPanel } from "../../properties/workflow-retrieve-properties-panel.tsx";
 import { DatasetModal } from "../dataset-modal.tsx";
 import { AgentPropertiesPanel } from "../properties/agent-properties-panel.tsx";

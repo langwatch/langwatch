@@ -116,15 +116,20 @@ export class SseLane {
     headers.set("Connection", "keep-alive");
     headers.set("X-Accel-Buffering", "no");
 
-    return new Response(this.stream(raw, procedure, input, path), { status: 200, headers });
+    return new Response(this.stream({ raw, procedure, input, path }), { status: 200, headers });
   }
 
-  private stream(
-    raw: Request,
-    procedure: (input: unknown) => unknown,
-    input: unknown,
-    path: string,
-  ): ReadableStream {
+  private stream({
+    raw,
+    procedure,
+    input,
+    path,
+  }: {
+    raw: Request;
+    procedure: (input: unknown) => unknown;
+    input: unknown;
+    path: string;
+  }): ReadableStream {
     return new ReadableStream({
       start: (controller) => {
         const channel = new SseChannel(controller, this.logger);
@@ -133,19 +138,24 @@ export class SseLane {
         // Deliberately fire-and-forget: the stream stays open while this
         // runs, and `deliver`'s own catch is the only place a rejection
         // surfaces.
-        void this.deliver(channel, procedure, input, path);
+        void this.deliver({ channel, procedure, input, path });
         raw.signal?.addEventListener("abort", () => channel.end());
       },
     });
   }
 
   /** Runs the procedure and forwards whatever shape it answers with. */
-  private async deliver(
-    channel: SseChannel,
-    procedure: (input: unknown) => unknown,
-    input: unknown,
-    path: string,
-  ): Promise<void> {
+  private async deliver({
+    channel,
+    procedure,
+    input,
+    path,
+  }: {
+    channel: SseChannel;
+    procedure: (input: unknown) => unknown;
+    input: unknown;
+    path: string;
+  }): Promise<void> {
     try {
       const result = await procedure(input);
 
@@ -167,7 +177,12 @@ export class SseLane {
     } catch (error) {
       // No `input` here: it is the raw request payload, which may carry
       // PII — same contract as the observable error path.
-      logStreamFailure(this.logger, error, { error, path }, "SSE handler error");
+      logStreamFailure({
+        logger: this.logger,
+        err: error,
+        logData: { error, path },
+        msg: "SSE handler error",
+      });
       channel.writeData(sseErrorFrame(error));
       channel.end();
     }
@@ -178,7 +193,12 @@ export class SseLane {
       next: (data: unknown) => channel.writeData(data),
       complete: () => channel.complete(),
       error: (err: unknown) => {
-        logStreamFailure(this.logger, err, { err, path }, "SSE observable error");
+        logStreamFailure({
+          logger: this.logger,
+          err,
+          logData: { err, path },
+          msg: "SSE observable error",
+        });
         channel.writeData(sseErrorFrame(err));
         channel.end();
       },
@@ -329,12 +349,17 @@ function subscriptionPathOf(url: URL): string {
  * loggers: customer-fault handled errors warn (spike-watched), platform /
  * provider and unhandled errors log at error.
  */
-function logStreamFailure(
-  logger: Logged,
-  err: unknown,
-  logData: Record<string, unknown>,
-  msg: string,
-) {
+function logStreamFailure({
+  logger,
+  err,
+  logData,
+  msg,
+}: {
+  logger: Logged;
+  err: unknown;
+  logData: Record<string, unknown>;
+  msg: string;
+}) {
   const handled = handledCauseOf(err);
   const level = handled && handled.fault === "customer" ? "warn" : "error";
 

@@ -10,7 +10,7 @@ export * from "./ui/sections/workflow-run-until-here-dialog.tsx";
 export * from "./ui/sections/workflow-running-status.tsx";
 export * from "./ui/elements/workflow-results-panel.tsx";
 export * from "./ui/sections/workflow-undo-redo.tsx";
-export * from "./ui/sections/properties/workflow-properties.ports.ts";
+export * from "./ui/sections/properties/workflow-properties-panel-props.ts";
 export * from "./ui/sections/properties/workflow-end-properties-panel.tsx";
 export * from "./ui/sections/properties/workflow-entry-point-properties-panel.tsx";
 export * from "./ui/sections/properties/workflow-code-properties-panel.tsx";

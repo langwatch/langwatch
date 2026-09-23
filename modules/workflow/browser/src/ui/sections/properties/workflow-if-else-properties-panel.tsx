@@ -18,7 +18,7 @@ import type {
   WorkflowCodeEditorProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports.ts";
+} from "./workflow-properties-panel-props.ts";
 
 const LIQUID_OPERATORS_DOCS = "https://shopify.github.io/liquid/basics/operators/";
 

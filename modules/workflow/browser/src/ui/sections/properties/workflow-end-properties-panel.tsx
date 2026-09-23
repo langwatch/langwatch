@@ -9,7 +9,7 @@ import type {
   WorkflowBasePropertiesPanelProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports.ts";
+} from "./workflow-properties-panel-props.ts";
 
 /**
  * Evaluator return vocabulary: four fixed results (all optional).

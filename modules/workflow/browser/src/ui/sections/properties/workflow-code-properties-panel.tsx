@@ -18,7 +18,7 @@ import type {
   WorkflowVariablesProps,
   WorkflowVariable,
   WorkflowPanelFieldMapping,
-} from "./workflow-properties.ports.ts";
+} from "./workflow-properties-panel-props.ts";
 
 const CODE_OUTPUT_TYPES: Field["type"][] = ["str", "float", "bool", "dict", "list", "image"];
 

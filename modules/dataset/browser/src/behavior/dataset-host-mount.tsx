@@ -26,14 +26,31 @@ import {
 } from "../model/dataset-host.ts";
 
 class CapabilityDatasetHost extends DatasetHostApi {
-  constructor(
-    private readonly scopeHost: UiScopeHost | undefined,
-    private readonly session: UiSession,
-    private readonly uiRoute: UiRoute,
-    private readonly navigation: UiNavigation,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly scopeHost: UiScopeHost | undefined;
+  private readonly session: UiSession;
+  private readonly uiRoute: UiRoute;
+  private readonly navigation: UiNavigation;
+  private readonly feedback: UiFeedback;
+
+  constructor({
+    scopeHost,
+    session,
+    uiRoute,
+    navigation,
+    feedback,
+  }: {
+    scopeHost: UiScopeHost | undefined;
+    session: UiSession;
+    uiRoute: UiRoute;
+    navigation: UiNavigation;
+    feedback: UiFeedback;
+  }) {
     super();
+    this.scopeHost = scopeHost;
+    this.session = session;
+    this.uiRoute = uiRoute;
+    this.navigation = navigation;
+    this.feedback = feedback;
   }
 
   project(): DatasetHostProject | undefined {
@@ -94,7 +111,7 @@ export default function DatasetHostMount({ children }: { children?: ReactNode })
   const scopeHost = useUiScope().scopeHost();
 
   const host = useMemo(
-    () => new CapabilityDatasetHost(scopeHost, session, route, navigation, feedback),
+    () => new CapabilityDatasetHost({ scopeHost, session, uiRoute: route, navigation, feedback }),
     [scopeHost, session, route, navigation, feedback],
   );
 

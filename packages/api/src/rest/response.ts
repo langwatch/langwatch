@@ -346,7 +346,8 @@ export const unauthorizedSchema = errorSchema;
 export const badRequestSchema = errorSchema;
 
 /** Schema for conflict error responses */
-export const conflictSchema = errorSchema.extend({
+export const conflictSchema = z.object({
+  ...errorSchema.shape,
   message: z.string(),
 });
 

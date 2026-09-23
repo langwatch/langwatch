@@ -16,7 +16,7 @@ import {
   type WorkflowCodeEditorProps,
   type WorkflowOutputsProps,
   type WorkflowVariablesProps,
-} from "../../ui/sections/properties/workflow-properties.ports.ts";
+} from "../../ui/sections/properties/workflow-properties-panel-props.ts";
 import { RetrievePropertiesPanel } from "../../ui/sections/properties/workflow-retrieve-properties-panel.tsx";
 import { _useWorkflowStore } from "../use-workflow-store.ts";
 

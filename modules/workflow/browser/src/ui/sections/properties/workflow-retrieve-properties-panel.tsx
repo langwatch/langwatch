@@ -1,7 +1,7 @@
 import type { Retriever } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 
-import type { WorkflowBasePropertiesPanelProps } from "./workflow-properties.ports.ts";
+import type { WorkflowBasePropertiesPanelProps } from "./workflow-properties-panel-props.ts";
 
 export function RetrievePropertiesPanel({
   node,

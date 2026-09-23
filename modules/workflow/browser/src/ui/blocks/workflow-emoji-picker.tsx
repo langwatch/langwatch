@@ -11,10 +11,7 @@ import { lazy, Suspense } from "react";
 const EMOJI_STYLE_NATIVE = "native" as EmojiStyle;
 const SKIN_TONE_PREVIEW = "PREVIEW" as SkinTonePickerLocation;
 
-const EmojiPicker = lazy(async () => {
-  const module = await import("emoji-picker-react");
-  return { default: module.default };
-});
+const EmojiPicker = lazy(() => import("emoji-picker-react"));
 
 export function WorkflowEmojiPicker({
   open,

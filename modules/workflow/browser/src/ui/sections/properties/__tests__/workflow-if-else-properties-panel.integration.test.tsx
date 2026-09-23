@@ -33,7 +33,7 @@ import { IfElsePropertiesPanel } from "../workflow-if-else-properties-panel.tsx"
 import type {
   WorkflowVariablesProps,
   WorkflowCodeEditorProps,
-} from "../workflow-properties.ports.ts";
+} from "../workflow-properties-panel-props.ts";
 
 const createIfElseNode = (overrides: Partial<Component> = {}): Node<Component> => ({
   id: "gate",

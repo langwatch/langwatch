@@ -581,13 +581,31 @@ type With<S extends RouteShape, Changes extends Partial<RouteShape>> = Readonly<
 }>;
 
 class RouteBuilder<Api, S extends RouteShape> {
-  constructor(
-    private readonly router: RestTransportRouter<Api, S["family"], S["strict"]>,
-    private readonly method: S["method"],
-    private readonly path: S["path"],
-    private readonly operation: string,
-    private readonly state: RouteState = {},
-  ) {}
+  private readonly router: RestTransportRouter<Api, S["family"], S["strict"]>;
+  private readonly method: S["method"];
+  private readonly path: S["path"];
+  private readonly operation: string;
+  private readonly state: RouteState;
+
+  constructor({
+    router,
+    method,
+    path,
+    operation,
+    state = {},
+  }: {
+    router: RestTransportRouter<Api, S["family"], S["strict"]>;
+    method: S["method"];
+    path: S["path"];
+    operation: string;
+    state?: RouteState;
+  }) {
+    this.router = router;
+    this.method = method;
+    this.path = path;
+    this.operation = operation;
+    this.state = state;
+  }
 
   withParams<Schema extends z.ZodObject>(
     schema: ExactPathSchema<S["path"], Schema> &
@@ -599,16 +617,16 @@ class RouteBuilder<Api, S extends RouteShape> {
     assertDistinctSources(schema, this.state.input);
     assertDistinctSources(schema, this.state.query);
 
-    return new RouteBuilder<Api, With<S, { params: Schema }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { params: Schema }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         params: schema,
       },
-    );
+    });
   }
 
   withInput<Schema extends SourceSchema>(
@@ -624,9 +642,15 @@ class RouteBuilder<Api, S extends RouteShape> {
     return new RouteBuilder<
       Api,
       With<S, { method: Exclude<HttpMethod, "get" | "head">; body: Schema }>
-    >(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      input: schema,
+    >({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        input: schema,
+      },
     });
   }
 
@@ -650,9 +674,15 @@ class RouteBuilder<Api, S extends RouteShape> {
     return new RouteBuilder<
       Api,
       With<S, { method: Exclude<HttpMethod, "get" | "head">; body: RestRawBodyDeclared<Form> }>
-    >(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      rawBody: { form, mediaType: options.mediaType ?? DEFAULT_RAW_MEDIA_TYPE[form] },
+    >({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        rawBody: { form, mediaType: options.mediaType ?? DEFAULT_RAW_MEDIA_TYPE[form] },
+      },
     });
   }
 
@@ -684,9 +714,15 @@ class RouteBuilder<Api, S extends RouteShape> {
         S,
         { method: Exclude<HttpMethod, "get" | "head">; body: RestMultipartDeclared<Fields, Files> }
       >
-    >(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      multipart: { fields: multipart.fields, files: multipart.files },
+    >({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        multipart: { fields: multipart.fields, files: multipart.files },
+      },
     });
   }
 
@@ -705,9 +741,15 @@ class RouteBuilder<Api, S extends RouteShape> {
       );
     }
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      rateLimit: policy,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        rateLimit: policy,
+      },
     });
   }
 
@@ -720,9 +762,15 @@ class RouteBuilder<Api, S extends RouteShape> {
     assertSourceUnset("cache", this.state.cache);
     assertCachePolicy({ operation: this.operation, policy });
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      cache: policy,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        cache: policy,
+      },
     });
   }
 
@@ -734,9 +782,15 @@ class RouteBuilder<Api, S extends RouteShape> {
   withEntitlement(entitlement: ApiEntitlement): RouteBuilder<Api, S> {
     assertSourceUnset("entitlement", this.state.entitlement);
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      entitlement,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        entitlement,
+      },
     });
   }
 
@@ -748,9 +802,15 @@ class RouteBuilder<Api, S extends RouteShape> {
   withIdempotency(idempotency: RestIdempotency): RouteBuilder<Api, S> {
     assertSourceUnset("idempotency", this.state.idempotency);
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      idempotency,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        idempotency,
+      },
     });
   }
 
@@ -761,16 +821,16 @@ class RouteBuilder<Api, S extends RouteShape> {
     assertDistinctSources(this.state.params, schema);
     assertDistinctSources(this.state.input, schema);
 
-    return new RouteBuilder<Api, With<S, { query: Schema }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { query: Schema }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         query: schema,
       },
-    );
+    });
   }
 
   /**
@@ -782,17 +842,17 @@ class RouteBuilder<Api, S extends RouteShape> {
     permission: AuthzPermission,
     target?: RestPermissionTarget,
   ): RouteBuilder<Api, With<S, { permission: true }>> {
-    return new RouteBuilder<Api, With<S, { permission: true }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { permission: true }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         permission,
         ...(target ? { permissionTarget: target } : {}),
       },
-    );
+    });
   }
 
   /**
@@ -803,39 +863,57 @@ class RouteBuilder<Api, S extends RouteShape> {
   withAccess<Kind extends RouteAccess>(
     access: Kind,
   ): RouteBuilder<Api, With<S, { permission: true; access: Kind["kind"] }>> {
-    return new RouteBuilder<Api, With<S, { permission: true; access: Kind["kind"] }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { permission: true; access: Kind["kind"] }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         access,
       },
-    );
+    });
   }
 
   withVersion(version: DateVersion): RouteBuilder<Api, S> {
     assertVersionLabel(version);
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      version,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        version,
+      },
     });
   }
 
   withDocs(docs: RestTransportDocs): RouteBuilder<Api, S> {
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      docs,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        docs,
+      },
     });
   }
 
   /** Marks this one route superseded, whatever the family declared. */
   withDeprecated(deprecated: RestDeprecation): RouteBuilder<Api, S> {
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      deprecated,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        deprecated,
+      },
     });
   }
 
@@ -845,16 +923,16 @@ class RouteBuilder<Api, S extends RouteShape> {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
 
-    return new RouteBuilder<Api, With<S, { answer: Schema }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { answer: Schema }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         output: schema,
       },
-    );
+    });
   }
 
   /**
@@ -869,16 +947,16 @@ class RouteBuilder<Api, S extends RouteShape> {
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
     assertDeclaredAnswers({ operation: this.operation, answers });
 
-    return new RouteBuilder<Api, With<S, { answer: Answers }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { answer: Answers }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         answers,
       },
-    );
+    });
   }
 
   /**
@@ -896,16 +974,16 @@ class RouteBuilder<Api, S extends RouteShape> {
 
     assertProduces({ operation: this.operation, produces });
 
-    return new RouteBuilder<Api, With<S, { answer: RestRawAnswerDeclared }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { answer: RestRawAnswerDeclared }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         rawResponse: { produces: [...produces] },
       },
-    );
+    });
   }
 
   /**
@@ -933,12 +1011,12 @@ class RouteBuilder<Api, S extends RouteShape> {
       because: declaredReason(options),
     });
 
-    return new RouteBuilder<Api, With<S, { answer: RestResponseDeclared<Kind, Produces> }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { answer: RestResponseDeclared<Kind, Produces> }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         response: {
           kind,
@@ -947,7 +1025,7 @@ class RouteBuilder<Api, S extends RouteShape> {
           ...(declaredRefusal(options) === undefined ? {} : { refusal: declaredRefusal(options) }),
         },
       },
-    );
+    });
   }
 
   /**
@@ -961,9 +1039,15 @@ class RouteBuilder<Api, S extends RouteShape> {
     assertSourceUnset("methods", this.state.methods);
     assertDeclaredMethods({ operation: this.operation, method: this.method, methods });
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      methods,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        methods,
+      },
     });
   }
 
@@ -973,9 +1057,15 @@ class RouteBuilder<Api, S extends RouteShape> {
    * operation, because it has none to publish, and writes its own answer.
    */
   anyMethod(): RouteBuilder<Api, S> {
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      anyMethod: true,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        anyMethod: true,
+      },
     });
   }
 
@@ -1051,9 +1141,15 @@ class RouteBuilder<Api, S extends RouteShape> {
       );
     }
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      status,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        status,
+      },
     });
   }
 
@@ -1061,11 +1157,17 @@ class RouteBuilder<Api, S extends RouteShape> {
     if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
       throw new Error("REST body limit must be a non-negative safe integer");
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      bodyLimit: {
-        maxBytes: limit.maxBytes,
-        onExceeded: limit.onExceeded ?? (() => new PayloadTooLargeError()),
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        bodyLimit: {
+          maxBytes: limit.maxBytes,
+          onExceeded: limit.onExceeded ?? (() => new PayloadTooLargeError()),
+        },
       },
     });
   }
@@ -1083,16 +1185,16 @@ class RouteBuilder<Api, S extends RouteShape> {
   withMiddleware<const Added extends readonly RestTransportMiddleware[]>(
     ...middleware: Added
   ): RouteBuilder<Api, With<S, { middleware: [...S["middleware"], ...Added] }>> {
-    return new RouteBuilder<Api, With<S, { middleware: [...S["middleware"], ...Added] }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { middleware: [...S["middleware"], ...Added] }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         middleware: [...(this.state.middleware ?? []), ...middleware],
       },
-    );
+    });
   }
 
   /**
@@ -1105,16 +1207,16 @@ class RouteBuilder<Api, S extends RouteShape> {
   ): RouteBuilder<Api, With<S, { door: NewDoor }>> {
     assertSourceUnset("credential", this.state.credential);
 
-    return new RouteBuilder<Api, With<S, { door: NewDoor }>>(
-      this.router,
-      this.method,
-      this.path,
-      this.operation,
-      {
+    return new RouteBuilder<Api, With<S, { door: NewDoor }>>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
         ...this.state,
         credential,
       },
-    );
+    });
   }
 
   /**
@@ -1126,9 +1228,15 @@ class RouteBuilder<Api, S extends RouteShape> {
     assertAuditAction(action);
     assertSourceUnset("audit", this.state.audit);
 
-    return new RouteBuilder<Api, S>(this.router, this.method, this.path, this.operation, {
-      ...this.state,
-      audit: action,
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: {
+        ...this.state,
+        audit: action,
+      },
     });
   }
 }
@@ -1200,12 +1308,27 @@ class RestTransportRouter<
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
 
-  constructor(
-    private readonly api: FeatureApiWitness<Api>,
-    readonly namespace: string,
-    readonly version: DateVersion,
-    readonly credential: Door,
-  ) {}
+  private readonly api: FeatureApiWitness<Api>;
+  readonly namespace: string;
+  readonly version: DateVersion;
+  readonly credential: Door;
+
+  constructor({
+    api,
+    namespace,
+    version,
+    credential,
+  }: {
+    api: FeatureApiWitness<Api>;
+    namespace: string;
+    version: DateVersion;
+    credential: Door;
+  }) {
+    this.api = api;
+    this.namespace = namespace;
+    this.version = version;
+    this.credential = credential;
+  }
 
   /**
    * The door this family's routes answer behind. Declared before the first
@@ -1219,12 +1342,12 @@ class RestTransportRouter<
       throw new Error(`REST "${this.namespace}" must declare its credential before its routes`);
     }
 
-    const router = new RestTransportRouter<Api, NewDoor, StrictJsonSchemas>(
-      this.api,
-      this.namespace,
-      this.version,
+    const router = new RestTransportRouter<Api, NewDoor, StrictJsonSchemas>({
+      api: this.api,
+      namespace: this.namespace,
+      version: this.version,
       credential,
-    );
+    });
 
     router.addressing = this.addressing;
     router.v1Twin = this.v1Twin;
@@ -1298,7 +1421,7 @@ class RestTransportRouter<
       namespace: this.namespace,
     });
 
-    return new RouteBuilder(this, "get", path, operation);
+    return new RouteBuilder({ router: this, method: "get", path, operation });
   }
 
   patch<Path extends string>(
@@ -1312,7 +1435,7 @@ class RestTransportRouter<
       namespace: this.namespace,
     });
 
-    return new RouteBuilder(this, "patch", path, operation);
+    return new RouteBuilder({ router: this, method: "patch", path, operation });
   }
 
   post<Path extends string>(
@@ -1326,7 +1449,7 @@ class RestTransportRouter<
       namespace: this.namespace,
     });
 
-    return new RouteBuilder(this, "post", path, operation);
+    return new RouteBuilder({ router: this, method: "post", path, operation });
   }
 
   put<Path extends string>(
@@ -1340,7 +1463,7 @@ class RestTransportRouter<
       namespace: this.namespace,
     });
 
-    return new RouteBuilder(this, "put", path, operation);
+    return new RouteBuilder({ router: this, method: "put", path, operation });
   }
 
   delete<Path extends string>(
@@ -1354,7 +1477,7 @@ class RestTransportRouter<
       namespace: this.namespace,
     });
 
-    return new RouteBuilder(this, "delete", path, operation);
+    return new RouteBuilder({ router: this, method: "delete", path, operation });
   }
 
   assertRouteAvailable(methods: readonly HttpMethod[], path: string, operation: string): void {
@@ -1391,12 +1514,12 @@ export function defineRestRouter<Api, StrictJsonSchemas extends boolean = false>
         withVersion(version: DateVersion): RestTransportRouter<Api, "project", StrictJsonSchemas> {
           assertVersionLabel(version);
 
-          return new RestTransportRouter<Api, "project", StrictJsonSchemas>(
+          return new RestTransportRouter<Api, "project", StrictJsonSchemas>({
             api,
             namespace,
             version,
-            "project",
-          );
+            credential: "project",
+          });
         },
       };
     },

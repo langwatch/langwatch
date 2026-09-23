@@ -29,7 +29,7 @@ vi.mock("@xyflow/react", () => ({
 }));
 
 import { EntryPointPropertiesPanel } from "../workflow-entry-point-properties-panel.tsx";
-import type { WorkflowVariablesProps } from "../workflow-properties.ports.ts";
+import type { WorkflowVariablesProps } from "../workflow-properties-panel-props.ts";
 
 const createEntryNode = (overrides: Partial<Entry> = {}): Node<Entry> => ({
   id: "entry",

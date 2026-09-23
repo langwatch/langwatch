@@ -11,7 +11,7 @@ import type {
   WorkflowBasePropertiesPanelProps,
   WorkflowVariablesProps,
   WorkflowVariable,
-} from "./workflow-properties.ports.ts";
+} from "./workflow-properties-panel-props.ts";
 
 /**
  * Drawer for the workflow's entry point.
