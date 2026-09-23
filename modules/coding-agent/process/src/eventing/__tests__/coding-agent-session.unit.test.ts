@@ -120,6 +120,12 @@ function spanFactsEvent({
   stamp?: ContextStamp;
 }): SpanFactsContributedEvent {
   return {
+    id: "evt-1",
+    aggregateId: "aggregate-1",
+    aggregateType: "coding_agent_session",
+    createdAt: startMs,
+    occurredAt: startMs,
+    version: "2025-01-01",
     tenantId: createTenantId("tenant-1"),
     type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
     data: {
@@ -138,7 +144,7 @@ function spanFactsEvent({
       scopeName: "com.anthropic.claude_code.tracing",
       ...stamp,
     },
-  } as unknown as SpanFactsContributedEvent;
+  };
 }
 
 function logFactsEvent({
@@ -155,6 +161,12 @@ function logFactsEvent({
   stamp?: ContextStamp;
 }): LogFactsContributedEvent {
   return {
+    id: "evt-1",
+    aggregateId: "aggregate-1",
+    aggregateType: "coding_agent_session",
+    createdAt: timeMs,
+    occurredAt: timeMs,
+    version: "2025-01-01",
     tenantId: createTenantId("tenant-1"),
     type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
     data: {
@@ -173,7 +185,7 @@ function logFactsEvent({
       facts,
       ...stamp,
     },
-  } as unknown as LogFactsContributedEvent;
+  };
 }
 
 function metricFactsEvent({
@@ -190,6 +202,12 @@ function metricFactsEvent({
   asOfMs?: number;
 }): MetricFactsContributedEvent {
   return {
+    id: "evt-1",
+    aggregateId: "aggregate-1",
+    aggregateType: "coding_agent_session",
+    createdAt: asOfMs,
+    occurredAt: asOfMs,
+    version: "2025-01-01",
     tenantId: createTenantId("tenant-1"),
     type: METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
     data: {
@@ -206,7 +224,7 @@ function metricFactsEvent({
       dataPointCount: 1,
       asOfUnixMs: asOfMs,
     },
-  } as unknown as MetricFactsContributedEvent;
+  };
 }
 
 describe("CodingAgentSessionFoldProjection", () => {

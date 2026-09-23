@@ -222,7 +222,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     expect(errorSpans.length).toBeGreaterThan(0);
   });
 
-  describe("Span Naming Integration Tests", () => {
+  describe("when LangChain spans are named", () => {
     it("names LLM spans with provider and model information", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 

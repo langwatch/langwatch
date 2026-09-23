@@ -1,4 +1,8 @@
-import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentProcessingEvent,
+  LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+} from "@langwatch/coding-agent-contract";
+import { createTenantId } from "@langwatch/eventing";
 /**
  * @vitest-environment node
  * @unit
@@ -25,10 +29,31 @@ function foldState(over: Partial<CodingAgentSessionState> = {}): CodingAgentSess
   } as CodingAgentSessionState;
 }
 
-const event = {
-  tenantId: "project-1",
+const event: CodingAgentProcessingEvent = {
+  id: "evt-1",
   aggregateId: "session-1",
-} as unknown as CodingAgentProcessingEvent;
+  aggregateType: "coding_agent_session",
+  tenantId: createTenantId("project-1"),
+  createdAt: 1_500,
+  occurredAt: 1_500,
+  type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+  version: "2025-01-01",
+  data: {
+    tenantId: "project-1",
+    sessionId: "session-1",
+    sessionKeySource: "provider",
+    agent: "claude_code",
+    occurredAt: 1_500,
+    recordId: "rec-1",
+    traceId: null,
+    spanId: null,
+    timeUnixMs: 1_500,
+    severityNumber: 9,
+    providerKind: "claude_code",
+    scopeName: "com.anthropic.claude_code.events",
+    facts: {},
+  },
+};
 
 function contextFor(state: CodingAgentSessionState) {
   return {

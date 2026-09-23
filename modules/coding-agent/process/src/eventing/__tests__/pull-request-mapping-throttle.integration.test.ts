@@ -3,7 +3,11 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 
-import type { CodingAgentProcessingEvent } from "@langwatch/coding-agent-contract";
+import {
+  type CodingAgentProcessingEvent,
+  LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+} from "@langwatch/coding-agent-contract";
+import { createTenantId } from "@langwatch/eventing";
 import { GroupStagingScripts } from "@langwatch/group-queue/operational";
 import { RedisContainer, type StartedRedisContainer } from "@testcontainers/redis";
 import Redis from "ioredis";
@@ -28,11 +32,30 @@ function keyPrefix() {
 function payloadFor(sessionId: string) {
   return {
     event: {
-      tenantId: TENANT_ID,
+      id: "evt-1",
       aggregateId: sessionId,
       aggregateType: "coding_agent_session",
+      tenantId: createTenantId(TENANT_ID),
       createdAt: Date.now(),
-    } as unknown as CodingAgentProcessingEvent,
+      occurredAt: Date.now(),
+      type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+      version: "2025-01-01",
+      data: {
+        tenantId: TENANT_ID,
+        sessionId: sessionId,
+        sessionKeySource: "provider",
+        agent: "claude_code",
+        occurredAt: Date.now(),
+        recordId: "rec-1",
+        traceId: null,
+        spanId: null,
+        timeUnixMs: Date.now(),
+        severityNumber: 9,
+        providerKind: "claude_code",
+        scopeName: "com.anthropic.claude_code.events",
+        facts: {},
+      },
+    } satisfies CodingAgentProcessingEvent,
     foldState: {
       repositoryHost: "github.com",
       repositoryOwner: "acme",

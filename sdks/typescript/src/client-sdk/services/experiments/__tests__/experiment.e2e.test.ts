@@ -225,7 +225,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
   });
 
-  describe("target registration", () => {
+  describe("when registering targets", () => {
     /** @scenario "Target metadata validation" */
     it("throws on conflicting metadata for same target", async () => {
       const evaluation = await langwatch.experiments.init(`test-conflict-${Date.now()}`);

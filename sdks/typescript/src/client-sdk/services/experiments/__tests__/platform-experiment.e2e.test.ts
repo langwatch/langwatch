@@ -24,7 +24,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
     });
   });
 
-  describe("error handling", () => {
+  describe("when the run request fails", () => {
     it("throws ExperimentNotFoundError for non-existent slug", async () => {
       await expect(langwatch.experiments.run("non-existent-evaluation-slug-12345")).rejects.toThrow(
         ExperimentNotFoundError,
@@ -41,7 +41,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
     });
   });
 
-  describe("run evaluation", () => {
+  describe("when running an evaluation", () => {
     it("runs an evaluation and returns results", async () => {
       // This test requires a real evaluation to be set up
       // Skip if TEST_EVALUATION_SLUG is not provided

@@ -2,7 +2,7 @@ import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   type LogFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
-import type { AppendStore, Event } from "@langwatch/eventing";
+import { type AppendStore, createTenantId, type Event } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -19,6 +19,13 @@ function logFactsEvent(
 ): LogFactsContributedEvent {
   const timeMs = over.timeMs ?? 1_700_000_000_000;
   return {
+    id: "evt-1",
+    aggregateId: "aggregate-1",
+    aggregateType: "coding_agent_session",
+    tenantId: createTenantId("tenant-1"),
+    createdAt: timeMs,
+    occurredAt: timeMs,
+    version: "2025-01-01",
     type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
     data: {
       tenantId: "tenant-1",
@@ -35,7 +42,7 @@ function logFactsEvent(
       scopeName: "com.anthropic.claude_code.events",
       facts,
     },
-  } as unknown as LogFactsContributedEvent;
+  };
 }
 
 function makeProjection(): CodingAgentSessionEventsMapProjection {
@@ -43,7 +50,7 @@ function makeProjection(): CodingAgentSessionEventsMapProjection {
     store: {
       append: async () => undefined,
       bulkAppend: async () => undefined,
-    } as unknown as AppendStore<CodingAgentSessionEventRecord>,
+    } satisfies AppendStore<CodingAgentSessionEventRecord>,
   });
 }
 

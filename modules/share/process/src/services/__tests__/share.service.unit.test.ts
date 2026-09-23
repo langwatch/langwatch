@@ -76,7 +76,7 @@ describe("ShareService", () => {
       deleteByResource: vi.fn(),
       findAllTraceShareResourceIds: vi.fn(),
       deleteAllTraceShares: vi.fn(),
-    } as unknown as ShareRepository;
+    };
     dataRetention = {
       autoUnpin: vi.fn().mockResolvedValue(void 0),
       autoPin: vi.fn().mockResolvedValue(void 0),
@@ -95,7 +95,7 @@ describe("ShareService", () => {
       isNewViewing: vi.fn().mockResolvedValue(true),
       findPayload: vi.fn().mockResolvedValue(null),
       setPayload: vi.fn().mockResolvedValue(void 0),
-    } as unknown as ShareCacheRepository;
+    };
     service = ShareService.create({
       repository: repo,
       dataRetention: createApiFixture<DataRetentionApi>(dataRetention),

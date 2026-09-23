@@ -3,7 +3,7 @@
  * ADR-071 step 3's deferred pruning promise leans on.
  * @see specs/coding-agent/session-aggregate.feature
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
 
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -220,11 +220,15 @@ describe("CodingAgentSessionClickHouseRepository list-read cost signal", () => {
     describe("when the window is listed", () => {
       it("times the failure under the error outcome and still raises it", async () => {
         const metrics = new CountingReadMetrics();
-        const failing = {
-          query: async () => {
-            throw new Error("clickhouse unavailable");
+        const failing = new ClickHouseQueryClient({
+          driver: {
+            execute: async () => {
+              throw new Error("clickhouse unavailable");
+            },
+            insert: async () => {},
+            command: async () => {},
           },
-        } as unknown as ClickHouseQueryClient;
+        });
         const repository = makeRepository(failing, metrics);
 
         await expect(

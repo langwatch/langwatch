@@ -60,7 +60,7 @@ function rawSpanEvent({
   startMs?: number;
   endMs?: number;
   /** OTLP status: 0 UNSET, 1 OK, 2 ERROR. */
-  statusCode?: number;
+  statusCode?: 0 | 1 | 2;
   /** The trace this span belongs to — span ids are unique only within one. */
   traceId?: string;
 }): TraceProcessingEvent {
@@ -72,6 +72,8 @@ function rawSpanEvent({
     createdAt: startMs,
     type: SPAN_RECEIVED_EVENT_TYPE,
     occurredAt: startMs,
+    version: "2025-01-01",
+    metadata: { spanId, traceId },
     data: {
       span: {
         traceId,
@@ -87,6 +89,9 @@ function rawSpanEvent({
         status: { code: statusCode },
         events: [],
         links: [],
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
       },
       resource: {
         attributes: Object.entries(resourceAttributes).map(([key, value]) => ({
@@ -95,8 +100,9 @@ function rawSpanEvent({
         })),
       },
       instrumentationScope: { name: scopeName },
+      piiRedactionLevel: "DISABLED",
     },
-  } as unknown as TraceProcessingEvent;
+  };
 }
 
 /**
@@ -169,7 +175,7 @@ function liftedPayload({
       facts: { tool_name: "Bash" },
       scopeName: "claude_code",
     },
-  } as unknown as SpanFactsLiftedPayload;
+  };
 }
 
 /**

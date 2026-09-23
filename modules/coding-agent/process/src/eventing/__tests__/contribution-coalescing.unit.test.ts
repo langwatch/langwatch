@@ -72,7 +72,7 @@ function batchParamsFor({
   storeEventsFn: (events: Event[], context: unknown) => Promise<void>;
 }) {
   return {
-    payloads: payloads as unknown as Record<string, unknown>[],
+    payloads,
     commandType: CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
     commandSchema: EventingContributeLogFactsAdapter.schema,
     handler: EventingContributeLogFactsAdapter.create({

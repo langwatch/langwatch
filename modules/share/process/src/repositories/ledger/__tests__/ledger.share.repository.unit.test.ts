@@ -35,21 +35,20 @@ const shareRow = (overrides: Partial<ShareLink> = {}): ShareLink =>
     ...overrides,
   }) as ShareLink;
 
-const spyHead = (compatIds: string[], anchored: boolean): ShareRepository =>
-  ({
-    findByToken: vi.fn().mockResolvedValue(null),
-    findById: vi.fn().mockResolvedValue(shareRow()),
-    existsById: vi.fn().mockResolvedValue(anchored),
-    findAllByResource: vi.fn().mockResolvedValue([]),
-    countActiveForResource: vi.fn().mockResolvedValue(0),
-    create: vi.fn().mockResolvedValue(shareRow({ id: "legacy_share" })),
-    consumeView: vi.fn().mockResolvedValue(true),
-    findAllIdsByResource: vi.fn().mockResolvedValue(compatIds.map((id) => id)),
-    deleteById: vi.fn().mockResolvedValue(void 0),
-    deleteByResource: vi.fn().mockResolvedValue(void 0),
-    findAllTraceShareResourceIds: vi.fn().mockResolvedValue([]),
-    deleteAllTraceShares: vi.fn().mockResolvedValue(void 0),
-  }) as unknown as ShareRepository;
+const spyHead = (compatIds: string[], anchored: boolean): ShareRepository => ({
+  findByToken: vi.fn().mockResolvedValue(null),
+  findById: vi.fn().mockResolvedValue(shareRow()),
+  existsById: vi.fn().mockResolvedValue(anchored),
+  findAllByResource: vi.fn().mockResolvedValue([]),
+  countActiveForResource: vi.fn().mockResolvedValue(0),
+  create: vi.fn().mockResolvedValue(shareRow({ id: "legacy_share" })),
+  consumeView: vi.fn().mockResolvedValue(true),
+  findAllIdsByResource: vi.fn().mockResolvedValue(compatIds.map((id) => id)),
+  deleteById: vi.fn().mockResolvedValue(void 0),
+  deleteByResource: vi.fn().mockResolvedValue(void 0),
+  findAllTraceShareResourceIds: vi.fn().mockResolvedValue([]),
+  deleteAllTraceShares: vi.fn().mockResolvedValue(void 0),
+});
 
 function buildRepository({
   onEngine,
@@ -63,10 +62,10 @@ function buildRepository({
   anchored?: boolean;
 }) {
   const head = spyHead(compatIds, anchored);
-  const grants = {
+  const grants: ShareGrantRepository = {
     findAllResourceGrantIds: vi.fn().mockResolvedValue(grantIds),
     consumeUsage: vi.fn().mockResolvedValue(true),
-  } as unknown as ShareGrantRepository;
+  };
   const projects = { findOrganizationId: vi.fn().mockResolvedValue(ORGANIZATION_ID) };
   // Not typed as AuthzApi: AuthzApi is owned by modules/authz/contract, and its
   // methods use shorthand signatures (unbound-method risk we can't fix from

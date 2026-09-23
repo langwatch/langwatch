@@ -34,7 +34,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
   // ── Dataset CRUD ──────────────────────────────────────────────────
 
-  describe("Dataset CRUD", () => {
+  describe("when managing datasets", () => {
     let datasetId: string;
     let datasetSlug: string;
 
@@ -115,7 +115,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
   // ── Record CRUD ───────────────────────────────────────────────────
 
-  describe("Record CRUD", () => {
+  describe("when managing dataset records", () => {
     let recordSlug: string;
     let recordIds: string[];
 
@@ -258,7 +258,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
   // ── Error Handling ────────────────────────────────────────────────
 
-  describe("Error handling", () => {
+  describe("when the dataset request fails", () => {
     it("throws DatasetNotFoundError for non-existent dataset", async () => {
       await expect(langwatch.datasets.get("does-not-exist-ever-" + Date.now())).rejects.toThrow(
         DatasetNotFoundError,
