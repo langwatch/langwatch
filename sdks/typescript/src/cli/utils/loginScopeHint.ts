@@ -29,5 +29,5 @@ export const loginPermissionsHint = (code: string): string | undefined => {
   if (!permissions?.length) return undefined;
   if (!loginKey || scopedApiKey() !== loginKey) return undefined;
 
-  return `Your login carries ${[...permissions].sort().join(", ")}. A command needing a permission that is not listed there is refused whatever your role is: run \`langwatch login\` again to approve more, or use an API key that already has it.`;
+  return `Your login carries ${[...permissions].toSorted().join(", ")}. A command needing a permission that is not listed there is refused whatever your role is: run \`langwatch login\` again to approve more, or use an API key that already has it.`;
 };

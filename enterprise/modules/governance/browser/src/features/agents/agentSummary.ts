@@ -207,7 +207,7 @@ function summarizeTopSpenders(rows: readonly GovernanceAgentRow[]): AgentSpendLi
   if (total <= 0) return [];
 
   return [...measured]
-    .sort((a, b) => b.costUsd30d - a.costUsd30d)
+    .toSorted((a, b) => b.costUsd30d - a.costUsd30d)
     .slice(0, TOP_SPENDER_COUNT)
     .map((row) => {
       const sharePercent = Math.round((row.costUsd30d / total) * 100);

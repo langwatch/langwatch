@@ -117,7 +117,7 @@ export const queryExamplesCommand = async (
               `No example carries that tag. Tags in use: ${[
                 ...new Set(reference.examples.flatMap((one) => one.tags)),
               ]
-                .sort()
+                .toSorted()
                 .join(", ")}`,
             ),
           );

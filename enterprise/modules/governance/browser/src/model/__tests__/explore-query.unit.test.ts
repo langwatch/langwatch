@@ -44,7 +44,7 @@ describe("the explore query line", () => {
         interval: "day",
       });
       for (const template of EXPLORE_TEMPLATES) {
-        expect(Object.keys(template.selection).sort()).toEqual([
+        expect(Object.keys(template.selection).toSorted()).toEqual([
           "breakdown",
           "interval",
           "measure",

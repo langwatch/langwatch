@@ -118,7 +118,7 @@ export function applyAgentFilters(
 ): GovernanceAgentRow[] {
   return rows
     .filter((row) => matchesFilters(row, filters))
-    .sort((a, b) => compareAgents(filters.sort, a, b));
+    .toSorted((a, b) => compareAgents(filters.sort, a, b));
 }
 
 /**
