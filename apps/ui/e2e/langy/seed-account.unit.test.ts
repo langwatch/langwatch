@@ -165,7 +165,7 @@ describe("seeding a scenario's own account", () => {
     });
   });
 
-  describe("reading the app's .env", () => {
+  describe("when reading the app's .env", () => {
     it("takes the value with or without quotes", () => {
       expect(databaseUrlFromDotenv(`DATABASE_URL="${LOCAL_DB}"`)).toBe(LOCAL_DB);
       expect(databaseUrlFromDotenv(`DATABASE_URL=${LOCAL_DB}`)).toBe(LOCAL_DB);

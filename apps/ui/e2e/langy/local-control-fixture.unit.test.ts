@@ -353,7 +353,7 @@ describe("shareControlProfile", () => {
       ...(pathDirs ? { pathDirs } : {}),
     });
 
-  describe("the git ceiling", () => {
+  describe("when it sets the git ceiling", () => {
     it("stops the repository walk at the folder the scenarios live in", () => {
       expect(profile()).toContain('export GIT_CEILING_DIRECTORIES="/tmp/scenario-repos"');
     });
@@ -367,7 +367,7 @@ describe("shareControlProfile", () => {
     });
   });
 
-  describe("the PATH it builds", () => {
+  describe("when it builds the PATH", () => {
     it("puts the scenario's own shims first and keeps the machine's after", () => {
       expect(profile(["/tmp/scenario-repos/acme-python/bin"])).toContain(
         'export PATH="/tmp/scenario-repos/acme-shims":"/tmp/scenario-repos/acme-bin":"/tmp/scenario-repos/acme-python/bin":"$PATH"',
@@ -375,7 +375,7 @@ describe("shareControlProfile", () => {
     });
   });
 
-  describe("the project key", () => {
+  describe("when it handles the project key", () => {
     it("is unset, so the terminal acts as the person and not the project", () => {
       expect(profile()).toContain("unset LANGWATCH_API_KEY");
     });
@@ -448,7 +448,7 @@ describe("pendingWaitDispatches", () => {
     });
   });
 
-  describe("the order it hands them over", () => {
+  describe("when it hands several cards over", () => {
     it("keeps the record's order, so the first card asked is answered first", () => {
       const dispatches = pendingWaitDispatches({
         waits: [wait({ waitId: "wait_1" }), wait({ waitId: "wait_2" }), wait({ waitId: "wait_3" })],
