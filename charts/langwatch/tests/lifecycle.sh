@@ -51,7 +51,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# ── Allowlist for the undeclared-values check (invariant 3) ──────────────────
+# ── Allowlist for the undeclared-values check (invariant 4) ──────────────────
 # Each entry is a `.Values` path a template reads that values.yaml does not (and
 # should not) declare, with the one-line reason it is exempt. Anything NOT here
 # and NOT declared in values.yaml is a hard failure.
@@ -66,7 +66,7 @@ VALUES_ALLOWLIST=(
   "ingress.host"
 )
 
-# SUBCHARTS (the names that invariant 4 treats as subcharts) is derived from
+# SUBCHARTS (the names that invariant 5 treats as subcharts) is derived from
 # Chart.yaml below, after the PyYAML guard — see the derivation there.
 
 failures=0
@@ -95,7 +95,7 @@ if ! python3 -c 'import yaml' >/dev/null 2>&1; then
   }
 fi
 
-# ── Subchart names for the parent-extraVolumes check (invariant 4) ───────────
+# ── Subchart names for the parent-extraVolumes check (invariant 5) ───────────
 # Read straight from Chart.yaml dependencies (the alias when set, else the name)
 # so a newly added subchart is covered without editing this script. redis and
 # postgresql are parent-managed StatefulSets, not subcharts, so their

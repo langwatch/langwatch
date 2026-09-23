@@ -101,14 +101,17 @@ app_unprovisioned = sum(
 emit("app_unprovisioned_legs", app_unprovisioned)
 
 # The suite step (the one that runs matrix.script / e2e.sh, where every suite
-# executes) must run unconditionally. An `if:` on it would silently drop a
-# whole leg's suites — the same "optional suite" failure continue-on-error
-# causes. Counted on the e2e job's suite steps only; the job-level draft gate
-# `if:` is not a step and is not counted.
-suite_step_if = sum(
-    1 for s in e2e["steps"]
-    if isinstance(s.get("run"), str) and "matrix.script" in s["run"] and "if" in s
-)
+# executes) must exist exactly once and run unconditionally. Counting only the
+# `if:` keys would also pass if the step were removed entirely, so emit the
+# step count too. An `if:` on it would silently drop a whole leg's suites — the
+# same "optional suite" failure continue-on-error causes. Counted on the e2e
+# job's steps only; the job-level draft gate `if:` is not a step.
+suite_steps = [
+    s for s in e2e["steps"]
+    if isinstance(s.get("run"), str) and "matrix.script" in s["run"]
+]
+emit("suite_step_count", len(suite_steps))
+suite_step_if = sum(1 for s in suite_steps if "if" in s)
 emit("suite_step_if_count", suite_step_if)
 
 # The suites each leg runs, parsed from `E2E_SUITES="..."` in its script. Legs
@@ -252,6 +255,15 @@ test_no_suite_is_optional() {
     ok "no optional suite" "the workflow has no continue-on-error"
   else
     bad "no optional suite" "$coe continue-on-error key(s) in the workflow, expected 0"
+  fi
+
+  local suite_steps
+  suite_steps="$(fact suite_step_count)"
+  if [ "$suite_steps" = "1" ]; then
+    ok "no optional suite" "exactly one e2e step runs the matrix suite script"
+  else
+    bad "no optional suite" "$suite_steps e2e steps run the matrix suite script, expected 1"
+    return
   fi
 
   local suite_if
