@@ -78,7 +78,11 @@ require("http")
 test_install() {
   sep; info "Suite: chart install"
 
-  helm_install -f "$CHART_DIR/tests/values-e2e.yaml"
+  # --wait-for-jobs so the install itself fails if the main-phase LWQL
+  # render Job fails: `helm --wait` waits for workloads but NOT for Jobs, and
+  # the LWQL access Secret is written by that Job, so without this an install
+  # can "succeed" with ClickHouse serving no access model.
+  helm_install --wait-for-jobs -f "$CHART_DIR/tests/values-e2e.yaml"
   pass "helm install"
 }
 
@@ -415,8 +419,40 @@ test_app() {
 # multi-replica and scale-up cases.
 # ─────────────────────────────────────────────────────────────────────────────
 # @scenario "A single-replica deployment provisions LangWatchQL unchanged"
+# The LWQL access model is DELIVERED by the main-phase <release>-lwql-access-render
+# Job (revision-suffixed name). `helm --wait` does not wait for Jobs, and the
+# ClickHouse mount is required, so a failed render leaves ClickHouse stuck rather
+# than silently accessless — but assert Complete explicitly anyway, and dump the
+# Job/pod events on failure so a broken render is diagnosable without a re-run.
+assert_render_job_complete() {
+  local job
+  job=$(kc get jobs -o name 2>/dev/null | sed 's|.*/||' \
+    | grep -E "^${RELEASE}-lwql-access-render-[0-9]+$" \
+    | awk -F- '{print $NF, $0}' | sort -rn | head -1 | cut -d' ' -f2)
+  if [ -z "$job" ]; then
+    fail "LWQL render Job not found (expected ${RELEASE}-lwql-access-render-<rev>)"
+    return
+  fi
+  if kc wait --for=condition=complete "job/${job}" --timeout="${TIMEOUT}s" 2>/dev/null; then
+    pass "LWQL render Job ${job} reached Complete"
+  else
+    fail "LWQL render Job ${job} did not complete"
+    info "--- render Job events ---"
+    kc describe "job/${job}" 2>&1 | sed -n '/Events:/,$p' | head -30 || true
+    local jpod
+    jpod=$(kc get pods -l "job-name=${job}" -o name 2>/dev/null | head -1)
+    if [ -n "$jpod" ]; then
+      info "--- render Job pod events ---"
+      kc describe "$jpod" 2>&1 | sed -n '/Events:/,$p' | head -40 || true
+    fi
+  fi
+}
+
 test_lwql() {
   sep; info "Suite: LangWatchQL access model (app self-provisioned)"
+
+  # The access model only exists because the render Job wrote its Secret.
+  assert_render_job_complete
 
   local app_pod
   app_pod=$(kc get pod \
@@ -592,13 +628,19 @@ test_lwql_replicas() {
   # Clean slate so ClickHouse comes up as a 3-node ReplicatedMergeTree cluster.
   helm_uninstall
   helm_install \
+    --wait-for-jobs \
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
     --set app.replicaCount=1
   pass "helm install (chart-managed ClickHouse, replicas=3)"
 
+  # The render Job (main-phase) must have delivered the access Secret before the
+  # ClickHouse pods can mount it; --wait-for-jobs above already fails the install
+  # if it did not, but assert it explicitly for a clear signal + events.
+  assert_render_job_complete
+
   # Every one of the three pods must carry the whole access set, delivered by the
-  # mounted Secret (the render Job ran as a pre-install hook before the pods).
+  # mounted Secret the main-phase render Job wrote before the pods came up.
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
 
   local app_pod pods p lwql_pw

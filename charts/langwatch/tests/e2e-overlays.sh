@@ -659,6 +659,12 @@ HARDENED_WORKLOADS=(
   "templates/redis/statefulset.yaml"
   "charts/gateway/templates/deployment.yaml"
   "charts/clickhouse/templates/statefulset.yaml"
+  # The LWQL access-render Job runs the app image to write the access Secret.
+  # It reaches the Kubernetes API (like the preflight / stored-objects hooks)
+  # but, unlike them, stays fully hardened: it projects a short-lived token
+  # explicitly instead of auto-mounting one, and runs read-only-root with a
+  # writable /tmp HOME. It renders whenever ClickHouse is chart-managed (default).
+  "templates/clickhouse/lwql-access-render.yaml"
 )
 
 # Workloads that render only behind a non-default value. They are as

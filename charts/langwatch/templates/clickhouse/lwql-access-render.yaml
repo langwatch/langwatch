@@ -36,9 +36,9 @@
   Helm's install order applies Secrets and RBAC before Jobs, and a Job before
   the StatefulSet is APPLIED but helm --wait then waits for both concurrently:
   the Job renders and writes the access Secret while the ClickHouse pods sit in
-  ContainerCreating (their optional subPath mount has nothing to resolve yet),
-  and once the Secret exists the kubelet re-syncs the optional volume and the
-  pods start. So a plain main-phase Job both sees its inputs and lands its output
+  ContainerCreating (their required subPath mount has nothing to resolve yet —
+  the kubelet retries a missing required Secret rather than hard-failing it),
+  and once the Secret exists the kubelet re-syncs the volume and the pods start. So a plain main-phase Job both sees its inputs and lands its output
   before the pods finish coming up, on install and upgrade alike. The Job name
   carries .Release.Revision because a Job's pod template is immutable — a
   stable-named Job could not be updated on `helm upgrade`; a fresh name each
@@ -128,29 +128,38 @@ spec:
         {{- include "langwatch.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ $name }}
-      automountServiceAccountToken: true
+      # No blanket token mount (hardened posture, like the backup Jobs). The Job
+      # DOES need an API token to write the access Secret, so it is projected
+      # explicitly into the standard SA path below with a bounded lifetime,
+      # rather than auto-mounting the long-lived one.
+      automountServiceAccountToken: false
       restartPolicy: Never
       {{- with (.Values.global).imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # Reuse the app component's pod security context (uid 1000, fsGroup 1000,
+      # runAsNonRoot, seccompProfile). The app image ships no USER directive, so
+      # a hand-written `runAsNonRoot: true` with no runAsUser makes the kubelet
+      # refuse the pod ("container has runAsNonRoot and image will run as root").
+      # The helper pins the same uid the app Deployment runs as.
       securityContext:
-        runAsNonRoot: true
-        seccompProfile:
-          type: RuntimeDefault
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
       containers:
         - name: lwql-access-render
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: {{ .Values.images.app.pullPolicy }}
-          # readOnlyRootFilesystem omitted: `pnpm run task` writes a store cache
-          # under $HOME, the same reason the stored-objects hook and the subchart
-          # preflight Job omit it.
+          # Same hardened container context as the app (read-only root, non-root,
+          # no privilege escalation, all capabilities dropped). `pnpm run task`
+          # keeps its cache and temp files under $HOME, which HOME below points
+          # at the writable /tmp emptyDir, so read-only root needs no exception.
           securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            # Give pnpm/node a writable HOME on the read-only root filesystem.
+            - name: HOME
+              value: /tmp
             - name: LWQL_ENABLED
               value: {{ .Values.lwql.enabled | quote }}
             - name: LWQL_RENDER_SECRET_NAME
@@ -239,6 +248,12 @@ spec:
               mountPath: /render
             - name: tmp
               mountPath: /tmp
+            # The SA token the write-secret script authenticates with. Mounted at
+            # the conventional path so the script (and NODE_EXTRA_CA_CERTS) find
+            # token, ca.crt and namespace exactly where a default mount puts them.
+            - name: kube-api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
           resources:
             requests:
               cpu: 100m
@@ -253,4 +268,24 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
+        # Reconstruct the standard ServiceAccount mount explicitly (token, ca.crt,
+        # namespace) so pod-level automountServiceAccountToken can stay false
+        # while the write-secret script still has a short-lived API token.
+        - name: kube-api-access
+          projected:
+            defaultMode: 0444
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace
 {{- end }}

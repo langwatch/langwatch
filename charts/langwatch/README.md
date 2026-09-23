@@ -268,6 +268,15 @@ ClickHouse needs none of them from you: the `langwatch/clickhouse-serverless`
 image already ships the two server-level settings, and rendered delivery means
 the app never runs access DDL there.
 
+**Install chart-managed ClickHouse with `--wait-for-jobs`.** The Secret
+`<release>-lwql-clickhouse-access` is written at deploy time by the main-phase
+`<release>-lwql-access-render` Job, and `helm install/upgrade --wait` waits for
+workloads but **not** for Jobs. The ClickHouse mount is required, so a failed or
+absent render leaves ClickHouse stuck `ContainerCreating` (not silently serving
+without an access model); add `--wait-for-jobs` so the release itself fails on a
+bad render, or confirm the `<release>-lwql-access-render` Job reached `Complete`
+before treating the install as done.
+
 | Prerequisite | Why | How chart-managed ClickHouse already satisfies it |
 | --- | --- | --- |
 | `custom_settings_prefixes` includes `custom_` | The `<database>_profile` settings profile (`langwatch_profile` by default) carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |

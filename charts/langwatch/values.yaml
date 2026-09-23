@@ -2024,19 +2024,25 @@ clickhouse:
   # ClickHouse pod mounts them here. Nested single-file (subPath) mounts, so they
   # coexist with the files ch-config renders into config.d / users.d at startup.
   #
-  # optional:true is load-bearing: on a first install the render Job (a
-  # main-phase Job) has not written the Secret yet when these pods are created,
-  # so the pods sit in ContainerCreating until the kubelet re-syncs the volume
-  # once the Job writes it. Without optional:true the missing Secret would hard-
-  # fail the volume instead of retrying. The secretName is tpl-rendered by the
-  # subchart, so .Release.Name resolves;
+  # optional:false is DELIBERATE. The Secret is written at runtime by the
+  # main-phase <release>-lwql-access-render Job, not by a chart Secret manifest,
+  # so on a first install it does not exist yet when these pods are created. A
+  # required mount does NOT hard-fail in that window — the kubelet retries a
+  # missing required Secret (FailedMount events, pod stays in ContainerCreating)
+  # and starts the pod once the Job writes it, exactly as the install race needs.
+  # What optional:false BUYS us: if the render Job never delivers the access model
+  # (a broken render, a bad token, RBAC drift), ClickHouse stays visibly not-Ready
+  # and `helm install --wait --wait-for-jobs` fails, instead of ClickHouse coming
+  # up healthy with NO LWQL access set — the silent-success failure that shipped
+  # once and was only caught much later by an in-cluster row-count assertion.
+  # The secretName is tpl-rendered by the subchart, so .Release.Name resolves;
   # it must equal langwatch.lwql.accessSecretName (<release>-lwql-clickhouse-access).
   ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod (LWQL access Secret by default).
   extraVolumes:
     - name: lwql-access
       secret:
         secretName: "{{ .Release.Name }}-lwql-clickhouse-access"
-        optional: true
+        optional: false
   ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container (LWQL access files by default).
   extraVolumeMounts:
     - name: lwql-access

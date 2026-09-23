@@ -357,6 +357,12 @@ ClickHouse depends on the posture:
   No access SQL DDL runs, and the ClickHouse identity holds no ACCESS MANAGEMENT.
   On upgrade, the ClickHouse pods roll (carrying the LWQL catalog annotation) so
   each re-mounts the freshly rendered Secret.
+
+  Install/upgrade with `--wait-for-jobs`: `helm --wait` does not wait for Jobs,
+  and the ClickHouse mount of that Secret is REQUIRED, so if the render Job fails
+  the ClickHouse pods stay ContainerCreating instead of coming up accessless.
+  With `--wait-for-jobs` the release fails on a bad render; otherwise confirm the
+  {{ .Release.Name }}-lwql-access-render-<revision> Job reached Complete yourself.
 {{- else }}
 
   External / bring-your-own ClickHouse: SQL DDL (`sql` mode). The chart cannot
