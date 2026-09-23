@@ -192,6 +192,12 @@ describe("given coding_tool_results provisioned over the shipped migrations (#80
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policy for the registered view, from the single
+    // access-model emitter (#8258) — the view statements are structural only.
+    await harness.applyAccessModel({
+      extraViews: [CODING_TOOL_RESULTS],
+      sourceDatabase: facts,
+    });
 
     await harness.admin.insert({
       table: `${facts}.stored_spans`,

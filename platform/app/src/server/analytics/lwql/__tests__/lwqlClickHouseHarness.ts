@@ -238,17 +238,18 @@ export const LWQL_FACT_TABLES: LangWatchQLTable[] = [
 ];
 
 /**
- * A synthetic fact-resident view over a harness fixture table.
+ * The fixture fact tables as REAL LangWatchQL view definitions (#8258).
  *
- * The fixture tables (`traces`, `spans`) are not in the shipped catalog, so the
- * harness feeds the ONE access-model emitter ({@link renderLwqlAccessModelDdl})
- * a synthetic view per table to provision its tenant policy and grant — there is
- * no per-statement builder any more (#8258). `name === sourceTable`, so the
- * view's whole-object SELECT grant lands on the fixture table itself, matching
- * the whole-table grant the harness issued before the builders were deleted.
+ * The toy tables (`traces`, `spans`) are not in the shipped catalog, so a suite
+ * that wants them policed registers them as ordinary view definitions in the
+ * `views` input to {@link buildLwqlAccessModelDefinition} — the grant and policy
+ * shape is then whatever the single emitter ({@link renderLwqlAccessModelDdl})
+ * produces, with no test-local statement builders. `name === sourceTable`, so
+ * the emitter's whole-object view grant lands on the fixture table itself (the
+ * whole-table grant the fixture path wants; see {@link startLangWatchQLClickHouse}).
  */
-function syntheticFactView(table: LangWatchQLTable): LangWatchQLViewDefinition {
-  return {
+const LWQL_FIXTURE_VIEWS: LangWatchQLViewDefinition[] = LWQL_FACT_TABLES.map(
+  (table): LangWatchQLViewDefinition => ({
     name: table.table,
     sourceTable: table.table,
     description: `harness fixture view over ${table.table}`,
@@ -269,13 +270,13 @@ function syntheticFactView(table: LangWatchQLTable): LangWatchQLViewDefinition {
         sourceColumns: [table.tenantColumn],
       },
     ],
-  };
-}
+  }),
+);
 
 /**
  * The named-collection stub the harness carries in a definition when it is not
  * rendering the collection itself (only {@link renderLwqlNamedCollectionDdl}
- * reads it, and the base setup does not call that).
+ * reads it, and the access-model emitter ignores it).
  */
 const HARNESS_NAMED_COLLECTION_STUB = {
   collection: "lwql_postgres",
@@ -289,101 +290,6 @@ const HARNESS_NAMED_COLLECTION_STUB = {
 /** The sha256 hex the restricted user is identified by (never the plaintext). */
 const RESTRICTED_PASSWORD_SHA256_HEX = (): string =>
   createHash("sha256").update(RESTRICTED_PASSWORD).digest("hex");
-
-/**
- * One table's tenant row policy, rendered through the single access-model
- * emitter (#8258) — the replacement for the deleted `lwqlRowPolicyStatement`
- * builder. The isolation suites drop a policy to prove it is load-bearing, then
- * re-create it with exactly this statement.
- */
-export function lwqlHarnessRowPolicyStatement({
-  names,
-  table,
-  tenantColumn = "TenantId",
-  sourceDatabase,
-}: {
-  names: LangWatchQLNames;
-  table: string;
-  tenantColumn?: string;
-  sourceDatabase?: string;
-}): string {
-  const definition = buildLwqlAccessModelDefinition({
-    names,
-    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
-    namedCollection: HARNESS_NAMED_COLLECTION_STUB,
-    sourceDatabase: sourceDatabase ?? names.database,
-    views: [syntheticFactView({ table, tenantColumn })],
-  });
-  const policy = renderLwqlAccessModelDdl(definition).find((statement) =>
-    statement.startsWith(`CREATE ROW POLICY OR REPLACE ${table}_tenant `),
-  );
-  if (!policy) {
-    throw new Error(`lwql harness: no row policy rendered for ${table}`);
-  }
-  return policy;
-}
-
-/**
- * A whole-object `GRANT SELECT` on one table, rendered through the single
- * access-model emitter (#8258) — the replacement for the deleted
- * `lwqlGrantStatement` builder. A synthetic view named after the table yields
- * the emitter's whole-object view grant.
- */
-export function lwqlHarnessGrantStatement({
-  names,
-  table,
-  database,
-}: {
-  names: LangWatchQLNames;
-  table: string;
-  database?: string;
-}): string {
-  const db = database ?? names.database;
-  const definition = buildLwqlAccessModelDefinition({
-    names,
-    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
-    namedCollection: HARNESS_NAMED_COLLECTION_STUB,
-    sourceDatabase: names.database,
-    views: [syntheticFactView({ table, tenantColumn: "TenantId" })],
-  });
-  const grant = renderLwqlAccessModelDdl(definition).find(
-    (statement) =>
-      statement === `GRANT SELECT ON ${db}.${table} TO ${names.restrictedUser}`,
-  );
-  if (!grant) {
-    throw new Error(
-      `lwql harness: no whole-object grant rendered for ${table}`,
-    );
-  }
-  return grant;
-}
-
-/**
- * The whole access model for a harness, rendered from the shared definition —
- * the single source production runs (#8258). The profile, restricted user,
- * key-map policy+grant, and each fixture table's policy+grant, all through
- * {@link renderLwqlAccessModelDdl}. A suite re-applies this to converge the
- * profile under new `limits` (the scan-ceiling proof) without re-running the
- * structural objects.
- */
-export function lwqlHarnessAccessModelStatements({
-  harness,
-  limits,
-}: {
-  harness: LangWatchQLClickHouseHarness;
-  limits?: LangWatchQLResourceLimits;
-}): string[] {
-  return renderLwqlAccessModelDdl(
-    buildLwqlAccessModelDefinition({
-      names: harness.names,
-      passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
-      namedCollection: HARNESS_NAMED_COLLECTION_STUB,
-      sourceDatabase: harness.factDatabase,
-      limits,
-      views: harness.lwqlTables.map(syntheticFactView),
-    }),
-  );
-}
 
 /**
  * Where the fact tables the proof reads come from.
@@ -440,6 +346,20 @@ export interface LangWatchQLClickHouseHarness {
   };
   /** Runs statements as the administrator, in order. */
   applyAsAdmin(statements: string[]): Promise<void>;
+  /**
+   * Renders the whole access model from one definition and applies it, exactly
+   * as production does (#8258). Run after the views exist. `views` overrides the
+   * base fixtures outright; `extraViews` appends the suite's own view
+   * definitions; `limits` re-provisions the settings profile; `sourceDatabase`
+   * overrides where the source tables live. Idempotent, so a suite reconverges
+   * a detached policy by calling it again.
+   */
+  applyAccessModel(opts?: {
+    views?: readonly LangWatchQLViewDefinition[];
+    extraViews?: readonly LangWatchQLViewDefinition[];
+    limits?: LangWatchQLResourceLimits;
+    sourceDatabase?: string;
+  }): Promise<void>;
   container: StartedClickHouseContainer;
   stop(): Promise<void>;
 }
@@ -588,27 +508,47 @@ export async function startLangWatchQLClickHouse({
     );
   }
 
-  // The access model is single-sourced from the definition now (#8258): the
-  // setup statements carry only the structural objects, and the profile, user,
-  // key-map policy+grant and every fixture table's policy+grant come from
-  // renderLwqlAccessModelDdl over one definition. For a migrated run
-  // `lwqlTables` is empty, so the emitter yields just profile/user/key-map and
-  // the real catalog's policies are applied later by the suite.
-  const accessDefinition = buildLwqlAccessModelDefinition({
-    names,
-    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
-    namedCollection: HARNESS_NAMED_COLLECTION_STUB,
-    // sourceDatabase mirrors provisionLwql.ts: production passes one
-    // sourceDatabase to both the setup and the view statements, so the key
-    // map (and its row policies) live in the facts database, not always
-    // names.database.
-    sourceDatabase: factDatabase,
-    views: lwqlTables.map(syntheticFactView),
-  });
-  await applyAsAdmin([
-    ...lwqlClickHouseSetupStatements({ names, sourceDatabase: factDatabase }),
-    ...renderLwqlAccessModelDdl(accessDefinition),
-  ]);
+  // The fixture fact tables, registered as real view definitions so the emitter
+  // polices them like any catalog source (#8258). Empty under `migrated`: the
+  // real catalog's views are applied later by the suite through
+  // `applyAccessModel`.
+  const baseViews: LangWatchQLViewDefinition[] =
+    facts === "migrated" ? [] : LWQL_FIXTURE_VIEWS;
+
+  /**
+   * Renders the whole access model from ONE definition and applies it, exactly
+   * as production does (profile → user → row policies → grants, from
+   * {@link renderLwqlAccessModelDdl}). Run after the views exist. `views`
+   * overrides the base fixtures outright; `extraViews` appends to them; both
+   * default to the base fixtures. Idempotent (`OR REPLACE`), so a suite that
+   * detaches one policy to prove it load-bearing reconverges the model by
+   * calling this again. `sourceDatabase` mirrors provisionLwql.ts — one database
+   * feeds the setup and view statements, so the key map (and its policies) live
+   * in the facts database, not always names.database.
+   */
+  const applyAccessModel = async (opts?: {
+    views?: readonly LangWatchQLViewDefinition[];
+    extraViews?: readonly LangWatchQLViewDefinition[];
+    limits?: LangWatchQLResourceLimits;
+    sourceDatabase?: string;
+  }): Promise<void> => {
+    const definition = buildLwqlAccessModelDefinition({
+      names,
+      passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+      namedCollection: HARNESS_NAMED_COLLECTION_STUB,
+      sourceDatabase: opts?.sourceDatabase ?? factDatabase,
+      ...(opts?.limits ? { limits: opts.limits } : {}),
+      views: opts?.views ?? [...baseViews, ...(opts?.extraViews ?? [])],
+    });
+    await applyAsAdmin(renderLwqlAccessModelDdl(definition));
+  };
+
+  // The setup statements carry only the structural objects; the access model is
+  // single-sourced from the definition above.
+  await applyAsAdmin(
+    lwqlClickHouseSetupStatements({ names, sourceDatabase: factDatabase }),
+  );
+  await applyAccessModel();
 
   await seedKeyMap({ admin, names, keyMapDatabase: factDatabase });
   if (facts === "migrated") {
@@ -626,6 +566,7 @@ export async function startLangWatchQLClickHouse({
     factDatabase,
     container,
     applyAsAdmin,
+    applyAccessModel,
     async restrictedClient(options) {
       const keyHash = options?.keyHash;
       const client = createClient({
@@ -2795,9 +2736,10 @@ export async function mapPostgresIntoClickHouse({
     }),
   );
   const collection = lwqlTestNamedCollection(harness.names);
-  // One definition drives both the named collection and the per-table row
-  // policies, through the single access-model emitter (#8258). The mapped tables
-  // are not in the shipped catalog, so each is fed as a synthetic view.
+  // Only the named collection reads these fields; the access model (grants and
+  // row policies) is single-sourced from the shipped catalog and applied by the
+  // suite through `harness.applyAccessModel({ views: lwqlPostgresViews(...) })`
+  // once the views exist — exactly as production orders it (#8258).
   const pgDefinition = buildLwqlAccessModelDefinition({
     names: harness.names,
     passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
@@ -2812,7 +2754,6 @@ export async function mapPostgresIntoClickHouse({
       password: PG_READER_PASSWORD,
     },
     sourceDatabase: harness.names.database,
-    views: lwqlTables.map(syntheticFactView),
   });
   await harness.applyAsAdmin([
     ...renderLwqlNamedCollectionDdl(pgDefinition),
@@ -2824,20 +2765,6 @@ export async function mapPostgresIntoClickHouse({
       names: harness.names,
       collection,
     }),
-    // No grant here on purpose. `lwqlViewSetupStatements` issues the
-    // column-scoped one for every source it reads, and ClickHouse grants are
-    // additive: a whole-table grant issued here would sit underneath it and
-    // quietly widen it back out — the same trap the fixture fact tables carry.
-    // So only the per-table row policies are taken from the rendered model.
-    ...renderLwqlAccessModelDdl(pgDefinition).filter(
-      (statement) =>
-        statement.startsWith("CREATE ROW POLICY OR REPLACE") &&
-        lwqlTables.some((lwqlTable) =>
-          statement.includes(
-            `_tenant ON ${harness.names.database}.${lwqlTable.table}`,
-          ),
-        ),
-    ),
   ]);
   return lwqlTables;
 }

@@ -37,7 +37,6 @@ import {
 } from "../limits";
 import {
   type LangWatchQLClickHouseHarness,
-  lwqlHarnessAccessModelStatements,
   recordSeedControl,
   startLangWatchQLClickHouse,
 } from "./lwqlClickHouseHarness";
@@ -91,9 +90,7 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
     // settings profile carries the ceiling under test, and the ordered
     // profile→user→policies→grants render converges it without stranding the
     // user on a replaced profile id.
-    await harness.applyAsAdmin(
-      lwqlHarnessAccessModelStatements({ harness, limits }),
-    );
+    await harness.applyAccessModel({ limits });
   };
 
   /** Runs `SCANNING_QUERY` as the restricted identity, through the executor. */

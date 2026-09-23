@@ -38,7 +38,6 @@ import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
   LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
-  lwqlHarnessRowPolicyStatement,
   MOVED_PARTITION_FIXTURE,
   mapPostgresIntoClickHouse,
   measureQuery,
@@ -175,6 +174,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole shipped catalog, from the
+    // single access-model emitter (#8258) — the view statements are structural.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: harness.factDatabase,
+    });
   };
 
   beforeAll(async () => {
@@ -496,14 +501,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           )
         ).map((row) => row.TenantId);
       } finally {
-        await harness.applyAsAdmin([
-          lwqlHarnessRowPolicyStatement({
-            names: harness.names,
-            table: sourceTable.table,
-            tenantColumn: sourceTable.tenantColumn,
-            sourceDatabase: facts,
-          }),
-        ]);
+        // Reconverge the whole catalog from the definition — restores the
+        // simulations source-table policy detached above.
+        await harness.applyAccessModel({
+          views: LWQL_VIEW_CATALOG,
+          sourceDatabase: facts,
+        });
       }
 
       expect(

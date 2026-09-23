@@ -105,6 +105,7 @@ function projectDdl(statements: string[]): Projection {
   if (!profileStmt || !userStmt) throw new Error("DDL missing profile/user");
 
   const [profileHead, ...settingLines] = profileStmt.split("\n");
+  if (profileHead === undefined) throw new Error("DDL profile statement empty");
   const profileName = profileHead
     .replace("CREATE SETTINGS PROFILE OR REPLACE ", "")
     .trim();
@@ -116,16 +117,29 @@ function projectDdl(statements: string[]): Projection {
       .trim()
       .match(/^(\S+) = (.+) (CONST|CHANGEABLE_IN_READONLY)$/);
     if (!match) continue;
-    settings[match[1]] = {
-      value: normalizeValue(match[2]),
-      constraint: match[3] === "CONST" ? "const" : "changeable_in_readonly",
+    const [, settingName, rawValue, constraintToken] = match;
+    if (
+      settingName === undefined ||
+      rawValue === undefined ||
+      constraintToken === undefined
+    ) {
+      continue;
+    }
+    settings[settingName] = {
+      value: normalizeValue(rawValue),
+      constraint:
+        constraintToken === "CONST" ? "const" : "changeable_in_readonly",
     };
   }
 
   const userMatch = userStmt.match(
     /CREATE USER OR REPLACE (\S+) IDENTIFIED WITH sha256_hash BY '([0-9a-f]+)'/,
   );
-  if (!userMatch) throw new Error("DDL user statement unparseable");
+  const userName = userMatch?.[1];
+  const userPasswordSha256Hex = userMatch?.[2];
+  if (userName === undefined || userPasswordSha256Hex === undefined) {
+    throw new Error("DDL user statement unparseable");
+  }
 
   const grants = statements
     .filter((s) => s.startsWith("GRANT SELECT"))
@@ -163,7 +177,7 @@ function projectDdl(statements: string[]): Projection {
     "";
 
   return {
-    user: { name: userMatch[1], passwordSha256Hex: userMatch[2] },
+    user: { name: userName, passwordSha256Hex: userPasswordSha256Hex },
     profile: { name: profileName, settings },
     grants,
     policies,
@@ -202,7 +216,9 @@ function projectYaml(
     named_collections: Record<string, Record<string, string | number>>;
   };
 
-  const [profileName, profile] = Object.entries(users.profiles)[0];
+  const profileEntry = Object.entries(users.profiles)[0];
+  if (!profileEntry) throw new Error("users yaml has no profile");
+  const [profileName, profile] = profileEntry;
   const settings: Projection["profile"]["settings"] = {};
   for (const [name, raw] of Object.entries(profile)) {
     if (name === "constraints") continue;
@@ -210,7 +226,9 @@ function projectYaml(
     settings[name] = { value: normalizeValue(String(raw)), constraint };
   }
 
-  const [userName, user] = Object.entries(users.users)[0];
+  const userEntry = Object.entries(users.users)[0];
+  if (!userEntry) throw new Error("users yaml has no user");
+  const [userName, user] = userEntry;
   const grants = user.grants.query
     .map((q) => {
       const m = q.match(/^GRANT SELECT(?:\(([^)]*)\))? ON ([^\s.]+)\.(\S+)$/);
@@ -230,7 +248,9 @@ function projectYaml(
   }
   policies.sort();
 
-  const [ncName, ncFields] = Object.entries(nc.named_collections)[0];
+  const ncEntry = Object.entries(nc.named_collections)[0];
+  if (!ncEntry) throw new Error("named collection yaml has no entry");
+  const [ncName, ncFields] = ncEntry;
 
   return {
     user: { name: userName, passwordSha256Hex: user.password_sha256_hex },

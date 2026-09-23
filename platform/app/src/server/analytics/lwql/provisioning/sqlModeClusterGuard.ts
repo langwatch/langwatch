@@ -86,10 +86,12 @@ async function maxOwnClusterHostCount(
   );
   const hostsByCluster = new Map<string, Set<string>>();
   for (const row of rows) {
-    if (!ownClusters.has(row.cluster)) continue;
-    const hosts = hostsByCluster.get(row.cluster) ?? new Set<string>();
-    hosts.add(row.host_name);
-    hostsByCluster.set(row.cluster, hosts);
+    const { cluster, host_name: hostName } = row;
+    if (cluster === undefined || hostName === undefined) continue;
+    if (!ownClusters.has(cluster)) continue;
+    const hosts = hostsByCluster.get(cluster) ?? new Set<string>();
+    hosts.add(hostName);
+    hostsByCluster.set(cluster, hosts);
   }
   let max = 0;
   for (const hosts of hostsByCluster.values()) {

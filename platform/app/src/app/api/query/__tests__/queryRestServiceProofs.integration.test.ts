@@ -839,6 +839,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole catalog, from the single
+    // access-model emitter (#8258) — the view statements are structural only.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: facts,
+    });
 
     await resetApp();
     const eventSourcing = createAuthzTestEventSourcing(prisma);
