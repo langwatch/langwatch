@@ -1,8 +1,8 @@
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import Parse from "papaparse";
 import { z } from "zod";
 
-export const tools = (dataset: string) => {
+export const tools = (dataset: string): ToolSet => {
   const parsedDataset = Parse.parse(dataset, { header: true });
   const columnNames = parsedDataset.meta.fields?.filter((field) => field !== "id");
 

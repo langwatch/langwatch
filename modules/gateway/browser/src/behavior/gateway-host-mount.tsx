@@ -75,17 +75,43 @@ function organizationsOf(
 }
 
 class CapabilityGatewayHost extends GatewayHostApi {
-  constructor(
-    private readonly activeScope: GatewayScope,
-    private readonly scopeHost: UiScopeHost | undefined,
-    private readonly isSaas: boolean,
-    private readonly session: UiSession,
-    private readonly navigation: UiNavigation,
-    private readonly uiRoute: UiRoute,
-    private readonly feedback: UiFeedback,
-    private readonly organizations_: readonly GatewayOrganization[],
-  ) {
+  private readonly activeScope: GatewayScope;
+  private readonly scopeHost: UiScopeHost | undefined;
+  private readonly isSaas: boolean;
+  private readonly session: UiSession;
+  private readonly navigation: UiNavigation;
+  private readonly uiRoute: UiRoute;
+  private readonly feedback: UiFeedback;
+  private readonly organizations_: readonly GatewayOrganization[];
+
+  constructor({
+    activeScope,
+    scopeHost,
+    isSaas,
+    session,
+    navigation,
+    uiRoute,
+    feedback,
+    organizations,
+  }: {
+    activeScope: GatewayScope;
+    scopeHost: UiScopeHost | undefined;
+    isSaas: boolean;
+    session: UiSession;
+    navigation: UiNavigation;
+    uiRoute: UiRoute;
+    feedback: UiFeedback;
+    organizations: readonly GatewayOrganization[];
+  }) {
     super();
+    this.activeScope = activeScope;
+    this.scopeHost = scopeHost;
+    this.isSaas = isSaas;
+    this.session = session;
+    this.navigation = navigation;
+    this.uiRoute = uiRoute;
+    this.feedback = feedback;
+    this.organizations_ = organizations;
   }
 
   scope(): GatewayScope {
@@ -189,16 +215,16 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
 
   const host = useMemo(
     () =>
-      new CapabilityGatewayHost(
-        { organizationId, projectId },
+      new CapabilityGatewayHost({
+        activeScope: { organizationId, projectId },
         scopeHost,
-        isSaaS,
+        isSaas: isSaaS,
         session,
         navigation,
-        route,
+        uiRoute: route,
         feedback,
         organizations,
-      ),
+      }),
     [
       organizationId,
       projectId,

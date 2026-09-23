@@ -468,12 +468,17 @@ function assertSingleOrganization(params: GuardParams, model: string, where: unk
   }
 }
 
-function assertOrganizationPredicate(
-  params: GuardParams,
-  model: string,
-  config: OrgScopedModelConfig,
-  where: unknown,
-): void {
+function assertOrganizationPredicate({
+  params,
+  model,
+  config,
+  where,
+}: {
+  params: GuardParams;
+  model: string;
+  config: OrgScopedModelConfig;
+  where: unknown;
+}): void {
   const passes = (clause: any) =>
     boundsToSingleOrg(clause) ||
     (config.extraBound ? config.extraBound({ clause, action: params.action }) : false);
@@ -518,7 +523,7 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
 
   // Single-organization invariant: a query may not target two orgs at once.
   assertSingleOrganization(params, model, where);
-  assertOrganizationPredicate(params, model, config, where);
+  assertOrganizationPredicate({ params, model, config, where });
 
   // upsert also writes a create payload when the row is absent, so hold it to
   // the same "every create declares its owning organization" invariant.

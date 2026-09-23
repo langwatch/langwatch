@@ -126,17 +126,23 @@ function ownershipError(message: string): Error {
   );
 }
 
-function assertRelationAccess(
-  value: unknown,
-  model: PrismaTableModel,
-  operation: string,
-  claimedModels: ReadonlySet<PrismaTableModel>,
-  exceptions: readonly PrismaRelationException[],
-): void {
+function assertRelationAccess({
+  value,
+  model,
+  operation,
+  claimedModels,
+  exceptions,
+}: {
+  value: unknown;
+  model: PrismaTableModel;
+  operation: string;
+  claimedModels: ReadonlySet<PrismaTableModel>;
+  exceptions: readonly PrismaRelationException[];
+}): void {
   if (!value || typeof value !== "object") return;
   if (Array.isArray(value)) {
     for (const item of value) {
-      assertRelationAccess(item, model, operation, claimedModels, exceptions);
+      assertRelationAccess({ value: item, model, operation, claimedModels, exceptions });
     }
     return;
   }
@@ -155,11 +161,11 @@ function assertRelationAccess(
       if (!claimedModels.has(target) && !exception) {
         throw ownershipError(`${operation} of foreign relation ${model}.${key}`);
       }
-      assertRelationAccess(child, target, operation, claimedModels, exceptions);
+      assertRelationAccess({ value: child, model: target, operation, claimedModels, exceptions });
       continue;
     }
     if (modelFields?.has(key)) continue;
-    assertRelationAccess(child, model, operation, claimedModels, exceptions);
+    assertRelationAccess({ value: child, model, operation, claimedModels, exceptions });
   }
 }
 
@@ -167,14 +173,19 @@ function delegateName(model: PrismaTableModel): string {
   return `${model.slice(0, 1).toLowerCase()}${model.slice(1)}`;
 }
 
-function scopedClient<Models extends readonly PrismaTableModel[]>(
-  client: object,
-  models: readonly PrismaTableModel[],
-  exceptions: readonly PrismaRelationException[],
+function scopedClient<Models extends readonly PrismaTableModel[]>({
+  client,
+  models,
+  exceptions,
+  transaction,
+}: {
+  client: object;
+  models: readonly PrismaTableModel[];
+  exceptions: readonly PrismaRelationException[];
   transaction:
     | (<Result>(callback: (transactionClient: object) => Promise<Result>) => Promise<Result>)
-    | undefined,
-): ScopedPrismaClient<Models> {
+    | undefined;
+}): ScopedPrismaClient<Models> {
   const claimedModels = new Set<PrismaTableModel>(models);
   const claimedDelegates = new Map(models.map((model) => [delegateName(model), model]));
   const allDelegates = new Set(
@@ -195,7 +206,14 @@ function scopedClient<Models extends readonly PrismaTableModel[]>(
               );
             }
             return transaction((transactionClient) =>
-              callback(scopedClient(transactionClient, models, exceptions, undefined)),
+              callback(
+                scopedClient({
+                  client: transactionClient,
+                  models,
+                  exceptions,
+                  transaction: undefined,
+                }),
+              ),
             );
           };
         }
@@ -215,7 +233,13 @@ function scopedClient<Models extends readonly PrismaTableModel[]>(
             const method = Reflect.get(delegateTarget, operation);
             if (typeof method !== "function") return method;
             return (...args: unknown[]) => {
-              assertRelationAccess(args[0], model, String(operation), claimedModels, exceptions);
+              assertRelationAccess({
+                value: args[0],
+                model,
+                operation: String(operation),
+                claimedModels,
+                exceptions,
+              });
               if (UNSAFE_MUTATION_OPERATIONS.has(String(operation))) {
                 throw ownershipError(
                   `${String(operation)} because Prisma relationMode cascades are not scoped`,
@@ -273,7 +297,10 @@ export function scopedPrismaClient<const Models extends readonly PrismaTableMode
       return Object.freeze({ ...exception });
     }),
   );
-  return scopedClient(client, Object.freeze([...models]), exceptions, (callback) =>
-    client.$transaction(callback),
-  );
+  return scopedClient({
+    client,
+    models: Object.freeze([...models]),
+    exceptions,
+    transaction: (callback) => client.$transaction(callback),
+  });
 }

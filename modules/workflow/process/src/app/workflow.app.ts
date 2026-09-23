@@ -27,6 +27,7 @@ import {
   type CopyWorkflowCommand,
   type CreateWorkflowCommand,
   type ExecuteWorkflowComponentInput,
+  type ExecutionState,
   type LLMConfig,
   type PublishWorkflowCommand,
   type RunWorkflowCommand,
@@ -42,10 +43,12 @@ import {
   type WorkflowRestEnvelope,
   type WorkflowCopyWithPath,
   type WorkflowDsl,
+  type WorkflowEvaluatorFields,
   type WorkflowEvaluationRequest,
   type WorkflowEvaluationStarted,
   type WorkflowLineageRow,
   type WorkflowListRow,
+  type WorkflowMappingFields,
   type WorkflowPublicationFlags,
   type WorkflowReference,
   type WorkflowRelatedEntities,
@@ -450,7 +453,7 @@ export class WorkflowApp implements WorkflowApi {
 
   // -- the workflow itself ---------------------------------------------------
 
-  async executeComponent(input: ExecuteWorkflowComponentInput) {
+  async executeComponent(input: ExecuteWorkflowComponentInput): Promise<ExecutionState> {
     const dispatch = this.#members.studioDispatch;
 
     if (!dispatch) throw new WorkflowExecutionFailedError();
@@ -477,19 +480,25 @@ export class WorkflowApp implements WorkflowApi {
     return this.#members.workflows.assertInProject(input);
   }
 
-  listFields(input: { projectId: string; workflowIds: string[] }) {
+  listFields(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<Record<string, WorkflowMappingFields>> {
     return this.#members.workflows.listFields(input);
   }
 
-  listSummaries(input: { projectId: string; workflowIds: string[] }) {
+  listSummaries(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<{ id: string; name: string }[]> {
     return this.#members.workflows.listSummaries(input);
   }
 
-  archiveLinked(input: WorkflowReference) {
+  archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
     return this.#members.workflows.archiveLinked(input);
   }
 
-  deleteUncommitted(input: WorkflowReference) {
+  deleteUncommitted(input: WorkflowReference): Promise<void> {
     return this.#members.workflows.deleteUncommitted(input);
   }
 
@@ -513,7 +522,7 @@ export class WorkflowApp implements WorkflowApi {
   }
 
   /** The evaluator-fields shape a peer's guard and run read off this workflow. */
-  getFields(input: { workflowId: string; projectId: string }) {
+  getFields(input: { workflowId: string; projectId: string }): Promise<WorkflowEvaluatorFields> {
     return this.#members.workflows.getFields(input);
   }
 
@@ -663,7 +672,11 @@ export class WorkflowApp implements WorkflowApi {
     return this.#studioCopies.copyWithDatasets(input);
   }
 
-  async completeCode(input: { projectId: string; userId: string; body: WorkflowRestEnvelope }) {
+  async completeCode(input: {
+    projectId: string;
+    userId: string;
+    body: WorkflowRestEnvelope;
+  }): Promise<WorkflowCodeCompletionResponse> {
     const permitted = await this.#members.permissions.has({
       userId: input.userId,
       projectId: input.projectId,

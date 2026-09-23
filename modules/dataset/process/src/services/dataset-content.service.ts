@@ -4,8 +4,13 @@ import {
   type CreateDatasetRecordsInput,
   type Dataset,
   type DatasetEntrySelection,
+  type DatasetHead,
+  type DatasetPage,
   type DatasetPageInput,
   type DatasetRecord,
+  type DatasetRecordMutationResult,
+  type DatasetRecordPage,
+  type DatasetWithRecords,
   type DeleteDatasetRecordsInput,
   type UpdateDatasetRecordInput,
   DatasetChunkCountMissingError,
@@ -50,7 +55,13 @@ export class DatasetContentAdapter implements DatasetContent {
     return new DatasetContentAdapter(options.datasets, options.storageResolver);
   }
 
-  async listRecords({ dataset, input }: { dataset: Dataset; input: DatasetPageInput }) {
+  async listRecords({
+    dataset,
+    input,
+  }: {
+    dataset: Dataset;
+    input: DatasetPageInput;
+  }): Promise<DatasetRecordPage> {
     this.assertReady(dataset);
     const total = dataset.rowCount ?? 0;
     const limit = input.limit ?? 50;
@@ -104,7 +115,7 @@ export class DatasetContentAdapter implements DatasetContent {
     page: number;
     limit: number;
     search: string;
-  }) {
+  }): Promise<DatasetRecordPage> {
     const { dataset } = input;
     this.assertReady(dataset);
     if ((dataset.rowCount ?? 0) > DATASET_SEARCH_MAX_ROWS) {
@@ -160,7 +171,13 @@ export class DatasetContentAdapter implements DatasetContent {
     };
   }
 
-  async getDatasetPage({ dataset, input }: { dataset: Dataset; input: DatasetPageInput }) {
+  async getDatasetPage({
+    dataset,
+    input,
+  }: {
+    dataset: Dataset;
+    input: DatasetPageInput;
+  }): Promise<DatasetPage> {
     const page = await this.listRecords({ dataset, input });
     return {
       id: dataset.id,
@@ -184,7 +201,7 @@ export class DatasetContentAdapter implements DatasetContent {
     projectId: string;
     entrySelection: DatasetEntrySelection;
     limitMb: number | null;
-  }) {
+  }): Promise<DatasetWithRecords> {
     this.assertReady(dataset);
     if (!dataset.chunkCount) {
       throw new DatasetChunkCountMissingError(dataset.id);
@@ -208,7 +225,7 @@ export class DatasetContentAdapter implements DatasetContent {
     };
   }
 
-  async getDatasetHead({ dataset }: { dataset: Dataset }) {
+  async getDatasetHead({ dataset }: { dataset: Dataset }): Promise<DatasetHead> {
     const result = await this.listRecords({
       dataset,
       input: {
@@ -231,7 +248,7 @@ export class DatasetContentAdapter implements DatasetContent {
   }: {
     dataset: Dataset;
     input: UpdateDatasetRecordInput & { recordId: string };
-  }) {
+  }): Promise<DatasetRecordMutationResult> {
     const storage = await this.storageResolver.forProject(input.projectId);
     const result = await this.chunks.editRecord({
       dataset,
@@ -252,7 +269,7 @@ export class DatasetContentAdapter implements DatasetContent {
   }: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
-  }) {
+  }): Promise<DatasetRecord[]> {
     const entries = input.entries.map((entry) => ({ ...entry }));
     const storage = await this.storageResolver.forProject(input.projectId);
     await this.chunks.append({
@@ -265,7 +282,13 @@ export class DatasetContentAdapter implements DatasetContent {
     return entries.map((entry) => toDatasetRecord({ id: entry.id, entry }, dataset));
   }
 
-  async deleteRecords({ dataset, input }: { dataset: Dataset; input: DeleteDatasetRecordsInput }) {
+  async deleteRecords({
+    dataset,
+    input,
+  }: {
+    dataset: Dataset;
+    input: DeleteDatasetRecordsInput;
+  }): Promise<{ count: number }> {
     const result = await this.chunks.deleteRecords({
       dataset,
       projectId: input.projectId,
@@ -334,7 +357,7 @@ export class DatasetContentAdapter implements DatasetContent {
     name: string;
     slug: string;
     columnTypes: Dataset["columnTypes"];
-  }) {
+  }): Promise<Dataset> {
     const updated = await this.chunks.migrateColumns({
       dataset,
       projectId,

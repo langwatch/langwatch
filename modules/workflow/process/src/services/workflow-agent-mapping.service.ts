@@ -58,13 +58,13 @@ export class WorkflowAgentMappingService implements WorkflowAgentMapping {
       const outputIdentifiers = new Set(outputs.map((field) => field.identifier));
 
       for (const agent of agents) {
-        const config = this.#refreshConfig(
-          agent.config,
+        const config = this.#refreshConfig({
+          config: agent.config,
           inputIdentifiers,
           outputIdentifiers,
-          mappings,
-          scenarioOutputField,
-        );
+          defaults: mappings,
+          outputField: scenarioOutputField,
+        });
         if (config === agent.config) continue;
 
         await this.#agents.updateWorkflowConfig({
@@ -82,13 +82,19 @@ export class WorkflowAgentMappingService implements WorkflowAgentMapping {
     }
   }
 
-  #refreshConfig(
-    config: Record<string, unknown>,
-    inputIdentifiers: Set<string>,
-    outputIdentifiers: Set<string>,
-    defaults: Record<string, unknown>,
-    outputField: string | undefined,
-  ): Record<string, unknown> {
+  #refreshConfig({
+    config,
+    inputIdentifiers,
+    outputIdentifiers,
+    defaults,
+    outputField,
+  }: {
+    config: Record<string, unknown>;
+    inputIdentifiers: Set<string>;
+    outputIdentifiers: Set<string>;
+    defaults: Record<string, unknown>;
+    outputField: string | undefined;
+  }): Record<string, unknown> {
     const currentMappings = mappingsSchema.safeParse(config.scenarioMappings).data ?? {};
     const currentKeys = Object.keys(currentMappings);
     const preserved = Object.fromEntries(

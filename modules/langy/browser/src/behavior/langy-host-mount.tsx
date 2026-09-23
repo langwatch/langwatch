@@ -30,15 +30,35 @@ import {
 } from "../model/langy-host.ts";
 
 class CapabilityLangyHost extends LangyHostApi {
-  constructor(
-    private readonly session: UiSession,
-    private readonly navigationCapability: UiNavigation,
-    private readonly routeCapability: UiRoute,
-    private readonly feedback: UiFeedback,
-    private readonly organizationRole_: LangyHostOrganizationRole,
-    private readonly isDemoProject_: boolean,
-  ) {
+  private readonly session: UiSession;
+  private readonly navigationCapability: UiNavigation;
+  private readonly routeCapability: UiRoute;
+  private readonly feedback: UiFeedback;
+  private readonly organizationRole_: LangyHostOrganizationRole;
+  private readonly isDemoProject_: boolean;
+
+  constructor({
+    session,
+    navigation,
+    route,
+    feedback,
+    organizationRole,
+    isDemoProject,
+  }: {
+    session: UiSession;
+    navigation: UiNavigation;
+    route: UiRoute;
+    feedback: UiFeedback;
+    organizationRole: LangyHostOrganizationRole;
+    isDemoProject: boolean;
+  }) {
     super();
+    this.session = session;
+    this.navigationCapability = navigation;
+    this.routeCapability = route;
+    this.feedback = feedback;
+    this.organizationRole_ = organizationRole;
+    this.isDemoProject_ = isDemoProject;
   }
 
   project(): LangyHostProject | undefined {
@@ -132,14 +152,14 @@ export default function LangyHostMount({ children }: { children?: ReactNode }) {
 
   const host = useMemo(
     () =>
-      new CapabilityLangyHost(
+      new CapabilityLangyHost({
         session,
         navigation,
         route,
         feedback,
         organizationRole,
         isDemoProject,
-      ),
+      }),
     [session, navigation, route, feedback, organizationRole, isDemoProject],
   );
   return <LangyHostProvider value={host}>{children}</LangyHostProvider>;

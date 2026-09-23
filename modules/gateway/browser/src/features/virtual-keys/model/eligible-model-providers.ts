@@ -60,12 +60,17 @@ export type ScopeHierarchy = {
  * Resolve the snippet-friendly model string for a provider row, emitting
  * vendor-prefixed defaults for self-hosted endpoints that don't serve OpenAI models.
  */
-export function resolveProviderDefaultModel(
-  providerKey: string,
-  providerLabel: string,
-  providerModels: string[],
-  customModels?: { modelId: string }[] | null,
-): string {
+export function resolveProviderDefaultModel({
+  providerKey,
+  providerLabel,
+  providerModels,
+  customModels,
+}: {
+  providerKey: string;
+  providerLabel: string;
+  providerModels: string[];
+  customModels?: { modelId: string }[] | null;
+}): string {
   const registryDefault = MODEL_PROVIDER_DEFAULT_MODELS[providerKey];
   const fallbackModel = providerModels[0] ?? customModels?.[0]?.modelId;
   const defaultModel = registryDefault ?? fallbackModel;
@@ -166,12 +171,12 @@ export function resolveEligible({
       label,
       modelCount: chatModels.length + customCount,
       definedAt,
-      defaultModel: resolveProviderDefaultModel(
-        provider.provider,
-        label,
-        chatModels,
-        provider.customModels,
-      ),
+      defaultModel: resolveProviderDefaultModel({
+        providerKey: provider.provider,
+        providerLabel: label,
+        providerModels: chatModels,
+        customModels: provider.customModels,
+      }),
     });
   }
   return Array.from(result.values()).toSorted(

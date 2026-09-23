@@ -26,13 +26,19 @@ export type ChoicesRefRow =
  * `live`/`dead` from the hydrator's answer, or `plain` for every entry of this type on
  * a hydrator failure (kept selectable rather than disabled on a transient error).
  */
-async function hydrateRefType(
-  entries: { optionId: string; refId: string }[],
-  hydrator: NonNullable<CapabilityHydrator["byIds"]>,
-  utils: CapabilityTrpcUtils,
-  projectId: string,
-  next: Map<string, ChoicesRefRow>,
-): Promise<void> {
+async function hydrateRefType({
+  entries,
+  hydrator,
+  utils,
+  projectId,
+  next,
+}: {
+  entries: { optionId: string; refId: string }[];
+  hydrator: NonNullable<CapabilityHydrator["byIds"]>;
+  utils: CapabilityTrpcUtils;
+  projectId: string;
+  next: Map<string, ChoicesRefRow>;
+}): Promise<void> {
   try {
     const hydration = await hydrator({
       utils,
@@ -87,7 +93,7 @@ async function hydrateAllRefTypes(
     [...hydratable.entries()].map(async ([type, entries]) => {
       const hydrator = CAPABILITY_HYDRATORS[type]?.byIds;
       if (!hydrator) return;
-      await hydrateRefType(entries, hydrator, utils, projectId, next);
+      await hydrateRefType({ entries, hydrator, utils, projectId, next });
     }),
   );
   return next;

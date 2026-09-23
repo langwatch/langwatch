@@ -117,20 +117,35 @@ export class PrismaConnection {
 
 /** Explicit, side-effect-free-until-called Prisma/Postgres construction. */
 export class PrismaConnectionService {
-  private constructor(
-    private readonly guard: PrismaQueryGuard,
-    private readonly driverAdapter: PrismaDriverAdapterFactory,
-    private readonly clientFactory: PrismaClientFactory,
-    private readonly logger: Logger,
-  ) {}
+  private readonly guard: PrismaQueryGuard;
+  private readonly driverAdapter: PrismaDriverAdapterFactory;
+  private readonly clientFactory: PrismaClientFactory;
+  private readonly logger: Logger;
+
+  private constructor({
+    guard,
+    driverAdapter,
+    clientFactory,
+    logger,
+  }: {
+    guard: PrismaQueryGuard;
+    driverAdapter: PrismaDriverAdapterFactory;
+    clientFactory: PrismaClientFactory;
+    logger: Logger;
+  }) {
+    this.guard = guard;
+    this.driverAdapter = driverAdapter;
+    this.clientFactory = clientFactory;
+    this.logger = logger;
+  }
 
   static create(options: PrismaConnectionServiceOptions): PrismaConnectionService {
-    return new PrismaConnectionService(
-      options.guard,
-      options.driverAdapter ?? PrismaDriverAdapterService.create(),
-      options.clientFactory ?? new GeneratedPrismaClientFactory(),
-      options.logger,
-    );
+    return new PrismaConnectionService({
+      guard: options.guard,
+      driverAdapter: options.driverAdapter ?? PrismaDriverAdapterService.create(),
+      clientFactory: options.clientFactory ?? new GeneratedPrismaClientFactory(),
+      logger: options.logger,
+    });
   }
 
   connect(configuration: PrismaConfiguration): PrismaConnection {
