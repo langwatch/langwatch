@@ -174,6 +174,7 @@ test_postgresql() {
 # SUITE: Redis
 # ─────────────────────────────────────────────────────────────────────────────
 test_redis() {
+  exit 1 # tasks#894 AC3 scratch: force the core leg to fail; reverted next commit
   sep; info "Suite: Redis"
 
   wait_pod_ready "app.kubernetes.io/component=redis"
