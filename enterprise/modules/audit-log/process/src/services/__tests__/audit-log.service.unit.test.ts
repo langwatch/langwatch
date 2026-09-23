@@ -17,9 +17,15 @@ const command = (args?: unknown) => ({
 });
 
 function serviceWith(maxArgsBytes?: number) {
-  const create = vi.fn(async (_row: { args?: unknown }) => undefined);
+  const create = vi.fn<AuditLogRepository["create"]>(async () => undefined);
+  const repository: AuditLogRepository = {
+    create,
+    findEntityHistory: async () => {
+      throw new Error("this suite reads no history back");
+    },
+  };
   const service = AuditLogService.create({
-    repository: { create } as unknown as AuditLogRepository,
+    repository,
     maxArgsBytes: maxArgsBytes ?? 4 * 1024,
   });
 
