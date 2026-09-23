@@ -23,25 +23,41 @@ function harness(options?: {
   eraseFails?: (userId: string) => boolean;
   locksReaped?: number;
 }) {
-  const findAbandoned = vi.fn(async () => options?.abandoned ?? []);
-  const releaseClaim = vi.fn(async () => undefined);
+  const findAbandoned = vi.fn<IdentityNewbornRepository["findAbandoned"]>(
+    async () => options?.abandoned ?? [],
+  );
+  const releaseClaim = vi.fn<IdentityNewbornRepository["releaseClaim"]>(async () => undefined);
   const eraseUser = vi.fn(async ({ userId }: { userId: string }) => {
     if (options?.eraseFails?.(userId)) throw new Error("clickhouse unavailable");
     return [];
   });
 
-  const reapOrphans = vi.fn(async () => options?.locksReaped ?? 0);
-  const reservations = {
-    claim: vi.fn(),
-    release: vi.fn(async () => 0),
+  const reapOrphans = vi.fn<IdentityReservationRepository["reapOrphans"]>(
+    async () => options?.locksReaped ?? 0,
+  );
+  const reservations: IdentityReservationRepository = {
+    claim: async () => {
+      throw new Error("the sweep never claims");
+    },
+    release: async () => 0,
     reapOrphans,
-  } as unknown as IdentityReservationRepository;
+  };
+  const newborns: IdentityNewbornRepository = {
+    findAbandoned,
+    releaseClaim,
+    claim: async () => {
+      throw new Error("the sweep never claims");
+    },
+    tryFindUserAtPinnedId: async () => {
+      throw new Error("the sweep never reads a pinned id");
+    },
+    commitNewborn: async () => {
+      throw new Error("the sweep never commits a newborn");
+    },
+  };
 
   const service = IdentityNewbornReconciliationService.create({
-    newborns: {
-      findAbandoned,
-      releaseClaim,
-    } as unknown as IdentityNewbornRepository,
+    newborns,
     identity: { eraseUser: eraseUser as never },
     reservations,
     now: () => NOW,

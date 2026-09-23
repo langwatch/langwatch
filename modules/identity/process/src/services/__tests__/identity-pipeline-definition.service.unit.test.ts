@@ -77,7 +77,7 @@ function command<T>(data: T): Command<T> {
     aggregateId: USER,
     type: "lw.identity.test",
     data,
-  } as unknown as Command<T>;
+  };
 }
 
 const held: IdentityHeads = {

@@ -2,7 +2,6 @@ import { IdentityEngineUnavailableError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IdentityBirthLedger } from "../../app/identity.members.ts";
-import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
 import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
@@ -36,32 +35,38 @@ function harness(overrides?: {
   };
 
   const ledger = {
-    stage: vi.fn(async () => {
+    stage: vi.fn<IdentityBirthLedger["stage"]>(async () => {
       order.push("stage");
       if (overrides?.stagingFails) {
         throw new Error("identity ledger cannot stage: stack unavailable");
       }
     }),
-    awaitFold: vi.fn(async () => {
+    awaitFold: vi.fn<IdentityBirthLedger["awaitFold"]>(async () => {
       order.push("fold");
       if (overrides?.foldWaitFails) {
         throw new Error("the projection could not be read");
       }
     }),
-  } as unknown as IdentityBirthLedger;
+  };
 
   const rows = {
-    tryFindUserAtPinnedId: vi.fn(async () =>
+    tryFindUserAtPinnedId: vi.fn<IdentityNewbornRepository["tryFindUserAtPinnedId"]>(async () =>
       overrides?.occupiedBy === undefined ? null : { id: overrides.occupiedBy },
     ),
-    claim: vi.fn(async () => {
+    claim: vi.fn<IdentityNewbornRepository["claim"]>(async () => {
       order.push("claim");
     }),
-    commitNewborn: vi.fn(async ({ userId }: { userId: string }) => {
+    commitNewborn: vi.fn<IdentityNewbornRepository["commitNewborn"]>(async ({ userId }) => {
       order.push("rows");
       return { id: userId, email: EMAIL };
     }),
-  } as unknown as IdentityNewbornRepository;
+    findAbandoned: async () => {
+      throw new Error("the entrance never sweeps");
+    },
+    releaseClaim: async () => {
+      throw new Error("the entrance never sweeps");
+    },
+  };
 
   const reservations = inMemoryIdentityReservations();
   const forgetGate = vi.fn();
@@ -89,7 +94,7 @@ const newborn = () => ({
 });
 
 const stagedCommand = (h: ReturnType<typeof harness>) =>
-  (h.ledger.stage as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.command as {
+  h.ledger.stage.mock.calls[0]?.[0]?.command as {
     data: { userId: string; commandId: string };
   };
 
@@ -109,8 +114,7 @@ describe("the born-finalized entrance", () => {
 
         const written = await service.bear(newborn());
 
-        const pinned = (rows.commitNewborn as unknown as ReturnType<typeof vi.fn>).mock
-          .calls[0]?.[0]?.userId as string;
+        const pinned = rows.commitNewborn.mock.calls[0]?.[0]?.userId;
         expect(written.id).toBe(pinned);
         expect(written.id).not.toBe("the-id-better-auth-minted");
       });
@@ -156,10 +160,9 @@ describe("the born-finalized entrance", () => {
 
         await service.bear(newborn());
 
-        const events = (ledger.awaitFold as unknown as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
-          ?.events as IdentityEvent[];
+        const events = ledger.awaitFold.mock.calls[0]?.[0]?.events;
         expect(events).toHaveLength(1);
-        expect(events[0]?.type).toBe("lw.identity.identifier_attached");
+        expect(events?.[0]?.type).toBe("lw.identity.identifier_attached");
       });
 
       /** @scenario "A flagged sign-up is refused when its pinned id is already someone's" */

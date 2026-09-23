@@ -41,15 +41,14 @@ function recordingMail() {
   };
 }
 
-function fakeAudience(overrides: Record<string, unknown> = {}): JoinRequestAudience {
+function fakeAudience(): JoinRequestAudience {
   return {
     tryFindRequesterId: vi.fn(async () => null),
     tryFindOrganizationName: vi.fn(async () => "Acme Corp"),
     findAdminEmails: vi.fn(async () => ["priya@acme.example"]),
     tryFindDisplayName: vi.fn(async () => "Morgan Ellis"),
     tryFindEmail: vi.fn(async () => "morgan@acme.example"),
-    ...overrides,
-  } as unknown as JoinRequestAudience;
+  };
 }
 
 function fakeContext(
