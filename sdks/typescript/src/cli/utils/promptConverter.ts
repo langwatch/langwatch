@@ -7,6 +7,20 @@ import {
   outputsToResponseFormat,
 } from "./responseFormat";
 
+type PromptYamlContent = {
+  model: string;
+  modelParameters?: {
+    temperature?: number;
+    maxTokens?: number;
+  };
+  messages: {
+    role: "system" | "user" | "assistant";
+    content: string;
+  }[];
+  response_format?: LocalResponseFormat;
+  parameters?: RuntimeParameters;
+};
+
 /**
  * Converts between the YAML `.prompt.yaml` format (GitHub's standard) and
  * this service's internal API schema, keeping the two evolvable independently.
@@ -38,20 +52,8 @@ export class PromptConverter {
    * Converts a MaterializedPrompt to the YAML content structure
    * for saving to .prompt.yaml files.
    */
-  static fromMaterializedToYaml(prompt: MaterializedPrompt): {
-    model: string;
-    modelParameters?: {
-      temperature?: number;
-      maxTokens?: number;
-    };
-    messages: {
-      role: "system" | "user" | "assistant";
-      content: string;
-    }[];
-    response_format?: LocalResponseFormat;
-    parameters?: RuntimeParameters;
-  } {
-    const result: any = {
+  static fromMaterializedToYaml(prompt: MaterializedPrompt): PromptYamlContent {
+    const result: PromptYamlContent = {
       model: prompt.model,
       messages: prompt.messages,
     };

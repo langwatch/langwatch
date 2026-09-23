@@ -20,9 +20,9 @@ function HostRow({ onOpen }: { onOpen: () => void }) {
   });
 
   return (
-    <div data-testid="row" onClick={onOpen} {...langy.targetProps}>
+    <button type="button" data-testid="row" onClick={onOpen} {...langy.targetProps}>
       a trace
-    </div>
+    </button>
   );
 }
 

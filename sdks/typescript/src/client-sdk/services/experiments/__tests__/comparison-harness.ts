@@ -89,7 +89,7 @@ export const createHarness = () => {
   };
 
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url = requestUrl(input);
     const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
 
     if (url.includes("/api/v1/experiment/init")) {
@@ -200,3 +200,9 @@ export const comparisonEvaluations = (harness: {
   harness.loggedEvaluations.filter(
     (evaluation) => evaluation.evaluator === "langevals/select_best_compare",
   );
+
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}

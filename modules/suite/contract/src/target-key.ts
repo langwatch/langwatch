@@ -270,9 +270,13 @@ export function targetLabels<T extends LabelledTarget>({
 }
 
 function sortedEntries(runParameters: RunParameterValues): [string, RunParameterValues[string]][] {
-  return Object.entries(runParameters).toSorted(([left], [right]) =>
-    left < right ? -1 : left > right ? 1 : 0,
-  );
+  return Object.entries(runParameters).toSorted(([left], [right]) => compareKeys(left, right));
+}
+
+function compareKeys(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 const rotateLeft = (value: number, bits: number): number =>

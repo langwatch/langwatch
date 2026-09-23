@@ -255,10 +255,9 @@ export class PromptsApiService {
    * @throws {PromptsApiError} If the API call fails.
    */
   async deleteTag(tagName: string): Promise<void> {
-    const { data, error, response } = await this.apiClient.DELETE(
-      "/api/v1/prompts/tags/{tag}" as any,
-      { params: { path: { tag: tagName } } } as any,
-    );
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/prompts/tags/{tag}", {
+      params: { path: { tag: tagName } },
+    });
     unwrapApiResult({
       operation: `delete tag "${tagName}"`,
       data,

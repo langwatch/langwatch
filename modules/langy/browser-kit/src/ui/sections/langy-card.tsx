@@ -13,6 +13,54 @@ const dotPulse = keyframes`
   50%      { opacity: 0.4; transform: scale(0.72); }
 `;
 
+function renderInlineCard({
+  dotColor,
+  showDot,
+  pulseDot,
+  reduce,
+  overline,
+  title,
+  children,
+  role,
+  ariaLabel,
+}: {
+  dotColor: string;
+  showDot: boolean | undefined;
+  pulseDot: boolean;
+  reduce: boolean;
+  overline: ReactNode;
+  title: ReactNode;
+  children: ReactNode;
+  role: string | undefined;
+  ariaLabel: string | undefined;
+}) {
+  return (
+    <HStack
+      gap={2}
+      align="center"
+      alignSelf="flex-start"
+      role={role ?? "status"}
+      aria-label={ariaLabel}
+      color="fg.muted"
+    >
+      {(showDot ?? true) ? statusDotForInline(dotColor, pulseDot, reduce) : null}
+      {overline ? (
+        <Text as="span" {...TYPE.sectionLabel} color="fg.subtle">
+          {overline}
+        </Text>
+      ) : null}
+      {typeof title === "string" ? (
+        <Text as="span" textStyle="xs" color="fg.muted">
+          {title}
+        </Text>
+      ) : (
+        title
+      )}
+      {children}
+    </HStack>
+  );
+}
+
 /**
  * The one card primitive for Langy's conversation, driven by INTENT.
  */
@@ -63,31 +111,17 @@ export function LangyCard({
 
   // ── activity: an inline line, not a box ──────────────────────────────────
   if (variant.inline) {
-    return (
-      <HStack
-        gap={2}
-        align="center"
-        alignSelf="flex-start"
-        role={role ?? "status"}
-        aria-label={ariaLabel}
-        color="fg.muted"
-      >
-        {(showDot ?? true) ? statusDotForInline(dotColor, pulseDot, reduce) : null}
-        {overline ? (
-          <Text as="span" {...TYPE.sectionLabel} color="fg.subtle">
-            {overline}
-          </Text>
-        ) : null}
-        {typeof title === "string" ? (
-          <Text as="span" textStyle="xs" color="fg.muted">
-            {title}
-          </Text>
-        ) : (
-          title
-        )}
-        {children}
-      </HStack>
-    );
+    return renderInlineCard({
+      dotColor,
+      showDot,
+      pulseDot,
+      reduce,
+      overline,
+      title,
+      children,
+      role,
+      ariaLabel,
+    });
   }
 
   // The eyebrow leads with the intent tone on the receipts, and stays subtle on

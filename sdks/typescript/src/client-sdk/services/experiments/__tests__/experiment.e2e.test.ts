@@ -583,8 +583,7 @@ describe("Evaluation Unit", () => {
       // Mock fetch to capture API calls
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-        const urlStr =
-          typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const urlStr = requestUrl(input);
         if (urlStr.includes("experiment/init")) {
           return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
             status: 200,
@@ -660,3 +659,9 @@ describe("Evaluation Unit", () => {
     });
   });
 });
+
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
