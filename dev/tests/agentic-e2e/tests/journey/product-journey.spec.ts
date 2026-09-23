@@ -336,13 +336,7 @@ test.describe("browser product journey", () => {
         .then(() => true)
         .catch(() => false);
       if (seen) break;
-      if (
-        (await stalled.isVisible().catch(() => false)) ||
-        !(await page
-          .getByTestId("agent-testing-run-drawer")
-          .isVisible()
-          .catch(() => false))
-      ) {
+      if (await isRunViewLost(stalled)) {
         await visit(`/${projectSlug}/agent-testing/results`);
         await page
           .getByTestId("agent-testing-run-plans")
@@ -548,12 +542,7 @@ async function writeScenario(): Promise<void> {
 /** The journey's suite and scenario, created if the project has neither. */
 async function ensureSuiteAndScenario(): Promise<void> {
   await openAgentTesting();
-  if (
-    await scenarioRow()
-      .isVisible()
-      .catch(() => false)
-  )
-    return;
+  if (await isScenarioRowVisible()) return;
 
   await ensureTestSuite();
   await writeScenario();
@@ -562,12 +551,7 @@ async function ensureSuiteAndScenario(): Promise<void> {
   // so the click is repeated until the row it creates is on the table.
   const save = page.getByTestId("case-modal-save").last();
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (
-      await scenarioRow()
-        .isVisible()
-        .catch(() => false)
-    )
-      break;
+    if (await isScenarioRowVisible()) break;
     if (await save.isVisible().catch(() => false)) {
       await save.click().catch(() => undefined);
     }
@@ -645,6 +629,21 @@ async function recoverSession(): Promise<boolean> {
 function inProject(): boolean {
   const first = new URL(page.url()).pathname.split("/")[1] ?? "";
   return first !== "" && !["onboarding", "auth", "settings"].includes(first);
+}
+
+async function isScenarioRowVisible(): Promise<boolean> {
+  return scenarioRow()
+    .isVisible()
+    .catch(() => false);
+}
+
+/** The run view is gone: the workspace stalled, or the run drawer closed. */
+async function isRunViewLost(stalled: Locator): Promise<boolean> {
+  if (await stalled.isVisible().catch(() => false)) return true;
+  return !(await page
+    .getByTestId("agent-testing-run-drawer")
+    .isVisible()
+    .catch(() => false));
 }
 
 function scenarioRow(): Locator {

@@ -65,9 +65,14 @@ function parseArgs(argv) {
 
 // A flag that takes a probability: a finite number from 0 to 1. Anything else
 // would silently make every rule fire, or none, so it is refused up front.
+function isProbability(raw, value) {
+  if (raw === undefined || raw === "") return false;
+  return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
 function probability(flag, raw) {
   const value = Number(raw);
-  if (raw === undefined || raw === "" || !Number.isFinite(value) || value < 0 || value > 1) {
+  if (!isProbability(raw, value)) {
     console.error(
       `${flag} takes a number from 0 to 1, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`,
     );
@@ -138,29 +143,36 @@ function readDotenv(file, name) {
 
 // ---------- rules ----------
 
+function ruleSetsFor(which) {
+  if (which === "both") return ["docs", "writing"];
+  return which === "landing" ? ["landing", "writing"] : [which];
+}
+
+function addSetRules({ set, rules, amend, seen, only, skip, out }) {
+  for (const r of rules) {
+    if (seen.has(r.id)) continue; // shared rules (em-dash) run once
+    seen.add(r.id);
+    const key = `${set}/${r.id}`;
+    if (only && !only.has(r.id) && !only.has(key)) continue;
+    if (skip && (skip.has(r.id) || skip.has(key))) continue;
+    const extra = amend[r.id];
+    out.push(
+      extra && r.kind === "judge"
+        ? { ...r, set, key, instruction: `${r.instruction} ${extra}` }
+        : { ...r, set, key },
+    );
+  }
+}
+
 function loadRules(which, only, skip) {
-  const sets =
-    which === "both" ? ["docs", "writing"] : which === "landing" ? ["landing", "writing"] : [which];
   const out = [];
   const seen = new Set();
   const amend = {};
-  for (const set of sets) {
+  for (const set of ruleSetsFor(which)) {
     const file = join(HERE, "rules", `${set}.json`);
     const doc = JSON.parse(readFileSync(file, "utf8"));
     Object.assign(amend, doc.amend ?? {});
-    for (const r of doc.rules) {
-      if (seen.has(r.id)) continue; // shared rules (em-dash) run once
-      seen.add(r.id);
-      const key = `${set}/${r.id}`;
-      if (only && !only.has(r.id) && !only.has(key)) continue;
-      if (skip && (skip.has(r.id) || skip.has(key))) continue;
-      const extra = amend[r.id];
-      out.push(
-        extra && r.kind === "judge"
-          ? { ...r, set, key, instruction: `${r.instruction} ${extra}` }
-          : { ...r, set, key },
-      );
-    }
+    addSetRules({ set, rules: doc.rules, amend, seen, only, skip, out });
   }
   return out;
 }
@@ -184,7 +196,8 @@ function founderUnitsIn(paragraphs) {
       .map((l) => l.replace(/\s+/g, " ").trim())
       .filter(isFounder);
     for (const u of p.units) {
-      if (isFounder(u) || founderLines.some((l) => l.includes(u))) marked.add(u);
+      const onFounderLine = isFounder(u) || founderLines.some((l) => l.includes(u));
+      if (onFounderLine) marked.add(u);
       else plain.add(u);
     }
   }
@@ -296,7 +309,8 @@ function classify(lines, kind) {
       );
     return { kind: "table", text, exempt, units: rows };
   }
-  if (lines.every((l) => /^\s*([-*+]|\d+[.)])\s/.test(l) || /^\s{2,}\S/.test(l))) {
+  const isList = lines.every((l) => /^\s*([-*+]|\d+[.)])\s/.test(l) || /^\s{2,}\S/.test(l));
+  if (isList) {
     const items = [];
     for (const l of lines) {
       if (/^\s*([-*+]|\d+[.)])\s/.test(l)) items.push(l.replace(/^\s*([-*+]|\d+[.)])\s+/, ""));
@@ -467,6 +481,13 @@ function countWords(p) {
 
 class MaxTokens extends Error {}
 
+async function waitBeforeRetry(res, attempt, text) {
+  if (attempt >= 6)
+    throw new Error(`HTTP ${res.status} after ${attempt} attempts: ${text.slice(0, 200)}`);
+  const ra = Number(res.headers.get("retry-after"));
+  await sleep(ra > 0 ? ra * 1000 : backoff(attempt));
+}
+
 async function jev(key, state, questions, usage) {
   const body = JSON.stringify({ state, model: MODEL, questions });
   let attempt = 0;
@@ -497,10 +518,7 @@ async function jev(key, state, questions, usage) {
     if (res.status === 400 && /max_tokens_exceeded/.test(text))
       throw new MaxTokens(text.slice(0, 200));
     if (res.status === 429 || res.status === 529 || res.status >= 500) {
-      if (attempt >= 6)
-        throw new Error(`HTTP ${res.status} after ${attempt} attempts: ${text.slice(0, 200)}`);
-      const ra = Number(res.headers.get("retry-after"));
-      await sleep(ra > 0 ? ra * 1000 : backoff(attempt));
+      await waitBeforeRetry(res, attempt, text);
       continue;
     }
     throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
@@ -618,17 +636,9 @@ async function judgeSection(key, rules, section, doc, opts, usage) {
   return findings;
 }
 
-async function locateSentences(key, findings, section, doc, opts, usage) {
-  // A finding that can fail the run is located even below --locate: without a
-  // sentence there is no way to tell whether it sits on a founder line.
-  const cutoff = Math.min(opts.locate, opts.threshold);
-  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= cutoff);
-  const prose = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag");
-  const sentences = prose.flatMap((p) => p.units);
-  const founderUnits = founderUnitsIn(prose);
-  const markFounder = (f) => {
-    f.founder = isFounder(f.sentence) || founderUnits.has(f.sentence);
-  };
+// Places the findings whose rule points at the heading or the opener, and
+// returns the rest, which need a second request to locate.
+function locateWithoutRequest({ fired, section, sentences, markFounder }) {
   const targets = [];
   for (const f of fired) {
     // rules about the heading or the opener need no second request
@@ -643,6 +653,21 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
     }
     markFounder(f);
   }
+  return targets;
+}
+
+async function locateSentences(key, findings, section, doc, opts, usage) {
+  // A finding that can fail the run is located even below --locate: without a
+  // sentence there is no way to tell whether it sits on a founder line.
+  const cutoff = Math.min(opts.locate, opts.threshold);
+  const fired = findings.filter((f) => f.rule.kind === "judge" && f.probability >= cutoff);
+  const prose = section.paragraphs.filter((p) => p.kind !== "code" && p.kind !== "tag");
+  const sentences = prose.flatMap((p) => p.units);
+  const founderUnits = founderUnitsIn(prose);
+  const markFounder = (f) => {
+    f.founder = isFounder(f.sentence) || founderUnits.has(f.sentence);
+  };
+  const targets = locateWithoutRequest({ fired, section, sentences, markFounder });
   if (targets.length === 0) return;
   const uniq = [...new Set(sentences)].slice(0, MAX_CHOICE_OPTIONS);
   if (uniq.length < 2) {
@@ -679,6 +704,21 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
 
 // ---------- driver ----------
 
+async function lintSection({ section, rules, doc, docCounts, opts, key, usage }) {
+  const findings = [
+    ...runRegexRules(rules, section, doc, docCounts),
+    ...runLocalRules(rules, section, doc),
+  ];
+  let error = null;
+  try {
+    findings.push(...(await judgeSection(key, rules, section, doc, opts, usage)));
+    if (!opts.noLocate) await locateSentences(key, findings, section, doc, opts, usage);
+  } catch (e) {
+    error = e.message;
+  }
+  return { section, findings, error };
+}
+
 async function lintFile(file, rules, opts, key) {
   const src = readFileSync(file, "utf8");
   const { frontmatter, body } = parseFrontmatter(src);
@@ -708,19 +748,15 @@ async function lintFile(file, rules, opts, key) {
   async function worker() {
     while (next < sections.length) {
       const i = next++;
-      const section = sections[i];
-      const findings = [
-        ...runRegexRules(rules, section, doc, docCounts),
-        ...runLocalRules(rules, section, doc),
-      ];
-      let error = null;
-      try {
-        findings.push(...(await judgeSection(key, rules, section, doc, opts, usage)));
-        if (!opts.noLocate) await locateSentences(key, findings, section, doc, opts, usage);
-      } catch (e) {
-        error = e.message;
-      }
-      results[i] = { section, findings, error };
+      results[i] = await lintSection({
+        section: sections[i],
+        rules,
+        doc,
+        docCounts,
+        opts,
+        key,
+        usage,
+      });
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, opts.concurrency) }, worker));
@@ -763,24 +799,32 @@ async function lintFile(file, rules, opts, key) {
 
 const round = (x, d = 3) => Math.round(x * 10 ** d) / 10 ** d;
 
+function findingFlag(f, threshold) {
+  if (f.founder) return "f";
+  return f.probability >= threshold ? "!" : " ";
+}
+
+function sectionReportLines(s, opts) {
+  const lines = [`## ${s.heading || "(intro)"}  [${s.words} words]`];
+  if (s.error) lines.push(`  error: ${s.error}`);
+  if (s.findings.length === 0) lines.push("  clean");
+  for (const f of s.findings) {
+    const flag = findingFlag(f, opts.threshold);
+    const extra = f.count && f.count > 1 ? `  (${f.count} hits)` : "";
+    lines.push(`${flag} ${f.probability.toFixed(2)}  ${f.rule}  ${f.name}${extra}`);
+    if (f.sentence) lines.push(`        > ${f.sentence}`);
+  }
+  lines.push("");
+  return lines;
+}
+
 function printReport(rep, opts) {
   const lines = [];
   lines.push(
     `${basename(rep.file)}  (${rep.rules} rules, ${rep.sections.length} sections, threshold ${opts.threshold})`,
   );
   lines.push("");
-  for (const s of rep.sections) {
-    lines.push(`## ${s.heading || "(intro)"}  [${s.words} words]`);
-    if (s.error) lines.push(`  error: ${s.error}`);
-    if (s.findings.length === 0) lines.push("  clean");
-    for (const f of s.findings) {
-      const flag = f.founder ? "f" : f.probability >= opts.threshold ? "!" : " ";
-      const extra = f.count && f.count > 1 ? `  (${f.count} hits)` : "";
-      lines.push(`${flag} ${f.probability.toFixed(2)}  ${f.rule}  ${f.name}${extra}`);
-      if (f.sentence) lines.push(`        > ${f.sentence}`);
-    }
-    lines.push("");
-  }
+  for (const s of rep.sections) lines.push(...sectionReportLines(s, opts));
   lines.push(
     `cost: ${rep.usage.inputTokens.toLocaleString()} input tokens over ${rep.usage.requests} requests = USD ${rep.usage.usd.toFixed(4)} (${PRICE_PER_MTOK} USD per million)`,
   );
