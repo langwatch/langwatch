@@ -6,13 +6,19 @@
  * @see ../sqlModeClusterGuard.ts
  */
 
-import { describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   assertLwqlSqlModeClusterSafe,
   type ClusterGuardQuery,
   LwqlSqlModeUnsafeOnClusterError,
 } from "../sqlModeClusterGuard";
+
+// The guard's own logger instance — createLogger memoises by name, so this is
+// the object the guard logs through. Spying on it lets each permit/bypass path
+// assert its log line without mocking the module.
+const logger = createLogger("langwatch:analytics:lwql:sqlModeClusterGuard");
 
 /**
  * A fake `system.*` query serving the aggregated rows the guard's SQL now
@@ -43,15 +49,33 @@ const SINGLE_NODE: Record<string, unknown>[] = [{ host_count: "1" }];
 const THREE_HOSTS: Record<string, unknown>[] = [{ host_count: "3" }];
 
 describe("assertLwqlSqlModeClusterSafe", () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+    warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    vi.spyOn(logger, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe("when the server is a single node", () => {
     /** @scenario "A single-node target passes the sql-mode cluster guard" */
-    it("passes", async () => {
+    it("passes and logs the permit with the counts", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
           query: fakeQuery({ clusterHostCount: SINGLE_NODE }),
           env: {},
         }),
       ).resolves.toBeUndefined();
+      expect(infoSpy).toHaveBeenCalledWith(
+        { hostCount: 1, replicatedDirectoryCount: 0, decidedBy: "clusters" },
+        expect.stringContaining("sql mode permitted"),
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -75,7 +99,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
 
   describe("when the cluster is multi-host with replicated access storage", () => {
     /** @scenario "A multi-host cluster with replicated access storage passes the sql-mode cluster guard" */
-    it("passes — the model reaches every host through Keeper", async () => {
+    it("passes and logs the permit — the model reaches every host through Keeper", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
           query: fakeQuery({
@@ -85,18 +109,33 @@ describe("assertLwqlSqlModeClusterSafe", () => {
           env: {},
         }),
       ).resolves.toBeUndefined();
+      expect(infoSpy).toHaveBeenCalledWith(
+        {
+          hostCount: null,
+          replicatedDirectoryCount: 1,
+          decidedBy: "replicatedDirectory",
+        },
+        expect.stringContaining("sql mode permitted"),
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 
   describe("when the single-node bypass is set", () => {
     /** @scenario "The sql-mode cluster guard is bypassed by the single-node override" */
-    it("passes regardless of the cluster topology", async () => {
+    it("passes and warns that env bypassed the guard", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
           query: fakeQuery({ clusterHostCount: THREE_HOSTS }),
           env: { LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: "true" },
         }),
       ).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        { bypass: "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE" },
+        expect.stringContaining("bypassed by env"),
+      );
+      // The bypass returns before any topology probe, so no permit-info fires.
+      expect(infoSpy).not.toHaveBeenCalled();
     });
   });
 

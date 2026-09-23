@@ -74,9 +74,18 @@ export function lwqlAccessModelDefinitionFromEnv(
 ): LwqlAccessModelDefinition {
   const selfProvision = lwqlSelfProvisionFromEnv(env);
   if (!selfProvision) {
-    // Either password absent — surfaced by name, never by value.
+    // Name only the password(s) actually absent — by name, never by value.
+    // `lwqlSelfProvisionFromEnv` requires both LWQL_CLICKHOUSE_PASSWORD (via the
+    // derived connection) and LWQL_POSTGRES_READER_PASSWORD. If both are present
+    // it declined for another reason (e.g. a mismatched LWQL_CLICKHOUSE_URL), so
+    // fall back to naming both rather than an empty list.
+    const required = [
+      "LWQL_CLICKHOUSE_PASSWORD",
+      "LWQL_POSTGRES_READER_PASSWORD",
+    ];
+    const missing = required.filter((name) => !env[name]);
     throw new LwqlRenderConfigMissingInputError(
-      "LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD",
+      (missing.length > 0 ? missing : required).join(" and "),
     );
   }
   const endpoint = lwqlPostgresEndpointFromDatabaseUrl(env.DATABASE_URL);

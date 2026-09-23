@@ -92,6 +92,58 @@ describe("renderLwqlAccessConfig", () => {
       expect(message).not.toContain(CLICKHOUSE_PASSWORD);
       expect(message).not.toContain(READER_PASSWORD);
     });
+
+    /** The missing-input error message for a given env (throws if none). */
+    function missingInputMessage(env: NodeJS.ProcessEnv): string {
+      try {
+        lwqlAccessModelDefinitionFromEnv(env);
+      } catch (caught) {
+        if (caught instanceof LwqlRenderConfigMissingInputError) {
+          return caught.message;
+        }
+        throw caught;
+      }
+      throw new Error("expected a missing-input error, none was thrown");
+    }
+
+    it("names only LWQL_CLICKHOUSE_PASSWORD when just it is absent", () => {
+      const { LWQL_CLICKHOUSE_PASSWORD, ...env } = FULL_ENV;
+      void LWQL_CLICKHOUSE_PASSWORD;
+
+      const message = missingInputMessage(env);
+      expect(message).toContain("LWQL_CLICKHOUSE_PASSWORD");
+      expect(message).not.toContain("LWQL_POSTGRES_READER_PASSWORD");
+      expect(message).not.toContain(CLICKHOUSE_PASSWORD);
+      expect(message).not.toContain(READER_PASSWORD);
+    });
+
+    it("names only LWQL_POSTGRES_READER_PASSWORD when just it is absent", () => {
+      const { LWQL_POSTGRES_READER_PASSWORD, ...env } = FULL_ENV;
+      void LWQL_POSTGRES_READER_PASSWORD;
+
+      const message = missingInputMessage(env);
+      expect(message).toContain("LWQL_POSTGRES_READER_PASSWORD");
+      expect(message).not.toContain("LWQL_CLICKHOUSE_PASSWORD");
+      expect(message).not.toContain(CLICKHOUSE_PASSWORD);
+      expect(message).not.toContain(READER_PASSWORD);
+    });
+
+    it("names both passwords when both are absent", () => {
+      const {
+        LWQL_CLICKHOUSE_PASSWORD,
+        LWQL_POSTGRES_READER_PASSWORD,
+        ...env
+      } = FULL_ENV;
+      void LWQL_CLICKHOUSE_PASSWORD;
+      void LWQL_POSTGRES_READER_PASSWORD;
+
+      const message = missingInputMessage(env);
+      expect(message).toContain(
+        "LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD",
+      );
+      expect(message).not.toContain(CLICKHOUSE_PASSWORD);
+      expect(message).not.toContain(READER_PASSWORD);
+    });
   });
 
   describe("when it reports what it wrote", () => {

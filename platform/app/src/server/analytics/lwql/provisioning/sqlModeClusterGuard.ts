@@ -123,20 +123,47 @@ export async function assertLwqlSqlModeClusterSafe({
   query: ClusterGuardQuery;
   env?: NodeJS.ProcessEnv;
 }): Promise<void> {
-  if (env[LWQL_SQL_SINGLE_NODE_BYPASS] === "true") return;
+  if (env[LWQL_SQL_SINGLE_NODE_BYPASS] === "true") {
+    // The most consequential permit: an operator explicitly accepted
+    // single-node scope, so nothing about the topology was checked. Say so by
+    // name at WARN so it is visible that env, not a safe topology, allowed it.
+    logger.warn(
+      { bypass: LWQL_SQL_SINGLE_NODE_BYPASS },
+      "lwql sql mode permitted: cluster guard bypassed by env — single-node scope accepted regardless of topology",
+    );
+    return;
+  }
 
   const replicatedDirectoryCount = await hasReplicatedUserDirectory(query);
-  if (replicatedDirectoryCount > 0) return;
+  if (replicatedDirectoryCount > 0) {
+    // Keeper-backed access storage replicates the model to every host, so the
+    // cluster size is not probed — hostCount is left null deliberately.
+    logger.info(
+      {
+        hostCount: null,
+        replicatedDirectoryCount,
+        decidedBy: "replicatedDirectory",
+      },
+      "lwql sql mode permitted: replicated access storage reaches every host",
+    );
+    return;
+  }
 
   const [clusterHostCount, replicaHostCount] = await Promise.all([
     maxOwnClusterHostCount(query),
     maxReplicaHostCount(query),
   ]);
   const hostCount = Math.max(clusterHostCount, replicaHostCount);
-  if (hostCount <= 1) return;
-
   const decidedBy =
     replicaHostCount > clusterHostCount ? "replicas" : "clusters";
+  if (hostCount <= 1) {
+    logger.info(
+      { hostCount, replicatedDirectoryCount, decidedBy },
+      "lwql sql mode permitted: single-host target",
+    );
+    return;
+  }
+
   logger.error(
     { hostCount, replicatedDirectoryCount, decidedBy },
     "lwql sql mode refused: multi-host cluster with no replicated access storage",
