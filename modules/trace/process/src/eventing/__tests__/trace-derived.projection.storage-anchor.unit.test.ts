@@ -1,7 +1,11 @@
 import { createTenantId } from "@langwatch/eventing";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+  type LogRecordReceivedEvent,
+  type TopicAssignedEvent,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,12 +64,15 @@ function logRecordEvent({
 }: {
   eventId: string;
   occurredAt: number;
-}): FoldEvent {
+}): LogRecordReceivedEvent {
   return {
     id: eventId,
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,
-    tenantId: TENANT,
+    version: LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+    tenantId: createTenantId(TENANT),
     aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    createdAt: occurredAt,
     occurredAt,
     data: {
       traceId: TRACE_ID,
@@ -81,7 +88,7 @@ function logRecordEvent({
       piiRedactionLevel: "DISABLED",
     },
     metadata: {},
-  } as unknown as FoldEvent;
+  };
 }
 
 function spanEvent({
@@ -306,23 +313,25 @@ describe("traceAnalytics storage anchor", () => {
       // business time too. Anchoring on it is what stops a trace class from
       // being permanently un-anchorable — whether such a state is WRITTEN is a
       // separate decision the persistable-signal gate still owns.
-      const state = foldAll([
-        {
-          id: "evt-topic",
-          type: TOPIC_ASSIGNED_EVENT_TYPE,
-          tenantId: TENANT,
-          aggregateId: TRACE_ID,
-          occurredAt: topicAtMs,
-          data: {
-            topicId: "topic-1",
-            topicName: "Support",
-            subtopicId: null,
-            subtopicName: null,
-            isIncremental: false,
-          },
-          metadata: {},
-        } as unknown as FoldEvent,
-      ]);
+      const topicAssigned: TopicAssignedEvent = {
+        id: "evt-topic",
+        type: TOPIC_ASSIGNED_EVENT_TYPE,
+        version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+        tenantId: createTenantId(TENANT),
+        aggregateId: TRACE_ID,
+        aggregateType: "trace",
+        createdAt: topicAtMs,
+        occurredAt: topicAtMs,
+        data: {
+          topicId: "topic-1",
+          topicName: "Support",
+          subtopicId: null,
+          subtopicName: null,
+          isIncremental: false,
+        },
+        metadata: {},
+      };
+      const state = foldAll([topicAssigned]);
 
       expect(state.storageAnchorMs).toBe(topicAtMs);
     });
@@ -330,16 +339,15 @@ describe("traceAnalytics storage anchor", () => {
 
   describe("given an event type this fold does not handle", () => {
     it("anchors nothing, because nothing was contributed", () => {
-      const state = foldAll([
-        {
-          id: "evt-unknown",
-          type: "lw.obs.trace.not_a_trace_analytics_event",
-          tenantId: TENANT,
-          aggregateId: TRACE_ID,
-          occurredAt: BASE_MS,
-          data: {},
-        } as unknown as FoldEvent,
-      ]);
+      const unhandled = {
+        id: "evt-unknown",
+        type: "lw.obs.trace.not_a_trace_analytics_event",
+        tenantId: TENANT,
+        aggregateId: TRACE_ID,
+        occurredAt: BASE_MS,
+        data: {},
+      };
+      const state = foldAll([unhandled]);
 
       expect(state.storageAnchorMs).toBe(0);
     });

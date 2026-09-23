@@ -29,7 +29,7 @@ function originSpan(
     ...createTestSpan(rest),
     resourceAttributes: resourceAttributes ?? {},
     ...(instrumentationScope ? { instrumentationScope } : {}),
-  } as unknown as NormalizedSpan;
+  };
 }
 
 describe("applySpanToSummary() langwatch.origin hoisting", () => {

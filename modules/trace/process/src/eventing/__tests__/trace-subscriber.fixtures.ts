@@ -1,4 +1,8 @@
-import type { TriggerContext } from "@langwatch/eventing";
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "@langwatch/trace-contract";
 import type {
   OtlpSpan,
   SpanReceivedEvent,
@@ -88,7 +92,7 @@ export function createOtlpSpan(
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 }
 
 export function createSpanReceivedEvent(
@@ -99,11 +103,11 @@ export function createSpanReceivedEvent(
     id: "event-1",
     aggregateId: TRACE_ID,
     aggregateType: "trace",
-    tenantId: TENANT_ID,
+    tenantId: createTenantId(TENANT_ID),
     createdAt: OCCURRED_AT,
     occurredAt: OCCURRED_AT,
-    type: "lw.obs.trace.span_received",
-    version: 1,
+    type: SPAN_RECEIVED_EVENT_TYPE,
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
     data: {
       span,
       resource: null,
@@ -112,7 +116,7 @@ export function createSpanReceivedEvent(
     },
     metadata: { spanId: "span-1", traceId: TRACE_ID },
     ...overrides,
-  } as unknown as SpanReceivedEvent;
+  };
 }
 
 export function createTraceEvent(

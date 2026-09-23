@@ -3,7 +3,7 @@
  * and gauges that survive being declared before boot. A hand-written meter
  * stands in for the SDK, since its aggregation isn't ours to test.
  */
-import { metrics, type Attributes } from "@opentelemetry/api";
+import { metrics, type Attributes, type MeterProvider } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { HISTOGRAM_BOUNDARIES } from "../histogram-boundaries.ts";
@@ -72,13 +72,13 @@ function createRecordingMeterProvider() {
     }
   };
 
+  const provider: MeterProvider = { getMeter: () => meter };
+
   return {
     recorded,
     collect,
     observableCount: () => observableCallbacks.length,
-    provider: { getMeter: () => meter } as unknown as Parameters<
-      typeof metrics.setGlobalMeterProvider
-    >[0],
+    provider,
   };
 }
 
@@ -97,11 +97,15 @@ describe("metric instruments", () => {
   });
 
   describe("given an instrument declared before a provider is registered", () => {
-    it("records into the provider registered afterwards", () => {
-      const jobs = counter({ name: "job_processing_counter", description: "Jobs processed" });
+    let jobs: ReturnType<typeof counter>;
 
+    beforeEach(() => {
+      jobs = counter({ name: "job_processing_counter", description: "Jobs processed" });
       metrics.setGlobalMeterProvider(harness.provider);
       activateMetrics();
+    });
+
+    it("records into the provider registered afterwards", () => {
       jobs.inc({ job_type: "trace" });
 
       expect(harness.recorded).toEqual([
@@ -110,10 +114,6 @@ describe("metric instruments", () => {
     });
 
     it("stops writing to a provider that has been replaced", () => {
-      const jobs = counter({ name: "job_processing_counter", description: "Jobs processed" });
-
-      metrics.setGlobalMeterProvider(harness.provider);
-      activateMetrics();
       jobs.inc();
 
       const replacement = createRecordingMeterProvider();

@@ -1,4 +1,10 @@
-import { LOG_RECORD_RECEIVED_EVENT_TYPE, type TraceSummaryData } from "@langwatch/trace-contract";
+import { createTenantId } from "@langwatch/eventing";
+import {
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+  type LogRecordReceivedEvent,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
@@ -29,12 +35,15 @@ function fold(state: TraceSummaryData, event: FoldEvent): TraceSummaryData {
 }
 
 /** A `log_record_received` event whose envelope was accepted at `acceptedAtMs`. */
-function logEvent(acceptedAtMs: number): FoldEvent {
+function logEvent(acceptedAtMs: number): LogRecordReceivedEvent {
   return {
     id: "log-1",
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,
-    tenantId: "tenant-1",
+    version: LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+    tenantId: createTenantId("tenant-1"),
     aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    createdAt: acceptedAtMs,
     occurredAt: acceptedAtMs,
     data: {
       traceId: TRACE_ID,
@@ -50,7 +59,7 @@ function logEvent(acceptedAtMs: number): FoldEvent {
       piiRedactionLevel: "DISABLED",
     },
     metadata: {},
-  } as unknown as FoldEvent;
+  };
 }
 
 function spanEvent(id: string, startMs: number, endMs: number): FoldEvent {
@@ -64,7 +73,7 @@ function spanEvent(id: string, startMs: number, endMs: number): FoldEvent {
     occurredAt: endMs + 30_000,
     startTimeUnixNano: msToUnixNano(startMs),
     endTimeUnixNano: msToUnixNano(endMs),
-  }) as unknown as FoldEvent;
+  });
 }
 
 describe("given a trace-summary fold that anchors its storage time", () => {
@@ -138,10 +147,8 @@ describe("given a trace-summary fold that anchors its storage time", () => {
 
   describe("when an event type the fold does not handle arrives first", () => {
     it("anchors nothing, because no contribution was folded", () => {
-      const state = fold(projection.init(), {
-        type: "lw.obs.trace.not.a.real.event",
-        occurredAt: BASE_MS,
-      } as unknown as FoldEvent);
+      const unhandled = { type: "lw.obs.trace.not.a.real.event", occurredAt: BASE_MS };
+      const state = fold(projection.init(), unhandled);
 
       expect(state.storageAnchorMs).toBe(0);
     });

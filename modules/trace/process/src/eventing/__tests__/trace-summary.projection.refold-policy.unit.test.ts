@@ -1,12 +1,15 @@
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { MAX_PROCESSED_SPANS, TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
-import { createInitState, createTestRuntime } from "./trace-summary-test.fixtures.ts";
+import {
+  createInitState,
+  createSpanReceivedEvent,
+  createTestRuntime,
+} from "./trace-summary-test.fixtures.ts";
 
 /** Regression guard for the 2026-07-09 re-fold storm. Hot traces reach the fold
  * out of occurredAt order; the trace summary is order-insensitive, so spans fold
@@ -35,17 +38,14 @@ function buildProjection(store: FoldProjectionStore<TraceSummaryData>): TraceSum
 
 /** Past the cap the fold never reads `data`, so the span stays minimal. */
 function spanEventAt(occurredAt: number, id: string): TraceProcessingEvent {
-  return {
-    id,
-    type: SPAN_RECEIVED_EVENT_TYPE,
-    aggregateId: TRACE_ID,
-    aggregateType: "trace",
+  return createSpanReceivedEvent({
+    eventId: id,
     tenantId: TENANT_ID,
+    traceId: TRACE_ID,
+    spanId: id,
+    name: "child",
     occurredAt,
-    createdAt: occurredAt,
-    version: "2025-12-17",
-    data: { span: { name: "child", spanId: id, traceId: TRACE_ID } },
-  } as unknown as TraceProcessingEvent;
+  });
 }
 
 describe("TraceSummaryFoldProjection re-fold policy", () => {

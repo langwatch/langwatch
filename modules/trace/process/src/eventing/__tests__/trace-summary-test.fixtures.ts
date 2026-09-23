@@ -1,4 +1,9 @@
-import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import { createTenantId } from "@langwatch/eventing";
+import {
+  NormalizedSpanKind,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "@langwatch/trace-contract";
 import type {
   NormalizedSpan,
   OtlpSpan,
@@ -78,7 +83,7 @@ export function createInitState(): TraceSummaryData {
     createdAt: 0,
     updatedAt: 0,
     LastEventOccurredAt: 0,
-  } as unknown as TraceSummaryData;
+  };
 }
 
 /** A minimal normalized span, for span-fold tests that only care about a few fields. */
@@ -93,17 +98,32 @@ export function createTestSpan(overrides: {
   const spanId = overrides.spanId ?? overrides.id ?? "span-1";
   const startTimeUnixMs = overrides.startTimeUnixMs ?? 1000;
   return {
+    id: spanId,
     traceId: "trace-1",
     spanId,
+    tenantId: "tenant-1",
     parentSpanId: overrides.parentSpanId ?? null,
+    parentTraceId: null,
+    parentIsRemote: null,
+    sampled: true,
     name: overrides.name ?? "span",
+    kind: NormalizedSpanKind.UNSPECIFIED,
     startTimeUnixMs,
     endTimeUnixMs: startTimeUnixMs + 100,
+    durationMs: 100,
     spanAttributes: overrides.spanAttributes ?? {},
     resourceAttributes: {},
     events: [],
-    status: {},
-  } as unknown as NormalizedSpan;
+    links: [],
+    statusMessage: null,
+    statusCode: null,
+    instrumentationScope: { name: "", version: null },
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
+  };
 }
 
 /** Wall-clock milliseconds as the OTLP nanosecond string the wire carries. */
@@ -134,7 +154,7 @@ export interface TestSpanReceivedEventOptions {
   endTimeUnixNano?: string;
   attributes?: Record<string, string | number | boolean>;
   resourceAttributes?: Record<string, string | number | boolean>;
-  statusCode?: number | null;
+  statusCode?: 0 | 1 | 2 | null;
 }
 
 /**
@@ -147,7 +167,7 @@ export function createSpanReceivedEvent(
 ): SpanReceivedEvent {
   const traceId = options.traceId ?? "aaaa0000000000000000000000000001";
   const spanId = options.spanId ?? "bbbb000000000001";
-  const span = {
+  const span: OtlpSpan = {
     traceId,
     spanId,
     parentSpanId: options.parentSpanId ?? null,
@@ -165,7 +185,7 @@ export function createSpanReceivedEvent(
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
+  };
 
   const resource = options.resourceAttributes
     ? {
@@ -177,9 +197,12 @@ export function createSpanReceivedEvent(
   return {
     id: options.eventId ?? "evt-1",
     type: SPAN_RECEIVED_EVENT_TYPE,
-    tenantId: options.tenantId ?? "tenant-1",
+    version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
+    tenantId: createTenantId(options.tenantId ?? "tenant-1"),
     aggregateId: traceId,
-    ...(options.occurredAt === undefined ? {} : { occurredAt: options.occurredAt }),
+    aggregateType: "trace",
+    createdAt: options.occurredAt ?? 0,
+    occurredAt: options.occurredAt ?? 0,
     data: {
       span,
       resource,
@@ -187,5 +210,5 @@ export function createSpanReceivedEvent(
       piiRedactionLevel: "DISABLED",
     },
     metadata: { spanId, traceId },
-  } as unknown as SpanReceivedEvent;
+  };
 }

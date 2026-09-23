@@ -2,7 +2,7 @@
  * A MeterProvider that records what instruments write: captures instrument
  * name, value, and attributes for test assertions.
  */
-import { metrics as metricsApi, type Attributes } from "@opentelemetry/api";
+import { metrics as metricsApi, type Attributes, type MeterProvider } from "@opentelemetry/api";
 
 import { activateMetrics, resetMetricsForTests } from "./instruments.ts";
 
@@ -81,9 +81,7 @@ export function createRecordingMeterProvider(): RecordingMeterProvider {
     removeBatchObservableCallback: () => void 0,
   };
 
-  const provider = { getMeter: () => meter } as unknown as Parameters<
-    typeof metricsApi.setGlobalMeterProvider
-  >[0];
+  const provider: MeterProvider = { getMeter: () => meter };
 
   const select = (instrument: string, attributes?: Attributes) =>
     recorded.filter((r) => r.instrument === instrument && matches(r.attributes, attributes));

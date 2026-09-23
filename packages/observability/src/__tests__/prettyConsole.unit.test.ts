@@ -6,7 +6,7 @@
 import { createRequire } from "node:module";
 import { PassThrough } from "node:stream";
 
-import pino from "pino";
+import pino, { type Level } from "pino";
 import { describe, expect, it } from "vitest";
 
 import { prettyConsoleOptions } from "../logger.ts";
@@ -18,7 +18,7 @@ const prettyStream = createRequire(import.meta.url)("pino-pretty") as (
 /** One record, rendered the way a dev terminal renders it. */
 async function renderedLine(
   record: Record<string, unknown>,
-  options: { level?: string; message?: string } = {},
+  options: { level?: Level; message?: string } = {},
 ): Promise<string> {
   const captured = new PassThrough();
   const chunks: string[] = [];
@@ -32,10 +32,7 @@ async function renderedLine(
   });
 
   const logger = pino({ name: "langwatch:api:rest", level: "debug" }, pretty as never);
-  (logger as unknown as Record<string, (...args: unknown[]) => void>)[options.level ?? "info"]!(
-    record,
-    options.message ?? "request handled",
-  );
+  logger[options.level ?? "info"](record, options.message ?? "request handled");
 
   await new Promise((resolve) => setTimeout(resolve, 50));
   return chunks.join("").trim();

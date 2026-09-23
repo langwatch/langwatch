@@ -14,7 +14,11 @@ import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
-import { createInitState, createTestRuntime } from "./trace-summary-test.fixtures.ts";
+import {
+  createInitState,
+  createTestRuntime,
+  createTestSpan,
+} from "./trace-summary-test.fixtures.ts";
 
 const applySpanToSummary = (
   ...args: Parameters<typeof TraceSummaryFoldProjection.applySpanToSummary>
@@ -55,7 +59,7 @@ function makeLogEvent(
       piiRedactionLevel: "ESSENTIAL",
     },
     metadata: {},
-  } as unknown as LogRecordReceivedEvent;
+  };
 }
 
 function makeContribution(): LogContributedEvent {
@@ -90,7 +94,7 @@ function makeContribution(): LogContributedEvent {
       piiRedactionLevel: "ESSENTIAL",
     },
     metadata: {},
-  } as unknown as LogContributedEvent;
+  };
 }
 
 describe("TraceSummaryFoldProjection compact log contribution", () => {
@@ -451,24 +455,23 @@ describe("TraceSummaryFoldProjection context size", () => {
     startTimeUnixMs: number;
     cacheRead: number;
     cacheCreation: number;
-  }) =>
-    ({
-      traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+  }) => ({
+    ...createTestSpan({
       spanId,
       parentSpanId: null,
       name: "claude_code.llm_request",
       startTimeUnixMs,
-      endTimeUnixMs: startTimeUnixMs + 500,
       spanAttributes: {
         "langwatch.span.type": "llm",
         "gen_ai.request.model": "claude-opus-5",
         "gen_ai.usage.cache_read.input_tokens": cacheRead,
         "gen_ai.usage.cache_creation.input_tokens": cacheCreation,
       },
-      resourceAttributes: {},
-      events: [],
-      status: { code: "STATUS_CODE_OK" },
-    }) as unknown as Parameters<typeof applySpanToSummary>[0]["span"];
+    }),
+    traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+    endTimeUnixMs: startTimeUnixMs + 500,
+    durationMs: 500,
+  });
 
   describe("when the trace's calls each carry cached and written input", () => {
     /** @scenario "The context a trace started from is lifted onto the trace summary" */

@@ -38,9 +38,9 @@ export function createTestLogger(): { logger: PinoLogger; lines: TestLogLines } 
       return typeof line.msg === "string" && line.msg.includes(msgIncludes);
     }) as TestLogLine | undefined;
   };
-  const lines = Object.assign(backing, {
+  const lines: TestLogLines = Object.assign(backing, {
     findLine: findByLevelAndMessage,
-  }) as unknown as TestLogLines;
+  });
 
   const destination = {
     write(chunk: string) {

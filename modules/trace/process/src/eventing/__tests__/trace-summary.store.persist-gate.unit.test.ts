@@ -1,16 +1,16 @@
 /** Persist gate for log-only traces: summary rows require visible content
  * (not just log count). */
-import type { ProjectionStoreContext } from "@langwatch/eventing";
+import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceSummaryProjectionRepository } from "../../repositories/projection/trace-summary-projection.repository.ts";
 import { TraceSummaryStore } from "../trace-summary.store.ts";
 
-const context = {
-  tenantId: "project_test",
+const context: ProjectionStoreContext = {
+  tenantId: createTenantId("project_test"),
   aggregateId: "trace_1",
-} as unknown as ProjectionStoreContext;
+};
 
 /** The fields the gate reads, over a state that is otherwise irrelevant. */
 function state(overrides: Partial<TraceSummaryData>): TraceSummaryData {
@@ -29,9 +29,13 @@ function state(overrides: Partial<TraceSummaryData>): TraceSummaryData {
 }
 
 function storeWithRecorder() {
-  const upsert = vi.fn(async () => undefined);
-  const upsertBatch = vi.fn(async () => undefined);
-  const storage = { upsert, upsertBatch } as unknown as TraceSummaryProjectionRepository;
+  const upsert = vi.fn<TraceSummaryProjectionRepository["upsert"]>(async () => undefined);
+  const upsertBatch = vi.fn<TraceSummaryProjectionRepository["upsertBatch"]>(async () => undefined);
+  const storage: TraceSummaryProjectionRepository = {
+    upsert,
+    upsertBatch,
+    findByTraceId: async () => null,
+  };
   return {
     store: TraceSummaryStore.create({ storage, defaultRetentionDays: 30 }),
     upsert,
@@ -119,8 +123,7 @@ describe("the trace summary persist gate", () => {
       ]);
 
       expect(upsertBatch).toHaveBeenCalledTimes(1);
-      const calls = upsertBatch.mock.calls as unknown as [{ data: TraceSummaryData }[]][];
-      expect(calls[0]![0].map((entry) => entry.data.traceId)).toEqual(["trace_2"]);
+      expect(upsertBatch.mock.calls[0]![0].map((entry) => entry.data.traceId)).toEqual(["trace_2"]);
     });
   });
 });

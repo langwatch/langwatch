@@ -39,7 +39,7 @@ function makeTraceNameChangedEvent({
     occurredAt: Date.now(),
     data: { traceId: "trace-1", newName, changedByUserId },
     metadata: {},
-  } as unknown as TraceNameChangedEvent;
+  };
 }
 
 function makeProjection() {

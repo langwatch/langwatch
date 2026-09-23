@@ -1,3 +1,4 @@
+import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * @unit
@@ -5,8 +6,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TrackedEventSync } from "../tracked-event-sync.subscriber.ts";
-import type { createOtlpSpan } from "./trace-subscriber.fixtures.ts";
+import {
+  TrackedEventSync,
+  type TrackedEventSyncSubscriberDeps,
+} from "../tracked-event-sync.subscriber.ts";
 import {
   createContext,
   createFoldState,
@@ -20,11 +23,7 @@ vi.mock("@langwatch/observability", () => ({
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-type Recorded = {
-  tenantId: string;
-  eventId: string;
-  body: { trace_id: string; event_type: string; timestamp: number };
-};
+type Recorded = Parameters<TrackedEventSyncSubscriberDeps["recordTrackedEvent"]>[0];
 
 function makeTrackedEventSink() {
   const recorded: Recorded[] = [];
@@ -34,7 +33,7 @@ function makeTrackedEventSink() {
       recordTrackedEvent: async (input: Recorded) => {
         recorded.push(input);
       },
-    } as unknown as Parameters<typeof TrackedEventSync.createTrackedEventSyncHandler>[0],
+    } satisfies TrackedEventSyncSubscriberDeps,
     /** The identity the tracked-event store collapses on. */
     identities(): Set<string> {
       return new Set(recorded.map((input) => `${input.tenantId}:${input.eventId}`));
@@ -50,7 +49,7 @@ type FeedbackPayload = {
 
 /** Attributes: event.type + metric/detail (not JSON like eval channel).
  * Missing event.type → dropped. */
-function feedbackAttributes(payload: FeedbackPayload) {
+function feedbackAttributes(payload: FeedbackPayload): OtlpKeyValue[] {
   return [
     { key: "event.type", value: { stringValue: payload.event_type } },
     ...Object.entries(payload.metrics ?? {}).map(([key, value]) => ({
@@ -65,7 +64,7 @@ function feedbackAttributes(payload: FeedbackPayload) {
 }
 
 /** One span carrying the given span events, in the order given. */
-function spanWithEvents(events: { name: string; attributes: unknown[] }[]) {
+function spanWithEvents(events: { name: string; attributes: OtlpKeyValue[] }[]): OtlpSpan {
   return {
     traceId: "aaaa0000000000000000000000000001",
     spanId: "bbbb000000000001",
@@ -86,7 +85,7 @@ function spanWithEvents(events: { name: string; attributes: unknown[] }[]) {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
-  } as unknown as ReturnType<typeof createOtlpSpan>;
+  };
 }
 
 function feedbackSpan(payloads: FeedbackPayload[]) {

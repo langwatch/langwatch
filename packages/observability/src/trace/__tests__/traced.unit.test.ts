@@ -241,7 +241,7 @@ describe("traced()", () => {
 
   describe("when the method is an async generator", () => {
     it("returns something async-iterable rather than a promise", () => {
-      const returned = service().stream(1) as unknown as Record<symbol, unknown>;
+      const returned = service().stream(1);
 
       expect(returned[Symbol.asyncIterator]).toBeTypeOf("function");
       expect(returned).not.toBeInstanceOf(Promise);
