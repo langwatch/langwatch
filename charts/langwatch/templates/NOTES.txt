@@ -343,28 +343,41 @@ The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
 until it is on for a project, queries are refused with `lwql_not_enabled`
 while the backend objects sit ready.
 
-The application self-provisions the LangWatchQL access model on every
-deployment — chart-managed ClickHouse and external/BYO ClickHouse alike. At
-boot it derives the ClickHouse target from CLICKHOUSE_URL and the PostgreSQL
-bridge endpoint from DATABASE_URL, then creates the restricted identity, its
-settings profile, grants, tenant row filters, the `lwql_postgres` named
-collection, the read-only PostgreSQL `lwql_ro` role, and the analytics views.
-No chart template renders any of this — Section 7 lists the two passwords
-(LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD) the chart hands the
-app to converge those identities with.
+The application owns the LangWatchQL access model in code. How it reaches
+ClickHouse depends on the posture:
+{{- if .Values.clickhouse.chartManaged }}
 
-This needs the admin user allowed access-management DDL
-(`access_management`, `named_collection_control`), the server to declare
-the `custom_` settings prefix, and
-`access_control_improvements.settings_constraints_replace_previous=true` (so
-the app's CHANGEABLE_IN_READONLY settings profile is accepted). The
-`langwatch/clickhouse-serverless` image ships all three; on a bring-your-own
-ClickHouse server, add them yourself (see the chart README's LangWatchQL
-section) or set lwql.enabled=false. If the server
-refuses the DDL the app logs it and LangWatchQL stays unavailable — nothing
-else breaks. Likewise, the PostgreSQL role that DATABASE_URL points at must be
-allowed to CREATE/ALTER ROLE, or the `lwql_ro` convergence logs and
-LangWatchQL stays refused (fail-closed).
+  Chart-managed ClickHouse (this release): RENDERED delivery. A deploy-time
+  Job ({{ .Release.Name }}-lwql-access-render) runs the app image, renders the
+  access model, and writes it into the Secret
+  {{ .Release.Name }}-lwql-clickhouse-access. Every ClickHouse pod mounts it at
+  users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml, so the
+  restricted identity, its profile, grants, row policies and the `lwql_postgres`
+  named collection land on EVERY replica — not just the one behind the Service.
+  No access SQL DDL runs, and the ClickHouse identity holds no ACCESS MANAGEMENT.
+  On upgrade, the ClickHouse pods roll (carrying the LWQL catalog annotation) so
+  each re-mounts the freshly rendered Secret.
+{{- else }}
+
+  External / bring-your-own ClickHouse: SQL DDL (`sql` mode). The chart cannot
+  write your server's config files, so the app self-provisions the model with
+  SQL DDL at boot, deriving the target from CLICKHOUSE_URL. This needs the admin
+  user allowed access-management DDL (`access_management`,
+  `named_collection_control`), the server to declare the `custom_` settings
+  prefix, and
+  `access_control_improvements.settings_constraints_replace_previous=true`. Set
+  LWQL_ACCESS_MODEL_MODE=sql (see examples/overlays/clickhouse-external.yaml). In
+  `sql` mode on a multi-host cluster without replicated access storage the app
+  refuses (AC9); acknowledge a single node with
+  LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true.
+{{- end }}
+
+Either way, Section 7 lists the two passwords (LWQL_CLICKHOUSE_PASSWORD,
+LWQL_POSTGRES_READER_PASSWORD) the chart hands the app. The `lwql_postgres`
+bridge dials the PostgreSQL that DATABASE_URL points at, converging a read-only
+`lwql_ro` role; that role's owner must be allowed to CREATE/ALTER ROLE or the
+convergence logs and LangWatchQL stays refused (fail-closed). If provisioning
+cannot complete, LangWatchQL stays unavailable — nothing else breaks.
 {{- else }}
 Disabled (lwql.enabled=false). No LangWatchQL objects are provisioned
 and the endpoints refuse every query.

@@ -21,7 +21,7 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 | `BACKUP_ENABLED` | `false` | Enable S3 disk for native `BACKUP`/`RESTORE` SQL |
 | `S3_ENDPOINT` | — | S3-compatible endpoint (e.g. `https://s3.us-east-1.amazonaws.com/bucket/`) |
 | `S3_ACCESS_KEY` / `S3_SECRET_KEY` | — | Static credentials (or use `USE_ENVIRONMENT_CREDENTIALS=true` for IRSA) |
-| `CH_REPLICATED` | `false` | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is provisioned by the app via SQL, never stored in Keeper; see [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md) |
+| `CH_REPLICATED` | `false` | Enable Keeper-coordinated ReplicatedMergeTree replication (requires keeper + data node env vars). Keeper replicates table data only — the LangWatchQL access model (users, profiles, row policies) is never stored in Keeper: on chart-managed ClickHouse it is delivered to every pod as rendered `users.d`/`config.d` files, and on bring-your-own ClickHouse the app provisions it via SQL; see [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md) |
 
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
@@ -29,23 +29,29 @@ For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverle
 
 ## LangWatchQL (LWQL)
 
-`ch-config` renders NO LangWatchQL access model. The application owns it: it
-provisions the restricted `langwatch_lwql` user, the `<database>_profile`
-settings profile (`langwatch_profile` by default), row policies, and the
-`lwql_postgres` named collection
-bridging into PostgreSQL via SQL DDL on every deployment, against whichever
-ClickHouse it is pointed at (chart-managed or BYO/external) — see
-[ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md).
+`ch-config` renders NO LangWatchQL access model — the application owns it (the
+restricted `langwatch_lwql` user, the `<database>_profile` settings profile,
+row policies, and the `lwql_postgres` PostgreSQL-bridge named collection). How
+that model reaches this ClickHouse depends on the posture (see
+[ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md)):
 
-What `ch-config` still renders is the three prerequisites that DDL needs from
-the server itself: `zz-access-management.yaml` grants the `default` user
-`access_management` + `named_collection_control` (the right to create users,
-profiles, row policies and named collections through SQL),
-`custom-settings-prefixes.yaml` declares the `custom_` settings prefix the
+- **Chart-managed ClickHouse (rendered mode, the default).** The app renders the
+  model to `users.d/lwql-access.yaml` and `config.d/lwql-named-collection.yaml`,
+  and the umbrella chart's render Job delivers them to **every** pod as a mounted
+  Secret. No access SQL DDL runs against this server. The user file carries only
+  the identity's `password_sha256_hex`, never the password.
+- **Bring-your-own ClickHouse (`sql` mode).** Where the chart cannot write the
+  server's config files, the app self-provisions the same model via SQL DDL.
+
+What `ch-config` renders in both cases is the server-level settings the model
+needs: `custom-settings-prefixes.yaml` declares the `custom_` settings prefix the
 per-query tenant capability rides on, and `access-control.yaml` sets
 `access_control_improvements.settings_constraints_replace_previous` to `true`
 (without it, ClickHouse rejects the `<database>_profile` settings profile's
-`CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). See
+`CHANGEABLE_IN_READONLY` constraint on `custom_api_key_hash`). The image also
+grants its `default` user `access_management` + `named_collection_control` — the
+right to create users, profiles, row policies and named collections through SQL,
+which **only `sql` mode uses**; rendered delivery runs no access DDL. See
 `internal/render/access.go`.
 
 ## What Gets Computed

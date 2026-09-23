@@ -237,34 +237,54 @@ For a complete installation guide, visit the [documentation](https://docs.langwa
 
 `lwql.enabled` (default `true`) provisions the LangWatchQL backend: a
 restricted `langwatch_lwql` user, the `<database>_profile` settings profile
-(`langwatch_profile` by default), row
-policies, a `lwql_postgres` PostgreSQL-bridge named collection, and the
-caller-facing views. **The application always owns the access model, on
-every path** — see
-[ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md) for
-the full contract. No chart template renders any part of it; the chart's
-only job is handing the app and workers the two passwords
-(`LWQL_CLICKHOUSE_PASSWORD`, `LWQL_POSTGRES_READER_PASSWORD`) it converges
-those identities with, both from the app Secret.
+(`langwatch_profile` by default), row policies, a `lwql_postgres`
+PostgreSQL-bridge named collection, and the caller-facing views. **The
+application owns the access model in code** — see
+[ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md) for the
+full contract. How the model reaches ClickHouse depends on the posture:
 
-At boot the app derives the ClickHouse target from `CLICKHOUSE_URL` and the
-PostgreSQL bridge endpoint from `DATABASE_URL`, then self-provisions the
-whole model via SQL DDL, degrading to a logged, fail-closed refusal if the
-server rejects a statement. This is true whether ClickHouse is chart-managed
-or bring-your-own — either way, your ClickHouse must satisfy four
-prerequisites before enabling `lwql.enabled`:
+- **Chart-managed ClickHouse (the default): rendered delivery.** The app renders
+  the access model to two config files and a deploy-time Job writes them into the
+  Secret `<release>-lwql-clickhouse-access`; **every** ClickHouse pod mounts them
+  at `users.d/lwql-access.yaml` and `config.d/lwql-named-collection.yaml`, so the
+  restricted identity, its profile, grants, row policies and the named collection
+  land in every replica — not just the one behind the Service. No access SQL DDL
+  runs against ClickHouse, and the chart-managed ClickHouse identity holds no
+  `ACCESS MANAGEMENT`. This is `LWQL_ACCESS_MODEL_MODE=rendered`, the default when
+  the variable is unset; the chart never sets it for chart-managed ClickHouse.
+- **Bring-your-own ClickHouse: SQL DDL (`sql` mode).** The chart cannot write your
+  server's config files, so the app self-provisions the model with SQL DDL at
+  boot, degrading to a logged, fail-closed refusal if the server rejects a
+  statement. Select it with `LWQL_ACCESS_MODEL_MODE=sql` — see
+  `examples/overlays/clickhouse-external.yaml`.
 
-| Prerequisite | Why | Where it lives on the chart-managed path |
+Either way the chart's only credential job is handing the app and workers the two
+passwords (`LWQL_CLICKHOUSE_PASSWORD`, `LWQL_POSTGRES_READER_PASSWORD`), both from
+the app Secret.
+
+**`sql`-mode prerequisites (bring-your-own only).** In `sql` mode your ClickHouse
+must satisfy four prerequisites before enabling `lwql.enabled`. Chart-managed
+ClickHouse needs none of them from you: the `langwatch/clickhouse-serverless`
+image already ships the two server-level settings, and rendered delivery means
+the app never runs access DDL there.
+
+| Prerequisite | Why | How chart-managed ClickHouse already satisfies it |
 | --- | --- | --- |
 | `custom_settings_prefixes` includes `custom_` | The `<database>_profile` settings profile (`langwatch_profile` by default) carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |
-| The administrative user (the one whose credentials the app connects with) has `access_management: 1` | The app needs DDL rights to create/repair `langwatch_lwql`, the `<database>_profile` settings profile (`langwatch_profile` by default), and the row policies. | The `langwatch/clickhouse-serverless` image grants this to its `default` user out of the box. |
-| `named_collection_control: 1` on that same administrative user | Required specifically to create/drop the `lwql_postgres` named collection via SQL (`CREATE NAMED COLLECTION`), distinct from the general `access_management` grant. | Same as above. |
-| `access_control_improvements.settings_constraints_replace_previous` is `true` | The `<database>_profile` settings profile marks `custom_api_key_hash` `CHANGEABLE_IN_READONLY`; without this server-level setting, ClickHouse rejects that constraint on the profile. | Rendered by `renderAccessControl` into `config.d/access-control.yaml` in `infra/clickhouse-serverless/internal/render/access.go`. |
+| The administrative user (the one whose credentials the app connects with) has `access_management: 1` | In `sql` mode the app needs DDL rights to create/repair `langwatch_lwql`, the settings profile and the row policies. Rendered delivery does not run this DDL, so the chart-managed identity is NOT granted it. | Not needed — the access objects arrive as mounted config, not DDL. |
+| `named_collection_control: 1` on that same administrative user | In `sql` mode, required to create/drop the `lwql_postgres` named collection via `CREATE NAMED COLLECTION`. | Not needed — the named collection arrives in the mounted `config.d` file. |
+| `access_control_improvements.settings_constraints_replace_previous` is `true` | The settings profile marks `custom_api_key_hash` `CHANGEABLE_IN_READONLY`; without this server-level setting, ClickHouse rejects that constraint on the profile. | Rendered by `renderAccessControl` into `config.d/access-control.yaml` in `infra/clickhouse-serverless/internal/render/access.go`. |
 
-Grant these on your ClickHouse server before pointing this chart at it with
-`lwql.enabled: true`; see `examples/overlays/clickhouse-external.yaml`. If the
-server refuses the DDL the app logs it and LangWatchQL stays unavailable —
-nothing else breaks.
+**AC9 — `sql` mode is fail-closed on clusters.** In `sql` mode the app reads
+`system.user_directories` and `system.clusters` before any access statement. If
+access storage is not `replicated` and the server belongs to a cluster with more
+than one host, it aborts (the DDL would reach only the one host the app connects
+to). Bypass a genuinely single-node BYO with
+`LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true`; ClickHouse Cloud and self-managed
+`<replicated>` access storage pass the check unchanged. Grant the `sql`-mode
+prerequisites on your server before pointing the chart at it with
+`lwql.enabled: true`; if the server refuses the DDL the app logs it and
+LangWatchQL stays unavailable — nothing else breaks.
 
 The `lwql_postgres` bridge dials whatever PostgreSQL `DATABASE_URL` points
 at, converging a dedicated read-only role `lwql_ro` — never the superuser —
@@ -293,11 +313,13 @@ GRANT SELECT ON "public"."lwql_traces" TO "lwql_ro";
 -- ...one GRANT SELECT per approved lwql_* view
 ```
 
-Nothing is rendered to `config.d` any more — the named collection is created
-by SQL and stored in ClickHouse's access store, not written to disk as
-config, so the plaintext-config-on-disk caveat that applied to the old
-chart-rendered path no longer applies. Note that `SHOW CREATE NAMED
-COLLECTION` is still not granted to the restricted identity.
+On chart-managed ClickHouse the named collection is delivered as a
+`config.d/lwql-named-collection.yaml` file (carried in the access Secret, mounted
+read-only on every pod), and the user file carries only the identity's
+`password_sha256_hex`, never the password. In `sql` mode (BYO) the named
+collection is created by SQL and stored in ClickHouse's access store instead. In
+both cases `SHOW CREATE NAMED COLLECTION` is not granted to the restricted
+identity.
 
 ### Pod security
 
@@ -911,7 +933,7 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 
 | Name           | Description                                                                                                        | Value  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------ | ------ |
-| `lwql.enabled` | The app self-provisions the LangWatchQL backend (identity, policies, named collection, views) via SQL DDL at boot, on every ClickHouse posture — chart-managed and external/BYO alike (see [LangWatchQL (LWQL) prerequisites](#langwatchql-lwql-prerequisites) and [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md)). The feature flag still gates the endpoint. | `true` |
+| `lwql.enabled` | Provision the LangWatchQL backend (identity, policies, named collection, views). On chart-managed ClickHouse the access model is DELIVERED as rendered config files mounted on every replica (default `rendered` mode); on bring-your-own ClickHouse the app self-provisions it via SQL DDL (`sql` mode). See [LangWatchQL (LWQL) prerequisites](#langwatchql-lwql-prerequisites) and [ADR-141](../../dev/docs/adr/141-the-app-owns-the-lwql-access-model.md). The feature flag still gates the endpoint. | `true` |
 
 ### Redis
 

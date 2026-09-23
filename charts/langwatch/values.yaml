@@ -2068,22 +2068,28 @@ clickhouse:
 # The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
 # backend objects exist regardless.
 #
-# One rule, one owner (issue #8258): the APPLICATION always owns the access
-# model, on every path. At boot it derives the ClickHouse target from
-# CLICKHOUSE_URL and the PostgreSQL bridge endpoint from DATABASE_URL, then
-# self-provisions the whole model via SQL DDL — chart-managed ClickHouse and
-# external/BYO ClickHouse alike — degrading to a logged, fail-closed refusal
-# if the server rejects a statement. This requires a ClickHouse whose admin
-# user may run access-management DDL (the `langwatch/clickhouse-serverless`
-# image ships this; a BYO server needs it added).
+# One rule, one owner (issue #8258): the APPLICATION owns the access model in
+# code. How it reaches ClickHouse depends on the posture:
 #
-# `lwql.enabled` is the only switch: the chart's sole job is handing the app
-# the two passwords (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD)
-# it converges those identities with. No chart template renders any part of
-# the access model.
+#   - Chart-managed ClickHouse (default): RENDERED delivery. The
+#     <release>-lwql-access-render Job renders the model and writes it into the
+#     Secret <release>-lwql-clickhouse-access, which every ClickHouse pod mounts
+#     (see clickhouse.extraVolumes above), so every replica carries the whole
+#     set. No access SQL DDL runs; the ClickHouse identity holds no ACCESS
+#     MANAGEMENT. This is LWQL_ACCESS_MODEL_MODE=rendered (the default when
+#     unset); the chart never sets the variable for chart-managed ClickHouse.
+#   - Bring-your-own ClickHouse: SQL DDL. The chart cannot write the server's
+#     config files, so the app self-provisions via SQL DDL, degrading to a
+#     logged, fail-closed refusal if the server rejects a statement. Select it
+#     with LWQL_ACCESS_MODEL_MODE=sql (see examples/overlays/clickhouse-external.yaml),
+#     which needs an admin user allowed access-management DDL.
+#
+# `lwql.enabled` is the only switch here: the chart's remaining job is handing
+# the app the two passwords (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD)
+# it converges the identities with.
 ## @section LangWatchQL (LWQL)
 lwql:
-  ## @param lwql.enabled [default: true] The app self-provisions the LangWatchQL backend (identity, policies, named collection, views) via SQL DDL at boot, on every ClickHouse posture. The feature flag still gates the endpoint.
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag still gates the endpoint.
   enabled: true
 
 # =============================================================================
