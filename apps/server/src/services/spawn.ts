@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { createInterface } from "node:readline";
+import { clearTimeout, setTimeout } from "node:timers";
 
 import { exitCause } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";

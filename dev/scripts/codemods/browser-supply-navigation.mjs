@@ -144,11 +144,13 @@ function scanRegistryGroup(tree, entries, literal, source, registries, field) {
 
 /** @param {string} base */
 function collectNavigationItems(tree, entries, literal, base, sources) {
-  for (const [basename, registries, field] of [
+  /** @type {Array<[string, string[], string]>} */
+  const navigationRegistries = [
     ["command-catalogue", ["navigationCommands"], "command"],
     ["project-nav-items", ["projectNavItems"], "project"],
     ["section-nav-items", ["gatewayNavItems", "governanceNavItems"], "section"],
-  ]) {
+  ];
+  for (const [basename, registries, field] of navigationRegistries) {
     const source = parse(`${base}/${basename}.ts`);
     sources.set(source.fileName, source);
     scanRegistryGroup(tree, entries, literal, source, registries, field);

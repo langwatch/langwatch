@@ -360,11 +360,9 @@ describe("MCP server platform_get_prompt tool registration", () => {
 
 /** No single output line may pair a version number with a deployment tag name. */
 function expectNoLineMixesVersionAndTag(result: string, tags: string[]) {
-  for (const line of result.split("\n")) {
-    const hasTag = tags.some((t) => line.includes(t));
-    if (hasTag) {
-      expect(line).not.toMatch(/\bv\d+\b|\bversion\b\W*\d+/i);
-    }
+  const taggedLines = result.split("\n").filter((line) => tags.some((t) => line.includes(t)));
+  for (const line of taggedLines) {
+    expect(line).not.toMatch(/\bv\d+\b|\bversion\b\W*\d+/i);
   }
 }
 

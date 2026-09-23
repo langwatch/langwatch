@@ -119,6 +119,11 @@ function signInIsForEnvironment(body: string): boolean {
   return body.includes(encodeURIComponent(`${ENVIRONMENT_URL}/.default`));
 }
 
+/** The sign-in form body as posted; the channel always sends it as a string. */
+function postedFormBody(init: RequestInit | undefined): string {
+  return typeof init?.body === "string" ? init.body : "";
+}
+
 beforeEach(() => {
   capturedCalls = [];
   warnings = [];
@@ -147,7 +152,7 @@ beforeEach(() => {
         // Manager and Graph still sign in, which is what leaves the two money
         // reads working while the conversation half cannot start.
         const refused =
-          environmentSignInStatus !== 200 && signInIsForEnvironment(String(init?.body));
+          environmentSignInStatus !== 200 && signInIsForEnvironment(postedFormBody(init));
         return new Response(JSON.stringify(refused ? {} : { access_token: "a-token" }), {
           status: refused ? environmentSignInStatus : 200,
           headers: { "content-type": "application/json" },
@@ -254,7 +259,7 @@ describe("the seat licence read inside the Dataverse source", () => {
 
       const scopes = capturedCalls
         .filter((call) => call.url.includes("login.microsoftonline.com"))
-        .map((call) => String(call.init?.body));
+        .map((call) => postedFormBody(call.init));
       expect(
         scopes.some((body) => body.includes(encodeURIComponent("https://graph.microsoft.com"))),
       ).toBe(false);
@@ -288,7 +293,7 @@ describe("the seat licence read inside the Dataverse source", () => {
 
       const scopes = capturedCalls
         .filter((call) => call.url.includes("login.microsoftonline.com"))
-        .map((call) => String(call.init?.body));
+        .map((call) => postedFormBody(call.init));
       expect(
         scopes.some((body) =>
           body.includes(encodeURIComponent("https://graph.microsoft.com/.default")),

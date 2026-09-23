@@ -6,6 +6,7 @@
 // Usage: node dev/scripts/check-node-resolution.mjs [--json]
 import { execFileSync, spawn } from "node:child_process";
 import { dirname, join, relative } from "node:path";
+import { clearTimeout, setTimeout } from "node:timers";
 import { fileURLToPath } from "node:url";
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");

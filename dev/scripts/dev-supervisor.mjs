@@ -9,6 +9,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { clearInterval, clearTimeout, setInterval, setTimeout } from "node:timers";
 import { fileURLToPath } from "node:url";
 
 /** How long the stack gets between SIGTERM and SIGKILL. */
