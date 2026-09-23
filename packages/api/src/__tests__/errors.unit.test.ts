@@ -410,7 +410,7 @@ describe("createErrorHandler", () => {
       const zodError = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
       const c = fakeContext();
 
-      void handler(zodError as unknown as Error, c as never);
+      void handler(zodError, c as never);
 
       const resolved = c._store.get("resolvedError") as {
         status: number;
