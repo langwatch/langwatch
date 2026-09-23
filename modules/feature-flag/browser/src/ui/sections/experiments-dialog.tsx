@@ -49,6 +49,8 @@ export function ExperimentsDialog({
   onSetEnrolment,
   onSetTenantPolicy,
 }: ExperimentsDialogProps) {
+  const showEmpty = !isLoading && experiments.length === 0;
+  const showList = !isLoading && experiments.length > 0;
   return (
     <Dialog.Root
       open={open}
@@ -69,13 +71,13 @@ export function ExperimentsDialog({
         </Dialog.Header>
 
         <Dialog.Body>
-          {isLoading ? (
-            <Text color="fg.muted">Loading experiments…</Text>
-          ) : experiments.length === 0 ? (
+          {isLoading && <Text color="fg.muted">Loading experiments…</Text>}
+          {showEmpty && (
             <Text color="fg.muted">
               No experiments are open to you right now. We will list them here when there are.
             </Text>
-          ) : (
+          )}
+          {showList && (
             <Stack gap={5} separator={<div />}>
               {experiments.map((entry) => {
                 const tenantDecision =

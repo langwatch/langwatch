@@ -26,6 +26,7 @@ import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
+  type StudioFieldMapping,
 } from "../../../../model/edge-mapping.ts";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
@@ -143,8 +144,8 @@ function DbEvaluatorForm({
   const effectiveEvaluatorDef = useMemo(() => {
     const fields = evaluator?.fields;
     if (fields && fields.length > 0) {
-      const requiredFields = fields.filter((f: any) => !f.optional).map((f: any) => f.identifier);
-      const optionalFields = fields.filter((f: any) => f.optional).map((f: any) => f.identifier);
+      const requiredFields = fields.filter((f) => !f.optional).map((f) => f.identifier);
+      const optionalFields = fields.filter((f) => f.optional).map((f) => f.identifier);
       return { requiredFields, optionalFields };
     }
     return evaluatorDef;
@@ -224,7 +225,7 @@ function DbEvaluatorForm({
   );
 
   const handleInputMappingChange = useCallback(
-    (identifier: string, mapping: any) => {
+    (identifier: string, mapping: StudioFieldMapping | undefined) => {
       const workflow = getWorkflow();
       const currentInputs = workflow.nodes.find((n) => n.id === node.id)?.data.inputs ?? [];
       const result = applyMappingChange({
@@ -423,7 +424,7 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
   }, [evaluator, resolvedDefaultModel.data?.model, resolvedDefaultEmbeddings.data?.model]);
 
   const onSubmit = useCallback(
-    (data: { settings: Record<string, any> }) => {
+    (data: { settings: Record<string, unknown> }) => {
       setNode({
         id: node.id,
         data: {

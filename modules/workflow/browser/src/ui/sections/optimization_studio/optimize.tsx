@@ -120,6 +120,23 @@ type OptimizeForm = {
   params: (typeof OPTIMIZERS)[keyof typeof OPTIMIZERS]["params"];
 };
 
+function optimizeDisabledReason({
+  trainLength,
+  hasProvidersWithoutCustomKeys,
+  hasEvaluator,
+}: {
+  trainLength: number;
+  hasProvidersWithoutCustomKeys: boolean;
+  hasEvaluator: boolean;
+}): string | false {
+  if (trainLength < 20) return "You need at least 20 entries to run the automated optimizer";
+  if (hasProvidersWithoutCustomKeys) return "Set up your API keys to run optimizations";
+  if (!hasEvaluator) {
+    return "You need at least one evaluator node in your workflow to run optimizations";
+  }
+  return false;
+}
+
 export function OptimizeModalContent({
   form,
   onClose,
@@ -352,14 +369,12 @@ export function OptimizeModalContent({
   }
 
   const hasEvaluator = nodes.some(checkIsEvaluator);
-  const isDisabled =
-    train.length < 20
-      ? "You need at least 20 entries to run the automated optimizer"
-      : hasProvidersWithoutCustomKeys
-        ? "Set up your API keys to run optimizations"
-        : !hasEvaluator
-          ? "You need at least one evaluator node in your workflow to run optimizations"
-          : false;
+  const isDisabled = optimizeDisabledReason({
+    trainLength: train.length,
+    hasProvidersWithoutCustomKeys,
+    hasEvaluator,
+  });
+  const showEvaluatorWarning = !hasProvidersWithoutCustomKeys && !hasEvaluator;
 
   return (
     <FormProvider {...form}>
@@ -469,12 +484,13 @@ export function OptimizeModalContent({
             )}
           </Grid>
           {/* Max rounds field disabled */}
-          {hasProvidersWithoutCustomKeys ? (
+          {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
               runWhat="run optimizations"
               nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
             />
-          ) : !hasEvaluator ? (
+          )}
+          {showEvaluatorWarning && (
             <Alert.Root status="warning">
               <Alert.Indicator />
               <Alert.Content>
@@ -484,7 +500,7 @@ export function OptimizeModalContent({
                 </Text>
               </Alert.Content>
             </Alert.Root>
-          ) : null}
+          )}
         </Dialog.Body>
         <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
           <VStack align="start" width="full" gap={3}>

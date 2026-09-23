@@ -376,13 +376,10 @@ export default function OptimizationStudio() {
                             position="bottom-left"
                             orientation="horizontal"
                             style={{
-                              marginLeft: nodeSelectionPanelIsOpen
-                                ? !isResultsPanelCollapsed
-                                  ? "16px"
-                                  : "122px"
-                                : !isResultsPanelCollapsed
-                                  ? "180px"
-                                  : "262px",
+                              marginLeft: controlsMarginLeft({
+                                nodeSelectionPanelIsOpen,
+                                isResultsPanelCollapsed,
+                              }),
                               marginBottom: "15px",
                             }}
                           />
@@ -450,6 +447,23 @@ function ReactFlowBackground() {
   );
 }
 
+function controlsMarginLeft({
+  nodeSelectionPanelIsOpen,
+  isResultsPanelCollapsed,
+}: {
+  nodeSelectionPanelIsOpen: boolean;
+  isResultsPanelCollapsed: boolean;
+}): string {
+  if (nodeSelectionPanelIsOpen) return isResultsPanelCollapsed ? "122px" : "16px";
+  return isResultsPanelCollapsed ? "262px" : "180px";
+}
+
+function statusCircleColor({ status }: { status: string }): string {
+  if (status === "connected") return "green.500";
+  if (status === "disconnected") return "red.300";
+  return "yellow.500";
+}
+
 function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | React.ReactNode }) {
   return (
     <Tooltip content={tooltip}>
@@ -459,13 +473,7 @@ function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | 
           maxWidth="12px"
           minHeight="12px"
           maxHeight="12px"
-          background={
-            status === "connected"
-              ? "green.500"
-              : status === "disconnected"
-                ? "red.300"
-                : "yellow.500"
-          }
+          background={statusCircleColor({ status })}
           borderRadius="full"
         />
         {status !== "connected" && status !== "disconnected" && (
