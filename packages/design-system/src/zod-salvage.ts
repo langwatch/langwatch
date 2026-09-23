@@ -62,6 +62,46 @@ function salvageNestedField(
   return directParseResult.success ? directParseResult.data : undefined;
 }
 
+function salvageObjectField({
+  salvaged,
+  key,
+  fieldSchema,
+  value,
+  nestedDefaults,
+}: {
+  salvaged: Record<string, unknown>;
+  key: string;
+  fieldSchema: unknown;
+  value: unknown;
+  nestedDefaults: unknown;
+}): void {
+  // Check if the field schema is an object or has an unwrapped object type
+  let objectSchema = fieldSchema;
+
+  // Unwrap ZodDefault, ZodOptional, etc. to get to the underlying ZodObject
+  while (
+    objectSchema instanceof z.ZodDefault ||
+    objectSchema instanceof z.ZodOptional ||
+    objectSchema instanceof z.ZodNullable
+  ) {
+    objectSchema = objectSchema.unwrap();
+  }
+
+  if (objectSchema instanceof z.ZodObject) {
+    // Recursively salvage nested objects, falling back to whatever
+    // defaults are available (the caller's, the schema's own empty
+    // parse, or ones constructed field-by-field from its shape).
+    try {
+      const nestedDefaultValue = resolveNestedDefaultValue(objectSchema, nestedDefaults);
+      salvaged[key] = salvageNestedField(objectSchema, value, nestedDefaultValue);
+    } catch {
+      // If salvage fails (e.g., required fields missing in optional nested object),
+      // silently fall back to the default from schemaDefaults (may be undefined)
+      salvaged[key] = nestedDefaults;
+    }
+  }
+}
+
 /**
  * Recursively keeps whatever fields of `data` pass `schema`, field by field,
  * falling back to `defaults` (or the schema's own empty parse) for the rest —
@@ -112,37 +152,16 @@ export function salvageValidData<T extends z.ZodObject<any>>(
     if (fieldResult.success) {
       salvaged[key] = fieldResult.data;
     } else if (value && typeof value === "object") {
-      // Check if the field schema is an object or has an unwrapped object type
-      let objectSchema = fieldSchema;
-
-      // Unwrap ZodDefault, ZodOptional, etc. to get to the underlying ZodObject
-      while (
-        objectSchema instanceof z.ZodDefault ||
-        objectSchema instanceof z.ZodOptional ||
-        objectSchema instanceof z.ZodNullable
-      ) {
-        objectSchema = objectSchema.unwrap();
-      }
-
-      if (objectSchema instanceof z.ZodObject) {
-        // Recursively salvage nested objects, falling back to whatever
-        // defaults are available (the caller's, the schema's own empty
-        // parse, or ones constructed field-by-field from its shape).
-        const nestedDefaults = schemaDefaults[key as keyof typeof schemaDefaults];
-
-        try {
-          const nestedDefaultValue = resolveNestedDefaultValue(objectSchema, nestedDefaults);
-          salvaged[key] = salvageNestedField(objectSchema, value, nestedDefaultValue);
-        } catch {
-          // If salvage fails (e.g., required fields missing in optional nested object),
-          // silently fall back to the default from schemaDefaults (may be undefined)
-          salvaged[key] = nestedDefaults;
-        }
-      }
+      salvageObjectField({
+        salvaged,
+        key,
+        fieldSchema,
+        value,
+        nestedDefaults: schemaDefaults[key as keyof typeof schemaDefaults],
+      });
     }
     // If field fails validation and isn't a nested object, skip it (use default)
   }
-
   // Merge salvaged values with defaults (salvaged takes precedence)
   return merge({}, schemaDefaults, salvaged);
 }

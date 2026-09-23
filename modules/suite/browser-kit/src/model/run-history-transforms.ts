@@ -345,6 +345,40 @@ export function computeBatchRunSummary({ batchRun }: { batchRun: BatchRun }): Ru
   return computeGroupSummary({ group: batchRun });
 }
 
+function computePassRate({
+  passedCount,
+  settledCount,
+  totalCount,
+}: {
+  passedCount: number;
+  settledCount: number;
+  totalCount: number;
+}): number | null {
+  if (settledCount > 0) return (passedCount / settledCount) * 100;
+  if (totalCount > 0) return null;
+  return 0;
+}
+
+function sumRunTotals(runs: RunGroup["scenarioRuns"]) {
+  let totalCost = 0;
+  let totalDurationMs = 0;
+  const allAgentLatencies: number[] = [];
+  const allAgentCosts: number[] = [];
+  for (const run of runs) {
+    if (run.totalCost != null) totalCost += run.totalCost;
+    if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
+    const agentLatencies = run.roleLatencies?.Agent;
+    if (agentLatencies) {
+      allAgentLatencies.push(...agentLatencies);
+    }
+    const agentCosts = run.roleCosts?.Agent;
+    if (agentCosts) {
+      allAgentCosts.push(...agentCosts);
+    }
+  }
+  return { totalCost, totalDurationMs, allAgentLatencies, allAgentCosts };
+}
+
 /**
  * Computes pass/fail summary for any RunGroup. Keep in sync with the sidebar's
  * ClickHouse query in simulation.clickhouse.repository.ts → getSetSummaries().
@@ -383,25 +417,11 @@ export function computeGroupSummary({ group }: { group: RunGroup }): RunGroupSum
   const completedCount = passedCount + failedCount;
   const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
-  const passRate =
-    settledCount > 0 ? (passedCount / settledCount) * 100 : totalCount > 0 ? null : 0;
+  const passRate = computePassRate({ passedCount, settledCount, totalCount });
 
-  let totalCost = 0;
-  let totalDurationMs = 0;
-  const allAgentLatencies: number[] = [];
-  const allAgentCosts: number[] = [];
-  for (const run of group.scenarioRuns) {
-    if (run.totalCost != null) totalCost += run.totalCost;
-    if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
-    const agentLatencies = run.roleLatencies?.Agent;
-    if (agentLatencies) {
-      allAgentLatencies.push(...agentLatencies);
-    }
-    const agentCosts = run.roleCosts?.Agent;
-    if (agentCosts) {
-      allAgentCosts.push(...agentCosts);
-    }
-  }
+  const { totalCost, totalDurationMs, allAgentLatencies, allAgentCosts } = sumRunTotals(
+    group.scenarioRuns,
+  );
 
   const agentLatencyStats = computeMetricStats(allAgentLatencies);
   const agentCostStats = computeMetricStats(allAgentCosts);
