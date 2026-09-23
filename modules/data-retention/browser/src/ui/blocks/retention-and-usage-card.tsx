@@ -60,9 +60,8 @@ export function RetentionAndUsageCard({
                 {storageDescription}
               </Text>
             </VStack>
-            {isLoading ? (
-              <Spinner size="sm" />
-            ) : data ? (
+            {isLoading && <Spinner size="sm" />}
+            {!isLoading && data && (
               <HStack gap={1.5} flexShrink={0} align="baseline">
                 <Text fontSize="sm" fontWeight="semibold">
                   {formatBytes(data.totalBytes)}
@@ -73,7 +72,7 @@ export function RetentionAndUsageCard({
                   </Text>
                 )}
               </HStack>
-            ) : null}
+            )}
           </HStack>
         </VStack>
       </Card.Body>

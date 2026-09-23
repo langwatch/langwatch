@@ -41,7 +41,7 @@ function EvaluatorInputsTooltip({
   inputs,
   children,
 }: {
-  inputs?: Record<string, any> | null;
+  inputs?: Record<string, unknown> | null;
   children: React.ReactNode;
 }) {
   if (inputs === undefined || inputs === null || Object.keys(inputs).length === 0) {

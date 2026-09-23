@@ -5,6 +5,7 @@ import {
   type ColumnSizingState,
   getCoreRowModel,
   getSortedRowModel,
+  type Row,
   type SortingState,
   type Updater,
   useReactTable,
@@ -47,6 +48,15 @@ interface TraceLensBodyProps {
    * widths, addon rows, paddings). See `SkeletonCellContent`.
    */
   isLoading?: boolean;
+}
+
+function markErrorRunStarts(rows: Row<TraceListItem>[]): boolean[] {
+  const flags: boolean[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const status = rows[i]!.original.status;
+    flags.push(status === "error" && rows[i - 1]?.original.status !== "error");
+  }
+  return flags;
 }
 
 export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
@@ -151,14 +161,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   // Precompute "is this the leading row of a consecutive error run?" for every row.
   // Done once per render in O(n) instead of having each RegistryRow probe its
   // neighbour.
-  const isFirstOfErrorRun = useMemo(() => {
-    const flags: boolean[] = [];
-    for (let i = 0; i < rows.length; i++) {
-      const status = rows[i]!.original.status;
-      flags.push(status === "error" && rows[i - 1]?.original.status !== "error");
-    }
-    return flags;
-  }, [rows]);
+  const isFirstOfErrorRun = useMemo(() => markErrorRunStarts(rows), [rows]);
 
   const { virtualizer, paddingTop, paddingBottom } = useTraceTableVirtualizer({
     count: rows.length,

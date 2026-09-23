@@ -64,6 +64,24 @@ export function truncateMarkdown({ text, maxChars }: { text: string; maxChars: n
   return `${text.slice(0, cut).trimEnd()}\n\n…`;
 }
 
+function bubbleDisplayText({
+  text,
+  truncated,
+  isExpandable,
+  isTruncated,
+  expanded,
+}: {
+  text: string;
+  truncated: string;
+  isExpandable: boolean;
+  isTruncated: boolean;
+  expanded: boolean;
+}): string {
+  if (!isExpandable || !isTruncated) return truncated;
+  if (expanded) return text;
+  return truncated.replace(/\n+…\s*$/, "");
+}
+
 export const Bubble: React.FC<BubbleProps> = ({
   side,
   tone,
@@ -94,8 +112,7 @@ export const Bubble: React.FC<BubbleProps> = ({
   const isTruncated = maxChars > 0 && text.length > maxChars;
   const canExpand = isExpandable && isTruncated;
   const truncated = truncateMarkdown({ text, maxChars });
-  const display =
-    !isExpandable || !isTruncated ? truncated : expanded ? text : truncated.replace(/\n+…\s*$/, "");
+  const display = bubbleDisplayText({ text, truncated, isExpandable, isTruncated, expanded });
 
   return (
     <Flex

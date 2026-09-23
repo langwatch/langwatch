@@ -81,7 +81,7 @@ export function TraceFindBar({ traces, renderShortcutKey }: TraceFindBarProps) {
         paddingX={2}
         paddingY={1.5}
         width="360px"
-        role="search"
+        as="search"
         aria-label="Find on page"
         data-find-bar
       >

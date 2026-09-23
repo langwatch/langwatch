@@ -318,17 +318,13 @@ export function AddOverrideDrawer({
                 </HStack>
               )}
               <Field.HelperText>
-                {preset === INDEFINITE_PRESET_VALUE
-                  ? "Data will be kept indefinitely (exempt from automatic deletion)."
-                  : preset === LEGACY_PRESET_VALUE
-                    ? "This length isn't available on your plan. Pick an option above to change it; leaving it keeps the current value."
-                    : preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
-                      ? `Stored as ${resolvedDays} days.`
-                      : preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid
-                        ? `Must be between ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days, in whole weeks.`
-                        : isEnterprise
-                          ? `Custom values start at ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days (7 weeks) and round to whole weeks.`
-                          : "Retention length is set by your plan."}
+                {retentionHelperText({
+                  preset,
+                  customAmount,
+                  daysValid,
+                  resolvedDays,
+                  isEnterprise,
+                })}
               </Field.HelperText>
             </Field.Root>
 
@@ -376,6 +372,37 @@ export function AddOverrideDrawer({
 
 /** Read-only display of a locked scope in the edit drawer: the scope's tier
  *  icon, name, and a tier badge, matching the policy table's row layout. */
+function retentionHelperText({
+  preset,
+  customAmount,
+  daysValid,
+  resolvedDays,
+  isEnterprise,
+}: {
+  preset: string;
+  customAmount: string;
+  daysValid: boolean;
+  resolvedDays: number;
+  isEnterprise: boolean;
+}): string {
+  if (preset === INDEFINITE_PRESET_VALUE) {
+    return "Data will be kept indefinitely (exempt from automatic deletion).";
+  }
+  if (preset === LEGACY_PRESET_VALUE) {
+    return "This length isn't available on your plan. Pick an option above to change it; leaving it keeps the current value.";
+  }
+  if (preset === CUSTOM_PRESET_VALUE && customAmount && daysValid) {
+    return `Stored as ${resolvedDays} days.`;
+  }
+  if (preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid) {
+    return `Must be between ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days, in whole weeks.`;
+  }
+  if (isEnterprise) {
+    return `Custom values start at ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days (7 weeks) and round to whole weeks.`;
+  }
+  return "Retention length is set by your plan.";
+}
+
 function ScopeReadout({
   scopeType,
   name,

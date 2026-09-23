@@ -177,7 +177,7 @@ export const TracesPage: React.FC = () => {
               gone (real traces arrive or user opts into sample data). */}
           {!showIntegratePane && (
             <Box
-              role="search"
+              as="search"
               aria-label="Trace search"
               width="full"
               {...(dimChrome ? (DIMMED_PROPS as Record<string, unknown>) : {})}
@@ -302,7 +302,6 @@ const FilterAside: React.FC<{
   return (
     <Box
       as="aside"
-      role="complementary"
       aria-label="Trace filters"
       position="relative"
       flexShrink={0}
@@ -465,7 +464,6 @@ const ResultsPane: React.FC = React.memo(() => {
   return (
     <Flex
       as="main"
-      role="main"
       aria-label="Trace results"
       direction="column"
       flex={1}
