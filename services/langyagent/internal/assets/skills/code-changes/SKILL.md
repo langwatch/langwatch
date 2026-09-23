@@ -11,15 +11,15 @@ description: Change the user's own program, on their machine or through GitHub. 
 
 ## Does this need code access?
 
-| Request | Needs code | Why |
-| --- | --- | --- |
-| Instrument tracing, wire the SDK, add spans, capture metadata | yes | the change lives in their program |
-| Fix the agent behind a failing scenario or a bad trace | yes | the behaviour lives in their program |
-| Add or change a run parameter on a connected agent | yes | the parameter is declared in the connect call |
-| Run a scenario against an account, plan, environment or fixture the connected agent does not accept yet | yes | the agent must declare the run parameter first; the scenario uses it afterwards |
-| Version a hardcoded prompt with the Prompts CLI | yes | the call site changes |
-| Create or edit a scenario, a suite, an evaluator, a monitor, a dataset, a dashboard | no | the platform holds it |
-| Create a prompt version from the prompt page, run an experiment, read traces or analytics | no | the platform holds it |
+| Request                                                                                                 | Needs code | Why                                                                             |
+| ------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------- |
+| Instrument tracing, wire the SDK, add spans, capture metadata                                           | yes        | the change lives in their program                                               |
+| Fix the agent behind a failing scenario or a bad trace                                                  | yes        | the behaviour lives in their program                                            |
+| Add or change a run parameter on a connected agent                                                      | yes        | the parameter is declared in the connect call                                   |
+| Run a scenario against an account, plan, environment or fixture the connected agent does not accept yet | yes        | the agent must declare the run parameter first; the scenario uses it afterwards |
+| Version a hardcoded prompt with the Prompts CLI                                                         | yes        | the call site changes                                                           |
+| Create or edit a scenario, a suite, an evaluator, a monitor, a dataset, a dashboard                     | no         | the platform holds it                                                           |
+| Create a prompt version from the prompt page, run an experiment, read traces or analytics               | no         | the platform holds it                                                           |
 
 When the answer is no, do the platform work and never ask for code access.
 

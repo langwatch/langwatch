@@ -1,6 +1,6 @@
 import { AgentSourcePermissionDeniedError } from "@langwatch/agent-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAgentAppFixture } from "./agent.fixture.ts";

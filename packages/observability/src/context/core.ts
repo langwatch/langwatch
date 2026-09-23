@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+
 import { isSpanContextValid, context as otelContext, trace } from "@opentelemetry/api";
 
 /**

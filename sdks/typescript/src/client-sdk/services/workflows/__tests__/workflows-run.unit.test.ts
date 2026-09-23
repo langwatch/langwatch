@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { WorkflowsApiService, WorkflowsApiError } from "../workflows-api.service";
+
 import { createLangWatchApiClient } from "@/internal/api/client";
+
+import { WorkflowsApiService, WorkflowsApiError } from "../workflows-api.service";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);

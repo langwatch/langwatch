@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { createApp } from "../src/application.ts";
-import { memberSourceOf } from "./member-source.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import {
   defineServerModule,
   type FeatureSetup,
   type ServerRole,
 } from "../src/feature-installer.ts";
+import { moduleApi } from "../src/module-api-token.ts";
 import { ResourceScope, type ResourceOwnership } from "../src/resource-scope.ts";
+import { memberSourceOf } from "./member-source.ts";
 
 interface ProjectApi {
   name(): string;
@@ -148,9 +149,7 @@ describe("feature-owned runtime services", () => {
     const events: string[] = [];
     const failure = new Error("factory failed");
 
-    await expect(graph({ events, bootFailure: failure }).boot()).rejects.toBe(
-      failure,
-    );
+    await expect(graph({ events, bootFailure: failure }).boot()).rejects.toBe(failure);
     expect(events).toEqual(["connection:close"]);
   });
 

@@ -44,8 +44,7 @@ const REAL_P2PKH_ADDRESS = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
 const REAL_P2SH_ADDRESS = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy";
 const REAL_BECH32_ADDRESS = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
 /** BIP-350 reference: witness version 1, so a bech32m checksum, not bech32. */
-const REAL_TAPROOT_ADDRESS =
-  "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr";
+const REAL_TAPROOT_ADDRESS = "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr";
 
 /**
  * A 32-hex OTel trace id the shape-only bitcoin pattern matches. Generated
@@ -62,9 +61,7 @@ describe("the native essential-PII engine on machine identifiers", () => {
       // the pattern the defect fired on, so it would pass without proving
       // anything. Pin the shape here so a future substitution cannot weaken it
       // in silence.
-      expect(HEX_TRACE_ID_SHAPED_LIKE_AN_ADDRESS).toMatch(
-        /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/,
-      );
+      expect(HEX_TRACE_ID_SHAPED_LIKE_AN_ADDRESS).toMatch(/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/);
 
       expect(asAttributeValue(HEX_TRACE_ID_SHAPED_LIKE_AN_ADDRESS)).toBe(
         HEX_TRACE_ID_SHAPED_LIKE_AN_ADDRESS,
@@ -76,9 +73,7 @@ describe("the native essential-PII engine on machine identifiers", () => {
       const corpus = hexCorpus({ count: 2000, length: 32, seed: 20260911 });
       // Guard the guard: a corpus that never reaches the pattern would pass
       // vacuously, so require the shape the defect fired on to be present.
-      expect(corpus.filter((id) => /^[13]/.test(id)).length).toBeGreaterThan(
-        100,
-      );
+      expect(corpus.filter((id) => /^[13]/.test(id)).length).toBeGreaterThan(100);
 
       const destroyed = corpus.filter((id) => asAttributeValue(id) !== id);
 
@@ -137,10 +132,9 @@ describe("the native essential-PII engine on machine identifiers", () => {
     });
 
     it("redacts an address written inside a sentence", () => {
-      expect(
-        redactEssentialPiiInText({ text: `send to ${REAL_P2PKH_ADDRESS} now` })
-          .text,
-      ).toBe("send to [CRYPTO] now");
+      expect(redactEssentialPiiInText({ text: `send to ${REAL_P2PKH_ADDRESS} now` }).text).toBe(
+        "send to [CRYPTO] now",
+      );
     });
 
     it("keeps an address whose checksum has been altered", () => {
@@ -162,11 +156,7 @@ describe("the native essential-PII engine on machine identifiers", () => {
     // case real: the Luhn check alone would replace all three.
     /** @scenario "A timestamp is not read as a card number at any of its widths" */
     it("keeps millisecond, microsecond and nanosecond timestamps alike", () => {
-      const timestamps = [
-        "1757500123454",
-        "1757500123450001",
-        "1757500123450000004",
-      ];
+      const timestamps = ["1757500123454", "1757500123450001", "1757500123450000004"];
       const text = `ms ${timestamps[0]} us ${timestamps[1]} ns ${timestamps[2]}`;
 
       expect(redactEssentialPiiInText({ text }).text).toBe(text);
@@ -176,15 +166,15 @@ describe("the native essential-PII engine on machine identifiers", () => {
   describe("given a payment card number", () => {
     /** @scenario "A card number written without separators is still redacted" */
     it("redacts a Visa number written as one digit run", () => {
-      expect(
-        redactEssentialPiiInText({ text: "card 4111111111111111" }).text,
-      ).toBe("card [CREDIT_CARD]");
+      expect(redactEssentialPiiInText({ text: "card 4111111111111111" }).text).toBe(
+        "card [CREDIT_CARD]",
+      );
     });
 
     it("redacts a card written with spaces", () => {
-      expect(
-        redactEssentialPiiInText({ text: "card 4111 1111 1111 1111 ok" }).text,
-      ).toBe("card [CREDIT_CARD] ok");
+      expect(redactEssentialPiiInText({ text: "card 4111 1111 1111 1111 ok" }).text).toBe(
+        "card [CREDIT_CARD] ok",
+      );
     });
 
     // One Luhn-valid number per scheme, at a length that scheme issues. The
@@ -233,9 +223,9 @@ describe("the native essential-PII engine on machine identifiers", () => {
     });
 
     it("still redacts a Mastercard two-series number at its own length", () => {
-      expect(
-        redactEssentialPiiInText({ text: "card 2221000123456781 ok" }).text,
-      ).toBe("card [CREDIT_CARD] ok");
+      expect(redactEssentialPiiInText({ text: "card 2221000123456781 ok" }).text).toBe(
+        "card [CREDIT_CARD] ok",
+      );
     });
   });
 });

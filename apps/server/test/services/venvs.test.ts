@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const execCalls: { bin: string; args: string[] }[] = [];
@@ -85,7 +86,15 @@ describe("evaluator environment", () => {
       // Exact set rather than a containment check: this pins the whole extras
       // list, so an extra nobody asked for cannot slip in unnoticed.
       expect([...extras].toSorted()).toEqual(
-        ["azure", "langevals", "lingua", "openai", "presidio", "ragas", "topic_clustering"].toSorted(),
+        [
+          "azure",
+          "langevals",
+          "lingua",
+          "openai",
+          "presidio",
+          "ragas",
+          "topic_clustering",
+        ].toSorted(),
       );
     });
   });

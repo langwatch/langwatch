@@ -1,7 +1,8 @@
+import { nowInstant } from "@langwatch/time";
+
 import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
 import type { ProjectionKind } from "./types.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * The GroupQueue's global key prefix. All event-sourcing jobs share one queue

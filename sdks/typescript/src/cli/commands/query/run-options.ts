@@ -5,8 +5,9 @@
  * @see specs/analytics/lwql-cli-query.feature
  */
 
-import chalk from "chalk";
 import { readFileSync } from "node:fs";
+
+import chalk from "chalk";
 
 import { formatTable } from "../../utils/formatting";
 import {
@@ -27,13 +28,7 @@ export function refuse(message: string): never {
 }
 
 /** The statement, from the argument or the file, never from both. */
-export function resolveStatement({
-  sql,
-  sqlFile,
-}: {
-  sql?: string;
-  sqlFile?: string;
-}): string {
+export function resolveStatement({ sql, sqlFile }: { sql?: string; sqlFile?: string }): string {
   if (sql !== undefined && sqlFile !== undefined) {
     refuse("give a statement or --sql-file, not both");
   }
@@ -57,10 +52,7 @@ export function resolveStatement({
  * declared inside the statement (`{days:UInt32}`), so guessing one here could
  * only disagree with the author's.
  */
-export function resolveParameters(pairs: readonly string[] = []): Record<
-  string,
-  ParameterValue
-> {
+export function resolveParameters(pairs: readonly string[] = []): Record<string, ParameterValue> {
   const parameters: Record<string, ParameterValue> = {};
   for (const pair of pairs) {
     const separator = pair.indexOf("=");
@@ -130,9 +122,7 @@ export function printTable(result: {
     const shown = result.rows.slice(0, TABLE_ROW_CAP);
     formatTable({
       data: shown.map((row) =>
-        Object.fromEntries(
-          headers.map((name) => [name, tableCell(row[name])]),
-        ),
+        Object.fromEntries(headers.map((name) => [name, tableCell(row[name])])),
       ),
       headers,
     });

@@ -8,7 +8,7 @@
     "resolveJsonModule": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "rootDir": ".",
-    "types": ["node"],
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "references": [

@@ -3,9 +3,9 @@
  * Only child_process is mocked; settings and plugin state files are real temp files.
  */
 
-import { describe, expect, it, vi } from "vitest";
-
 import type * as ChildProcessModule from "node:child_process";
+
+import { describe, expect, it, vi } from "vitest";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 

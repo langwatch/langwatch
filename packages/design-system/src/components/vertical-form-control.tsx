@@ -1,7 +1,10 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import type { FieldErrors } from "react-hook-form";
 
-import { HorizontalFormControl, type HorizontalFormControlProps } from "./horizontal-form-control.tsx";
+import {
+  HorizontalFormControl,
+  type HorizontalFormControlProps,
+} from "./horizontal-form-control.tsx";
 
 export interface VerticalFormControlProps extends HorizontalFormControlProps {
   helper?: string | ReactNode;

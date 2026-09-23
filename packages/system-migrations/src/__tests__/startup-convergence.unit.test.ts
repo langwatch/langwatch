@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
+
 import {
   runSystemMigrationsAtStartup,
   SystemMigrationStartupIncompleteError,
 } from "../convergence.ts";
 import type { SystemMigrationStateRepository } from "../state.repository.ts";
+import type { SystemMigration } from "../system-migration.ts";
 import type { TenantSource } from "../tenant-source.ts";
 import type { TenantMigrationRecord } from "../types.ts";
-import type { SystemMigration } from "../system-migration.ts";
 
 const migration = {
   name: "m1",

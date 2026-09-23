@@ -1,10 +1,11 @@
+import { Command } from "commander";
 /**
  * The output PORT: a command returns data, the port picks the format. Every
  * test guards against answering a machine caller with human text -- or a
  * fabricated value -- at exit 0, invisible by construction.
  */
 import { describe, it, expect } from "vitest";
-import { Command } from "commander";
+
 import { isOutputAware, registerOutputOptions, emitsResult } from "../output";
 import { installOutputHarness } from "./output-harness";
 

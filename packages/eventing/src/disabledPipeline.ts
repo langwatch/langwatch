@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+
 import type { AggregateType } from "./domain/aggregateType.ts";
 import type { Event, Projection } from "./domain/types.ts";
 import type { PipelineMetadata, RegisteredPipeline } from "./pipeline/types.ts";

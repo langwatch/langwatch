@@ -1,7 +1,8 @@
-import { describe, it, expect } from "vitest";
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { join } from "path";
+
+import { describe, it, expect } from "vitest";
 
 /**
  * Verifies peer dep ranges accept latest versions (catches ERESOLVE failures).

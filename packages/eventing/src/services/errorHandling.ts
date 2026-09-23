@@ -1,5 +1,5 @@
-import { HandledError } from "@langwatch/handled-error";
 import { NonRetryableGroupQueueError } from "@langwatch/group-queue";
+import { HandledError } from "@langwatch/handled-error";
 import type { createLogger } from "@langwatch/observability";
 
 const TRANSIENT_NETWORK_CODES: ReadonlySet<string> = new Set([

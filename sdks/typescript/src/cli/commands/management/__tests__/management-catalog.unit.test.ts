@@ -5,6 +5,7 @@
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { describe, expect, it } from "vitest";
+
 import { FEATURE_MAP } from "../../../../internal/generated/cli/feature-map.generated";
 import { buildProgram } from "../../../program";
 import { buildCatalog, flattenCatalog, type CatalogEntry } from "../../../utils/commandCatalog";

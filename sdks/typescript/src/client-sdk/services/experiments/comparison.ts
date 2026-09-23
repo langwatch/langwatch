@@ -4,6 +4,7 @@
  * so it can pick the prompt that fits the row; a copied default here would drift and disable that.
  */
 
+import { ComparisonError } from "./errors";
 import type {
   ComparisonOptions,
   ComparisonStatus,
@@ -11,7 +12,6 @@ import type {
   EvaluationStatus,
   RunEvaluatorResponse,
 } from "./types";
-import { ComparisonError } from "./errors";
 
 /** The evaluator behind every comparison, in the workbench and in the SDK. */
 export const COMPARISON_EVALUATOR_SLUG = "langevals/select_best_compare";

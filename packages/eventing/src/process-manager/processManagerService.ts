@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+
 import { createLogger } from "@langwatch/observability";
 import {
   type Attributes,
@@ -10,6 +11,7 @@ import {
   type Tracer,
   trace,
 } from "@opentelemetry/api";
+
 import {
   incrementEsProcessIntentsSuppressed,
   incrementEsProcessManagerTotal,

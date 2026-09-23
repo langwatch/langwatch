@@ -23,8 +23,7 @@
       "@langwatch/gateway-contract": ["../../gateway/contract/src/index.ts"],
       "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
       "@langwatch/user-contract": ["../contract/src/index.ts"]
-    },
-
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "references": [

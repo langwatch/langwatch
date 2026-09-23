@@ -1,13 +1,13 @@
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner.ts";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output.ts";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders

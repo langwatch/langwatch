@@ -1,10 +1,10 @@
-import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import { Console } from "node:console";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
 import chalk from "chalk";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 
 import { disableOutputColor } from "../../utils/errorOutput";
 import {

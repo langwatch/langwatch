@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { FileManager } from "../fileManager";
 
 describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {

@@ -1,9 +1,10 @@
 import { z } from "zod";
+
+import { planCatalogue } from "./catalogue.ts";
 import { planGatesSchema } from "./gates.ts";
 import { planLimitSchema } from "./limits.ts";
 import type { Deployment } from "./plan-type.ts";
 import type { Plan } from "./plan.ts";
-import { planCatalogue } from "./catalogue.ts";
 
 /**
  * A bespoke contract, never a new entry in the catalogue: only what the

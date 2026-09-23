@@ -8,8 +8,7 @@
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [

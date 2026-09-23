@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { counted, printEmpty, runManagement } from "../management/_shared";

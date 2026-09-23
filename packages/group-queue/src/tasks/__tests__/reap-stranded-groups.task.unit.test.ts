@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { GroupQueueRedis } from "../../dependencies-adapter.ts";
 import { reapStrandedGroups } from "../reap-stranded-groups.task.ts";
 

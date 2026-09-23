@@ -1,8 +1,10 @@
 import chalk from "chalk";
+
 import {
   RoleBindingsApiService,
   type UpdateRoleBindingInput,
 } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
+
 import { parseRole } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";

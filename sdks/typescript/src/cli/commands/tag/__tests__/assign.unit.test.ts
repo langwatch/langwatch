@@ -13,8 +13,9 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
-import { tagAssignCommand } from "../assign";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import { tagAssignCommand } from "../assign";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

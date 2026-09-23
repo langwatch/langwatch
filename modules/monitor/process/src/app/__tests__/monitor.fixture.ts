@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The monitor application over memory repositories, for a test that wants the
  * real decisions and none of the datastores. An operation the test did not
@@ -10,7 +11,6 @@ import type {
   OnlineEvaluationPerformance,
 } from "@langwatch/evaluation-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";

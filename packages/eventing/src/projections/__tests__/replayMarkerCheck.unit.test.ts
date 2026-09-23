@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { Event } from "../../domain/types.ts";
 import { isAtOrBeforeCutoff, isAtOrBeforeCutoffMarker } from "../../replay/replayConstants.ts";
 import { RedisReplayMarkerChecker, ReplayDeferralError } from "../replayMarkerCheck.ts";

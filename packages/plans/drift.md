@@ -14,10 +14,10 @@ refused against right now. The other value is recorded here and in
 
 ## 1. `free-plan-two-definitions` — two Free plans disagree
 
-| | Members | Lite | Volume / month | Publishing | Visibility |
-| --- | ---: | ---: | ---: | --- | ---: |
-| **In the catalogue** (billing) | 2 | 0 | 50,000 | allowed | 14 days |
-| Alternative (licensing) | 1 | 0 | 1,000 | refused | 14 days |
+|                                | Members | Lite | Volume / month | Publishing | Visibility |
+| ------------------------------ | ------: | ---: | -------------: | ---------- | ---------: |
+| **In the catalogue** (billing) |       2 |    0 |         50,000 | allowed    |    14 days |
+| Alternative (licensing)        |       1 |    0 |          1,000 | refused    |    14 days |
 
 - In force: `packages/plans/src/catalogue-data.ts:115` (`FREE_PLAN`)
 - Alternative: `packages/plans/src/licensing.ts:237` (`CLOUD_FREE_LICENSING_PLAN`, which
@@ -30,10 +30,10 @@ rather than by a decision.
 
 ## 2. `pro-volume-below-free` — Pro is quoted below Free
 
-| | Members | Lite | Volume / month |
-| --- | ---: | ---: | ---: |
-| **In the catalogue** (billing) | 5 | 9,999 | 10,000 |
-| Alternative (licensing template) | 10 | 5 | 100,000 |
+|                                  | Members |  Lite | Volume / month |
+| -------------------------------- | ------: | ----: | -------------: |
+| **In the catalogue** (billing)   |       5 | 9,999 |         10,000 |
+| Alternative (licensing template) |      10 |     5 |        100,000 |
 
 - In force: `packages/plans/src/catalogue-data.ts:178` (`PRO_PLAN`)
 - Alternative: `packages/plans/src/licensing.ts:136` (`PRO_TEMPLATE`)
@@ -45,10 +45,10 @@ the ordering and fixing the number are the same decision.
 
 ## 3. `growth-copy-volume` — the pricing page quotes twice what Growth enforces
 
-| | Volume / month |
-| --- | ---: |
-| **In the catalogue** (billing) | 100,000 |
-| Alternative (pricing page copy) | 200,000 |
+|                                 | Volume / month |
+| ------------------------------- | -------------: |
+| **In the catalogue** (billing)  |        100,000 |
+| Alternative (pricing page copy) |        200,000 |
 
 - In force: `packages/plans/src/catalogue-data.ts:203` (`GROWTH_PLAN`)
 - Alternative: `enterprise/modules/billing/browser/src/model/billing-plans.ts:89`
@@ -59,11 +59,11 @@ number the product does not honour.
 
 ## 4. `automation-ceiling-three-ways` — the daily dispatch ceiling is stated three times
 
-| | Free | Paid | Enterprise |
-| --- | ---: | ---: | ---: |
-| **In the catalogue** (per plan) | 50 | 150 / 300 / 500 | 5,000 |
-| Alternative (API composition buckets) | 50 | 500 | 5,000 |
-| Alternative (automation service test) | 100 | 1,000 | 10,000 |
+|                                       | Free |            Paid | Enterprise |
+| ------------------------------------- | ---: | --------------: | ---------: |
+| **In the catalogue** (per plan)       |   50 | 150 / 300 / 500 |      5,000 |
+| Alternative (API composition buckets) |   50 |             500 |      5,000 |
+| Alternative (automation service test) |  100 |           1,000 |     10,000 |
 
 - In force: `packages/plans/src/catalogue-data.ts` (per plan: Free 50, Pro 500,
   Launch 150, Accelerate 300, Growth 500, Enterprise 5,000)
@@ -93,5 +93,5 @@ two sites disagreeing about one plan's number.
   states a unit for the plan itself.
 - **Retention days are prose only.** The pricing page says "14 days data
   retention" and "30 days retention" (`billing-plans.ts:77`, `:91`). No plan
-  limit backs either. The catalogue carries the 14-day *visibility* window,
+  limit backs either. The catalogue carries the 14-day _visibility_ window,
   which is a different rule, and states no retention limit at all.

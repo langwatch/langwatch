@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { RedisConfigService } from "./config.ts";
 
 const config = new RedisConfigService();

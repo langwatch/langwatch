@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import type { ProjectionStoreContext } from "../../projections/projectionStoreContext.ts";

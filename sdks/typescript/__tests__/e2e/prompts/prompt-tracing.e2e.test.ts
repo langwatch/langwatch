@@ -1,11 +1,12 @@
-import { describe, expect, it, beforeAll, beforeEach } from "vitest";
-import { getLangwatchSDK } from "../../helpers/get-sdk.js";
-import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-node";
+import { describe, expect, it, beforeAll, beforeEach } from "vitest";
+
 import { type LangWatch, attributes } from "../../../dist/index.js";
 import { promptResponseFactory } from "../../factories/prompt.factory.js";
-import { handles } from "./handlers.js";
+import { getLangwatchSDK } from "../../helpers/get-sdk.js";
+import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
 import { server } from "../setup/msw-setup.js";
+import { handles } from "./handlers.js";
 
 const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
 

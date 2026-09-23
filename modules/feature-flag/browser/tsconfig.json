@@ -9,8 +9,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [

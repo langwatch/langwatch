@@ -10,10 +10,10 @@ without any of them dragging the others onto a boot graph.
 ```ts
 import { applyOverride, planCatalogue } from "@langwatch/plans";
 
-planCatalogue.plan("GROWTH").limits.volume;              // { value: 100000, unit: "messages-per-month" }
-planCatalogue.baseline("self-hosted");                   // the open-source plan
+planCatalogue.plan("GROWTH").limits.volume; // { value: 100000, unit: "messages-per-month" }
+planCatalogue.baseline("self-hosted"); // the open-source plan
 planCatalogue.above({ pricingModel: "TIERED", type: "LAUNCH" });
-planCatalogue.gate("ENTERPRISE", "auditLogs");           // true
+planCatalogue.gate("ENTERPRISE", "auditLogs"); // true
 ```
 
 ## What this package is not
@@ -22,7 +22,7 @@ It answers "what is the number", never "may this succeed". Enforcement stays
 where it is: seat guards in organization, identity and SCIM, the visibility
 window in trace, the dispatch ceiling in automation. Stripe price ids, the
 checkout and the webhooks stay in billing; the catalogue holds the amount a
-customer is *quoted*, not the thing we charge against. Refusal and upgrade copy
+customer is _quoted_, not the thing we charge against. Refusal and upgrade copy
 stay with the presentation registry and the refusing feature.
 
 ## Disputes

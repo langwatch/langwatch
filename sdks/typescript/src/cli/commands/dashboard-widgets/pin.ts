@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   DashboardWidgetsApiError,
   DashboardWidgetsApiService,
@@ -8,10 +8,12 @@ import {
   DashboardsApiService,
   type DashboardSummary,
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Resolves a widget reference (id or name) to the widget it names. Tries it
@@ -32,10 +34,7 @@ async function resolveWidgetRef({
     // match. Auth, network, and 5xx failures are real and must reach the
     // caller — swallowing them would silently reinterpret the ref as a name
     // and hide the actual problem.
-    if (
-      !(error instanceof DashboardWidgetsApiError) ||
-      error.status !== 404
-    ) {
+    if (!(error instanceof DashboardWidgetsApiError) || error.status !== 404) {
       throw error;
     }
   }
@@ -106,20 +105,14 @@ export const pinDashboardWidgetCommand = async (
 
     const safeWidgetName = sanitizeTerminalText(widget.name);
     const safeDashboardName = sanitizeTerminalText(dashboard.name);
-    spinner.succeed(
-      `Added "${safeWidgetName}" to dashboard "${safeDashboardName}"`,
-    );
+    spinner.succeed(`Added "${safeWidgetName}" to dashboard "${safeDashboardName}"`);
 
     return {
       data: { widget, dashboard },
       table: () => {
         console.log();
-        console.log(
-          `  ${chalk.gray("Widget:")}    ${chalk.cyan(safeWidgetName)}`,
-        );
-        console.log(
-          `  ${chalk.gray("Dashboard:")} ${chalk.cyan(safeDashboardName)}`,
-        );
+        console.log(`  ${chalk.gray("Widget:")}    ${chalk.cyan(safeWidgetName)}`);
+        console.log(`  ${chalk.gray("Dashboard:")} ${chalk.cyan(safeDashboardName)}`);
         console.log();
       },
     };

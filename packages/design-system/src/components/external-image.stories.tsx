@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { ExternalImage } from "./external-image.tsx";
 
 const SAMPLE =

@@ -8,8 +8,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/__tests__/**"],

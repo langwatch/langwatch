@@ -2,6 +2,7 @@
  * The `/api/v1/teams` REST family, which shipped without a CLI.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
+
 import {
   createManagementRequest,
   resolveManagementToken,

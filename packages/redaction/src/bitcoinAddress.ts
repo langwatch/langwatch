@@ -6,8 +6,7 @@ import { createHash } from "node:crypto";
  * — every OTel trace id is one — so a checksum cuts that to ~1 in 4 billion.
  */
 
-const BASE58_ALPHABET =
-  "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 const BASE58_DIGIT: ReadonlyMap<string, number> = new Map(
   Array.from(BASE58_ALPHABET, (character, index) => [character, index]),
@@ -64,13 +63,8 @@ export function isBase58CheckAddress(value: string): boolean {
   const decoded = base58Decode(value);
   if (!decoded || decoded.length !== BASE58_ADDRESS_BYTES) return false;
   if (!BASE58_MAINNET_VERSIONS.has(decoded[0]!)) return false;
-  const payload = decoded.subarray(
-    0,
-    BASE58_ADDRESS_BYTES - BASE58_CHECKSUM_BYTES,
-  );
-  const checksum = decoded.subarray(
-    BASE58_ADDRESS_BYTES - BASE58_CHECKSUM_BYTES,
-  );
+  const payload = decoded.subarray(0, BASE58_ADDRESS_BYTES - BASE58_CHECKSUM_BYTES);
+  const checksum = decoded.subarray(BASE58_ADDRESS_BYTES - BASE58_CHECKSUM_BYTES);
   const expected = sha256(sha256(payload));
   for (let i = 0; i < BASE58_CHECKSUM_BYTES; i++) {
     if (expected[i] !== checksum[i]) return false;
@@ -79,9 +73,7 @@ export function isBase58CheckAddress(value: string): boolean {
 }
 
 const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-const BECH32_GENERATOR = [
-  0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3,
-];
+const BECH32_GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
 /** BIP-173 (segwit v0) and BIP-350 (segwit v1+) differ only in this constant. */
 const BECH32_CONSTANT = 1;
 const BECH32M_CONSTANT = 0x2bc830a3;
@@ -153,10 +145,7 @@ export function isBech32Address(value: string): boolean {
   const expected = witnessVersion === 0 ? BECH32_CONSTANT : BECH32M_CONSTANT;
   if (bech32Polymod(values) !== expected) return false;
 
-  const program = values.slice(
-    BC_HRP_EXPANDED.length + 1,
-    values.length - BECH32_CHECKSUM_CHARS,
-  );
+  const program = values.slice(BC_HRP_EXPANDED.length + 1, values.length - BECH32_CHECKSUM_CHARS);
   return isValidWitnessProgram({ witnessVersion, program });
 }
 

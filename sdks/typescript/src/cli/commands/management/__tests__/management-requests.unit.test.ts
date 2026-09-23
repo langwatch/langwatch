@@ -28,6 +28,7 @@ vi.mock("ora", () => ({
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { getApiKeyCommand } from "../../api-keys/get";
 import { updateApiKeyCommand } from "../../api-keys/update";
 import { addGroupBindingCommand } from "../../groups/bindings";

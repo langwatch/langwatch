@@ -1,8 +1,12 @@
-import { guardEnMasse } from "./mass-delete-guard.ts";
+import {
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "./connection.ts";
 import type { GuardNext, GuardParams } from "./guard-middleware.ts";
+import { guardEnMasse } from "./mass-delete-guard.ts";
 import { guardProjectId } from "./multi-tenancy-guard.ts";
 import { guardOrganizationId } from "./organization-guard.ts";
-import { PrismaQueryGuard, type PrismaQueryContext, type PrismaQueryExecutor } from "./connection.ts";
 
 /**
  * Tenancy policy implementation: composes mass-delete, project, and org guards in order.

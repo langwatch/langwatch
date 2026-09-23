@@ -1,12 +1,14 @@
 import chalk from "chalk";
+
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
+
 import type { PromptsLock, SyncResult } from "../types";
+import { resolveCredentials } from "../utils/apiKey";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { resolveCredentials } from "../utils/apiKey";
 import { pullPrompts } from "./pull";
 import { pushPrompts } from "./push";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const syncCommand = async (): Promise<void> => {
   console.log("🔄 Starting sync...");

@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
+
 import type { createLogger } from "@langwatch/observability";
-import { incrementEsCommandTotal, observeEsCommandDuration } from "../../metrics.ts";
-import { mapValidationIssues } from "../../utils/errors.ts";
+
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { createCommand } from "../../commands/command.ts";
 import type { CommandSchema } from "../../commands/commandSchema.ts";
@@ -11,10 +11,16 @@ import type { TenantId } from "../../domain/tenantId.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { EventSchema } from "../../domain/types.ts";
+import {
+  isComponentKilled,
+  type KillSwitchOptions,
+  type KillSwitch,
+} from "../../kill-switch/index.ts";
+import { incrementEsCommandTotal, observeEsCommandDuration } from "../../metrics.ts";
 import type { CommandSerializationOptions } from "../../pipeline/staticBuilder.types.ts";
 import type { DeduplicationStrategy } from "../../queues/index.ts";
 import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
-import { isComponentKilled, type KillSwitchOptions, type KillSwitch } from "../../kill-switch/index.ts";
+import { mapValidationIssues } from "../../utils/errors.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
 import { ValidationError } from "../errorHandling.ts";
 

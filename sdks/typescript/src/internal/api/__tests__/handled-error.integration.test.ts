@@ -1,11 +1,12 @@
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
 /**
  * The transport's error path, driven end to end.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 
 import { TracesApiService, TracesApiError } from "@/client-sdk/services/traces/traces-api.service";
+
 import { createLangWatchApiClient } from "../client";
 import { LangWatchHandledError, isLangWatchHandledError } from "../errors";
 

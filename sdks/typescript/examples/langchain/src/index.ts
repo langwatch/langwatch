@@ -1,10 +1,11 @@
-import { setupObservability } from "langwatch/observability/node";
-import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
-import { getLangWatchTracer } from "langwatch";
-import { ChatOpenAI } from "@langchain/openai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import * as readline from "readline";
+
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
 import cliMarkdown from "cli-markdown";
+import { getLangWatchTracer } from "langwatch";
+import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+import { setupObservability } from "langwatch/observability/node";
 
 setupObservability();
 

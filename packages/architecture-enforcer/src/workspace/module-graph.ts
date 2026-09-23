@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
+
 import ts from "typescript";
+
 import { WORKSPACE_ROOTS, isIgnoredDirectory } from "./layout.ts";
 
 /**
@@ -83,7 +85,9 @@ function fresh(entry: Cached<unknown> | undefined, file: string): boolean {
   const stats = statSync(file);
 
   return (
-    entry?.mtimeMs === stats.mtimeMs && entry?.ctimeMs === stats.ctimeMs && entry?.size === stats.size
+    entry?.mtimeMs === stats.mtimeMs &&
+    entry?.ctimeMs === stats.ctimeMs &&
+    entry?.size === stats.size
   );
 }
 

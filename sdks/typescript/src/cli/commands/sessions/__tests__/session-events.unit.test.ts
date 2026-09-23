@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 // Agent-mode detection reads the ambient environment (Claude Code sets

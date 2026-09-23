@@ -18,9 +18,10 @@ vi.mock("../../../utils/formatting", () => ({
   formatRelativeTime: vi.fn().mockReturnValue("3d ago"),
 }));
 
-import { tagListCommand } from "../list";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
 import { formatTable } from "../../../utils/formatting";
+import { tagListCommand } from "../list";
 
 describe("tagListCommand", () => {
   let mockListTags: ReturnType<typeof vi.fn>;

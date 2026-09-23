@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
-import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
 
 /** What the Test suite column shows for a scenario filed nowhere. */
 const UNFILED = "unfiled";

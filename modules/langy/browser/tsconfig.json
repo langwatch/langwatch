@@ -12,11 +12,9 @@
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
     "resolveJsonModule": true,
 
-
     "rootDir": ".",
 
-    "outDir": "dist",
-
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "scripts/**/*.ts"],
 

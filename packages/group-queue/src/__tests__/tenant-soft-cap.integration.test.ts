@@ -302,7 +302,11 @@ describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
 
       for (let i = 0; i < 5; i++) {
         await scripts.stage(
-          makeJob({ stagedJobId: `noisy-j${i}`, groupId: `proj_noisy/g${i}`, dispatchAfterMs: 1000 }),
+          makeJob({
+            stagedJobId: `noisy-j${i}`,
+            groupId: `proj_noisy/g${i}`,
+            dispatchAfterMs: 1000,
+          }),
         );
       }
       await scripts.stage(
@@ -321,9 +325,15 @@ describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
     it("over-cap tenant blocked group is skipped without affecting other tenants", async () => {
       scripts = new GroupStagingScripts(redis, QUEUE_NAME, { tenantConcurrencyCap: 2 });
 
-      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "proj_noisy/g1", dispatchAfterMs: 1000 }));
-      await scripts.stage(makeJob({ stagedJobId: "j2", groupId: "proj_noisy/g2", dispatchAfterMs: 1000 }));
-      await scripts.stage(makeJob({ stagedJobId: "j3", groupId: "proj_noisy/g3", dispatchAfterMs: 1000 }));
+      await scripts.stage(
+        makeJob({ stagedJobId: "j1", groupId: "proj_noisy/g1", dispatchAfterMs: 1000 }),
+      );
+      await scripts.stage(
+        makeJob({ stagedJobId: "j2", groupId: "proj_noisy/g2", dispatchAfterMs: 1000 }),
+      );
+      await scripts.stage(
+        makeJob({ stagedJobId: "j3", groupId: "proj_noisy/g3", dispatchAfterMs: 1000 }),
+      );
       await scripts.stage(
         makeJob({ stagedJobId: "quiet-j1", groupId: "proj_quiet/g1", dispatchAfterMs: 1001 }),
       );
@@ -362,7 +372,9 @@ describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
     it("drift cleanup still runs for under-cap tenants with empty job ZSETs", async () => {
       scripts = new GroupStagingScripts(redis, QUEUE_NAME, { tenantConcurrencyCap: 10 });
 
-      await scripts.stage(makeJob({ stagedJobId: "j1", groupId: "proj_acme/g1", dispatchAfterMs: 1000 }));
+      await scripts.stage(
+        makeJob({ stagedJobId: "j1", groupId: "proj_acme/g1", dispatchAfterMs: 1000 }),
+      );
 
       const batch1 = await scripts.dispatchBatch({ nowMs: 2000, activeTtlSec: 60, maxJobs: 10 });
       expect(batch1).toHaveLength(1);
@@ -506,7 +518,9 @@ describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
       await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }); // g2 parked
       expect(await redis.zcard(parkedKey("proj_acme"))).toBe(1);
 
-      await scripts.stage(makeJob({ groupId: "proj_acme/g2", stagedJobId: "j2b", dispatchAfterMs: 900 }));
+      await scripts.stage(
+        makeJob({ groupId: "proj_acme/g2", stagedJobId: "j2b", dispatchAfterMs: 900 }),
+      );
 
       expect(await redis.zscore(`${keyPrefix()}ready`, "proj_acme/g2")).toBeNull();
       expect(await redis.zrange(parkedKey("proj_acme"), 0, -1, "WITHSCORES")).toEqual([

@@ -1,4 +1,5 @@
 import { scopedApiKey } from "@/internal/credentialContext";
+
 import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
 export type {
@@ -113,39 +114,40 @@ export type {
   CreateProjectInput,
   UpdateProjectInput,
 } from "./services/projects/projects-api.service";
-import { LocalPromptsService } from "./services/prompts/local-prompts.service";
-import { ExperimentsFacade } from "./services/experiments";
+import { resolveEndpoint } from "@/internal/endpoint";
+
+import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
+import { type Logger, NoOpLogger } from "../logger";
+import { AgentsApiService } from "./services/agents/agents-api.service";
+import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
+import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
+import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
 import { DatasetsFacade } from "./services/datasets";
 import { EvaluationsFacade } from "./services/evaluations";
 import { EvaluatorsApiService } from "./services/evaluators";
-import { ScenariosApiService } from "./services/scenarios";
-import { SuitesApiService } from "./services/suites";
-import { RunPlansApiService } from "./services/run-plans";
-import { InstantEvalsApiService } from "./services/instant-evals";
-import { TestSuitesApiService } from "./services/test-suites";
-import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
-import { AgentsApiService } from "./services/agents/agents-api.service";
-import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
-import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
-import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
-import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
-import { QueryApiService } from "./services/query/query-api.service";
-import { TriggersApiService } from "./services/triggers";
-import { GraphsApiService } from "./services/graphs";
-import { SimulationRunsApiService } from "./services/simulation-runs";
-import { MonitorsApiService } from "./services/monitors";
-import { SecretsApiService } from "./services/secrets";
-import { VirtualKeysApiService } from "./services/virtual-keys/virtual-keys-api.service";
+import { ExperimentsFacade } from "./services/experiments";
 import { GatewayBudgetsApiService } from "./services/gateway-budgets/gateway-budgets-api.service";
-import { SpendEventsApiService } from "./services/spend-events/spend-events-api.service";
-import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
-import { TeamsApiService } from "./services/teams/teams-api.service";
+import { GraphsApiService } from "./services/graphs";
+import { InstantEvalsApiService } from "./services/instant-evals";
+import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
+import { MonitorsApiService } from "./services/monitors";
 import { ProjectsApiService } from "./services/projects/projects-api.service";
-import { type InternalConfig } from "./types";
-import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
-import { type Logger, NoOpLogger } from "../logger";
+import { LocalPromptsService } from "./services/prompts/local-prompts.service";
+import { QueryApiService } from "./services/query/query-api.service";
+import { RunPlansApiService } from "./services/run-plans";
+import { ScenariosApiService } from "./services/scenarios";
+import { SecretsApiService } from "./services/secrets";
+import { SimulationRunsApiService } from "./services/simulation-runs";
+import { SpendEventsApiService } from "./services/spend-events/spend-events-api.service";
+import { SuitesApiService } from "./services/suites";
+import { TeamsApiService } from "./services/teams/teams-api.service";
+import { TestSuitesApiService } from "./services/test-suites";
 import { TracesFacade } from "./services/traces/facade";
-import { resolveEndpoint } from "@/internal/endpoint";
+import { TriggersApiService } from "./services/triggers";
+import { VirtualKeysApiService } from "./services/virtual-keys/virtual-keys-api.service";
+import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
+import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
+import { type InternalConfig } from "./types";
 
 export interface LangWatchConstructorOptions {
   apiKey?: string;

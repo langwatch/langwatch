@@ -1,6 +1,7 @@
 /** Tests fleet gauges through the OpenTelemetry metrics pipeline. */
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { bindProcessFleetMetricsSource } from "../metrics.ts";
 
 const metrics = createRecordingMeterProvider();

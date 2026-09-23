@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/audit-log-null": ["./src/index.ts"]
-    },
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["**/__tests__/**", "**/*.test.*"],

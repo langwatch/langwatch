@@ -4,16 +4,17 @@ import { type DocumentInterface } from "@langchain/core/documents";
 import type { Serialized } from "@langchain/core/load/serializable";
 import { type BaseMessage } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
+import type { ChainValues } from "@langchain/core/utils/types";
+import { context, trace, SpanStatusCode, type Attributes } from "@opentelemetry/api";
+
 import {
   chatMessageSchema,
   type ChatMessage,
   type ChatRichContent,
 } from "../../../internal/generated/types/tracer";
-import type { ChainValues } from "@langchain/core/utils/types";
-import { getLangWatchTracer } from "../../tracer";
-import type { LangWatchSpan } from "../../span";
-import { context, trace, SpanStatusCode, type Attributes } from "@opentelemetry/api";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
+import type { LangWatchSpan } from "../../span";
+import { getLangWatchTracer } from "../../tracer";
 
 type RunKind = "llm" | "chat" | "chain" | "tool" | "retriever";
 

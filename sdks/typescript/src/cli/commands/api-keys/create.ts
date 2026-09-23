@@ -1,14 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import {
   parseBindingFlags,
   parsePermissionFlags,
   parsePermissionMode,
 } from "../../utils/managementFlags";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { withParsedFlags } from "../management/_shared";
 
 export interface CreateApiKeyOptions {

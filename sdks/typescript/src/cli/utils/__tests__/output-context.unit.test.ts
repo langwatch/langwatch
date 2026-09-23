@@ -1,17 +1,18 @@
+import chalk from "chalk";
 /**
  * The output contract's RESOLUTION half: flag normalisation (legacy
  * `-f/--format`, `--json`, `--jq`, `--agent`), agent-mode detection, and
  * `applyOutputContext` pushing the resolved context into error/colour.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import chalk from "chalk";
+
+import { getOutputFormat } from "../errorOutput";
 import {
   AGENT_MODE_ENV_VARS,
   applyOutputContext,
   isAgentModeEnv,
   resolveOutputOptions,
 } from "../output";
-import { getOutputFormat } from "../errorOutput";
 
 /** Agent-mode env vars from the host (e.g. CLAUDECODE) must not leak into tests. */
 let savedAgentEnv: Record<string, string | undefined> = {};

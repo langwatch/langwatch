@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { Instance } from "../instance.ts";
 import type { InstanceSchemeType } from "../instance.ts";
 

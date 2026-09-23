@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";

@@ -7,6 +7,7 @@
 import chalk from "chalk";
 
 import { requestStatus, requestStop, type DaemonStatus } from "../daemon/client";
+import { collectForwardedEnv } from "../daemon/eligibility";
 import {
   inspectSocketTrust,
   isDaemonSupported,
@@ -23,7 +24,6 @@ import {
 } from "../daemon/server";
 import { spawnDaemon } from "../daemon/spawn";
 import { warmCommandModules } from "../daemon/warmup";
-import { collectForwardedEnv } from "../daemon/eligibility";
 
 declare const __CLI_VERSION__: string;
 

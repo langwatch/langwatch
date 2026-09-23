@@ -8,7 +8,11 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { resolvePersonCredentials } from "../../../utils/apiKey";
+import type { KeyEvent, KeySource } from "../approval";
 import {
   chooseRequest,
   createControlApi,
@@ -25,8 +29,6 @@ import {
   type ControlApi,
   type ControlRequest,
 } from "../requests";
-import { resolvePersonCredentials } from "../../../utils/apiKey";
-import type { KeyEvent, KeySource } from "../approval";
 import type { UiWriter } from "../ui";
 
 const ENDPOINT = "https://app.langwatch.test";
@@ -86,12 +88,10 @@ describe("given the share-control command", () => {
 
     /** @scenario "The command refuses to share a home directory or a filesystem root" */
     it("refuses the home directory and the filesystem root", () => {
-      expect(() => resolveShareRoot({ cwd: base, homedir: base })).toThrow(
-        /home directory/,
+      expect(() => resolveShareRoot({ cwd: base, homedir: base })).toThrow(/home directory/);
+      expect(() => resolveShareRoot({ cwd: path.parse(base).root, homedir: base })).toThrow(
+        /filesystem root/,
       );
-      expect(() =>
-        resolveShareRoot({ cwd: path.parse(base).root, homedir: base }),
-      ).toThrow(/filesystem root/);
     });
 
     /** @scenario "A folder uv manages names uv as its package manager" */
@@ -202,9 +202,7 @@ describe("given the share-control command", () => {
       });
 
     beforeEach(() => {
-      dir = fs.realpathSync(
-        fs.mkdtempSync(path.join(os.tmpdir(), "langy-signin-")),
-      );
+      dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "langy-signin-")));
       configPath = path.join(dir, "home", "config.json");
       fs.mkdirSync(path.dirname(configPath));
       const folder = path.join(dir, "folder");
@@ -277,9 +275,7 @@ describe("given the share-control command", () => {
         expect(login).toHaveBeenCalledTimes(1);
         expect(login).toHaveBeenCalledWith({ device: true });
         expect(credentials.apiKey).toBe("sk-lw-new-login-key");
-        expect(printed).toContain(
-          "No login on this machine yet. Signing in first.",
-        );
+        expect(printed).toContain("No login on this machine yet. Signing in first.");
         expect(printed).toContain("Using your login as Riley at ACME.");
       });
 
@@ -300,9 +296,7 @@ describe("given the share-control command", () => {
         expect(login).toHaveBeenCalledTimes(1);
         expect(credentials.apiKey).toBe("sk-lw-new-login-key");
         expect(probed).toEqual(["sk-lw-new-login-key"]);
-        expect(process.env.LANGWATCH_API_KEY).toBe(
-          "sk-lw-exported-in-the-shell",
-        );
+        expect(process.env.LANGWATCH_API_KEY).toBe("sk-lw-exported-in-the-shell");
       });
 
       /** @scenario "The folder's .env is left as it is" */
@@ -341,8 +335,7 @@ describe("given the share-control command", () => {
     });
 
     describe("given a login that cannot be used", () => {
-      const SIGNING_IN_AGAIN =
-        "The login on this machine can no longer be used. Signing in again.";
+      const SIGNING_IN_AGAIN = "The login on this machine can no longer be used. Signing in again.";
 
       /** @scenario "A login that cannot be used signs in again" */
       it("signs in again when the login holds no login key, not falling to the folder's key", async () => {
@@ -427,9 +420,7 @@ describe("given the share-control command", () => {
         const login = loginThatSignsIn();
         const isAccepted = vi.fn(async () => true);
 
-        const failure = await ensureSignedIn({ login, isAccepted }).catch(
-          (e) => e,
-        );
+        const failure = await ensureSignedIn({ login, isAccepted }).catch((e) => e);
 
         expect(failure).toBeInstanceOf(ShareControlError);
         expect((failure as Error).message).toBe(
@@ -475,24 +466,18 @@ describe("given the share-control command", () => {
           body: { message: "Invalid API key" },
         },
       });
-      expect(await platformTakesTheKey(credentials, { fetchImpl: impl })).toBe(
-        false,
-      );
+      expect(await platformTakesTheKey(credentials, { fetchImpl: impl })).toBe(false);
     });
 
     it("says yes when the list answers, and on a failure that is not about the key", async () => {
       const open = fakeFetch({
         "/api/v1/langy/control/requests": { body: { requests: [] } },
       });
-      expect(
-        await platformTakesTheKey(credentials, { fetchImpl: open.impl }),
-      ).toBe(true);
+      expect(await platformTakesTheKey(credentials, { fetchImpl: open.impl })).toBe(true);
       const down = fakeFetch({
         "/api/v1/langy/control/requests": { status: 503, body: {} },
       });
-      expect(
-        await platformTakesTheKey(credentials, { fetchImpl: down.impl }),
-      ).toBe(true);
+      expect(await platformTakesTheKey(credentials, { fetchImpl: down.impl })).toBe(true);
     });
   });
 
@@ -547,9 +532,7 @@ describe("given the share-control command", () => {
         apiKey: "sk-lw-abc",
         fetchImpl: impl,
       });
-      await expect(api.list()).rejects.toThrow(
-        "This request was cancelled. Ask Langy again.",
-      );
+      await expect(api.list()).rejects.toThrow("This request was cancelled. Ask Langy again.");
     });
 
     /** @scenario "A refusal with several tips prints as sentences" */
@@ -649,9 +632,7 @@ describe("given the share-control command", () => {
         fetchImpl: impl,
       });
       await api.cancel({ requestId: "req_1" });
-      expect(calls[0]!.url).toBe(
-        `${ENDPOINT}/api/v1/langy/control/requests/req_1/cancel`,
-      );
+      expect(calls[0]!.url).toBe(`${ENDPOINT}/api/v1/langy/control/requests/req_1/cancel`);
 
       const ask = (async () => ({ action: "cancel" })) as never;
       const choice = await chooseRequest({
@@ -669,9 +650,7 @@ describe("given the share-control command", () => {
       const asked: Record<string, unknown>[] = [];
       const ask = (async (options: Record<string, unknown>) => {
         asked.push(options);
-        return options.name === "requestId"
-          ? { requestId: "req_2" }
-          : { action: "approve" };
+        return options.name === "requestId" ? { requestId: "req_2" } : { action: "approve" };
       }) as never;
 
       // The picker lists the newest first, so the two need timestamps of their
@@ -713,9 +692,7 @@ describe("given the share-control command", () => {
       const asked: Record<string, unknown>[] = [];
       const ask = (async (options: Record<string, unknown>) => {
         asked.push(options);
-        return options.name === "requestId"
-          ? { requestId: "req_1" }
-          : { action: "approve" };
+        return options.name === "requestId" ? { requestId: "req_1" } : { action: "approve" };
       }) as never;
 
       const requests = [
@@ -732,9 +709,7 @@ describe("given the share-control command", () => {
 
       const picker = asked[0]!.choices as { description: string }[];
       expect(picker[0]!.description).toBe("project ACME Shop, asked just now");
-      expect(picker[1]!.description).toBe(
-        "project ACME Shop, asked 3 minutes ago",
-      );
+      expect(picker[1]!.description).toBe("project ACME Shop, asked 3 minutes ago");
     });
   });
 
@@ -775,11 +750,7 @@ describe("given the share-control command", () => {
   describe("when no conversation asked yet", () => {
     /** @scenario "No open request waits for one" */
     it("says it is waiting once and picks up a request recorded later", async () => {
-      const answers: ControlRequest[][] = [
-        [],
-        [],
-        [requestNamed("req_1", "Instrument tracing")],
-      ];
+      const answers: ControlRequest[][] = [[], [], [requestNamed("req_1", "Instrument tracing")]];
       let read = 0;
       const api: ControlApi = {
         list: async () => answers[read++] ?? [],
@@ -864,7 +835,10 @@ describe("given a terminal that can draw the question", () => {
       });
       await settle();
 
-      const box = screen.drawn.join(" ").replace(/[│╭╮╰╯─]/g, " ").replace(/\s+/g, " ");
+      const box = screen.drawn
+        .join(" ")
+        .replace(/[│╭╮╰╯─]/g, " ")
+        .replace(/\s+/g, " ");
       expect(screen.drawn[0]).toContain("Langy wants to work in acme");
       expect(box).toContain("Instrument tracing in acme-app");
       expect(box).toContain("Project ACME Shop");

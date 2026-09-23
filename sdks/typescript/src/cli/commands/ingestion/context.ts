@@ -4,22 +4,23 @@
  * report its launch directory. Never exits non-zero or throws.
  */
 
+import {
+  defaultClaudeSessionRegistryDir,
+  readClaudeSessionName,
+} from "@/cli/utils/governance/claude-session-registry";
+import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
+import { defaultCodexSessionsRoot } from "@/cli/utils/governance/codex-rollout-otlp";
+import {
+  codexSessionIndexPath,
+  readCodexThreadNames,
+} from "@/cli/utils/governance/codex-session-index";
 import { loadConfig } from "@/cli/utils/governance/config";
-import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-
-import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook.ts";
-import { type GitRunner, readSessionContext, runGitCommand } from "./git-context.ts";
 import {
   defaultStateDir,
   readFingerprint,
   stateFilePath,
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
-import { writeSpooledDeclaration } from "@/cli/utils/governance/session-context-spool";
-import {
-  defaultClaudeSessionRegistryDir,
-  readClaudeSessionName,
-} from "@/cli/utils/governance/claude-session-registry";
 import {
   buildSessionContextLogPayload,
   normalizeSessionName,
@@ -27,15 +28,13 @@ import {
   sessionContextFingerprint,
   sessionTitleFromPrompt,
 } from "@/cli/utils/governance/session-context";
-import {
-  codexSessionIndexPath,
-  readCodexThreadNames,
-} from "@/cli/utils/governance/codex-session-index";
-import { defaultCodexSessionsRoot } from "@/cli/utils/governance/codex-rollout-otlp";
-import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
+import { writeSpooledDeclaration } from "@/cli/utils/governance/session-context-spool";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 import { type ResolvedSession, resolveSession } from "./context-session.ts";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context.ts";
+import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook.ts";
 
 export interface ContextCommandOptions {
   /** Declare for this session instead of resolving the live one. */

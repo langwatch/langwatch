@@ -1,5 +1,6 @@
-import { defineConfig } from "vitest/config";
 import { resolve } from "path";
+
+import { defineConfig } from "vitest/config";
 
 /**
  * Standalone vitest config for the governance CLI wrapper e2e suite: no

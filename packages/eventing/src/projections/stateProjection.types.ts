@@ -1,6 +1,6 @@
 import type { Event } from "../domain/types.ts";
-import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 export interface ProjectionCursor {
   /** When the canonical event log accepted the event. */

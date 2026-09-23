@@ -1,6 +1,9 @@
 import { performance } from "node:perf_hooks";
+
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
+
 import {
   incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
@@ -12,7 +15,6 @@ import {
 import { decodeFoldCacheEntry, encodeFoldCacheEntry } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionStore } from "./foldProjection.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
 

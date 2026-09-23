@@ -2,13 +2,10 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
-    "files": [
-    "./src/billing.web.ts",
-    "./src/ui/sections/contact-sales/index.ts"
-  ],
+  "files": ["./src/billing.web.ts", "./src/ui/sections/contact-sales/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

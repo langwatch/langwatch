@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  isBase58CheckAddress,
-  isBech32Address,
-  isBitcoinAddress,
-} from "../bitcoinAddress.ts";
+import { isBase58CheckAddress, isBech32Address, isBitcoinAddress } from "../bitcoinAddress.ts";
 
 /**
  * The whole point is telling a real address from a same-shaped hex string,
@@ -14,8 +10,7 @@ import {
 const P2PKH = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
 const P2SH = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy";
 const SEGWIT_V0 = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4";
-const TAPROOT =
-  "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr";
+const TAPROOT = "bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr";
 
 /**
  * The hex identifier the shape-only pattern used to call an address.
@@ -111,16 +106,12 @@ describe("given a bech32 address", () => {
    */
   describe("when the witness version and the checksum constant disagree", () => {
     it("rejects a version zero address carrying a bech32m checksum", () => {
-      expect(
-        isBech32Address("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kemeawh"),
-      ).toBe(false);
+      expect(isBech32Address("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kemeawh")).toBe(false);
     });
 
     it("rejects a version one address carrying a bech32 checksum", () => {
       expect(
-        isBech32Address(
-          "bc1p38j9r5y49hruaue7wxjce0updqjuyyx0kh56v8s25huc6995vvpql3jow4",
-        ),
+        isBech32Address("bc1p38j9r5y49hruaue7wxjce0updqjuyyx0kh56v8s25huc6995vvpql3jow4"),
       ).toBe(false);
     });
   });
@@ -160,23 +151,14 @@ describe("given a bech32 address", () => {
         "version zero at sixteen bytes, which is neither 20 nor 32",
         "BC1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P",
       ],
-      [
-        "version zero at sixteen bytes, constructed",
-        "bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas",
-      ],
+      ["version zero at sixteen bytes, constructed", "bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas"],
     ])("rejects %s", (_case, address) => {
       expect(isBech32Address(address)).toBe(false);
     });
 
     it.each([
-      [
-        "version one at twenty bytes",
-        "bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvge0qxlk",
-      ],
-      [
-        "version zero at twenty bytes",
-        "bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl",
-      ],
+      ["version one at twenty bytes", "bc1pqv9pzxqlyckngw6zf9g9whn9d3eh4qvge0qxlk"],
+      ["version zero at twenty bytes", "bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl"],
     ])("accepts the same construction at %s", (_case, address) => {
       expect(isBech32Address(address)).toBe(true);
     });
@@ -187,10 +169,7 @@ describe("given a bech32 address", () => {
       ["a changed data character", mutate(SEGWIT_V0, 10, "p")],
       ["a character outside the charset", mutate(SEGWIT_V0, 10, "b")],
       ["a truncated address", SEGWIT_V0.slice(0, -1)],
-      [
-        "mixed case, which BIP-173 forbids",
-        "bc1QW508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4",
-      ],
+      ["mixed case, which BIP-173 forbids", "bc1QW508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"],
       ["nothing but the prefix", "bc1"],
     ])("rejects %s", (_case, address) => {
       expect(isBech32Address(address)).toBe(false);
@@ -221,8 +200,6 @@ describe("given either address form", () => {
 
   /** Mixed case stays invalid: BIP-173 forbids it, in either router. */
   it("still rejects a mixed case segwit address", () => {
-    expect(isBitcoinAddress("BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7Kv8f3t4")).toBe(
-      false,
-    );
+    expect(isBitcoinAddress("BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7Kv8f3t4")).toBe(false);
   });
 });

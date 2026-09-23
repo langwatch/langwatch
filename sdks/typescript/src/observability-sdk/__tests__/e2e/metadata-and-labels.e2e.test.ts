@@ -5,6 +5,8 @@
  */
 
 import { beforeEach, describe, it, expect } from "vitest";
+
+import * as semconv from "../../semconv";
 import {
   setupE2ETest,
   createTestTracer,
@@ -15,7 +17,6 @@ import {
   getTraceIdFromSpan,
   expectSpanAttributeWithTrace,
 } from "./e2e-utils";
-import * as semconv from "../../semconv";
 
 describe("Metadata and Labels E2E", () => {
   const setup = setupE2ETest();

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { emDashInCopyRule } from "../../src/rules/em-dash-in-copy.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 

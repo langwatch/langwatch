@@ -1,10 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Who may write a privacy rule where.
  * Spec: specs/data-privacy/policy-configuration.feature
  */
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import type { DataPrivacyProjectLineage } from "@langwatch/data-privacy-process";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { DataPrivacyDirectoryReader } from "../../app/data-privacy.app.ts";

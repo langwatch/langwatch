@@ -4,6 +4,7 @@
  * @see specs/typescript-sdk/agent-wrapper.feature
  */
 import type { IncomingMessage } from "node:http";
+
 import { context, propagation, trace } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
@@ -19,21 +20,16 @@ import {
   sharedClientForTests,
   shutdownForTests,
 } from "../client";
-import {
-  reconnectDelayMs,
-  RECONNECT_BASE_MS,
-  RECONNECT_MAX_MS,
-} from "../reconnect";
 import { connectAgent, type AgentCall, type AgentHandler } from "../define";
 import { PROTOCOL_VERSION, type AgentParameterValue, type RegisterFrame } from "../protocol";
+import { reconnectDelayMs, RECONNECT_BASE_MS, RECONNECT_MAX_MS } from "../reconnect";
 import { NoWebSocketError } from "../transport";
 
 type Frame = Record<string, unknown> & { type: string };
 
 class Connection {
   readonly frames: Frame[] = [];
-  private readonly waiters: { type: string | undefined; resolve: (frame: Frame) => void }[] =
-    [];
+  private readonly waiters: { type: string | undefined; resolve: (frame: Frame) => void }[] = [];
 
   constructor(
     readonly socket: WsSocket,

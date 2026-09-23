@@ -1,8 +1,9 @@
 import { EventEmitter } from "node:events";
+
 import { nowInstant } from "@langwatch/time";
-import type { RedisConnection } from "./types.ts";
 
 import type { SessionStateStore } from "./session-state.ts";
+import type { RedisConnection } from "./types.ts";
 
 /**
  * The channel half of the Redis store, with the handlers by channel.

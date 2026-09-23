@@ -29,9 +29,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "catalog:",
     "@langwatch/config": "workspace:*",
-    "@langwatch/secrets": "workspace:*"
+    "@langwatch/secrets": "workspace:*",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/vitest-config": "workspace:*",

@@ -11,11 +11,11 @@ import * as vm from "node:vm";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { configPath, loadConfig } from "../utils/governance/config";
 import { recordCliLocation } from "../utils/governance/cli-location";
+import { configPath, loadConfig } from "../utils/governance/config";
 import { defaultStateDir } from "../utils/governance/hook-state";
-import { SESSION_CONTEXT_GUIDANCE } from "../utils/governance/session-guidance";
 import { installSessionContextHooks } from "../utils/governance/session-context-hooks";
+import { SESSION_CONTEXT_GUIDANCE } from "../utils/governance/session-guidance";
 
 const { hookCommandMock } = vi.hoisted(() => ({ hookCommandMock: vi.fn() }));
 
@@ -27,10 +27,7 @@ vi.mock("../commands/ingestion/hook.js", () => ({
 // no test runner defines (see help-topic.unit.test.ts).
 (globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 
-const launcherPath = path.resolve(
-  __dirname,
-  "../../../../../plugins/langwatch/scripts/launch.mjs",
-);
+const launcherPath = path.resolve(__dirname, "../../../../../plugins/langwatch/scripts/launch.mjs");
 
 interface LauncherConfigContract {
   envVar: string;
@@ -77,9 +74,7 @@ describe("the launcher's config contract", () => {
     it("names the same file under the home directory, and the same state directory beside it", () => {
       delete process.env.LANGWATCH_CLI_CONFIG;
       expect(configPath()).toBe(path.join(os.homedir(), ...contract.path));
-      expect(defaultStateDir()).toBe(
-        path.join(path.dirname(configPath()), ...contract.stateDir),
-      );
+      expect(defaultStateDir()).toBe(path.join(path.dirname(configPath()), ...contract.stateDir));
     });
   });
 
@@ -90,10 +85,7 @@ describe("the launcher's config contract", () => {
 
       expect(recordCliLocation({ location })).toBe(true);
 
-      const raw = JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<
-        string,
-        unknown
-      >;
+      const raw = JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<string, unknown>;
       expect(raw[contract.locationField]).toEqual(location);
       expect(loadConfig().cli_location).toEqual(location);
     });
@@ -114,10 +106,7 @@ describe("the launcher's command contract", () => {
         group.hooks.map((hook) => hook.command),
       );
 
-      expect(Object.keys(commands).toSorted()).toEqual([
-        "session-context",
-        "session-guidance",
-      ]);
+      expect(Object.keys(commands).toSorted()).toEqual(["session-context", "session-guidance"]);
       expect(rawCommands.toSorted()).toEqual(
         Object.values(commands)
           .map((argv) => `langwatch ${argv.join(" ")}`)
@@ -154,12 +143,7 @@ describe("the cross-version contract of the hook commands", () => {
   describe("given a plugin from a later version passing arguments this CLI does not know", () => {
     /** @scenario "The session context hook command accepts and ignores arguments it does not know" */
     it("runs the session context hook for the named agent and says nothing", async () => {
-      await parse([
-        ...commands["session-context"]!,
-        "--from-the-future",
-        "extra",
-        "--and=more",
-      ]);
+      await parse([...commands["session-context"]!, "--from-the-future", "extra", "--and=more"]);
 
       expect(hookCommandMock).toHaveBeenCalledTimes(1);
       expect(hookCommandMock).toHaveBeenCalledWith({ tool: "claude-code" });
@@ -169,11 +153,7 @@ describe("the cross-version contract of the hook commands", () => {
 
     /** @scenario "The guidance command accepts and ignores arguments it does not know" */
     it("prints the guidance JSON and exits zero", async () => {
-      await parse([
-        ...commands["session-guidance"]!,
-        "--from-the-future",
-        "extra",
-      ]);
+      await parse([...commands["session-guidance"]!, "--from-the-future", "extra"]);
 
       expect(exited).toEqual([]);
       expect(stdout).toHaveLength(1);

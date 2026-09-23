@@ -1,6 +1,8 @@
 import chalk from "chalk";
+
 import type { MemberAccessBinding } from "@/client-sdk/services/organization/organization-api.service";
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { orDash, runManagement } from "../management/_shared";

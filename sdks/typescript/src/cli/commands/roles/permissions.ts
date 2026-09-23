@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { RolesApiService } from "@/client-sdk/services/roles/roles-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { counted, runManagement } from "../management/_shared";

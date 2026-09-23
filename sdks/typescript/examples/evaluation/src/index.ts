@@ -4,8 +4,8 @@
  */
 
 import "dotenv/config";
-import { LangWatch } from "langwatch";
 import { trace } from "@opentelemetry/api";
+import { LangWatch } from "langwatch";
 
 // Check for required environment variables
 if (!process.env.LANGWATCH_API_KEY) {

@@ -1,20 +1,28 @@
 import { z } from "zod";
-import type { paths, operations } from "@/internal/generated/openapi/api-client";
-import { type PromptResponse, type TagDefinition, type CreatedTag,type CreatePromptBody,type UpdatePromptBody } from "./types";
+
+import type { RuntimeParameters } from "@/cli/types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
-import { PromptServiceTracingDecorator, tracer } from "./tracing";
-import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { type InternalConfig } from "@/client-sdk/types";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { isLangWatchHandledError } from "@/internal/api/errors";
-import { PromptsApiError } from "./errors";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
   formatApiErrorMessage,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
-import type { RuntimeParameters } from "@/cli/types";
+import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
+import type { paths, operations } from "@/internal/generated/openapi/api-client";
+
+import { PromptsApiError } from "./errors";
+import { PromptServiceTracingDecorator, tracer } from "./tracing";
+import {
+  type PromptResponse,
+  type TagDefinition,
+  type CreatedTag,
+  type CreatePromptBody,
+  type UpdatePromptBody,
+} from "./types";
 
 const syncActionSchema = z.enum(["created", "updated", "conflict", "up_to_date"]);
 

@@ -1,10 +1,11 @@
+import { describe, expect, it } from "vitest";
 /**
  * @vitest-environment node
  *
  * Spec: packages/eventing/specs/producer-only-event-store.feature
  */
 import { z } from "zod";
-import { describe, expect, it } from "vitest";
+
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { defineCommandSchema } from "../../commands/commandSchema.ts";
 import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
@@ -17,8 +18,8 @@ import type {
   EventSourcedQueueProcessor,
 } from "../../queues/queue.types.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
-import { EventStoreProducerOnly } from "../eventStoreProducerOnly.ts";
 import type { EventStoreReadContext } from "../eventStore.types.ts";
+import { EventStoreProducerOnly } from "../eventStoreProducerOnly.ts";
 
 const readContext: EventStoreReadContext = { tenantId: createTenantId("organization-1") };
 

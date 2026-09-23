@@ -4,8 +4,9 @@
  * a locked-down sandbox with no hostname or no passwd entry still connects.
  */
 
-import * as os from "node:os";
 import { randomUUID } from "node:crypto";
+import * as os from "node:os";
+
 import { LANGWATCH_SDK_VERSION } from "../internal/constants";
 import { resolveEndpoint } from "../internal/endpoint";
 import type { RegisterInstance, RegisterSdk } from "./protocol";

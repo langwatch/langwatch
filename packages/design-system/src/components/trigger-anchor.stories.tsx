@@ -1,5 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { Menu } from "./menu.tsx";
 import { Tooltip } from "./tooltip.tsx";
 import { TriggerAnchor } from "./trigger-anchor.tsx";

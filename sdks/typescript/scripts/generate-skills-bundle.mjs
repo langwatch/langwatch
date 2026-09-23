@@ -128,9 +128,7 @@ const skills = listPublishedSkills()
   // skills/_publish/sync.ts's filter, applied to the CLI's own public output.
   .filter((skill) => {
     if (skill.featureFlag) {
-      console.log(
-        `  ⊘ ${skill.slug} (gated by ${skill.featureFlag}, excluded from CLI bundle)`,
-      );
+      console.log(`  ⊘ ${skill.slug} (gated by ${skill.featureFlag}, excluded from CLI bundle)`);
     }
     return !skill.featureFlag;
   })

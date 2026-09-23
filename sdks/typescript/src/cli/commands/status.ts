@@ -1,18 +1,20 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner.ts";
-import { resolveCredentials } from "../utils/apiKey.ts";
-import { createLangWatchApiClient } from "@/internal/api/client";
-import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { printResult, type RawOutputFlags } from "../utils/output.ts";
-import { buildProgram } from "../program.ts";
-import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog.ts";
-import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
+import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
+import { createLangWatchApiClient } from "@/internal/api/client";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { buildProgram } from "../program.ts";
+import { resolveCredentials } from "../utils/apiKey.ts";
+import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog.ts";
+import { printResult, type RawOutputFlags } from "../utils/output.ts";
+import { createSpinner } from "../utils/spinner.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Budgets at or above this utilization are worth a human's attention. */
@@ -198,7 +200,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // of them.
     const recent = list.experiments
       .filter((experiment) => experiment.lastRunAt !== null)
-      .toSorted((a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime());
+      .toSorted(
+        (a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
+      );
     const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
 
     const checks = await Promise.allSettled(

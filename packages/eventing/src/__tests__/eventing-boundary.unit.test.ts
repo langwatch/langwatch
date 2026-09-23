@@ -6,6 +6,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -15,7 +16,7 @@ function productionSources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) return entry.name === "__tests__" ? [] : productionSources(path);
-    if (!entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) return [];
+    if (!entry.name.endsWith(".ts") || entry.name.endsWith(".test.ts")) return [];
     return [path];
   });
 }

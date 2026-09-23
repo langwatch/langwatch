@@ -1,5 +1,5 @@
-import type { Task } from "./task.ts";
 import { TaskNotFoundError } from "./task.errors.ts";
+import type { Task } from "./task.ts";
 
 export class TaskCatalogue {
   private readonly tasksByName: ReadonlyMap<string, Task>;

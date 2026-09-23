@@ -14,7 +14,9 @@
     // `packages/browser-types/`; vite still resolves the real packages at runtime.
     "paths": {
       "better-auth/react": ["../../packages/browser-types/better-auth-react.d.ts"],
-      "@better-auth/passkey/client": ["../../packages/browser-types/better-auth-passkey-client.d.ts"]
+      "@better-auth/passkey/client": [
+        "../../packages/browser-types/better-auth-passkey-client.d.ts"
+      ]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

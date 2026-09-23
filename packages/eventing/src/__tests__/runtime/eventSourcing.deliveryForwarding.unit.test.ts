@@ -3,6 +3,7 @@
  * dedup. Regression guard for #6578.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { EventSourcing } from "../../eventSourcing.ts";
 import type { EventSourcedQueueDefinition } from "../../queues/index.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";

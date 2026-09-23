@@ -1,12 +1,15 @@
 import * as fs from "fs";
 import * as path from "path";
-import * as yaml from "js-yaml";
+
 import chalk from "chalk";
+import * as yaml from "js-yaml";
+
+import { PromptConverter } from "@/cli/utils/promptConverter";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+
 import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
 import { localPromptConfigSchema } from "../types-prompt";
-import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";

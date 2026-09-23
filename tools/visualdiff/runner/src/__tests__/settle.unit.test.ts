@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { InFlightTracker, shouldIgnoreRequest } from "../settle";
 
 const settings = { quietMillis: 500, deadlineMillis: 20_000 };

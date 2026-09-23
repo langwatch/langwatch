@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import type { Event } from "../../domain/types.ts";
 import type { ProcessManagerInitialStage } from "../processBuilder.ts";
 import { buildProcessManager } from "../processBuilder.ts";

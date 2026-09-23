@@ -1,14 +1,16 @@
 import { Liquid } from "liquidjs";
-import { PromptTracingDecorator, tracer } from "./tracing";
+
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
+
+import { PromptCompilationError, PromptValidationError } from "./errors";
 import { promptDataSchema } from "./schema";
+import { PromptTracingDecorator, tracer } from "./tracing";
 import {
   type TemplateVariables,
   type PromptData,
   type CorePromptData,
   type PromptScope,
 } from "./types";
-import { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Re-export types and errors for convenience
 export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";

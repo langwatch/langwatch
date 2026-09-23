@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from "fs";
 import path from "path";
+
 import { describe, expect, it } from "vitest";
 
 const COMPONENTS = path.resolve(import.meta.dirname, "../src/components");

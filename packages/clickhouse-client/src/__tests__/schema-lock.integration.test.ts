@@ -5,10 +5,11 @@
  */
 import { execFile } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { promisify } from "node:util";
+
 import { beforeEach, describe, expect, it } from "vitest";
 
 const run = promisify(execFile);

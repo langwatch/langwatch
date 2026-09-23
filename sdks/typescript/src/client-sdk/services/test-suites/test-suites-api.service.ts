@@ -1,13 +1,13 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
-import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import type { RunPlanRunResult } from "@/client-sdk/services/run-plans/run-plans-api.service";
+import type { InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 /** One test suite as the list answers it: a name and the scenarios filed in it. */
 export type TestSuite = NonNullable<
@@ -89,7 +89,10 @@ export class TestSuitesApiService {
 
   /** The project's test suites. Archived suites are left out unless asked for. */
   async list(options?: { includeArchived?: boolean }): Promise<TestSuite[]> {
-    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites", (options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}));
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/test-suites",
+      options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {},
+    );
     return unwrapApiResult({
       operation: "list test suites",
       data,

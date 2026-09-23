@@ -1,6 +1,6 @@
+import { Instance } from "./instance.ts";
 import { Ksuid } from "./ksuid.ts";
 import { Node } from "./node.ts";
-import { Instance } from "./instance.ts";
 
 /**
  * Singleton node instance with proper KSUID factory

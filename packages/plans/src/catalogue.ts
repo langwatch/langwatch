@@ -31,7 +31,9 @@ function rungOfLadder(ladder: PricingModel): readonly PlanRung[] {
   );
 
   return Object.freeze(
-    representatives.map((plan) => buildRung(plan)).toSorted((left, right) => left.order - right.order),
+    representatives
+      .map((plan) => buildRung(plan))
+      .toSorted((left, right) => left.order - right.order),
   );
 }
 

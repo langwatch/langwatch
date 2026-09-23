@@ -19,8 +19,7 @@
     // vocabulary from it — so a `node:*` import or a `Buffer` reference must
     // not compile here. Tests are checked by tsconfig.test.json, which
     // supplies the node types the import-free guard needs to read its subject.
-    "types": ["vitest/globals"],
-
+    "types": ["vitest/globals"]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**"],

@@ -1,7 +1,9 @@
 /** E2E sanity checks for real LLM interaction flows and metadata validation. */
 
-import { describe, it, expect, beforeAll } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
+import { describe, it, expect, beforeAll } from "vitest";
+
+import * as semconv from "../../semconv";
 import {
   setupE2ETest,
   createTestTracer,
@@ -12,7 +14,6 @@ import {
   getTraceIdFromSpan,
   expectSpanAttribute,
 } from "./e2e-utils";
-import * as semconv from "../../semconv";
 
 describe("Real LLM Interactions E2E", () => {
   const setup = setupE2ETest();

@@ -1,10 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
-import { FileManager } from "../utils/fileManager";
-import { PromptsError } from "@/client-sdk/services/prompts";
+
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { PromptsError } from "@/client-sdk/services/prompts";
+
+import { FileManager } from "../utils/fileManager";
+import { createSpinner } from "../utils/spinner";
 import { failSpinner } from "../utils/spinnerError";
 
 export const removeCommand = async (name: string): Promise<void> => {

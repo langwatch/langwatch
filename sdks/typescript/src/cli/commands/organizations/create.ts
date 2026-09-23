@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 import { instanceAdminService, requireInstanceKey } from "./_shared";

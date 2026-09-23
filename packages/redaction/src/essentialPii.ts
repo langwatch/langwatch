@@ -1,10 +1,8 @@
-import { formatPiiMarker } from "./markers.ts";
 import { findPhoneNumbersInText } from "libphonenumber-js";
+
 import { isBitcoinAddress } from "./bitcoinAddress.ts";
-import {
-  isIdentifierShapedValue,
-  MAX_IDENTIFIER_LENGTH,
-} from "./identifierHoldout.ts";
+import { isIdentifierShapedValue, MAX_IDENTIFIER_LENGTH } from "./identifierHoldout.ts";
+import { formatPiiMarker } from "./markers.ts";
 
 /**
  * Native, lightweight redaction for the "essential" PII level (emails, phones, cards, IPs,
@@ -72,9 +70,7 @@ function issuedCardRange(digits: string): boolean {
   if (first === 2) {
     if (digits.length !== MASTERCARD_SERIES_LENGTH) return false;
     const series = Number(digits.slice(0, 4));
-    return (
-      series >= MASTERCARD_SERIES_FIRST && series <= MASTERCARD_SERIES_LAST
-    );
+    return series >= MASTERCARD_SERIES_FIRST && series <= MASTERCARD_SERIES_LAST;
   }
   return true;
 }
@@ -179,8 +175,7 @@ const RECOGNIZERS: Recognizer[] = [
   // case-classes from mixing confusable glyphs base58 excludes.
   {
     entity: "CRYPTO",
-    regex:
-      /\b(?:bc1[a-z0-9]{25,62}|BC1[A-Z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
+    regex: /\b(?:bc1[a-z0-9]{25,62}|BC1[A-Z0-9]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g,
     validate: isBitcoinAddress,
     isSelfProving: true,
   },
@@ -636,8 +631,7 @@ export function redactEssentialPiiInText({
     exceptPatterns,
     protectedRanges,
     isIdentifierShaped:
-      isAttributeValue &&
-      (shouldTreatAsIdentifier || isIdentifierShapedValue(text)),
+      isAttributeValue && (shouldTreatAsIdentifier || isIdentifierShapedValue(text)),
   });
   if (spans.length === 0) return { text, redactedCount: 0 };
 

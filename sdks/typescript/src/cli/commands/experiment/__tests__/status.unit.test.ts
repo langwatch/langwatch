@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type * as ExperimentsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 const oraMocks = vi.hoisted(() => ({
@@ -33,6 +34,7 @@ vi.mock("ora", () => ({
 }));
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { experimentStatusCommand } from "../status";
 
 class ProcessExitError extends Error {

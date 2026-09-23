@@ -1,14 +1,15 @@
 import type { RunTestSuiteBody } from "@/client-sdk/services/test-suites";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
-import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
+import { parseRunNoteFlag } from "../../utils/runNote";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { emitRunResult } from "../run-plans/reportRun";
+import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 import { resolveSuiteId } from "./resolveSuite";
-import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
-import { emitRunResult } from "../run-plans/reportRun";
 
 export interface RunTestSuiteOptions extends RawOutputFlags {
   target?: string[];

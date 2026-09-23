@@ -8,8 +8,7 @@
     "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "types": ["vitest/globals"],
-
+    "types": ["vitest/globals"]
   },
   "include": ["src/**/*.ts"],
   "references": [

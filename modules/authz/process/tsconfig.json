@@ -10,8 +10,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     // Consumers import the TypeScript sources directly (see the package's
     // `exports`), so this project only ever type-checks - nothing is built.
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [

@@ -1,6 +1,8 @@
 import * as http from "node:http";
+
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { startAuthProxy } from "../tunnel/auth-proxy";
 import { DEV_SECRET_HEADER } from "../tunnel/write-back";
 

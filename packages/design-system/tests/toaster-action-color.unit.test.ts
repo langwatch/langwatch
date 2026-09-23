@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { toastActionColor } from "../src/components/toaster.tsx";
 
 /**

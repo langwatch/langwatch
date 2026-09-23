@@ -11,7 +11,7 @@ a subscriber job: `ReplayExecutor` calls the fold's pure `projection.apply()`
 and writes straight to the store via `store.store()`, never constructing a
 `ProjectionRouter`, which is the only thing that calls `dispatchToSubscribers`.
 Subscribers are unreachable from replay by construction — `replay/` contains
-no reference to a subscriber except two that exist to *suppress* re-fires.
+no reference to a subscriber except two that exist to _suppress_ re-fires.
 
 `governanceOcsfEventsSync` (OCSF audit) and `governanceKpisSync` are
 subscribers on the `traceSummary` fold, so for them this method IS the
@@ -29,7 +29,7 @@ replay-covered (`ReplayService.replay` drives `config.projections` and
    missing blob never comes back, so parking would freeze that aggregate
    forever on a job that can never succeed.
 2. `retryRestage` (the ladder `handleTransientDecode` rides) is arguably the
-   *right* answer for `body_unreadable`: `JOB_RETRY_CONFIG`'s own budget
+   _right_ answer for `body_unreadable`: `JOB_RETRY_CONFIG`'s own budget
    exists to "ride out a rolling restart… without parking the group," which is
    precisely the codec-skew case — retrying would hand the job to a newer
    worker that can read it. **Deliberately deferred (#5823), not overlooked**:

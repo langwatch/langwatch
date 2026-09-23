@@ -5,6 +5,7 @@
  */
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+
 import packageJson from "../package.json" with { type: "json" };
 
 const args = process.argv.slice(2);
@@ -19,8 +20,7 @@ const target = flag("target");
 // directory so the path is the same whoever invokes it; the image build passes
 // its own --outfile.
 const outfile =
-  flag("outfile") ??
-  resolve(import.meta.dir, "../../..", ".bin/langy-worker/langy-worker");
+  flag("outfile") ?? resolve(import.meta.dir, "../../..", ".bin/langy-worker/langy-worker");
 
 // `bun build --compile` refuses to overwrite a running/existing binary cleanly
 // on some platforms; remove it first so repeat builds are deterministic.

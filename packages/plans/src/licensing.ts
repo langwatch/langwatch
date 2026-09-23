@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { UNLIMITED } from "./limits.ts";
 import type { MoneyByCurrency } from "./plan-type.ts";
 import { planSeatsAndVolume } from "./quoted-plan.ts";

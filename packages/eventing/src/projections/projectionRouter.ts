@@ -1,6 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { Event, Projection } from "../domain/types.ts";
+import { isComponentKilled, type KillSwitch } from "../kill-switch/index.ts";
 import {
   incrementEsFoldPostStoreFailure,
   incrementEsFoldProjectionTotal,
@@ -18,24 +22,21 @@ import {
   observeEsSubscriberDuration,
   withMetrics,
 } from "../metrics.ts";
-import type { AggregateType } from "../domain/aggregateType.ts";
-import type { Event, Projection } from "../domain/types.ts";
 import type { DeduplicationStrategy } from "../queues/index.ts";
-import { ConfigurationError, categorizeError, handleError } from "../services/errorHandling.ts";
-import type { QueueManager } from "../services/queues/queueManager.ts";
-import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
-import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow.ts";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
-import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
-import { isComponentKilled, type KillSwitch } from "../kill-switch/index.ts";
-import { EventUtils } from "../utils/event.utils.ts";
-import { toError } from "../utils/errors.ts";
 import {
   executionTargetMatches,
   type ExecutionTarget,
   type RetentionPolicy,
   type RetentionPolicyResolver,
 } from "../runtime.types.ts";
+import { ConfigurationError, categorizeError, handleError } from "../services/errorHandling.ts";
+import type { QueueManager } from "../services/queues/queueManager.ts";
+import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
+import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
+import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import { toError } from "../utils/errors.ts";
+import { EventUtils } from "../utils/event.utils.ts";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";

@@ -1,7 +1,7 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-contract";
 import { createLogger } from "@langwatch/observability";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";

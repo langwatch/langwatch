@@ -214,7 +214,8 @@ if (inbox) {
           return;
         }
         setNotifying(true);
-        notice.textContent = "You will be told when a message arrives, even with this tab in the background.";
+        notice.textContent =
+          "You will be told when a message arrives, even with this tab in the background.";
       });
     }
   }

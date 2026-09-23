@@ -5,7 +5,9 @@
  */
 
 import * as readline from "node:readline";
+
 import chalk from "chalk";
+
 import type { LocalCall, TerminalPermissionDecision } from "../../../agent/local-control-protocol";
 import { patternPhrase, shorten, terminalWidth, wrapWords, type UiWriter } from "./ui";
 

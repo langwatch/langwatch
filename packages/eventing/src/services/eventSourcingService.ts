@@ -1,7 +1,9 @@
 import { performance } from "node:perf_hooks";
+
 import { createLogger } from "@langwatch/observability";
 import { type Span, SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { createTenantId } from "../domain/tenantId.ts";
 import type { Event, Projection } from "../domain/types.ts";

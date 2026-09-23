@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { LocalPromptsService } from "../local-prompts.service";
-import { type FileManager } from "@/cli/utils/fileManager";
 import { mock, type MockProxy } from "vitest-mock-extended";
-import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
+
+import { type FileManager } from "@/cli/utils/fileManager";
 import { type Logger } from "@/logger";
+
+import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
+import { LocalPromptsService } from "../local-prompts.service";
 import type { PromptData } from "../types";
 
 describe("LocalPromptsService", () => {

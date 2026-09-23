@@ -1,14 +1,17 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
+
 import { PromptConverter } from "@/cli/utils/promptConverter";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
+
 import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
+import { resolveCredentials } from "../utils/apiKey";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { resolveCredentials } from "../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { createSpinner } from "../utils/spinner";
 
 /**
  * Core pull logic: fetches remote prompts and materializes them locally.

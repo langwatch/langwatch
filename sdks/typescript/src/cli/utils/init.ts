@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import { FileManager } from "./fileManager";
 
 export const initializeProject = async (): Promise<void> => {

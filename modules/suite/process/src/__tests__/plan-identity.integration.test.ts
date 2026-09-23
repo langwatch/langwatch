@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -30,7 +31,6 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 

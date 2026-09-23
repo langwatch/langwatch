@@ -4,8 +4,8 @@
 // without ever finishing is reported as "interrupted": the SDK process likely
 // died before sending finished_at/stopped_at.
 
-import type { ExperimentRunSummary } from "./platformTypes";
 import { ExperimentTimeoutError, ExperimentRunFailedError } from "./platformErrors";
+import type { ExperimentRunSummary } from "./platformTypes";
 
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000;
 

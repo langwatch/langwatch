@@ -2,96 +2,84 @@
 
 ## [1.17.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.16.0...typescript-sdk@v1.17.0) (2026-09-22)
 
-
 ### Features
 
-* **self-hosting:** connected self-hosted, hosted services metered against the license ([#8232](https://github.com/langwatch/langwatch/issues/8232)) ([8cfb4c3](https://github.com/langwatch/langwatch/commit/8cfb4c379c2f7b95486d9b0e02017f81f1ad14d9))
-
+- **self-hosting:** connected self-hosted, hosted services metered against the license ([#8232](https://github.com/langwatch/langwatch/issues/8232)) ([8cfb4c3](https://github.com/langwatch/langwatch/commit/8cfb4c379c2f7b95486d9b0e02017f81f1ad14d9))
 
 ### Bug Fixes
 
-* **cli:** --project everywhere, and six refusals that did not say what they meant ([#8259](https://github.com/langwatch/langwatch/issues/8259)) ([c8e06ed](https://github.com/langwatch/langwatch/commit/c8e06ede8c7fbdf886f615e81ba66b181745d2aa))
+- **cli:** --project everywhere, and six refusals that did not say what they meant ([#8259](https://github.com/langwatch/langwatch/issues/8259)) ([c8e06ed](https://github.com/langwatch/langwatch/commit/c8e06ede8c7fbdf886f615e81ba66b181745d2aa))
 
 ## [1.16.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.15.0...typescript-sdk@v1.16.0) (2026-09-22)
 
-
 ### Features
 
-* **instant-evals:** meter judgements on the gateway spend spine, a Stripe meter and a 1 USD free budget ([#8220](https://github.com/langwatch/langwatch/issues/8220)) ([e5a2252](https://github.com/langwatch/langwatch/commit/e5a22526eca51e242d9018e3ac24928fe9250131))
-* **instant-evals:** the CLI that waits for the answer, the target shorthand and estimate before spend ([#8216](https://github.com/langwatch/langwatch/issues/8216)) ([c01b277](https://github.com/langwatch/langwatch/commit/c01b277a7631308a2d45dfa5ac97dd3a46ef58ff))
-* **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
-* **lwql:** app-side extraction functions as identity UDFs with a hydration stage ([#8196](https://github.com/langwatch/langwatch/issues/8196)) ([ad1bc9e](https://github.com/langwatch/langwatch/commit/ad1bc9eddf8f1c30e79b213cbd7fdbcb4563f990))
-* **lwql:** eval functions judged by the classifier interface (Instant Evals) ([#8201](https://github.com/langwatch/langwatch/issues/8201)) ([1eb6dfe](https://github.com/langwatch/langwatch/commit/1eb6dfe76206df168df94c443319760dc4bc4591))
-* **onboarding:** a Langy-guided onboarding after sign-up, behind a flag for the A/B test ([#7920](https://github.com/langwatch/langwatch/issues/7920)) ([5f5b591](https://github.com/langwatch/langwatch/commit/5f5b591c2dd55beb5991064b7ce55dc6509b0255))
-* **query:** one reference door for LWQL and trace filters, filter and facets on the traces API, langwatch query CLI, MCP run_query ([#8198](https://github.com/langwatch/langwatch/issues/8198)) ([0b5f4d0](https://github.com/langwatch/langwatch/commit/0b5f4d0add6cdc6c6483264f1ff4847f44410eb5))
-* **query:** self-describing LangWatchQL door + whoami --json ([#8085](https://github.com/langwatch/langwatch/issues/8085)) ([#8113](https://github.com/langwatch/langwatch/issues/8113)) ([5b17bde](https://github.com/langwatch/langwatch/commit/5b17bde8e2497714d489504d13d8306393be429c))
-* **traces-v2:** enter to search, a routed search bar, instant evals in the filter bar, Langy in sync with the explorer ([#8234](https://github.com/langwatch/langwatch/issues/8234)) ([a4db9f8](https://github.com/langwatch/langwatch/commit/a4db9f83d4483804a113640cda81072d0fbc11e1))
-
+- **instant-evals:** meter judgements on the gateway spend spine, a Stripe meter and a 1 USD free budget ([#8220](https://github.com/langwatch/langwatch/issues/8220)) ([e5a2252](https://github.com/langwatch/langwatch/commit/e5a22526eca51e242d9018e3ac24928fe9250131))
+- **instant-evals:** the CLI that waits for the answer, the target shorthand and estimate before spend ([#8216](https://github.com/langwatch/langwatch/issues/8216)) ([c01b277](https://github.com/langwatch/langwatch/commit/c01b277a7631308a2d45dfa5ac97dd3a46ef58ff))
+- **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
+- **lwql:** app-side extraction functions as identity UDFs with a hydration stage ([#8196](https://github.com/langwatch/langwatch/issues/8196)) ([ad1bc9e](https://github.com/langwatch/langwatch/commit/ad1bc9eddf8f1c30e79b213cbd7fdbcb4563f990))
+- **lwql:** eval functions judged by the classifier interface (Instant Evals) ([#8201](https://github.com/langwatch/langwatch/issues/8201)) ([1eb6dfe](https://github.com/langwatch/langwatch/commit/1eb6dfe76206df168df94c443319760dc4bc4591))
+- **onboarding:** a Langy-guided onboarding after sign-up, behind a flag for the A/B test ([#7920](https://github.com/langwatch/langwatch/issues/7920)) ([5f5b591](https://github.com/langwatch/langwatch/commit/5f5b591c2dd55beb5991064b7ce55dc6509b0255))
+- **query:** one reference door for LWQL and trace filters, filter and facets on the traces API, langwatch query CLI, MCP run_query ([#8198](https://github.com/langwatch/langwatch/issues/8198)) ([0b5f4d0](https://github.com/langwatch/langwatch/commit/0b5f4d0add6cdc6c6483264f1ff4847f44410eb5))
+- **query:** self-describing LangWatchQL door + whoami --json ([#8085](https://github.com/langwatch/langwatch/issues/8085)) ([#8113](https://github.com/langwatch/langwatch/issues/8113)) ([5b17bde](https://github.com/langwatch/langwatch/commit/5b17bde8e2497714d489504d13d8306393be429c))
+- **traces-v2:** enter to search, a routed search bar, instant evals in the filter bar, Langy in sync with the explorer ([#8234](https://github.com/langwatch/langwatch/issues/8234)) ([a4db9f8](https://github.com/langwatch/langwatch/commit/a4db9f83d4483804a113640cda81072d0fbc11e1))
 
 ### Bug Fixes
 
-* **instant-evals:** end-to-end dogfood on main, five fixes in how numbers and words reach the caller ([#8233](https://github.com/langwatch/langwatch/issues/8233)) ([c5c0030](https://github.com/langwatch/langwatch/commit/c5c00301250d6c8354b126732c56e80e3dda9514))
-* **instant-evals:** review sweep over the ten Instant Evals PRs ([#8230](https://github.com/langwatch/langwatch/issues/8230)) ([1126498](https://github.com/langwatch/langwatch/commit/11264989ee5efa081e282bc0fd12f0917d3f2c92))
-* **onboarding:** pick order badges, tour logo, offer gating, and CLI share-control login ([#8223](https://github.com/langwatch/langwatch/issues/8223)) ([0c5adf4](https://github.com/langwatch/langwatch/commit/0c5adf4017720ee124f5cb086dde122d4feef75f))
+- **instant-evals:** end-to-end dogfood on main, five fixes in how numbers and words reach the caller ([#8233](https://github.com/langwatch/langwatch/issues/8233)) ([c5c0030](https://github.com/langwatch/langwatch/commit/c5c00301250d6c8354b126732c56e80e3dda9514))
+- **instant-evals:** review sweep over the ten Instant Evals PRs ([#8230](https://github.com/langwatch/langwatch/issues/8230)) ([1126498](https://github.com/langwatch/langwatch/commit/11264989ee5efa081e282bc0fd12f0917d3f2c92))
+- **onboarding:** pick order badges, tour logo, offer gating, and CLI share-control login ([#8223](https://github.com/langwatch/langwatch/issues/8223)) ([0c5adf4](https://github.com/langwatch/langwatch/commit/0c5adf4017720ee124f5cb086dde122d4feef75f))
 
 ## [1.15.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.14.0...typescript-sdk@v1.15.0) (2026-09-13)
 
-
 ### Features
 
-* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([2877be0](https://github.com/langwatch/langwatch/commit/2877be087bf9da0726b5c10d79c01a825080ed38))
-* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([e9d9ea0](https://github.com/langwatch/langwatch/commit/e9d9ea025d4daa61418e49ff2b051558d76d817b))
-
+- **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([2877be0](https://github.com/langwatch/langwatch/commit/2877be087bf9da0726b5c10d79c01a825080ed38))
+- **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([e9d9ea0](https://github.com/langwatch/langwatch/commit/e9d9ea025d4daa61418e49ff2b051558d76d817b))
 
 ### Bug Fixes
 
-* **cli:** session context hooks report for a tool pinned with instrument --key ([#8102](https://github.com/langwatch/langwatch/issues/8102)) ([2e7ab41](https://github.com/langwatch/langwatch/commit/2e7ab4118395a3a3eeb82c4123f7982f10ccedbd))
-* **gateway:** publish image token quantities on the spend read surfaces ([#8104](https://github.com/langwatch/langwatch/issues/8104)) ([926364b](https://github.com/langwatch/langwatch/commit/926364bcd60001440881b888236f51c80ff8abb8))
+- **cli:** session context hooks report for a tool pinned with instrument --key ([#8102](https://github.com/langwatch/langwatch/issues/8102)) ([2e7ab41](https://github.com/langwatch/langwatch/commit/2e7ab4118395a3a3eeb82c4123f7982f10ccedbd))
+- **gateway:** publish image token quantities on the spend read surfaces ([#8104](https://github.com/langwatch/langwatch/issues/8104)) ([926364b](https://github.com/langwatch/langwatch/commit/926364bcd60001440881b888236f51c80ff8abb8))
 
 ## [1.14.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.13.0...typescript-sdk@v1.14.0) (2026-09-12)
 
-
 ### Features
 
-* **analytics:** sandboxed custom chart widgets over LWQL ([#7870](https://github.com/langwatch/langwatch/issues/7870)) ([279b657](https://github.com/langwatch/langwatch/commit/279b6572ce15d9c0d6f791ed7e95afb469be2765))
-* **api-keys:** personal ingest keys live and die with the CLI session that minted them ([#7960](https://github.com/langwatch/langwatch/issues/7960)) ([2e69cff](https://github.com/langwatch/langwatch/commit/2e69cff13143b6f0aa51c021af944db1ba39bd93))
-
+- **analytics:** sandboxed custom chart widgets over LWQL ([#7870](https://github.com/langwatch/langwatch/issues/7870)) ([279b657](https://github.com/langwatch/langwatch/commit/279b6572ce15d9c0d6f791ed7e95afb469be2765))
+- **api-keys:** personal ingest keys live and die with the CLI session that minted them ([#7960](https://github.com/langwatch/langwatch/issues/7960)) ([2e69cff](https://github.com/langwatch/langwatch/commit/2e69cff13143b6f0aa51c021af944db1ba39bd93))
 
 ### Bug Fixes
 
-* **api-keys:** every door to a personal key stops revoking the other machines', and a signed-out device says so ([#7918](https://github.com/langwatch/langwatch/issues/7918)) ([a6da084](https://github.com/langwatch/langwatch/commit/a6da084777832c759cfb1b7aa4f3b01d2f998ec6))
-* **cli:** suggest restarting active code launchers after telemetry changes ([#7946](https://github.com/langwatch/langwatch/issues/7946)) ([0b6e7af](https://github.com/langwatch/langwatch/commit/0b6e7afefaa916e0eba460e14c2f02f38595cdcc))
-* **sdk-js:** the langy control calls use the shared transport, and the tunnel probe allowance follows its file ([#7915](https://github.com/langwatch/langwatch/issues/7915)) ([7734bdb](https://github.com/langwatch/langwatch/commit/7734bdb1206c9a76390312f242907e369831528f))
-* **security:** move the connected-agent example onto the ai 6 line ([1af94ec](https://github.com/langwatch/langwatch/commit/1af94eca5f8169f567fb47f8c9ee1a2cf463c5e3))
-* **security:** move the connected-agent example onto the ai 6 line (13 alerts, 3 HIGH) ([#7722](https://github.com/langwatch/langwatch/issues/7722)) ([1af94ec](https://github.com/langwatch/langwatch/commit/1af94eca5f8169f567fb47f8c9ee1a2cf463c5e3))
+- **api-keys:** every door to a personal key stops revoking the other machines', and a signed-out device says so ([#7918](https://github.com/langwatch/langwatch/issues/7918)) ([a6da084](https://github.com/langwatch/langwatch/commit/a6da084777832c759cfb1b7aa4f3b01d2f998ec6))
+- **cli:** suggest restarting active code launchers after telemetry changes ([#7946](https://github.com/langwatch/langwatch/issues/7946)) ([0b6e7af](https://github.com/langwatch/langwatch/commit/0b6e7afefaa916e0eba460e14c2f02f38595cdcc))
+- **sdk-js:** the langy control calls use the shared transport, and the tunnel probe allowance follows its file ([#7915](https://github.com/langwatch/langwatch/issues/7915)) ([7734bdb](https://github.com/langwatch/langwatch/commit/7734bdb1206c9a76390312f242907e369831528f))
+- **security:** move the connected-agent example onto the ai 6 line ([1af94ec](https://github.com/langwatch/langwatch/commit/1af94eca5f8169f567fb47f8c9ee1a2cf463c5e3))
+- **security:** move the connected-agent example onto the ai 6 line (13 alerts, 3 HIGH) ([#7722](https://github.com/langwatch/langwatch/issues/7722)) ([1af94ec](https://github.com/langwatch/langwatch/commit/1af94eca5f8169f567fb47f8c9ee1a2cf463c5e3))
 
 ## [1.13.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.1...typescript-sdk@v1.13.0) (2026-09-06)
 
-
 ### Features
 
-* **agent-testing:** suite fields and evaluators on scenario runs ([#7867](https://github.com/langwatch/langwatch/issues/7867)) ([0bcf01e](https://github.com/langwatch/langwatch/commit/0bcf01edb3d8cc36aa62cd48e6ee147a7b01b45b))
-* **langy:** langy works on the developer's code through a shared local folder or GitHub ([#7879](https://github.com/langwatch/langwatch/issues/7879)) ([ad87487](https://github.com/langwatch/langwatch/commit/ad874879284ee71416fa8a538a58f76e39a03bcd))
-
+- **agent-testing:** suite fields and evaluators on scenario runs ([#7867](https://github.com/langwatch/langwatch/issues/7867)) ([0bcf01e](https://github.com/langwatch/langwatch/commit/0bcf01edb3d8cc36aa62cd48e6ee147a7b01b45b))
+- **langy:** langy works on the developer's code through a shared local folder or GitHub ([#7879](https://github.com/langwatch/langwatch/issues/7879)) ([ad87487](https://github.com/langwatch/langwatch/commit/ad874879284ee71416fa8a538a58f76e39a03bcd))
 
 ### Bug Fixes
 
-* **agents:** a key waits for its grants, and a listing shows who holds each agent ([#7907](https://github.com/langwatch/langwatch/issues/7907)) ([654e82a](https://github.com/langwatch/langwatch/commit/654e82ae9f53c98c0cc710dc9c0c520a87e2c6cb))
-* **api-keys:** per-device personal ingest keys and hook self-heal on a revoked key ([#7859](https://github.com/langwatch/langwatch/issues/7859)) ([d6d1dda](https://github.com/langwatch/langwatch/commit/d6d1dda3ca126d39da8a64180e2e66bb6d068e30))
-* **sdks:** one HTTP client per SDK, redirects followed only for an http to https upgrade ([#7906](https://github.com/langwatch/langwatch/issues/7906)) ([5301cb0](https://github.com/langwatch/langwatch/commit/5301cb0a60f2ea4f1726673ef92c521a2e4d67e1))
-
+- **agents:** a key waits for its grants, and a listing shows who holds each agent ([#7907](https://github.com/langwatch/langwatch/issues/7907)) ([654e82a](https://github.com/langwatch/langwatch/commit/654e82ae9f53c98c0cc710dc9c0c520a87e2c6cb))
+- **api-keys:** per-device personal ingest keys and hook self-heal on a revoked key ([#7859](https://github.com/langwatch/langwatch/issues/7859)) ([d6d1dda](https://github.com/langwatch/langwatch/commit/d6d1dda3ca126d39da8a64180e2e66bb6d068e30))
+- **sdks:** one HTTP client per SDK, redirects followed only for an http to https upgrade ([#7906](https://github.com/langwatch/langwatch/issues/7906)) ([5301cb0](https://github.com/langwatch/langwatch/commit/5301cb0a60f2ea4f1726673ef92c521a2e4d67e1))
 
 ### Documentation
 
-* **improve-your-agent:** follow-ups: plain connected target, native GEPA tracking, writing-rules sweep ([#7897](https://github.com/langwatch/langwatch/issues/7897)) ([a710273](https://github.com/langwatch/langwatch/commit/a7102738c0f13b9c8dd8152c3b947d72f4b604c4))
-* **improve-your-agent:** the agent improvement loop and the optimization guides ([#7868](https://github.com/langwatch/langwatch/issues/7868)) ([c96d20f](https://github.com/langwatch/langwatch/commit/c96d20f35b9644a84e2345a4e98e8e810b87e936))
+- **improve-your-agent:** follow-ups: plain connected target, native GEPA tracking, writing-rules sweep ([#7897](https://github.com/langwatch/langwatch/issues/7897)) ([a710273](https://github.com/langwatch/langwatch/commit/a7102738c0f13b9c8dd8152c3b947d72f4b604c4))
+- **improve-your-agent:** the agent improvement loop and the optimization guides ([#7868](https://github.com/langwatch/langwatch/issues/7868)) ([c96d20f](https://github.com/langwatch/langwatch/commit/c96d20f35b9644a84e2345a4e98e8e810b87e936))
 
 ## [1.12.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.0...typescript-sdk@v1.12.1) (2026-09-04)
 
-
 ### Bug Fixes
 
-* **sdk-ts:** annotations methods return what their signatures promise ([#7865](https://github.com/langwatch/langwatch/issues/7865)) ([0730c99](https://github.com/langwatch/langwatch/commit/0730c99bde6763e1e22a0aa4c8f0471c3e9627b0))
+- **sdk-ts:** annotations methods return what their signatures promise ([#7865](https://github.com/langwatch/langwatch/issues/7865)) ([0730c99](https://github.com/langwatch/langwatch/commit/0730c99bde6763e1e22a0aa4c8f0471c3e9627b0))
 
 ## [1.12.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.11.0...typescript-sdk@v1.12.0) (2026-09-01)
 

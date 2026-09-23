@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AnalyticsApiError,AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
+
+import {
+  AnalyticsApiError,
+  AnalyticsApiService,
+} from "@/client-sdk/services/analytics/analytics-api.service";
 
 vi.mock("@/client-sdk/services/analytics/analytics-api.service", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;

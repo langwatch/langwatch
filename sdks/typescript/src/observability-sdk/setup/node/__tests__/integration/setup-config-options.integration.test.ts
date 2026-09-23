@@ -1,12 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { trace } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { resourceFromAttributes } from "@opentelemetry/resources";
+import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { resetObservabilitySdkConfig } from "../../../../config.js";
+import { getConcreteProvider } from "../../../utils";
 import { setupObservability } from "../../setup";
 import { type SetupObservabilityOptions } from "../../types";
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import { trace } from "@opentelemetry/api";
-import { getConcreteProvider } from "../../../utils";
-import { resetObservabilitySdkConfig } from "../../../../config.js";
 
 beforeEach(() => {
   trace.disable();

@@ -1,5 +1,9 @@
-import { PromptsApiService, type AssignTagResult } from "./prompts-api.service";
+import { type InternalConfig } from "@/client-sdk/types";
+
+import { PromptsError } from "./errors";
+import { LocalPromptsService } from "./local-prompts.service";
 import { Prompt } from "./prompt";
+import { PromptsApiService, type AssignTagResult } from "./prompts-api.service";
 import type {
   CreatePromptBody,
   UpdatePromptBody,
@@ -8,9 +12,6 @@ import type {
   CreatedTag,
 } from "./types";
 import { FetchPolicy } from "./types";
-import { type InternalConfig } from "@/client-sdk/types";
-import { LocalPromptsService } from "./local-prompts.service";
-import { PromptsError } from "./errors";
 
 /**
  * Options for fetching a prompt.

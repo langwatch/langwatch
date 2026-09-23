@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 const roots: string[] = [];
@@ -50,7 +51,10 @@ describe("Prisma ownership catalogue generation", () => {
     );
     expect(world.run().status).toBe(0);
     expect(readFileSync(world.output, "utf8")).toContain('"profile": "Profile"');
-    writeFileSync(world.schemaFile, "model User {\n id String @id\n}\nmodel Profile {\n id String @id\n}\n");
+    writeFileSync(
+      world.schemaFile,
+      "model User {\n id String @id\n}\nmodel Profile {\n id String @id\n}\n",
+    );
     expect(world.run("--check").status).not.toBe(0);
   });
 

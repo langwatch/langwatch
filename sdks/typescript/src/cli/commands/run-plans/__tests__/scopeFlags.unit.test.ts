@@ -287,12 +287,9 @@ describe("parseWait()", () => {
 
   describe("when the minutes overflow the millisecond timeout", () => {
     /** @scenario "Wait with a value that is not a number of minutes" */
-    it.each(["1e308", "1e400"])(
-      "refuses %j rather than polling forever",
-      (value) => {
-        expect(() => parseWait(value)).toThrow(ProcessExitError);
-        expect(reported()).toContain("--wait takes a number of minutes");
-      },
-    );
+    it.each(["1e308", "1e400"])("refuses %j rather than polling forever", (value) => {
+      expect(() => parseWait(value)).toThrow(ProcessExitError);
+      expect(reported()).toContain("--wait takes a number of minutes");
+    });
   });
 });

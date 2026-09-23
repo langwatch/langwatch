@@ -3,6 +3,7 @@
  * holds to reach `/api/scim/v2`.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
+
 import {
   createManagementRequest,
   managementPath,

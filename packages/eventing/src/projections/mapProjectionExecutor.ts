@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+
 import type { Event } from "../domain/types.ts";
 import type { BulkAppendContext, MapProjectionDefinition } from "./mapProjection.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";

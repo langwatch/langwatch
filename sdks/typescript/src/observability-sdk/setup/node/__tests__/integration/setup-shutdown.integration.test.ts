@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { setupObservability } from "../../setup";
 import { trace } from "@opentelemetry/api";
+import { describe, it, expect, vi, afterEach } from "vitest";
+
 import { resetObservabilitySdkConfig } from "../../../../config.js";
+import { setupObservability } from "../../setup";
 
 // Integration tests for shutdown behavior in setupObservability
 function createMockLogger() {

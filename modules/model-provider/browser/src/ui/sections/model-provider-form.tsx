@@ -2,8 +2,8 @@ import { Box, Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/reac
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { Switch } from "@langwatch/design-system/switch";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   skipListToInput,
   type ModelProviderEditorValue,

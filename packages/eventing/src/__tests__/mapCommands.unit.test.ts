@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { mapCommands } from "../mapCommands.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 

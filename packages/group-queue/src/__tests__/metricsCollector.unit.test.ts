@@ -2,6 +2,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { register } from "prom-client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   gqGroupStagingDepthMax,
   gqGroupsOverStagingDepth,

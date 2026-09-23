@@ -1,10 +1,10 @@
-import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";
-import type { SerializedHandledError } from "@langwatch/handled-error";
 import {
   type ErrorExplanation,
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/error-presentation/presentation";
+import { UNNAMED_FAILURE } from "@langwatch/experiment-contract";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 
 /**
  * What a failed cell says, plus the engine's own words for whoever asks.

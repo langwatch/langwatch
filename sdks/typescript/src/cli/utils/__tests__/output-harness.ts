@@ -4,6 +4,7 @@
  * named `*.test.ts` on purpose — vitest's `include` would collect it as a suite.
  */
 import { beforeEach, afterEach, vi } from "vitest";
+
 import { AGENT_MODE_ENV_VARS } from "../output";
 
 export interface OutputHarness {

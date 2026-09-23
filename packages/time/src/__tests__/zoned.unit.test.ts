@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  compareMoments,
+  differenceInMilliseconds,
+  wallClockSecondsBetween,
+} from "../difference.ts";
 import { Temporal } from "../temporal.ts";
 import { toDate, toEpochMs, toZonedDateTime } from "../zoned.ts";
-import { compareMoments, differenceInMilliseconds, wallClockSecondsBetween } from "../difference.ts";
 
 const AMSTERDAM = { timeZone: "Europe/Amsterdam" } as const;
 const NEW_YORK = { timeZone: "America/New_York" } as const;

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryDriver, QueryRequest } from "../query.ts";
+
 import { ClickHouseQueryClient } from "../client.ts";
+import type { QueryDriver, QueryRequest } from "../query.ts";
 import {
   checkTenantScope,
   TenantGuard,

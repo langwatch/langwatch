@@ -10,8 +10,8 @@ import * as path from "node:path";
 
 import { afterEach, beforeEach, vi } from "vitest";
 
-import { hookCommand } from "../hook";
 import type { GitRunner } from "../git-context";
+import { hookCommand } from "../hook";
 
 export const ENDPOINT = "http://app.example.com/api/otel";
 export const SESSION_ID = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c11";

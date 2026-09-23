@@ -1,10 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * `optimization.chat` runs the workflow the caller named, in the scope that was
  * checked - on the same application operation the public run endpoint reaches.
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

@@ -13,12 +13,12 @@
 
 Measured on that version:
 
-| | |
-| --- | --- |
-| `.on("HEAD", path, h)`, then a HEAD request | **404**. Nothing HEAD-shaped is ever matched |
-| `.get(path, h)`, then a HEAD request | 200 with an empty body, which is correct HTTP |
-| Both registered, HEAD request | The **GET** handler runs. The HEAD one is shadowed |
-| `c.req.method` inside the handler on a HEAD request | Reads **`"GET"`** |
+|                                                     |                                                    |
+| --------------------------------------------------- | -------------------------------------------------- |
+| `.on("HEAD", path, h)`, then a HEAD request         | **404**. Nothing HEAD-shaped is ever matched       |
+| `.get(path, h)`, then a HEAD request                | 200 with an empty body, which is correct HTTP      |
+| Both registered, HEAD request                       | The **GET** handler runs. The HEAD one is shadowed |
+| `c.req.method` inside the handler on a HEAD request | Reads **`"GET"`**                                  |
 
 That last row closes the door. A handler cannot detect that it is serving a
 HEAD, so the work cannot be skipped from inside the GET route either.

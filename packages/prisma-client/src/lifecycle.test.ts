@@ -2,6 +2,7 @@ import type { Logger } from "@langwatch/observability";
 import type { PrismaPg } from "@prisma/adapter-pg";
 import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
+
 import { PrismaConfigService } from "./config.ts";
 import {
   forwardPrismaEvent,

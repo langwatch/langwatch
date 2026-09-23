@@ -7,7 +7,7 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "rootDir": ".",
-    "outDir": "dist",
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [

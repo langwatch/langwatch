@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import type { GroupQueueRedis } from "../dependencies-adapter.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { GroupQueueRedis } from "../dependencies-adapter.ts";
 
 const logger = createLogger("langwatch:task:group-queue-reap-stranded-groups");
 

@@ -1,5 +1,6 @@
 import chalk from "chalk";
 
+import { commandValidationError, reportCommandError } from "@/cli/utils/errorOutput";
 import {
   adminListIngestionTemplates,
   archiveIngestionTemplate,
@@ -8,10 +9,8 @@ import {
   getIngestionTemplate,
   updateIngestionTemplateOttlRules,
 } from "@/cli/utils/governance/cli-api";
-import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
-import { commandValidationError, reportCommandError } from "@/cli/utils/errorOutput";
-
 import type { IngestionTemplateRow } from "@/cli/utils/governance/cli-api";
+import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 
 /**
  * `langwatch governance ingestion-templates <verb>`

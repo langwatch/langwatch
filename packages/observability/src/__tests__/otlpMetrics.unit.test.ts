@@ -1,5 +1,6 @@
 import { metrics } from "@opentelemetry/api";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { resetMetricsForTests } from "../metrics/index.ts";
 import { startOtlpMetricsExport } from "../node/otlp-metrics.ts";
 

@@ -1,3 +1,5 @@
+import { nowInstant, toEpochMs } from "@langwatch/time";
+
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { createTenantId } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
@@ -9,7 +11,6 @@ import {
 } from "../services/errorHandling.ts";
 import type { EventStoreReadContext } from "./eventStore.types.ts";
 import type { EventRecord } from "./repositories/eventRepository.types.ts";
-import { nowInstant, toEpochMs } from "@langwatch/time";
 
 /**
  * Transforms an EventRecord from storage into a domain Event.

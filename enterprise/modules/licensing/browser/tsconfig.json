@@ -12,8 +12,7 @@
     "paths": {
       "@langwatch/enterprise-licensing-contract": ["../contract/src/index.ts"],
       "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"]
-    },
-
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [

@@ -5,6 +5,7 @@
  */
 
 import { context, propagation, trace } from "@opentelemetry/api";
+
 import type { Logger } from "../logger";
 import type { AgentCall, AgentResult } from "./define";
 import {
@@ -27,7 +28,6 @@ import {
   type RegisterInstance,
   type RegisteredFrame,
 } from "./protocol";
-import { AgentParameterError, type ParameterReader } from "./schema";
 import {
   describeError,
   NoWebSocketError,
@@ -37,6 +37,7 @@ import {
   reconnectDelayMs,
   watchdogDelayMs,
 } from "./reconnect";
+import { AgentParameterError, type ParameterReader } from "./schema";
 import {
   type AgentTransport,
   defaultSocketFactory,

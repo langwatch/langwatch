@@ -20,9 +20,11 @@ vi.mock("readline", () => ({
   createInterface: vi.fn(),
 }));
 
-import { tagDeleteCommand } from "../delete";
-import { PromptsApiService } from "@/client-sdk/services/prompts";
 import * as readline from "readline";
+
+import { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import { tagDeleteCommand } from "../delete";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

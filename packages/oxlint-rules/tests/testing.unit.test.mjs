@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import { createFixtureWorkspace } from "../src/testing.mjs";
 
 let workspace;

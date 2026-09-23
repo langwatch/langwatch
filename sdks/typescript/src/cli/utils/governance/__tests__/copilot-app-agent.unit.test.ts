@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { type LaunchAgentSpec } from "../copilot-app";
 import {
   CopilotAppAgentError,
   installCopilotAppAgent,
@@ -13,7 +14,6 @@ import {
   removeCopilotAppAgent,
   type AgentIo,
 } from "../copilot-app-agent";
-import { type LaunchAgentSpec } from "../copilot-app";
 
 /** `failOn(cmd, args)` returns true when that command should throw. */
 function fakeIo(

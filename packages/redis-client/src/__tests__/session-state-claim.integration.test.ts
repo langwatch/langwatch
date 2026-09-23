@@ -3,8 +3,10 @@ import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { SessionStateStoreFactory } from "../session-state.factory.ts";
 
 function waitForReady(server: ChildProcess): Promise<void> {

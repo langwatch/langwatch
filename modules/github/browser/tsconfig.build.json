@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/github-browser": ["./src/index.ts"]
-    },
+    }
   },
   "files": [
     "./src/behavior/github-connect-popup.ts",

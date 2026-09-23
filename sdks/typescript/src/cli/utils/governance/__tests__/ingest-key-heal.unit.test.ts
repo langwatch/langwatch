@@ -35,9 +35,7 @@ function deps(over: Partial<HealDeps> = {}): HealDeps & {
     saveConfig: vi.fn(),
     isLoggedIn: (cfg: GovernanceConfig) => Boolean(cfg.access_token),
     // A platform from before the cause was recorded: the heal proceeds.
-    describeIngestionKey: vi
-      .fn()
-      .mockResolvedValue({ status: "unknown", revocationCause: null }),
+    describeIngestionKey: vi.fn().mockResolvedValue({ status: "unknown", revocationCause: null }),
     resolveLiveIngestionKey: vi.fn().mockResolvedValue({
       token: FRESH,
       prefix: FRESH.slice(0, 12),
@@ -207,9 +205,7 @@ describe("healRevokedIngestKey", () => {
     it("re-mints for a rotation and for an older server's cap alike", async () => {
       for (const revocationCause of ["rotation", "cap"]) {
         const d = deps({
-          describeIngestionKey: vi
-            .fn()
-            .mockResolvedValue({ status: "revoked", revocationCause }),
+          describeIngestionKey: vi.fn().mockResolvedValue({ status: "revoked", revocationCause }),
         });
 
         const healed = await healRevokedIngestKey({
@@ -227,13 +223,11 @@ describe("healRevokedIngestKey", () => {
     /** @scenario "A status call that does not answer ends the heal" */
     it("reports a failure rather than minting past a decision it cannot read", async () => {
       const d = deps({
-        describeIngestionKey: vi
-          .fn()
-          .mockRejectedValue(
-            Object.assign(new Error("The operation was aborted"), {
-              name: "TimeoutError",
-            }),
-          ),
+        describeIngestionKey: vi.fn().mockRejectedValue(
+          Object.assign(new Error("The operation was aborted"), {
+            name: "TimeoutError",
+          }),
+        ),
       });
 
       const healed = await healRevokedIngestKey({
@@ -390,9 +384,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       expect(healed).toEqual({ status: "failed" });
-      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
-        CACHED,
-      );
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(CACHED);
     });
   });
 
@@ -419,9 +411,7 @@ describe("healRevokedIngestKey", () => {
       // The invariant the next heal depends on: the cache still names the key
       // the collector rejected, so `rejectedToken === cached` holds next time,
       // on disk as well as in memory.
-      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
-        CACHED,
-      );
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(CACHED);
       expect(d.saveConfig).toHaveBeenLastCalledWith(
         expect.objectContaining({
           default_personal_ingest_keys: expect.objectContaining({
@@ -453,9 +443,7 @@ describe("healRevokedIngestKey", () => {
       // A key the cache never recorded would be rejected by the next heal as
       // someone else's, so the tool is left on the one the cache does name.
       expect(d.installTelemetryWiring).not.toHaveBeenCalled();
-      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
-        CACHED,
-      );
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(CACHED);
     });
   });
 });

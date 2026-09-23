@@ -19,11 +19,6 @@ import {
   removeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
-  defaultCodexAgentsMdPath,
-  hasCodexAgentGuidance,
-  removeCodexAgentGuidance,
-} from "./codex-agents-md";
-import {
   appEnvHasAnyVar,
   appEnvValues,
   appSettingsTargetFor,
@@ -37,6 +32,11 @@ import {
   removeLangwatchClaudeMarketplace,
   uninstallLangwatchClaudePlugin,
 } from "./claude-plugin";
+import {
+  defaultCodexAgentsMdPath,
+  hasCodexAgentGuidance,
+  removeCodexAgentGuidance,
+} from "./codex-agents-md";
 import {
   copilotAppAgentPath,
   isCopilotAppAgentInstalled,

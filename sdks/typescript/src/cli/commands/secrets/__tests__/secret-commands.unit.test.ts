@@ -17,11 +17,11 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listSecretsCommand } from "../list";
-import { getSecretCommand } from "../get";
 import { createSecretCommand } from "../create";
-import { updateSecretCommand } from "../update";
 import { deleteSecretCommand } from "../delete";
+import { getSecretCommand } from "../get";
+import { listSecretsCommand } from "../list";
+import { updateSecretCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

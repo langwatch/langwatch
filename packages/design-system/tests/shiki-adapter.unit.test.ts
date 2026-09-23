@@ -3,12 +3,12 @@
  * and normalizeShikiLang.
  */
 
-import { describe, expect, it } from "vitest";
 import {
   ensureDisposeNeutered,
   getSharedHighlighter,
   normalizeShikiLang,
 } from "@langwatch/design-system/shiki";
+import { describe, expect, it } from "vitest";
 
 describe("given the normalizeShikiLang function", () => {
   describe("when the language is bundled", () => {

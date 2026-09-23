@@ -4,12 +4,12 @@
  * official extension pattern (examples/extensions/todo.ts).
  */
 
-import { Type } from "typebox";
 import type {
   ExtensionAPI,
   ExtensionContext,
   InlineExtension,
 } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 export const TODOWRITE_TOOL_NAME = "todowrite";
 
@@ -58,7 +58,10 @@ const TODO_STATUS_BY_WORD: Record<string, TodoStatus> = {
  */
 export function normalizeTodoStatus(status: unknown): TodoStatus {
   if (typeof status !== "string") return "pending";
-  const word = status.trim().toLowerCase().replace(/[-\s]+/g, "_");
+  const word = status
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
   return TODO_STATUS_BY_WORD[word] ?? "pending";
 }
 

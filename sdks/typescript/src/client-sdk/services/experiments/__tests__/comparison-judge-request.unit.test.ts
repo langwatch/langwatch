@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+
 import type { ComparisonMetric } from "../types";
 import {
   type ComparisonHarness,

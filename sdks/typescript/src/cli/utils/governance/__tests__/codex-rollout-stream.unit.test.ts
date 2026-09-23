@@ -1,7 +1,9 @@
 import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { createCodexIOStreamer } from "../codex-rollout-otlp";
 
 const line = (obj: unknown) => JSON.stringify(obj);

@@ -5,6 +5,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -49,9 +50,7 @@ const GUARDED_WRITERS: Record<string, string> = {
  * Serializers whose output is never handed to a person. `parse-tabular-file` converts an
  * uploaded JSON file into the CSV text the import parser reads back moments later.
  */
-const INTERNAL_SERIALIZERS = new Set([
-  "modules/dataset/browser/src/model/parse-tabular-file.ts",
-]);
+const INTERNAL_SERIALIZERS = new Set(["modules/dataset/browser/src/model/parse-tabular-file.ts"]);
 
 /**
  * Below this many scanned files, assume the walk broke rather than that the

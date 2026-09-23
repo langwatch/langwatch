@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+
 import type {
   DashboardWidgetDefinitionInput,
   DashboardWidgetQueryInput,

@@ -1,10 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The workflow module installs, in every role it serves, and the token the
  * transports bind to resolves to the app the installer built.
  */
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

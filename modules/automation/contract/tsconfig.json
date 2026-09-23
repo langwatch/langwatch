@@ -7,8 +7,7 @@
 
     "lib": ["es2023", "DOM", "DOM.Iterable"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [

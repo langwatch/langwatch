@@ -4,7 +4,9 @@
  */
 
 import { afterEach, beforeEach, vi } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
+
 import type { Experiment } from "../experiment";
 import type { ComparisonOptions, ComparisonVerdict } from "../types";
 

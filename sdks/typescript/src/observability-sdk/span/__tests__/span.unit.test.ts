@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
-import { type SpanType } from "../../span/types";
+import semconv from "@opentelemetry/semantic-conventions/incubating";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import {
   setupTestEnvironment,
   testData,
@@ -8,7 +9,7 @@ import {
   performanceUtils,
 } from "../../__tests__/test-utils";
 import * as intSemconv from "../../semconv";
-import semconv from "@opentelemetry/semantic-conventions/incubating";
+import { type SpanType } from "../../span/types";
 
 describe("span.ts", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -484,7 +485,9 @@ describe("span.ts", () => {
       });
 
       // Should complete within reasonable time (1ms per operation max)
-      expect(() => performanceUtils.expectPerformance(duration, { maxDuration: 1000 })).not.toThrow();
+      expect(() =>
+        performanceUtils.expectPerformance(duration, { maxDuration: 1000 }),
+      ).not.toThrow();
     });
 
     it("handles concurrent method calls", async () => {

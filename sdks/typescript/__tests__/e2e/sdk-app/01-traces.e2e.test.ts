@@ -1,10 +1,10 @@
 // @vitest-environment node
 
+import { SpanStatusCode } from "@opentelemetry/api";
 /**
  * Leg 1 — an application records an LLM span and the platform can find it.
  */
 import { describe, expect, it } from "vitest";
-import { SpanStatusCode } from "@opentelemetry/api";
 
 import { attributes, getLangWatchTracer } from "../../../dist";
 import { setupObservability } from "../../../dist/observability-sdk/setup/node";

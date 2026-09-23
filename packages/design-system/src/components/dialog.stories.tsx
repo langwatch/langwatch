@@ -1,5 +1,6 @@
 import { Button, Input, Spinner, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { Dialog } from "./dialog.tsx";
 
 const meta = {

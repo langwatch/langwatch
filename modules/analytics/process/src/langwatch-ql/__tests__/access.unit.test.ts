@@ -1,8 +1,8 @@
 /** @vitest-environment node */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LWQL_FLAG, lwqlEnabled } from "../../rules/lwql-access.rules.ts";

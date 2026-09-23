@@ -8,11 +8,9 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
-
     "rootDir": ".",
 
-    "outDir": "dist",
-
+    "outDir": "dist"
   },
   // `tests/` holds the real-browser lane. Vite's oxc transform reads the
   // tsconfig that covers a file, so one outside `include` fails to transform

@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { createTracingProxy } from "../../create-tracing-proxy";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import { getLangWatchTracer } from "../../../../observability-sdk";
-import { createIntegrationObservability } from "../../../../observability-sdk/setup/node/__tests__/createIntegrationObservability";
 import type { setupObservability } from "../../../../observability-sdk/setup/node";
+import { createIntegrationObservability } from "../../../../observability-sdk/setup/node/__tests__/createIntegrationObservability";
+import { createTracingProxy } from "../../create-tracing-proxy";
 
 /** Integration tests for createTracingProxy with real OpenTelemetry setup. */
 

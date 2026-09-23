@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/langy-contract": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/cards/index.ts", "./src/cards/handled-error.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

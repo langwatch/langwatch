@@ -93,12 +93,13 @@ afterEach(() => {
 });
 
 describe("instrumentCommand", () => {
-
   describe("given changed wiring and a running langwatch code launcher", () => {
     it("prints the restart advice returned by the installer", async () => {
       const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
       asMock(installTelemetryWiring).mockReturnValue({
-        labels: ["~/.zshrc"], warnings: [notice], requiredFailures: [],
+        labels: ["~/.zshrc"],
+        warnings: [notice],
+        requiredFailures: [],
       });
 
       await instrumentCommand("code", {});

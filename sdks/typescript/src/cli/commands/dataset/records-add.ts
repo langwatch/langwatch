@@ -1,11 +1,13 @@
-import chalk from "chalk";
 import fs from "fs";
-import { createSpinner } from "../../utils/spinner";
+
+import chalk from "chalk";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Reads all data from stdin as a string.

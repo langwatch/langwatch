@@ -5,9 +5,11 @@
  */
 
 import chalk from "chalk";
-import { scopedApiKey } from "@/internal/credentialContext";
-import { buildAuthHeaders } from "@/internal/api/auth";
+
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+
 import { fetchBatchRuns, tallyBatchRuns, type BatchRun } from "./batchRunProgress";
 import { createSpinner } from "./spinner";
 

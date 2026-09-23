@@ -1,6 +1,8 @@
+import { type ExportResult } from "@opentelemetry/core";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import { type ExportResult } from "@opentelemetry/core";
+
+import { buildAuthHeaders } from "../../internal/api/auth";
 import {
   DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,
@@ -9,7 +11,6 @@ import {
   LANGWATCH_SDK_VERSION,
   TRACES_PATH,
 } from "../../internal/constants";
-import { buildAuthHeaders } from "../../internal/api/auth";
 import { type TraceFilter, type Criteria, type Match, applyFilters } from "./trace-filters";
 
 /** Options: endpoint URL, API key for auth, and optional span filters (default excludes HTTP). */

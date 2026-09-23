@@ -1,14 +1,15 @@
+import { createLogger } from "@langwatch/observability";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
+
 import type { Event } from "../../../domain/types.ts";
+import type { RetentionPolicyResolver } from "../../../runtime.types.ts";
+import { AbstractEventStore } from "../../../stores/abstractEventStore.ts";
 import type { EventStoreReadContext } from "../../../stores/eventStore.types.ts";
 import type {
   EventRecord,
   EventRepository,
 } from "../../../stores/repositories/eventRepository.types.ts";
-import type { RetentionPolicyResolver } from "../../../runtime.types.ts";
-import { AbstractEventStore } from "../../../stores/abstractEventStore.ts";
-import { createLogger } from "@langwatch/observability";
-import { SpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
 import type { EventingRetentionConfiguration } from "../../retention.ts";
 
 /**
@@ -67,10 +68,8 @@ export class EventingClickHouseEventStore<
     attributes: Record<string, string | number>,
     fn: () => Promise<T>,
   ): Promise<T> {
-    return this.tracer.withActiveSpan(
-      name,
-      { kind: SpanKind.INTERNAL, attributes },
-      async () => fn(),
+    return this.tracer.withActiveSpan(name, { kind: SpanKind.INTERNAL, attributes }, async () =>
+      fn(),
     );
   }
 

@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/error-views": ["./src/views.tsx"]
-    },
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [

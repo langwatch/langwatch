@@ -1,6 +1,8 @@
 import { mkdirSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
+
 import { afterAll, describe, expect, it } from "vitest";
+
 import { zodObjectCompositionRule } from "../../src/rules/zod-object-composition.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -14,8 +16,7 @@ const workspace = createFixtureWorkspace({
       'import { z } from "zod"; export const base = z.object({ id: z.string() });',
     "modules/project/contract/src/base.ts":
       'import { z } from "zod"; export const base = z.object({ id: z.string() });',
-    "modules/project/contract/src/barrel.ts":
-      'export { base as schema } from "./base.ts";',
+    "modules/project/contract/src/barrel.ts": 'export { base as schema } from "./base.ts";',
     "modules/project/contract/src/star.ts": 'export * from "./barrel.ts";',
     "modules/project/contract/src/refined.ts":
       'import { z } from "zod"; export const base = z.object({ id: z.string() }).refine(value => value.id.length > 0);',

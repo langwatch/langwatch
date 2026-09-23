@@ -2,6 +2,7 @@
  * The `/api/v1/organizations` instance-provisioning family: self-hosted only.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
+
 import { createManagementRequest, type ManagementRequest } from "../_shared/management-request";
 
 export interface ProvisionedOrganizationSummary {

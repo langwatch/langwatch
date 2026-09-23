@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { REQUEST_CAUSE_FIELD } from "../constants.ts";
 import {
   getLogLevelFromStatusCode,

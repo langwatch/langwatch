@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/evaluation-process": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "src/services/workflow-evaluation.service.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

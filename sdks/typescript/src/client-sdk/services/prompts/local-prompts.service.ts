@@ -1,8 +1,9 @@
 import type { LocalPromptConfig, PromptDependency } from "@/cli/types";
+import { PromptFileNotFoundError } from "@/cli/utils/errors/prompt-not-found.error";
 import { FileManager } from "@/cli/utils/fileManager";
 import { type Logger, NoOpLogger } from "@/logger";
+
 import { type PromptData } from "./types";
-import { PromptFileNotFoundError } from "@/cli/utils/errors/prompt-not-found.error";
 
 export interface LocalPromptsServiceConfig {
   fileManager?: typeof FileManager;

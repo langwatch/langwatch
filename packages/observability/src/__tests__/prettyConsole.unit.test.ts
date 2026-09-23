@@ -3,12 +3,13 @@
  * (see dev-stack-log-format.feature).
  */
 
-import pino from "pino";
+import { createRequire } from "node:module";
 import { PassThrough } from "node:stream";
+
+import pino from "pino";
 import { describe, expect, it } from "vitest";
 
 import { prettyConsoleOptions } from "../logger.ts";
-import { createRequire } from "node:module";
 
 const prettyStream = createRequire(import.meta.url)("pino-pretty") as (
   options: unknown,

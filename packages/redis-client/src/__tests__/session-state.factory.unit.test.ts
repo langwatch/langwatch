@@ -1,11 +1,12 @@
+import { describe, expect, it } from "vitest";
+
+import { SessionStateStoreFactory } from "../session-state.factory.ts";
 /**
  * The Redis session state store, against a fake connection: when a subscriber
  * starts receiving, and what a failed transaction command does.
  * @see specs/agents/connected-agents.feature
  */
 import type { RedisConnection } from "../types.ts";
-import { describe, expect, it } from "vitest";
-import { SessionStateStoreFactory } from "../session-state.factory.ts";
 
 type MessageListener = (channel: string, message: string) => void;
 

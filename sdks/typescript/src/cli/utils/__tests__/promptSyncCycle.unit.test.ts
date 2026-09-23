@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_PROMPT_MODEL } from "../../constants";
-import { responseFormatToOutputs } from "../responseFormat";
-import { PromptConverter } from "../promptConverter";
+
 import type { PromptResponse } from "@/client-sdk/services/prompts/types";
+
+import { DEFAULT_PROMPT_MODEL } from "../../constants";
+import { PromptConverter } from "../promptConverter";
+import { responseFormatToOutputs } from "../responseFormat";
 
 /**
  * End-to-end sync (no network): a prompt with a response_format is pushed

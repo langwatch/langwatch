@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { DisabledPipeline } from "../../disabledPipeline.ts";
-import { createTenantId } from "../../domain/tenantId.ts";
 import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";

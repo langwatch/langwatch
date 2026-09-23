@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { EventRecord } from "../eventRepository.types.ts";
 import { EventRepositoryMemory } from "../eventRepositoryMemory.ts";
 

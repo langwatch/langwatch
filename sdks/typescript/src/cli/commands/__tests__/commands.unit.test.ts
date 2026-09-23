@@ -4,9 +4,10 @@
  * plain-text tree rendering.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 import { commandsCommand } from "../commands";
 import { helpTreeCommand } from "../help-tree";
-import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
 // vitest there is no bundler define, so stub it before buildProgram() runs.

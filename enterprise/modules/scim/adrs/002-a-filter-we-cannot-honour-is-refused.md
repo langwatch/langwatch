@@ -24,7 +24,7 @@ all three are legitimate SCIM:
 
 The third is what Okta and Entra actually send, and it was dropped on the floor:
 the patch service skipped any operation whose `value` was not an object, so the
-call returned 200 with the record unchanged. Where a dotted key *was* read, the
+call returned 200 with the record unchanged. Where a dotted key _was_ read, the
 stored name was rebuilt from the half supplied, so patching a surname threw the
 forename away.
 

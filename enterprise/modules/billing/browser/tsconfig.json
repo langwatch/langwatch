@@ -8,8 +8,7 @@
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [

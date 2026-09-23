@@ -1,8 +1,9 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,

@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { parseColumns } from "./create";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Updates an existing dataset's name and/or column types.

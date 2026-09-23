@@ -1,9 +1,10 @@
-import { describe, expect, it, beforeAll } from "vitest";
-import { execa } from "execa";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { execa } from "execa";
+import { describe, expect, it, beforeAll } from "vitest";
 
 const here = resolve(fileURLToPath(import.meta.url), "..");
 const cliPath = resolve(here, "../dist/cli.cjs");

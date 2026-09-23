@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+
 import { LangWatchApiError } from "../errors";
 
 describe("LangWatchApiError", () => {

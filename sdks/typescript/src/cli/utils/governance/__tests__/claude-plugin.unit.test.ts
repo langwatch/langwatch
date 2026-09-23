@@ -1,10 +1,9 @@
 /** Claude plugin installation: behavior on success and failure. */
 
+import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
-
-import type * as ChildProcessModule from "node:child_process";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 

@@ -1,4 +1,5 @@
 import type { z } from "zod";
+
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { CommandType } from "../domain/commandType.ts";
 import type { EventType } from "../domain/eventType.ts";

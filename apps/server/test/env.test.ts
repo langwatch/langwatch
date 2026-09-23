@@ -2,7 +2,9 @@ import { chmodSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { buildEnv, reconcileEnvFile, scaffoldEnvFile } from "../src/shared/env.ts";
 import { allocatePorts } from "../src/shared/ports.ts";
 

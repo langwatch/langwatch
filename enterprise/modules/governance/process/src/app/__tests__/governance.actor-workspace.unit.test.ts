@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Resolving actor token to the person's workspace (for the bird's-eye /governance/users/[id] page).
  * Test verifies failed lookups return null (no info leak) and short-circuit.
@@ -9,7 +10,6 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, PersonalWorkspace } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceMemberDatabase } from "../../governance.server.ts";

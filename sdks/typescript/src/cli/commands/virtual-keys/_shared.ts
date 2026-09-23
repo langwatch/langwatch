@@ -1,4 +1,6 @@
 import chalk from "chalk";
+
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type {
   VirtualKey,
   VirtualKeyBudgetInput,
@@ -6,7 +8,6 @@ import type {
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**

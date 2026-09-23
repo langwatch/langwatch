@@ -2,8 +2,9 @@
 // implement the interface as intentional no-ops.
 
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { toPgTimestampUtc } from "./pg-timestamp.ts";
+
 import type { ScheduledJobRecord, ScheduledJobStore } from "../../schedule/scheduler.types.ts";
+import { toPgTimestampUtc } from "./pg-timestamp.ts";
 
 /**
  * Prisma-backed `ScheduledJob` repository. Reads use `$queryRaw` for cross-tenant

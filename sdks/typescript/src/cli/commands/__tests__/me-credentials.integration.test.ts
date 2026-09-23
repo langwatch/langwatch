@@ -1,15 +1,16 @@
+import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import type { AddressInfo } from "node:net";
+import * as os from "node:os";
+import * as path from "node:path";
+
 /**
  * The /me credentials story, end to end against the REAL built CLI and a real HTTP server:
  * a device session alone (no env vars anywhere) powers data commands via the personal
  * project's API key, the lazy exchange happens exactly once and rewrites the session file,
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { spawn } from "node:child_process";
-import * as fs from "node:fs";
-import * as http from "node:http";
-import * as os from "node:os";
-import * as path from "node:path";
-import type { AddressInfo } from "node:net";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 

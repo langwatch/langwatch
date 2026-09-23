@@ -5,9 +5,8 @@
  */
 
 import { Alert, Box, Button, Text, VStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
-
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import type { ReactNode } from "react";
 
 /**
  * As much of a react-hook-form as {@link FormServerError} reads — the whole-form

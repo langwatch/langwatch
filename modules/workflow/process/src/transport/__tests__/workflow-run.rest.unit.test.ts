@@ -1,6 +1,6 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /** @vitest-environment node */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

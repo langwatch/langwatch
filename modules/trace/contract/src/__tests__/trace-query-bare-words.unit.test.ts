@@ -108,9 +108,9 @@ describe("combineQueries", () => {
   });
 
   it("parenthesises a side carrying OR so AND cannot rebind it", () => {
-    expect(combineQueries({ base: "status:error", addition: "model:gpt-5-mini OR model:claude" })).toBe(
-      "status:error AND (model:gpt-5-mini OR model:claude)",
-    );
+    expect(
+      combineQueries({ base: "status:error", addition: "model:gpt-5-mini OR model:claude" }),
+    ).toBe("status:error AND (model:gpt-5-mini OR model:claude)");
   });
 
   describe("when a side starts and ends with a parenthesis without being one group", () => {

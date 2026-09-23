@@ -1,8 +1,8 @@
+import type { Instant } from "@langwatch/time";
 import type { Attributes } from "@opentelemetry/api";
 import type { Cluster, Redis as IORedis } from "ioredis";
 
 import type { ObjectStore, ProjectStorageDestination } from "./storage.ts";
-import type { Instant } from "@langwatch/time";
 
 export interface GroupQueuePayloadSchema<Payload> {
   parse(value: unknown): Payload;

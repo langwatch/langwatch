@@ -1,10 +1,3 @@
-import type {
-  CommandHandlerOptions,
-  NoCommands,
-  PipelineMetadata,
-  RegisteredCommand,
-  StaticPipelineDefinition,
-} from "../index.ts";
 import type { CommandHandler } from "../commands/command.ts";
 import type {
   CommandHandlerClass,
@@ -13,6 +6,13 @@ import type {
 } from "../commands/commandHandlerClass.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
+import type {
+  CommandHandlerOptions,
+  NoCommands,
+  PipelineMetadata,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "../index.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionOptions,

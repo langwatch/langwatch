@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
 import { trace } from "@opentelemetry/api";
-import { setupObservability } from "../../setup";
-import { isConcreteProvider } from "../../../utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+
 import { resetObservabilitySdkConfig } from "../../../../config.js";
+import { isConcreteProvider } from "../../../utils";
+import { setupObservability } from "../../setup";
 
 // Integration tests for NodeSDK initialization in setupObservability
 function createMockLogger() {

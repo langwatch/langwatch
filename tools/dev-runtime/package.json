@@ -2,8 +2,8 @@
   "name": "@langwatch/dev-runtime",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "description": "Contributor-only: the two Node applications in one local process.",
+  "type": "module",
   "exports": {
     ".": {
       "types": "./src/backend.process.ts",

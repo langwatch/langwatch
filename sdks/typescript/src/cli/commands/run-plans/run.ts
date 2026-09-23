@@ -1,13 +1,15 @@
 import type { RunPlanRunBody } from "@/client-sdk/services/run-plans";
-import { createSpinner } from "../../utils/spinner.ts";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
-import { parseRunNoteFlag } from "../../utils/runNote.ts";
 import type { RawOutputFlags } from "../../utils/output.ts";
-import { createCliRunPlansService } from "./cli-run-plans-service.ts";
+import { parseRunNoteFlag } from "../../utils/runNote.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
 import { type EvaluatorFlagRef, readEvaluators } from "../test-suites/evaluatorFlags.ts";
+import { createCliRunPlansService } from "./cli-run-plans-service.ts";
+import { emitRunResult } from "./reportRun.ts";
 import {
   buildScope,
   parseRepeat,
@@ -15,7 +17,6 @@ import {
   parseTargets,
   type ScopeOptions,
 } from "./scopeFlags.ts";
-import { emitRunResult } from "./reportRun.ts";
 
 export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   target?: string[];

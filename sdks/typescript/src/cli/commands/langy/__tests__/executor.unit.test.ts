@@ -8,7 +8,9 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { BASH_OUTPUT_CAP_BYTES } from "../../../../agent/local-control-protocol";
 import { LocalCallFailure } from "../errors";
 import {
@@ -230,10 +232,9 @@ describe("given a shared folder", () => {
       expect(output.logPath).toBe(logPathFor({ root, callId: "call-7" }));
       expect(alive(output.pid!)).toBe(true);
 
-      await waitUntil(
-        () => fs.readFileSync(output.logPath!, "utf8").includes("tick"),
-        { what: "the background process to write its log" },
-      );
+      await waitUntil(() => fs.readFileSync(output.logPath!, "utf8").includes("tick"), {
+        what: "the background process to write its log",
+      });
       killGroup(output.pid);
     });
   });
@@ -244,10 +245,7 @@ describe("given a shared folder", () => {
       execFileSync("git", ["init", "-q"], { cwd: root });
       const command = startCommand({ command: "echo hi", root, callId: "call-8" });
       await command.result;
-      const exclude = fs.readFileSync(
-        path.join(root, ".git", "info", "exclude"),
-        "utf8",
-      );
+      const exclude = fs.readFileSync(path.join(root, ".git", "info", "exclude"), "utf8");
       expect(exclude).toContain(".langwatch/");
       expect(
         execFileSync("git", ["status", "--porcelain"], {
@@ -285,9 +283,7 @@ describe("collapseProgressRedraws", () => {
     it("keeps the last state of the line, the way the terminal shows it", () => {
       const spinner = "\rframe 1\rframe 2\rframe 3 done";
 
-      expect(collapseProgressRedraws(`start\n${spinner}\nend`)).toBe(
-        "start\nframe 3 done\nend",
-      );
+      expect(collapseProgressRedraws(`start\n${spinner}\nend`)).toBe("start\nframe 3 done\nend");
     });
   });
 
@@ -299,9 +295,7 @@ describe("collapseProgressRedraws", () => {
 
   describe("when nothing was redrawn", () => {
     it("returns the text untouched", () => {
-      expect(collapseProgressRedraws("2 passed\n1 warning\n")).toBe(
-        "2 passed\n1 warning\n",
-      );
+      expect(collapseProgressRedraws("2 passed\n1 warning\n")).toBe("2 passed\n1 warning\n");
     });
   });
 });
@@ -397,9 +391,7 @@ describe("given the environment a command runs with", () => {
     for (const [name, inherited] of variables) {
       expect(inheritsVariable(name)).toBe(inherited);
     }
-    const source = Object.fromEntries(
-      variables.map(([name]) => [name, `value-of-${name}`]),
-    );
+    const source = Object.fromEntries(variables.map(([name]) => [name, `value-of-${name}`]));
     expect(Object.keys(commandEnvironment(source)).toSorted()).toEqual(
       variables
         .filter(([, inherited]) => inherited)
@@ -413,7 +405,7 @@ describe("given the environment a command runs with", () => {
     process.env.LANGY_TEST_SECRET = "sk-lw-do-not-leak";
     try {
       const command = startCommand({
-        command: "echo \"key=[${LANGY_TEST_SECRET:-none}]\"",
+        command: 'echo "key=[${LANGY_TEST_SECRET:-none}]"',
         root,
         callId: "call_env",
       });

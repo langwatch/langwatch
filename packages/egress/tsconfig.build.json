@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/egress": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/ssrf/address.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

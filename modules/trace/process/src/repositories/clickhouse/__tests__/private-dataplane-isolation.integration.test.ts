@@ -22,7 +22,11 @@ import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
 } from "@langwatch/eventing/server";
-import { migrateTestClickHouseOnce, privateRouteOrgId, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
+import {
+  migrateTestClickHouseOnce,
+  privateRouteOrgId,
+  startTestClickHouseEndpoints,
+} from "@langwatch/test-harness/clickhouse";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

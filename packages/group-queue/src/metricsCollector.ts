@@ -1,7 +1,9 @@
 import type { Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
+
 import {
   gqActiveGroups,
   gqBlockedGroups,
@@ -17,7 +19,6 @@ import {
 } from "./metrics.ts";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore.ts";
 import { type DispatchResult, type GroupStagingScripts, pendingGroupsKey } from "./scripts.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Sample size for backlog-age gauge; samples nearest deferred groups. Bounded

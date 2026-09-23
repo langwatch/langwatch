@@ -5,13 +5,16 @@
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
-import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
 import {
   explainHandledError,
   explainUnhandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/error-presentation/presentation";
-import { readEnvelopeTraceId, readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import {
+  readEnvelopeTraceId,
+  readHandledError,
+} from "@langwatch/error-presentation/read-handled-error";
+import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
 
 import { UiFeedback, type UiFailureNotice, type UiSuccessNotice } from "./capabilities.ts";
 import { isHandledByGlobalHandler } from "./errors.ts";

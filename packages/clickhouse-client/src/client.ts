@@ -4,11 +4,11 @@
  * outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
-import type { ConcurrencyLimiter } from "./rateLimit.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import type { ConcurrencyLimiter } from "./rateLimit.ts";
 import type { RetryPolicy } from "./retry.ts";
-import type { QueryTracer } from "./tracing.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
+import type { QueryTracer } from "./tracing.ts";
 
 export interface ClickHouseQueryClientOptions {
   /** The only collaborator that talks to a server. */

@@ -1,7 +1,9 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import type * as ExperimentsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
@@ -31,11 +33,12 @@ vi.mock("ora", () => ({
 }));
 
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { experimentCreateCommand } from "../create";
 import { experimentGetStateCommand } from "../get-state";
+import { experimentRestoreCommand } from "../restore";
 import { experimentSetStateCommand } from "../set-state";
 import { experimentVersionsCommand } from "../versions";
-import { experimentRestoreCommand } from "../restore";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

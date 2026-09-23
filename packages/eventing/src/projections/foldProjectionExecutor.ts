@@ -1,4 +1,6 @@
 import { createLogger } from "@langwatch/observability";
+
+import type { Event } from "../domain/types.ts";
 import {
   incrementEsFoldAbsentMissTrustedTotal,
   incrementEsFoldDuplicateEventsSkipped,
@@ -7,7 +9,6 @@ import {
   incrementEsFoldRefoldTotal,
   observeEsFoldBlindReapplyEvents,
 } from "../metrics.ts";
-import type { Event } from "../domain/types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";

@@ -1,6 +1,7 @@
-import { type Prompt, type TemplateVariables, type CompiledPrompt } from "../prompt";
 import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
 import type { LangWatchSpan } from "@/observability-sdk";
+
+import { type Prompt, type TemplateVariables, type CompiledPrompt } from "../prompt";
 
 /**
  * Class that decorates the target prompt,

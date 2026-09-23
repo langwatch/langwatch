@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { setupTestEnvironment, testScenarios, MockTracerProvider } from "./test-utils";
-import { createLangWatchSpan, type LangWatchSpan } from "../span";
-import { getLangWatchTracer, getLangWatchTracerFromProvider } from "../tracer";
-import { FilterableBatchSpanProcessor } from "../processors";
+
 import { LangWatchExporter } from "../exporters";
 import * as indexModule from "../index";
+import { FilterableBatchSpanProcessor } from "../processors";
+import { createLangWatchSpan, type LangWatchSpan } from "../span";
+import { getLangWatchTracer, getLangWatchTracerFromProvider } from "../tracer";
+import { setupTestEnvironment, testScenarios, MockTracerProvider } from "./test-utils";
 
 describe("index.ts", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   createRestRuntime,
   type IdempotentRunner,
@@ -10,7 +11,6 @@ import {
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { gatewayPlatformRest } from "../gateway-platform.rest.ts";

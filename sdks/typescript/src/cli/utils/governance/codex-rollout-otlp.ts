@@ -7,17 +7,18 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
 import {
   type GitRunner,
   readSessionContext,
   runGitCommand,
 } from "@/cli/commands/ingestion/git-context";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+
 import { GovernanceCliError } from "./cli-api";
 import { type CodexRolloutMeta, type CodexTurnIO, parseCodexRollout } from "./codex-rollout";
-import { defaultStateDir, readFingerprint, stateFilePath, writeFingerprint } from "./hook-state";
-import { drainSessionContextSpool } from "./session-context-spool";
 import { codexSessionIndexPath, readCodexThreadNames } from "./codex-session-index";
+import { defaultStateDir, readFingerprint, stateFilePath, writeFingerprint } from "./hook-state";
 import {
   buildSessionContextLogPayload,
   normalizeSessionName,
@@ -26,6 +27,7 @@ import {
   sessionContextFingerprint,
   sessionTitleFromPrompt,
 } from "./session-context";
+import { drainSessionContextSpool } from "./session-context-spool";
 
 /** Deterministic 16-hex span id derived from the turn's trace_id. */
 function ioSpanId(traceId: string): string {

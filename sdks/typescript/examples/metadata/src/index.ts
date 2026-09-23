@@ -4,9 +4,9 @@
  * customer id, labels and the metadata attribute are the rest). Run: pnpm start
  */
 
-import { getLangWatchTracer } from "langwatch";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
+import { getLangWatchTracer } from "langwatch";
 import { setupObservability } from "langwatch/observability/node";
 
 // Initialize LangWatch observability

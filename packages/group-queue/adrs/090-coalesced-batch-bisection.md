@@ -9,7 +9,7 @@ drained sibling to one handler call. Without splitting, one unprocessable
 ("poison") payload fails the whole batch, and the retry re-drains the same
 siblings into the same batch — the poison payload takes up to
 `coalesceMaxBatch - 1` healthy payloads down with it on every attempt until
-the group is quarantined. A *size*-driven failure (a batch too heavy for a
+the group is quarantined. A _size_-driven failure (a batch too heavy for a
 downstream query's memory budget) was equally undirected: it only recovered
 if the retry happened to re-assemble a lighter set by chance.
 
@@ -25,10 +25,10 @@ handles both a too-heavy batch (halves until it fits) and a poison payload
 
 **Limits of bisection:**
 
-- A throw propagates immediately, so payloads *after* the offender in the
+- A throw propagates immediately, so payloads _after_ the offender in the
   batch are never attempted in that pass — stepping over them would apply
   them across a gap the fold cannot see. Bisection recovers everything
-  *before* the offender and names it; it does not rescue what queued behind
+  _before_ the offender and names it; it does not rescue what queued behind
   it (tracked separately in #6482).
 - Non-retryable failures are not split: they fail identically at every size,
   so bisecting one only multiplies the work before the same verdict.
@@ -46,7 +46,7 @@ handles both a too-heavy batch (halves until it fits) and a poison payload
 **Idempotency across sub-batches:** fold redelivery is idempotent via the
 store's applied-event-id set (#6016), but only because every sub-batch call
 after the first successful commit carries `delivery.isContinuation`, which
-tells the fold commit to *extend* that set rather than replace it. Without
+tells the fold commit to _extend_ that set rather than replace it. Without
 the flag, each sub-batch commit would erase the ids the earlier sub-batches
 recorded, and a retry after a failed later sub-batch would re-apply the
 committed prefix (the bug fixed by #6578).

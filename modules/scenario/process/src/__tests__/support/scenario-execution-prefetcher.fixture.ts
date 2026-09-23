@@ -1,4 +1,5 @@
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
@@ -10,7 +11,6 @@ import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contrac
 import { type LiteLLMParams, scenarioSchema } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
   workflowDslSchema,

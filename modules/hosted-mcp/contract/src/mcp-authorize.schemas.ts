@@ -22,11 +22,34 @@ export const refused = z.object({
  * this stays the shape check it always was rather than a new refusal class.
  */
 export const postedApprovalFieldsSchema = z.object({
-  projectId: z.string().min(1).optional().catch(void 0),
-  redirect_uri: z.string().min(1).optional().catch(void 0),
-  client_id: z.string().min(1).optional().catch(void 0),
-  code_challenge: z.string().min(1).optional().catch(void 0),
-  code_challenge_method: z.string().min(1).optional().catch(void 0),
-  state: z.string().min(1).optional().catch(void 0),
+  projectId: z
+    .string()
+    .min(1)
+    .optional()
+    .catch(void 0),
+  redirect_uri: z
+    .string()
+    .min(1)
+    .optional()
+    .catch(void 0),
+  client_id: z
+    .string()
+    .min(1)
+    .optional()
+    .catch(void 0),
+  code_challenge: z
+    .string()
+    .min(1)
+    .optional()
+    .catch(void 0),
+  code_challenge_method: z
+    .string()
+    .min(1)
+    .optional()
+    .catch(void 0),
+  state: z
+    .string()
+    .min(1)
+    .optional()
+    .catch(void 0),
 });
-

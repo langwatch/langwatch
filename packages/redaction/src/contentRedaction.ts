@@ -5,18 +5,18 @@
  */
 
 import {
+  compilePiiExceptPatterns,
+  ESSENTIAL_PII_ENTITIES,
+  redactEssentialPiiInText,
+} from "./essentialPii.ts";
+import { reservesTraceAddress } from "./identifierHoldout.ts";
+import {
   compileSecretPatterns,
   isSensitiveAttributeKey,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
   SHAPE_ONLY_SECRET_RULE_IDS,
 } from "./secrets.ts";
-import {
-  compilePiiExceptPatterns,
-  ESSENTIAL_PII_ENTITIES,
-  redactEssentialPiiInText,
-} from "./essentialPii.ts";
-import { reservesTraceAddress } from "./identifierHoldout.ts";
 
 /**
  * The resolved data-privacy policy, as the native passes read it. Structural

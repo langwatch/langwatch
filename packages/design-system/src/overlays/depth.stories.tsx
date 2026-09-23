@@ -1,5 +1,6 @@
 import { Button, Code, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { Dialog } from "../components/dialog.tsx";
 import { Menu } from "../components/menu.tsx";
 import { Popover } from "../components/popover.tsx";

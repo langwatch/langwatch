@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { Trigger } from "@langwatch/automation-contract";
 /**
  * @vitest-environment node
@@ -9,7 +10,6 @@ import type { Trigger } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";

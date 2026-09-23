@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import { parseApiSchemaSync } from "../schema.ts";
 
 describe("API Standard Schema boundary", () => {

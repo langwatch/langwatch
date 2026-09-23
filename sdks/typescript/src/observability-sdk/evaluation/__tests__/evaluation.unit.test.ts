@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { context, trace, INVALID_SPAN_CONTEXT, type ContextManager } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+
 import { MockSpan, MockTracerProvider } from "../../__tests__/test-utils";
+import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../../semconv/attributes";
 import { createLangWatchSpan } from "../../span";
 import { getLangWatchTracerFromProvider } from "../../tracer";
-import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../../semconv/attributes";
 import { emitEvaluationEvent } from "../index";
 
 /**

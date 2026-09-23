@@ -22,16 +22,10 @@ export type TrpcThrottleDecision = Readonly<{
  * operation the map does not name passes through untouched.
  */
 export type TrpcThrottle<TContext> = Readonly<{
-  policyFor(input: {
-    procedure: string;
-    ctx: TContext;
-  }): Promise<TrpcThrottlePolicy | undefined>;
+  policyFor(input: { procedure: string; ctx: TContext }): Promise<TrpcThrottlePolicy | undefined>;
   /** Who the counter counts: the actor the check resolved, else the address. */
   principalOf(ctx: TContext): string;
-  check(input: {
-    key: string;
-    policy: TrpcThrottlePolicy;
-  }): Promise<TrpcThrottleDecision>;
+  check(input: { key: string; policy: TrpcThrottlePolicy }): Promise<TrpcThrottleDecision>;
 }>;
 
 /**

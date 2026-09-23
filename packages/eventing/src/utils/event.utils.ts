@@ -1,5 +1,7 @@
 import { generate } from "@langwatch/ksuid";
+import { nowInstant } from "@langwatch/time";
 import { context, trace } from "@opentelemetry/api";
+
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { EventType } from "../domain/eventType.ts";
 import type { TenantId } from "../domain/tenantId.ts";
@@ -7,7 +9,6 @@ import { TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event, EventMetadataBase, Projection } from "../domain/types.ts";
 import { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "../domain/types.ts";
 import { SecurityError } from "../services/errorHandling.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Generates a k-sortable event ID (KSUID): its embedded second-precision

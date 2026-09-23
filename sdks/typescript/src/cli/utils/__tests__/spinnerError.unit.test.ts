@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
 import type { Ora } from "ora";
+import { describe, it, expect, vi } from "vitest";
+
 import { failSpinner } from "../spinnerError";
 
 const makeSpinner = () => {

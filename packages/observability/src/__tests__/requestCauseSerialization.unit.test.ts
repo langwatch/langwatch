@@ -4,8 +4,10 @@
  */
 
 import { Writable } from "node:stream";
+
 import pino from "pino";
 import { describe, expect, it } from "vitest";
+
 import { REQUEST_CAUSE_FIELD } from "../constants.ts";
 import { NODE_LOG_SERIALIZERS } from "../logger.ts";
 import { logHttpRequest } from "../request/requestLogging.ts";

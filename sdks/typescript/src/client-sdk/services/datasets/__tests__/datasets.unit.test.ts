@@ -2,7 +2,10 @@
  * Unit tests for Dataset TypeScript SDK
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
+import { NoOpLogger } from "@/logger";
+
 import { DatasetService } from "../dataset.service";
 import {
   DatasetNotFoundError,
@@ -10,7 +13,6 @@ import {
   DatasetValidationError,
   DatasetPlanLimitError,
 } from "../errors";
-import { NoOpLogger } from "@/logger";
 
 const createMockApiClient = () => {
   return {

@@ -1,3 +1,5 @@
+import { nowInstant } from "@langwatch/time";
+
 import { isAtOrBeforeCutoff } from "./replayConstants.ts";
 import { discoverProjectionAggregates, filterDiscoveredByAggregateIds } from "./replayDiscovery.ts";
 import { pauseProjection, unpauseProjection, waitForActiveJobs } from "./replayDrain.ts";
@@ -9,7 +11,6 @@ import {
 import { StateAccumulator } from "./replayExecutor.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
 import { aggregateKey } from "./replayMarkers.ts";
-import { nowInstant } from "@langwatch/time";
 import type {
   BatchCompleteInfo,
   RegisteredStateProjection,

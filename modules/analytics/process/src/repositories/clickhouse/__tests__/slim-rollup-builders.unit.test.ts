@@ -164,13 +164,9 @@ describe("buildSlimTimeseriesQuery", () => {
         excludeOrigins: ["langy"],
       });
 
-      expect(sql).toContain(
-        "ta.Origin NOT IN ({slim_excludeOrigins:Array(String)})",
-      );
+      expect(sql).toContain("ta.Origin NOT IN ({slim_excludeOrigins:Array(String)})");
       expect(params.slim_excludeOrigins).toEqual(["langy"]);
-      expect(sql.indexOf("ta.UserId IN")).toBeLessThan(
-        sql.indexOf("ta.Origin NOT IN"),
-      );
+      expect(sql.indexOf("ta.UserId IN")).toBeLessThan(sql.indexOf("ta.Origin NOT IN"));
     });
 
     it("adds nothing when the exclusion is empty", () => {

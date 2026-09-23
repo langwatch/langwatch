@@ -1,15 +1,16 @@
+import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import type { AddressInfo } from "node:net";
+import * as os from "node:os";
+import * as path from "node:path";
+
 /**
  * The end-to-end fidelity test: the REAL built CLI, running REAL commands against a REAL
  * HTTP server, once in-process and once through a real daemon, asserting the two are
  * indistinguishable.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { spawn } from "node:child_process";
-import * as fs from "node:fs";
-import * as http from "node:http";
-import * as os from "node:os";
-import * as path from "node:path";
-import type { AddressInfo } from "node:net";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 

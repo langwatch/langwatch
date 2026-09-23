@@ -5,6 +5,7 @@
  */
 import { metrics, type Attributes } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { HISTOGRAM_BOUNDARIES } from "../histogram-boundaries.ts";
 import {
   activateMetrics,
@@ -24,7 +25,9 @@ interface Recorded {
 /** Collects every value written through it, in order. */
 function createRecordingMeterProvider() {
   const recorded: Recorded[] = [];
-  const observableCallbacks: ((result: { observe: (v: number, a?: Attributes) => void }) => unknown)[] = [];
+  const observableCallbacks: ((result: {
+    observe: (v: number, a?: Attributes) => void;
+  }) => unknown)[] = [];
 
   const write = (instrument: string) => ({
     add: (value: number, attributes?: Attributes) => {

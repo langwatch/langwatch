@@ -1,5 +1,6 @@
 import { Box, Skeleton, Table, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { ListTable } from "./list-table.tsx";
 
 const ROWS = [

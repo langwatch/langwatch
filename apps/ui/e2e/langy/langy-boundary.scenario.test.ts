@@ -5,6 +5,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+
 import { createEvaluator, deleteEvaluator, listEvaluators } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import { LANGY_ADMIN_BOUNDARY_CRITERIA, LANGY_DELETE_REQUEST_CRITERIA } from "./langy-rules";

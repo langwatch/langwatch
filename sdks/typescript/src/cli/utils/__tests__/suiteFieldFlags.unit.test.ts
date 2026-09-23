@@ -4,10 +4,8 @@
  * Spec: specs/features/{test-suite-cli,scenario-cli}.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  parseScenarioFieldFlags,
-  parseSuiteFieldDefinitionFlags,
-} from "../suiteFieldFlags";
+
+import { parseScenarioFieldFlags, parseSuiteFieldDefinitionFlags } from "../suiteFieldFlags";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -60,9 +58,9 @@ describe("parseSuiteFieldDefinitionFlags", () => {
   describe("given a type the platform does not have", () => {
     /** @scenario "A field with a type the platform does not have is refused" */
     it("refuses the flag naming the three types", () => {
-      expect(() =>
-        parseSuiteFieldDefinitionFlags({ pairs: ["golden_sql:json"] }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseSuiteFieldDefinitionFlags({ pairs: ["golden_sql:json"] })).toThrow(
+        ProcessExitError,
+      );
       expect(printedErrors()).toContain("golden_sql:json");
     });
   });
@@ -70,18 +68,18 @@ describe("parseSuiteFieldDefinitionFlags", () => {
   describe("given a reserved identifier", () => {
     /** @scenario "A field whose identifier is reserved is refused" */
     it("refuses the flag with the reason", () => {
-      expect(() =>
-        parseSuiteFieldDefinitionFlags({ pairs: ["situation:text"] }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseSuiteFieldDefinitionFlags({ pairs: ["situation:text"] })).toThrow(
+        ProcessExitError,
+      );
       expect(printedErrors()).toContain("situation");
     });
   });
 
   describe("given a pair with no type", () => {
     it("refuses the flag", () => {
-      expect(() =>
-        parseSuiteFieldDefinitionFlags({ pairs: ["golden_sql"] }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseSuiteFieldDefinitionFlags({ pairs: ["golden_sql"] })).toThrow(
+        ProcessExitError,
+      );
       expect(printedErrors()).toContain("identifier:type");
     });
   });
@@ -106,30 +104,28 @@ describe("parseScenarioFieldFlags", () => {
     });
 
     it("keeps a numeric-looking text value as text", () => {
-      expect(
-        parseScenarioFieldFlags({ pairs: ["golden_sql=007"], definitions }),
-      ).toEqual({ golden_sql: "007" });
+      expect(parseScenarioFieldFlags({ pairs: ["golden_sql=007"], definitions })).toEqual({
+        golden_sql: "007",
+      });
     });
 
     it("leaves a blank value out, so the field reads as no value", () => {
-      expect(
-        parseScenarioFieldFlags({ pairs: ["golden_sql="], definitions }),
-      ).toEqual({});
+      expect(parseScenarioFieldFlags({ pairs: ["golden_sql="], definitions })).toEqual({});
     });
 
     /** @scenario "A field value the suite does not declare is refused" */
     it("refuses a field the suite does not declare, naming the ones it does", () => {
-      expect(() =>
-        parseScenarioFieldFlags({ pairs: ["golden=SELECT"], definitions }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseScenarioFieldFlags({ pairs: ["golden=SELECT"], definitions })).toThrow(
+        ProcessExitError,
+      );
       expect(printedErrors()).toContain("golden_sql, row_limit, strict");
     });
 
     /** @scenario "A field value that does not read as its type is refused" */
     it("refuses a value that does not read as the field's type", () => {
-      expect(() =>
-        parseScenarioFieldFlags({ pairs: ["row_limit=ten"], definitions }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseScenarioFieldFlags({ pairs: ["row_limit=ten"], definitions })).toThrow(
+        ProcessExitError,
+      );
       expect(printedErrors()).toContain("row_limit is a number field");
     });
   });
@@ -146,9 +142,9 @@ describe("parseScenarioFieldFlags", () => {
 
   describe("given a pair with no equals sign", () => {
     it("refuses the flag", () => {
-      expect(() =>
-        parseScenarioFieldFlags({ pairs: ["golden_sql"], definitions }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseScenarioFieldFlags({ pairs: ["golden_sql"], definitions })).toThrow(
+        ProcessExitError,
+      );
       expect(printedErrors()).toContain("identifier=value");
     });
   });

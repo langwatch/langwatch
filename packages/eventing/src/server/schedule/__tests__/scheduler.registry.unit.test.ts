@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { SchedulerRegistry } from "../scheduler.registry.ts";
 import type { ScheduledJobFire } from "../scheduler.types.ts";
 

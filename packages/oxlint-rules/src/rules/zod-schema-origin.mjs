@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve, sep } from "node:path";
+
 import { parseProgram } from "../parse.mjs";
 
 const modules = new Map();

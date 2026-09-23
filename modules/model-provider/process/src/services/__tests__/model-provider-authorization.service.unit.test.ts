@@ -2,9 +2,9 @@
 // this question and disagree on PROJECT (`project:update` vs `project:manage`), so this test
 // exists to make drift between them a deliberate edit, not a silent divergence.
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderAuthorizationService } from "../model-provider-authorization.service.ts";

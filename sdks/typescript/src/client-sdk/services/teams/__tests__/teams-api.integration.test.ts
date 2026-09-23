@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { TeamsApiService } from "../teams-api.service";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
+
 import { LangWatchHandledError } from "@/internal/api/errors";
+
+import { TeamsApiService } from "../teams-api.service";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 

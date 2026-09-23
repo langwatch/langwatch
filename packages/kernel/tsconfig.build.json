@@ -5,22 +5,11 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
-      "@langwatch/kernel": [
-        "./src/index.ts"
-      ]
-    },
+      "@langwatch/kernel": ["./src/index.ts"]
+    }
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ],
-  "exclude": [
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/tests/**",
-    "**/*.test.*",
-    "**/*.spec.*"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
       "path": "../config/tsconfig.build.json"

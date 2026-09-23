@@ -8,8 +8,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "rootDir": "src",
-    "types": ["node"],
-
+    "types": ["node"]
   },
   "include": ["src/**/*"],
 

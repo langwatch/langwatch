@@ -9,7 +9,9 @@ const expected = catalogue.features.map((feature) => feature.id);
 const duplicates = expected.filter((name, index) => expected.indexOf(name) !== index);
 
 if (duplicates.length > 0) {
-  throw new Error(`catalogue.json contains duplicate feature ids: ${[...new Set(duplicates)].join(", ")}`);
+  throw new Error(
+    `catalogue.json contains duplicate feature ids: ${[...new Set(duplicates)].join(", ")}`,
+  );
 }
 
 const generatedSource = `${[

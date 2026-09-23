@@ -6,7 +6,10 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
+import {
+  migrateTestClickHouseOnce,
+  startTestClickHouseEndpoints,
+} from "@langwatch/test-harness/clickhouse";
 
 /** The one endpoint name every migrated-schema metric suite asks for. */
 const MIGRATED_ENDPOINT_SUITE = "metric-migrated";

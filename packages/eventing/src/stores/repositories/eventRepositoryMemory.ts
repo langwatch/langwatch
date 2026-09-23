@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+
 import { EventNotFoundError } from "../../services/errorHandling.ts";
 import { compareOrdinal } from "../../utils/compareOrdinal.ts";
 import type { EventRecord, EventRepository } from "./eventRepository.types.ts";

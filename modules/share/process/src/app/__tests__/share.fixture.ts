@@ -1,7 +1,7 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi, PinnedTrace } from "@langwatch/data-retention-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { vi } from "vitest";
 
 /** Every audience check permits, so a scoped link resolves without a directory. */

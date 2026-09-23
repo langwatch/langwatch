@@ -4,8 +4,9 @@
  * line corrupts the parse. `createSpinner` silences itself for JSON output.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { createSpinner } from "../spinner";
+
 import { setOutputFormat } from "../errorOutput";
+import { createSpinner } from "../spinner";
 
 afterEach(() => {
   setOutputFormat(undefined);

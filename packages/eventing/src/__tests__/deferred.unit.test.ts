@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { Deferred } from "../deferred.ts";
 
 describe("Deferred", () => {

@@ -23,7 +23,10 @@ import {
   VoiceScenarioNotFoundError,
   type VoiceSessionInfrastructure,
 } from "../voice-session.service.ts";
-import type { VoiceTransportCredential, VoiceTransportRunner } from "../voice-transport.registry.ts";
+import type {
+  VoiceTransportCredential,
+  VoiceTransportRunner,
+} from "../voice-transport.registry.ts";
 
 const CREDENTIAL: VoiceTransportCredential = {
   kind: "elevenlabs",

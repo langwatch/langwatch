@@ -71,7 +71,9 @@ describe("queryNamesFacet", () => {
     expect(queryNamesFacet({ queryText: "evaluator.verdict:pass", facetKey: "evaluator" })).toBe(
       true,
     );
-    expect(queryNamesFacet({ queryText: "model:gpt-5-mini refund", facetKey: "status" })).toBe(false);
+    expect(queryNamesFacet({ queryText: "model:gpt-5-mini refund", facetKey: "status" })).toBe(
+      false,
+    );
     expect(queryNamesFacet({ queryText: "", facetKey: "status" })).toBe(false);
   });
 });

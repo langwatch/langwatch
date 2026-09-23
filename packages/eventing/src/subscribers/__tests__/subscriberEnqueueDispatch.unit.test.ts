@@ -6,8 +6,8 @@
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
-import { KillSwitch, type KillSwitchQuery } from "../../kill-switch/index.ts";
 import type { Event } from "../../domain/types.ts";
+import { KillSwitch, type KillSwitchQuery } from "../../kill-switch/index.ts";
 import { ProjectionRouter } from "../../projections/projectionRouter.ts";
 import {
   createMockEventStore,
@@ -155,7 +155,9 @@ describe("subscriber enqueue-time contract", () => {
         expect(received.map((event) => event.tenantId)).toEqual([tenantId]);
         expect(filterRan).toBe(true);
 
-        expect(asked.map((ask) => ask.tenantId).toSorted()).toEqual([killedTenant, tenantId].toSorted());
+        expect(asked.map((ask) => ask.tenantId).toSorted()).toEqual(
+          [killedTenant, tenantId].toSorted(),
+        );
         for (const ask of asked) {
           expect(ask.componentType).toBe("subscriber");
           expect(ask.componentName).toBe("seamSubscriber");

@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { TeamsApiService } from "@/client-sdk/services/teams/teams-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import { parseCount } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";

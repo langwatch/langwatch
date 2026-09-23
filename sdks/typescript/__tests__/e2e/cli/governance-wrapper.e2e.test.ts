@@ -1,16 +1,17 @@
 // @vitest-environment node
 
+import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import * as os from "node:os";
+import * as path from "node:path";
+
 /**
  * CLI wrapper e2e suite: pure-Node harness (no Docker, no live LLM), a fake
  * control-plane + gateway in-process, and tool stubs on a tmp PATH.
  * Spec: specs/ai-governance/cli-wrappers/wrap-login-routing.feature
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
-import * as http from "node:http";
-import { spawn } from "node:child_process";
 
 // ─────────────────────────────────────────────────────────────────
 // Harness state

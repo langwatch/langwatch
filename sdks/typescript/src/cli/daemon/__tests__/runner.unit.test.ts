@@ -1,12 +1,13 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
 /**
  * The caller of a hung/cancelled command settles AT ONCE (124/130), but the window
  * stays held until the abandoned work actually settles — node can't unwind its
  * promise chain, so `applyWindow` on the next request would rewrite `process.env` from under it.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 
 // The executor builds the commander tree per request; these tests are about
 // the window/timeout lifecycle, not parsing, so the program is a stub.

@@ -1,4 +1,5 @@
 import { Factory } from "fishery";
+
 import { type LocalPromptConfig } from "../../src/cli/types";
 
 /**

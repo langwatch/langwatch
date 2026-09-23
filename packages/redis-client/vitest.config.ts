@@ -1,5 +1,5 @@
-import { configDefaults } from "vitest/config";
 import { defineModuleVitestConfig } from "@langwatch/vitest-config";
+import { configDefaults } from "vitest/config";
 
 export default defineModuleVitestConfig({
   kind: "node",

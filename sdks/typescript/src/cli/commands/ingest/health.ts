@@ -1,7 +1,8 @@
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { getSourceHealth } from "@/cli/utils/governance/cli-api";
+
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { getSourceHealth } from "@/cli/utils/governance/cli-api";
+import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 
 /**
  * `langwatch ingest health <sourceId> [--json]`: one-shot snapshot of events

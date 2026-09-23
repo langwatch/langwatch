@@ -3,7 +3,9 @@
  */
 
 import { createRequire } from "node:module";
+
 import type { WebSocket as WsWebSocket } from "ws";
+
 import { langwatchFetch } from "../internal/http/langwatchFetch";
 
 export const AGENT_TRANSPORTS = ["websocket", "http"] as const;
@@ -191,7 +193,8 @@ export class HttpLongPollSocket implements SocketLike {
   constructor(options: HttpLongPollOptions) {
     this.url = options.url;
     this.headers = options.headers;
-    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? langwatchFetch : undefined);
+    const fetchImpl =
+      options.fetch ?? (typeof globalThis.fetch === "function" ? langwatchFetch : undefined);
     if (typeof fetchImpl !== "function") {
       throw new Error("the HTTP transport needs a global fetch; run on Node 20 or later");
     }

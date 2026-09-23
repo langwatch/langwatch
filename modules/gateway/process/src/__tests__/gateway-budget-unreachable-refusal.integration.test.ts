@@ -2,13 +2,13 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 /**
  * @vitest-environment node
  * Real Postgres, no mocks: reachability follows virtual key scope and project.
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  */
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";

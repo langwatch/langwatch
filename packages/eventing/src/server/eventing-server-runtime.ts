@@ -1,10 +1,12 @@
 import type { GroupQueueDependencies } from "@langwatch/group-queue";
-import type { RetentionPolicyResolver } from "../runtime.types.ts";
+
+import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 import { createEventingGroupQueueFactory } from "../queues/groupQueueFactory.ts";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../queues/queue.types.ts";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { EventStore } from "../stores/eventStore.types.ts";
 import { EventingClickHouseEventRepository } from "./adapters/clickhouse/event-repository.clickhouse.ts";
 import {
@@ -15,7 +17,6 @@ import { PrismaProcessStore } from "./adapters/postgres/prisma-process-store.ts"
 import type { EventingClickHouseClientResolver } from "./clickhouse-client-resolver.ts";
 import type { EventingProcessPersistenceDatabase } from "./process-persistence.database.ts";
 import type { EventingRetentionConfiguration } from "./retention.ts";
-import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 
 export interface EventingServerRuntimeOptions {
   database: EventingProcessPersistenceDatabase;

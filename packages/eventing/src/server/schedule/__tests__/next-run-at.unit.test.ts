@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { computeCatchUp, computeNextRunAt } from "../next-run-at.ts";
 
 describe("computeNextRunAt", () => {

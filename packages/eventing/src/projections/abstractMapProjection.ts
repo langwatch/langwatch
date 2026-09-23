@@ -1,4 +1,5 @@
 import type { z } from "zod";
+
 import type { AnyEventSchema } from "./abstractFoldProjection.ts";
 import {
   type DotSnakeToPascal,

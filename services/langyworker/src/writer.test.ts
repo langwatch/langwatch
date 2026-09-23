@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { ProtocolWriter, type ProtocolSink } from "./writer.js";
 
 describe("ProtocolWriter", () => {

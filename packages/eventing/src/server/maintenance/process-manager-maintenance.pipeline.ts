@@ -2,6 +2,10 @@ import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
 import type { Event } from "../../domain/types.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import {
+  type ProcessRetentionSweepDeps,
+  runProcessRetentionSweep,
+} from "./process-retention-sweep.intent.ts";
+import {
   PROCESS_RETENTION_SWEEP_INITIAL_STATE,
   PROCESS_RETENTION_SWEEP_INTERVAL_MS,
   PROCESS_RETENTION_SWEEP_LEASE_MS,
@@ -10,10 +14,6 @@ import {
   processRetentionSweepSchema,
   processRetentionSweepWake,
 } from "./process-retention-sweep.process.ts";
-import {
-  type ProcessRetentionSweepDeps,
-  runProcessRetentionSweep,
-} from "./process-retention-sweep.intent.ts";
 
 export interface ProcessManagerMaintenancePipelineDeps {
   retentionSweep: ProcessRetentionSweepDeps;

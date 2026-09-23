@@ -33,13 +33,7 @@ function isJsonColumn(column: QueryColumn): boolean {
  * parse is written through as the string it is: refusing the row would lose
  * the other columns of a row that is otherwise fine.
  */
-function machineValue({
-  column,
-  value,
-}: {
-  column: QueryColumn;
-  value: unknown;
-}): unknown {
+function machineValue({ column, value }: { column: QueryColumn; value: unknown }): unknown {
   if (!isJsonColumn(column) || typeof value !== "string") return value;
   try {
     return JSON.parse(value);
@@ -71,9 +65,7 @@ export function renderJsonl({
   columns: readonly QueryColumn[];
   rows: readonly QueryRow[];
 }): string {
-  return rows
-    .map((row) => JSON.stringify(machineRow({ columns, row })))
-    .join("\n");
+  return rows.map((row) => JSON.stringify(machineRow({ columns, row }))).join("\n");
 }
 
 /**
@@ -83,7 +75,7 @@ export function renderJsonl({
  */
 export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const text = typeof value === "string" ? value : JSON.stringify(value) ?? "";
+  const text = typeof value === "string" ? value : (JSON.stringify(value) ?? "");
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
@@ -96,9 +88,7 @@ export function renderCsv({
 }): string {
   const header = columns.map((column) => csvCell(column.name)).join(",");
   const body = rows.map((row) =>
-    columns
-      .map((column) => csvCell(machineValue({ column, value: row[column.name] })))
-      .join(","),
+    columns.map((column) => csvCell(machineValue({ column, value: row[column.name] }))).join(","),
   );
   return [header, ...body].join("\n");
 }

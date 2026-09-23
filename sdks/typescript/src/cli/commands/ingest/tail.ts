@@ -1,8 +1,10 @@
 import { setTimeout as wait } from "node:timers/promises";
+
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { getEventsForSource, type ActivityEventDetailRow } from "@/cli/utils/governance/cli-api";
+
 import { readCommandError, reportCommandError } from "@/cli/utils/errorOutput";
+import { getEventsForSource, type ActivityEventDetailRow } from "@/cli/utils/governance/cli-api";
+import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 
 /**
  * Stream OCSF events for an IngestionSource. --follow polls every 3s,

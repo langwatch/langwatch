@@ -32,10 +32,7 @@ describe("given the identifier hold-out rules", () => {
       // Assembled rather than written out: the literal is high-entropy enough
       // that the secrets gate reads it as a credential, and a fixture is not
       // worth an allowlist entry that would stand forever.
-      [
-        "a base64-style token",
-        Buffer.from("hello world 1234567890").toString("base64"),
-      ],
+      ["a base64-style token", Buffer.from("hello world 1234567890").toString("base64")],
     ])("treats %s as opaque", (_case, value) => {
       expect(isOpaqueIdentifierValue(value)).toBe(true);
     });
@@ -69,22 +66,10 @@ describe("given the identifier hold-out rules", () => {
 
   describe("when the value carries an identifier but is not one", () => {
     it.each([
-      [
-        "a sentence quoting a prefixed id",
-        "Jane Doe on trace_49386409e80a37fa22dc518583b31932",
-      ],
-      [
-        "a sentence quoting a bare hex id",
-        "Jane Doe on 49386409e80a37fa22dc518583b31932",
-      ],
-      [
-        "a JSON fragment",
-        '{"user":"Jane Doe","trace":"49386409e80a37fa22dc518583b31932"}',
-      ],
-      [
-        "a URL path",
-        "https://acme.example.com/u/jane.doe/49386409e80a37fa22dc518583b31932",
-      ],
+      ["a sentence quoting a prefixed id", "Jane Doe on trace_49386409e80a37fa22dc518583b31932"],
+      ["a sentence quoting a bare hex id", "Jane Doe on 49386409e80a37fa22dc518583b31932"],
+      ["a JSON fragment", '{"user":"Jane Doe","trace":"49386409e80a37fa22dc518583b31932"}'],
+      ["a URL path", "https://acme.example.com/u/jane.doe/49386409e80a37fa22dc518583b31932"],
     ])("does not treat %s as opaque", (_case, value) => {
       expect(isOpaqueIdentifierValue(value)).toBe(false);
     });
@@ -95,12 +80,8 @@ describe("given the identifier hold-out rules", () => {
      * identifier in them was too weak to be recognised in the first place.
      */
     it("holds the identifier back when it stands on its own", () => {
-      expect(
-        isOpaqueIdentifierValue("trace_49386409e80a37fa22dc518583b31932"),
-      ).toBe(true);
-      expect(isOpaqueIdentifierValue("49386409e80a37fa22dc518583b31932")).toBe(
-        true,
-      );
+      expect(isOpaqueIdentifierValue("trace_49386409e80a37fa22dc518583b31932")).toBe(true);
+      expect(isOpaqueIdentifierValue("49386409e80a37fa22dc518583b31932")).toBe(true);
     });
   });
 
@@ -122,14 +103,12 @@ describe("given the identifier hold-out rules", () => {
   });
 
   describe("when the attribute name reserves a tracer address", () => {
-    it.each([
-      "metadata.otelTraceId",
-      "metadata.trace_id",
-      "trace_id",
-      "spanid",
-    ])("reserves %s whatever its case", (key) => {
-      expect(isReservedIdentifierAttributeKey(key)).toBe(true);
-    });
+    it.each(["metadata.otelTraceId", "metadata.trace_id", "trace_id", "spanid"])(
+      "reserves %s whatever its case",
+      (key) => {
+        expect(isReservedIdentifierAttributeKey(key)).toBe(true);
+      },
+    );
 
     it("holds a reserved attribute back even when the value is all digits", () => {
       expect(
@@ -151,9 +130,7 @@ describe("given the identifier hold-out rules", () => {
       ["a dotted person name", "jane.doe"],
     ])("does not hold a reserved name back over %s", (_case, value) => {
       expect(isReservedIdentifierAttributeKey("metadata.trace_id")).toBe(true);
-      expect(
-        isHeldOutIdentifierAttribute({ key: "metadata.trace_id", value }),
-      ).toBe(false);
+      expect(isHeldOutIdentifierAttribute({ key: "metadata.trace_id", value })).toBe(false);
     });
 
     /**
@@ -161,13 +138,12 @@ describe("given the identifier hold-out rules", () => {
      * `langwatch.trace_id` folds to nothing, so treating it as reserved
      * would exempt a spelling the pipeline never produces.
      */
-    it.each([
-      "langwatch.trace_id",
-      "langwatch.traceid",
-      "langwatch.foo.trace_id",
-    ])("does not reserve %s, which no namespace folds to a reserved name", (key) => {
-      expect(isReservedIdentifierAttributeKey(key)).toBe(false);
-    });
+    it.each(["langwatch.trace_id", "langwatch.traceid", "langwatch.foo.trace_id"])(
+      "does not reserve %s, which no namespace folds to a reserved name",
+      (key) => {
+        expect(isReservedIdentifierAttributeKey(key)).toBe(false);
+      },
+    );
 
     it.each([
       "langwatch.user_id",
@@ -176,9 +152,7 @@ describe("given the identifier hold-out rules", () => {
       "gen_ai.conversation.id",
     ])("does not reserve %s, which customers fill in themselves", (key) => {
       expect(isReservedIdentifierAttributeKey(key)).toBe(false);
-      expect(isHeldOutIdentifierAttribute({ key, value: "Jane Doe" })).toBe(
-        false,
-      );
+      expect(isHeldOutIdentifierAttribute({ key, value: "Jane Doe" })).toBe(false);
     });
 
     /**
@@ -186,17 +160,18 @@ describe("given the identifier hold-out rules", () => {
      * recognised here, since redaction runs BEFORE that fold. Looping over
      * the shared constant turns a namespace added there into a red test, not a silent hole.
      */
-    it.each(
-      METADATA_SUBKEY_PREFIXES,
-    )("reserves a trace address written under the %s namespace", (prefix) => {
-      expect(isReservedIdentifierAttributeKey(`${prefix}trace_id`)).toBe(true);
-      expect(isReservedIdentifierAttributeKey(`${prefix}traceid`)).toBe(true);
-      expect(
-        isHeldOutIdentifierAttribute({
-          key: `${prefix}trace_id`,
-          value: DECIMAL_TRACE_ADDRESS,
-        }),
-      ).toBe(true);
-    });
+    it.each(METADATA_SUBKEY_PREFIXES)(
+      "reserves a trace address written under the %s namespace",
+      (prefix) => {
+        expect(isReservedIdentifierAttributeKey(`${prefix}trace_id`)).toBe(true);
+        expect(isReservedIdentifierAttributeKey(`${prefix}traceid`)).toBe(true);
+        expect(
+          isHeldOutIdentifierAttribute({
+            key: `${prefix}trace_id`,
+            value: DECIMAL_TRACE_ADDRESS,
+          }),
+        ).toBe(true);
+      },
+    );
   });
 });

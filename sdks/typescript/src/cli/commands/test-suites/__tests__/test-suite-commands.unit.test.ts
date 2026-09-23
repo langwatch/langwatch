@@ -1,6 +1,8 @@
 // Test the test-suite commands; a suite is scenarios sent with the request.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { TestSuitesApiError } from "@/client-sdk/services/test-suites";
+
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const listSpy = vi.hoisted(() => vi.fn());
@@ -41,13 +43,13 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listTestSuitesCommand } from "../list";
+import { archiveTestSuiteCommand } from "../archive";
 import { createTestSuiteCommand } from "../create";
 import { getTestSuiteCommand } from "../get";
+import { listTestSuitesCommand } from "../list";
 import { renameTestSuiteCommand } from "../rename";
-import { updateTestSuiteCommand } from "../update";
-import { archiveTestSuiteCommand } from "../archive";
 import { runTestSuiteCommand } from "../run";
+import { updateTestSuiteCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -353,9 +355,7 @@ describe("updateTestSuiteCommand()", () => {
       });
 
       expect(updateSpy).toHaveBeenCalledWith("suite_abc", {
-        evaluators: [
-          expect.objectContaining({ evaluatorId: "evaluator_sql", required: true }),
-        ],
+        evaluators: [expect.objectContaining({ evaluatorId: "evaluator_sql", required: true })],
       });
     });
   });
@@ -363,18 +363,14 @@ describe("updateTestSuiteCommand()", () => {
   describe("when nothing is given", () => {
     /** @scenario "An update with nothing to change is refused" */
     it("refuses before sending anything", async () => {
-      await expect(updateTestSuiteCommand("Refunds")).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(updateTestSuiteCommand("Refunds")).rejects.toThrow(ProcessExitError);
       expect(updateSpy).not.toHaveBeenCalled();
     });
   });
 
   describe("when the suite does not exist", () => {
     it("refuses before patching anything", async () => {
-      await expect(
-        updateTestSuiteCommand("Nope", { name: "x" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(updateTestSuiteCommand("Nope", { name: "x" })).rejects.toThrow(ProcessExitError);
       expect(updateSpy).not.toHaveBeenCalled();
     });
   });

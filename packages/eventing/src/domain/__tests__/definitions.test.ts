@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { createEventCatalogue, defineAggregate, defineEvents } from "../definitions.ts";
 
 describe("event catalogue", () => {

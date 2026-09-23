@@ -1,3 +1,4 @@
+import { createTenantId, type Event } from "@langwatch/eventing";
 import {
   createEventingRetentionConfiguration,
   EventingClickHouseEventRepository,
@@ -6,7 +7,6 @@ import {
   type EventingClickHouseClient,
   type EventingClickHouseQueryResult,
 } from "@langwatch/eventing/server";
-import { createTenantId, type Event } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 

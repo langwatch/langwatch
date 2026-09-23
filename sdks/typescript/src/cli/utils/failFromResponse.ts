@@ -1,4 +1,5 @@
 import type { Ora } from "ora";
+
 import { formatApiErrorMessage } from "../../client-sdk/services/_shared/format-api-error";
 import { handledErrorFrom } from "../../internal/api/errors";
 import { failSpinner } from "./spinnerError";

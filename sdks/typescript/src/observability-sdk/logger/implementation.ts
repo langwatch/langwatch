@@ -1,4 +1,9 @@
+import { context } from "@opentelemetry/api";
 import { type AnyValue, type Logger } from "@opentelemetry/api-logs";
+
+import { shouldCaptureOutput } from "../config";
+import * as intSemconv from "../semconv";
+import { type SemConvLogRecordAttributes } from "../semconv";
 import {
   type EmitOptions,
   type LangWatchLogger,
@@ -9,10 +14,6 @@ import {
   type LangWatchSpanGenAIToolMessageEventBody,
   type LangWatchSpanGenAIUserMessageEventBody,
 } from "./types";
-import { shouldCaptureOutput } from "../config";
-import * as intSemconv from "../semconv";
-import { type SemConvLogRecordAttributes } from "../semconv";
-import { context } from "@opentelemetry/api";
 
 /** Internal implementation of {@link LangWatchLogger}. Wraps OpenTelemetry
  * logger with LangWatch functionality. Use {@link getLangWatchLogger} instead. */

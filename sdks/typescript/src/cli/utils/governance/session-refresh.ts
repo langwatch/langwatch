@@ -4,9 +4,9 @@
  * race between two sessions re-reads config and retries with the winner's pair.
  */
 
-import * as deviceFlow from "./device-flow";
 import type { GovernanceConfig } from "./config";
 import { loadConfig, saveConfig } from "./config";
+import * as deviceFlow from "./device-flow";
 
 /**
  * Treat an access token as spent this many seconds before its stated

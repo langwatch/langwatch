@@ -5,7 +5,7 @@ import {
   type EvaluatorWithFields,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { generate,KSUID_RESOURCES } from "@langwatch/ksuid";
+import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { type Span, type Trace } from "@langwatch/trace-contract";

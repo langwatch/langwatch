@@ -1,9 +1,11 @@
+import type { OutboundProxyConfig } from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
+
+import { resolveEmailProviderName } from "../providers/index.ts";
 import { ResendEmailProvider } from "../providers/resend.ts";
 import { SendgridEmailProvider } from "../providers/sendgrid.ts";
 import { SesEmailProvider, type SesAwsClientConfiguration } from "../providers/ses.ts";
 import { SmtpEmailProvider } from "../providers/smtp.ts";
-import { resolveEmailProviderName } from "../providers/index.ts";
 import type {
   EmailContent,
   EmailProviderName,
@@ -11,7 +13,6 @@ import type {
   MailerConfiguration,
 } from "../providers/types.ts";
 import { EmailDelivery } from "../providers/types.ts";
-import type { OutboundProxyConfig } from "@langwatch/egress";
 
 const logger = createLogger("langwatch:mailer:runtime");
 

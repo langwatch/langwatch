@@ -4,7 +4,6 @@
 // path loads after this (dotenv, commander, …) compiles from cache on warm
 // runs. Must precede every other import — see compileCache.ts.
 import "./compileCache";
-
 // Loads env before DISPATCH -- but static imports are hoisted above this
 // body, so `./daemon/dispatch` below is already evaluated by then. Only
 // function bodies called after this point see the loaded .env; module-scope

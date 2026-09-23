@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import type { TenantId } from "../../domain/tenantId.ts";
 import { defineCommand } from "../defineCommand.ts";
 

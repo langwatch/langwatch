@@ -353,7 +353,7 @@ Detect the user's transport from their codebase and pick the matching adapter. *
 | Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
 | Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                 |
 | OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                    |
-| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
+| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a _voice wrapper_ around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed, and they will (rightly) call it useless.
 
@@ -548,7 +548,6 @@ describe("Voice agent: angry billing", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-
         // The adapter drives an OpenAI Realtime session with the same
         // config your production agent uses. Importing from production
         // source keeps the test aligned with what is actually deployed.
@@ -604,7 +603,6 @@ describe("Voice agent: angry billing (Pipecat WS)", () => {
         "The agent must acknowledge the frustration before pivoting to " +
         "logistics, stay calm, and queue a refund.",
       agents: [
-
         // Connects to the user's ALREADY-RUNNING bot over WebSocket.
         scenario.pipecatAgent({
           url: BOT_WS_URL,
@@ -717,12 +715,12 @@ Then drive everything via `langwatch scenario --help`, `langwatch test-suite --h
 
 ### Four nouns, and mixing them up is what makes this API feel confusing
 
-| Noun               | What it is                                                                                                                                                                | Commands                     |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| **scenario**       | One test: a *situation* plus natural-language *criteria*. It needs a target to run against.                                                                               | `langwatch scenario …`       |
-| **test suite**     | A test suite groups scenarios: a name, the scenarios filed under it, the typed *fields* every scenario carries a value for, and the *evaluators* that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …`     |
-| **run plan**       | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan. | `langwatch run-plan …`       |
-| **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`.                                                                                | `langwatch simulation-run …` |
+| Noun               | What it is                                                                                                                                                                                                                                             | Commands                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| **scenario**       | One test: a _situation_ plus natural-language _criteria_. It needs a target to run against.                                                                                                                                                            | `langwatch scenario …`       |
+| **test suite**     | A test suite groups scenarios: a name, the scenarios filed under it, the typed _fields_ every scenario carries a value for, and the _evaluators_ that run after every scenario run. Every project has a `Default` test suite, so no scenario is loose. | `langwatch test-suite …`     |
+| **run plan**       | What you run. Its NAME is its identity: a run under a name that exists replaces that plan's configuration and joins its history, a run under a new name creates the plan.                                                                              | `langwatch run-plan …`       |
+| **simulation run** | One scenario executed once against one target. Runs started together share a `batchRunId`.                                                                                                                                                             | `langwatch simulation-run …` |
 
 A run plan's configuration is the scope (all scenarios, the scenarios of one or more test suites, the scenarios carrying given labels, or a hand-picked list), the targets, the repeat count and the two models. Parameters, the note and the idempotency key belong to one run, not to the plan.
 
@@ -912,15 +910,29 @@ langwatch test-suite update "Case lookups" --evaluator sql-query-equivalence --e
 - A tool call is **never inferred**. For an input that must read what the agent sent to a tool, write the full attachment with `--evaluators-json <file|json>`:
 
 ```json
-[{
-  "evaluatorId": "<id from evaluator list>",
-  "required": true,
-  "mappings": {
-    "output":            { "type": "source", "sourceId": "trace",    "path": ["tool_calls", "run_sql", "input"] },
-    "expected_output":   { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] },
-    "expected_contexts": { "type": "source", "sourceId": "scenario", "path": ["fields", "table_schema"] }
+[
+  {
+    "evaluatorId": "<id from evaluator list>",
+    "required": true,
+    "mappings": {
+      "output": {
+        "type": "source",
+        "sourceId": "trace",
+        "path": ["tool_calls", "run_sql", "input"]
+      },
+      "expected_output": {
+        "type": "source",
+        "sourceId": "scenario",
+        "path": ["fields", "golden_sql"]
+      },
+      "expected_contexts": {
+        "type": "source",
+        "sourceId": "scenario",
+        "path": ["fields", "table_schema"]
+      }
+    }
   }
-}]
+]
 ```
 
 Paths: `conversation` → `first_user_message`, `last_agent_message`, `transcript`, `messages`; `scenario` → `situation`, `criteria`, `fields.<identifier>`; `trace` → `contexts`, `tool_calls.<toolName>.input|output`. A literal is `{ "type": "value", "value": "..." }`.
@@ -940,7 +952,7 @@ Review the results, sharpen the scenario with `langwatch scenario update <id> --
 
 One short question beats a confident wrong run.
 
-- Never choose *which* agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
+- Never choose _which_ agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
 - Never invent a target: `http:demo-agent-support` is not an agent id.
 - Never widen a vague request into a bigger investigation, or a bigger plan, than was asked for. If the instruction is two words and ambiguous, ask one question and stop.
 

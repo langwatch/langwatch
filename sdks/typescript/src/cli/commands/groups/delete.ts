@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { GroupsApiService } from "@/client-sdk/services/groups/groups-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 

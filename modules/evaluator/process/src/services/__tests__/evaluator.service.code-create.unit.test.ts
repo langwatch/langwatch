@@ -1,5 +1,5 @@
-import type { Evaluator } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { Evaluator } from "@langwatch/evaluator-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";

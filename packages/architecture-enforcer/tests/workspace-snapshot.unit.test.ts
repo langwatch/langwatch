@@ -4,10 +4,12 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildWorkspaceSnapshot } from "../src/workspace/snapshot.ts";
-import { moduleImports, sourceFile, sourceText } from "../src/workspace/module-graph.ts";
+
 import { walkFiles } from "../src/workspace/layout.ts";
+import { moduleImports, sourceFile, sourceText } from "../src/workspace/module-graph.ts";
+import { buildWorkspaceSnapshot } from "../src/workspace/snapshot.ts";
 
 let root: string;
 

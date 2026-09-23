@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event, EventMetadataBase } from "../../domain/types.ts";

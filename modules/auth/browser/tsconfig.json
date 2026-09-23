@@ -16,8 +16,7 @@
       "@better-auth/passkey/client": [
         "../../../packages/browser-types/better-auth-passkey-client.d.ts"
       ]
-    },
-
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vitest.setup.ts"],
   "references": [

@@ -10,9 +10,9 @@ vi.mock("../config", () => ({
   saveConfig: (...args: unknown[]) => saveConfig(...args),
 }));
 
-import { fetchPersonalProject, fetchProjectKeyBySlug, SessionApiError } from "../session-api";
 import { loadConfig } from "../config";
 import type { GovernanceConfig } from "../config";
+import { fetchPersonalProject, fetchProjectKeyBySlug, SessionApiError } from "../session-api";
 
 const liveSession = (): GovernanceConfig =>
   ({

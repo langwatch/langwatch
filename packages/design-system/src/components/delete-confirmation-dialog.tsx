@@ -1,6 +1,7 @@
 import { Button, Input, Text, VStack } from "@chakra-ui/react";
-import { Dialog } from "./dialog.tsx";
 import { useEffect, useRef, useState } from "react";
+
+import { Dialog } from "./dialog.tsx";
 
 /** Shared destructive-action confirmation for app-owned feature composition. */
 export function DeleteConfirmationDialog({
@@ -52,7 +53,7 @@ export function DeleteConfirmationDialog({
             <Input
               placeholder="Type 'delete' to confirm"
               value={confirmationText}
-              
+
               onChange={(event) => {
                 event.stopPropagation();
                 setConfirmationText(event.target.value);

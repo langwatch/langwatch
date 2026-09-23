@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { allocatePorts, portsToCheck, PORT_BASE_DEFAULT } from "../src/shared/ports.ts";
 
 describe("port allocation", () => {

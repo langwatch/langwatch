@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Ksuid } from "../ksuid.ts";
+
 import { Instance } from "../instance.ts";
+import { Ksuid } from "../ksuid.ts";
 
 describe("Ksuid", () => {
   let testInstance: Instance;

@@ -1,4 +1,5 @@
 import type { Locator, Page } from "playwright";
+
 import type { Side } from "../capture";
 import type { Credential } from "../protocol";
 

@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import { lintStrictContractBuildConfigs, type ClassifiedPackage } from "../src/index.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -45,7 +47,11 @@ describe("strict contract declaration build configs", () => {
       exclude: ["tests"],
     });
 
-    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("future-feature")] }))).toEqual([]);
+    expect(
+      lintStrictContractBuildConfigs(
+        snapshotOf({ root, packages: [contractPackage("future-feature")] }),
+      ),
+    ).toEqual([]);
   });
 
   it("accepts recursive test-root exclusions used by canonical contracts", () => {
@@ -56,9 +62,11 @@ describe("strict contract declaration build configs", () => {
       exclude: ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
     });
 
-    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("recursive-feature")] }))).toEqual(
-      [],
-    );
+    expect(
+      lintStrictContractBuildConfigs(
+        snapshotOf({ root, packages: [contractPackage("recursive-feature")] }),
+      ),
+    ).toEqual([]);
   });
 
   it("rejects an exclusion scoped only below src", () => {
@@ -69,9 +77,11 @@ describe("strict contract declaration build configs", () => {
       exclude: ["src/tests/**"],
     });
 
-    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("nested-feature")] }))).toMatchObject(
-      [{ policy: "contract-build-config" }],
-    );
+    expect(
+      lintStrictContractBuildConfigs(
+        snapshotOf({ root, packages: [contractPackage("nested-feature")] }),
+      ),
+    ).toMatchObject([{ policy: "contract-build-config" }]);
   });
 
   /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
@@ -83,16 +93,18 @@ describe("strict contract declaration build configs", () => {
       exclude: [],
     });
 
-    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("api-key")] }))).toMatchObject([
-      { policy: "contract-build-config" },
-    ]);
+    expect(
+      lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("api-key")] })),
+    ).toMatchObject([{ policy: "contract-build-config" }]);
   });
 
   it("requires the build config when a discovered strict contract has a build script", () => {
     root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
 
-    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("new-contract")] }))).toMatchObject([
-      { policy: "contract-build-config" },
-    ]);
+    expect(
+      lintStrictContractBuildConfigs(
+        snapshotOf({ root, packages: [contractPackage("new-contract")] }),
+      ),
+    ).toMatchObject([{ policy: "contract-build-config" }]);
   });
 });

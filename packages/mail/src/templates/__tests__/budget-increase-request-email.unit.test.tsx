@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sendBudgetIncreaseRequestEmail } from "../budget-increase-request-email.tsx";
-import { sendEmail } from "../../email-sender.ts";
+
 import { TestMailer } from "../../__tests__/mailer.test-double.ts";
+import { sendEmail } from "../../email-sender.ts";
+import { sendBudgetIncreaseRequestEmail } from "../budget-increase-request-email.tsx";
 
 vi.mock("../../email-sender.ts", () => ({
   sendEmail: vi.fn(),

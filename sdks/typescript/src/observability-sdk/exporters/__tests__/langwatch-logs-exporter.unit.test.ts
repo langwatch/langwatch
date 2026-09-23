@@ -1,8 +1,6 @@
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  LangWatchLogsExporter,
-  type LangWatchLogsExporterOptions,
-} from "../langwatch-logs-exporter";
+
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,
@@ -10,7 +8,10 @@ import {
   LANGWATCH_SDK_RUNTIME,
   LOGS_PATH,
 } from "../../../internal/constants";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import {
+  LangWatchLogsExporter,
+  type LangWatchLogsExporterOptions,
+} from "../langwatch-logs-exporter";
 
 const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 const DEFAULT_URL = `${DEFAULT_ENDPOINT}${LOGS_PATH}`;

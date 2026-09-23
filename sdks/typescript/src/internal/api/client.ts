@@ -1,5 +1,8 @@
 import openApiCreateClient, { type Middleware } from "openapi-fetch";
-import type { paths } from "../generated/openapi/api-client";
+
+import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
+import { resolveEndpoint } from "@/internal/endpoint";
+
 import { version } from "../../../package.json";
 import {
   LANGWATCH_SDK_LANGUAGE,
@@ -7,11 +10,10 @@ import {
   LANGWATCH_SDK_RUNTIME,
   LANGWATCH_SDK_VERSION,
 } from "../constants";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { scopedApiKey, scopedProjectId } from "@/internal/credentialContext";
+import type { paths } from "../generated/openapi/api-client";
+import { langwatchFetch } from "../http/langwatchFetch";
 import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
-import { langwatchFetch } from "../http/langwatchFetch";
 
 /**
  * Turns a NAMED failure into a typed throw, once, for every call that goes through this

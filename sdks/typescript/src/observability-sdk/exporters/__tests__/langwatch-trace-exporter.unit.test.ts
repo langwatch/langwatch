@@ -1,8 +1,6 @@
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  LangWatchTraceExporter,
-  type LangWatchTraceExporterOptions,
-} from "../langwatch-trace-exporter";
+
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY,
   LANGWATCH_SDK_LANGUAGE,
@@ -10,7 +8,10 @@ import {
   LANGWATCH_SDK_RUNTIME,
   TRACES_PATH,
 } from "../../../internal/constants.js";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import {
+  LangWatchTraceExporter,
+  type LangWatchTraceExporterOptions,
+} from "../langwatch-trace-exporter";
 
 const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 const DEFAULT_URL = `${DEFAULT_ENDPOINT}${TRACES_PATH}`;

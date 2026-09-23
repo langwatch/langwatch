@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { openFakeWorkbenchTab } from "./fake-workbench-tab";
 import { seedComparisonWorkbench } from "./seed-optimization-workbench";
 import {

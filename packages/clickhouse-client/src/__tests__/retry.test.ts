@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { QueryRequest } from "../query.ts";
 import { RetryPolicy, runWithRetry } from "../retry.ts";
 

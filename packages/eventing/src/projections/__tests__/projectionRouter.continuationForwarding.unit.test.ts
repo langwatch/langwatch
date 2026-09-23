@@ -1,6 +1,7 @@
 // Continuation flag must survive the runtime chain to prevent double-apply
 // (#6578); each link is pinned separately to catch drops early.
 import { describe, expect, it, vi } from "vitest";
+
 import type { Event } from "../../domain/types.ts";
 import type { JobDelivery } from "../../queues/index.ts";
 import {

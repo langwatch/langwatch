@@ -1,10 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import type { CommandResult } from "../../utils/output";
 import { formatTable } from "../../utils/formatting";
-import { createDatasetService } from "./service-factory";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Truncates a string to a maximum length, adding ellipsis if truncated.

@@ -2,14 +2,15 @@
  * Shared utilities for end-to-end tests
  */
 
+import { type Span as OtelSpan, trace } from "@opentelemetry/api";
+import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { beforeAll, afterAll, afterEach, expect } from "vitest";
+
+import { LangWatch } from "../../../client-sdk";
+import { type GetTraceResponse } from "../../../client-sdk/services/traces/types";
+import { LangWatchExporter } from "../../exporters";
 import { setupObservability } from "../../setup/node";
 import { getLangWatchTracer } from "../../tracer";
-import { LangWatch } from "../../../client-sdk";
-import { LangWatchExporter } from "../../exporters";
-import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { type Span as OtelSpan, trace } from "@opentelemetry/api";
-import { type GetTraceResponse } from "../../../client-sdk/services/traces/types";
 
 type Trace = GetTraceResponse;
 type Span = NonNullable<Trace["spans"]>[number];

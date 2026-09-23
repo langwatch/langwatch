@@ -1,13 +1,14 @@
+import { logs, createNoopLogger } from "@opentelemetry/api-logs";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import {
   getLangWatchLogger,
   getLangWatchLoggerFromProvider,
   setLangWatchLoggerProvider,
   createLangWatchLogger,
 } from "..";
-import { logs, createNoopLogger } from "@opentelemetry/api-logs";
-import { type LangWatchLogRecord } from "../types";
 import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
+import { type LangWatchLogRecord } from "../types";
 
 vi.mock("@opentelemetry/api-logs", () => ({
   logs: {

@@ -7,11 +7,7 @@
 
 import { VStack } from "@chakra-ui/react";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import {
-  type BatchRun,
-  ScenarioRunContent,
-  targetKeyOfRun,
-} from "@langwatch/suite-browser-kit";
+import { type BatchRun, ScenarioRunContent, targetKeyOfRun } from "@langwatch/suite-browser-kit";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type {

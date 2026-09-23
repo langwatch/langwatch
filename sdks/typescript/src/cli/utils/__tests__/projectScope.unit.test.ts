@@ -4,12 +4,14 @@
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
 import type {
   PaginatedProjects,
   Project,
   ProjectsApiService,
 } from "@/client-sdk/services/projects/projects-api.service";
 import { ProjectsApiError } from "@/client-sdk/services/projects/projects-api.service";
+
 import { ProjectScopeError, resolveProjectSelector } from "../projectScope";
 
 const project = (over: Partial<Project> & Pick<Project, "id" | "slug">): Project => ({

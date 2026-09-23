@@ -3,7 +3,9 @@
  * empty binding lists must display empty, not permission mode values.
  */
 import chalk from "chalk";
+
 import type { ApiKeyDetail } from "@/client-sdk/services/api-keys/api-keys-api.service";
+
 import { formatTable } from "../../utils/formatting";
 
 /**

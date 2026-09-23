@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { HighlightedCode, InlineLink, Muted, Paragraph } from "../email-layout.tsx";
 
 /**

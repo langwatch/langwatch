@@ -1,5 +1,5 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { BrowserSessionIdentity } from "../browser-session.ts";

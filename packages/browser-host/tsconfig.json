@@ -8,11 +8,9 @@
     "verbatimModuleSyntax": true,
     "types": ["node"],
 
-
     "rootDir": ".",
 
-    "outDir": "dist",
-
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
 

@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/config": ["./src/index.ts"]
-    },
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/__tests__/**"],

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   CLOUD_FREE_LICENSING_PLAN,
   ENTERPRISE_TEMPLATE,

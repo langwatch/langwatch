@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/enterprise-governance-process": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/__tests__/testing.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

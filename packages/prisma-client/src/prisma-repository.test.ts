@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { PrismaRepository, prismaRepositories } from "./prisma-repository.ts";
+
 import type { PrismaClient } from "./generated/client.ts";
+import { PrismaRepository, prismaRepositories } from "./prisma-repository.ts";
 
 class AnnotationRepository extends PrismaRepository.for("Annotation") {
   static readonly create = this.factory((prisma) => new AnnotationRepository(prisma));
@@ -33,7 +34,10 @@ describe("PrismaRepository", () => {
 
   it("builds repositories from one shared Prisma client and derives their claims", () => {
     const prisma = {} as PrismaClient;
-    const provider = prismaRepositories({ annotations: AnnotationRepository, queues: QueueRepository });
+    const provider = prismaRepositories({
+      annotations: AnnotationRepository,
+      queues: QueueRepository,
+    });
     const repositories = provider.create({ prisma });
 
     expect(provider.requires).toEqual(["prisma"]);

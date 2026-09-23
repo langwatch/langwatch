@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { AnnotationsApiError,AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
+
+import {
+  AnnotationsApiError,
+  AnnotationsApiService,
+} from "@/client-sdk/services/annotations/annotations-api.service";
+
 import { setOutputFormat } from "../../../utils/errorOutput";
 
 vi.mock("@/client-sdk/services/annotations/annotations-api.service", async (importOriginal) => {
@@ -26,10 +31,10 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listAnnotationsCommand } from "../list";
-import { getAnnotationCommand } from "../get";
 import { createAnnotationCommand } from "../create";
 import { deleteAnnotationCommand } from "../delete";
+import { getAnnotationCommand } from "../get";
+import { listAnnotationsCommand } from "../list";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

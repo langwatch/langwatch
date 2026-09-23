@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "../storage.ts";
 import { detectCompression, MSGPACK_MIN_BYTES } from "../bodyCodec.ts";
 import { decodeJobEnvelope, encodeJobEnvelope, splitEnvelope } from "../jobEnvelope.ts";
+import { createTenantId } from "../storage.ts";
 import { TieredBlobStore } from "../tieredBlobStore.ts";
 import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blob-test-doubles.ts";
 

@@ -1,7 +1,8 @@
-import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { build } from "esbuild";
 
 const __dirname = resolve(fileURLToPath(import.meta.url), "..");
 const serverPackage = JSON.parse(readFileSync(resolve(__dirname, "../package.json"), "utf8"));

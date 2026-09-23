@@ -1,9 +1,9 @@
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
+import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type { RetentionPolicy } from "../runtime.types.ts";
 import type { EnqueueDispatchOptions } from "../subscribers/eventSubscriber.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
-import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
  * Stateless projection: pure map function transforms each event into a record

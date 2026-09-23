@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { composeSystemPrompt, prependResumeSeed } from "./system-prompt.js";
 
 describe("composeSystemPrompt", () => {

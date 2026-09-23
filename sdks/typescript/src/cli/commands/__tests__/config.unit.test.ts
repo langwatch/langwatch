@@ -1,15 +1,16 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
 /**
  * `langwatch config set daemon off` — the persistent daemon opt-out — and the
  * per-key validation around it. Driven against a real (temporary) config file
  * via LANGWATCH_CLI_CONFIG, the override the file lookup already honours.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 
-import { configGetCommand, configListCommand, configSetCommand } from "../config";
 import { loadConfig } from "../../utils/governance/config";
+import { configGetCommand, configListCommand, configSetCommand } from "../config";
 
 describe("config commands", () => {
   let dir: string;

@@ -1,7 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
-import type { TaskCatalogue } from "./task-catalogue.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { TaskCatalogue } from "./task-catalogue.ts";
 
 /**
  * `argv` is the raw args after the program name: `["clickhouse-migrate",

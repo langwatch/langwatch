@@ -10,6 +10,7 @@ setupScenarioTracing();
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+
 import {
   listAnnotations,
   listDatasets,

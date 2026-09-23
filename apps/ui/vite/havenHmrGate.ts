@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
+
 import type { ModuleNode, Plugin, ViteDevServer } from "vite";
 
 function releaseIsolatedUpdate({

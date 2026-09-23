@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/scenarios/scenario-run-parameters.feature
@@ -11,7 +12,6 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { suiteSchema, type SuiteApi, type SuiteRunResult } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";

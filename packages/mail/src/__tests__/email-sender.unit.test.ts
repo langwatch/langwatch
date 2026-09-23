@@ -30,9 +30,9 @@ vi.mock("@aws-sdk/client-ses", () => {
   return { SESClient, SendEmailCommand, SendRawEmailCommand };
 });
 
+import { MailerAdapter } from "../adapters/mailer.adapter.ts";
 import { sendEmail as sendEmailWithMailer } from "../email-sender.ts";
 import { buildRawMimeMessage, rfc2047EncodeHeader } from "../providers/mime.ts";
-import { MailerAdapter } from "../adapters/mailer.adapter.ts";
 import type { SesAwsClientConfiguration } from "../providers/ses.ts";
 import type { EmailContent } from "../providers/types.ts";
 

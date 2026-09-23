@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { placeholderRuntime } from "../src/shared/runtime-placeholder.ts";
-import type { RuntimeApi, RuntimeContext } from "../src/shared/runtime-contract.ts";
-import { allocatePorts } from "../src/shared/ports.ts";
-import { paths } from "../src/shared/paths.ts";
+
 import { resolveLocalOrchestratorConfig } from "../src/platform/config/local-orchestrator.config.ts";
+import { paths } from "../src/shared/paths.ts";
+import { allocatePorts } from "../src/shared/ports.ts";
+import type { RuntimeApi, RuntimeContext } from "../src/shared/runtime-contract.ts";
+import { placeholderRuntime } from "../src/shared/runtime-placeholder.ts";
 
 const ctx: RuntimeContext = {
   ports: allocatePorts(5560),

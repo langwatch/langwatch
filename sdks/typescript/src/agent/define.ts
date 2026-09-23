@@ -7,7 +7,6 @@ import { ConsoleLogger, type Logger } from "../logger";
 import { getSharedClient, warnOnce, type AgentRuntime } from "./client";
 import { resolveEnabled, resolveEnvironment, resolveInstanceLabel } from "./identity";
 import type { AgentMessage, AgentParameterValue, JsonSchemaObject } from "./protocol";
-import type { AgentTransport } from "./transport";
 import {
   AgentParameterError,
   createParameterReader,
@@ -19,6 +18,7 @@ import {
   type ParameterInput,
   type StandardJsonSchema,
 } from "./schema";
+import type { AgentTransport } from "./transport";
 
 /** The default call timeout, and the cap the platform enforces. */
 export const DEFAULT_TIMEOUT_MS = 120_000;

@@ -1,15 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner.ts";
-import { resolveCredentials } from "../../utils/apiKey.ts";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output.ts";
-import { redactTriggerSecrets } from "./redact.ts";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { redactTriggerSecrets } from "./redact.ts";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in whatever

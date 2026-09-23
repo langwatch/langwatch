@@ -16,11 +16,11 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listMonitorsCommand } from "../list";
-import { getMonitorCommand } from "../get";
 import { createMonitorCommand } from "../create";
-import { updateMonitorCommand } from "../update";
 import { deleteMonitorCommand } from "../delete";
+import { getMonitorCommand } from "../get";
+import { listMonitorsCommand } from "../list";
+import { updateMonitorCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

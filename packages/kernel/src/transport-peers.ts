@@ -27,21 +27,18 @@ export interface TransportPeers {
  */
 export class MissingTransportPeerError extends Error {
   constructor(readonly token: string) {
-    super(
-      `This process builds its doors from ${token}, and no installed module provides it.`,
-    );
+    super(`This process builds its doors from ${token}, and no installed module provides it.`);
     this.name = "MissingTransportPeerError";
   }
 }
 
 /** The peers a booting application hands its door factory. */
-export function transportPeersOf(
-  resolve: (token: TokenIdentity) => unknown,
-): TransportPeers {
+export function transportPeersOf(resolve: (token: TokenIdentity) => unknown): TransportPeers {
   return {
     app: <Instance>(token: DependencyToken<Instance>): Instance => {
       const instance = resolve(token as TokenIdentity);
-      if (instance === void 0) throw new MissingTransportPeerError(tokenName(token as TokenIdentity));
+      if (instance === void 0)
+        throw new MissingTransportPeerError(tokenName(token as TokenIdentity));
       return instance as Instance;
     },
     find: <Instance>(token: DependencyToken<Instance>): Instance | undefined =>

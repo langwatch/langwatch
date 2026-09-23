@@ -13,8 +13,9 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
-import { tagRenameCommand } from "../rename";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import { tagRenameCommand } from "../rename";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

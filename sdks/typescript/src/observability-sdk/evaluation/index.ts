@@ -6,6 +6,7 @@
 
 import { type Span, isSpanContextValid } from "@opentelemetry/api";
 import { generate as generateKsuid } from "xksuid";
+
 import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../semconv/attributes";
 
 /**

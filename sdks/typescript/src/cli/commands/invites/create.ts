@@ -1,9 +1,12 @@
-import chalk from "chalk";
 import fs from "fs";
+
+import chalk from "chalk";
+
 import {
   OrganizationApiService,
   type InviteInput,
 } from "@/client-sdk/services/organization/organization-api.service";
+
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { formatTable } from "../../utils/formatting";
 import { composeInvitesFromFlags, parseInvitesJson } from "../../utils/managementInvites";

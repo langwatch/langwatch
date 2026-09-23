@@ -1,13 +1,14 @@
 import type { RunPlanRunBody } from "@/client-sdk/services/run-plans";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
-import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
+import { parseRunNoteFlag } from "../../utils/runNote";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { createCliRunPlansService } from "../run-plans/cli-run-plans-service";
-import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
 import { emitRunResult } from "../run-plans/reportRun";
+import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
 
 export interface RunScenarioOptions extends RawOutputFlags {
   target?: string[];

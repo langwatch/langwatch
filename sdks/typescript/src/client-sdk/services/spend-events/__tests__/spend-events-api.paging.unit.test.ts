@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import {
   SpendEventsApiError,
   SpendEventsApiService,
@@ -143,9 +144,7 @@ describe("SpendEventsApiService cursor paging", () => {
 
     describe("when a spend page is read", () => {
       it("reads the missing image quantities as zero on a listed event", async () => {
-        mockFetch.mockResolvedValueOnce(
-          jsonResponse(legacyEventsPage("req_old")),
-        );
+        mockFetch.mockResolvedValueOnce(jsonResponse(legacyEventsPage("req_old")));
 
         const page = await new SpendEventsApiService().listPage(WINDOW);
 

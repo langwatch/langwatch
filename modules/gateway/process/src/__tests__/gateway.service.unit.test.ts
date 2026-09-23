@@ -1,7 +1,7 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayAudit } from "../app/gateway.members.ts";

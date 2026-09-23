@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { GuardNext, GuardParams } from "./guard-middleware.ts";
 
 const calls = vi.hoisted(() => ({

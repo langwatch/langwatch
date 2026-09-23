@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The per-organization answer covers only organizations the caller belongs
  * to, omitting the rest — otherwise a membership oracle. The whole list is
@@ -6,7 +7,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";

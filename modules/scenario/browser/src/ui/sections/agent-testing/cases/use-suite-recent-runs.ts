@@ -5,10 +5,7 @@
  */
 
 import type { Period } from "@langwatch/analytics-browser-kit";
-import {
-  computeBatchRunSummary,
-  groupRunsByBatchId,
-} from "@langwatch/suite-browser-kit";
+import { computeBatchRunSummary, groupRunsByBatchId } from "@langwatch/suite-browser-kit";
 import { useMemo } from "react";
 
 import { api } from "../../../../behavior/scenario-api.ts";

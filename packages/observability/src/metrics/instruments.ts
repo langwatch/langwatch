@@ -10,6 +10,7 @@ import {
   type Histogram,
   type Meter,
 } from "@opentelemetry/api";
+
 import { HISTOGRAM_BOUNDARIES } from "./histogram-boundaries.ts";
 
 /**

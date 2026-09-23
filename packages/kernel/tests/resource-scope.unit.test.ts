@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { ResourceScope } from "../src/index.ts";
 
 describe("ResourceScope", () => {

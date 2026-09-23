@@ -5,12 +5,14 @@
  */
 
 import { trace, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
-import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
-import type { EvaluationResult, EvaluateOptions, EvaluateRequest, EvaluateResponse } from "./types";
-import { EvaluatorCallError, EvaluatorNotFoundError, EvaluationsApiError } from "./errors";
-import type { Logger } from "@/logger";
+
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import type { Logger } from "@/logger";
+import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
+
+import { EvaluatorCallError, EvaluatorNotFoundError, EvaluationsApiError } from "./errors";
+import type { EvaluationResult, EvaluateOptions, EvaluateRequest, EvaluateResponse } from "./types";
 
 type EvaluationsFacadeConfig = {
   endpoint: string;

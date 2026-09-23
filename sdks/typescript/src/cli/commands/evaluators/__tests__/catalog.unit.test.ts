@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { closestEvaluatorTypes, evaluatorTypeCatalog, isValidEvaluatorType } from "../catalog";
 
 describe("the CLI's evaluator-type catalog", () => {

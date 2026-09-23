@@ -1,5 +1,6 @@
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
 import * as React from "react";
+
 import { CloseButton } from "./close-button.tsx";
 
 export type DialogRootProps = Omit<ChakraDialog.RootProps, "size"> & {

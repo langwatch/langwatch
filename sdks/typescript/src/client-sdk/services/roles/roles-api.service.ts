@@ -3,6 +3,7 @@
  * permission catalog they are built from.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
+
 import {
   createManagementRequest,
   managementPath,

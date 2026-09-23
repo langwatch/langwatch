@@ -4,6 +4,7 @@
  * typed error; anything else keeps the generic path's behaviour byte for byte.
  */
 import { handledErrorFrom, type LangWatchHandledError } from "@/internal/api/errors";
+
 import { extractStatusFromResponse } from "./format-api-error";
 
 export interface ThrowIfHandledErrorParams {

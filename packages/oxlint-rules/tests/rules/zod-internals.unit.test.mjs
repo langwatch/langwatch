@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { zodInternalsRule } from "../../src/rules/zod-internals.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 

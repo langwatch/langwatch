@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import type { Ora } from "ora";
+
 import {
   readCommandError,
   renderErrorAsJson,

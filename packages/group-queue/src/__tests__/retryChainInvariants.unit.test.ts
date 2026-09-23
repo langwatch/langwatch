@@ -3,6 +3,7 @@
  * compiler-enforced link; past violations of these invariants led to delivery duplication.
  */
 import { describe, expect, it } from "vitest";
+
 import { GROUP_ATTEMPT_TTL_SECONDS } from "../groupQueue.ts";
 import { getBackoffMs, JOB_RETRY_CONFIG } from "../retry.ts";
 

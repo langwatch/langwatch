@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+
+import { Instance } from "../instance.ts";
 import {
   checkPrefix,
   checkUint,
@@ -8,7 +10,6 @@ import {
   checkNonEmptyString,
   ValidationError,
 } from "../validation.ts";
-import { Instance } from "../instance.ts";
 
 describe("Validation", () => {
   describe("checkPrefix()", () => {

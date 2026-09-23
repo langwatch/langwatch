@@ -7,7 +7,11 @@ describe("processFailureLine", () => {
     const error = new TypeError('Feature API "project" must be implemented by an object.');
 
     describe("when it reports the failure", () => {
-      const line = processFailureLine({ service: "langwatch-api", event: "fatal boot failure", error });
+      const line = processFailureLine({
+        service: "langwatch-api",
+        event: "fatal boot failure",
+        error,
+      });
       const record = JSON.parse(line) as Record<string, unknown>;
 
       // @scenario "A process that cannot boot prints one fatal record with its stack"
@@ -32,7 +36,11 @@ describe("processFailureLine", () => {
   describe("given a failure that is not an Error", () => {
     it("names the event and the value, with no stack", () => {
       const record = JSON.parse(
-        processFailureLine({ service: "langwatch-backend", event: "unhandled rejection", error: "boom" }),
+        processFailureLine({
+          service: "langwatch-backend",
+          event: "unhandled rejection",
+          error: "boom",
+        }),
       ) as Record<string, unknown>;
       expect(record.msg).toBe("unhandled rejection: boom");
       expect(record.error).toEqual({ type: "string", message: "boom" });
@@ -43,7 +51,10 @@ describe("processFailureLine", () => {
   describe("given an event with no error behind it", () => {
     it("is the event alone", () => {
       const record = JSON.parse(
-        processFailureLine({ service: "langwatch-backend", event: "shutdown outlived its deadline; exiting" }),
+        processFailureLine({
+          service: "langwatch-backend",
+          event: "shutdown outlived its deadline; exiting",
+        }),
       ) as Record<string, unknown>;
       expect(record.msg).toBe("shutdown outlived its deadline; exiting");
       expect(record).not.toHaveProperty("error");

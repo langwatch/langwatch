@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { sendEmail } from "../email-sender.ts";
 import type { EmailDelivery } from "../providers/types.ts";
 import { EmailLayout, Paragraph, PrimaryButton } from "./email-layout.tsx";
@@ -43,8 +44,8 @@ export const SignUpVerificationEmail = ({
     {firstSteps && <FirstSteps {...firstSteps} />}
     <Paragraph>
       This link expires in 1 hour and can be used once. If this was not you, you can ignore this
-      email — the account cannot sign anybody in until this address is confirmed, and it will not
-      be used for anything else.
+      email — the account cannot sign anybody in until this address is confirmed, and it will not be
+      used for anything else.
     </Paragraph>
   </EmailLayout>
 );

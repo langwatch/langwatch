@@ -123,9 +123,7 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>> {
   }
 
   /** See GroupQueueProcessor.registerPreflightGroups — a producer registers, never consumes. */
-  registerPreflightGroups(
-    resolveGroupIds: () => readonly (string | undefined)[],
-  ): Promise<void> {
+  registerPreflightGroups(resolveGroupIds: () => readonly (string | undefined)[]): Promise<void> {
     return this.#processor.registerPreflightGroups(resolveGroupIds);
   }
 

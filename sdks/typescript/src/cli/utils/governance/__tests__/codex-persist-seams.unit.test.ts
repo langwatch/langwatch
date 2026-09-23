@@ -5,6 +5,7 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 // `__dirname`, not `import.meta.url`: this package type-checks against a

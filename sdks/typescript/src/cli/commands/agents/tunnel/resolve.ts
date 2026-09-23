@@ -4,12 +4,15 @@
  */
 
 import * as path from "node:path";
+
 import chalk from "chalk";
 import prompts from "prompts";
+
 import {
   type AgentResponse,
   type AgentsApiService,
 } from "@/client-sdk/services/agents/agents-api.service";
+
 import { commandValidationError, reportCommandError } from "../../../utils/errorOutput";
 import { loadConfig, saveConfig } from "../../../utils/governance/config";
 

@@ -1,16 +1,19 @@
+import * as fs from "fs";
+import * as path from "path";
+
+import { setupServer } from "msw/node";
+import { createOpenApiHttp } from "openapi-msw";
 /**
  * Integration tests for PromptsFacade with MSW.
  * Tests CRUD operations and get prompt behavior with mocked API.
  */
 import { describe, expect, it, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
-import { setupServer } from "msw/node";
-import { createOpenApiHttp } from "openapi-msw";
-import * as fs from "fs";
-import * as path from "path";
-import type { paths } from "@/internal/generated/openapi/api-client";
-import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
-import { CliRunner } from "../../../../../__tests__/e2e/cli/helpers/cli-runner";
+
 import { LangWatch } from "@/client-sdk";
+import type { paths } from "@/internal/generated/openapi/api-client";
+
+import { CliRunner } from "../../../../../__tests__/e2e/cli/helpers/cli-runner";
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 
 const http = createOpenApiHttp<paths>({
   baseUrl: process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560",

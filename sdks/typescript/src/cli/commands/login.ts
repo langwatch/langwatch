@@ -1,14 +1,16 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import chalk from "chalk";
 import prompts from "prompts";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { rememberProjectName } from "@/cli/utils/identityNotice";
-import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
-import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
-import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
+
 import { recordCliLocation } from "@/cli/utils/governance/cli-location";
+import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
+import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
+import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
+import { rememberProjectName } from "@/cli/utils/identityNotice";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
 

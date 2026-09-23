@@ -1,21 +1,22 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner.ts";
+
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import {
   AgentsApiService,
   type AgentCallBody,
   type AgentCallMessage,
   type AgentParameterSpec,
 } from "@/client-sdk/services/agents/agents-api.service";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { formatFetchError } from "../../utils/formatFetchError.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
 import type { CommandResult } from "../../utils/output.ts";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 export interface RunAgentOptions {
   input?: string;

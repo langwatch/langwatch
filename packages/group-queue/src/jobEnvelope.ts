@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import type { Logger } from "@langwatch/observability";
 
-import { errorText as errText, safeParseErrorText as safeParseErrText } from "./errors.ts";
 import { MAX_BLOB_BYTES } from "./blobConstants.ts";
 import {
   type CompressionCodec,
@@ -13,9 +12,10 @@ import {
   decompress,
   encodePayload,
 } from "./bodyCodec.ts";
+import { errorText as errText, safeParseErrorText as safeParseErrText } from "./errors.ts";
 import { gqPayloadTooLargeTotal } from "./metrics.ts";
-import type { BlobRef, TieredBlobStore } from "./tieredBlobStore.ts";
 import type { TenantId } from "./storage.ts";
+import type { BlobRef, TieredBlobStore } from "./tieredBlobStore.ts";
 
 /**
  * zlib reports an over-limit result as ERR_BUFFER_TOO_LARGE (or an "output

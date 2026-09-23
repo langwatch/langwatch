@@ -5,6 +5,7 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import chalk from "chalk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +37,7 @@ import {
   AgentsApiService,
   type AgentResponse,
 } from "@/client-sdk/services/agents/agents-api.service";
+
 import { describeParameter, getAgentCommand } from "../get";
 import { agentOwnerLabel, agentStatusColor, agentStatusLabel, listAgentsCommand } from "../list";
 import { buildRelayBody, runAgentCommand } from "../run";

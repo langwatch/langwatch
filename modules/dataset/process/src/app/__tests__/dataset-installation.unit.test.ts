@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
@@ -6,7 +7,6 @@
  */
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { datasetServer } from "../../dataset.server.ts";

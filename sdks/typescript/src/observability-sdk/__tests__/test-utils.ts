@@ -1,4 +1,3 @@
-import { vi, expect } from "vitest";
 import {
   type Span,
   type SpanContext,
@@ -14,6 +13,8 @@ import {
   SpanKind,
   type SpanStatusCode,
 } from "@opentelemetry/api";
+import { vi, expect } from "vitest";
+
 import { createLangWatchSpan } from "../span";
 import { getLangWatchTracerFromProvider } from "../tracer";
 

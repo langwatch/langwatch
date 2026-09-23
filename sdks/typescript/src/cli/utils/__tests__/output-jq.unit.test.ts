@@ -4,6 +4,7 @@
  * fabricated `null` at exit 0. Split out of `output-port.unit.test.ts`.
  */
 import { describe, it, expect } from "vitest";
+
 import { applyJq } from "../output";
 
 describe("applyJq", () => {

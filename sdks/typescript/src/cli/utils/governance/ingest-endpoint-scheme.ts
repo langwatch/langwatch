@@ -13,15 +13,15 @@ const LOOPBACK_V6 = new Set(["::1", "0:0:0:0:0:0:0:1"]);
  * endpoint is refused elsewhere, and a warning naming nothing helps no one.
  */
 export function sendsIngestKeyInClear(endpoint: string | undefined): boolean {
-	if (!endpoint?.trim()) return false;
-	let url: URL;
-	try {
-		url = new URL(endpoint.trim());
-	} catch {
-		return false;
-	}
-	if (url.protocol !== "http:") return false;
-	return !isLoopbackHost(url.hostname);
+  if (!endpoint?.trim()) return false;
+  let url: URL;
+  try {
+    url = new URL(endpoint.trim());
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "http:") return false;
+  return !isLoopbackHost(url.hostname);
 }
 
 /**
@@ -30,13 +30,16 @@ export function sendsIngestKeyInClear(endpoint: string | undefined): boolean {
  * IPv4-mapped IPv6 spelling `new URL()` normalises `[::ffff:127.0.0.1]` into.
  */
 function isLoopbackHost(hostname: string): boolean {
-	const host = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
-	if (host === "localhost" || host.endsWith(".localhost")) return true;
-	if (LOOPBACK_V6.has(host)) return true;
-	if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
-	const mapped = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
-	if (mapped && Number.parseInt(mapped[1]!, 16) >>> 8 === 127) return true;
-	return false;
+  const host = hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (LOOPBACK_V6.has(host)) return true;
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+  const mapped = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+  if (mapped && Number.parseInt(mapped[1]!, 16) >>> 8 === 127) return true;
+  return false;
 }
 
 /**
@@ -45,13 +48,13 @@ function isLoopbackHost(hostname: string): boolean {
  * not have typed, and says what to do without claiming they cannot do this.
  */
 export function cleartextIngestEndpointWarning(endpoint: string): string {
-	return `the ingest key will travel unencrypted to ${safeHost(endpoint)}: ${endpoint} is plain http. Outside a private network, use an https endpoint.`;
+  return `the ingest key will travel unencrypted to ${safeHost(endpoint)}: ${endpoint} is plain http. Outside a private network, use an https endpoint.`;
 }
 
 function safeHost(endpoint: string): string {
-	try {
-		return new URL(endpoint.trim()).host;
-	} catch {
-		return "that host";
-	}
+  try {
+    return new URL(endpoint.trim()).host;
+  } catch {
+    return "that host";
+  }
 }

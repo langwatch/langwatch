@@ -12,6 +12,7 @@ import { setOpencodeOpenTelemetryFlag } from "@/cli/utils/opencode-config-flag";
 import { claudeProjectSettingsTarget } from "./app-settings";
 import { lwTag } from "./brand";
 import { GovernanceCliError, issuePersonalVirtualKey } from "./cli-api";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import type { GovernanceConfig } from "./config";
 import { saveConfig } from "./config";
 import { deviceLabelForThisMachine } from "./device-label";
@@ -20,7 +21,6 @@ import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { runningCodeRestartNotice } from "./running-code";
 import { SHELL_FUNCTION_TOOLS, assertCodexTurnHarvest } from "./shell-rc";
-import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
   type ClaudeProjectPinResult,
   ensureClaudeProjectTelemetryPin,

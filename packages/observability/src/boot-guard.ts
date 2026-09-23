@@ -4,6 +4,7 @@
  * entry code runs — so the handlers below can't depend on it resolving first.
  */
 import process from "node:process";
+
 import { processFailureLine } from "./run-script.ts";
 
 /** Fatal handlers a process must have before its real entry point loads. */
@@ -36,7 +37,10 @@ export function installBootGuard(service: string): { dispose(): void } {
  * inline `import()` — a boot seam, not lazy loading, so a failure rejects
  * rather than crashing pre-handler; dispose() then hands off to the entry's own handlers.
  */
-export async function bootNodeExecutable(service: string, load: () => Promise<unknown>): Promise<void> {
+export async function bootNodeExecutable(
+  service: string,
+  load: () => Promise<unknown>,
+): Promise<void> {
   const guard = installBootGuard(service);
   try {
     await load();

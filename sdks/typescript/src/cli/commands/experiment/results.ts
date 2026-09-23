@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   ExperimentsApiService,
   type ExperimentRunResultsResponse,
@@ -7,10 +7,12 @@ import {
   type ExperimentRunEvaluation,
 } from "@/client-sdk/services/experiments/experiments-api.service";
 import { deriveRunStatus, isTerminalStatus } from "@/client-sdk/services/experiments/run-status";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { resolveRunId } from "./resolve-run";
 
 export type ExperimentResultsFilter = "failed" | "all";

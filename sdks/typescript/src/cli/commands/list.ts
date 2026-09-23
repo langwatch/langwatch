@@ -1,12 +1,14 @@
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
+
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
+
 import { resolveCredentials } from "../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../utils/formatting";
-import { parsePositiveIntOrNull } from "../utils/positiveInt";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { failSpinner } from "../utils/spinnerError";
 import type { CommandResult } from "../utils/output";
+import { parsePositiveIntOrNull } from "../utils/positiveInt";
+import { createSpinner } from "../utils/spinner";
+import { failSpinner } from "../utils/spinnerError";
 
 export interface PromptListOptions {
   /** How many prompts to return. All of them when absent. */

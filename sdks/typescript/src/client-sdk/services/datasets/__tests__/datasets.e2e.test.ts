@@ -3,7 +3,9 @@
  * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
+
 import { DatasetNotFoundError, DatasetValidationError } from "../errors";
 
 const SKIP = !process.env.LANGWATCH_API_KEY;

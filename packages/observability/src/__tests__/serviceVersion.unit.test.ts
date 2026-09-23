@@ -1,6 +1,7 @@
 /** Whether a log line can say which build produced it. */
 
 import { describe, expect, it } from "vitest";
+
 import { resolveLoggerConfiguration } from "../logger-config.ts";
 import { serviceVersionField } from "../logger.ts";
 

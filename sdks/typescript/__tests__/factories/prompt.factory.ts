@@ -1,4 +1,5 @@
 import { Factory } from "fishery";
+
 import type { PromptResponse } from "../../src/client-sdk/services/prompts/types";
 
 /**

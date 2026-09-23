@@ -111,9 +111,7 @@ describe("resolveLiveIngestionKey", () => {
           claude_code: { secret: "ik-lw-cachedlookupid_secret" },
         },
       });
-      vi.mocked(cliApi.listIngestionKeys).mockRejectedValue(
-        new Error("fetch failed"),
-      );
+      vi.mocked(cliApi.listIngestionKeys).mockRejectedValue(new Error("fetch failed"));
 
       const resolved = await resolveLiveIngestionKey({
         cfg,

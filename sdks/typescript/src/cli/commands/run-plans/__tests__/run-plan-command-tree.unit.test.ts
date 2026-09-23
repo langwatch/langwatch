@@ -12,9 +12,9 @@ vi.mock("@/internal/api/client", () => ({
 }));
 
 import { buildProgram } from "../../../program.ts";
-import { createCliRunPlansService } from "../cli-run-plans-service.ts";
-import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service.ts";
 import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "../../../utils/governance/surface.ts";
+import { createCliTestSuitesService } from "../../test-suites/cli-test-suites-service.ts";
+import { createCliRunPlansService } from "../cli-run-plans-service.ts";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant, which
 // no test runner defines (see help-topic.unit.test.ts).

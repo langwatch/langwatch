@@ -1,9 +1,10 @@
+import { createLogger } from "@langwatch/observability";
+
 import { EventNotFoundError } from "../../../services/errorHandling.ts";
 import type {
   EventRecord,
   EventRepository,
 } from "../../../stores/repositories/eventRepository.types.ts";
-import { createLogger } from "@langwatch/observability";
 import type {
   EventingClickHouseClient,
   EventingClickHouseClientResolver,

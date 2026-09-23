@@ -6,6 +6,7 @@
 import { ORGANIZATION_ROLES } from "@/client-sdk/services/_shared/management-types";
 import type { ManagementRole } from "@/client-sdk/services/_shared/management-types";
 import type { InviteInput } from "@/client-sdk/services/organization/organization-api.service";
+
 import { ManagementFlagError, oneOf, parseOrganizationRole, parseRoleIn } from "./managementFlags";
 
 type TeamAssignment = InviteInput["teams"][number];
@@ -36,9 +37,7 @@ const parseEmail = ({ value, source }: { value: string; source: string }): strin
  * `teamId:role`, repeated: the teams an invited person lands on and the role
  * they hold there. A team id never contains a colon.
  */
-export const parseTeamFlags = (
-  values: string[] = [],
-): { teamId: string; role: ManagementRole }[] =>
+export const parseTeamFlags = (values: string[] = []): { teamId: string; role: ManagementRole }[] =>
   values.map((value) => {
     const parts = value.split(":");
     if (parts.length !== 2) {

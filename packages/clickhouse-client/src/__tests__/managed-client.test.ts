@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { ClickHouseClientCreationInput } from "../connection.ts";
 import {
   ClickHouseManagedClientService,
@@ -149,7 +150,9 @@ describe("ClickHouseManagedClientService", () => {
     if (raw === undefined) throw new Error("Expected a raw vendor client");
     raw.query.mockRejectedValueOnce(new Error("cluster busy"));
 
-    await expect(client.query({ query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}" })).resolves.toEqual({ ok: true });
+    await expect(
+      client.query({ query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}" }),
+    ).resolves.toEqual({ ok: true });
 
     expect(raw.query).toHaveBeenCalledTimes(2);
   });
@@ -249,9 +252,13 @@ describe("ClickHouseManagedClientService", () => {
         }),
     );
 
-    const first = client.query({ query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}" });
+    const first = client.query({
+      query: "SELECT 1 FROM traces WHERE TenantId = {tenantId:String}",
+    });
     await vi.waitFor(() => expect(raw.query).toHaveBeenCalledOnce());
-    await expect(client.query({ query: "SELECT 2 FROM traces WHERE TenantId = {tenantId:String}" })).rejects.toBeInstanceOf(QueueFullError);
+    await expect(
+      client.query({ query: "SELECT 2 FROM traces WHERE TenantId = {tenantId:String}" }),
+    ).rejects.toBeInstanceOf(QueueFullError);
     release?.();
     await first;
 

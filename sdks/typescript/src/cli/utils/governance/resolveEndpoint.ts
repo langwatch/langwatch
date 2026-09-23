@@ -6,6 +6,7 @@
 
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
+
 import { loadConfig } from "./config";
 
 export interface ResolveEndpointOptions {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { resolveLocalOrchestratorConfig } from "../src/platform/config/local-orchestrator.config.ts";
 
 describe("local orchestrator configuration", () => {

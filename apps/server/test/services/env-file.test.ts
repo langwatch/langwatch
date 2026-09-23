@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
 import { readEnvFile } from "../../src/services/env-file.ts";
 
 function tmpFile(content: string): string {

@@ -4,9 +4,11 @@
  * Spec: specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import { RunPlansApiError, RunPlansApiService } from "../run-plans-api.service";
-import { isLangWatchHandledError } from "@/internal/api/errors";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
+
+import { RunPlansApiError, RunPlansApiService } from "../run-plans-api.service";
 
 /** The flat @langwatch/api envelope: the code sits at the top level. */
 const flatNotFound = {

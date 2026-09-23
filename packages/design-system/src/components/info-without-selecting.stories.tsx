@@ -1,6 +1,7 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Info } from "react-feather";
+
 import { InfoWithoutSelecting } from "./info-without-selecting.tsx";
 import { Tooltip } from "./tooltip.tsx";
 

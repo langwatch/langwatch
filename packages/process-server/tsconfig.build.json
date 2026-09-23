@@ -5,26 +5,12 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
-      "@langwatch/process-server": [
-        "./src/index.ts"
-      ]
+      "@langwatch/process-server": ["./src/index.ts"]
     },
-    "lib": [
-      "es2023",
-      "dom",
-      "dom.iterable"
-    ]
+    "lib": ["es2023", "dom", "dom.iterable"]
   },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "**/__tests__/**",
-    "**/__mocks__/**",
-    "**/tests/**",
-    "**/*.test.*",
-    "**/*.spec.*"
-  ],
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
       "path": "../actor/tsconfig.build.json"

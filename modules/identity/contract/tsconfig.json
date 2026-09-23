@@ -14,8 +14,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
 
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   // The package ships its TypeScript sources (exports point at src/*.ts), so

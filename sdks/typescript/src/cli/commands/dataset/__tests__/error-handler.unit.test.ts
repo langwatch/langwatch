@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import type { Ora } from "ora";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
+
 import {
   DatasetApiError,
   DatasetNotFoundError,
   DatasetPlanLimitError,
 } from "@/client-sdk/services/datasets/errors";
-import { handleDatasetCommandError } from "../error-handler";
+
 import { setOutputFormat } from "../../../utils/outputScope";
+import { handleDatasetCommandError } from "../error-handler";
 
 describe("handleDatasetCommandError", () => {
   let consoleErrorSpy: MockInstance<typeof console.error>;

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { prismaCountInListQueryRule } from "../../src/rules/prisma-count-in-list-query.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -83,7 +84,7 @@ describe("given a Prisma repository seam file", () => {
           "class AgentRepository {\n" +
             "  findMany() {\n" +
             "    return this.client.agent.findMany({\n" +
-            "      orderBy: { posts: { _count: \"desc\" } },\n" +
+            '      orderBy: { posts: { _count: "desc" } },\n' +
             "    });\n" +
             "  }\n" +
             "}",

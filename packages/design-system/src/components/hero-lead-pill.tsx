@@ -75,11 +75,7 @@ export function HeroLeadPill({
       transition="border-color 130ms ease, background 130ms ease"
       _hover={style._hover}
     >
-      <chakra.span
-        fontSize={style.fontSize}
-        fontWeight={style.fontWeight}
-        color={style.color}
-      >
+      <chakra.span fontSize={style.fontSize} fontWeight={style.fontWeight} color={style.color}>
         {label}
       </chakra.span>
       <HStack gap="3px">
@@ -104,13 +100,7 @@ export function HeroLeadPill({
       {/* The caret is the interaction, stated. An ask fires the moment you
           click it; this one opens and asks you to choose a route, and a
           control should look like what it does before you touch it. */}
-      <Box
-        aria-hidden
-        display="grid"
-        color="fg.subtle"
-        paddingRight="3px"
-        flexShrink={0}
-      >
+      <Box aria-hidden display="grid" color="fg.subtle" paddingRight="3px" flexShrink={0}>
         <LuChevronDown size={13} />
       </Box>
     </chakra.button>

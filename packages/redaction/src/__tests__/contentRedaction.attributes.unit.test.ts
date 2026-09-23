@@ -4,6 +4,7 @@
  * folded in — this is the mechanical sweep over identifier-shaped values.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   compilePolicyPiiExceptions,
   compilePolicySecretPatterns,
@@ -470,18 +471,15 @@ describe("redacting an attribute under a reserved trace identifier name", () => 
 
   describe("given a value shaped like the address the name promises", () => {
     /** @scenario "A reserved trace identifier name keeps the address it promises" */
-    it.each(["metadata.traceid", "langwatch.metadata.traceid"])(
-      "keeps it under %s",
-      (key) => {
-        expect(
-          redactAttributeNative({
-            key,
-            value: DECIMAL_TRACE_ADDRESS,
-            policy: policy({}),
-          }).text,
-        ).toBe(DECIMAL_TRACE_ADDRESS);
-      },
-    );
+    it.each(["metadata.traceid", "langwatch.metadata.traceid"])("keeps it under %s", (key) => {
+      expect(
+        redactAttributeNative({
+          key,
+          value: DECIMAL_TRACE_ADDRESS,
+          policy: policy({}),
+        }).text,
+      ).toBe(DECIMAL_TRACE_ADDRESS);
+    });
   });
 
   describe("given a value that is not an address at all", () => {

@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, formatStatus } from "./_shared";
-import type { CommandResult } from "../../utils/output";
 
 /**
  * Returns the listing rather than printing it (output port renders

@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { TeamsApiService } from "@/client-sdk/services/teams/teams-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { asDate, printFacts, runManagement } from "../management/_shared";
 

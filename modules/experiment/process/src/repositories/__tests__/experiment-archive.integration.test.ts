@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -15,7 +16,6 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

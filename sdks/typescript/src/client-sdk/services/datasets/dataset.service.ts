@@ -1,6 +1,14 @@
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { type LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
+import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import { type Logger } from "@/logger";
+
+import { DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError } from "./errors";
+import { tracer } from "./tracing";
 import {
   type Dataset,
   type DatasetEntry,
@@ -20,13 +28,6 @@ import {
   type UploadResponse,
   type DatasetRecordResponse,
 } from "./types";
-import { DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError } from "./errors";
-import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { tracer } from "./tracing";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;

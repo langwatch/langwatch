@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps.ts";
 
 // ADR-076 invariants. Cheap to state, expensive to lose.

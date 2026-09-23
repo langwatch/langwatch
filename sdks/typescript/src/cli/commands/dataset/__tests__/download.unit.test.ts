@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { escapeCsvField, toCsv, toJsonl } from "../download";
+
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
+
+import { escapeCsvField, toCsv, toJsonl } from "../download";
 
 describe("escapeCsvField()", () => {
   describe("when given a plain string", () => {

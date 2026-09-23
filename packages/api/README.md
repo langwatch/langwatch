@@ -2,18 +2,18 @@
 
 LangWatch's API framework, in six entry points.
 
-| Import                | What it is                                                                                                                                                                                                                                                                    |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@langwatch/api/contract` | `defineTrpcContract`: what a feature declares, in a module a browser can read. Value-imports nothing — no tRPC, no Hono, no Node API — so a feature contract and a feature web package may both name it. |
-| `@langwatch/api/access` | `decide`: the one access check both transports run after the parser — the three declarations, the scope-lineage guard, the blank-scope-id refusal and the project-id mismatch refusal. Names no transport. |
-| `@langwatch/api`      | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework. |
-| `@langwatch/api/rest` | The contract-sealed Hono service framework: explicit version namespaces, input/output validation, OpenAPI documentation, capability middleware, SSE streaming, the route-policy registry and the REST service builder.                                                        |
-| `@langwatch/api/trpc` | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                         |
-| `@langwatch/api/web` | The browser's half: `createModuleApi` derives a feature's typed tRPC hooks from its own contract, and `trpcQueryKey` / `trpcQueryFilter` / `useInvalidateProcedure` reach a procedure no contract the package names declares yet. React and `@trpc/react-query` live here and nowhere else in the package. It is the ONLY entry a web package may import. |
+| Import                    | What it is                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@langwatch/api/contract` | `defineTrpcContract`: what a feature declares, in a module a browser can read. Value-imports nothing — no tRPC, no Hono, no Node API — so a feature contract and a feature web package may both name it.                                                                                                                                                  |
+| `@langwatch/api/access`   | `decide`: the one access check both transports run after the parser — the three declarations, the scope-lineage guard, the blank-scope-id refusal and the project-id mismatch refusal. Names no transport.                                                                                                                                                |
+| `@langwatch/api`          | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework.                                                                             |
+| `@langwatch/api/rest`     | The contract-sealed Hono service framework: explicit version namespaces, input/output validation, OpenAPI documentation, capability middleware, SSE streaming, the route-policy registry and the REST service builder.                                                                                                                                    |
+| `@langwatch/api/trpc`     | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                                                                                                     |
+| `@langwatch/api/web`      | The browser's half: `createModuleApi` derives a feature's typed tRPC hooks from its own contract, and `trpcQueryKey` / `trpcQueryFilter` / `useInvalidateProcedure` reach a procedure no contract the package names declares yet. React and `@trpc/react-query` live here and nowhere else in the package. It is the ONLY entry a web package may import. |
 
 None re-exports another. A consumer that wants the error vocabulary imports
 `@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
-one wiring tRPC imports `@langwatch/api/trpc`; one *declaring* procedures for
+one wiring tRPC imports `@langwatch/api/trpc`; one _declaring_ procedures for
 both a server and a browser imports `@langwatch/api/contract`; a feature web
 package imports `@langwatch/api/web`. Most REST call sites need two of the six,
 and that is the point — the import says which half of the framework a file
@@ -35,8 +35,11 @@ Behaviour: [specs/transport-declaration-split.feature](./specs/transport-declara
 import { defineTrpcContract } from "@langwatch/api/contract";
 
 export const annotationTrpc = defineTrpcContract("annotation")
-  .query("getById").withInput(annotationScopeSchema).withOutput(annotationSchema)
-  .mutation("deleteById").withInput(annotationScopeSchema)
+  .query("getById")
+  .withInput(annotationScopeSchema)
+  .withOutput(annotationSchema)
+  .mutation("deleteById")
+  .withInput(annotationScopeSchema)
   .build();
 ```
 
@@ -81,7 +84,9 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   .withPermission("annotations:view")
   .withOutput(annotationRestResponseSchema)
   .withDocs({ summary: "Get an annotation in the caller’s project" })
-  .handle(async ({ app, input, scope }) => ({ data: await app.getById({ id: input.id, projectId: scope.id }) }))
+  .handle(async ({ app, input, scope }) => ({
+    data: await app.getById({ id: input.id, projectId: scope.id }),
+  }))
   .build();
 ```
 

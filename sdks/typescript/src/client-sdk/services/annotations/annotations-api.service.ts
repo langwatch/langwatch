@@ -1,11 +1,11 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 // The generator no longer names this shape as a standalone component (every
 // annotation operation now inlines it), so the type comes from a real
@@ -128,7 +128,10 @@ export class AnnotationsApiService {
       onError: this.handleApiError.bind(this),
     });
     if (!isDeleteAnnotationResponse(result)) {
-      this.handleApiError(operation, new Error("Delete annotation response has an unexpected shape"));
+      this.handleApiError(
+        operation,
+        new Error("Delete annotation response has an unexpected shape"),
+      );
     }
     return result;
   }

@@ -6,6 +6,7 @@
  */
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+
 import packageJson from "../package.json" with { type: "json" };
 
 const args = process.argv.slice(2);
@@ -19,8 +20,7 @@ const target = flag("target");
 // which is ignored wholesale. Resolved from this script rather than the working
 // directory so the path is the same whoever invokes it; the release workflow
 // passes its own --outfile under dist/bin, which packaging already excludes.
-const outfile =
-  flag("outfile") ?? resolve(import.meta.dir, "../../..", ".bin/langwatch/langwatch");
+const outfile = flag("outfile") ?? resolve(import.meta.dir, "../../..", ".bin/langwatch/langwatch");
 
 // `bun build --compile` refuses to overwrite a running/existing binary cleanly
 // on some platforms; remove it first so repeat builds are deterministic.

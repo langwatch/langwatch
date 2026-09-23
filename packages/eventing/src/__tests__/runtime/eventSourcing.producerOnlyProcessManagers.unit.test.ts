@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { defineCommandSchema } from "../../commands/commandSchema.ts";
 import { defineAggregate, defineEvents } from "../../domain/definitions.ts";

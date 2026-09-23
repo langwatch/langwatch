@@ -1,12 +1,14 @@
 import chalk from "chalk";
+
 import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags";
-import { createCliScenariosService } from "./cli-scenarios-service";
 import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite";
+import { createCliScenariosService } from "./cli-scenarios-service";
 
 export const createScenarioCommand = async (
   name: string,

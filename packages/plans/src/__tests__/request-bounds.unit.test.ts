@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { PLAN_TYPES } from "../plan-type.ts";
 import {
   ENTERPRISE_PLAN_TYPES,

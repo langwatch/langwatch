@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { detectRuntime } from "../runtime";
 
 describe("runtime.ts", () => {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { createSpinner } from "../../spinner";
 import type { GovernanceConfig } from "../config";
 import { envForTool } from "../tool-env";

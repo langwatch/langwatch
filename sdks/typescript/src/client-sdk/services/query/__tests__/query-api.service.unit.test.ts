@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { QueryApiError, QueryApiService } from "../query-api.service";
-import { isLangWatchHandledError } from "@/internal/api/errors";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
+
+import { QueryApiError, QueryApiService } from "../query-api.service";
 
 /**
  * The canonical REST envelope `/api/v1/query` answers a domain refusal

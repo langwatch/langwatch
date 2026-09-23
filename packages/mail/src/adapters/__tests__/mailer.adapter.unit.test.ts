@@ -10,9 +10,9 @@ vi.mock("../../providers/smtp.ts", () => ({
   SmtpEmailProvider: { create },
 }));
 
-import { MailerAdapter } from "../mailer.adapter.ts";
 import type { SesAwsClientConfiguration } from "../../providers/ses.ts";
 import type { MailerConfiguration } from "../../providers/types.ts";
+import { MailerAdapter } from "../mailer.adapter.ts";
 
 /**
  * SES is never selected in this suite — the configuration names SMTP — so the

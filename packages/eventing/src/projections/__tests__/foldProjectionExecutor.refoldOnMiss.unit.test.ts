@@ -1,5 +1,6 @@
 import { register } from "prom-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Event } from "../../domain/types.ts";
 import {
   createMockFoldProjectionDefinition,

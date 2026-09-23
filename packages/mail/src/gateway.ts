@@ -12,7 +12,11 @@ export {
 } from "./providers/ses.ts";
 export { ResendEmailProvider } from "./providers/resend.ts";
 export { SendgridEmailProvider } from "./providers/sendgrid.ts";
-export { buildSmtpTransportOptions, isSmtpConfigured, SmtpEmailProvider } from "./providers/smtp.ts";
+export {
+  buildSmtpTransportOptions,
+  isSmtpConfigured,
+  SmtpEmailProvider,
+} from "./providers/smtp.ts";
 export {
   EmailDelivery,
   EmailProviderConfigurationError,

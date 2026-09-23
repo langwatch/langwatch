@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { StepRecorder } from "../recorder";
+
 import { contextOptions } from "../capture";
+import { StepRecorder } from "../recorder";
 
 describe("Feature: Visual diff between two refs", () => {
   describe("given a step that logs a console error and gets a 500", () => {

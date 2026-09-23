@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { CommandHandler } from "../../../commands/command.ts";
 import type { CommandSchema } from "../../../commands/commandSchema.ts";
 import type { AggregateType } from "../../../domain/aggregateType.ts";

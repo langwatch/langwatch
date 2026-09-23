@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+
 import { ComparisonError } from "../errors";
 import {
   type ComparisonHarness,

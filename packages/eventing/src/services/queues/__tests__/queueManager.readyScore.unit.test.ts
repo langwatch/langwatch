@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
 import type { Command, CommandHandler } from "../../../commands/command.ts";
 import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
 import { defineCommandSchema } from "../../../commands/commandSchema.ts";

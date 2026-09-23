@@ -6,9 +6,10 @@ import {
   type TracerProvider,
   trace,
 } from "@opentelemetry/api";
+
+import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
 import { createLangWatchSpan } from "../span";
 import { type LangWatchTracer } from "./types";
-import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
 
 /**
  * @param name - Tracer name (service or library)

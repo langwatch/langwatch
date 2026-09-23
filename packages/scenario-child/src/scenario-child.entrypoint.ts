@@ -4,8 +4,8 @@
  * @see specs/scenarios/child-execution-contract.feature
  */
 
-import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import { fetchValidatedDestination } from "@langwatch/egress/ssrf/fenced-fetch";
+import { createSsrfUrlValidator } from "@langwatch/egress/ssrf/url-validator";
 import { ChildProcessJobDataSchema, type ChildProcessJobData } from "@langwatch/scenario-contract";
 import {
   createChildProcessLogger,

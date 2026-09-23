@@ -16,9 +16,10 @@ import {
   MeterProvider,
   PeriodicExportingMetricReader,
 } from "@opentelemetry/sdk-metrics";
+
 import { activateMetrics, metricHistogramViews } from "../metrics/index.ts";
-import type { ProcessObservabilityFlusher } from "./process-observability.ts";
 import { createAuthoritativeOtlpConfiguration } from "./otlp-configuration.ts";
+import type { ProcessObservabilityFlusher } from "./process-observability.ts";
 
 /** How often a started export pushes; the collector's scrape interval matches. */
 const EXPORT_INTERVAL_MS = 15_000;

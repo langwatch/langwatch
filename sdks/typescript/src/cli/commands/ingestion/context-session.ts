@@ -10,9 +10,9 @@ import {
   type AncestorProbe,
   resolveCodexSessionFromAncestors,
 } from "@/cli/utils/governance/codex-ancestor-session";
+import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
 import { type CodexRolloutMeta, parseCodexRollout } from "@/cli/utils/governance/codex-rollout";
 import { findRolloutForThread } from "@/cli/utils/governance/codex-rollout-otlp";
-import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
 
 /** The agents a declaration can name, keyed by their normalized spelling. */
 const AGENTS = new Set(["claude_code", "codex", "opencode"]);

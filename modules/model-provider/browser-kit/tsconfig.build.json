@@ -2,10 +2,10 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-    "files": ["./src/provider-icons.ts"],
+  "files": ["./src/provider-icons.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
     "**/__tests__/**",

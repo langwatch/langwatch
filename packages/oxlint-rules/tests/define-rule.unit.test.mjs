@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { defineRule, renderMessage, renderTemplate } from "../src/define-rule.mjs";
 import { createFixtureWorkspace, runRule } from "../src/testing.mjs";
 

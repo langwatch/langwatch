@@ -1,7 +1,8 @@
 /** Pins the structured JSON log format contract (dev/docs/best_practices/dev-log-format.md). */
 import { describe, expect, it, vi } from "vitest";
-import { createLoggerFactory } from "../logger.ts";
+
 import { resolveLoggerConfiguration } from "../logger-config.ts";
+import { createLoggerFactory } from "../logger.ts";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },

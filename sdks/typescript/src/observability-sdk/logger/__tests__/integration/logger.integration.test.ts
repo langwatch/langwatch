@@ -1,14 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   InMemoryLogRecordExporter,
   LoggerProvider,
   SimpleLogRecordProcessor,
 } from "@opentelemetry/sdk-logs";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import { getLangWatchLogger, getLangWatchLoggerFromProvider } from "../..";
 import { NoOpLogger } from "../../../../logger";
+import { resetObservabilitySdkConfig } from "../../../config";
 import { setupObservability } from "../../../setup/node";
 import { type LangWatchLogRecord } from "../../types";
-import { resetObservabilitySdkConfig } from "../../../config";
 
 /** Integration tests for LangWatch logger with a real OpenTelemetry SDK. */
 

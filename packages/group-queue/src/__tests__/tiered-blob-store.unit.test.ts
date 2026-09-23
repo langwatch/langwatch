@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createTenantId } from "../storage.ts";
 import { BLOB_BACKSTOP_TTL_SECONDS } from "../blobConstants.ts";
+import { createTenantId } from "../storage.ts";
 import {
   type BlobRef,
   contentHash,

@@ -4,6 +4,7 @@
  * have queued, and the process ports a mount supplies.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestHeader,
   bindRestMiddleware,
@@ -25,7 +26,6 @@ import {
   type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
 import { suiteSchema, type Suite, type SuiteApi } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { fromDate } from "@langwatch/time";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";

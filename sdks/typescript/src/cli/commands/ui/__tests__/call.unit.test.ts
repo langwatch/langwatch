@@ -9,6 +9,7 @@ vi.mock("../../../utils/apiKey", () => ({
 }));
 
 import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+
 import { REQUEST_TIMEOUT_MS, uiCallCommand } from "../call";
 
 /**

@@ -1,11 +1,12 @@
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+import chalk from "chalk";
 /**
  * How a failure is rendered, in each of the two shapes a caller can ask for.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import chalk from "chalk";
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 
 import { LangWatchHandledError } from "@/internal/api/errors";
+
 import { ExecutionContext, withExecutionContext } from "../../daemon/execution";
 import {
   commandValidationError,

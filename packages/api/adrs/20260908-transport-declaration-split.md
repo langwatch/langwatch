@@ -46,8 +46,11 @@ declaration per route.**
 
 ```ts
 export const annotationTrpc = defineTrpcContract("annotation")
-  .query("getById").withInput(annotationApiAnnotationScopeSchema).withOutput(annotationSchema)
-  .mutation("deleteById").withInput(annotationApiAnnotationScopeSchema)
+  .query("getById")
+  .withInput(annotationApiAnnotationScopeSchema)
+  .withOutput(annotationSchema)
+  .mutation("deleteById")
+  .withInput(annotationApiAnnotationScopeSchema)
   .build();
 ```
 
@@ -79,7 +82,7 @@ host's root, context and policy arrive, and it drives the same
 `createTrpcService` chain every existing feature runs on — the parser first,
 then the policy, then the output check — rather than a second copy of it. That
 is what "one execution path" means here: the new front door is a different way
-to *state* a procedure, not a different way to *run* one.
+to _state_ a procedure, not a different way to _run_ one.
 
 ### `defineRestRouter`, on `@langwatch/api/rest`
 
@@ -87,7 +90,12 @@ to *state* a procedure, not a different way to *run* one.
 export const annotationRest = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
   .withVersion(MANAGEMENT_API_VERSION)
-  .get("/:id", "getAnnotation").withParams(S).withPermission(P).withOutput(O).withDocs(D).handle(h)
+  .get("/:id", "getAnnotation")
+  .withParams(S)
+  .withPermission(P)
+  .withOutput(O)
+  .withDocs(D)
+  .handle(h)
   .build();
 ```
 
@@ -118,7 +126,7 @@ indexed reads of a schema's `_zod` key, so the derivation reads the same key.
 
 **The map cannot drift, because there is no map.** The three disagreements
 listed above are gone by construction; every one of them was the derived type
-being *wider or narrower* than the hand-written one, and every call site
+being _wider or narrower_ than the hand-written one, and every call site
 compiles against the derived type unchanged.
 
 **Six refusals are compile-time**, pinned twice: as `@ts-expect-error` lines in
@@ -126,14 +134,14 @@ compiles against the derived type unchanged.
 enforces) and as diagnostic assertions in
 `src/trpc/__tests__/trpc-router.compiler.test.ts`.
 
-| Refusal | Where it is refused |
-| --- | --- |
-| a procedure name the contract does not declare | `.procedure` parameter type; also a runtime throw naming the name |
-| the same procedure implemented twice | `.procedure` parameter type; also a runtime throw naming the name |
-| `build()` with a procedure unimplemented | `build`'s `this` type, which names the omitted procedure |
-| `handle` before an access decision | `handle` does not exist until `withPermission`/`noPermission`/`serviceAuthorized` |
-| data answered by a procedure declared without output | the handler's return type is `void \| Promise<void>` |
-| a params schema whose keys are not the path's | `ExactPathSchema`, unchanged from the previous REST builder |
+| Refusal                                              | Where it is refused                                                               |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------- |
+| a procedure name the contract does not declare       | `.procedure` parameter type; also a runtime throw naming the name                 |
+| the same procedure implemented twice                 | `.procedure` parameter type; also a runtime throw naming the name                 |
+| `build()` with a procedure unimplemented             | `build`'s `this` type, which names the omitted procedure                          |
+| `handle` before an access decision                   | `handle` does not exist until `withPermission`/`noPermission`/`serviceAuthorized` |
+| data answered by a procedure declared without output | the handler's return type is `void \| Promise<void>`                              |
+| a params schema whose keys are not the path's        | `ExactPathSchema`, unchanged from the previous REST builder                       |
 
 The two duplicate refusals are **also** runtime throws. The type refuses them
 first; the throw is what a JavaScript caller and the mount itself hit, and it

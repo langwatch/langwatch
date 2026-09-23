@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { parseOriginOption } from "../origin-filter";
 
 describe("parseOriginOption()", () => {

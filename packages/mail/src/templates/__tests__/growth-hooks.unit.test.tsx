@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { automationLimitEmailTemplate } from "../automation-limit-email.tsx";
 import { budgetIncreaseRequestEmailTemplate } from "../budget-increase-request-email.tsx";
 import { DOCUMENTATION_URL } from "../email-layout.tsx";
@@ -12,8 +13,8 @@ import {
   joinRequestExpiredTemplate,
 } from "../join-request-emails.tsx";
 import { licenseEmailTemplate } from "../license-email.tsx";
-import { renderMailTemplate, type MailTemplate } from "../registry.ts";
 import { FIRST_STEPS_LINKS } from "../onboarding/first-steps.tsx";
+import { renderMailTemplate, type MailTemplate } from "../registry.ts";
 import { signUpVerificationEmailTemplate } from "../sign-up-verification-email.tsx";
 import { triggerDigestEmailTemplate } from "../trigger-digest-email.tsx";
 import { usageLimitEmailTemplate } from "../usage-limit-email.tsx";

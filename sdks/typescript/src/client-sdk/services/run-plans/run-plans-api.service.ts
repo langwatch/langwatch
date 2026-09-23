@@ -1,12 +1,12 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
-import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import type { InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 /** One run plan, exactly as the REST surface answers it. */
 export type RunPlan =
@@ -82,7 +82,10 @@ export class RunPlansApiService {
 
   /** The project's run plans. Archived plans are left out unless asked for. */
   async list(options?: { includeArchived?: boolean }): Promise<RunPlan[]> {
-    const { data, error, response } = await this.apiClient.GET("/api/v1/run-plans", (options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}));
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/run-plans",
+      options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {},
+    );
     return unwrapApiResult({
       operation: "list run plans",
       data,

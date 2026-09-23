@@ -8,7 +8,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
     "rootDir": ".",
-    "outDir": "dist",
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts"],
   "exclude": ["tests/**/*.ts"],

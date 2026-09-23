@@ -3,6 +3,7 @@
  * commands: agent topic is agent-mode; collision tests run in CI.
  */
 import type { Command } from "commander";
+
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
 
 /**

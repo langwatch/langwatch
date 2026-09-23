@@ -3,9 +3,11 @@
  * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
-import { Experiment } from "../experiment";
+
 import { ExperimentInitError, TargetMetadataConflictError } from "../errors";
+import { Experiment } from "../experiment";
 
 // Skip if no API key (CI environments without backend)
 const SKIP_INTEGRATION = !process.env.LANGWATCH_API_KEY;

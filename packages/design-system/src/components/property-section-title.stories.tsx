@@ -1,5 +1,6 @@
 import { Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { PropertySectionTitle } from "./property-section-title.tsx";
 
 const meta = {

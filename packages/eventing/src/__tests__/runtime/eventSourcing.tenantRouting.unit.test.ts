@@ -1,15 +1,16 @@
+import { NonRetryableGroupQueueError } from "@langwatch/group-queue";
 /**
  * The consumer's tenant gate: a job whose payload tenant disagrees with its
  * group-key tenant segment was misrouted and must be refused — dead-lettered
  * via the queue's non-retryable failure path — before its handler runs.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NonRetryableGroupQueueError } from "@langwatch/group-queue";
+
 import { EventSourcing } from "../../eventSourcing.ts";
 import type { EventSourcedQueueDefinition } from "../../queues/index.ts";
-import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
-import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
 import { QueueTenantMismatchError } from "../../services/errorHandling.ts";
+import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
+import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 const captured: {
   definition?: EventSourcedQueueDefinition<Record<string, unknown>>;

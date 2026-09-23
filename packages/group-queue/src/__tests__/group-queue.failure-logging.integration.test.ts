@@ -1,9 +1,9 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { NonRetryableGroupQueueError } from "../errors.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
-import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 
 type TestPayload = {
   id: string;

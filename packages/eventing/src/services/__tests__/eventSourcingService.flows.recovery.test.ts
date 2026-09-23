@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
+
 import type { Event } from "../../domain/types.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";

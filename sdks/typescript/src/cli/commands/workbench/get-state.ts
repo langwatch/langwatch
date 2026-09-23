@@ -1,5 +1,5 @@
-import { uiCallCommand } from "../ui/call";
 import type { CommandResult } from "../../utils/output";
+import { uiCallCommand } from "../ui/call";
 
 /**
  * Reads the evaluations workbench live -- unsaved drafts, pending cells and

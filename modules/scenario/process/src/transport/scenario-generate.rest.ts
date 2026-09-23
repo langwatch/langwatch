@@ -1,10 +1,10 @@
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { resolveRequestBound } from "@langwatch/plans";
 import {
   ScenarioApi,
   scenarioGenerateRequestSchema,
   scenarioGenerateResponseSchema,
 } from "@langwatch/scenario-contract";
-import { resolveRequestBound } from "@langwatch/plans";
 
 /** The author-assist door delegates model work to the composed Scenario application. */
 export const scenarioGenerateRest = defineRestRouter(ScenarioApi)

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { oneSidedFailures } from "../findings";
 import type { CaptureMessage } from "../protocol";
 

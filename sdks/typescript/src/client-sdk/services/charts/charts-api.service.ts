@@ -1,7 +1,3 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { scopedProjectId } from "@/internal/credentialContext";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
@@ -14,6 +10,10 @@ import {
   type QueryRunResult,
   type QuerySchemaResult,
 } from "@/client-sdk/services/query/query-api.service";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import { scopedProjectId } from "@/internal/credentialContext";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 /** A saved workbench chart, exactly as the REST surface answers it. */
 export type SavedChart =

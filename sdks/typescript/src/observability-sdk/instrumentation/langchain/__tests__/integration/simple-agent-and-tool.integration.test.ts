@@ -1,15 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { ChatOpenAI } from "@langchain/openai";
-import { DynamicStructuredTool } from "@langchain/core/tools";
-import { z } from "zod";
-import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { z } from "zod";
+
 import { LangWatchCallbackHandler } from "../..";
 import type { setupObservability } from "../../../../setup/node";
-import { getLangWatchTracer } from "../../../../tracer";
 import { createIntegrationObservability } from "../../../../setup/node/__tests__/createIntegrationObservability";
+import { getLangWatchTracer } from "../../../../tracer";
 
 const RUN_EXTERNAL = process.env.RUN_EXTERNAL_LLM_TESTS === "true";
 

@@ -5,6 +5,7 @@
 
 import * as scenario from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
+
 import { LANGY_EVALUATOR_INFERENCE_CRITERIA } from "./langy-rules";
 import {
   expectEvaluatorWiring,

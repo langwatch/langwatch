@@ -8,6 +8,7 @@
 import chalk from "chalk";
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
@@ -34,9 +35,7 @@ export const queryLwqlSchemaCommand = async (options?: {
       table: () => {
         for (const view of schema.views) {
           console.log();
-          console.log(
-            `  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`,
-          );
+          console.log(`  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`);
           console.log(
             `  ${chalk.gray("Grain:")} ${view.grain}  ${chalk.gray("Time column:")} ${view.timeColumn}`,
           );

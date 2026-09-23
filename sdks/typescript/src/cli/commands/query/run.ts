@@ -4,23 +4,20 @@
  * @see specs/analytics/lwql-cli-query.feature
  */
 
-import chalk from "chalk";
 import { writeFileSync } from "node:fs";
+
+import chalk from "chalk";
 
 import {
   type QueryRunResult,
   QueryApiService,
 } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  type QueryColumn,
-  type QueryOutputFormat,
-  type QueryRow,
-  renderRows,
-} from "./rows";
+import { type QueryColumn, type QueryOutputFormat, type QueryRow, renderRows } from "./rows";
 import {
   type ParameterValue,
   printTable,
@@ -60,7 +57,6 @@ export interface QueryRunOptions {
   out?: string;
   project?: string;
 }
-
 
 /** Where the next page of a keyset walk starts. */
 interface KeysetCursor {

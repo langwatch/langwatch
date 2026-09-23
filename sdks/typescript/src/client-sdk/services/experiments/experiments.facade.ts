@@ -5,13 +5,20 @@
 import type { LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { Logger } from "@/logger";
+
 import { Experiment } from "./experiment";
 import { ExperimentsApiService, toRunStartRequest } from "./experiments-api.service";
 import type {
   ExperimentRunStartResponse,
   ExperimentRunStatusResponse,
 } from "./experiments-api.service";
-import type { ExperimentInitOptions } from "./types";
+import { mapRunResultsToRows } from "./mapResults";
+import {
+  ExperimentsApiError,
+  ExperimentNotFoundError,
+  ExperimentTimeoutError,
+  ExperimentRunFailedError,
+} from "./platformErrors";
 import type {
   ExperimentRunResult,
   RunExperimentOptions,
@@ -19,15 +26,9 @@ import type {
   ExperimentRunWithResults,
   ExperimentRunSummary,
 } from "./platformTypes";
-import {
-  ExperimentsApiError,
-  ExperimentNotFoundError,
-  ExperimentTimeoutError,
-  ExperimentRunFailedError,
-} from "./platformErrors";
-import { pollExperimentRun, rebaseUrlToEndpoint, fetchResultsWithRetry } from "./run-status";
-import { mapRunResultsToRows } from "./mapResults";
 import { printSummary } from "./printSummary";
+import { pollExperimentRun, rebaseUrlToEndpoint, fetchResultsWithRetry } from "./run-status";
+import type { ExperimentInitOptions } from "./types";
 
 const DEFAULT_POLL_INTERVAL = 2000;
 const DEFAULT_TIMEOUT = 600000; // 10 minutes

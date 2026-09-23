@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/stored-object-process": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/repositories/clickhouse/stored-objects.repository.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

@@ -3,6 +3,7 @@
  */
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
@@ -11,7 +12,6 @@ import {
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

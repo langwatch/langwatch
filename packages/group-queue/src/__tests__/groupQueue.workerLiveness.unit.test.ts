@@ -2,6 +2,7 @@
 
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GROUP_QUEUE_CONFIG, GroupQueueProcessor } from "../groupQueue.ts";
 import {

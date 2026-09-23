@@ -33,9 +33,7 @@ export function noMembers<Members>(): MemberSource<Members> {
  * a member passed is used, one absent is refused BY NAME when read, never
  * quietly replaced — so a frozen clock plus memory cache needs no client library.
  */
-export function membersFrom<Members>(
-  supplied: Readonly<Partial<Members>>,
-): MemberSource<Members> {
+export function membersFrom<Members>(supplied: Readonly<Partial<Members>>): MemberSource<Members> {
   const names = Object.keys(supplied) as (keyof Members & string)[];
 
   return {

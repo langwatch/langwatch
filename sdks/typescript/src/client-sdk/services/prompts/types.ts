@@ -1,5 +1,7 @@
 import { type z } from "zod";
+
 import type { paths } from "@/internal/generated/openapi/api-client";
+
 import {
   type corePromptDataSchema,
   type promptMetadataSchema,

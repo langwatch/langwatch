@@ -1,8 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+
 import { expressive } from "../email-layout.tsx";
 import { mailTemplates } from "../index.ts";
 import { renderMailTemplate, type MailTemplate } from "../registry.ts";

@@ -1,7 +1,5 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
 
-import type { TenantId } from "./storage.ts";
-
 import {
   BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_LEASE_SET_TTL_SECONDS,
@@ -11,6 +9,7 @@ import {
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua.ts";
 import { blobHolderSetKey, blobLeaseSetKey, redisBlobKey } from "./blobKeys.ts";
 import { CachedLuaScript } from "./cachedLuaScript.ts";
+import type { TenantId } from "./storage.ts";
 import type { BlobRef } from "./tieredBlobStore.ts";
 
 const REDIS_NOW_MS_LUA = `

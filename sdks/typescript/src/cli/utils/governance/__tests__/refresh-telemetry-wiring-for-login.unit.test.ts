@@ -12,9 +12,9 @@ import { codexOtelBlockEndpoint, writeCodexOtelBlock } from "../../codex-config-
 import { appSettingsTargetFor, installAppEnv } from "../app-settings";
 import * as cliApi from "../cli-api";
 import { buildOtelEnvBlock } from "../otel-env-block";
+import { runningCodeRestartNotice } from "../running-code";
 import { buildScopedToolFunction, persistBlockToRc, rcPath, toolMarkers } from "../shell-rc";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
-import { runningCodeRestartNotice } from "../running-code";
 
 vi.mock("../running-code", () => ({ runningCodeRestartNotice: vi.fn() }));
 import {
@@ -42,8 +42,7 @@ describe("refreshTelemetryWiringForLogin", () => {
   describe("when login changes the instance used by an active langwatch code launcher", () => {
     /** @scenario "Login refresh reports the same restart advice" */
     it("returns restart advice with the successful wiring refresh", async () => {
-      const notice =
-        "Restart `langwatch code` to apply the updated telemetry settings.";
+      const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
       vi.mocked(runningCodeRestartNotice).mockReturnValue(notice);
       persistBlockToRc(
         "zsh",
@@ -180,13 +179,10 @@ describe("refreshTelemetryWiringForLogin", () => {
 
         // The guidance names no endpoint and no key, so the pin has no
         // reason to withhold it; the wiring the pin does own is untouched.
-        expect(fs.readFileSync(agentsMd, "utf8")).toContain(
-          "langwatch ingest context",
-        );
+        expect(fs.readFileSync(agentsMd, "utf8")).toContain("langwatch ingest context");
         expect(codexOtelBlockEndpoint()).toBe(`${STALE_ENDPOINT}/v1/traces`);
       });
     });
-
 
     describe("when the org policy forbids direct OTLP for a tool", () => {
       it("leaves that tool's wiring alone and mints nothing for it", async () => {

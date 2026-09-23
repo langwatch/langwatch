@@ -1,7 +1,10 @@
 /** E2E sanity checks that LangWatch correctly parses content from different input types. */
 
-import { describe, it, expect, beforeAll } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
+import { describe, it, expect, beforeAll } from "vitest";
+
+import { getLangWatchLogger } from "../../logger";
+import * as semconv from "../../semconv";
 import {
   setupE2ETest,
   createTestTracer,
@@ -12,8 +15,6 @@ import {
   getTraceIdFromSpan,
   expectSpanAttribute,
 } from "./e2e-utils";
-import * as semconv from "../../semconv";
-import { getLangWatchLogger } from "../../logger";
 
 describe("Content Parsing E2E", () => {
   const setup = setupE2ETest();

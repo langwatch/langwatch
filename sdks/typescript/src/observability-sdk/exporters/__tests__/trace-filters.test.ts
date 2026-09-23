@@ -1,4 +1,6 @@
+import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { describe, it, expect } from "vitest";
+
 import {
   applyFilters,
   applyFilterRule,
@@ -11,7 +13,6 @@ import {
   type Criteria,
   type Match,
 } from "../trace-filters";
-import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
 function createMockSpan(name: string, scopeName: string): ReadableSpan {
   return {

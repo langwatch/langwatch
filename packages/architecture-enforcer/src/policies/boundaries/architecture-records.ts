@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+
 import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 const REQUIRED_SECTIONS = [
   "Context",

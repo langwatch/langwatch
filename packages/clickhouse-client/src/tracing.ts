@@ -4,9 +4,10 @@
  * text or parameters, since neither is redacted and could leak ids or literals.
  */
 
+import { nowInstant } from "@langwatch/time";
+
 import { quietly } from "./observability.ts";
 import type { QueryRequest, QueryResult } from "./query.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * A failure, reduced to what is safe to ship — never the raw error, since a

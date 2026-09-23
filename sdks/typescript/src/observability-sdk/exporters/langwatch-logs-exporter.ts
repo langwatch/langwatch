@@ -1,4 +1,5 @@
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+
 import {
   DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,

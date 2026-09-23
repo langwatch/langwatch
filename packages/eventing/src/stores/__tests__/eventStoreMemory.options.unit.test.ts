@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { EventSourcing } from "../../eventSourcing.ts";
 import { EventStoreMemory } from "../eventStoreMemory.ts";
 

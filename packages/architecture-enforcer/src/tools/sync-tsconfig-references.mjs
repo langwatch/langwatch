@@ -6,10 +6,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import {
-  deriveWorkspaceReferences,
-  renderReferences,
-} from "../workspace/tsconfig-references.ts";
+import { deriveWorkspaceReferences, renderReferences } from "../workspace/tsconfig-references.ts";
 
 const options = process.argv.slice(2);
 const rootIndex = options.indexOf("--root");

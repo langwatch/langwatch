@@ -1,6 +1,8 @@
 import { isIP } from "node:net";
+
 import { createLogger } from "@langwatch/observability";
 import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "undici";
+
 import type { SsrfUrlValidator, SsrfValidationResult } from "./url-validator.ts";
 
 /**

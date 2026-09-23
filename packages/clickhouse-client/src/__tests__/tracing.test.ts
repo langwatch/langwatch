@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { QueryRequest } from "../query.ts";
 import { SPAN_ATTRIBUTES, type Span, type Tracer, QueryTracer } from "../tracing.ts";
 

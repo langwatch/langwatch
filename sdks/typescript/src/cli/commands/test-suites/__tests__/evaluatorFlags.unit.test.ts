@@ -6,13 +6,12 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
-import {
-  readEvaluators,
-  readEvaluatorsJson,
-  resolveEvaluatorAttachments,
-} from "../evaluatorFlags";
+
+import { readEvaluators, readEvaluatorsJson, resolveEvaluatorAttachments } from "../evaluatorFlags";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -130,11 +129,7 @@ describe("resolveEvaluatorAttachments", () => {
         service: serviceWith([sqlEquivalence, answerJudge]),
       });
 
-      expect(resolved.map((entry) => entry.attachment.required)).toEqual([
-        true,
-        false,
-        false,
-      ]);
+      expect(resolved.map((entry) => entry.attachment.required)).toEqual([true, false, false]);
     });
   });
 
@@ -252,9 +247,7 @@ describe("readEvaluatorsJson", () => {
 
   describe("given text that is not JSON", () => {
     it("refuses the flag", () => {
-      expect(() =>
-        readEvaluatorsJson({ value: "not json", fields: [] }),
-      ).toThrow(ProcessExitError);
+      expect(() => readEvaluatorsJson({ value: "not json", fields: [] })).toThrow(ProcessExitError);
       expect(printedErrors()).toContain("--evaluators-json");
     });
   });

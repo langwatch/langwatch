@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { makePostgresPredep } from "../src/predeps/postgres.ts";
 
 const paths = {

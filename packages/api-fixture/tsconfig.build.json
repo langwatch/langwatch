@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/api-fixture": ["./src/index.ts"]
-    },
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/*.test.*", "**/*.spec.*"],

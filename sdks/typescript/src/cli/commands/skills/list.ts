@@ -3,9 +3,11 @@
  * installed state at the target root (default ~/.agents).
  */
 import * as fs from "node:fs";
+
 import chalk from "chalk";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+
 import { formatTable } from "../../utils/formatting";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import {
   resolveSkillsRoot,
   skillFilePath,

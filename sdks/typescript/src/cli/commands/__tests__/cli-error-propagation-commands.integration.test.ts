@@ -1,14 +1,16 @@
+import { spawn } from "child_process";
+import * as fs from "fs";
+import http from "http";
+import type { AddressInfo } from "net";
+import * as os from "os";
+import * as path from "path";
+
 /**
  * Integration tests that spawn the real CLI binary and verify every non-prompt command
  * surfaces meaningful server-side error messages.
  */
 import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import http from "http";
-import { spawn } from "child_process";
-import type { AddressInfo } from "net";
+
 import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");

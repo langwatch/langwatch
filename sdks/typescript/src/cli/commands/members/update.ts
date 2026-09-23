@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import { parseOrganizationRole } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement, withParsedFlags } from "../management/_shared";

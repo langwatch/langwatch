@@ -2,21 +2,17 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-    "files": [
+  "files": [
     "./src/behavior/personal-workspace-features-api.ts",
     "./src/behavior/scope-capability.ts",
     "./src/behavior/ui-organization-facts.ts",
     "./src/department-picker.ts",
     "./src/organization.web.ts"
   ],
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.json"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",

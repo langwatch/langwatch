@@ -3,6 +3,7 @@
  * its invites, all implied by the credential rather than addressed by an id.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
+
 import {
   createManagementRequest,
   managementPath,

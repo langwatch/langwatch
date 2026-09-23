@@ -7,7 +7,7 @@
     "paths": {
       "@langwatch/browser-trpc/workflow-api": ["./src/workflow-api.ts"],
       "@langwatch/browser-trpc/agent-client": ["./src/agent-client.ts"]
-    },
+    }
   },
   "files": ["./src/workflow-api.ts", "./src/agent-client.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

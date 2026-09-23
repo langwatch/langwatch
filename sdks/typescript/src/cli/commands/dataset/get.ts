@@ -1,10 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import type { CommandResult } from "../../utils/output";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { createDatasetService } from "./service-factory";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /** How many records the human table previews before it says "and N more". */
 const PREVIEW_LIMIT = 10;
@@ -37,9 +38,7 @@ const buildDatasetPreviewRows = (
         cell = "";
       } else if (typeof value === "string") {
         cell =
-          value.length > MAX_CELL_LENGTH
-            ? value.substring(0, MAX_CELL_LENGTH - 3) + "..."
-            : value;
+          value.length > MAX_CELL_LENGTH ? value.substring(0, MAX_CELL_LENGTH - 3) + "..." : value;
       } else {
         cell = JSON.stringify(value).substring(0, MAX_CELL_LENGTH);
       }

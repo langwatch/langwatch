@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+
 import chalk from "chalk";
+
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorAttachment } from "@/client-sdk/services/test-suites";
 import {
@@ -11,6 +13,7 @@ import {
   scenarioMappingPathIssue,
 } from "@/internal/generated/types/evaluator-attachments";
 import type { SuiteFieldDefinition } from "@/internal/generated/types/suite-fields";
+
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 
 // The --evaluator family of flags; --required/--not-required apply to prior evaluator.

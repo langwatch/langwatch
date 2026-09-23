@@ -4,10 +4,12 @@
  * catalog when known, for request-shape knowledge the manager lacks.
  */
 
-import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
-import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
+import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
+
 import type { LangyWorkerModelConfig } from "./config.js";
 
 export const PROVIDER_ID = "langwatch-gateway";

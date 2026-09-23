@@ -4,10 +4,9 @@
  * (`src/agent/`). Owns the connection and nothing else.
  */
 
-import * as os from "node:os";
 import { randomUUID } from "node:crypto";
-import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
-import { resolveEndpoint } from "../../../internal/endpoint";
+import * as os from "node:os";
+
 import {
   LOCAL_CONTROL_PROTOCOL_VERSION,
   parsePlatformFrame,
@@ -36,6 +35,8 @@ import {
   type SocketFactory,
   type SocketLike,
 } from "../../../agent/transport";
+import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
+import { resolveEndpoint } from "../../../internal/endpoint";
 
 export const CONTROL_CONNECT_PATH = "/api/v1/langy/control/connect";
 

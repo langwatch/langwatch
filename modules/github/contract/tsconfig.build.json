@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/github-contract": ["./src/index.ts"]
-    },
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [

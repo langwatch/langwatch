@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { ClickHouseQueryClient } from "../client.ts";
 import type { QueryRequest } from "../query.ts";
 import { ConcurrencyLimiter } from "../rateLimit.ts";
@@ -35,7 +36,9 @@ describe("ClickHouseQueryClient", () => {
     describe("when a statement is executed", () => {
       it("passes it straight to the driver", async () => {
         const execute = vi.fn(async () => ({ rows: [1] }));
-        const client = new ClickHouseQueryClient({ driver: { execute, insert: unusedInsert, command: unusedCommand } });
+        const client = new ClickHouseQueryClient({
+          driver: { execute, insert: unusedInsert, command: unusedCommand },
+        });
 
         await expect(client.query(request())).resolves.toEqual({ rows: [1] });
         expect(execute).toHaveBeenCalledTimes(1);
@@ -142,7 +145,8 @@ describe("ClickHouseQueryClient", () => {
         let release: (() => void) | undefined;
         const client = new ClickHouseQueryClient({
           driver: {
-            insert: unusedInsert, command: unusedCommand,
+            insert: unusedInsert,
+            command: unusedCommand,
             execute: async () =>
               new Promise((resolve) => {
                 release = () => resolve({ rows: [] });
@@ -190,7 +194,8 @@ describe("ClickHouseQueryClient", () => {
 
         const client = new ClickHouseQueryClient({
           driver: {
-            insert: unusedInsert, command: unusedCommand,
+            insert: unusedInsert,
+            command: unusedCommand,
             execute: async () => {
               events.push("driver");
               return { rows: [] };
@@ -272,7 +277,11 @@ describe("ClickHouseQueryClient", () => {
         });
 
         await expect(
-          client.insert({ tenantId: "project_1", table: "suite_runs", rows: [{ BatchRunId: "b" }] }),
+          client.insert({
+            tenantId: "project_1",
+            table: "suite_runs",
+            rows: [{ BatchRunId: "b" }],
+          }),
         ).rejects.toBeInstanceOf(TenantScopeError);
       });
     });
@@ -309,4 +318,3 @@ describe("ClickHouseQueryClient", () => {
     });
   });
 });
-

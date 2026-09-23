@@ -1,9 +1,9 @@
-import type { ReplayRedis } from "./replay-redis.port.ts";
-import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { Event } from "../domain/types.ts";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource.ts";
 
 export interface RegisteredFoldProjection {

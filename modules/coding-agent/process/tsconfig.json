@@ -15,8 +15,7 @@
       "@langwatch/project-contract": ["../../project/contract/src/index.ts"]
     },
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [

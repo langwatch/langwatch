@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { PrismaClient } from "./generated/client.ts";
 import {
   scopedPrismaClient,
@@ -11,16 +12,23 @@ function clientFixture() {
   const userFindMany = vi.fn(async () => []);
   const userUpdate = vi.fn(async () => ({ id: "user_1" }));
   const userDelete = vi.fn(async () => ({ id: "user_1" }));
-  const userFindUnique = vi.fn(() => Object.assign(Promise.resolve({ id: "user_1" }), {
-    accounts: vi.fn(),
-  }));
+  const userFindUnique = vi.fn(() =>
+    Object.assign(Promise.resolve({ id: "user_1" }), {
+      accounts: vi.fn(),
+    }),
+  );
   const organizationFindMany = vi.fn(async () => []);
   const transaction = vi.fn(async (callback: (client: PrismaClient) => Promise<unknown>) => {
     return callback(client);
   });
   const client = {
     auditLog: { create: auditLogCreate },
-    user: { delete: userDelete, findMany: userFindMany, findUnique: userFindUnique, update: userUpdate },
+    user: {
+      delete: userDelete,
+      findMany: userFindMany,
+      findUnique: userFindUnique,
+      update: userUpdate,
+    },
     organization: { findMany: organizationFindMany },
     $transaction: transaction,
   } as PrismaClient;
@@ -42,8 +50,12 @@ describe("scoped Prisma repository capability", () => {
     const scoped = scopedPrismaClient(client, ["AuditLog"]);
 
     expect(() => Reflect.get(scoped, "user")).toThrow(/denied access to client member user/);
-    expect(() => Reflect.get(scoped, "$queryRaw")).toThrow(/denied access to client member \$queryRaw/);
-    expect(() => Reflect.get(scoped, "$extends")).toThrow(/denied access to client member \$extends/);
+    expect(() => Reflect.get(scoped, "$queryRaw")).toThrow(
+      /denied access to client member \$queryRaw/,
+    );
+    expect(() => Reflect.get(scoped, "$extends")).toThrow(
+      /denied access to client member \$extends/,
+    );
   });
 
   it("rejects foreign nested relation reads before the delegate executes", () => {
@@ -71,9 +83,7 @@ describe("scoped Prisma repository capability", () => {
         where: { id: "user_1" },
         data: { orgMemberships: { deleteMany: {} } },
       }),
-    ).toThrow(
-      /foreign relation User.orgMemberships/,
-    );
+    ).toThrow(/foreign relation User.orgMemberships/);
     expect(userFindMany).not.toHaveBeenCalled();
     expect(userUpdate).not.toHaveBeenCalled();
   });

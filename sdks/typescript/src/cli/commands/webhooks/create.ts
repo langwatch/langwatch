@@ -1,13 +1,15 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type {
   WebhookDestinationInput,
   WebhookSqsDestinationInput,
 } from "@/client-sdk/services/webhooks/webhooks-api.service";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateWebhookOptions {
   url?: string;

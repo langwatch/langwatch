@@ -1,8 +1,10 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import ts from "typescript";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   deriveWorkspaceReferences,
   renderReferences,
@@ -329,12 +331,16 @@ describe("given a package's project actually references its adopted dependency",
   }
 
   function semanticDiagnosticCount(directory: string): number {
-    const parsed = ts.getParsedCommandLineOfConfigFile(join(directory, "tsconfig.json"), {}, {
-      ...ts.sys,
-      onUnRecoverableConfigFileDiagnostic: (error) => {
-        throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
+    const parsed = ts.getParsedCommandLineOfConfigFile(
+      join(directory, "tsconfig.json"),
+      {},
+      {
+        ...ts.sys,
+        onUnRecoverableConfigFileDiagnostic: (error) => {
+          throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
+        },
       },
-    });
+    );
     if (!parsed) throw new Error("The project config could not be parsed");
     const program = ts.createProgram(parsed.fileNames, { ...parsed.options, incremental: false });
     return program.getSemanticDiagnostics().length;
@@ -352,40 +358,55 @@ describe("given a package's project actually references its adopted dependency",
 
   describe("when the package is typechecked", () => {
     /** @scenario "A package's adopted dependencies are checked before its own source" */
-    it("builds the dependency's declarations first and resolves them instead of its source", () => {
-      const { dependency, consumer } = writeDependencyAndConsumer();
+    it(
+      "builds the dependency's declarations first and resolves them instead of its source",
+      () => {
+        const { dependency, consumer } = writeDependencyAndConsumer();
 
-      expect(build(consumer)).toBe(ts.ExitStatus.Success);
-      expect(existsSync(join(dependency, "dist/index.d.ts"))).toBe(true);
-      expect(existsSync(join(consumer, "dist/index.js"))).toBe(true);
-    }, REAL_BUILD_TIMEOUT_MS);
-
-    /** @scenario "A package's adopted dependencies are checked before its own source" */
-    it("still reports a type error against the dependency's own exports", () => {
-      const { consumer } = writeDependencyAndConsumer();
-      build(consumer);
-
-      writeFileSync(
-        join(consumer, "src/index.ts"),
-        'import { value } from "../../dependency/dist/index";\nexport const bad: string = value;',
-      );
-
-      expect(semanticDiagnosticCount(consumer)).toBeGreaterThan(0);
-    }, REAL_BUILD_TIMEOUT_MS);
+        expect(build(consumer)).toBe(ts.ExitStatus.Success);
+        expect(existsSync(join(dependency, "dist/index.d.ts"))).toBe(true);
+        expect(existsSync(join(consumer, "dist/index.js"))).toBe(true);
+      },
+      REAL_BUILD_TIMEOUT_MS,
+    );
 
     /** @scenario "A package's adopted dependencies are checked before its own source" */
-    it("a failed dependency build stops the package's own build", () => {
-      const { dependency, consumer } = writeDependencyAndConsumer();
-      build(consumer);
+    it(
+      "still reports a type error against the dependency's own exports",
+      () => {
+        const { consumer } = writeDependencyAndConsumer();
+        build(consumer);
 
-      writeFileSync(join(dependency, "src/index.ts"), 'export const value: number = "not a number";');
-      rmSync(join(dependency, "dist"), { recursive: true, force: true });
-      rmSync(join(consumer, "dist"), { recursive: true, force: true });
+        writeFileSync(
+          join(consumer, "src/index.ts"),
+          'import { value } from "../../dependency/dist/index";\nexport const bad: string = value;',
+        );
 
-      expect(build(consumer)).not.toBe(ts.ExitStatus.Success);
-      expect(existsSync(join(dependency, "dist/index.d.ts"))).toBe(false);
-      expect(existsSync(join(consumer, "dist/index.js"))).toBe(false);
-    }, REAL_BUILD_TIMEOUT_MS);
+        expect(semanticDiagnosticCount(consumer)).toBeGreaterThan(0);
+      },
+      REAL_BUILD_TIMEOUT_MS,
+    );
+
+    /** @scenario "A package's adopted dependencies are checked before its own source" */
+    it(
+      "a failed dependency build stops the package's own build",
+      () => {
+        const { dependency, consumer } = writeDependencyAndConsumer();
+        build(consumer);
+
+        writeFileSync(
+          join(dependency, "src/index.ts"),
+          'export const value: number = "not a number";',
+        );
+        rmSync(join(dependency, "dist"), { recursive: true, force: true });
+        rmSync(join(consumer, "dist"), { recursive: true, force: true });
+
+        expect(build(consumer)).not.toBe(ts.ExitStatus.Success);
+        expect(existsSync(join(dependency, "dist/index.d.ts"))).toBe(false);
+        expect(existsSync(join(consumer, "dist/index.js"))).toBe(false);
+      },
+      REAL_BUILD_TIMEOUT_MS,
+    );
   });
 });
 

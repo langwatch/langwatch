@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type { DatasetRecordResponse } from "@/client-sdk/services/datasets/types";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { createDatasetService } from "./service-factory";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /**
  * Escapes a value for inclusion in a CSV field.

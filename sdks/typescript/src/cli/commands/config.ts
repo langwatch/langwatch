@@ -5,6 +5,7 @@
  */
 
 import chalk from "chalk";
+
 import { loadConfig, saveConfig, configPath } from "@/cli/utils/governance/config";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { normalizeEndpoint } from "@/internal/endpoint";

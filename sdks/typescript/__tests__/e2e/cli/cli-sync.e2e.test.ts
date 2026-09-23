@@ -7,14 +7,15 @@
  * TODO: To run against the actual server locally, set CI=false
  */
 
-import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
+import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
-import { randomUUID } from "crypto";
 
 import { config } from "dotenv";
-import { expectations, CliRunner, LockFileManager, PromptFileManager } from "./helpers";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
+
 import { LangWatch } from "../../../dist";
+import { expectations, CliRunner, LockFileManager, PromptFileManager } from "./helpers";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });

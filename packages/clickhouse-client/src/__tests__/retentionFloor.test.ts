@@ -2,6 +2,7 @@
  * Spec: specs/clickhouse/bounded-reads.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
 import {
   DEFAULT_RETENTION_FLOOR_MARGIN_MS,
   type RetentionDaysProvider,
@@ -221,7 +222,9 @@ describe("resolving a retention floor for a read", () => {
     /** @scenario "The retention lookup is not repeated for every read" */
     it("keeps one tenant's answer from being served to another", async () => {
       const provider: RetentionDaysProvider = {
-        tryGetRetentionDays: vi.fn(async ({ tenantId }) => (tenantId === "project_long" ? 400 : 10)),
+        tryGetRetentionDays: vi.fn(async ({ tenantId }) =>
+          tenantId === "project_long" ? 400 : 10,
+        ),
       };
       const service = serviceWith(provider);
 

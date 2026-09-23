@@ -1,15 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   SpendEventsApiService,
   type SpendGroupBy,
   type SpendSummaryRow,
 } from "@/client-sdk/services/spend-events/spend-events-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
 import { parseInstantOrNull } from "../../utils/instant";
 import { parseKeyValueFlags } from "../../utils/keyValueFlags";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const parseInstant = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);
@@ -174,8 +176,7 @@ export const spendSummaryCommand = async (options: {
       table: () => {
         console.log();
         for (const row of data) {
-          const imageTokens =
-            row.usage.input_image_tokens + row.usage.output_image_tokens;
+          const imageTokens = row.usage.input_image_tokens + row.usage.output_image_tokens;
           // Only on rows that have image spend: the text buckets read as the
           // whole story otherwise, and image tokens are not part of them.
           const imageNote =

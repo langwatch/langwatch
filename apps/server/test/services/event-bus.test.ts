@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { EventBus } from "../../src/services/event-bus.ts";
 
 describe("EventBus", () => {

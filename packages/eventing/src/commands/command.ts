@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { type CommandType, CommandTypeSchema } from "../domain/commandType.ts";
 import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";

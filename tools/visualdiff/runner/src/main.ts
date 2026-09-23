@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { openSide, captureMessage, type Side } from "./capture";
 import { diffScreenshots } from "./diff";
-import { resolveAction } from "./flows/registry";
 import { fillPath } from "./flows/context";
+import { resolveAction } from "./flows/registry";
 import { emit, note, type CaptureMessage, type Plan, type PlanFlow } from "./protocol";
 
 const out = process.stdout;

@@ -5,7 +5,9 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { findSkill, SKILLS_BUNDLE, SKILLS_BUNDLE_VERSION, type BundledSkill } from "../installer";
 
 const REPO_ROOT = path.join(__dirname, "../../../../../../../");
@@ -22,8 +24,7 @@ const frontmatterIsFlagGated = (source: string): boolean => {
 };
 
 /** A skill's own SKILL.mdx frontmatter says whether it's gated by a feature flag. */
-const isFlagGated = (src: string): boolean =>
-  frontmatterIsFlagGated(fs.readFileSync(src, "utf8"));
+const isFlagGated = (src: string): boolean => frontmatterIsFlagGated(fs.readFileSync(src, "utf8"));
 
 /**
  * The published set, read from the same sources the codegen reads. Skills
@@ -46,12 +47,9 @@ const expectedPublishedSlugs = (): { slug: string; isRecipe: boolean }[] => {
     .filter((entry) => fs.existsSync(path.join(SKILLS_ROOT, "recipes", entry.name, "SKILL.mdx")))
     .map((entry) => ({ slug: entry.name, isRecipe: true }));
   return [
-    ...featureSkills.filter(
-      ({ slug }) => !isFlagGated(path.join(SKILLS_ROOT, slug, "SKILL.mdx")),
-    ),
+    ...featureSkills.filter(({ slug }) => !isFlagGated(path.join(SKILLS_ROOT, slug, "SKILL.mdx"))),
     ...recipes.filter(
-      ({ slug }) =>
-        !isFlagGated(path.join(SKILLS_ROOT, "recipes", slug, "SKILL.mdx")),
+      ({ slug }) => !isFlagGated(path.join(SKILLS_ROOT, "recipes", slug, "SKILL.mdx")),
     ),
   ];
 };
@@ -65,9 +63,7 @@ const skill = (slug: string): BundledSkill => {
 describe("frontmatterIsFlagGated", () => {
   describe("given a feature-flag key in the opening frontmatter", () => {
     it("reports the skill as gated", () => {
-      const source = ["---", "feature-flag: release_x", "---", "# Body"].join(
-        "\n",
-      );
+      const source = ["---", "feature-flag: release_x", "---", "# Body"].join("\n");
       expect(frontmatterIsFlagGated(source)).toBe(true);
     });
   });

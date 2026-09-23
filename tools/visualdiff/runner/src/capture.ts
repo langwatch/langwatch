@@ -1,10 +1,12 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+
 import type { Browser, BrowserContext, Page, Request, Response } from "playwright";
 import { chromium } from "playwright";
+
+import type { CaptureMessage, PlanSide, SettleConfig, Viewport } from "./protocol";
 import { StepRecorder } from "./recorder";
 import { InFlightTracker, shouldIgnoreRequest } from "./settle";
-import type { CaptureMessage, PlanSide, SettleConfig, Viewport } from "./protocol";
 
 /** Animations and carets are the largest source of pixel noise between two identical screens. */
 const FREEZE_CSS =

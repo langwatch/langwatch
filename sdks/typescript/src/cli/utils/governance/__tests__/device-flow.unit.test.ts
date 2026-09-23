@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+
 import {
   startDeviceCode,
   exchange,
@@ -189,9 +190,7 @@ describe("pollUntilDone", () => {
     new Response(
       new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(
-            new TextEncoder().encode('data: {"status":"approved"}\n\n'),
-          );
+          controller.enqueue(new TextEncoder().encode('data: {"status":"approved"}\n\n'));
         },
       }),
       { status: 200, headers: { "Content-Type": "text/event-stream" } },
@@ -216,8 +215,7 @@ describe("pollUntilDone", () => {
         return Promise.resolve(approval());
       }
       polls.push(String(url));
-      const next =
-        exchanges[polls.length - 1] ?? exchanges[exchanges.length - 1];
+      const next = exchanges[polls.length - 1] ?? exchanges[exchanges.length - 1];
       return Promise.resolve(next!());
     });
     return { fetchImpl, polls };
@@ -225,15 +223,9 @@ describe("pollUntilDone", () => {
 
   it("retries on pending, returns on success", async () => {
     const { fetchImpl, polls } = routedFetch({
-      exchanges: [
-        () => emptyResponse(428),
-        () => jsonResponse(200, sessionBody),
-      ],
+      exchanges: [() => emptyResponse(428), () => jsonResponse(200, sessionBody)],
     });
-    const r = await pollUntilDone(
-      { baseUrl: "http://x", fetchImpl },
-      deviceCode,
-    );
+    const r = await pollUntilDone({ baseUrl: "http://x", fetchImpl }, deviceCode);
     expect(r.kind).toBe("device_session");
     if (r.kind !== "device_session") throw new Error("unreachable");
     expect(r.access_token).toBe("at");
@@ -247,10 +239,7 @@ describe("pollUntilDone", () => {
     });
 
     const started = Date.now();
-    await pollUntilDone(
-      { baseUrl: "http://x", fetchImpl },
-      { ...deviceCode, interval: 30 },
-    );
+    await pollUntilDone({ baseUrl: "http://x", fetchImpl }, { ...deviceCode, interval: 30 });
 
     expect(polls).toHaveLength(1);
     expect(Date.now() - started).toBeLessThan(1000);
@@ -259,10 +248,7 @@ describe("pollUntilDone", () => {
   /** @scenario "The approval stream cuts the wait short" */
   it("polls as soon as the approval stream emits", async () => {
     const { fetchImpl, polls } = routedFetch({
-      exchanges: [
-        () => emptyResponse(428),
-        () => jsonResponse(200, sessionBody),
-      ],
+      exchanges: [() => emptyResponse(428), () => jsonResponse(200, sessionBody)],
       approval: approvalFrame,
     });
 
@@ -281,18 +267,12 @@ describe("pollUntilDone", () => {
   /** @scenario "A server without the approval stream still logs in" */
   it("falls back to the interval when the stream is unavailable", async () => {
     const { fetchImpl, polls } = routedFetch({
-      exchanges: [
-        () => emptyResponse(428),
-        () => jsonResponse(200, sessionBody),
-      ],
+      exchanges: [() => emptyResponse(428), () => jsonResponse(200, sessionBody)],
       approval: () => emptyResponse(404),
     });
 
     const started = Date.now();
-    await pollUntilDone(
-      { baseUrl: "http://x", fetchImpl },
-      { ...deviceCode, interval: 0.2 },
-    );
+    await pollUntilDone({ baseUrl: "http://x", fetchImpl }, { ...deviceCode, interval: 0.2 });
 
     expect(polls).toHaveLength(2);
     // The second poll waited the interval out rather than firing at once.
@@ -309,9 +289,7 @@ describe("pollUntilDone", () => {
         new ReadableStream<Uint8Array>({
           start(controller) {
             frame.emit = () =>
-              controller.enqueue(
-                new TextEncoder().encode('data: {"status":"approved"}\n\n'),
-              );
+              controller.enqueue(new TextEncoder().encode('data: {"status":"approved"}\n\n'));
           },
         }),
         { status: 200, headers: { "Content-Type": "text/event-stream" } },

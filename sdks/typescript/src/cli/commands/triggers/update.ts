@@ -1,14 +1,14 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner.ts";
-import { resolveCredentials } from "../../utils/apiKey.ts";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
-import { commandValidationError } from "../../utils/errorOutput.ts";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output.ts";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 /**
  * Returns the updated trigger rather than printing it: the output port renders

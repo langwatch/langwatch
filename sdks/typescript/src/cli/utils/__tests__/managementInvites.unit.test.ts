@@ -4,6 +4,7 @@
  * invite was wrong. See specs/typescript-sdk/cli-management-apis.feature.
  */
 import { describe, expect, it } from "vitest";
+
 import { ManagementFlagError } from "../managementFlags";
 import { composeInvitesFromFlags, parseInvitesJson } from "../managementInvites";
 

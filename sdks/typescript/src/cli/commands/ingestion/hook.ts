@@ -5,13 +5,14 @@
  * @see specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
-import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
-import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
-import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-import { resolveLogsEndpoint } from "@/internal/endpoint";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
-import { parseHookInput, readStdin } from "./hook-input";
+import {
+  defaultClaudeSessionRegistryDir,
+  readClaudeSessionName,
+} from "@/cli/utils/governance/claude-session-registry";
+import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
 import {
   defaultStateDir,
   pruneStaleState,
@@ -19,15 +20,8 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
 import { type HealOutcome, healRevokedIngestKey } from "@/cli/utils/governance/ingest-key-heal";
-import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
-import {
-  defaultClaudeSessionRegistryDir,
-  readClaudeSessionName,
-} from "@/cli/utils/governance/claude-session-registry";
+import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import {
   buildSessionContextLogPayload,
   normalizeSessionName,
@@ -35,7 +29,13 @@ import {
   parseTraceparent,
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
+import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+import { resolveLogsEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
+import { parseHookInput, readStdin } from "./hook-input";
 
 /**
  * What each accepted tool argument means: the agent, plus the environment

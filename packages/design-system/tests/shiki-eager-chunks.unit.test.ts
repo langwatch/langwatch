@@ -1,3 +1,5 @@
+import { SHIKI_BASE_LANGS, SHIKI_THEMES } from "@langwatch/design-system/shiki";
+import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
 /**
  * @vitest-environment jsdom
  * Drift guard: verify base languages/themes stay eager, others lazy, in the
@@ -5,8 +7,6 @@
  */
 import { bundledLanguagesInfo } from "shiki";
 import { describe, expect, it } from "vitest";
-import { SHIKI_BASE_LANGS, SHIKI_THEMES } from "@langwatch/design-system/shiki";
-import { shikiManualChunk } from "@langwatch/design-system/shiki-chunking";
 
 // Resolve a Shiki lang alias (e.g. "bash") to its grammar FILE name
 // (e.g. "shellscript") using Shiki's own registry, so the mapping can't drift.

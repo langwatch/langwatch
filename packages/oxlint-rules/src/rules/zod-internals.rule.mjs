@@ -28,7 +28,11 @@ function textOf(source, node) {
 function isZodErrorReference(node) {
   if (node.type === "Identifier") return node.name === "ZodError";
   if (node.type === "MemberExpression" && !node.computed && node.property.type === "Identifier") {
-    return node.object.type === "Identifier" && node.object.name === "z" && node.property.name === "ZodError";
+    return (
+      node.object.type === "Identifier" &&
+      node.object.name === "z" &&
+      node.property.name === "ZodError"
+    );
   }
 
   return false;

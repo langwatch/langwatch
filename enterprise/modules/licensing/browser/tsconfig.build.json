@@ -2,10 +2,10 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
-    "files": [
+  "files": [
     "./src/licensing.ts",
     "./src/licensing.web.ts",
     "./src/ui/sections/global-upgrade-modal/index.ts",

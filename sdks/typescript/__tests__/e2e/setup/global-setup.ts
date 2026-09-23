@@ -2,6 +2,7 @@
  * Resolves the stack every SDK and CLI end-to-end file runs against.
  */
 import { execFileSync } from "node:child_process";
+
 import { REPO_ROOT, seededProject, startStack, type RunningStack } from "@langwatch/e2e-stack";
 
 import { writeStackHandoff } from "./stack-handoff";

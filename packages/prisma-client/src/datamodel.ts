@@ -5,7 +5,6 @@ export interface PrismaDatamodelModel {
   fields: string[];
 }
 
-
 /**
  * Parses Prisma's datamodel from schema.prisma after Prisma 7 removed dmmf exposure.
  * Located here so both partition suites that use it find the same schema.

@@ -1,5 +1,6 @@
 import { type AvatarFallbackProps, Avatar as ChakraAvatar } from "@chakra-ui/react";
 import * as React from "react";
+
 import { firstGrapheme } from "../first-grapheme.ts";
 
 /** Chakra v3 Avatar wrapper (import from here, not @chakra-ui/react); custom Fallback for

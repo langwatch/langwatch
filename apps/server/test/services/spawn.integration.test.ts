@@ -1,8 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { EventBus } from "../../src/services/event-bus.ts";
 import { servicePaths } from "../../src/services/paths.ts";
 import { supervise } from "../../src/services/spawn.ts";

@@ -1,6 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { getMaxTokenLimit,
+import {
+  getMaxTokenLimit,
   buildModelChangeValues,
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
@@ -9,7 +10,8 @@ import { getMaxTokenLimit,
   type LLMConfigValues,
   normalizeMaxTokens,
   ParameterRow,
-  toFormKey } from "@langwatch/prompt-browser-kit";
+  toFormKey,
+} from "@langwatch/prompt-browser-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useModelProvidersSettings } from "../../../../behavior/use-model-providers-settings.ts";

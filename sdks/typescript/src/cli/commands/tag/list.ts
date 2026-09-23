@@ -1,7 +1,9 @@
 import chalk from "chalk";
+
 import { PromptsApiService } from "@/client-sdk/services/prompts";
-import { formatTable, formatRelativeTime } from "../../utils/formatting";
+
 import { resolveCredentials } from "../../utils/apiKey";
+import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 
 /**

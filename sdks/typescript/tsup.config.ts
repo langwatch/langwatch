@@ -1,4 +1,5 @@
 import { defineConfig } from "tsup";
+
 import packageJson from "./package.json";
 
 // The card/domain-error contract is a source-only workspace devDependency,

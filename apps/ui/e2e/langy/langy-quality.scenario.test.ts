@@ -11,10 +11,12 @@
  */
 
 import { randomUUID } from "node:crypto";
+
 import { openai } from "@ai-sdk/openai";
 import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
 import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { deleteMonitor, listMonitors, seedApplicationTraces } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {

@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/monitor-browser": ["./src/online-evaluations.ts"]
-    },
+    }
   },
   "files": ["./src/online-evaluations.ts", "./src/monitor.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

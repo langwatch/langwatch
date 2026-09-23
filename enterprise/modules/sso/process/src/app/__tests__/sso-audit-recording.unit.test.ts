@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -6,7 +7,6 @@
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

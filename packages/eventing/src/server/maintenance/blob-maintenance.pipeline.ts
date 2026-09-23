@@ -1,7 +1,9 @@
 import { BLOB_SWEEP_INTERVAL_MS } from "@langwatch/group-queue/operational";
+
 import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
 import type { Event } from "../../domain/types.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
+import { type BlobCleanupDeps, runBlobCleanup } from "./blob-cleanup.intent.ts";
 import {
   BLOB_CLEANUP_INITIAL_STATE,
   BLOB_CLEANUP_PROCESS_NAME,
@@ -9,7 +11,6 @@ import {
   blobCleanupSchema,
   blobCleanupWake,
 } from "./blob-cleanup.process.ts";
-import { type BlobCleanupDeps, runBlobCleanup } from "./blob-cleanup.intent.ts";
 
 export interface BlobMaintenancePipelineDeps {
   cleanup: BlobCleanupDeps;

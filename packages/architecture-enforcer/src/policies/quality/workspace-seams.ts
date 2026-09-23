@@ -1,8 +1,10 @@
 import { join, sep } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation } from "../../types.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../../types.ts";
 
 /**
  * `workspace-seams`: the enforcer lints itself. One reading of the workspace is

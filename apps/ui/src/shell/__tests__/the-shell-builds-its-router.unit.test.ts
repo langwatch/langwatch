@@ -4,7 +4,7 @@
  * key when the router is BUILT, so the first gap took the browser down at boot.
  */
 import { webModules } from "@langwatch/installed-web-modules";
-import { mergeUiPageLoaders,uiRoutePageKeys } from "@langwatch/ui-kernel/feature-install";
+import { mergeUiPageLoaders, uiRoutePageKeys } from "@langwatch/ui-kernel/feature-install";
 import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
 import { describe, expect, it } from "vitest";

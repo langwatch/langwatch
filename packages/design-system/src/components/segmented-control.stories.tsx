@@ -1,5 +1,6 @@
 import { Box, Stack } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { SegmentedControl } from "./segmented-control.tsx";
 
 const meta = {

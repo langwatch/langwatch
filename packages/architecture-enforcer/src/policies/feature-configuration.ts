@@ -1,7 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
+
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../types.ts";
+import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 
 /**
  * A feature declares runtime configuration once in its contract; no application declares

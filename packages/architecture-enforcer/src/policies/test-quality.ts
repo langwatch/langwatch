@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
+
 import ts from "typescript";
+
+import type { ArchitectureViolation } from "../types.ts";
 import { sourceFile } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../types.ts";
 
 const TEST_FILE = /(?:^|\/)\S+\.(?:test|spec)\.[cm]?[jt]sx?$/;
 const TEST_CALLBACKS = new Set(["it", "test"]);

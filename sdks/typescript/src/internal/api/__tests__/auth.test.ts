@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+
 import { buildAuthHeaders, isPersonalAccessToken, isUserScopedApiKey } from "../auth";
 
 describe("isUserScopedApiKey", () => {

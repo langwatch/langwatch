@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { EvaluatorsApiService } from "../evaluators-api.service";
-import { EvaluatorsApiError } from "../errors";
-import type { CreateEvaluatorBody } from "../types";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
+
+import { EvaluatorsApiError } from "../errors";
+import { EvaluatorsApiService } from "../evaluators-api.service";
+import type { CreateEvaluatorBody } from "../types";
 
 /**
  * D12: openapi-fetch's own empty-body short-circuit answers a non-2xx (or an empty-but-ok)

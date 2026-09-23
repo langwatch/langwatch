@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import sgMail from "@sendgrid/mail";
+
 import { sanitizeHeaders } from "./mime.ts";
 import {
   type EmailContent,

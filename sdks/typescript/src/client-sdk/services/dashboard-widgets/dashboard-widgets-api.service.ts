@@ -1,15 +1,12 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import { scopedProjectId } from "@/internal/credentialContext";
-import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import { scopedProjectId } from "@/internal/credentialContext";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 /** A dashboard widget, exactly as the REST surface answers it. */
 export type DashboardWidget =
@@ -81,9 +78,7 @@ export class DashboardWidgetsApiService {
 
   private projectId(operation: string): string {
     const projectId =
-      this.configuredProjectId ??
-      scopedProjectId() ??
-      process.env.LANGWATCH_PROJECT_ID;
+      this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
     if (!projectId) {
       throw new DashboardWidgetsApiError(
         "No project is in scope. Pass --project <slug-or-id>, or set LANGWATCH_PROJECT_ID.",
@@ -109,8 +104,7 @@ export class DashboardWidgetsApiService {
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       { params: { path: { projectId, widgetId: id } } },
     );
-    if (error)
-      this.handleApiError({ operation: `get dashboard widget "${id}"`, error, response });
+    if (error) this.handleApiError({ operation: `get dashboard widget "${id}"`, error, response });
     return data as unknown as DashboardWidget;
   }
 
@@ -130,8 +124,7 @@ export class DashboardWidgetsApiService {
         },
       },
     );
-    if (error)
-      this.handleApiError({ operation: "create dashboard widget", error, response });
+    if (error) this.handleApiError({ operation: "create dashboard widget", error, response });
     return data as unknown as DashboardWidget;
   }
 
@@ -181,8 +174,7 @@ export class DashboardWidgetsApiService {
         body: { dashboardId },
       },
     );
-    if (error)
-      this.handleApiError({ operation: `pin dashboard widget "${id}"`, error, response });
+    if (error) this.handleApiError({ operation: `pin dashboard widget "${id}"`, error, response });
     return data as unknown as DashboardWidget;
   }
 

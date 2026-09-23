@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
+
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 
 // Mock FileManager before importing pull
 vi.mock("../../utils/fileManager", () => ({

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DeviceFlowError } from "../device-flow";
 import type { GovernanceConfig } from "../config";
+import { DeviceFlowError } from "../device-flow";
 import {
   canRefreshSession,
   isAccessTokenExpired,

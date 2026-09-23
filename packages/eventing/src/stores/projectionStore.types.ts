@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Projection } from "../domain/types.ts";
 

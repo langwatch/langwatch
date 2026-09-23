@@ -5,6 +5,7 @@
  * specs/background/worker-graceful-shutdown.feature}
  */
 import { describe, expect, it } from "vitest";
+
 import { EventSourcing } from "../eventSourcing.ts";
 
 /**

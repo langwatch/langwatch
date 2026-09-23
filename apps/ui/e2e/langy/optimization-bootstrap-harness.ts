@@ -7,6 +7,7 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { expect } from "vitest";
+
 import { makeLangyAdapter } from "./langy-agent";
 import { runScenarioAndLog } from "./scenario-logger";
 import {

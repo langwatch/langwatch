@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { DEFAULT_ENDPOINT } from "../constants";
 import { normalizeEndpoint, resolveEndpoint, resolveLogsEndpoint } from "../endpoint";
 

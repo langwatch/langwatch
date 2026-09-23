@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "../resilience.ts";
 
 const withCode = ({ message, code }: { message: string; code: string }): Error =>

@@ -8,19 +8,21 @@ import { apiKeyWeb } from "@langwatch/api-key-browser/declaration";
 import { authWeb } from "@langwatch/auth-browser/declaration";
 import { authzWeb } from "@langwatch/authz-browser/declaration";
 import { automationWeb } from "@langwatch/automation-browser/declaration";
-import { billingWeb } from "@langwatch/enterprise-billing-browser/declaration";
 import { codingAgentWeb } from "@langwatch/coding-agent-browser/declaration";
 import { dataPrivacyWeb } from "@langwatch/data-privacy-browser/declaration";
 import { dataRetentionWeb } from "@langwatch/data-retention-browser/declaration";
 import { datasetWeb } from "@langwatch/dataset-browser/declaration";
+import { billingWeb } from "@langwatch/enterprise-billing-browser/declaration";
+import { governanceWeb } from "@langwatch/enterprise-governance-browser/declaration";
+import { licensingWeb } from "@langwatch/enterprise-licensing-browser/declaration";
+import { scimWeb } from "@langwatch/enterprise-scim-browser/declaration";
+import { ssoWeb } from "@langwatch/enterprise-sso-browser/declaration";
 import { evaluatorWeb } from "@langwatch/evaluator-browser/declaration";
 import { experimentWeb } from "@langwatch/experiment-browser/declaration";
 import { featureFlagWeb } from "@langwatch/feature-flag-browser/declaration";
 import { gatewayWeb } from "@langwatch/gateway-browser/declaration";
 import { githubWeb } from "@langwatch/github-browser/declaration";
-import { governanceWeb } from "@langwatch/enterprise-governance-browser/declaration";
 import { langyWeb } from "@langwatch/langy-browser/declaration";
-import { licensingWeb } from "@langwatch/enterprise-licensing-browser/declaration";
 import { modelProviderWeb } from "@langwatch/model-provider-browser/declaration";
 import { monitorWeb } from "@langwatch/monitor-browser/declaration";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
@@ -32,10 +34,8 @@ import { presenceWeb } from "@langwatch/presence-browser/declaration";
 import { projectWeb } from "@langwatch/project-browser/declaration";
 import { promptWeb } from "@langwatch/prompt-browser/declaration";
 import { scenarioWeb } from "@langwatch/scenario-browser/declaration";
-import { scimWeb } from "@langwatch/enterprise-scim-browser/declaration";
 import { secretWeb } from "@langwatch/secret-browser/declaration";
 import { shareWeb } from "@langwatch/share-browser/declaration";
-import { ssoWeb } from "@langwatch/enterprise-sso-browser/declaration";
 import { suiteWeb } from "@langwatch/suite-browser/declaration";
 import { topicWeb } from "@langwatch/topic-browser/declaration";
 import { traceWeb } from "@langwatch/trace-browser/declaration";
@@ -85,8 +85,100 @@ export const webModules = [
   userWeb satisfies { readonly name: "user" },
   workflowWeb satisfies { readonly name: "workflow" },
 ] as const;
-type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "scim" | "sso";
-type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "billing" | "coding-agent" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "instant-eval" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "saas" | "scenario" | "scim" | "secret" | "share" | "sso" | "stored-object" | "suite" | "topic" | "trace" | "user" | "webhook" | "workflow";
+type PairedOnDisk =
+  | "agent"
+  | "analytics"
+  | "annotation"
+  | "api-key"
+  | "auth"
+  | "authz"
+  | "automation"
+  | "coding-agent"
+  | "data-privacy"
+  | "data-retention"
+  | "dataset"
+  | "evaluator"
+  | "experiment"
+  | "feature-flag"
+  | "gateway"
+  | "github"
+  | "langy"
+  | "model-provider"
+  | "monitor"
+  | "notification"
+  | "onboarding"
+  | "ops"
+  | "organization"
+  | "presence"
+  | "project"
+  | "prompt"
+  | "scenario"
+  | "secret"
+  | "share"
+  | "suite"
+  | "topic"
+  | "trace"
+  | "user"
+  | "workflow"
+  | "billing"
+  | "governance"
+  | "licensing"
+  | "scim"
+  | "sso";
+type ServerHalfOnDisk =
+  | "agent"
+  | "analytics"
+  | "annotation"
+  | "api-key"
+  | "auth"
+  | "authz"
+  | "automation"
+  | "billing"
+  | "coding-agent"
+  | "dashboard"
+  | "data-privacy"
+  | "data-retention"
+  | "dataset"
+  | "entitlement"
+  | "evaluation"
+  | "evaluator"
+  | "experiment"
+  | "feature-flag"
+  | "gateway"
+  | "github"
+  | "governance"
+  | "hosted-mcp"
+  | "identity"
+  | "instant-eval"
+  | "langy"
+  | "licensing"
+  | "log"
+  | "managed-provider"
+  | "metric"
+  | "model-provider"
+  | "monitor"
+  | "notification"
+  | "onboarding"
+  | "ops"
+  | "organization"
+  | "platform-health"
+  | "presence"
+  | "project"
+  | "prompt"
+  | "role"
+  | "saas"
+  | "scenario"
+  | "scim"
+  | "secret"
+  | "share"
+  | "sso"
+  | "stored-object"
+  | "suite"
+  | "topic"
+  | "trace"
+  | "user"
+  | "webhook"
+  | "workflow";
 type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number]["name"]>;
 type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;
 export const webModulePairing = {} satisfies {

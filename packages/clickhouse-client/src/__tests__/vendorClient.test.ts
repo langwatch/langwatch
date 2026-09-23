@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import type { StatementLogSink, StatementMetrics } from "../statementReporting.ts";
 import { VendorClientResilience, type VendorStatementClient } from "../vendorClient.ts";
 

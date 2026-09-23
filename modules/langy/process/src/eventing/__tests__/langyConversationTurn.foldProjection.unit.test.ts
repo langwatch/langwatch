@@ -353,10 +353,7 @@ describe("a turn as its own render document", () => {
         base,
       ),
     );
-    state = fold.apply(
-      state,
-      toolInitiated({ turnId, toolCallId: `${turnId}-tc-1` }, base + 10),
-    );
+    state = fold.apply(state, toolInitiated({ turnId, toolCallId: `${turnId}-tc-1` }, base + 10));
     state = fold.apply(
       state,
       event(
@@ -371,10 +368,7 @@ describe("a turn as its own render document", () => {
         base + 20,
       ),
     );
-    state = fold.apply(
-      state,
-      toolInitiated({ turnId, toolCallId: `${turnId}-tc-2` }, base + 30),
-    );
+    state = fold.apply(state, toolInitiated({ turnId, toolCallId: `${turnId}-tc-2` }, base + 30));
     state = fold.apply(
       state,
       event(
@@ -398,9 +392,7 @@ describe("a turn as its own render document", () => {
       const state = foldTurn(TURN, 1000);
 
       expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
-      expect(state.AnswerParts).toEqual([
-        { type: "text", text: "the whole answer of turn-1" },
-      ]);
+      expect(state.AnswerParts).toEqual([{ type: "text", text: "the whole answer of turn-1" }]);
       expect(state.ToolCalls).toHaveLength(2);
       expect(state.ToolCalls.map((call) => call.status)).toEqual([
         LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
@@ -426,17 +418,11 @@ describe("a turn as its own render document", () => {
       const first = foldTurn(TURN, 1000);
       const second = foldTurn("turn-2", 2000);
 
-      expect(fold.key(answered(TURN, 1100))).not.toBe(
-        fold.key(answered("turn-2", 2100)),
-      );
+      expect(fold.key(answered(TURN, 1100))).not.toBe(fold.key(answered("turn-2", 2100)));
       expect(first.TurnId).toBe(TURN);
       expect(second.TurnId).toBe("turn-2");
-      expect(first.AnswerParts).toEqual([
-        { type: "text", text: "the whole answer of turn-1" },
-      ]);
-      expect(second.AnswerParts).toEqual([
-        { type: "text", text: "the whole answer of turn-2" },
-      ]);
+      expect(first.AnswerParts).toEqual([{ type: "text", text: "the whole answer of turn-1" }]);
+      expect(second.AnswerParts).toEqual([{ type: "text", text: "the whole answer of turn-2" }]);
       expect(first.ToolCalls.map((call) => call.toolCallId)).toEqual([
         "turn-1-tc-1",
         "turn-1-tc-2",

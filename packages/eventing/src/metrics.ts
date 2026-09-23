@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+
 import { Counter, Histogram, register } from "prom-client";
 
 type CounterMetric = Counter<string>;

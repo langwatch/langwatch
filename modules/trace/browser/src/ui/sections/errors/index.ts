@@ -15,7 +15,10 @@ export {
   FORM_SERVER_ERROR,
 } from "../../../behavior/errors/logic/apply-handled-error-to-form.ts";
 export type { AppErrorCode } from "@langwatch/error-presentation/app-codes";
-export type { ErrorExplanation, ErrorPresentation } from "@langwatch/error-presentation/presentation";
+export type {
+  ErrorExplanation,
+  ErrorPresentation,
+} from "@langwatch/error-presentation/presentation";
 export {
   explainAnyError,
   explainHandledError,

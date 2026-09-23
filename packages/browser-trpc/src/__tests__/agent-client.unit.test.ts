@@ -6,9 +6,9 @@ describe("agentHasDevTunnel", () => {
   describe("given an http agent", () => {
     describe("when its configuration names a dev tunnel", () => {
       it("reports the tunnel", () => {
-        expect(agentHasDevTunnel({ type: "http", config: { devTunnel: "https://tunnel.test" } })).toBe(
-          true,
-        );
+        expect(
+          agentHasDevTunnel({ type: "http", config: { devTunnel: "https://tunnel.test" } }),
+        ).toBe(true);
       });
     });
 

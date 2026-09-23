@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+
 import type { Event } from "../../domain/types.ts";
-import { EventSourcingService } from "../eventSourcingService.ts";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
+import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   createMockEventStore,
   createMockLogger,

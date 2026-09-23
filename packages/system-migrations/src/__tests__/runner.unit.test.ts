@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { MigrationLeaseRepository } from "../lease.repository.ts";
 import { SystemMigrationRunnerService } from "../runner.service.ts";
 import type { SystemMigrationStateRepository } from "../state.repository.ts";

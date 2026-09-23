@@ -10,8 +10,9 @@ import { StringDecoder } from "node:string_decoder";
 import chalk from "chalk";
 
 import { runWithCredentialHolder } from "@/internal/credentialContext";
-import { AGENT_MODE_ENV_VARS } from "../utils/output";
+
 import { currentOutputScope, withOutputScope } from "../utils/errorOutput";
+import { AGENT_MODE_ENV_VARS } from "../utils/output";
 
 /** Set membership test for the strip rule in `applyWindow`. */
 const AGENT_MODE_ENV_VAR_SET: ReadonlySet<string> = new Set(AGENT_MODE_ENV_VARS);

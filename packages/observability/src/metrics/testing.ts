@@ -3,6 +3,7 @@
  * name, value, and attributes for test assertions.
  */
 import { metrics as metricsApi, type Attributes } from "@opentelemetry/api";
+
 import { activateMetrics, resetMetricsForTests } from "./instruments.ts";
 
 /** One value written to one instrument. */

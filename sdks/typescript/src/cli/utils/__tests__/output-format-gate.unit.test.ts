@@ -1,10 +1,11 @@
+import { Command } from "commander";
 /**
  * `assertFormatIsSupported`: the gate deciding whether a command may answer
  * in the format it was asked for -- refusing must not fire for the legacy
  * `-f json` spelling, a command's own `--json`, or env-detected agent mode.
  */
 import { describe, it, expect } from "vitest";
-import { Command } from "commander";
+
 import {
   assertFormatIsSupported,
   registerOutputOptions,

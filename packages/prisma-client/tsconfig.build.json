@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/prisma-client": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/generated/client.ts", "./src/prisma-error-codes.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

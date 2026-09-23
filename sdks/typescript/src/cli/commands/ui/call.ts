@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises";
+
 import { handledErrorFrom } from "@/internal/api/errors";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { reportCommandError } from "../../utils/errorOutput.ts";
 import type { CommandResult } from "../../utils/output.ts";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Bound the request so a wedged control plane cannot hold the whole turn.

@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { parsePrismaDatamodel } from "./datamodel.ts";
 import type { GuardParams } from "./guard-middleware.ts";
-import { guardProjectId, PROJECT_TENANCY_REGIMES, SCOPED_MODEL_NAMES } from "./multi-tenancy-guard.ts";
+import {
+  guardProjectId,
+  PROJECT_TENANCY_REGIMES,
+  SCOPED_MODEL_NAMES,
+} from "./multi-tenancy-guard.ts";
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
 /**

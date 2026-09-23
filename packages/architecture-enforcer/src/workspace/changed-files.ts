@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { extname, resolve, sep } from "node:path";
+
 import { walkFiles } from "./layout.ts";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);

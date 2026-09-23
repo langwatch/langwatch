@@ -1,8 +1,10 @@
 import chalk from "chalk";
+
 import {
   RoleBindingsApiService,
   type CreateRoleBindingInput,
 } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
+
 import {
   composeRoleBindingPrincipal,
   parseRole,

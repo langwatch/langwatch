@@ -20,9 +20,7 @@ const projectScope = {
 
 const key = { type: "apiKey", id: "key-1" } as const;
 
-const projectBinding = (
-  roleKey: CollectedBinding["roleKey"],
-): CollectedBinding[] => [
+const projectBinding = (roleKey: CollectedBinding["roleKey"]): CollectedBinding[] => [
   {
     roleKey,
     scopeType: "PROJECT",
@@ -48,9 +46,7 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
       makeReader({
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
         findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("admin")),
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(projectBinding("viewer")),
       });
 
@@ -137,9 +133,7 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
   describe("given a user principal", () => {
     it("never looks for an owner", async () => {
       const reader = makeReader({
-        findOrganizationMembership: vi
-          .fn()
-          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(projectBinding("admin")),
       });
 

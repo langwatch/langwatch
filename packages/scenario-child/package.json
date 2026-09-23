@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "description": "The scenario child process, as its own program and its own bundle.",
+  "files": [
+    "scripts"
+  ],
   "type": "module",
   "main": "./src/bundle-path.ts",
   "types": "./dist/bundle-path.d.ts",
@@ -45,8 +48,5 @@
     "esbuild": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "files": [
-    "scripts"
-  ]
+  }
 }

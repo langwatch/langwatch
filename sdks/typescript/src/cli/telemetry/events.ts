@@ -8,8 +8,10 @@
 // instrumented command, and the package root pulls in the (zod-based) card
 // schemas, which cost ~28ms an invocation to load and which nothing here needs.
 import { handledErrorFromThrown } from "@langwatch/langy-contract/cards/handled-error";
+
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
+
 import {
   LANGWATCH_EVENT_ATTRIBUTES as ATTR,
   LANGWATCH_EVENTS,

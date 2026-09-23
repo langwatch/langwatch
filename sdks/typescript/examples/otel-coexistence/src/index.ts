@@ -4,9 +4,9 @@
  * Auto-instrumentation via the global API is NOT isolated by this.
  */
 
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { SimpleSpanProcessor, ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
 import { trace } from "@opentelemetry/api";
+import { SimpleSpanProcessor, ConsoleSpanExporter } from "@opentelemetry/sdk-trace-base";
+import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 
 // ── Step 1: Simulate another OTel SDK initializing first ────────────
 const externalProvider = new NodeTracerProvider({

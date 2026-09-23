@@ -7,6 +7,7 @@ import type { InputProps } from "@chakra-ui/react";
 import { Input } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import * as React from "react";
+
 import { InputGroup } from "./input-group.tsx";
 
 export const SearchInput = React.forwardRef<HTMLInputElement, InputProps>(

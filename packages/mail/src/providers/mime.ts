@@ -1,5 +1,6 @@
-import type { EmailAttachment } from "./types.ts";
 import { nowInstant } from "@langwatch/time";
+
+import type { EmailAttachment } from "./types.ts";
 
 export const sanitizeHeaderValue = (value: string): string => value.replace(/[\r\n]+/g, " ").trim();
 

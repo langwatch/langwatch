@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { AwsClientProcessRuntime } from "../process-runtime.ts";
+
 import { OutboundProxyResolver } from "../aws-client.ts";
+import { AwsClientProcessRuntime } from "../process-runtime.ts";
 
 class NoProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {

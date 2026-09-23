@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import { langwatchFetch } from "../../internal/http/langwatchFetch";
 
 const LANGWATCH_DOCS_BASE = "https://langwatch.ai/docs";

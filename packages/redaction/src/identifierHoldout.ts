@@ -9,17 +9,13 @@
  * canonicalise fold: a namespace taught to the canonicaliser but not here
  * reaches the recognizers unprotected. Declared here — this leaf package has no workspace deps.
  */
-export const METADATA_SUBKEY_PREFIXES = [
-  "langwatch.metadata.",
-  "langwatch.trace.",
-] as const;
+export const METADATA_SUBKEY_PREFIXES = ["langwatch.metadata.", "langwatch.trace."] as const;
 
 const HAS_LETTER = /[A-Za-z]/;
 const HAS_DIGIT = /\d/;
 const HAS_LOWERCASE = /[a-z]/;
 const HAS_UPPERCASE = /[A-Z]/;
-const UUID_VALUE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_VALUE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HEX_RUN_VALUE = /^[0-9a-f]{16,}$/i;
 const BASE64ISH_VALUE = /^[A-Za-z0-9+/_=-]{16,}$/;
 
@@ -55,11 +51,7 @@ export function isIdentifierShapedValue(value: string): boolean {
   if (isDigitBearingIdentifier(value)) return true;
   if (UUID_VALUE.test(value)) return true;
   if (HEX_RUN_VALUE.test(value)) return true;
-  return (
-    BASE64ISH_VALUE.test(value) &&
-    HAS_LOWERCASE.test(value) &&
-    HAS_UPPERCASE.test(value)
-  );
+  return BASE64ISH_VALUE.test(value) && HAS_LOWERCASE.test(value) && HAS_UPPERCASE.test(value);
 }
 
 /**
@@ -157,16 +149,8 @@ const TRACE_ADDRESS_VALUE = /^(?:[0-9a-f]{8,64}|\d{1,32})$/i;
  * Whether this attribute is a reserved trace/span name carrying something that
  * could be the address the name promises.
  */
-export function reservesTraceAddress({
-  key,
-  value,
-}: {
-  key: string;
-  value: string;
-}): boolean {
-  return (
-    isReservedIdentifierAttributeKey(key) && TRACE_ADDRESS_VALUE.test(value)
-  );
+export function reservesTraceAddress({ key, value }: { key: string; value: string }): boolean {
+  return isReservedIdentifierAttributeKey(key) && TRACE_ADDRESS_VALUE.test(value);
 }
 
 /**

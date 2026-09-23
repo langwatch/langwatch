@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { firstGrapheme } from "../src/first-grapheme.ts";
 
 describe("firstGrapheme", () => {

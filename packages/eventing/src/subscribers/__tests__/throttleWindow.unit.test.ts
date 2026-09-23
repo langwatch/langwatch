@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { SubscriberJobPayload } from "../throttleWindow.ts";
 import { throttledPerWindow } from "../throttleWindow.ts";
 

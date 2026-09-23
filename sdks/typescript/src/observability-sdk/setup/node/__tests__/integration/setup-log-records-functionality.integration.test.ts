@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { setupObservability } from "../../setup";
 import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { getLangWatchLogger } from "../../../../logger";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { resetObservabilitySdkConfig } from "../../../../config.js";
+import { getLangWatchLogger } from "../../../../logger";
+import { setupObservability } from "../../setup";
 
 // Integration tests for log records functionality in setupObservability
 function createMockLogger() {

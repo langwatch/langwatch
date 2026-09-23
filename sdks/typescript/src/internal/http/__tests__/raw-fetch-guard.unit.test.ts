@@ -1,11 +1,12 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+
 /**
  * Every SDK request goes through `langwatchFetch`, which applies the
  * redirect rule -- a raw `fetch(` or `fetchImpl = fetch` default elsewhere
  * bypasses it, so this test walks `src` and fails on any found outside the allowed list.
  */
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
 
 const SRC_ROOT = resolve(__dirname, "..", "..", "..");
 
@@ -26,7 +27,8 @@ const TRANSPORT = "internal/http/langwatchFetch.ts";
 const SKIPPED_DIRS = new Set(["internal/generated"]);
 
 /** A call, a parameter default, or a fallback to the global. */
-const RAW_FETCH = /(?<![\w.$])fetch\(|(?<![\w.$])=\s*fetch\s*[,;)]|\?\?\s*globalThis\.fetch\b|globalThis\.fetch\(/;
+const RAW_FETCH =
+  /(?<![\w.$])fetch\(|(?<![\w.$])=\s*fetch\s*[,;)]|\?\?\s*globalThis\.fetch\b|globalThis\.fetch\(/;
 
 const isComment = (line: string): boolean => /^\s*(\*|\/\/|\/\*)/.test(line);
 

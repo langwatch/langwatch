@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 /**
  * @vitest-environment node
@@ -18,7 +19,6 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

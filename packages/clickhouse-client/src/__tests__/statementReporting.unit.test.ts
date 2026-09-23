@@ -4,6 +4,7 @@
  * not `error`, `warn` not `error` (the wrapper can't know if the caller recovers).
  */
 import { describe, expect, it } from "vitest";
+
 import { QUERY_CAUSE_FIELD } from "../resilience.ts";
 import { StatementReporter, type StatementLogSink } from "../statementReporting.ts";
 

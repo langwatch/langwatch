@@ -12,8 +12,7 @@
     // enforced by the compiler rather than by a convention in a barrel.
     "types": [],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [

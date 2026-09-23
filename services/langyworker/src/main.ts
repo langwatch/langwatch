@@ -4,9 +4,9 @@
  * (imported transitively through app.js) can execute any side effect.
  */
 
-import { rawStdoutWrite } from "./boot.js";
 import packageJson from "../package.json" with { type: "json" };
 import { runApp } from "./app.js";
+import { rawStdoutWrite } from "./boot.js";
 
 async function main(): Promise<void> {
   if (process.argv.includes("--version")) {

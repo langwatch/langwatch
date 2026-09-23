@@ -5,7 +5,9 @@
  */
 
 import chalk from "chalk";
+
 import type { RunPlanRunResult } from "@/client-sdk/services/run-plans";
+
 import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
 import { waitForBatchRun, type BatchRunOutcome } from "../../utils/waitForBatchRun";
 import type { WaitOptions } from "./scopeFlags";

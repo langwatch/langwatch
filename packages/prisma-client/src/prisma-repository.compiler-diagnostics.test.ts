@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -16,7 +17,9 @@ function diagnosticsFor(source: string): readonly string[] {
   const config = join(directory, "tsconfig.json");
   writeFileSync(
     file,
-    source.replaceAll("__REPOSITORY__", repository).replaceAll("__GENERATED_CLIENT__", generatedClient),
+    source
+      .replaceAll("__REPOSITORY__", repository)
+      .replaceAll("__GENERATED_CLIENT__", generatedClient),
   );
   writeFileSync(
     config,
@@ -40,9 +43,7 @@ function diagnosticsFor(source: string): readonly string[] {
   } catch (error) {
     const result = error as { stdout?: string; stderr?: string };
     const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-    const errors = output
-      .split("\n")
-      .filter((line) => line.includes("error TS"));
+    const errors = output.split("\n").filter((line) => line.includes("error TS"));
     const fixtureErrors = errors.filter((line) => line.includes("fixture.ts("));
     const externalErrors = errors.filter((line) => !line.includes("fixture.ts("));
     if (externalErrors.length > 0 || fixtureErrors.length === 0) {

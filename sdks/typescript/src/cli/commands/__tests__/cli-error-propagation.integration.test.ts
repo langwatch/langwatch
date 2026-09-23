@@ -1,14 +1,15 @@
+import { spawn } from "child_process";
+import * as fs from "fs";
+import http from "http";
+import type { AddressInfo } from "net";
+import * as os from "os";
+import * as path from "path";
+
 /**
  * Integration tests asserting that the CLI surfaces actionable error messages from the API
  * instead of generic "Internal server error" blobs.
  */
 import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import http from "http";
-import { spawn } from "child_process";
-import type { AddressInfo } from "net";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 

@@ -4,6 +4,7 @@
  * agnostic on purpose. See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
+import { nowInstant } from "@langwatch/time";
 import {
   type Context,
   ROOT_CONTEXT,
@@ -13,7 +14,6 @@ import {
   trace,
 } from "@opentelemetry/api";
 import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
-import { nowInstant } from "@langwatch/time";
 
 import {
   ATTR_NAVIGATION_FROM_PATH,

@@ -1,8 +1,11 @@
 import type fs from "fs";
+
 import * as yaml from "js-yaml";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
+
 import type { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import type { PromptsConfig, PromptsLock, SyncResult } from "../../types";
 
 const { mockWriteFileSync } = vi.hoisted(() => ({
   mockWriteFileSync: vi.fn(),
@@ -30,8 +33,8 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { pushPrompts } from "../push";
 import { FileManager } from "../../utils/fileManager";
+import { pushPrompts } from "../push";
 
 describe("pushPrompts", () => {
   let mockSync: ReturnType<typeof vi.fn>;

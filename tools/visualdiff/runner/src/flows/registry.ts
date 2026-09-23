@@ -1,5 +1,5 @@
-import type { Action } from "./context";
 import * as actions from "./actions";
+import type { Action } from "./context";
 import { click, dismissTour, fill, go, select, type, wait } from "./primitives";
 
 /** Keep names aligned with `RunnerActions` in tools/visualdiff/config.go; tests enforce parity. */
@@ -29,7 +29,9 @@ export const REGISTRY: Record<string, Action> = {
 export const resolveAction = (name: string): Action => {
   const action = REGISTRY[name];
   if (action === undefined) {
-    throw new Error(`unknown action "${name}" (known: ${Object.keys(REGISTRY).toSorted().join(", ")})`);
+    throw new Error(
+      `unknown action "${name}" (known: ${Object.keys(REGISTRY).toSorted().join(", ")})`,
+    );
   }
   return action;
 };

@@ -1,6 +1,7 @@
 import { type Context, type Tracer } from "@opentelemetry/api";
-import type { LangWatchSpan, LangWatchSpanOptions } from "../span/types";
+
 import type { AddEvaluationParams } from "../evaluation";
+import type { LangWatchSpan, LangWatchSpanOptions } from "../span/types";
 
 /**
  * Enhanced LangWatch tracer interface that extends OpenTelemetry's Tracer: returns

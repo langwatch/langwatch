@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TENANT_CAP } from "../scripts.ts";
+
 import { resolveGroupQueuePolicyFromEnv } from "../policy-env.ts";
+import { DEFAULT_TENANT_CAP } from "../scripts.ts";
 
 /**
  * Tenant soft-cap is a noisy-neighbour defense; defaults to 50 and configurable

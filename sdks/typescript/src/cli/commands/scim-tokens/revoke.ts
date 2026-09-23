@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { ScimTokensApiService } from "@/client-sdk/services/scim-tokens/scim-tokens-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 

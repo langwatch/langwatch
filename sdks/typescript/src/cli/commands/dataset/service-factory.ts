@@ -1,9 +1,8 @@
-import { scopedApiKey } from "@/internal/credentialContext";
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { DatasetService } from "@/client-sdk/services/datasets";
 import { createLangWatchApiClient } from "@/internal/api/client";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { NoOpLogger } from "@/logger";
-
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
  * Creates a DatasetService configured from environment variables.
  * Reused by all dataset CLI commands.

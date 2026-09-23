@@ -5,6 +5,7 @@
  */
 
 import chalk from "chalk";
+
 import {
   isAppendEdit,
   type BashOutput,

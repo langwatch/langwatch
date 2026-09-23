@@ -1,14 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner.ts";
+
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
 import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags.ts";
-import { createCliScenariosService } from "./cli-scenarios-service.ts";
 import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
 import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite.ts";
+import { createCliScenariosService } from "./cli-scenarios-service.ts";
 
 /**
  * The field definitions of the suite a scenario is filed in, or none when

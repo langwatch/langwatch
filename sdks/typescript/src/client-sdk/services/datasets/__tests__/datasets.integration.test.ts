@@ -1,10 +1,12 @@
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
 /**
  * Integration tests for Dataset TypeScript SDK
  */
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
+
 import { LangWatch } from "@/client-sdk";
+
 import { DatasetNotFoundError, DatasetApiError } from "../errors";
 
 const TEST_ENDPOINT = "http://localhost:5560";

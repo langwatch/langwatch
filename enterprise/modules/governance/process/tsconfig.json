@@ -10,8 +10,7 @@
     "verbatimModuleSyntax": true,
     "paths": {
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"]
-    },
-
+    }
   },
   "include": ["src/**/*.ts"],
   "references": [

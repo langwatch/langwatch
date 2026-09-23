@@ -1,13 +1,12 @@
 import chalk from "chalk";
+
 import type { UpdateTestSuiteBody } from "@/client-sdk/services/test-suites";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { parseSuiteFieldDefinitionFlags } from "../../utils/suiteFieldFlags";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 import { type EvaluatorFlagRef, readEvaluators } from "./evaluatorFlags";

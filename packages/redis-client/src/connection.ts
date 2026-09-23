@@ -4,6 +4,7 @@
  * called (ADR-093).
  */
 import IORedis, { Cluster, type Redis } from "ioredis";
+
 import {
   RedisConfigService,
   type RedisConfigResolution,

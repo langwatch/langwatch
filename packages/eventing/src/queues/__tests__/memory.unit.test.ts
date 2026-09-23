@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { EventSourcedQueueDefinition } from "../../queues/index.ts";
 
 const mockLogger = {

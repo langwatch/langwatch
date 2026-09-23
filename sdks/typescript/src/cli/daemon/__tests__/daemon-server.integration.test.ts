@@ -1,17 +1,20 @@
-/**
- * Integration tests over a real Unix domain socket, driving handshake,
- * framing, identity, lifecycle, cancellation and fallback without commander.
- * The full CLI-through-daemon path is covered elsewhere.
- */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Writable } from "node:stream";
 
+/**
+ * Integration tests over a real Unix domain socket, driving handshake,
+ * framing, identity, lifecycle, cancellation and fallback without commander.
+ * The full CLI-through-daemon path is covered elsewhere.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { execViaDaemon, requestStatus, requestStop } from "../client";
 import { secureSocketFile, UntrustedSocketDirError } from "../identity";
+import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
+import type { CommandExecution, CommandExecutor } from "../runner";
 import {
   cleanStaleSocket,
   createDaemonServer,
@@ -21,8 +24,6 @@ import {
   stagingSocketPath,
   type DaemonServer,
 } from "../server";
-import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
-import type { CommandExecution, CommandExecutor } from "../runner";
 import { noopTelemetry, type DaemonTelemetry } from "../telemetry";
 
 const CLI_VERSION = "9.9.9";

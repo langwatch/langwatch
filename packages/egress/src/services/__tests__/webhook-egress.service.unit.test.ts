@@ -3,13 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../webhook/http-destination.ts", () => ({ sendHttpDestination: vi.fn() }));
 
+import { sendHttpDestination } from "../../webhook/http-destination.ts";
+import { verifyWebhookSignature, WEBHOOK_SIGNATURE_HEADER } from "../../webhook/signature.ts";
 import { InMemoryWebhookDispatchRateLimiterService } from "../in-memory.webhook-dispatch-rate-limiter.service.ts";
 import {
   WebhookDispatchRateLimiter,
   type WebhookDispatchRateLimitResult,
 } from "../webhook-dispatch-rate-limiter.service.ts";
-import { sendHttpDestination } from "../../webhook/http-destination.ts";
-import { verifyWebhookSignature, WEBHOOK_SIGNATURE_HEADER } from "../../webhook/signature.ts";
 import { WebhookEgressService } from "../webhook-egress.service.ts";
 
 /**

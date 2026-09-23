@@ -1,12 +1,12 @@
-import type { ReplayRedis } from "./replay-redis.port.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import type { ReplayRedis } from "./replay-redis.port.ts";
 import { discoverProjectionAggregates } from "./replayDiscovery.ts";
 import { runFoldMapReplay } from "./replayEngine.ts";
+import type { ReplayEventSource } from "./replayEventSource.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
 import { nullLog } from "./replayLog.ts";
 import { cleanupAll, hasPreviousRun } from "./replayMarkers.ts";
 import { replayStateProjection } from "./replayStatePath.ts";
-import type { ReplayEventSource } from "./replayEventSource.ts";
 import type {
   DiscoveryResult,
   RegisteredFoldProjection,

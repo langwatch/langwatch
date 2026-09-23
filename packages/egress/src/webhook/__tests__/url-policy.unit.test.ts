@@ -1,5 +1,6 @@
 import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+
 import { assertWebhookUrlAllowed, inspectWebhookUrl } from "../url-policy.ts";
 
 /**

@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { type TenantId, TenantIdSchema } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";

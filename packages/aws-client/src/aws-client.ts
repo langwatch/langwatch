@@ -1,6 +1,6 @@
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
-import { NodeHttpHandler } from "@smithy/node-http-handler";
 import type { HttpHandlerOptions, HttpRequest, HttpResponse } from "@smithy/core/protocols";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
 import { HttpsProxyAgent } from "https-proxy-agent";
 
 export abstract class OutboundProxyResolver {

@@ -11,6 +11,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { ComparisonError } from "../errors";
 import {
   type ComparisonHarness,

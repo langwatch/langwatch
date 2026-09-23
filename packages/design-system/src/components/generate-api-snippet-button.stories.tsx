@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+
 import { GenerateApiSnippetButton } from "./generate-api-snippet-button.tsx";
 
 const meta = {

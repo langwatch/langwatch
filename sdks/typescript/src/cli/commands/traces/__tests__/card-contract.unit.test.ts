@@ -1,5 +1,3 @@
-// Contract test pinning CLI JSON output schema to Langy panel expectations.
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   cardKindFor,
   parseCliResult,
@@ -7,6 +5,8 @@ import {
   traceIdOf,
   type TraceSummary,
 } from "@langwatch/langy-contract/cards";
+// Contract test pinning CLI JSON output schema to Langy panel expectations.
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -30,6 +30,7 @@ vi.mock("ora", () => ({
 }));
 
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
+
 import { searchTracesCommand } from "../search";
 
 /** The shape the traces API really answers with — see openapiLangWatch.json. */

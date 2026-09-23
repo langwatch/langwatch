@@ -3,9 +3,9 @@
  * Forces imports to load before the bundler can drop them.
  */
 
+import * as analyticsQuery from "../commands/analytics/query";
 import * as promptList from "../commands/list";
 import * as status from "../commands/status";
-import * as analyticsQuery from "../commands/analytics/query";
 import * as tracesGet from "../commands/traces/get";
 import * as tracesSearch from "../commands/traces/search";
 

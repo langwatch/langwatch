@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Task } from "../task.ts";
+
 import { TaskCatalogue } from "../task-catalogue.ts";
 import { TaskNotFoundError } from "../task.errors.ts";
+import { Task } from "../task.ts";
 
 /** Runs `fn`, returning the error it throws so the caller can assert on it unconditionally. */
 function thrownBy(fn: () => unknown): unknown {

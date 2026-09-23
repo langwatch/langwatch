@@ -1,5 +1,6 @@
 import { getQueryKey } from "@trpc/react-query";
 import { describe, expect, it } from "vitest";
+
 import { createModuleApi } from "../module-api.ts";
 import { trpcQueryFilter, trpcQueryKey } from "../trpc-query-key.ts";
 

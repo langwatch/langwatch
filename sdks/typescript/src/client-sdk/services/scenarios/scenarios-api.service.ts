@@ -1,3 +1,12 @@
+import {
+  extractStatusFromResponse,
+  formatApiErrorForOperation,
+} from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+
+import { ScenariosApiError } from "./errors";
 import type {
   CreateScenarioBody,
   DeleteScenarioResponse,
@@ -6,14 +15,6 @@ import type {
   ScenarioVersionListResponse,
   UpdateScenarioBody,
 } from "./types";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
-import { ScenariosApiError } from "./errors";
-import {
-  extractStatusFromResponse,
-  formatApiErrorForOperation,
-} from "@/client-sdk/services/_shared/format-api-error";
-import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export class ScenariosApiService {
   private readonly apiClient: LangwatchApiClient;

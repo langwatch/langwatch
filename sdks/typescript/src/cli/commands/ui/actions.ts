@@ -1,7 +1,8 @@
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import type { CommandResult } from "../../utils/output.ts";
 import { asCommandResult } from "./call.ts";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Bound the request so a quiet socket cannot hold the CLI open forever. This

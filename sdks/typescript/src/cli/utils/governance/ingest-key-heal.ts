@@ -1,11 +1,11 @@
+import { describeIngestionKey, extractLookupIdFromToken, isExpiredSession } from "./cli-api";
+import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./config";
 /**
  * Heals a personal ingest key the collector rejected: re-mints it under the device's current
  * session and rewrites the tool's wiring. Never throws to the caller — every failure degrades
  * to a null and a debug line, so a dead key can't be why a running agent's session breaks.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
-import { describeIngestionKey, extractLookupIdFromToken, isExpiredSession } from "./cli-api";
-import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./config";
 import { resolveLiveIngestionKey } from "./telemetry-refresh";
 
 /** The wiring target for one agent's OTLP logs, and what authenticates it. */

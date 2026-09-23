@@ -5,11 +5,14 @@
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 import { mock } from "vitest-mock-extended";
+
 import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import { LOGS_PATH, METRICS_PATH, TRACES_PATH } from "@/internal/constants";
+
 import { PromptsApiService } from "../prompts/prompts-api.service";
 
 const SDK_SRC = resolve(__dirname, "../../..");

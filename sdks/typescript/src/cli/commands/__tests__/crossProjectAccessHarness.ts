@@ -9,6 +9,7 @@ import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");

@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { lintFeatureConfiguration } from "../src/policies/feature-configuration.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -57,10 +59,7 @@ describe("feature configuration", () => {
   describe("given a configuration module with no schema of its own", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("refuses it and names the export it needs", () => {
-      write(
-        "modules/widget/contract/src/widget.config.ts",
-        'const leaf = { env: "WIDGET_URL" };',
-      );
+      write("modules/widget/contract/src/widget.config.ts", 'const leaf = { env: "WIDGET_URL" };');
 
       expect(findings()).toHaveLength(1);
       expect(findings()[0]?.allowed).toContain("widgetServerConfigSchema");

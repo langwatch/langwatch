@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { runScript, scriptFailureRecord } from "../run-script.ts";
 
 /** Everything the runner wrote to stdout, as parsed records. */

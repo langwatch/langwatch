@@ -1,14 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 // The schema endpoint is a project-wide LangWatchQL discovery surface, not a
 // widget-specific one — `ChartsApiService` already carries it, so dashboard
 // widgets reuse it rather than duplicating the same request on a second
 // service class.
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the LangWatchQL analytics schema rather than printing it (output
@@ -35,9 +37,7 @@ export const dashboardWidgetSchemaCommand = async (options?: {
       table: () => {
         for (const view of schema.views) {
           console.log();
-          console.log(
-            `  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`,
-          );
+          console.log(`  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`);
           console.log(
             `  ${chalk.gray("Grain:")} ${view.grain}  ${chalk.gray("Time column:")} ${view.timeColumn}`,
           );

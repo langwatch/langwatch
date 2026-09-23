@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
+
 import {
   ConfigurationError,
   categorizeError,

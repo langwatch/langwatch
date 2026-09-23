@@ -2,6 +2,7 @@
  * `actionParams` must never reach machine output.
  */
 import { describe, it, expect } from "vitest";
+
 import { redactTriggerSecrets, redactTriggerListSecrets } from "../redact";
 
 const WEBHOOK = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXX";

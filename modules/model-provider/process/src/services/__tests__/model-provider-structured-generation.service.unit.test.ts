@@ -1,10 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Structured feature generation stays portable at the contract boundary.
  * @vitest-environment node
  */
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LanguageModel } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";

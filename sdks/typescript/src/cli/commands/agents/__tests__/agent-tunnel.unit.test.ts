@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import {
   afterAll,
   afterEach,
@@ -73,6 +74,7 @@ vi.mock("cloudflared", () => ({
 }));
 
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
+
 import { agentTunnelCommand, startAgentTunnelSession } from "../tunnel";
 import { DEV_SECRET_HEADER } from "../tunnel/write-back";
 

@@ -3,6 +3,7 @@
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const runSpy = vi.hoisted(() => vi.fn());

@@ -1,5 +1,6 @@
 /** Progress spinner; silent when --format json to preserve JSON output. */
 import ora, { type Options, type Ora } from "ora";
+
 import { getOutputFormat } from "./errorOutput";
 
 /**

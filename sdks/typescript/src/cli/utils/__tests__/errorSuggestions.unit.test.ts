@@ -1,3 +1,4 @@
+import type { CliHandledError } from "@langwatch/langy-contract/cards/handled-error";
 /**
  * The code-keyed fallback table: exact-code hits, clean misses, and the rule
  * that advice the platform sent always beats advice the CLI shipped with.
@@ -5,7 +6,7 @@
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { describe, expect, it } from "vitest";
-import type { CliHandledError } from "@langwatch/langy-contract/cards/handled-error";
+
 import { fallbackSuggestionsFor, withFallbackSuggestions } from "../errorSuggestions";
 
 const domain = (overrides: Partial<CliHandledError> = {}): CliHandledError => ({

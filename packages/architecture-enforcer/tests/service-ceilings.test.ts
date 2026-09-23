@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { lintServiceCeilingsFile } from "../src/index.ts";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -16,21 +18,17 @@ describe("service ceilings", () => {
 
   it("keeps the api-key service free of discrete structural violations", () => {
     expect(() =>
-      execFileSync(
-        "pnpm",
-        ["exec", "oxlint", "--config", ".oxlintrc.jsonc", apiKeyService],
-        { cwd: root, stdio: "pipe" },
-      ),
+      execFileSync("pnpm", ["exec", "oxlint", "--config", ".oxlintrc.jsonc", apiKeyService], {
+        cwd: root,
+        stdio: "pipe",
+      }),
     ).not.toThrow();
   });
 
   /** @scenario "A ratchet whose inventory reached zero becomes a plain refusal" */
   it("refuses an over-ceiling service with no per-file inventory left to raise it", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "service-ceilings-file-"));
-    const service = join(
-      fixtureRoot,
-      "modules/example/process/src/services/example.service.ts",
-    );
+    const service = join(fixtureRoot, "modules/example/process/src/services/example.service.ts");
     mkdirSync(join(fixtureRoot, "modules/example/process/src/services"), {
       recursive: true,
     });

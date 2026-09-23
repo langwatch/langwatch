@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PromptsApiService } from "../prompts-api.service";
-import { PromptsApiError } from "../errors";
 import { mock } from "vitest-mock-extended";
+
 import type { InternalConfig } from "@/client-sdk/types";
-import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import type { LangwatchApiClient } from "@/internal/api/client";
+
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import { PromptsApiError } from "../errors";
+import { PromptsApiService } from "../prompts-api.service";
 
 describe("PromptsApiService.renameTag", () => {
   let service: PromptsApiService;
@@ -197,7 +199,9 @@ describe("PromptsApiService.handleApiError", () => {
       caught = e;
     }
     expect(caught).toBeInstanceOf(PromptsApiError);
-    expect((caught as PromptsApiError).message).toBe("Failed to test operation: nested error string");
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: nested error string",
+    );
   });
 
   it("extracts error.error.message", () => {
@@ -210,7 +214,9 @@ describe("PromptsApiService.handleApiError", () => {
       caught = e;
     }
     expect(caught).toBeInstanceOf(PromptsApiError);
-    expect((caught as PromptsApiError).message).toBe("Failed to test operation: nested error message");
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: nested error message",
+    );
   });
 
   it("serializes error.error object when no message", () => {
@@ -237,7 +243,9 @@ describe("PromptsApiService.handleApiError", () => {
       caught = e;
     }
     expect(caught).toBeInstanceOf(PromptsApiError);
-    expect((caught as PromptsApiError).message).toBe("Failed to test operation: direct error message");
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: direct error message",
+    );
   });
 
   it("uses unknown error when no extractable message", () => {

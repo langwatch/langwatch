@@ -169,9 +169,9 @@ describe("the throttle middleware on the declared path", () => {
       await caller.heavyWrite({ projectId: "project-1" });
       await caller.heavyWrite({ projectId: "project-1" });
 
-      const refusal = await caller.heavyWrite({ projectId: "project-1" }).catch(
-        (error: unknown) => error,
-      );
+      const refusal = await caller
+        .heavyWrite({ projectId: "project-1" })
+        .catch((error: unknown) => error);
 
       expect(refusal).toBeInstanceOf(TRPCError);
       expect((refusal as TRPCError).code).toBe("TOO_MANY_REQUESTS");
@@ -193,9 +193,9 @@ describe("the throttle middleware on the declared path", () => {
       await first.heavyRead({ projectId: "project-1" });
       await first.heavyRead({ projectId: "project-1" });
 
-      const refusal = await first.heavyRead({ projectId: "project-1" }).catch(
-        (error: unknown) => error,
-      );
+      const refusal = await first
+        .heavyRead({ projectId: "project-1" })
+        .catch((error: unknown) => error);
 
       expect(refusal).toBeInstanceOf(TRPCError);
 

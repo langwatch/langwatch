@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import { RedisReadinessService } from "./readiness.ts";
 import type { RedisConnection } from "./types.ts";
 

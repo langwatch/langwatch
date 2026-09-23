@@ -1,5 +1,5 @@
-import type { RetentionPolicy } from "../runtime.types.ts";
 import type { Projection } from "../domain/types.ts";
+import type { RetentionPolicy } from "../runtime.types.ts";
 import type { ProjectionStore } from "../stores/projectionStore.types.ts";
 import type { FoldProjectionStore } from "./foldProjection.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
@@ -38,9 +38,7 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
     });
   }
 
-  async storeBatch(
-    entries: { state: TData; context: ProjectionStoreContext }[],
-  ): Promise<void> {
+  async storeBatch(entries: { state: TData; context: ProjectionStoreContext }[]): Promise<void> {
     if (entries.length === 0) return;
 
     const firstContext = entries[0]!.context;

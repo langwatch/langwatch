@@ -61,28 +61,36 @@ describe("given a trace the SDK posted", () => {
 
   describe("when the trace is searched for and read from the terminal", () => {
     // @scenario "A trace posted by the SDK is found and read from the terminal"
-    it("finds it in the search and prints it by id", () => {
-      const search = workspace.cli.run(`trace search -q "${PHRASE}" --limit 50 -o json`);
-      expect(search.exitCode ?? 0).toBe(0);
-      const found = parseJson<{ traces: { trace_id: string }[] }>(search.output, "trace search");
-      expect(found.traces.map((each) => each.trace_id)).toContain(traceId);
+    it(
+      "finds it in the search and prints it by id",
+      () => {
+        const search = workspace.cli.run(`trace search -q "${PHRASE}" --limit 50 -o json`);
+        expect(search.exitCode ?? 0).toBe(0);
+        const found = parseJson<{ traces: { trace_id: string }[] }>(search.output, "trace search");
+        expect(found.traces.map((each) => each.trace_id)).toContain(traceId);
 
-      const one = workspace.cli.run(`trace get ${traceId} -o json`);
-      expect(one.exitCode ?? 0).toBe(0);
-      expect(one.output).toContain(traceId);
-    }, CLI_TIMEOUT_MS);
+        const one = workspace.cli.run(`trace get ${traceId} -o json`);
+        expect(one.exitCode ?? 0).toBe(0);
+        expect(one.output).toContain(traceId);
+      },
+      CLI_TIMEOUT_MS,
+    );
   });
 
   describe("when the trace's transcript is asked for", () => {
     // @scenario "A trace's transcript is read from the terminal"
     // Marked failing: GET /api/v1/traces/{traceId}/transcript is not mounted on
     // this branch, so the command cannot succeed until that route is served.
-    it.fails("prints the transcript", () => {
-      const result = workspace.cli.run(`trace transcript ${traceId} -o json`);
+    it.fails(
+      "prints the transcript",
+      () => {
+        const result = workspace.cli.run(`trace transcript ${traceId} -o json`);
 
-      expect(result.exitCode ?? 0).toBe(0);
-      const transcript = parseJson<{ entries: unknown[] }>(result.output, "trace transcript");
-      expect(Array.isArray(transcript.entries)).toBe(true);
-    }, CLI_TIMEOUT_MS);
+        expect(result.exitCode ?? 0).toBe(0);
+        const transcript = parseJson<{ entries: unknown[] }>(result.output, "trace transcript");
+        expect(Array.isArray(transcript.entries)).toBe(true);
+      },
+      CLI_TIMEOUT_MS,
+    );
   });
 });

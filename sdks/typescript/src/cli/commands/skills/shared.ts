@@ -4,7 +4,9 @@
  * one confirmation gate every destructive path goes through.
  */
 import * as readline from "node:readline";
+
 import chalk from "chalk";
+
 import { resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
 import {
   resolveSkills,

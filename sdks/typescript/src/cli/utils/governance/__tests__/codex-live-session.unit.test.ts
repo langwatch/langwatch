@@ -99,7 +99,9 @@ describe("resolving the live codex session", () => {
       const live = await resolveLiveCodexSession({ sessionsRoot, nowMs: NOW });
 
       expect(live.kind).toBe("ambiguous");
-      expect(live.kind === "ambiguous" && live.sessionIds).toEqual([SESSION_A, SESSION_B].toSorted());
+      expect(live.kind === "ambiguous" && live.sessionIds).toEqual(
+        [SESSION_A, SESSION_B].toSorted(),
+      );
     });
   });
 

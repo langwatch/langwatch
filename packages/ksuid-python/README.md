@@ -89,6 +89,7 @@ print(ksuid.to_json())  # Full JSON representation
 ### Main Functions
 
 #### `generate(resource: str) -> Ksuid`
+
 Generates a new KSUID for the specified resource.
 
 ```python
@@ -96,6 +97,7 @@ ksuid = generate('user')
 ```
 
 #### `parse(input: str) -> Ksuid`
+
 Parses a KSUID string and returns a Ksuid instance.
 
 ```python
@@ -105,9 +107,11 @@ ksuid = parse('user_00028U9MDT583X9eXPG1IU0ptdl1l')
 ### Environment Management
 
 #### `get_environment() -> str`
+
 Returns the current environment.
 
 #### `set_environment(value: str) -> None`
+
 Sets the current environment.
 
 ```python
@@ -118,9 +122,11 @@ env = get_environment()  # 'dev'
 ### Instance Management
 
 #### `get_instance() -> Instance`
+
 Returns the current instance.
 
 #### `set_instance(value: Instance) -> None`
+
 Sets the current instance.
 
 ```python
@@ -131,9 +137,11 @@ set_instance(instance)
 ### Classes
 
 #### `Ksuid`
+
 The main KSUID class.
 
 **Properties:**
+
 - `environment: str` - The environment (prod, dev, etc.)
 - `resource: str` - The resource type (user, order, etc.)
 - `timestamp: int` - Unix timestamp
@@ -142,19 +150,23 @@ The main KSUID class.
 - `date: datetime` - Python datetime object
 
 **Methods:**
+
 - `__str__() -> str` - Returns the string representation
 - `equals(other: Ksuid) -> bool` - Compares two KSUIDs
 - `to_json() -> dict` - Returns JSON representation
 
 #### `Instance`
+
 Represents a machine/container instance.
 
 **Schemes:**
+
 - `InstanceScheme.RANDOM` - Random identifier
 - `InstanceScheme.MAC_AND_PID` - MAC address + PID
 - `InstanceScheme.DOCKER_CONT` - Docker container ID
 
 #### `Node`
+
 Advanced class for custom KSUID generation.
 
 ### Error Classes

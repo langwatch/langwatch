@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
@@ -7,7 +8,6 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 

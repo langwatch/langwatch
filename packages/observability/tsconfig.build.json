@@ -7,7 +7,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/observability": ["./src/index.ts"]
-    },
+    }
   },
   "files": [
     "./src/index.ts",

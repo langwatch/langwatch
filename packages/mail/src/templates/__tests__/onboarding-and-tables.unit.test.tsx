@@ -1,12 +1,18 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { render } from "@react-email/render";
 import { describe, expect, it } from "vitest";
+
 import { DataTable } from "../email-layout.tsx";
 import { inviteEmailTemplate } from "../invite-email.tsx";
 import { joinRequestApprovedTemplate } from "../join-request-emails.tsx";
-import { AGENT_PROMPT, FIRST_STEPS_LINKS, SKILLS_INSTALL_COMMAND } from "../onboarding/first-steps.tsx";
+import {
+  AGENT_PROMPT,
+  FIRST_STEPS_LINKS,
+  SKILLS_INSTALL_COMMAND,
+} from "../onboarding/first-steps.tsx";
 import { tokenize } from "../onboarding/highlight.ts";
 import { renderMailTemplate, type MailTemplate } from "../registry.ts";
 import { signUpVerificationEmailTemplate } from "../sign-up-verification-email.tsx";

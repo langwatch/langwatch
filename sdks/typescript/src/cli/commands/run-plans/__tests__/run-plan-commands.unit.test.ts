@@ -3,7 +3,9 @@
  * Spec: specs/features/run-plan-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { RunPlansApiError } from "@/client-sdk/services/run-plans";
+
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const runSpy = vi.hoisted(() => vi.fn());
@@ -44,10 +46,10 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { runRunPlanCommand } from "../run";
-import { listRunPlansCommand } from "../list";
-import { getRunPlanCommand } from "../get";
 import { archiveRunPlanCommand } from "../archive";
+import { getRunPlanCommand } from "../get";
+import { listRunPlansCommand } from "../list";
+import { runRunPlanCommand } from "../run";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

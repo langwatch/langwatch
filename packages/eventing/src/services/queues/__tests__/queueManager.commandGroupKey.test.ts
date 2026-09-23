@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
 import type { Command, CommandHandler } from "../../../commands/command.ts";
 import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
 import { defineCommandSchema } from "../../../commands/commandSchema.ts";
@@ -234,12 +235,10 @@ describe("QueueManager migration preflight targets", () => {
       },
       vi.fn(),
     );
-    manager.initializeProjectionQueues(
-      { state: { name: "state" } },
-      vi.fn(),
-      undefined,
-      { queueType: "projection", jobPath: "fold" },
-    );
+    manager.initializeProjectionQueues({ state: { name: "state" } }, vi.fn(), undefined, {
+      queueType: "projection",
+      jobPath: "fold",
+    });
     manager.initializeProjectionSubscriberQueues(
       {
         effect: {
@@ -270,9 +269,7 @@ describe("QueueManager migration preflight targets", () => {
     });
 
     expect(queue.registerPreflightGroups).toHaveBeenCalledOnce();
-    const registered = vi
-      .mocked(queue.registerPreflightGroups!)
-      .mock.calls[0]![0]();
+    const registered = vi.mocked(queue.registerPreflightGroups!).mock.calls[0]![0]();
     expect(new Set(registered)).toEqual(
       new Set([
         `${tenantId}/map/writer/${aggregateType}:aggregate-1`,
@@ -281,9 +278,9 @@ describe("QueueManager migration preflight targets", () => {
         `${tenantId}/command/start/${aggregateType}:aggregate-1`,
       ]),
     );
-    expect(
-      vi.mocked(queue.registerPreflightGroups!).mock.invocationCallOrder[0],
-    ).toBeLessThan(vi.mocked(queue.send).mock.invocationCallOrder[0]!);
+    expect(vi.mocked(queue.registerPreflightGroups!).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(queue.send).mock.invocationCallOrder[0]!,
+    );
   });
 
   it("fails closed before staging when a pipeline has custom group routing", async () => {

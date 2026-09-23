@@ -28,16 +28,16 @@ not be completed — the same ladder as `apidiff`.
    workspace packages the api and worker import a dist from, and the
    developer's own `.env` copied in (see "Preparing a fresh worktree" below)
    - and only then does it become a `haven up --agent --detach` stack under
-   its own run-scoped slug, with haven's own automatic prep doing migrate and
-   seed. With `-no-haven`, visualdiff provisions the old way instead:
-   `pnpm install --offline` and `pnpm run start:prepare:files` in each
-   worktree, then each ref's stack starts on its own ports - the base at
-   `-base-port` (5670 by default), the candidate ten above it, so the two can
-   never collide. A modular checkout runs `dev:ui`, `dev:api` and
-   `dev:worker`; a monolith checkout runs `dev:app` with the Prisma,
-   ClickHouse and provisioning steps skipped, because both refs share your
-   local databases and the older ref must not re-apply its own migration set
-   over them.
+     its own run-scoped slug, with haven's own automatic prep doing migrate and
+     seed. With `-no-haven`, visualdiff provisions the old way instead:
+     `pnpm install --offline` and `pnpm run start:prepare:files` in each
+     worktree, then each ref's stack starts on its own ports - the base at
+     `-base-port` (5670 by default), the candidate ten above it, so the two can
+     never collide. A modular checkout runs `dev:ui`, `dev:api` and
+     `dev:worker`; a monolith checkout runs `dev:app` with the Prisma,
+     ClickHouse and provisioning steps skipped, because both refs share your
+     local databases and the older ref must not re-apply its own migration set
+     over them.
 3. Polls both stacks until they answer, then seeds a handful of traces and one
    dataset through the **candidate's** API, so the fixtures exist in the shape
    the newer code writes.
@@ -151,13 +151,13 @@ ref's crash-loop on the port-based path.
 The report's first pass is rule-based, and every row keeps both screenshots so
 a person can overrule it:
 
-| Class              | Rule                                                                |
-| ------------------ | ------------------------------------------------------------------- |
-| `regression`       | the candidate throws, or fails a step, where the base does not       |
-| `restore-gap`      | the candidate hits a 404 on an `/api/` call the base does not        |
-| `intended-restore` | the base has no such screen and the candidate renders one            |
-| `noise`            | under 2% different with no errors on either side                     |
-| `changed`          | a real difference none of the rules explains                         |
+| Class              | Rule                                                           |
+| ------------------ | -------------------------------------------------------------- |
+| `regression`       | the candidate throws, or fails a step, where the base does not |
+| `restore-gap`      | the candidate hits a 404 on an `/api/` call the base does not  |
+| `intended-restore` | the base has no such screen and the candidate renders one      |
+| `noise`            | under 2% different with no errors on either side               |
+| `changed`          | a real difference none of the rules explains                   |
 
 A failure rule beats a restore rule: a restored screen that throws is a
 regression, not a restoration. `regression` and `restore-gap` are the rows
@@ -173,7 +173,18 @@ comparison is decided, fsynced before the run continues, so `tail -f
 <run-dir>/findings.jsonl` shows a finding as soon as it exists. Each line is:
 
 ```json
-{"route":"/{slug}/analytics","kind":"changed","module":"analytics","evidence":{"base":"shots/base/routes/analytics.png","candidate":"shots/candidate/routes/analytics.png","diff":"shots/diff/route_%7Bslug%7D_analytics_0.png"},"message":"differs by 4.10%","capturedAt":"2026-09-10T03:05:00Z"}
+{
+  "route": "/{slug}/analytics",
+  "kind": "changed",
+  "module": "analytics",
+  "evidence": {
+    "base": "shots/base/routes/analytics.png",
+    "candidate": "shots/candidate/routes/analytics.png",
+    "diff": "shots/diff/route_%7Bslug%7D_analytics_0.png"
+  },
+  "message": "differs by 4.10%",
+  "capturedAt": "2026-09-10T03:05:00Z"
+}
 ```
 
 `kind` is one of `missing-on-candidate`, `changed`, `console-error`,

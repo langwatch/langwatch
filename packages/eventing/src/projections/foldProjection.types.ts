@@ -1,6 +1,6 @@
 import type { Event } from "../domain/types.ts";
-import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
+import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
 // `init()` for initial state, `apply()` for state + event → new state.

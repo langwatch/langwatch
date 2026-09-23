@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/organization-process": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/repositories/prisma/prisma.organization-invite.repository.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

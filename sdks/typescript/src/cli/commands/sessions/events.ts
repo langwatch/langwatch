@@ -1,14 +1,16 @@
 import chalk from "chalk";
 import { z } from "zod";
-import { createSpinner } from "../../utils/spinner.ts";
-import { resolveCredentials } from "../../utils/apiKey.ts";
-import { formatFetchError } from "../../utils/formatFetchError.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
-import { clockTime, dayHeading, localDay } from "../../utils/event-clock.ts";
-import { printResult, type RawOutputFlags } from "../../utils/output.ts";
-import { createCommandEvents } from "../../telemetry/events.ts";
-import { cliAuthHeaders } from "../../utils/authHeaders.ts";
+
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { createCommandEvents } from "../../telemetry/events.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { cliAuthHeaders } from "../../utils/authHeaders.ts";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { printResult, type RawOutputFlags } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 /** Bound each page request so a quiet socket cannot hold the CLI open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;

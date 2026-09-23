@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SpanStatusCode, SpanKind, trace as otelTrace, type SpanOptions } from "@opentelemetry/api";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import { getLangWatchTracer, getLangWatchTracerFromProvider } from "..";
-import { type LangWatchTracer } from "../types";
-import { type LangWatchSpan } from "../../span";
 import {
   MockTracer,
   MockTracerProvider,
@@ -12,6 +11,8 @@ import {
   errorTestUtils,
   performanceUtils,
 } from "../../__tests__/test-utils";
+import { type LangWatchSpan } from "../../span";
+import { type LangWatchTracer } from "../types";
 
 describe("tracer.ts", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -274,9 +275,7 @@ describe("tracer.ts", () => {
           throw new Error("Null error");
         });
 
-        await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow(
-          Error,
-        );
+        await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow(Error);
         expect(callback).toHaveBeenCalled();
       });
 

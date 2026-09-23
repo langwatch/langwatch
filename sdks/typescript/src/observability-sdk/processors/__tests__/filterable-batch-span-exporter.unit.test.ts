@@ -1,9 +1,10 @@
+import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import {
   FilterableBatchSpanProcessor,
   type SpanProcessingExcludeRule,
 } from "../filterable-batch-span-processor";
-import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
 
 function makeSpan({
   name,

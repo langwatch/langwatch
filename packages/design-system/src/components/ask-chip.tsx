@@ -37,8 +37,7 @@ export function AskChip({
     paddingY: "4px",
     cursor: "pointer",
     whiteSpace: "nowrap",
-    transition:
-      "color 130ms ease, border-color 130ms ease, background 130ms ease",
+    transition: "color 130ms ease, border-color 130ms ease, background 130ms ease",
     _hover: {
       color: "orange.fg",
       borderColor: "orange.emphasized",

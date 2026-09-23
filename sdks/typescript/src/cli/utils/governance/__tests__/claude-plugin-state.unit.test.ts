@@ -4,12 +4,11 @@
  * mocked; every other file read is real, under a temp HOME.
  */
 
+import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
-
-import type * as ChildProcessModule from "node:child_process";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 

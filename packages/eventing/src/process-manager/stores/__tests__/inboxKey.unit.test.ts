@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { deriveInboxKey } from "../inboxKey.ts";
 
 const SHORT = "event_000649zPnIW3V0Ug6yVk9DECNYK3S";

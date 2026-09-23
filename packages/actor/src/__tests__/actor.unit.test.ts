@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { type Actor, internalActor, ledgerActorFor, SYSTEM_ACTORS, toLedgerActor } from "../index.ts";
+
+import {
+  type Actor,
+  internalActor,
+  ledgerActorFor,
+  SYSTEM_ACTORS,
+  toLedgerActor,
+} from "../index.ts";
 
 describe("the actor vocabulary", () => {
   describe("given a rich actor headed for the ledger", () => {

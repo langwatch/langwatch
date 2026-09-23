@@ -2,6 +2,7 @@ import {
   nonNegativeSafeIntegerOrUndefined,
   positiveSafeIntegerOrUndefined,
 } from "@langwatch/config";
+
 import type { GroupQueuePolicy } from "./contracts.ts";
 
 /**

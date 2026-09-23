@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
 import type { Event } from "../../domain/types.ts";
 import type { StateProjectionDefinition } from "../../projections/stateProjection.types.ts";

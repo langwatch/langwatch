@@ -1,5 +1,6 @@
-import type { LocalPromptConfig, MaterializedPrompt, RuntimeParameters } from "../types";
 import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
+
+import type { LocalPromptConfig, MaterializedPrompt, RuntimeParameters } from "../types";
 import {
   type CliOutput,
   type LocalResponseFormat,

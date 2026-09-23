@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 /**
@@ -8,9 +9,9 @@ import { describe, expect, it } from "vitest";
  */
 describe("system migration start ordering", () => {
   const read = (rel: string): { start: string; prepare: string } => {
-    const pkg = JSON.parse(
-      readFileSync(new URL(rel, import.meta.url), "utf8"),
-    ) as { scripts: Record<string, string> };
+    const pkg = JSON.parse(readFileSync(new URL(rel, import.meta.url), "utf8")) as {
+      scripts: Record<string, string>;
+    };
     return {
       start: pkg.scripts.start ?? "",
       prepare: pkg.scripts["start:prepare:db"] ?? "",

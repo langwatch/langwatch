@@ -1,8 +1,10 @@
 import chalk from "chalk";
+
 import {
   OrganizationApiService,
   type UpdateOrganizationInput,
 } from "@/client-sdk/services/organization/organization-api.service";
+
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement } from "../management/_shared";

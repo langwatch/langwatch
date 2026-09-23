@@ -6,7 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/dataset-process": ["./src/index.ts"]
-    },
+    }
   },
   "files": ["./src/index.ts", "./src/repositories/prisma/prisma.dataset-content.repository.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

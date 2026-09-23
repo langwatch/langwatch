@@ -11,7 +11,7 @@
     "noFallthroughCasesInSwitch": true,
     "outDir": "dist",
     "rootDir": ".",
-    "isolatedModules": true,
+    "isolatedModules": true
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["dist", "node_modules", "test"],

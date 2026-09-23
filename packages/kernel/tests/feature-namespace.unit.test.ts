@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
+
 import {
   FEATURE_NAMES,
   type ModuleName,

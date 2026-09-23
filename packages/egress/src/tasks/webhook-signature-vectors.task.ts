@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+
 import { Task } from "@langwatch/task";
+
 import { serializeVectors, VECTORS_RELATIVE_PATH } from "../webhook/signature-vectors.ts";
 
 /** Rewrites committed cross-language webhook signature vectors. Needs no

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { renderEvent } from "../src/animation/log-tee.ts";
 
 describe("renderEvent", () => {

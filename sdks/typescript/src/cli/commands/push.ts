@@ -1,22 +1,25 @@
 import * as fs from "fs";
+import readline from "node:readline";
 import * as path from "path";
+
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
 import * as yaml from "js-yaml";
+
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { responseFormatToOutputs } from "@/cli/utils/responseFormat";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import {
   type ConfigData,
   PromptsApiService,
   PromptsError,
   type SyncAction,
 } from "@/client-sdk/services/prompts";
+
 import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
+import { resolveCredentials } from "../utils/apiKey";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { resolveCredentials } from "../utils/apiKey";
-import readline from "node:readline";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { createSpinner } from "../utils/spinner";
 
 // Handle conflict resolution - show diff and ask user to choose
 const handleConflict = async (

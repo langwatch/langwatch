@@ -4,6 +4,7 @@
  */
 import { gunzipSync } from "node:zlib";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
@@ -12,7 +13,6 @@ import {
   type SimulationService,
   Verdict,
 } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunExportDownloadService } from "../scenario-run-export-download.service.ts";

@@ -7,7 +7,9 @@ import {
   renderScenarioContent,
   type RunParameterValues,
   withoutParameterNames,
-  type ScenarioConfig,parseCallerVoiceConfig,type CallerVoiceConfig
+  type ScenarioConfig,
+  parseCallerVoiceConfig,
+  type CallerVoiceConfig,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 

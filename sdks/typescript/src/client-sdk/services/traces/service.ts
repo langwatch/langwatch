@@ -1,7 +1,8 @@
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
-import { type GetTraceParams, TracesError, type GetTraceResponse } from "./types";
+
 import { tracer } from "./tracing";
+import { type GetTraceParams, TracesError, type GetTraceResponse } from "./types";
 
 /**
  * Service for managing trace resources via the Langwatch API. Constructor creates a proxy

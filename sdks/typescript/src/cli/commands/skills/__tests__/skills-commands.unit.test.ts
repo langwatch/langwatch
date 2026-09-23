@@ -6,7 +6,12 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
+import { skillsGetCommand } from "../get";
+import { skillsInstallCommand } from "../install";
 import {
   findSkill,
   installSkill,
@@ -16,11 +21,8 @@ import {
   type BundledSkill,
 } from "../installer";
 import { skillsListCommand } from "../list";
-import { skillsGetCommand } from "../get";
-import { skillsInstallCommand } from "../install";
-import { skillsUpdateCommand } from "../update";
 import { skillsUninstallCommand } from "../uninstall";
-import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
+import { skillsUpdateCommand } from "../update";
 
 const skill = (slug: string): BundledSkill => {
   const found = findSkill(slug);

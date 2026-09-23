@@ -5,8 +5,9 @@
  * modules/trace/specs/trace-processing-registration-ownership.feature}
  */
 import { describe, expect, it } from "vitest";
-import type { Event } from "../../domain/types.ts";
+
 import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 

@@ -4,6 +4,8 @@
  * these tests pin both directions so the catalog can't silently drift.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { FEATURE_MAP } from "../../../internal/generated/cli/feature-map.generated";
 import { buildProgram } from "../../program";
 import {
   buildCatalog,
@@ -13,7 +15,6 @@ import {
   renderStatusSummary,
   type CatalogEntry,
 } from "../commandCatalog";
-import { FEATURE_MAP } from "../../../internal/generated/cli/feature-map.generated";
 import { AGENT_MODE_ENV_VARS } from "../output";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under

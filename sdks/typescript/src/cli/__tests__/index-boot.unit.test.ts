@@ -1,10 +1,11 @@
+import { readFileSync, existsSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+
 /**
  * Invariants: .env loads before dispatch (except daemon), and the boot module
  * graph stays lazy to preserve cold start performance.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
 
 /**
  * Append-only record of module eval vs config() call order (not reset per test).

@@ -1,4 +1,8 @@
-export { GroupQueueConsumer, GroupQueueProducer, RunningGroupQueueConsumer } from "./capabilities.ts";
+export {
+  GroupQueueConsumer,
+  GroupQueueProducer,
+  RunningGroupQueueConsumer,
+} from "./capabilities.ts";
 export type {
   DeduplicationConfig,
   GroupQueueActivity,

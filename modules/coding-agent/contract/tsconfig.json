@@ -10,8 +10,7 @@
       "zod": ["../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"]
     },
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [

@@ -1,5 +1,6 @@
 // TODO: Move these to their own files
 import { z } from "zod";
+
 import { PromptScope } from "../constants";
 
 /**

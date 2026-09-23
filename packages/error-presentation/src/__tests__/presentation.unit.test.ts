@@ -1,9 +1,3 @@
-/**
- * The contract these pin is narrow but load-bearing: whatever comes off the
- * wire, a customer never reads a code slug, a server message, or a raw meta
- * dump (ADR-045 + #5984).
- */
-import { goErrorCodes, nodeErrorCodes } from "../codes.generated.ts";
 import { APP_ERROR_CODES } from "@langwatch/error-presentation/app-codes";
 import {
   explainHandledError,
@@ -13,6 +7,13 @@ import {
 import type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
+/**
+ * The contract these pin is narrow but load-bearing: whatever comes off the
+ * wire, a customer never reads a code slug, a server message, or a raw meta
+ * dump (ADR-045 + #5984).
+ */
+import { goErrorCodes, nodeErrorCodes } from "../codes.generated.ts";
 
 /** Every code the registry must cover — app + generated Go + generated node. */
 const ALL_CODES = [
@@ -421,18 +422,17 @@ describe("explainHandledError", () => {
     });
 
     /** @scenario "A provider rate limit gets its own remediation copy" */
-    it.each([
-      "rate_limit_exceeded",
-      "rate_limit_error",
-      "RESOURCE_EXHAUSTED",
-    ])("explains the provider's own %s code as the same wait-and-retry", (code) => {
-      const { description } = explainHandledError(
-        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
-      );
+    it.each(["rate_limit_exceeded", "rate_limit_error", "RESOURCE_EXHAUSTED"])(
+      "explains the provider's own %s code as the same wait-and-retry",
+      (code) => {
+        const { description } = explainHandledError(
+          shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+        );
 
-      expect(description).toContain("rate-limiting");
-      expect(description).toContain("pick a model with more room");
-    });
+        expect(description).toContain("rate-limiting");
+        expect(description).toContain("pick a model with more room");
+      },
+    );
 
     /** @scenario "A provider outage gets its own remediation copy" */
     it.each(["upstream_unavailable", "upstream_timeout"])(

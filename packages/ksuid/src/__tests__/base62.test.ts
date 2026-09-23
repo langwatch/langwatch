@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+
 import { encode, decode, Base62Error } from "../base62.ts";
 
 describe("Base62", () => {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { Event, Projection } from "../../domain/types.ts";
 import type { EventSourcingPipelineDefinition } from "../../pipeline/types.ts";

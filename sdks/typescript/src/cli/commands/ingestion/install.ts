@@ -1,21 +1,21 @@
 import chalk from "chalk";
 
-import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
-import { resolveIngestionCredential } from "@/cli/utils/governance/telemetry-refresh";
+import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
+import { reportCommandError } from "@/cli/utils/errorOutput";
 import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
 } from "@/cli/utils/governance/claude-plugin";
 import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
+import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
 import {
   CODEX_TURN_HARVEST_BLOCKED_MESSAGE,
   type CodexTurnHarvestOutcome,
   installCodexTurnHarvest,
 } from "@/cli/utils/governance/shell-rc";
-import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
-import { reportCommandError } from "@/cli/utils/errorOutput";
+import { resolveIngestionCredential } from "@/cli/utils/governance/telemetry-refresh";
 
 /**
  * Path B activation: mint key, export OTLP, wire out-of-band activation.

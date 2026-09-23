@@ -4,15 +4,16 @@
  * parented under the evaluation.iteration span.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatch } from "@/client-sdk";
+import { trace, context } from "@opentelemetry/api";
+import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
 import {
   NodeTracerProvider,
   SimpleSpanProcessor,
   InMemorySpanExporter,
 } from "@opentelemetry/sdk-trace-node";
-import { trace, context } from "@opentelemetry/api";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { LangWatch } from "@/client-sdk";
 
 const originalFetch = globalThis.fetch;
 

@@ -12,6 +12,7 @@ import {
   fieldValueIsBlank,
   suiteFieldDefinitionsSchema,
 } from "@/internal/generated/types/suite-fields";
+
 import { commandValidationError, reportCommandError } from "./errorOutput";
 import { coerceParameterValue } from "./keyValueFlags";
 
@@ -75,9 +76,7 @@ export const parseScenarioFieldFlags = ({
   for (const pair of pairs) {
     const separator = pair.indexOf("=");
     if (separator <= 0) {
-      return rejectFlag(
-        `Invalid ${FIELD_FLAG} value: ${pair} (expected identifier=value)`,
-      );
+      return rejectFlag(`Invalid ${FIELD_FLAG} value: ${pair} (expected identifier=value)`);
     }
     const identifier = pair.slice(0, separator).trim();
     const raw = pair.slice(separator + 1);
@@ -85,9 +84,7 @@ export const parseScenarioFieldFlags = ({
       values.set(identifier, coerceParameterValue({ value: raw }));
       continue;
     }
-    const definition = definitions.find(
-      (candidate) => candidate.identifier === identifier,
-    );
+    const definition = definitions.find((candidate) => candidate.identifier === identifier);
     if (!definition) {
       const declared = definitions.map((field) => field.identifier);
       return rejectFlag(

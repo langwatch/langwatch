@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { PROVIDER_ID, buildModelsJson } from "./models.js";
+
 import type { LangyWorkerModelConfig } from "./config.js";
+import { PROVIDER_ID, buildModelsJson } from "./models.js";
 
 const model: LangyWorkerModelConfig = {
   id: "gpt-5-mini",

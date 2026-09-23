@@ -1,15 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner.ts";
-import { resolveCredentials } from "../../utils/apiKey.ts";
-import { readFetchFailure } from "../../utils/formatFetchError.ts";
-import { failSpinner } from "../../utils/spinnerError.ts";
-import type { CommandResult } from "../../utils/output.ts";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
+import { buildAuthHeaders } from "@/internal/api/auth";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { readFetchFailure } from "../../utils/formatFetchError.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 /**
  * Flattens Anthropic-style content (string OR array of {type:text|tool_use|tool_result|thinking})
  * into a readable single-line string. Thinking blocks are dropped; tool_use shows the tool name;

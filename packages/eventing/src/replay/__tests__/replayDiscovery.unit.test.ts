@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { filterDiscoveredByAggregateIds } from "../replayDiscovery.ts";
 import type { DiscoveredAggregate } from "../replayEventSource.ts";
 

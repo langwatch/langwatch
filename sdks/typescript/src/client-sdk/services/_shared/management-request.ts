@@ -2,9 +2,10 @@
  * The raw-fetch request path the management API services share.
  */
 import { scopedApiKey } from "@/internal/credentialContext";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
 import { formatApiErrorForOperation } from "./format-api-error.ts";
 import { throwIfHandledError } from "./throw-handled-error.ts";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Builds the family's own error for a failure the platform did not name. */
 export type ManagementErrorFactory = (params: {

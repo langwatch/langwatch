@@ -13,13 +13,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { writeCodexGatewayBlock, writeCodexOtelBlock } from "../../codex-config-toml";
 import { appSettingsTargetFor, claudeProjectSettingsTarget, installAppEnv } from "../app-settings";
+import { defaultCodexAgentsMdPath, installCodexAgentGuidance } from "../codex-agents-md";
 import {
   installOpencodeSessionContextPlugin,
   OPENCODE_PLUGIN_FILE_NAME,
   opencodePluginTarget,
 } from "../opencode-plugin";
 import { telemetryEnvVarNames } from "../otel-env-block";
-import { defaultCodexAgentsMdPath, installCodexAgentGuidance } from "../codex-agents-md";
 import { installSessionContextHooks, sessionContextHookCommand } from "../session-context-hooks";
 import { buildScopedToolFunction, persistBlockToRc, toolMarkers } from "../shell-rc";
 import { scanTelemetryTargets } from "../telemetry-targets";

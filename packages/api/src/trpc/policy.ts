@@ -1136,8 +1136,8 @@ export function createTrpcRuntimePolicy<
   TContext extends TrpcPolicyContext & object,
   TAuthenticatedContext extends object,
 >(root: TrpcRoot<TContext>, ports: TrpcRuntimePolicyMembers<TContext, TAuthenticatedContext>) {
-/** Plain functions preserve identity/order for comparison; type-checking against
- * `MiddlewareFunction` rather than `MiddlewareBuilder` */
+  /** Plain functions preserve identity/order for comparison; type-checking against
+   * `MiddlewareFunction` rather than `MiddlewareBuilder` */
   type AuthenticateParams = {
     ctx: TrpcMiddlewareContext<TContext>;
     next: <$ContextOverride>(opts: {
@@ -1319,8 +1319,8 @@ export function createTrpcRuntimePolicy<
     );
   });
 
-/** Converts HandledErrors to TRPCErrors (else fall through as INTERNAL_SERVER_ERROR);
- * promotes bare ZodErrors same as REST door does */
+  /** Converts HandledErrors to TRPCErrors (else fall through as INTERNAL_SERVER_ERROR);
+   * promotes bare ZodErrors same as REST door does */
   const handledErrorMiddleware = root.middleware(async ({ next }) => {
     const result = await next();
     if (result.ok) return result;
@@ -1396,7 +1396,7 @@ export function createTrpcRuntimePolicy<
     });
   });
 
-/** Protected (authenticated) procedure; verifies session and guarantees authenticated context */
+  /** Protected (authenticated) procedure; verifies session and guarantees authenticated context */
   const authProtectedProcedure = root.procedure.use(authenticate).use(auditErrors);
 
   return {

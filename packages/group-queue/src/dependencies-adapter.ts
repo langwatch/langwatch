@@ -1,4 +1,5 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
+
 import type {
   GroupQueueActivity,
   GroupQueueContext,

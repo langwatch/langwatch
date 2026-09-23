@@ -15,7 +15,10 @@ import {
 } from "@langwatch/gateway-process/testing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
+import {
+  migrateTestClickHouseOnce,
+  startTestClickHouseEndpoints,
+} from "@langwatch/test-harness/clickhouse";
 import { Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

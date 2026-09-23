@@ -172,7 +172,7 @@ deterministic summary, or the machine report with `-json` (optionally to
   compared. Success bodies still get full shape + value comparison.
   `-exact-status` restores exact-code and error-body comparison. The summary
   ends with a `suppressed: N same-class status differences, M error-body
-  comparisons` line.
+comparisons` line.
 - `/api/gateway` operations are excluded by default (they egress to real LLM
   providers); repeat `-exclude-prefix` to add more.
 - Idempotent probes (GET/HEAD/OPTIONS) retry up to 2 times on 5xx with
@@ -351,7 +351,7 @@ Every other direction keeps failing exactly as before. In particular:
   degrading to a 5xx is `handled-refusal-degraded`, a defect, whichever
   status pair it is — a 5xx is never auto-accepted on the candidate side,
   even a named handled 503.
-- A main 2xx becoming anything else, a main 4xx becoming a *different* 4xx
+- A main 2xx becoming anything else, a main 4xx becoming a _different_ 4xx
   (401→402), and a main 4xx becoming a 2xx are all still ordinary drift —
   the last one is a permission/publication change for a human to decide,
   not something this rule grants.
@@ -386,17 +386,37 @@ as one `not-found-as-500:404-500`.
 
 ```json
 {
-  "totals": { "unionOperations": 303, "probed": 275, "skipped": 4,
-              "differingOperations": 41, "causes": 13,
-              "newCauses": 2, "knownCauses": 11 },
-  "causes": [ { "rootCause": "not-found-as-500:404-500", "kind": "status_diff",
-                "count": 5, "operations": ["GET /api/prompts/{id}"],
-                "known": false } ],
-  "operations": [ { "method": "GET", "path": "/api/annotations",
-                    "operationId": "listAnnotations", "presence": "both",
-                    "cases": ["read"], "classification": "equal",
-                    "rootCauses": [], "sideStatus": [200, 200],
-                    "known": false } ]
+  "totals": {
+    "unionOperations": 303,
+    "probed": 275,
+    "skipped": 4,
+    "differingOperations": 41,
+    "causes": 13,
+    "newCauses": 2,
+    "knownCauses": 11
+  },
+  "causes": [
+    {
+      "rootCause": "not-found-as-500:404-500",
+      "kind": "status_diff",
+      "count": 5,
+      "operations": ["GET /api/prompts/{id}"],
+      "known": false
+    }
+  ],
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/api/annotations",
+      "operationId": "listAnnotations",
+      "presence": "both",
+      "cases": ["read"],
+      "classification": "equal",
+      "rootCauses": [],
+      "sideStatus": [200, 200],
+      "known": false
+    }
+  ]
 }
 ```
 
@@ -438,7 +458,14 @@ report and ledger. Each line is its own `Write`, flushed immediately, so
 nothing is batched across findings:
 
 ```json
-{"surface":"rest","name":"GET /api/prompts","kind":"identical","module":"prompt","detail":"","capturedAt":"2026-09-10T00:00:00Z"}
+{
+  "surface": "rest",
+  "name": "GET /api/prompts",
+  "kind": "identical",
+  "module": "prompt",
+  "detail": "",
+  "capturedAt": "2026-09-10T00:00:00Z"
+}
 ```
 
 `surface` is `rest` or `trpc` (the latter reserved — see "Not covered"
@@ -466,7 +493,7 @@ No worker process is booted on either side, so anything whose observable
 result depends on a queue, projection or scheduler is compared in a state
 neither instance reaches in production.
 
-### The union blind spot — a route absent from *both* documents
+### The union blind spot — a route absent from _both_ documents
 
 The probe set is the union of the two OpenAPI documents. A route that appears
 in neither is not compared, not skipped, and not counted: it is invisible, and
@@ -479,7 +506,7 @@ mounted nowhere on the candidate branch, while both shipped SDKs and our own
 `services/langyagent` post to those paths. Seven runs of this tool had reported
 on that branch and none could have found it, because the ingestion routes are
 not in the OpenAPI document on either side. The nine-operation REST teams
-family went the same way and was found only because it happened to be *in*
+family went the same way and was found only because it happened to be _in_
 main's document, which is the difference between a diff finding and a silent
 hole.
 

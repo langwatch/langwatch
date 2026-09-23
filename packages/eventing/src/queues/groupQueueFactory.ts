@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+
 import {
   defineGroupQueue,
   GroupQueueConsumer,
@@ -6,6 +7,7 @@ import {
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
+
 import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types.ts";
 
 export interface EventingGroupQueueFactoryOptions {

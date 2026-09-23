@@ -15,8 +15,7 @@
       "@langwatch/prisma-client/generated": [
         "../../../packages/prisma-client/src/generated/client.ts"
       ]
-    },
-
+    }
   },
   "include": ["src/**/*.ts"],
   "references": [

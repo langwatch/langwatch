@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { lintTestQuality } from "../src/index.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -13,7 +15,9 @@ function writeFixture(root: string, file: string, source: string): string {
 }
 
 function policies(root: string, file: string): string[] {
-  return lintTestQuality(snapshotOf({ root }), { files: [file] }).map((violation) => violation.policy);
+  return lintTestQuality(snapshotOf({ root }), { files: [file] }).map(
+    (violation) => violation.policy,
+  );
 }
 
 describe("test quality", () => {

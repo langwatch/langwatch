@@ -4,13 +4,9 @@
     "outDir": "dist",
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
-    "paths": {},
+    "paths": {}
   },
-  "files": [
-    "./src/share-link-views.ts",
-    "./src/share-links.ts",
-    "./src/share.web.ts"
-  ],
+  "files": ["./src/share-link-views.ts", "./src/share-links.ts", "./src/share.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

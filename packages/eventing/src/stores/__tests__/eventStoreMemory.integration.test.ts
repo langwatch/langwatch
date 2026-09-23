@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+
 import { type AggregateType, EventUtils } from "../..//index.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import { TEST_EVENT_TYPES } from "../../services/__tests__/testHelpers.ts";

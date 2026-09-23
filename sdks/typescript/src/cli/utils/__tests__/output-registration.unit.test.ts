@@ -1,10 +1,11 @@
+import { Command } from "commander";
 /**
  * The output contract's COMMANDER half: `registerOutputOptions` adds global
  * flags without stealing a command's own, and `resolveActionOutputOptions`
  * reads the resolved context in the preAction hook.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Command } from "commander";
+
 import { AGENT_MODE_ENV_VARS, registerOutputOptions, resolveActionOutputOptions } from "../output";
 
 /**

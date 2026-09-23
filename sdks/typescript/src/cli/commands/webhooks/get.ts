@@ -1,8 +1,9 @@
-import { createSpinner } from "../../utils/spinner";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getWebhookCommand = async (id: string): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();

@@ -7,14 +7,13 @@ import * as os from "node:os";
 
 import { displayCodexConfigPath, writeCodexOtelBlock } from "../codex-config-toml";
 import { setOpencodeOpenTelemetryFlag } from "../opencode-config-flag";
-import { clearVscodeTerminalOtelEnv } from "./vscode-settings";
 import { appSettingsTargetFor, installAppEnv } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
 import { runningCodeRestartNotice } from "./running-code";
 import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
-import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
   assertCodexTurnHarvest,
   buildScopedToolFunction,
@@ -26,6 +25,7 @@ import {
   rcHasLangwatchBlock,
   toolMarkers,
 } from "./shell-rc";
+import { clearVscodeTerminalOtelEnv } from "./vscode-settings";
 
 export interface WiringInstallResult {
   /** Human-readable label per target written or confirmed. */

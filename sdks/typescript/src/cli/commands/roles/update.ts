@@ -1,8 +1,10 @@
 import chalk from "chalk";
+
 import {
   RolesApiService,
   type UpdateRoleInput,
 } from "@/client-sdk/services/roles/roles-api.service";
+
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { parsePermissionFlags } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";

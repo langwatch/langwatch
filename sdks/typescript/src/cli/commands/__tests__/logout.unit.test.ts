@@ -17,6 +17,7 @@ import {
   rcPath,
   toolMarkers,
 } from "@/cli/utils/governance/shell-rc";
+
 import { logoutCommand } from "../logout";
 
 let tmpHome: string;

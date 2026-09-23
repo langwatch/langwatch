@@ -1,8 +1,10 @@
 import chalk from "chalk";
+
 import {
   ApiKeysApiService,
   type UpdateApiKeyInput,
 } from "@/client-sdk/services/api-keys/api-keys-api.service";
+
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import {
   parseBindingFlags,

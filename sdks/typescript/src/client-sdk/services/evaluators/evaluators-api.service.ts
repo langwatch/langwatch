@@ -1,17 +1,18 @@
+import {
+  extractStatusFromResponse,
+  formatApiErrorForOperation,
+} from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import { type InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+
+import { EvaluatorsApiError } from "./errors";
 import type {
   CreateEvaluatorBody,
   DeleteEvaluatorResponse,
   EvaluatorResponse,
   UpdateEvaluatorBody,
 } from "./types";
-import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { type InternalConfig } from "@/client-sdk/types";
-import { EvaluatorsApiError } from "./errors";
-import {
-  extractStatusFromResponse,
-  formatApiErrorForOperation,
-} from "@/client-sdk/services/_shared/format-api-error";
-import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 /**
  * Service for retrieving evaluator resources via the LangWatch API.

@@ -13,6 +13,7 @@ import {
   Text,
 } from "@react-email/components";
 import type { CSSProperties, ReactNode } from "react";
+
 import { tokenize, type HighlightLanguage } from "./onboarding/highlight.ts";
 
 /**

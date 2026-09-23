@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { RuleTester } from "oxlint/plugins-dev";
+
 import { resetClassificationCache } from "./classify.mjs";
 import { renderMessage } from "./define-rule.mjs";
 
@@ -81,13 +83,19 @@ export function runRule(rule, { code, cwd = process.cwd(), filename, options = [
  * @param {{ meta: object, create: Function }} rule
  * @param {object} run `{ code, filename, output, cwd?, errors?, options? }`
  */
-export function expectFix(rule, { code, cwd = process.cwd(), errors = 1, filename, options = [], output }) {
+export function expectFix(
+  rule,
+  { code, cwd = process.cwd(), errors = 1, filename, options = [], output },
+) {
   resetClassificationCache();
   withSilentTestHooks(() => {
     const tester = new RuleTester({ cwd, languageOptions: { sourceType: "module" } });
     const testCase = { code, errors, filename, output };
     if (options.length > 0) testCase.options = options;
-    tester.run(rule.meta?.docs?.name ?? "rule-under-test", rule, { valid: [], invalid: [testCase] });
+    tester.run(rule.meta?.docs?.name ?? "rule-under-test", rule, {
+      valid: [],
+      invalid: [testCase],
+    });
   });
   resetClassificationCache();
 }

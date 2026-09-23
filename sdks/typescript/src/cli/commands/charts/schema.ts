@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
+import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the LangWatchQL analytics schema rather than printing it (output
@@ -49,9 +51,7 @@ export const chartSchemaCommand = async (options?: {
       table: () => {
         for (const view of schema.views) {
           console.log();
-          console.log(
-            `  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`,
-          );
+          console.log(`  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`);
           console.log(
             `  ${chalk.gray("Grain:")} ${view.grain}  ${chalk.gray("Time column:")} ${view.timeColumn}`,
           );

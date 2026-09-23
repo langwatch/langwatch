@@ -4,11 +4,10 @@
  * Claude Code writes them. Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
  */
 
+import type * as ChildProcessModule from "node:child_process";
 import { mkdirSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
-
-import type * as ChildProcessModule from "node:child_process";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 

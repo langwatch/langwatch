@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { servicePaths } from "../../src/services/paths.ts";
 
 const fakePaths = {

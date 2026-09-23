@@ -1,9 +1,10 @@
-import { createSpinner } from "../../utils/spinner";
-import { SQS_SECRET_ENV, sqsSecretFromEnv } from "./create";
 import { WebhooksApiService } from "@/client-sdk/services/webhooks/webhooks-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { SQS_SECRET_ENV, sqsSecretFromEnv } from "./create";
 
 export const updateWebhookCommand = async (
   id: string,

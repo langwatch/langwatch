@@ -4,16 +4,18 @@
  * Spec: specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
+import { LangWatch } from "@/client-sdk/index";
+import { RunPlansApiService } from "@/client-sdk/services/run-plans";
+import { SuitesApiService } from "@/client-sdk/services/suites";
+import type { LangwatchApiClient } from "@/internal/api/client";
+import { isLangWatchHandledError } from "@/internal/api/errors";
+
 import {
   type EvaluatorAttachment,
   TestSuitesApiError,
   TestSuitesApiService,
 } from "../test-suites-api.service.ts";
-import { isLangWatchHandledError } from "@/internal/api/errors";
-import type { LangwatchApiClient } from "@/internal/api/client";
-import { LangWatch } from "@/client-sdk/index";
-import { RunPlansApiService } from "@/client-sdk/services/run-plans";
-import { SuitesApiService } from "@/client-sdk/services/suites";
 
 /** The 401 envelope: the failure nested under `error`. */
 const nestedUnauthorized = {

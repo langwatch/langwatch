@@ -14,13 +14,13 @@ Each worktree's slug is simply its own directory name, sanitised (a checkout at
 `.../worktrees/portless` is the `portless` stack), cached in `.langwatch-slug`.
 Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 
-| Hostname                                | Service                                 |
-| --------------------------------------- | --------------------------------------- |
-| `app.<slug>.langwatch.localhost`        | App — the UI, **and its API at `/api`** |
+| Hostname                                | Service                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| `app.<slug>.langwatch.localhost`        | App — the UI, **and its API at `/api`**                                     |
 | `api.<slug>.langwatch.localhost`        | The API, direct - additive alongside `app.<slug>.../api`, not a replacement |
-| `gateway.<slug>.langwatch.localhost`    | AI Gateway (Go)                         |
-| `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                         |
-| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database  |
+| `gateway.<slug>.langwatch.localhost`    | AI Gateway (Go)                                                             |
+| `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
+| `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
 Two more are there only when the worktree asked for them (`haven up
 +design-system +mail-room`) — developer tools rather than parts of the product:
@@ -414,10 +414,10 @@ be. The layout is detected once, at `up`, from the directories on disk, and
 recorded on the stack, so `haven status --json` carries it and everything
 downstream reads that one answer:
 
-| Layout     | Detected by             | Node lanes                     |
-| ---------- | ----------------------- | ------------------------------ |
-| `modular`  | `apps/ui` + `apps/api`  | `ui` + `api` (hosts the worker) |
-| `monolith` | `platform/app`          | `app`, one process for both    |
+| Layout     | Detected by            | Node lanes                      |
+| ---------- | ---------------------- | ------------------------------- |
+| `modular`  | `apps/ui` + `apps/api` | `ui` + `api` (hosts the worker) |
+| `monolith` | `platform/app`         | `app`, one process for both     |
 
 A checkout with neither shape is planned as modular and fails on its own lane's
 error rather than on a guess.

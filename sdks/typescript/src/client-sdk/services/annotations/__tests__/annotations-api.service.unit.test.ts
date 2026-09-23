@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+
+import type { LangwatchApiClient } from "@/internal/api/client";
+
 import {
   AnnotationsApiService,
   type AnnotationResponse,
   type CreateAnnotationBody,
 } from "../annotations-api.service";
-import type { LangwatchApiClient } from "@/internal/api/client";
 
 /**
  * The server wraps every annotation read and write in `{ data: ... }`

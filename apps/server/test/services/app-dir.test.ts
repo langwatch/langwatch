@@ -2,7 +2,9 @@ import { mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import { restoreShellScriptBits } from "../../src/services/app-dir.ts";
 
 describe("shell script bits after relocation", () => {

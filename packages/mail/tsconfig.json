@@ -8,11 +8,9 @@
     "verbatimModuleSyntax": true,
     "types": ["node", "vitest/globals"],
 
-
     "rootDir": ".",
 
-    "outDir": "dist/typecheck",
-
+    "outDir": "dist/typecheck"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
 

@@ -15,8 +15,7 @@
       "@langwatch/authz-browser-kit/scope-picker": [
         "../../../../modules/authz/browser-kit/src/scope-picker/index.ts"
       ]
-    },
-
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [

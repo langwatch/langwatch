@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+
 import { detectRuntime, getRuntime, resetRuntimeCache } from "../runtime";
 
 describe("runtime.ts", () => {

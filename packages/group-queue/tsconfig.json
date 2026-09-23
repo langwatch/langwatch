@@ -9,8 +9,7 @@
     "emitDeclarationOnly": true,
     "rootDir": ".",
     "outDir": "./dist",
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/__tests__/**"],

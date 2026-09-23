@@ -11,10 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appSettingsTargetFor } from "../app-settings";
 import { installTelemetryWiring } from "../instrument-wiring";
 import { runningCodeRestartNotice } from "../running-code";
-import {
-	baseCfg,
-	installTempHomeAndCwd,
-} from "./telemetry-refresh-test-helpers";
+import { baseCfg, installTempHomeAndCwd } from "./telemetry-refresh-test-helpers";
 
 const temp = installTempHomeAndCwd();
 
@@ -37,8 +34,7 @@ afterEach(() => {
 
 describe("installTelemetryWiring", () => {
   describe("when langwatch code is running", () => {
-    const notice =
-      "Restart `langwatch code` to apply the updated telemetry settings.";
+    const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
     const install = (token = TOKEN) =>
       installTelemetryWiring({
         cfg: baseCfg(),
@@ -92,13 +88,7 @@ describe("installTelemetryWiring", () => {
       () => {
         const settingsParent =
           process.platform === "darwin"
-            ? path.join(
-                temp.home,
-                "Library",
-                "Application Support",
-                "Code",
-                "User",
-              )
+            ? path.join(temp.home, "Library", "Application Support", "Code", "User")
             : path.join(temp.home, ".config", "Code", "User");
         fs.mkdirSync(path.join(settingsParent, "settings.json"), {
           recursive: true,

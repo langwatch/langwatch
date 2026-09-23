@@ -1,11 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse, UpdateEvaluatorBody } from "@/client-sdk/services/evaluators";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the updated evaluator rather than printing it: the output port

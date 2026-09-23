@@ -8,7 +8,7 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "references": [

@@ -1,9 +1,10 @@
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 /**
  * Failing command output contract: failure must land on stdout in machine
  * parseable format (Langy cannot distinguish transient from terminal failures).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
+
 import type * as TracesApiModule from "@/client-sdk/services/traces/traces-api.service";
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
@@ -32,8 +33,9 @@ vi.mock("ora", () => ({
 
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { LangWatchHandledError } from "@/internal/api/errors";
-import { searchTracesCommand } from "../traces/search";
+
 import { setOutputFormat } from "../../utils/errorOutput";
+import { searchTracesCommand } from "../traces/search";
 
 class ProcessExitError extends Error {
   constructor(public readonly code: number) {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { SessionStateStoreFactory } from "../session-state.factory.ts";
 
 describe("session state claims", () => {

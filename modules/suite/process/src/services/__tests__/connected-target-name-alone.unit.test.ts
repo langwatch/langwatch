@@ -1,7 +1,7 @@
 import type { Agent, AgentApi } from "@langwatch/agent-contract";
 import { AgentEnvironmentUnresolvedError } from "@langwatch/agent-contract";
-import type { SuiteTarget } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { SuiteTarget } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
 import {

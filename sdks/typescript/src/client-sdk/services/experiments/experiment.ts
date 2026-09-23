@@ -3,20 +3,39 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
+
 import { trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
-import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
-import type { LangWatchSpan } from "@/observability-sdk/span/types";
+
+import { buildAuthHeaders } from "@/internal/api/auth";
 import type { LangwatchApiClient } from "@/internal/api/client";
+import { resolveEndpoint } from "@/internal/endpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 import type { Logger } from "@/logger";
 import { ensureSetup } from "@/observability-sdk/setup/node";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { generateHumanReadableId } from "./humanReadableId.ts";
+import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
+import type { LangWatchSpan } from "@/observability-sdk/span/types";
+
+import type { CapturedTargetOutput } from "./comparison.ts";
+import {
+  COMPARISON_EVALUATOR_SLUG,
+  DEFAULT_COMPARISON_NAME,
+  buildComparisonCandidates,
+  buildComparisonData,
+  buildComparisonSettings,
+  comparisonEntryLabel,
+  comparisonEntryStatus,
+  describeSkippedComparison,
+  renderTargetOutput,
+  toComparisonVerdict,
+} from "./comparison.ts";
 import {
   ExperimentInitError,
   TargetMetadataConflictError,
   ComparisonError,
   EvaluatorError,
 } from "./errors/index.ts";
+import { generateHumanReadableId } from "./humanReadableId.ts";
+import { printSummary } from "./printSummary.ts";
 import type {
   Batch,
   BatchEntry,
@@ -39,22 +58,6 @@ import type {
   TargetExecutionContext,
   TargetContext,
 } from "./types.ts";
-import type { CapturedTargetOutput } from "./comparison.ts";
-import {
-  COMPARISON_EVALUATOR_SLUG,
-  DEFAULT_COMPARISON_NAME,
-  buildComparisonCandidates,
-  buildComparisonData,
-  buildComparisonSettings,
-  comparisonEntryLabel,
-  comparisonEntryStatus,
-  describeSkippedComparison,
-  renderTargetOutput,
-  toComparisonVerdict,
-} from "./comparison.ts";
-import { printSummary } from "./printSummary.ts";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;

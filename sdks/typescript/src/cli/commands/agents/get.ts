@@ -1,12 +1,14 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   AgentsApiService,
   type AgentParameterSpec,
 } from "@/client-sdk/services/agents/agents-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /** One parameter on one line: name, type, options, default and whether it is required. */
 export const describeParameter = (parameter: AgentParameterSpec): string => {

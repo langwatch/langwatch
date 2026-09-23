@@ -5,7 +5,9 @@
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
+
 import { ExperimentNotFoundError, ExperimentsApiError } from "../platformErrors";
 
 // Skip if not configured for integration testing

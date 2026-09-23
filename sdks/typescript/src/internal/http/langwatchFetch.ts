@@ -31,15 +31,7 @@ export class LangWatchRedirectError extends Error {
   readonly location: string | null;
   readonly status: number;
 
-  constructor({
-    url,
-    location,
-    status,
-  }: {
-    url: string;
-    location: string | null;
-    status: number;
-  }) {
+  constructor({ url, location, status }: { url: string; location: string | null; status: number }) {
     super(
       `LangWatch refused to follow a redirect from ${url} to ${location ?? "an unknown location"} (HTTP ${status}). Set the endpoint to the final URL.`,
     );
@@ -338,8 +330,7 @@ export const createLangWatchFetch = ({
   fetch: fetchImpl,
   logger,
 }: CreateLangWatchFetchOptions = {}): LangWatchFetch => {
-  const send: LangWatchFetch =
-    fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
+  const send: LangWatchFetch = fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   const log = logger ?? new ConsoleLogger({ level: "warn", prefix: "LangWatch" });
 
   return async (input, init) => {

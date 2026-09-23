@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { RoleBindingsApiService } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 

@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "../projections/abstractFoldProjection.ts";
-import { AbstractMapProjection, type MapEventHandlers } from "../projections/abstractMapProjection.ts";
+import {
+  AbstractMapProjection,
+  type MapEventHandlers,
+} from "../projections/abstractMapProjection.ts";
 import type { FoldProjectionStore } from "../projections/foldProjection.types.ts";
 import type { AppendStore } from "../projections/mapProjection.types.ts";
 

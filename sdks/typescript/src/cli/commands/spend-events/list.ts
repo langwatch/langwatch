@@ -1,12 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { SpendEventsApiService } from "@/client-sdk/services/spend-events/spend-events-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-
 import { parseInstantOrNull } from "../../utils/instant";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const parsePositiveInt = (value: string, flag: string): number => {
   const parsed = Number(value);
@@ -94,9 +95,7 @@ export const listSpendEventsCommand = async (options: {
             "Image in/out": e.data.usage
               ? `${e.data.usage.input_image_tokens}/${e.data.usage.output_image_tokens}`
               : chalk.gray("?"),
-            Images: e.data.usage
-              ? `${e.data.usage.image_count}`
-              : chalk.gray("?"),
+            Images: e.data.usage ? `${e.data.usage.image_count}` : chalk.gray("?"),
             "Cost USD": e.data.cost?.total_usd ?? chalk.yellow("unknown"),
             Status: formatSpendEventStatus(e.data.status, e.data.error?.class),
           })),

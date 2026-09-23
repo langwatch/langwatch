@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { TestMailer } from "../../__tests__/mailer.test-double.ts";
+import { sendEmail } from "../../email-sender.ts";
 import {
   automationLimitEmailSubject,
   renderAutomationLimitEmail,
   sendAutomationLimitEmail,
 } from "../automation-limit-email.tsx";
-import { sendEmail } from "../../email-sender.ts";
-import { TestMailer } from "../../__tests__/mailer.test-double.ts";
 
 vi.mock("../../email-sender.ts", () => ({
   sendEmail: vi.fn(),

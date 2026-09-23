@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { createServer } from "node:http";
+
+import { describe, expect, it } from "vitest";
+
 import { execCheck, httpGetCheck, pollUntilHealthy } from "../../src/services/health.ts";
 
 describe("httpGetCheck", () => {

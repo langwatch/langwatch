@@ -6,7 +6,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import { lintWorkspaceSeams } from "../src/policies/quality/workspace-seams.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -130,7 +132,7 @@ describe("Workspace seams", () => {
           'import { sourceFile, workspaceModuleResolver } from "../workspace/module-graph.ts";',
           "",
           "export function read(root: string) {",
-          "  const files = listFiles({ directory: root, accept: (path) => path.endsWith(\".ts\") });",
+          '  const files = listFiles({ directory: root, accept: (path) => path.endsWith(".ts") });',
           "  const resolver = workspaceModuleResolver({ root });",
           "",
           "  return files.map((file) => ts.isSourceFile(sourceFile({ file })) && resolver);",

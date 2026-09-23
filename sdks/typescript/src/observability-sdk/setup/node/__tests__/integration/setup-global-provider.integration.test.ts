@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { trace } from "@opentelemetry/api";
-import { setupObservability } from "../../setup";
-import { isConcreteProvider } from "../../../utils";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { isConcreteProvider } from "../../../utils";
+import { setupObservability } from "../../setup";
 
 function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };

@@ -4,11 +4,11 @@ import {
   type AgentApi,
   type AgentOverview,
 } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

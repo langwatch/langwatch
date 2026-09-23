@@ -11,8 +11,7 @@
     "lib": ["es2023"],
     "types": [],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true,
-
+    "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   "references": [

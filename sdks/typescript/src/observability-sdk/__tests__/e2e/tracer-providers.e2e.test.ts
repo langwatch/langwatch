@@ -1,7 +1,9 @@
 /** E2E sanity checks that LangWatch works with various OpenTelemetry tracer provider setups. */
 
-import { describe, it, expect } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
+import { describe, it, expect } from "vitest";
+
+import * as semconv from "../../semconv";
 import {
   setupE2ETest,
   createTestTracer,
@@ -12,7 +14,6 @@ import {
   getTraceIdFromSpan,
   expectSpanAttribute,
 } from "./e2e-utils";
-import * as semconv from "../../semconv";
 
 describe("Tracer Provider Configuration E2E", () => {
   const setup = setupE2ETest();

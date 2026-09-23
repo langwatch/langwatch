@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+
 import { checkBudget, renderBudgetExceeded } from "../budget";
 import type { GovernanceConfig } from "../config";
 

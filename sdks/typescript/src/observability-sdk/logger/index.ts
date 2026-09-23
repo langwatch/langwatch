@@ -4,8 +4,9 @@ import {
   type LoggerProvider,
   createNoopLogger,
 } from "@opentelemetry/api-logs";
-import { type LangWatchLogger } from "./types";
+
 import { LangWatchLoggerInternal } from "./implementation";
+import { type LangWatchLogger } from "./types";
 
 /**
  * `NoopLoggerProvider` was dropped from @opentelemetry/api-logs' public exports

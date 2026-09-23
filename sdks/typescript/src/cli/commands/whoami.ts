@@ -1,5 +1,5 @@
-import { loadConfig, isLoggedIn, type GovernanceConfig } from "@/cli/utils/governance/config";
 import { commandAuthError } from "@/cli/utils/errorOutput";
+import { loadConfig, isLoggedIn, type GovernanceConfig } from "@/cli/utils/governance/config";
 import type { CommandResult } from "@/cli/utils/output";
 
 /**
@@ -72,9 +72,7 @@ const buildWhoamiJson = (cfg: GovernanceConfig): Record<string, unknown> => {
     ...(personalProject ? { personal_project: personalProject } : {}),
     ...(scope ? { cli_api_key_scope: scope } : {}),
     ...(cfg.gateway_url === undefined ? {} : { gateway_url: cfg.gateway_url }),
-    ...(cfg.control_plane_url === undefined
-      ? {}
-      : { control_plane_url: cfg.control_plane_url }),
+    ...(cfg.control_plane_url === undefined ? {} : { control_plane_url: cfg.control_plane_url }),
   };
 };
 

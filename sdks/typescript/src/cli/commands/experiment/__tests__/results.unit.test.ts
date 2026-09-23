@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ExperimentsApiServiceError,ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
+import {
+  ExperimentsApiServiceError,
+  ExperimentsApiService,
+} from "@/client-sdk/services/experiments/experiments-api.service";
 import type * as EvaluationsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 const oraMocks = vi.hoisted(() => ({

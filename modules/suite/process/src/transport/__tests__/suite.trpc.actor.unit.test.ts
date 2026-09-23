@@ -1,10 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/scenarios/run-actor-on-runs.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { SuiteApi, SuiteRunResult } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

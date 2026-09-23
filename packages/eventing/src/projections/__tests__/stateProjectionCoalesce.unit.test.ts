@@ -1,6 +1,7 @@
 // State projections' `coalesceMaxBatch` must reach the queue's batch path;
 // declaration alone is dead code if any link drops it.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Event } from "../../domain/types.ts";
 import { TEST_CONSTANTS } from "../../services/__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";

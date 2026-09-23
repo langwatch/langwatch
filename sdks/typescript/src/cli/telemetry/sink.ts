@@ -5,6 +5,7 @@
  */
 
 import net from "node:net";
+
 import type { LangWatchEvent } from "./attributes";
 
 /** One beat of a command's life cycle, in transport-neutral form. */

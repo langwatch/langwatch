@@ -4,6 +4,7 @@
  * Token cost estimates an agent's context cost for a command's help: chars / 4, rounded up.
  */
 import type { Command } from "commander";
+
 import {
   FEATURE_MAP,
   type GeneratedFeature,

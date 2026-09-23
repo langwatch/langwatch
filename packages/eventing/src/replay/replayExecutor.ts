@@ -1,4 +1,3 @@
-import type { RetentionPolicy, RetentionPolicyResolver } from "../runtime.types.ts";
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event } from "../domain/types.ts";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
@@ -12,6 +11,7 @@ import type {
   StoredProjection,
 } from "../projections/stateProjection.types.ts";
 import { applyStateEvent } from "../projections/stateProjectionExecutor.ts";
+import type { RetentionPolicy, RetentionPolicyResolver } from "../runtime.types.ts";
 import type { ReplayEvent } from "./replayEventSource.ts";
 
 /** Default number of projection entries per ClickHouse INSERT batch. */

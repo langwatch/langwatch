@@ -1,6 +1,7 @@
+import { toEpochMs } from "@langwatch/time";
+
 import type { DiscoveredAggregate } from "./replayEventSource.ts";
 import type { DiscoveryResult, ReplayContext } from "./types.ts";
-import { toEpochMs } from "@langwatch/time";
 
 /**
  * Discovers the aggregates (and total event count) a projection's replay must

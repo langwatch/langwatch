@@ -16,11 +16,11 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { listTriggersCommand } from "../list";
-import { getTriggerCommand } from "../get";
 import { createTriggerCommand } from "../create";
-import { updateTriggerCommand } from "../update";
 import { deleteTriggerCommand } from "../delete";
+import { getTriggerCommand } from "../get";
+import { listTriggersCommand } from "../list";
+import { updateTriggerCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {

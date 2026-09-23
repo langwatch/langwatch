@@ -11,8 +11,8 @@ import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { GatewayEndUserCapsAdapter } from "../../app/gateway-end-user-caps.composition.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
+import { GatewayEndUserCapsAdapter } from "../../app/gateway-end-user-caps.composition.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,

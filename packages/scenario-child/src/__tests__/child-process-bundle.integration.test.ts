@@ -5,9 +5,10 @@
  */
 import { execSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import { createRequire,isBuiltin } from "node:module";
+import { createRequire, isBuiltin } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { OPTIONAL_EXTERNALS } from "../../scripts/bundle-optional-externals.mjs";

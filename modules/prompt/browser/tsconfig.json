@@ -7,11 +7,9 @@
     "verbatimModuleSyntax": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
-
     "rootDir": ".",
 
-    "outDir": "dist",
-
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
 
