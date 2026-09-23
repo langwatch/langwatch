@@ -13,6 +13,10 @@ import {
   type TraceIoSide,
   type TraceIoValue,
 } from "../../app/trace.members.ts";
+import {
+  createInitState,
+  createTestSpan,
+} from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
 import { OUTPUT_SOURCE, TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
 
@@ -70,32 +74,17 @@ function accumulator(
 }
 
 function state(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
-  return {
-    traceId: "t1",
-    computedInput: null,
-    computedOutput: null,
-    outputFromRootSpan: false,
-    outputSpanEndTimeMs: 0,
-    blockedByGuardrail: false,
-    attributes: {},
-    ...overrides,
-  } as unknown as TraceSummaryData;
+  return { ...createInitState(), traceId: "t1", ...overrides };
 }
 
 function span(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {
+    ...createTestSpan({ spanId: "s1", name: "root", startTimeUnixMs: 0 }),
     traceId: "t1",
-    spanId: "s1",
-    parentSpanId: null,
-    name: "root",
-    startTimeUnixMs: 0,
     endTimeUnixMs: 1000,
-    spanAttributes: {},
-    resourceAttributes: {},
-    events: [],
-    links: [],
+    durationMs: 1000,
     ...overrides,
-  } as unknown as NormalizedSpan;
+  };
 }
 
 describe("TraceIOAccumulationService", () => {

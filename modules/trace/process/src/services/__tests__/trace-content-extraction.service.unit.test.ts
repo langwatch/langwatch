@@ -37,12 +37,12 @@ function makeService(
   return {
     storeFromBytes:
       overrides.storeFromBytes ??
-      vi.fn().mockResolvedValue({
+      vi.fn<TraceMediaStore["storeFromBytes"]>().mockResolvedValue({
         id: "stored-id-1",
         mediaType: "audio/mp3",
         isDuplicate: false,
       }),
-  } as unknown as TraceMediaStore;
+  };
 }
 
 const BASE_PARAMS = {
