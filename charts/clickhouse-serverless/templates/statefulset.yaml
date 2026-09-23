@@ -254,6 +254,13 @@ spec:
             - name: secrets
               mountPath: /mnt/secrets
               readOnly: true
+            {{- /* Generic passthrough for operator-supplied mounts (e.g. an
+                   umbrella chart delivering extra server config into config.d /
+                   users.d). tpl-rendered so values may reference .Release.Name.
+                   Nothing here is specific to any one consumer. */}}
+            {{- with .Values.extraVolumeMounts }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
+            {{- end }}
 
       volumes:
         - name: config-d
@@ -282,6 +289,10 @@ spec:
               - key: {{ include "clickhouse-serverless.clusterSecretKey" . }}
                 path: cluster-secret
               {{- end }}
+        {{- /* Generic passthrough (see extraVolumeMounts above). */}}
+        {{- with .Values.extraVolumes }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
+        {{- end }}
 
   volumeClaimTemplates:
     - metadata:

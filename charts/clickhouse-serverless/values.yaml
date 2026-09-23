@@ -211,6 +211,14 @@ serviceAccount:
 imagePullSecrets: []
 podAnnotations: {}
 
+# Generic extra volumes / mounts for the ClickHouse container. An umbrella chart
+# uses these to deliver additional server config (files under config.d / users.d)
+# without this subchart knowing what that config is. tpl-rendered, so values may
+# reference .Release.Name and other release context. Kept intentionally generic —
+# no consumer-specific names live here.
+extraVolumes: []
+extraVolumeMounts: []
+
 # Scheduling
 scheduling:
   nodeSelector: {}

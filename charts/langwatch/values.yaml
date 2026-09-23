@@ -2014,6 +2014,50 @@ clickhouse:
     ## @param clickhouse.scheduling.tolerations [array] Tolerations for ClickHouse pods.
     tolerations: []
 
+  # ---------------------------------------------------------------------------
+  # LangWatchQL access-model delivery (issue #8258)
+  # ---------------------------------------------------------------------------
+  # The app owns the LangWatchQL access model in code; on chart-managed
+  # ClickHouse it is DELIVERED to every replica (not provisioned by DDL on the
+  # one pod behind the Service). The <release>-lwql-access-render Job writes the
+  # rendered files into the Secret <release>-lwql-clickhouse-access, and every
+  # ClickHouse pod mounts them here. Nested single-file (subPath) mounts, so they
+  # coexist with the files ch-config renders into config.d / users.d at startup.
+  #
+  # optional:true keeps a pod bootable even if the render Secret is briefly
+  # absent (the Job always writes it first as a pre-install/pre-upgrade hook).
+  # The secretName is tpl-rendered by the subchart, so .Release.Name resolves;
+  # it must equal langwatch.lwql.accessSecretName (<release>-lwql-clickhouse-access).
+  ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod (LWQL access Secret by default).
+  extraVolumes:
+    - name: lwql-access
+      secret:
+        secretName: "{{ .Release.Name }}-lwql-clickhouse-access"
+        optional: true
+  ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container (LWQL access files by default).
+  extraVolumeMounts:
+    - name: lwql-access
+      mountPath: /etc/clickhouse-server/users.d/lwql-access.yaml
+      subPath: lwql-access.yaml
+      readOnly: true
+    - name: lwql-access
+      mountPath: /etc/clickhouse-server/config.d/lwql-named-collection.yaml
+      subPath: lwql-named-collection.yaml
+      readOnly: true
+
+  # Roll every ClickHouse pod when the app catalog (hence the rendered access
+  # model) changes, so an upgrade re-mounts the freshly rendered Secret.
+  # Kubernetes does not propagate Secret updates into a subPath mount, so a pod
+  # only picks up a changed model on (re)start; this annotation, bumped in
+  # release lockstep with the app image, is what forces that restart on upgrade.
+  # ClickHouse 25.10 hot-reloads users.d/config.d from disk in ~3s, but that
+  # only helps a non-subPath mount, which ch-config's writable config dirs
+  # preclude here. A values-only upgrade at the same version does NOT roll
+  # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
+  ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
+  podAnnotations:
+    langwatch.com/lwql-access-catalog: "3.17.0" # x-release-please-version
+
 # =============================================================================
 # LangWatchQL (LWQL) Configuration
 # =============================================================================
