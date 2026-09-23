@@ -84,13 +84,13 @@ function GuardrailsPage() {
     () =>
       (monitorsQuery.data ?? [])
         .filter(
-          (m: any) =>
+          (m) =>
             m.enabled &&
             m.executionMode === "AS_GUARDRAIL" &&
             typeof m.evaluatorId === "string" &&
             m.evaluatorId.length > 0,
         )
-        .map((m: any) => ({
+        .map((m) => ({
           id: m.evaluatorId as string,
           name: m.name as string,
           slug: m.slug as string,
@@ -167,6 +167,10 @@ function GuardrailsPage() {
     );
   }
 
+  const isLoadingGuardrails = listQuery.isLoading;
+  const showGuardrailsEmpty = !isLoadingGuardrails && activeRows.length === 0;
+  const showGuardrails = !isLoadingGuardrails && activeRows.length !== 0;
+
   return (
     <AiGatewayLayout pageTitle="Guardrails · AI Gateway · LangWatch">
       <PageLayout.Header>
@@ -192,9 +196,8 @@ function GuardrailsPage() {
             closed). The VK opt-in lives in the virtual-key drawer.
           </Text>
 
-          {listQuery.isLoading ? (
-            <Spinner />
-          ) : activeRows.length === 0 ? (
+          {isLoadingGuardrails && <Spinner />}
+          {showGuardrailsEmpty && (
             <Card.Root>
               <Card.Body>
                 <EmptyState.Root>
@@ -221,7 +224,8 @@ function GuardrailsPage() {
                 </EmptyState.Root>
               </Card.Body>
             </Card.Root>
-          ) : (
+          )}
+          {showGuardrails && (
             <Table.Root size="sm" variant="line">
               <Table.Header>
                 <Table.Row>

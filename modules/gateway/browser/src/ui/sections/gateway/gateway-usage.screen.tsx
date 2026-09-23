@@ -219,6 +219,12 @@ function GatewayUsagePage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const isLoadingUsage = activeQuery.isLoading;
+  const showUsageError = !isLoadingUsage && activeQuery.isError;
+  const showUsageEmpty =
+    !isLoadingUsage && !activeQuery.isError && (!data || data.totalRequests === 0);
+  const showUsage = !isLoadingUsage && !activeQuery.isError && !showUsageEmpty;
+
   return (
     <AiGatewayLayout>
       <>
@@ -278,15 +284,15 @@ function GatewayUsagePage() {
         </PageLayout.Header>
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
-          {activeQuery.isLoading ? (
-            <Spinner />
-          ) : activeQuery.isError ? (
+          {isLoadingUsage && <Spinner />}
+          {showUsageError && (
             <GatewayErrorPanel
               title="Failed to load usage"
               error={activeQuery.error}
               onRetry={() => activeQuery.refetch()}
             />
-          ) : !data || data.totalRequests === 0 ? (
+          )}
+          {showUsageEmpty && (
             <EmptyState.Root>
               <EmptyState.Content>
                 <EmptyState.Indicator>
@@ -299,7 +305,8 @@ function GatewayUsagePage() {
                 </EmptyState.Description>
               </EmptyState.Content>
             </EmptyState.Root>
-          ) : (
+          )}
+          {showUsage && data && (
             <VStack align="stretch" gap={6}>
               <HStack gap={4} align="stretch">
                 <StatTile label="Total spend" value={formatBudgetUsd(data.totalUsd)} />

@@ -52,6 +52,101 @@ function useBudgetRows(organizationId: string | undefined) {
   };
 }
 
+function BudgetSpendCell({
+  budget,
+  spent,
+  limit,
+  pct,
+  seatsSeen,
+  seatsOver,
+  seatsOverPct,
+}: {
+  budget: BudgetListRow;
+  spent: number;
+  limit: number;
+  pct: number;
+  seatsSeen: number;
+  seatsOver: number;
+  seatsOverPct: number;
+}) {
+  if (!budget.spendAvailable) {
+    return (
+      <HStack fontSize="xs">
+        <Text color="fg.muted">Unavailable</Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+      </HStack>
+    );
+  }
+  if (budget.scopeType === "GROUP") {
+    // A group budget is one allowance per member; the list can only total everyone's
+    // spend together, so it says exactly that. Per-member standing lives on the
+    // detail page and in the key drawer's applies list.
+    return (
+      <VStack align="stretch" gap={0.5} data-testid="budget-group-spend">
+        <HStack fontSize="xs" gap={1}>
+          <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
+          <Text color="fg.muted">group total</Text>
+        </HStack>
+        <Text fontSize="2xs" color="fg.muted">
+          {formatBudgetUsd(limit)} per member
+          {typeof budget.scopeTarget?.memberCount === "number"
+            ? ` · ${budget.scopeTarget.memberCount} ${
+                budget.scopeTarget.memberCount === 1 ? "member" : "members"
+              }`
+            : ""}
+        </Text>
+      </VStack>
+    );
+  }
+  if (budget.scopeType === "ATTRIBUTED_USER") {
+    // A per-person template is one allowance per end user, so there is no single total;
+    // the list names the cap each person carries and how many have passed it.
+    return (
+      <VStack align="stretch" gap={1} data-testid="budget-attributed-user-spend">
+        <HStack fontSize="xs" gap={1}>
+          <Text fontWeight="medium">{formatBudgetUsd(limit)}</Text>
+          <Text color="fg.muted">per person</Text>
+        </HStack>
+        <Text fontSize="2xs" color="fg.muted">
+          {seatsOver} of {seatsSeen} people over cap
+        </Text>
+        <Progress.Root
+          value={seatsOverPct}
+          size="xs"
+          colorPalette={seatsOver > 0 ? "red" : "green"}
+        >
+          <Progress.Track>
+            <Progress.Range />
+          </Progress.Track>
+        </Progress.Root>
+      </VStack>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack fontSize="xs">
+        <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+        <Spacer />
+        <Badge variant="outline" colorPalette={usagePalette(pct)} fontSize="2xs">
+          {pct.toFixed(0)}%
+        </Badge>
+      </HStack>
+      <Progress.Root value={pct} size="xs" colorPalette={usagePalette(pct)}>
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
+    </VStack>
+  );
+}
+
+function usagePalette(pct: number): "red" | "orange" | "green" {
+  if (pct >= 100) return "red";
+  if (pct >= 80) return "orange";
+  return "green";
+}
+
 function BudgetsPage() {
   const showErrorToast = useShowErrorToast();
   const { organization, hasPermission } = useOrganizationTeamProject();
@@ -78,6 +173,10 @@ function BudgetsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<BudgetListRow | null>(null);
   const [archiving, setArchiving] = useState<BudgetListRow | null>(null);
+
+  const showError = !isLoading && isError;
+  const showEmpty = !isLoading && !isError && rows.length === 0;
+  const showRows = !isLoading && !isError && rows.length > 0;
 
   const confirmArchive = async () => {
     if (!archiving || !organization) return;
@@ -106,15 +205,15 @@ function BudgetsPage() {
         </PageLayout.Header>
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
-          {isLoading ? (
-            <Spinner />
-          ) : isError ? (
+          {isLoading && <Spinner />}
+          {showError && (
             <GatewayErrorPanel
               title="Failed to load budgets"
               error={error}
               onRetry={() => refetch()}
             />
-          ) : rows.length === 0 ? (
+          )}
+          {showEmpty && (
             <EmptyState.Root>
               <EmptyState.Content>
                 <EmptyState.Indicator>
@@ -133,7 +232,8 @@ function BudgetsPage() {
                 )}
               </EmptyState.Content>
             </EmptyState.Root>
-          ) : (
+          )}
+          {showRows && (
             <VStack align="stretch" gap={4}>
               {!spendAvailable && (
                 <Alert.Root status="warning" data-testid="budget-spend-unavailable">
@@ -241,88 +341,15 @@ function BudgetsPage() {
                               </Badge>
                             </Table.Cell>
                             <Table.Cell minWidth="220px">
-                              {!b.spendAvailable ? (
-                                <HStack fontSize="xs">
-                                  <Text color="fg.muted">Unavailable</Text>
-                                  <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                                </HStack>
-                              ) : b.scopeType === "GROUP" ? (
-                                // A group budget is one allowance per member;
-                                // the only number the list can total is everyone's
-                                // spend together, so it is labelled as exactly
-                                // that. Per-member standing lives on the detail
-                                // page and in the key drawer's applies list.
-                                <VStack align="stretch" gap={0.5} data-testid="budget-group-spend">
-                                  <HStack fontSize="xs" gap={1}>
-                                    <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
-                                    <Text color="fg.muted">group total</Text>
-                                  </HStack>
-                                  <Text fontSize="2xs" color="fg.muted">
-                                    {formatBudgetUsd(limit)} per member
-                                    {typeof b.scopeTarget?.memberCount === "number"
-                                      ? ` · ${b.scopeTarget.memberCount} ${
-                                          b.scopeTarget.memberCount === 1 ? "member" : "members"
-                                        }`
-                                      : ""}
-                                  </Text>
-                                </VStack>
-                              ) : b.scopeType === "ATTRIBUTED_USER" ? (
-                                // A per-person template is one allowance per
-                                // end user, so there is no single total to
-                                // measure anyone against. What the list can
-                                // say honestly is the cap each person carries
-                                // and how many of them have passed it.
-                                <VStack
-                                  align="stretch"
-                                  gap={1}
-                                  data-testid="budget-attributed-user-spend"
-                                >
-                                  <HStack fontSize="xs" gap={1}>
-                                    <Text fontWeight="medium">{formatBudgetUsd(limit)}</Text>
-                                    <Text color="fg.muted">per person</Text>
-                                  </HStack>
-                                  <Text fontSize="2xs" color="fg.muted">
-                                    {seatsOver} of {seatsSeen} people over cap
-                                  </Text>
-                                  <Progress.Root
-                                    value={seatsOverPct}
-                                    size="xs"
-                                    colorPalette={seatsOver > 0 ? "red" : "green"}
-                                  >
-                                    <Progress.Track>
-                                      <Progress.Range />
-                                    </Progress.Track>
-                                  </Progress.Root>
-                                </VStack>
-                              ) : (
-                                <VStack align="stretch" gap={1}>
-                                  <HStack fontSize="xs">
-                                    <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
-                                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                                    <Spacer />
-                                    <Badge
-                                      variant="outline"
-                                      colorPalette={
-                                        pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                                      }
-                                      fontSize="2xs"
-                                    >
-                                      {pct.toFixed(0)}%
-                                    </Badge>
-                                  </HStack>
-                                  <Progress.Root
-                                    value={pct}
-                                    size="xs"
-                                    colorPalette={
-                                      pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"
-                                    }
-                                  >
-                                    <Progress.Track>
-                                      <Progress.Range />
-                                    </Progress.Track>
-                                  </Progress.Root>
-                                </VStack>
-                              )}
+                              <BudgetSpendCell
+                                budget={b}
+                                spent={spent}
+                                limit={limit}
+                                pct={pct}
+                                seatsSeen={seatsSeen}
+                                seatsOver={seatsOver}
+                                seatsOverPct={seatsOverPct}
+                              />
                             </Table.Cell>
                             <Table.Cell>
                               <Badge colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}>

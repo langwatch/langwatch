@@ -122,6 +122,8 @@ function BudgetDetailPage() {
   const seatsSeen = budget?.endUsersSeen ?? 0;
   const seatsOver = budget?.endUsersOver ?? 0;
   const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
+  const isLoadingBudget = detailQuery.isLoading;
+  const budgetMissing = !isLoadingBudget && !budget;
 
   return (
     <AiGatewayLayout>
@@ -178,11 +180,9 @@ function BudgetDetailPage() {
         </PageLayout.Header>
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
-          {detailQuery.isLoading ? (
-            <Spinner />
-          ) : !budget ? (
-            <Text color="fg.muted">Budget not found.</Text>
-          ) : (
+          {isLoadingBudget && <Spinner />}
+          {budgetMissing && <Text color="fg.muted">Budget not found.</Text>}
+          {!isLoadingBudget && budget && (
             <VStack align="stretch" gap={6} maxWidth="960px">
               {!budget.spendAvailable && (
                 <Alert.Root status="warning" data-testid="budget-spend-unavailable">
@@ -211,65 +211,16 @@ function BudgetDetailPage() {
               )}
               <Section title="Utilization">
                 <VStack align="stretch" gap={2}>
-                  {!budget.spendAvailable ? (
-                    <HStack>
-                      <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
-                        Unavailable
-                      </Text>
-                      <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                    </HStack>
-                  ) : budget.scopeType === "ATTRIBUTED_USER" ? (
-                    // The template's limit belongs to each end user
-                    // separately, so the headline is the per-person cap and
-                    // the standing underneath is a headcount.
-                    <VStack
-                      align="stretch"
-                      gap={2}
-                      data-testid="budget-attributed-user-utilization"
-                    >
-                      <HStack>
-                        <Text fontWeight="medium" fontSize="2xl">
-                          {formatBudgetUsd(limit)}
-                        </Text>
-                        <Text color="fg.muted">per person</Text>
-                        <Spacer />
-                        <Badge colorPalette={seatsOver > 0 ? "red" : "green"}>
-                          {seatsOver} of {seatsSeen} people over cap
-                        </Badge>
-                      </HStack>
-                      <Progress.Root
-                        value={seatsOverPct}
-                        size="sm"
-                        colorPalette={seatsOver > 0 ? "red" : "green"}
-                      >
-                        <Progress.Track>
-                          <Progress.Range />
-                        </Progress.Track>
-                      </Progress.Root>
-                    </VStack>
-                  ) : (
-                    <>
-                      <HStack>
-                        <Text fontWeight="medium" fontSize="2xl">
-                          {formatBudgetUsd(spent)}
-                        </Text>
-                        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
-                        <Spacer />
-                        <Badge colorPalette={pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"}>
-                          {pct.toFixed(1)}% used
-                        </Badge>
-                      </HStack>
-                      <Progress.Root
-                        value={pct}
-                        size="sm"
-                        colorPalette={pct >= 100 ? "red" : pct >= 80 ? "orange" : "green"}
-                      >
-                        <Progress.Track>
-                          <Progress.Range />
-                        </Progress.Track>
-                      </Progress.Root>
-                    </>
-                  )}
+                  <UtilizationHeadline
+                    spendAvailable={budget.spendAvailable}
+                    perPerson={budget.scopeType === "ATTRIBUTED_USER"}
+                    spent={spent}
+                    limit={limit}
+                    pct={pct}
+                    seatsSeen={seatsSeen}
+                    seatsOver={seatsOver}
+                    seatsOverPct={seatsOverPct}
+                  />
                   <HStack fontSize="xs" color="fg.muted">
                     <Text>
                       Window: <strong>{budget.window.toLowerCase()}</strong>
@@ -502,20 +453,102 @@ function ScopeBadge({
   );
 }
 
+function UtilizationHeadline({
+  spendAvailable,
+  perPerson,
+  spent,
+  limit,
+  pct,
+  seatsSeen,
+  seatsOver,
+  seatsOverPct,
+}: {
+  spendAvailable: boolean;
+  perPerson: boolean;
+  spent: number;
+  limit: number;
+  pct: number;
+  seatsSeen: number;
+  seatsOver: number;
+  seatsOverPct: number;
+}) {
+  if (!spendAvailable) {
+    return (
+      <HStack>
+        <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
+          Unavailable
+        </Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+      </HStack>
+    );
+  }
+  if (perPerson) {
+    // The template's limit belongs to each end user separately, so the
+    // headline is the per-person cap and the standing underneath is a headcount.
+    return (
+      <VStack align="stretch" gap={2} data-testid="budget-attributed-user-utilization">
+        <HStack>
+          <Text fontWeight="medium" fontSize="2xl">
+            {formatBudgetUsd(limit)}
+          </Text>
+          <Text color="fg.muted">per person</Text>
+          <Spacer />
+          <Badge colorPalette={seatsOver > 0 ? "red" : "green"}>
+            {seatsOver} of {seatsSeen} people over cap
+          </Badge>
+        </HStack>
+        <Progress.Root
+          value={seatsOverPct}
+          size="sm"
+          colorPalette={seatsOver > 0 ? "red" : "green"}
+        >
+          <Progress.Track>
+            <Progress.Range />
+          </Progress.Track>
+        </Progress.Root>
+      </VStack>
+    );
+  }
+  return (
+    <>
+      <HStack>
+        <Text fontWeight="medium" fontSize="2xl">
+          {formatBudgetUsd(spent)}
+        </Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+        <Spacer />
+        <Badge colorPalette={usagePalette(pct)}>{pct.toFixed(1)}% used</Badge>
+      </HStack>
+      <Progress.Root value={pct} size="sm" colorPalette={usagePalette(pct)}>
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
+    </>
+  );
+}
+
+function usagePalette(pct: number): "red" | "orange" | "green" {
+  if (pct >= 100) return "red";
+  if (pct >= 80) return "orange";
+  return "green";
+}
+
+function statusPalette(
+  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED",
+): "green" | "red" | "orange" | "gray" {
+  if (status === "SUCCESS") return "green";
+  if (status === "BLOCKED_BY_GUARDRAIL") return "red";
+  if (status === "PROVIDER_ERROR") return "orange";
+  return "gray";
+}
+
 function StatusBadge({
   status,
 }: {
   status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
 }) {
-  const palette =
-    status === "SUCCESS"
-      ? "green"
-      : status === "BLOCKED_BY_GUARDRAIL"
-        ? "red"
-        : status === "PROVIDER_ERROR"
-          ? "orange"
-          : "gray";
-  return <Badge colorPalette={palette}>{status.toLowerCase()}</Badge>;
+  return <Badge colorPalette={statusPalette(status)}>{status.toLowerCase()}</Badge>;
 }
 
 // Per-row ledger debit formatter. Same precision tiers as
