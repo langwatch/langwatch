@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CliLoginKeyService } from "~/server/api-key/cli-login-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { seedRoleBinding } from "~/test-utils/authz-seeds";
@@ -123,6 +124,11 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
   beforeAll(async () => {
     ({ redisConnection } = await startTestContainers());
     await resetApp();
+    // Drop the memoized grants-ledger handle: under `isolate: false` this
+    // suite shares a worker with files whose afterAll drained their App's
+    // event-sourcing queue, and the stale handle would send into that closed
+    // queue. Re-resolves lazily against the fresh App created just below.
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
       redis: redisConnection,
       _eventSourcing: createAuthzTestEventSourcing(prisma),
@@ -186,6 +192,7 @@ describe("POST /api/auth/cli/refresh and the login key's expiry", () => {
     // The App holds the container's Redis connection, so it is cleared before
     // that connection is closed rather than left behind holding a dead client.
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     await stopTestContainers();
   });
 
