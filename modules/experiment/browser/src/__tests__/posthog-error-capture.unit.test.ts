@@ -1,4 +1,3 @@
-import posthog from "posthog-js";
 /**
  * @vitest-environment jsdom
  *
@@ -8,11 +7,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { captureException } from "../model/posthog-error-capture.ts";
 
-vi.mock("posthog-js", () => ({
-  default: { __loaded: true, capture: vi.fn() },
-}));
+const capture = vi.hoisted(() => vi.fn());
 
-const capture = vi.mocked(posthog.capture);
+vi.mock("posthog-js", () => ({
+  default: { __loaded: true, capture },
+}));
 
 function capturedProperties(): Record<string, unknown> {
   const call = capture.mock.calls.at(0);

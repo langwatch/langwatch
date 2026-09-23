@@ -1,3 +1,5 @@
+import { clearTimeout, setTimeout } from "node:timers";
+
 import type { AgentCallSignal } from "@langwatch/agent-contract";
 import { instanceGoneSchema, replyNudgeSchema } from "@langwatch/agent-contract";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";

@@ -39,7 +39,7 @@ export function parseTagsCsv(csv: string): string[] {
 export function tagsBeyondLimitsNotice(csv: string): string | null {
   const tags = parseTagsCsv(csv);
   const overCount = new Set(tags).size > VK_TAGS_MAX_COUNT;
-  const overLength = tags.some((tag) => [...tag].length > VK_TAG_MAX_LENGTH);
+  const overLength = tags.some((tag) => Array.from(tag).length > VK_TAG_MAX_LENGTH);
 
   const notices: string[] = [];
   if (overCount) {

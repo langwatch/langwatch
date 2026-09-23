@@ -20,10 +20,10 @@ export function startAndIdentifyRun({
     const answer = (runId?: string) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      globalThis.clearTimeout(timer);
       resolve(runId);
     };
-    const timer = setTimeout(() => answer(undefined), RUN_ID_WAIT_MS);
+    const timer = globalThis.setTimeout(() => answer(undefined), RUN_ID_WAIT_MS);
     const started = start(answer);
     if (started) {
       void started.finally(() => answer(undefined)).catch(() => undefined);

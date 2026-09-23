@@ -1,3 +1,5 @@
+import { clearTimeout, setTimeout } from "node:timers";
+
 import {
   type AgentCallSignal,
   AgentSessionUnknownError,

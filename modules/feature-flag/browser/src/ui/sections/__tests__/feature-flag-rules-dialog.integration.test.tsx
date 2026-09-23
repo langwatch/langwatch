@@ -118,25 +118,26 @@ describe("given an operator picks the New users scope for a rule", () => {
  * geometry that makes "the row below" a real answer.
  */
 function stubVerticalLayout(): () => void {
-  const original = Element.prototype.getBoundingClientRect;
-  Element.prototype.getBoundingClientRect = function (this: Element): DOMRect {
-    const siblings = this.parentElement?.children;
-    const index = siblings ? Array.prototype.indexOf.call(siblings, this) : 0;
-    const top = index * 60;
-    return {
-      x: 0,
-      y: top,
-      top,
-      bottom: top + 50,
-      left: 0,
-      right: 400,
-      width: 400,
-      height: 50,
-      toJSON: () => ({}),
-    } as DOMRect;
-  };
+  const layout = vi
+    .spyOn(Element.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: Element): DOMRect {
+      const siblings = this.parentElement?.children;
+      const index = siblings ? Array.prototype.indexOf.call(siblings, this) : 0;
+      const top = index * 60;
+      return {
+        x: 0,
+        y: top,
+        top,
+        bottom: top + 50,
+        left: 0,
+        right: 400,
+        width: 400,
+        height: 50,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
   return () => {
-    Element.prototype.getBoundingClientRect = original;
+    layout.mockRestore();
   };
 }
 

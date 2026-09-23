@@ -7,6 +7,7 @@ import type {
   WebhookDeliveryInput,
   WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
+import { TriggerNotFoundError } from "@langwatch/automation-contract";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -198,7 +199,7 @@ class Triggers extends TriggerRepository {
   findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
     this.findByIdInputs.push(input);
     const row = this.rowsById.get(`${input.projectId}:${input.triggerId}`);
-    if (!row) return Promise.reject(new Error("automation not found in this project"));
+    if (!row) return Promise.reject(new TriggerNotFoundError());
     return Promise.resolve(row);
   }
   findById() {
@@ -341,7 +342,9 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
       id: "t",
       projectId: "p",
     });
-    await expect(service.getById({ triggerId: "t", projectId: "other" })).rejects.toThrow();
+    await expect(service.getById({ triggerId: "t", projectId: "other" })).rejects.toThrow(
+      TriggerNotFoundError,
+    );
     expect(triggers.findByIdInputs).toEqual([
       { triggerId: "t", projectId: "p" },
       { triggerId: "t", projectId: "other" },

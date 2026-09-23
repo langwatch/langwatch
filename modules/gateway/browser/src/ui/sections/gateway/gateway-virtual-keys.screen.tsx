@@ -171,7 +171,7 @@ function VirtualKeysPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
-  const [editing, setEditing] = useState<any | null>(null);
+  const [editing, setEditing] = useState<any>(null);
   const [rotating, setRotating] = useState<{ id: string; name: string } | null>(null);
   const [revoking, setRevoking] = useState<{
     id: string;

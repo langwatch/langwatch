@@ -59,7 +59,7 @@ describe("given the field's own length cap", () => {
       const emojiTag = "🙂".repeat(VK_TAG_MAX_LENGTH);
       const fullList = Array.from({ length: VK_TAGS_MAX_COUNT }, () => emojiTag).join(", ");
 
-      expect([...emojiTag]).toHaveLength(VK_TAG_MAX_LENGTH);
+      expect(Array.from(emojiTag)).toHaveLength(VK_TAG_MAX_LENGTH);
       expect(emojiTag.length).toBeGreaterThan(VK_TAG_MAX_LENGTH);
       expect(fullList.length).toBeLessThanOrEqual(TAGS_CSV_MAX_LENGTH);
     });
