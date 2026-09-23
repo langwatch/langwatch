@@ -5,6 +5,7 @@
  */
 import {
   bindRestMiddleware,
+  canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
   type MountableRestApp,
@@ -14,12 +15,8 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 import { createAutomationRest } from "../automation.rest.ts";
-import { slackAutomationRest, slackAutomationRestErrors } from "../slack-trigger.rest.ts";
-import {
-  unsubscribeCallerAddress,
-  unsubscribeRest,
-  unsubscribeRestErrors,
-} from "../unsubscribe.rest.ts";
+import { slackAutomationRest } from "../slack-trigger.rest.ts";
+import { unsubscribeCallerAddress, unsubscribeRest } from "../unsubscribe.rest.ts";
 
 /** The project every credentialed request in these suites is authenticated for. */
 export const TEST_PROJECT = { id: "project_1", slug: "acme" } as const;
@@ -87,13 +84,13 @@ export function mountAutomationRest(app: Partial<AutomationApi>) {
   );
 }
 
-/** `/api/trigger/slack`, with the three bodies it has always answered. */
+/** `/api/trigger/slack`, refusing through the process's own canonical boundary. */
 export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
   return requests(
     runtime().mount(slackAutomationRest.router(), {
       app: () => app as AutomationApi,
       credential: "project",
-      onError: slackAutomationRestErrors,
+      onError: canonicalErrorResponse,
     }),
   );
 }
@@ -107,7 +104,7 @@ export function mountUnsubscribeRest(
     runtime().mount(unsubscribeRest.router(), {
       app: () => app as AutomationApi,
       credential: "public",
-      onError: unsubscribeRestErrors,
+      onError: canonicalErrorResponse,
       facts: [bindRestMiddleware(unsubscribeCallerAddress, () => callerAddress)],
     }),
   );

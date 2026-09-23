@@ -70,7 +70,7 @@ describe("given the one-click unsubscribe door", () => {
 
       const failed = await broken.send("POST", "/api/unsubscribe?token=t_valid");
       expect(failed.status).toBe(500);
-      await expect(failed.json()).resolves.toEqual({ error: "Internal server error" });
+      expect(await failed.json()).toMatchObject({ code: "internal_error" });
     });
   });
 

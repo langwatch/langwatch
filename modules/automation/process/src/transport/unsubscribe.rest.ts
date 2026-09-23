@@ -8,7 +8,6 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
 import {
   AutomationApi,
@@ -110,14 +109,3 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
     body: JSON.stringify({ error: "Method not allowed" }),
   }))
   .build();
-
-/**
- * The one sentence an unanticipated failure answers with. Every refusal this
- * route can word is a declared ANSWER above, so reaching here means the write
- * itself failed - which tells the mail client nothing beyond "not done".
- */
-export const unsubscribeRestErrors: RestErrorHandler = (error, context) => {
-  logger.error({ error }, "One-click unsubscribe failed");
-
-  return context.json({ error: "Internal server error" }, 500);
-};

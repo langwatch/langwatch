@@ -489,7 +489,8 @@ describe("given the workbench's own doors", () => {
 
       expect(typeof answered.abortWorkbenchRun).toBe("function");
       expect(typeof answered.experiments).toBe("function");
-      expect(typeof answered.run).toBe("function");
+      expect(typeof answered.startSavedRun).toBe("function");
+      expect(typeof answered.pollRun).toBe("function");
     });
 
     it("answers the setup doors with the application itself", () => {

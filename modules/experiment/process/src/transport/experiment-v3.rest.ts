@@ -1,4 +1,3 @@
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 /**
  * `/api/experiments/*` - the workbench's project-keyed doors for the CI/CD
  * run, run reads and saved setup. Each route names its required permission,
@@ -12,51 +11,34 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import {
-  ExperimentNotFoundError,
-  ExperimentRunNotFoundError as RunNotFoundError,
-  ExperimentRunLoopUnavailableError,
   ExperimentVersionNotFoundError,
-  InvalidExperimentConfigurationError,
   listRunsQuerySchema,
+  listRunsResponseSchema,
   listVersionsQuerySchema,
   listWorkbenchVersionsResponseSchema,
-  persistedEvaluationsV3StateSchema,
   restoreWorkbenchVersionBodySchema,
   restoreWorkbenchVersionResponseSchema,
   runIdParamsSchema,
-  runInputsBodySchema,
+  runRefusalSchema,
   runResultsQuerySchema,
   runResultsResponseSchema,
   runStatusResponseSchema,
-  runsSavedDataset,
   saveWorkbenchStateBodySchema,
   saveWorkbenchStateResponseSchema,
   slugParamsSchema,
   slugVersionParamsSchema,
   workbenchStateQuerySchema,
   workbenchStateAnswerSchema,
-  type CarriedOverCell,
-  type EvaluationsV3State,
-  type ExecutionScope,
+  type SavedRunAnswer,
+  type WorkbenchRunAnswer,
 } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import type { ExperimentV3RunLoop } from "#app/experiment-workbench.members";
 import type { ExperimentApp } from "#app/experiment.app";
-
-import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
-import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
-import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
-import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
-import type { LoadedExecutionData } from "../services/experiment-execution-data.service.ts";
-import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
-import { ExperimentSavedStateExecutionService } from "../services/experiment-saved-state-execution.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
@@ -80,31 +62,15 @@ export interface ExperimentV3RestApi {
   ): Promise<{ success: true; runId: string; message: "Abort requested" }>;
   /** The application the workbench's four setup doors answer from. */
   experiments(): ExperimentApp;
-  /**
-   * The run loop, as this process composed it. A call rather than a field:
-   * a module's API exposes operations only (`LocalFeatureApi`), and a
-   * field-valued collaborator read off one throws.
-   */
-  run(): ExperimentV3RunLoop;
-  /**
-   * Records that a person ran an experiment, where this process has somewhere to
-   * record it.
-   */
-  recordExperimentRan?:
-    | ((input: {
-        userId: string;
-        projectId: string;
-        experimentId: string | undefined;
-        isFullRun: boolean;
-      }) => void)
-    | undefined;
-  /** Where an unnamed failure is reported. Best-effort. */
-  reportError?: ((error: unknown, context: Record<string, unknown>) => void) | undefined;
+  startSavedRun: ExperimentApp["startSavedRun"];
+  executeWorkbenchRun: ExperimentApp["executeWorkbenchRun"];
+  listRunsPage: ExperimentApp["listRunsPage"];
+  pollRun: ExperimentApp["pollRun"];
+  readRunResults: ExperimentApp["readRunResults"];
 }
 
 export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>()("experiment");
 
-/** The refusal a run door answers where this process composed no run loop. */
 /**
  * A JSON answer this door writes itself, rather than validating against one
  * success schema — each route states its 200 body in its own words.
@@ -138,28 +104,6 @@ const parseOptionalPositiveInt = (value: string | undefined) => {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 };
 
-/** The run loop, or the refusal a process without one owes. Starting a run needs both halves. */
-export function runLoopOf(run: ExperimentV3RunLoop): {
-  ports: ExperimentRunCollaborators;
-  progress: ExperimentRunProgressRepository;
-} {
-  if (!run.ports || !run.progress) {
-    throw new ExperimentRunLoopUnavailableError("experiment run loop");
-  }
-  return { ports: run.ports, progress: run.progress };
-}
-
-/**
- * Where a run's progress is READ from. Only the progress half: a process that
- * composes the store but starts no runs of its own still answers a poll, and
- * gating that read on `ports` made every reader of a run a 503.
- */
-export function runProgressOf(run: ExperimentV3RunLoop): ExperimentRunProgressRepository {
-  if (!run.progress) throw new ExperimentRunLoopUnavailableError("experiment run progress store");
-
-  return run.progress;
-}
-
 export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withNamespace("experiments")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -190,157 +134,24 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
   .handle(
-    async ({ app, input, raw, request, scope }, project, credential): Promise<RestRawResult> => {
-      const { slug } = input;
-
-      const experiments = app.experiments();
-
-      const savedExperiment = await experiments.findBySlugAndType({
-        projectId: scope.id,
-        slug,
-        type: "EVALUATIONS_V3",
-      });
-
-      if (!savedExperiment) {
-        throw new ExperimentNotFoundError(slug);
-      }
-
-      const parseResult = persistedEvaluationsV3StateSchema.safeParse(
-        savedExperiment.workbenchState,
-      );
-      if (!parseResult.success) {
-        logger.error({ slug, errors: parseResult.error.issues }, "Invalid workbenchState");
-        throw new InvalidExperimentConfigurationError(slug);
-      }
-
-      const workbenchState = parseResult.data;
-      const dataset = workbenchState.datasets[0];
-      if (!dataset) {
-        return jsonAnswer({ error: "No dataset configured" }, 400);
-      }
-
-      let rawBody: unknown = {};
-      if (raw.trim()) {
-        try {
-          rawBody = JSON.parse(raw);
-        } catch {
-          return jsonAnswer({ error: "Invalid JSON body" }, 400);
-        }
-      }
-      const inputsParse = runInputsBodySchema.safeParse(rawBody);
-      if (!inputsParse.success) {
-        return jsonAnswer(
-          { error: inputsParse.error.issues[0]?.message ?? "Invalid request body" },
-          400,
-        );
-      }
-      const runInputs = inputsParse.data;
-
-      const prepared = await ExperimentSavedStateExecutionService.prepareSavedStateExecution({
-        experiments: experiments.experimentService,
-        services: app.run().services,
-        projectId: scope.id,
-        slug,
-        runInputs: {
-          data: runInputs.data,
-          datasetId: runInputs.dataset_id,
-          parameters: runInputs.parameters,
-        },
-      });
-
-      if ("error" in prepared) {
-        return jsonAnswer({ error: prepared.error }, prepared.status);
-      }
-
-      const {
-        experiment,
-        state,
-        datasetRows,
-        datasetColumns,
-        loadedPrompts,
-        loadedAgents,
-        loadedEvaluators,
-        loadedWorkflows,
-      } = prepared;
-
-      const runScope: ExecutionScope = runInputs.row_indices
-        ? { type: "rows", rowIndices: runInputs.row_indices }
-        : { type: "full" };
-
-      const carriedOverCells = ExperimentSavedStateExecutionService.planSavedRunCarryOver({
-        prepared,
-        scope: runScope,
-      });
-
-      const isSSE = (request.headers.get("Accept") ?? "").includes("text/event-stream");
-
-      logger.info(
-        { projectId: scope.id, slug, isSSE, rowCount: datasetRows.length },
-        "Starting CI/CD experiment execution",
-      );
-
-      if (isSSE) {
-        const { ports: runPorts } = runLoopOf(app.run());
-        return {
-          status: 200,
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          },
-          body: runEventStream({
-            app,
-            projectId: scope.id,
-            experimentId: experiment.id,
-            slug,
-            scope: runScope,
-            state,
-            datasetRows,
-            datasetColumns,
-            loadedPrompts,
-            loadedAgents,
-            loadedEvaluators,
-            loadedWorkflows,
-            runPorts,
-            carriedOverCells,
-          }),
-        };
-      }
-
-      const { runId, runUrl, total } = await app.run().startRun({
-        projectId: scope.id,
-        projectSlug: project.projectSlug,
-        experimentId: experiment.id,
-        experimentSlug: slug,
-        scope: runScope,
-        state,
-        datasetRows,
-        datasetColumns,
-        loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
-        loadedAgents: loadedAgents as Map<string, TypedAgent>,
-        loadedEvaluators,
-        loadedWorkflows,
-        ...(carriedOverCells.length > 0 ? { carriedOverCells } : {}),
-        // A run of the saved dataset fills the cells the workbench shows.
-        ...(runsSavedDataset(runInputs)
-          ? {
-              persistResults: {
-                experiments: experiments.experimentService,
-                actor: workbenchActorFrom({ credential }),
-              },
-            }
-          : {}),
-      });
-
-      return jsonAnswer({ runId, status: "running", total, runUrl }, 200);
-    },
+    async ({ app, input, raw, request, scope }, project, credential): Promise<RestRawResult> =>
+      rawAnswerOf(
+        await app.startSavedRun({
+          projectId: scope.id,
+          projectSlug: project.projectSlug,
+          slug: input.slug,
+          body: raw,
+          acceptsEvents: (request.headers.get("Accept") ?? "").includes("text/event-stream"),
+          credential,
+        }),
+      ),
   )
 
   // ── GET /runs?experimentSlug=... (list runs for an experiment) ────────
   .get("/runs", "getApiExperimentsRuns")
   .withQuery(listRunsQuerySchema)
   .withPermission("evaluations:view")
-  .withRawResponse({ produces: "application/json" })
+  .responds({ 200: listRunsResponseSchema, 400: runRefusalSchema })
   .withDocs({
     summary: "List runs of an experiment",
     description:
@@ -352,44 +163,14 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment in this project" },
     },
   })
-  .handle(async ({ app, input, scope }) => {
-    const { experimentSlug } = input;
-    if (!experimentSlug) {
-      return jsonAnswer({ error: "experimentSlug query parameter is required" }, 400);
-    }
-
-    const pageSize = (() => {
-      const parsed = input.pageSize ? parseInt(input.pageSize, 10) : 50;
-      if (!Number.isFinite(parsed) || parsed <= 0) return 50;
-      return Math.min(parsed, 200);
-    })();
-    const page = (() => {
-      const parsed = input.page ? parseInt(input.page, 10) : 1;
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-    })();
-
-    const { experiment, runs, totalHits } = await app
-      .experiments()
-      .getRunsPageBySlug({ projectId: scope.id, experimentSlug, page, pageSize })
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
-          throw new ExperimentNotFoundError(experimentSlug);
-        }
-        throw error;
-      });
-
-    const offset = (page - 1) * pageSize;
-
-    return jsonAnswer(
-      {
-        experimentId: experiment.id,
-        experimentSlug: experiment.slug,
-        runs,
-        pagination: { page, pageSize, totalHits, hasMore: offset + runs.length < totalHits },
-      },
-      200,
-    );
-  })
+  .handle(({ app, input, scope }) =>
+    app.listRunsPage({
+      projectId: scope.id,
+      experimentSlug: input.experimentSlug,
+      page: input.page,
+      pageSize: input.pageSize,
+    }),
+  )
 
   // ── GET /runs/:runId (poll run status) ─────────────────────────────────
   .get("/runs/:runId", "getApiExperimentsRunsByRunId")
@@ -406,77 +187,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such run in this project" },
     },
   })
-  .handle(async ({ app, input, scope }) => {
-    const { runId } = input;
-
-    const progress = runProgressOf(app.run());
-
-    const runState = await progress.findRunState(runId);
-
-    // All three not-found branches raise the SAME code: from outside they
-    // are one answer - this run is not yours to read.
-    if (!runState || runState.projectId !== scope.id) {
-      throw new RunNotFoundError(runId);
-    }
-
-    // Same archive guard as /runs/:runId/results: a run whose owning
-    // experiment was archived must not keep serving status from the cache.
-    if (runState.experimentId) {
-      const stillLive = await app
-        .experiments()
-        .isActive({ projectId: scope.id, id: runState.experimentId });
-      if (!stillLive) throw new RunNotFoundError(runId);
-    }
-
-    logger.debug({ runId, status: runState.status }, "Run status queried");
-
-    if (runState.status === "running" || runState.status === "pending") {
-      return {
-        runId: runState.runId,
-        status: runState.status,
-        progress: runState.progress,
-        total: runState.total,
-        startedAt: runState.startedAt,
-      };
-    }
-
-    if (runState.status === "completed") {
-      return {
-        runId: runState.runId,
-        status: runState.status,
-        progress: runState.progress,
-        total: runState.total,
-        startedAt: runState.startedAt,
-        finishedAt: runState.finishedAt,
-        summary: runState.summary,
-      };
-    }
-
-    if (runState.status === "failed") {
-      return {
-        runId: runState.runId,
-        status: runState.status,
-        progress: runState.progress,
-        total: runState.total,
-        startedAt: runState.startedAt,
-        finishedAt: runState.finishedAt,
-        // The code, never the thrown message (ADR-045).
-        error: runState.error,
-        ...(runState.domainError ? { domainError: runState.domainError } : {}),
-        ...(runState.traceId ? { traceId: runState.traceId } : {}),
-      };
-    }
-
-    // stopped
-    return {
-      runId: runState.runId,
-      status: runState.status,
-      progress: runState.progress,
-      total: runState.total,
-      startedAt: runState.startedAt,
-      finishedAt: runState.finishedAt,
-    };
-  })
+  .handle(({ app, input, scope }) => app.pollRun({ projectId: scope.id, runId: input.runId }))
 
   // ── GET /runs/:runId/results (full per-row results) ─────────────────────
   .get("/runs/:runId/results", "getApiExperimentsRunsByRunIdResults")
@@ -494,48 +205,13 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such run in this project" },
     },
   })
-  .handle(async ({ app, input, scope }) => {
-    const { runId } = input;
-
-    const progress = runProgressOf(app.run());
-    const experiments = app.experiments();
-
-    const runState = await progress.findRunState(runId);
-    const slugFromState =
-      runState && runState.projectId === scope.id ? runState.experimentSlug : undefined;
-    const experimentIdFromState =
-      runState && runState.projectId === scope.id ? runState.experimentId : undefined;
-
-    const experimentSlug = input.experimentSlug ?? slugFromState;
-    let experimentId = experimentIdFromState;
-
-    if (!experimentId && experimentSlug) {
-      const experiment = await experiments.findIdBySlug({
-        projectId: scope.id,
-        slug: experimentSlug,
-      });
-      experimentId = experiment?.id;
-    } else if (experimentId) {
-      const stillLive = await experiments.isActive({ projectId: scope.id, id: experimentId });
-      if (!stillLive) experimentId = undefined;
-    }
-
-    if (!experimentId) {
-      throw new RunNotFoundError(runId);
-    }
-
-    try {
-      const run = await experiments.findRun({ projectId: scope.id, experimentId, runId });
-      if (!run) throw new RunNotFoundError(runId);
-
-      return run;
-    } catch (error) {
-      // Only a genuine miss is a 404 (ADR-045).
-      if (HandledError.isHandled(error)) throw error;
-      logger.error({ error, runId }, "Failed to fetch run results");
-      throw error;
-    }
-  })
+  .handle(({ app, input, scope }) =>
+    app.readRunResults({
+      projectId: scope.id,
+      runId: input.runId,
+      experimentSlug: input.experimentSlug,
+    }),
+  )
 
   // ── GET /:slug/workbench-state ───────────────────────────────────────
   .get("/:slug/workbench-state", "getApiExperimentsBySlugWorkbenchState")
@@ -721,55 +397,36 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   .build();
 
-/** The `:slug/run` SSE stream: the same orchestrator, with no mirror or writer. */
-function runEventStream(
-  options: {
-    app: ExperimentV3RestApi;
-    projectId: string;
-    experimentId: string;
-    slug: string;
-    scope: ExecutionScope;
-    state: EvaluationsV3State;
-    runPorts: ExperimentRunCollaborators;
-    carriedOverCells: CarriedOverCell[];
-  } & LoadedExecutionData,
-): ReadableStream {
-  const { app, projectId, slug } = options;
+/** A run door's answer as main wrote it: a flat JSON body, or `data:` frames until the run ends. */
+export function rawAnswerOf(answer: SavedRunAnswer | WorkbenchRunAnswer): RestRawResult {
+  if (answer.kind === "refused") return jsonAnswer({ error: answer.error }, answer.status);
+
+  if (answer.kind === "started") {
+    const { kind: _started, ...started } = answer;
+    return jsonAnswer(started, 200);
+  }
+
+  return {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+    body: eventStreamOf(answer.events),
+  };
+}
+
+/** Each event as one `data:` frame, closing when the events end. */
+function eventStreamOf(events: AsyncIterable<unknown>): ReadableStream {
   const encoder = new TextEncoder();
 
   return new ReadableStream({
     async start(controller) {
-      const write = (payload: unknown) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
-
       try {
-        const orchestrator = ExperimentRunOrchestratorService.runOrchestrator({
-          projectId,
-          experimentId: options.experimentId,
-          scope: options.scope,
-          state: options.state,
-          datasetRows: options.datasetRows,
-          datasetColumns: options.datasetColumns,
-          loadedPrompts: options.loadedPrompts,
-          loadedAgents: options.loadedAgents,
-          ports: options.runPorts,
-          workflows: app.run().workflows,
-          loadedEvaluators: options.loadedEvaluators,
-          loadedWorkflows: options.loadedWorkflows,
-          defaultConcurrency: app.run().defaultConcurrency,
-          ...(options.carriedOverCells.length > 0
-            ? { carriedOverCells: options.carriedOverCells }
-            : {}),
-        });
-
-        for await (const event of orchestrator) {
-          write(event);
-          if (event.type === "done" || event.type === "stopped") break;
+        for await (const event of events) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
         }
-      } catch (error) {
-        logger.error({ error, projectId, slug }, "Orchestrator error");
-        app.reportError?.(error, { projectId, slug });
-        write(mapThrownErrorEvent({ error }));
       } finally {
         controller.close();
       }

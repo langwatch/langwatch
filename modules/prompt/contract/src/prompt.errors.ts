@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 export const promptProblemSchema = z
@@ -299,5 +299,21 @@ export class PromptTagMissingError extends NotFoundError {
   constructor(name: string) {
     super("prompt_tag_not_found", "Tag", name, { meta: { name } });
     this.name = "PromptTagMissingError";
+  }
+}
+
+/** A tag refusal as `/api/prompts` has always answered it: 422, carrying the refusal's own code. */
+export class PromptTagUnprocessableError extends HandledError {
+  constructor(refusal: { code: string; message: string }) {
+    super(refusal.code, refusal.message, { httpStatus: 422, fault: "customer" });
+    this.name = "PromptTagUnprocessableError";
+  }
+}
+
+/** A prompt address whose shorthand does not parse, or that names a tag or version twice. */
+export class PromptAddressInvalidError extends ValidationError {
+  constructor(message: string) {
+    super(message);
+    this.name = "PromptAddressInvalidError";
   }
 }

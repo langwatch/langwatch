@@ -32,22 +32,25 @@ import {
   idVersionParamsSchema,
   restorePromptVersionBodySchema,
   promptWindowQuerySchema,
+  PromptAddressInvalidError,
+  PromptNotFoundError,
   PromptTagConflictError,
+  PromptTagInvalidError,
+  PromptTagMissingError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
+  PromptTagProtectedRefusalError,
+  PromptTagTakenError,
+  PromptTagUnprocessableError,
   PromptTagValidationError,
-  type PromptScope,
   renameTagInputSchema,
   ShorthandParseError,
-  SystemPromptConflictError,
-  SystemPromptRequiredError,
   promptWireSchema,
   syncInputSchema,
   tagDefinitionSchema,
   tagParamsSchema,
   updatePromptInputSchema,
 } from "@langwatch/prompt-contract";
-import { HTTPException } from "hono/http-exception";
 import { z, type ZodSchema } from "zod";
 
 export const versionInputSchema = getLatestConfigVersionSchema();
@@ -100,36 +103,6 @@ export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteRespons
   };
 };
 
-/**
- * Maps other conflict refusals, if any, onto the 409 this family has
- * always answered, naming the scope the write asked for.
- * PromptHandleTakenError is now a handled error and reaches the boundary itself.
- */
-export const handlePossibleConflictError = (error: unknown, scope: PromptScope = "PROJECT") => {
-  // Reserved for other conflict handlers; currently all are handled errors.
-  void scope;
-};
-
-/**
- * Maps system-prompt HandledErrors thrown by the prompt service to Hono HTTP exceptions
- * @param error - The error to handle
- * @returns void
- */
-export const handleSystemPromptHandledErrors = (error: unknown) => {
-  if (error instanceof SystemPromptRequiredError) {
-    throw new HTTPException(400, {
-      message: error.message,
-      cause: error,
-    });
-  }
-  if (error instanceof SystemPromptConflictError) {
-    throw new HTTPException(409, {
-      message: error.message,
-      cause: error,
-    });
-  }
-};
-
 // ── the family ───────────────────────────────────────────────────────────────
 
 const logger = createLogger("langwatch:api:prompts");
@@ -175,7 +148,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // decides which version the customer's live traffic resolves to. That is a
   // deployment, and it belongs with the grain that administers the prompt
   // rather than with the one that edits its text.
-  .put("/api/prompts/:promptId{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
+  .put("/api/prompts/:id{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
   .withParams(idTagParamsSchema)
   .withInput(assignTagInputSchema)
   .withPermission("prompts:manage")
@@ -194,7 +167,7 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { promptId: id, tag, versionId } = input;
+    const { id, tag, versionId } = input;
 
     logger.info(
       { projectId: scope.id, promptId: id, tag, versionId },
@@ -231,10 +204,7 @@ export const promptRest = defineRestRouter(PromptApi)
         updatedAt: result.updatedAt,
       };
     } catch (error: unknown) {
-      if (error instanceof PromptTagValidationError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      throw error;
+      throw asRestRefusal(error);
     }
   })
 
@@ -287,7 +257,7 @@ export const promptRest = defineRestRouter(PromptApi)
 
       return { id: tag.id, name: tag.name, createdAt: tag.createdAt };
     } catch (error) {
-      throw asTagWriteRefusal(error);
+      throw asRestRefusal(error);
     }
   })
 
@@ -324,7 +294,7 @@ export const promptRest = defineRestRouter(PromptApi)
 
       return { id: tag.id, name: tag.name, createdAt: tag.createdAt };
     } catch (error) {
-      throw asTagWriteRefusal(error);
+      throw asRestRefusal(error);
     }
   })
 
@@ -351,14 +321,11 @@ export const promptRest = defineRestRouter(PromptApi)
         "Custom prompt tag deleted via REST",
       );
     } catch (error) {
-      if (error instanceof PromptTagProtectedError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      throw error;
+      throw asRestRefusal(error);
     }
   })
 
-  .get("/api/prompts/:promptId{.+?}/versions", "getApiPromptsByIdVersions")
+  .get("/api/prompts/:id{.+?}/versions", "getApiPromptsByIdVersions")
   .withParams(idParamsSchema)
   .withPermission("prompts:view")
   .withOutput(z.array(promptWireSchema))
@@ -373,16 +340,16 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    logger.info({ projectId: scope.id, promptId: input.promptId }, "Getting versions for prompt");
+    logger.info({ projectId: scope.id, promptId: input.id }, "Getting versions for prompt");
 
     const versions = await app.getAllVersions({
-      idOrHandle: input.promptId,
+      idOrHandle: input.id,
       projectId: scope.id,
       organizationId: project.organizationId,
     });
 
     logger.info(
-      { projectId: scope.id, promptId: input.promptId, versionCount: versions.length },
+      { projectId: scope.id, promptId: input.id, versionCount: versions.length },
       "Successfully retrieved prompt versions",
     );
 
@@ -395,7 +362,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // Restore (rollback to) a specific version - a new version of a prompt that
   // already exists, i.e. an update of that prompt.
   .post(
-    "/api/prompts/:promptId{.+?}/versions/:versionId/restore",
+    "/api/prompts/:id{.+?}/versions/:versionId/restore",
     "postApiPromptsByIdVersionsByVersionIdRestore",
   )
   .withParams(idVersionParamsSchema)
@@ -417,7 +384,7 @@ export const promptRest = defineRestRouter(PromptApi)
   })
   .handle(async ({ app, input, scope }, project) => {
     logger.info(
-      { projectId: scope.id, promptId: input.promptId, versionId: input.versionId },
+      { projectId: scope.id, promptId: input.id, versionId: input.versionId },
       "Restoring prompt version",
     );
 
@@ -431,7 +398,7 @@ export const promptRest = defineRestRouter(PromptApi)
     });
 
     logger.info(
-      { projectId: scope.id, promptId: input.promptId, versionId: input.versionId },
+      { projectId: scope.id, promptId: input.id, versionId: input.versionId },
       "Successfully restored prompt version",
     );
 
@@ -441,7 +408,7 @@ export const promptRest = defineRestRouter(PromptApi)
     };
   })
 
-  .get("/api/prompts/:promptId{.+}", "getApiPromptsById")
+  .get("/api/prompts/:id{.+}", "getApiPromptsById")
   .withParams(idParamsSchema)
   .withQuery(promptWindowQuerySchema)
   .withPermission("prompts:view")
@@ -463,7 +430,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .handle(async ({ app, input, scope }, project) => {
     try {
       // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
-      const shorthand = parsePromptShorthand(input.promptId);
+      const shorthand = parsePromptShorthand(input.id);
 
       // The two window parameters stay unrefused by their schema: a caller that
       // sends `version=abc` is answered by the conflict and shorthand rules
@@ -475,9 +442,9 @@ export const promptRest = defineRestRouter(PromptApi)
       // "latest" (which normalizes away), so "foo:latest?tag=production" is
       // correctly rejected.
       if (shorthand.hadSuffix && (queryTag || queryVersion)) {
-        throw new HTTPException(422, {
-          message: `Conflict: shorthand syntax in path cannot be combined with tag or version query parameters. Use one or the other, not both.`,
-        });
+        throw new PromptAddressInvalidError(
+          `Conflict: shorthand syntax in path cannot be combined with tag or version query parameters. Use one or the other, not both.`,
+        );
       }
 
       const version = shorthand.version ?? queryVersion;
@@ -498,17 +465,7 @@ export const promptRest = defineRestRouter(PromptApi)
         platformUrl: project.promptsUrl,
       };
     } catch (error: unknown) {
-      if (error instanceof HTTPException) throw error;
-      if (error instanceof PromptTagValidationError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      // `NotFoundError` is a `HandledError` and is left to propagate: the
-      // boundary serialises it with its `prompt_not_found` code, and re-wrapping
-      // it would flatten that back down to a bare status plus prose.
-      if (error instanceof ShorthandParseError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      throw error;
+      throw asRestRefusal(error);
     }
   })
 
@@ -567,17 +524,11 @@ export const promptRest = defineRestRouter(PromptApi)
       };
     } catch (error: unknown) {
       logger.error({ projectId: scope.id, error }, "Error creating prompt");
-      if (error instanceof PromptTagValidationError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      handlePossibleConflictError(error, data.scope);
-
-      // Re-throw other errors to be handled by the error middleware
-      throw error;
+      throw asRestRefusal(error);
     }
   })
 
-  .post("/api/prompts/:promptId{.+?}/sync", "postApiPromptsByIdSync")
+  .post("/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
   .withPermission("prompts:manage")
@@ -594,7 +545,7 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { promptId: id, ...data } = input;
+    const { id, ...data } = input;
 
     logger.info({ projectId: scope.id, promptId: id }, "Syncing prompt with local content");
 
@@ -619,25 +570,11 @@ export const promptRest = defineRestRouter(PromptApi)
       return syncResult;
     } catch (error: unknown) {
       logger.error({ projectId: scope.id, promptId: id, error }, "Error syncing prompt");
-
-      if (error instanceof Error && error.message.includes("No permission")) {
-        throw new HTTPException(403, { message: error.message });
-      }
-
-      if (error instanceof PromptTagValidationError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-
-      // Translate a taken handle into a readable 409 instead of bubbling up as
-      // "Internal server error".
-      handlePossibleConflictError(error);
-
-      // Re-throw other errors to be handled by the error middleware
-      throw error;
+      throw asRestRefusal(error);
     }
   })
 
-  .put("/api/prompts/:promptId{.+}", "putApiPromptsById")
+  .put("/api/prompts/:id{.+}", "putApiPromptsById")
   .withParams(idParamsSchema)
   .withInput(updatePromptInputSchema)
   .withPermission("prompts:update")
@@ -657,18 +594,14 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { promptId: id, tags, ...data } = input;
-
-    if (Object.keys(data).length === 0) {
-      throw new HTTPException(422, { message: "At least one field is required" });
-    }
+    const { id, tags, ...data } = input;
 
     logger.info({ projectId: scope.id, handleOrId: id, data, tags }, "Updating prompt");
 
     try {
       const updated = await app.updatePrompt({ idOrHandle: id, projectId: scope.id, data });
 
-      if (!updated) throw new HTTPException(404, { message: `Prompt not found: ${id}` });
+      if (!updated) throw new PromptNotFoundError(`Prompt not found: ${id}`);
 
       const answered = await assignInitialTags({
         app,
@@ -689,18 +622,11 @@ export const promptRest = defineRestRouter(PromptApi)
       };
     } catch (error: unknown) {
       logger.error({ projectId: scope.id, promptId: id, error }, "Error updating prompt");
-      if (error instanceof PromptTagValidationError) {
-        throw new HTTPException(422, { message: error.message });
-      }
-      handlePossibleConflictError(error, data.scope);
-      handleSystemPromptHandledErrors(error);
-
-      // Re-throw other errors to be handled by the error middleware
-      throw error;
+      throw asRestRefusal(error);
     }
   })
 
-  .delete("/api/prompts/:promptId{.+}", "deleteApiPromptsById")
+  .delete("/api/prompts/:id{.+}", "deleteApiPromptsById")
   .withParams(idParamsSchema)
   .withPermission("prompts:manage")
   .withOutput(successSchema)
@@ -714,16 +640,16 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    logger.info({ projectId: scope.id, promptId: input.promptId }, "Deleting prompt");
+    logger.info({ projectId: scope.id, promptId: input.id }, "Deleting prompt");
 
     const result = await app.deletePrompt({
-      idOrHandle: input.promptId,
+      idOrHandle: input.id,
       projectId: scope.id,
       organizationId: project.organizationId,
     });
 
     logger.info(
-      { projectId: scope.id, promptId: input.promptId, success: result.success },
+      { projectId: scope.id, promptId: input.id, success: result.success },
       "Successfully deleted prompt",
     );
 
@@ -770,20 +696,19 @@ async function assignInitialTags(options: {
   return refetched ? apiResponsePromptWithVersionDataSchema.parse(refetched) : prompt;
 }
 
-/** The statuses a tag definition write answers its four domain refusals with. */
-function asTagWriteRefusal(error: unknown): unknown {
-  if (error instanceof PromptTagValidationError) {
-    return new HTTPException(422, { message: error.message });
+/** The statuses this family has always answered its tag and address refusals with. */
+function asRestRefusal(error: unknown): unknown {
+  if (
+    error instanceof PromptTagValidationError ||
+    error instanceof PromptTagInvalidError ||
+    error instanceof PromptTagProtectedError ||
+    error instanceof PromptTagProtectedRefusalError
+  ) {
+    return new PromptTagUnprocessableError(error);
   }
-  if (error instanceof PromptTagConflictError) {
-    return new HTTPException(409, { message: error.message });
-  }
-  if (error instanceof PromptTagProtectedError) {
-    return new HTTPException(422, { message: error.message });
-  }
-  if (error instanceof PromptTagNotFoundError) {
-    return new HTTPException(404, { message: error.message });
-  }
+  if (error instanceof PromptTagConflictError) return new PromptTagTakenError(error.message);
+  if (error instanceof PromptTagNotFoundError) return new PromptTagMissingError(error.tagName);
+  if (error instanceof ShorthandParseError) return new PromptAddressInvalidError(error.message);
 
   return error;
 }

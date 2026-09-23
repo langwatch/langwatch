@@ -66,11 +66,11 @@ describe("the /api/triggers declaration", () => {
       .routes.map((route) => `${route.method.toUpperCase()} ${route.path} ${route.operation}`);
 
     expect(routes).toEqual([
-      "GET / listTriggers",
-      "GET /:id getTrigger",
-      "POST / createTrigger",
-      "PATCH /:id updateTrigger",
-      "DELETE /:id deleteTrigger",
+      "GET / getApiTriggers",
+      "GET /:id getApiTriggersById",
+      "POST / postApiTriggers",
+      "PATCH /:id patchApiTriggersById",
+      "DELETE /:id deleteApiTriggersById",
     ]);
   });
 
@@ -82,11 +82,11 @@ describe("the /api/triggers declaration", () => {
     );
 
     expect(permissions).toEqual({
-      listTriggers: "triggers:view",
-      getTrigger: "triggers:view",
-      createTrigger: "triggers:create",
-      updateTrigger: "triggers:update",
-      deleteTrigger: "triggers:manage",
+      getApiTriggers: "triggers:view",
+      getApiTriggersById: "triggers:view",
+      postApiTriggers: "triggers:create",
+      patchApiTriggersById: "triggers:update",
+      deleteApiTriggersById: "triggers:manage",
     });
   });
 });

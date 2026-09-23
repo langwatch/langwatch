@@ -237,12 +237,8 @@ export type {
  * four are inert declarations, carried by `automationServer` too.
  */
 export { createAutomationRest } from "./transport/automation.rest.ts";
-export { slackAutomationRest, slackAutomationRestErrors } from "./transport/slack-trigger.rest.ts";
-export {
-  unsubscribeCallerAddress,
-  unsubscribeRest,
-  unsubscribeRestErrors,
-} from "./transport/unsubscribe.rest.ts";
+export { slackAutomationRest } from "./transport/slack-trigger.rest.ts";
+export { unsubscribeCallerAddress, unsubscribeRest } from "./transport/unsubscribe.rest.ts";
 export { automationCallerEmailFact, automationTrpcTransport } from "./transport/automation.trpc.ts";
 export { emailSuppressionTrpcTransport } from "./transport/email-suppression.trpc.ts";
 

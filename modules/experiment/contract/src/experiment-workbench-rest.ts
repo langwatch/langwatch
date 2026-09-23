@@ -5,6 +5,9 @@
 
 import { z } from "zod";
 
+import type { WorkbenchCredential } from "./experiment.api.ts";
+import type { EvaluationV3Event } from "./workbench/execution/types.ts";
+
 export const runIdParamsSchema = z.object({ runId: z.string().min(1) });
 
 export const slugVersionParamsSchema = z.object({
@@ -149,6 +152,11 @@ const runListEntrySchema = z.object({
   progress: z.number().nullable().optional(),
   total: z.number().nullable().optional(),
   summary: runAggregateSummarySchema,
+});
+
+/** The flat refusal main published on the run doors: one sentence, no code. */
+export const runRefusalSchema = z.object({
+  error: z.string().describe("What was wrong with the request, as a sentence"),
 });
 
 export const listRunsResponseSchema = z.object({
@@ -458,3 +466,38 @@ export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.extend({
   current: z.number().optional().describe("Experiments already in use"),
   max: z.number().optional().describe("What the plan allows"),
 });
+
+/** A refusal main answers in its own flat body, at the status it chose. */
+export type WorkbenchRunRefusal = Readonly<{ kind: "refused"; status: number; error: string }>;
+
+/** A run whose progress the caller follows as it happens. */
+export type WorkbenchRunStream = Readonly<{
+  kind: "streaming";
+  events: AsyncIterable<EvaluationV3Event>;
+}>;
+
+export type WorkbenchRunAnswer = WorkbenchRunRefusal | WorkbenchRunStream;
+
+export type SavedRunAnswer =
+  | WorkbenchRunAnswer
+  | (Readonly<{ kind: "started" }> & z.infer<typeof startRunResponseSchema>);
+
+export type SavedRunRequest = Readonly<{
+  projectId: string;
+  projectSlug: string;
+  slug: string;
+  body: string;
+  acceptsEvents: boolean;
+  credential: WorkbenchCredential;
+}>;
+
+export type RunsPageRequest = Readonly<{ projectId: string }> & z.infer<typeof listRunsQuerySchema>;
+
+export type RunsPageAnswer =
+  | Readonly<{ status: 400; body: z.infer<typeof runRefusalSchema> }>
+  | Readonly<{ status: 200; body: z.infer<typeof listRunsResponseSchema> }>;
+
+export type RunStatusAnswer = z.infer<typeof runStatusResponseSchema>;
+
+export type RunResultsRequest = Readonly<{ projectId: string; runId: string }> &
+  z.infer<typeof runResultsQuerySchema>;

@@ -36,6 +36,13 @@ import {
   type ExperimentRunPageInput,
   type ExperimentRunSlugPageInput,
   type ExperimentRunWithItems,
+  type RunResultsRequest,
+  type RunStatusAnswer,
+  type RunsPageAnswer,
+  type RunsPageRequest,
+  type SavedRunAnswer,
+  type SavedRunRequest,
+  type WorkbenchRunAnswer,
   type ExperimentSlugLookup,
   type ExperimentType,
   type FindOrCreateWorkflowExperimentInput,
@@ -76,6 +83,10 @@ import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-s
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
+import {
+  ExperimentWorkbenchRunService,
+  type WorkbenchExecutionRequest,
+} from "../services/experiment-workbench-run.service.ts";
 import type { ExperimentService } from "../services/experiment.service.ts";
 import { buildExperimentInfrastructure } from "./experiment-composition.build.ts";
 
@@ -227,9 +238,15 @@ export class ExperimentApp implements ExperimentApi {
   }
 
   #dependencies: ExperimentAppDependencies;
+  #workbenchRuns: ExperimentWorkbenchRunService;
 
   private constructor(dependencies: ExperimentAppDependencies) {
     this.#dependencies = dependencies;
+    this.#workbenchRuns = ExperimentWorkbenchRunService.create({
+      experiments: dependencies.experiments,
+      runLoop: dependencies.runLoop,
+      observer: dependencies.workbenchObserver,
+    });
   }
 
   /**
@@ -688,6 +705,29 @@ export class ExperimentApp implements ExperimentApi {
       projectId: input.projectId,
       runId: input.runId,
     });
+  }
+
+  startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer> {
+    return this.#workbenchRuns.startSavedRun(input);
+  }
+
+  executeWorkbenchRun(
+    input: WorkbenchExecutionRequest,
+    by: Readonly<{ id: string }>,
+  ): Promise<WorkbenchRunAnswer> {
+    return this.#workbenchRuns.executeWorkbenchRun(input, by);
+  }
+
+  listRunsPage(input: RunsPageRequest): Promise<RunsPageAnswer> {
+    return this.#workbenchRuns.listRunsPage(input);
+  }
+
+  pollRun(input: Readonly<{ projectId: string; runId: string }>): Promise<RunStatusAnswer> {
+    return this.#workbenchRuns.pollRun(input);
+  }
+
+  readRunResults(input: RunResultsRequest): Promise<ExperimentRunWithItems> {
+    return this.#workbenchRuns.readRunResults(input);
   }
 
   /**

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * `POST /api/trigger/slack`, the narrow ancestor of `/api/triggers`, over the
- * real REST runtime - the three bodies its callers were written against.
+ * real REST runtime, refusing through the process's canonical boundary.
  * @see specs/automations/slack-trigger-rest-api.feature
  */
 import type { AutomationApi } from "@langwatch/automation-contract";
@@ -72,19 +72,19 @@ describe("given the Slack alert door", () => {
   });
 
   describe("when the body fails the schema", () => {
-    it("answers 400 with the validation body, never the 500 that told a caller to retry", async () => {
+    it("answers the handled validation refusal, never the 500 that told a caller to retry", async () => {
       const api = mount();
 
       const response = await api.post("/api/trigger/slack", { name: "No webhook" });
 
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({ message: "Invalid request data" });
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
       expect(api.created).toEqual([]);
     });
   });
 
   describe("when the application refuses the create", () => {
-    it("answers the one 500 sentence this route has always answered", async () => {
+    it("answers the generic unknown error, with the detail left in the log", async () => {
       const api = mount(async () => {
         throw new Error("connection reset");
       });
@@ -96,7 +96,7 @@ describe("given the Slack alert door", () => {
       });
 
       expect(response.status).toBe(500);
-      await expect(response.json()).resolves.toEqual({ message: "Error creating trigger" });
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
     });
   });
 });

@@ -31,7 +31,7 @@ export const automationRestResponseSchema = z.object({
 });
 export type AutomationRestResponse = z.infer<typeof automationRestResponseSchema>;
 
-export const automationRestIdParamsSchema = z.object({ triggerId: z.string().min(1) });
+export const automationRestIdParamsSchema = z.object({ id: z.string().min(1) });
 
 export const automationRestCreateInputSchema = z.object({
   name: z.string().min(1, "name is required"),
