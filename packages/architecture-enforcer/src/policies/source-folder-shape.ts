@@ -1,26 +1,15 @@
 import { basename, dirname, join, relative, resolve } from "node:path";
-import {
-  type BaselineEntry,
-  type BaselinePolicy,
-  baselinePath,
-  collectBaseline,
-  emptyBaselineRows,
-  liveKeys,
-  readBaseline,
-  staleRows,
-} from "../baseline.ts";
+
+import type { ArchitectureViolation } from "../types.ts";
 import { PACKAGE_SOURCE_ROOTS, listFiles } from "../workspace/layout.ts";
 import { sourceText, valueImports } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-import type { ArchitectureViolation } from "../types.ts";
 
 /**
  * A folder is one concept, a file is one part of it that reads alone. Two ways a tree
  * stops being that: a folder past what a reader can hold, and a file so small only one
  * neighbour reads it. Messages are the instruction the author should have followed.
  */
-
-const BASELINE_FILE = "source-folder-shape-baseline.json";
 
 /** Source files a folder may hold before it is a filing cabinet rather than a module. */
 export const FOLDER_BUDGET = 12;
@@ -217,73 +206,13 @@ function comparePathThenKind(a: SourceFolderShapeFinding, b: SourceFolderShapeFi
   return a.kind < b.kind ? -1 : 1;
 }
 
-/** The key of a source-folder-shape row: `<kind>|<path>`. */
-function entryKey(entry: { kind: SourceFolderShapeKind; path: string }): string {
-  return `${entry.kind}|${entry.path}`;
-}
-
-export const SOURCE_FOLDER_SHAPE_BASELINE: BaselinePolicy = {
-  id: "source-folder-shape",
-  file: BASELINE_FILE,
-  label: "Source folder shape baseline",
-  keyRule: "A key is `<kind>|<path>`, kind one of crowded-folder, fragment-file.",
-  enforceExpiry: false,
-  refuseEmpty: true,
-  stale: (entry) => ({
-    message: `Source folder shape baseline entry ${entry.key.split("|").join(" ")} no longer matches anything and must be removed.`,
-  }),
-};
-
-export function collectSourceFolderShapeBaseline({
-  root,
-  previous = [],
-}: {
-  root: string;
-  previous?: readonly BaselineEntry[];
-}): BaselineEntry[] {
-  const found = collectSourceFolderShapeFindings(root).map(entryKey);
-
-  return collectBaseline({ policy: SOURCE_FOLDER_SHAPE_BASELINE, found, previous });
-}
-
-function baselineFile(root: string): string {
-  return baselinePath({ root, policy: SOURCE_FOLDER_SHAPE_BASELINE });
-}
-
 export function lintSourceFolderShape(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root } = snapshot;
-  const file = baselineFile(root);
-  const baseline = readBaseline({ policy: SOURCE_FOLDER_SHAPE_BASELINE, file });
 
-  const violations = [
-    ...baseline.violations,
-    ...emptyBaselineRows({ read: baseline, policy: SOURCE_FOLDER_SHAPE_BASELINE, file }),
-  ];
-
-  const findings = collectSourceFolderShapeFindings(root);
-  const baselined = liveKeys({ entries: baseline.entries });
-  const found = new Set(findings.map(entryKey));
-
-  for (const finding of findings) {
-    const key = entryKey(finding);
-    if (baselined.has(key)) continue;
-
-    violations.push({
-      policy: "source-folder-shape",
-      file: join(root, finding.path),
-      message: finding.message,
-      allowed: finding.allowed,
-    });
-  }
-
-  violations.push(
-    ...staleRows({
-      entries: baseline.entries,
-      found,
-      policy: SOURCE_FOLDER_SHAPE_BASELINE,
-      file,
-    }),
-  );
-
-  return violations;
+  return collectSourceFolderShapeFindings(root).map((finding) => ({
+    policy: "source-folder-shape",
+    file: join(root, finding.path),
+    message: finding.message,
+    allowed: finding.allowed,
+  }));
 }

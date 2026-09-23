@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { conditionalTypeDepthRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -44,6 +45,24 @@ describe("given a type alias in a feature contract", () => {
       );
 
       expect(found[0]?.message).toContain("nests 4 conditional types");
+    });
+  });
+
+  describe("when the deep conditional sits inside an object type", () => {
+    /** @scenario "A deep conditional nested in an object type is reported" */
+    it("reports it at the conditional's line, naming the enclosing type", () => {
+      const found = report(`export interface Shape<T> {
+  id: string;
+  value: T extends A ? 1 : T extends B ? 2 : T extends C ? 3 : T extends D ? 4 : 5;
+}
+export function pick<T>(input: T): { out: T extends A ? 1 : T extends B ? 2 : T extends C ? 3 : T extends D ? 4 : 5 } {
+  return input;
+}`);
+
+      expect(found.map((entry) => [entry.line, entry.message.split(";")[0]])).toEqual([
+        [3, "Type Shape nests 4 conditional types"],
+        [5, "This type nests 4 conditional types"],
+      ]);
     });
   });
 

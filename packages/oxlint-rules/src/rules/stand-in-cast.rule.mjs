@@ -1,10 +1,8 @@
 import { defineRule } from "../define-rule.mjs";
 
-// `x as unknown as T` and `x as any` are a type hole with a comment attached.
-// In production, fix the type or parse at the seam it arrives. In a test,
-// there is no trust boundary to parse at - build a typed stub instead
-// (a factory/builder, or `satisfies`). `as const` and a narrowing `as T` on
-// a literal are untouched in both.
+// `x as unknown as T` is a type hole: in production fix the type or parse at
+// the seam; in a test build a typed stub. A lone `as any` is left to
+// `typescript/no-explicit-any`, and `x as const as T` only widens a literal.
 
 const GOVERNED = /^(?:enterprise\/modules|modules|apps|packages)\//;
 
@@ -24,8 +22,11 @@ function typeTextOf(source, annotation) {
   return text.length > NAME_BUDGET ? `${text.slice(0, NAME_BUDGET)}…` : text;
 }
 
-function isAnyAnnotation(annotation) {
-  return annotation?.type === "TSAnyKeyword";
+/** `as const`: freezing a literal checks nothing away, so a cast over it is a single cast. */
+function isConstAssertion(node) {
+  const annotation = node.typeAnnotation;
+
+  return annotation?.type === "TSTypeReference" && annotation.typeName?.name === "const";
 }
 
 export const standInCastRule = defineRule({
@@ -38,23 +39,14 @@ export const standInCastRule = defineRule({
       fix: "If this value crossed a trust boundary (network, database row, user input), parse it with the contract's Zod schema (`Schema.parse(value)`) instead of casting; otherwise fix the type of whatever produced it so the cast is unnecessary.",
       why: "A cast through `unknown` or `any` removes the only check that stood between the two types.",
     },
-    anyCast: {
-      what: "`as any` drops the type of this expression.",
-      fix: "If this value crossed a trust boundary (network, database row, user input), parse it with the contract's Zod schema (`Schema.parse(value)`) instead of casting; otherwise name its real type in place of `any`.",
-    },
     doubleCastInTest: {
       what: "`as {{through}} as {{target}}` forces this test value to {{target}} without checking it.",
       fix: "Build the stub to {{target}}'s real shape instead of casting: give each mocked member its real signature so the object type-checks without the cast.",
       why: "A test value never crossed a trust boundary, so there is nothing to parse — the fix is a typed stub, not a schema.",
     },
-    anyCastInTest: {
-      what: "`as any` drops the type of this test stub.",
-      fix: "Build the stub to the real type instead of casting: give each mocked member its real signature so the object type-checks without the cast.",
-    },
   },
   create(context, file) {
     const doubleCastId = file.isTest ? "doubleCastInTest" : "doubleCast";
-    const anyCastId = file.isTest ? "anyCastInTest" : "anyCast";
 
     // The inner half of a double cast is reported once, as the outer one.
     const covered = new WeakSet();
@@ -62,31 +54,19 @@ export const standInCastRule = defineRule({
 
     return {
       TSAsExpression(node) {
-        if (covered.has(node)) return;
-
         const inner = node.expression;
-        if (inner?.type === "TSAsExpression") {
-          covered.add(inner);
-          context.report({
-            node,
-            messageId: doubleCastId,
-            data: {
-              through: typeTextOf(source, inner.typeAnnotation),
-              target: typeTextOf(source, node.typeAnnotation),
-            },
-          });
-
+        if (covered.has(node) || inner?.type !== "TSAsExpression" || isConstAssertion(inner))
           return;
-        }
 
-        if (isAnyAnnotation(node.typeAnnotation)) {
-          context.report({ node, messageId: anyCastId });
-        }
-      },
-      TSTypeAssertion(node) {
-        if (isAnyAnnotation(node.typeAnnotation)) {
-          context.report({ node, messageId: anyCastId });
-        }
+        covered.add(inner);
+        context.report({
+          node,
+          messageId: doubleCastId,
+          data: {
+            through: typeTextOf(source, inner.typeAnnotation),
+            target: typeTextOf(source, node.typeAnnotation),
+          },
+        });
       },
     };
   },

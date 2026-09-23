@@ -3,8 +3,15 @@
 // reports such a mint, and `id-generation-origin`, which stops claiming these
 // values: an idempotency key is not an entity id and no ksuid fixes it.
 
-/** The one property name that carries a request-deduplication token. */
-export const IDEMPOTENCY_KEY = "idempotencyKey";
+/** `idempotencyKey`, `idempotency_key` and the `Idempotency-Key` header, in any case. */
+function isIdempotencyKeyName(name) {
+  return (
+    typeof name === "string" && name.replaceAll(/[-_]/g, "").toLowerCase() === "idempotencykey"
+  );
+}
+
+/** `headers.set("Idempotency-Key", value)` and `.append(...)` write a header, not a field. */
+const HEADER_WRITES = new Set(["set", "append"]);
 
 /** Calls that answer differently every time they are evaluated. */
 const MINTING_CALLS = new Set(["randomUUID", "nanoid", "uuid", "uuidv4", "v4", "ulid"]);
@@ -57,44 +64,57 @@ export function assignedFieldNameOf(node) {
 }
 
 /**
- * Whether a declaration's target names an `idempotencyKey`, directly or through
- * the destructure a `useState` binding arrives as.
+ * The idempotency-key name a declaration binds, directly or through the
+ * destructure a `useState` binding arrives as.
  */
-function bindsIdempotencyKey(id) {
-  if (id?.type === "Identifier") return id.name === IDEMPOTENCY_KEY;
+function boundIdempotencyKeyName(id) {
+  if (id?.type === "Identifier") return isIdempotencyKeyName(id.name) ? id.name : undefined;
 
-  if (id?.type === "ArrayPattern") {
-    return (id.elements ?? []).some(
-      (element) => element?.type === "Identifier" && element.name === IDEMPOTENCY_KEY,
-    );
-  }
+  const names =
+    id?.type === "ArrayPattern"
+      ? (id.elements ?? []).map((element) =>
+          element?.type === "Identifier" ? element.name : undefined,
+        )
+      : (id?.properties ?? []).map(propertyKeyName);
 
-  if (id?.type === "ObjectPattern") {
-    return (id.properties ?? []).some((property) => propertyKeyName(property) === IDEMPOTENCY_KEY);
-  }
-
-  return false;
+  return names.find(isIdempotencyKeyName);
 }
 
-/**
- * The value written to an `idempotencyKey`: an object property, a variable
- * of that name, or an assignment to a field of that name.
- * @returns {{ value: object | undefined } | undefined}
- */
-export function idempotencyKeyTargetOf(node) {
-  if (node?.type === "Property") {
-    return propertyKeyName(node) === IDEMPOTENCY_KEY ? { value: node.value } : undefined;
-  }
+function headerWriteOf(node) {
+  const { callee } = node;
+  if (callee?.type !== "MemberExpression" || callee.computed) return undefined;
+  if (!HEADER_WRITES.has(callee.property?.name)) return undefined;
+  const [key, value] = node.arguments ?? [];
+  if (key?.type !== "Literal" || !isIdempotencyKeyName(key.value)) return undefined;
 
-  if (node?.type === "VariableDeclarator") {
-    return bindsIdempotencyKey(node.id) ? { value: node.init } : undefined;
-  }
+  return { name: key.value, value };
+}
 
-  if (node?.type === "AssignmentExpression") {
-    return assignedFieldNameOf(node) === IDEMPOTENCY_KEY ? { value: node.right } : undefined;
-  }
+function targetName(node) {
+  if (node?.type === "Property") return propertyKeyName(node);
+  if (node?.type === "VariableDeclarator") return boundIdempotencyKeyName(node.id);
+  if (node?.type === "AssignmentExpression") return assignedFieldNameOf(node);
 
   return undefined;
+}
+
+const TARGET_VALUE = {
+  AssignmentExpression: "right",
+  Property: "value",
+  VariableDeclarator: "init",
+};
+
+/**
+ * The value written to an idempotency key and the name it is written under: an
+ * object property or header, a variable, a field, or a `headers.set` call.
+ * @returns {{ name: string, value: object | undefined } | undefined}
+ */
+export function idempotencyKeyTargetOf(node) {
+  if (node?.type === "CallExpression") return headerWriteOf(node);
+  const name = targetName(node);
+  if (!isIdempotencyKeyName(name)) return undefined;
+
+  return { name, value: node[TARGET_VALUE[node.type]] };
 }
 
 function memberPath(callee) {
@@ -152,7 +172,7 @@ export function mintedSourceOf(expression) {
 }
 
 /**
- * Whether `node` sits inside the value of an `idempotencyKey`, walking out
+ * Whether `node` sits inside the value of an idempotency key, walking out
  * through the wrappers a value can be nested in and no further.
  */
 export function withinAnIdempotencyKey(node) {

@@ -1,184 +1,79 @@
-# See ../adrs/004-frontend-feature-boundaries.md
+# The kit law, dev/docs/ARCHITECTURE.md §3.4.
 
-Feature: Frontend feature boundary lint
+Feature: A module's browser package is closed
   As a maintainer
-  I want browser composition to have explicit feature and package boundaries
-  So that user-facing capabilities can compose narrowly without recreating the monolith
+  I want every edge onto a module's browser package refused, at import and at manifest level
+  So that sharing happens through a browser-kit and never through a side door
 
   @unit @architecture
-  Scenario: A web package can be governed before its screen migration completes
-    Given apps/ui/src/features/catalogue.json opts @langwatch/prompt-browser into governance
-    And no frontend feature claims its Prompt Studio screen yet
-    When architecture lint checks the package exports and dependency closures
-    Then broad Prompt web exports fail
-    And the export boundary is not reported as a completed Prompt Studio migration
+  Scenario: A cross-module import of a browser package is reported
+    Given a module's browser package imports another module's browser package
+    When the browser package closure is checked
+    Then the import is reported against the importing file
 
   @unit @architecture
-  Scenario: A frontend feature is independent of a backend feature
-    Given apps/ui/src/features/catalogue.json declares prompt-studio
-    And prompt-studio owns its exact route root and Prompt screen export
-    When architecture lint checks the workspace
-    Then it does not require prompt-studio to match a modules catalogue name
-    And it accepts the declared @langwatch/prompt-browser/screens/prompt-studio import
+  Scenario: A bare side-effect import of a browser package is reported
+    Given a file imports another module's browser package for its side effect alone
+    When the browser package closure is checked
+    Then the import is reported
 
   @unit @architecture
-  Scenario: A frontend feature imports only its declared contributions
-    Given trace-explorer declares a Prompt reference surface in the frontend catalogue
-    When it imports @langwatch/prompt-browser/surfaces/prompt-reference
-    Then architecture lint accepts the import
-    And an undeclared feature-web screen or surface import fails with the owning catalogue entry
+  Scenario: A re-export naming a browser package is reported
+    Given a file re-exports from another module's browser package
+    When the browser package closure is checked
+    Then the re-export is reported
 
   @unit @architecture
-  Scenario: A module declares the sibling surfaces its web package consumes
-    Given no frontend feature in the browser catalogue is rooted at the scenario module
-    And the scenario module names a Suite run-formatters surface in its own feature.json
-    When architecture lint checks the scenario web package's manifest dependency on the Suite web package
-    Then it accepts the dependency as a declared surface collaboration
-    And the same dependency without the declaration still fails as a cross-feature edge
+  Scenario: A type-position dynamic import naming a browser package is reported
+    Given a file names another module's browser package in a typeof import type
+    When the browser package closure is checked
+    Then the reference is reported, because a test can load it at run time
 
   @unit @architecture
-  Scenario: A declared surface use names a real surface door or fails
-    Given a module declares a surface its target package does not export
-    Or it declares a screen entry, a bare package entry or another private subpath
-    When architecture lint reads the declaration
-    Then it reports the declaration itself against the module's feature.json
-    And the dangling declaration allowlists no package dependency
+  Scenario: apps/ui may import a browser package
+    Given apps/ui imports a module's browser package
+    When the browser package closure is checked
+    Then nothing is reported, because apps/ui installs browser halves
 
   @unit @architecture
-  Scenario: A declared surface use stays inside governance
-    Given a module declares a surface of a web package the catalogue does not govern
-    When architecture lint reads the declaration
-    Then it reports the ungoverned package and allowlists no dependency
+  Scenario: A browser package's own files may import themselves
+    Given a browser package imports one of its own subpaths
+    When the browser package closure is checked
+    Then nothing is reported
 
   @unit @architecture
-  Scenario: An enterprise module declares a surface use of a core module
-    Given an enterprise module names a core module's declared surface in its feature.json
-    When architecture lint checks the enterprise web package's manifest dependency
-    Then it accepts the dependency exactly as it does for a core module
+  Scenario: A manifest dependency edge onto a browser package is reported
+    Given a module package declares another module's browser package as a dependency
+    When the browser package closure is checked
+    Then the manifest edge is reported whether or not any source file uses it
 
   @unit @architecture
-  Scenario: Owner-only screens cannot be imported by another frontend feature
-    Given prompt-studio owns @langwatch/prompt-browser/screens/prompt-studio
-    When trace-explorer imports that screen
-    Then architecture lint reports an owner-screen violation
-    And it directs trace-explorer to a declared Prompt surface
+  Scenario: One manifest edge onto a browser package is reported once
+    Given a browser package and a kit each declare another module's browser package
+    When the manifest, kit and closure policies all run
+    Then each edge is reported once, by the manifest closure
+    And neither the cross-feature manifest check nor the kit dependency check repeats it
 
   @unit @architecture
-  Scenario: A surface is the public door onto its package implementation
-    Given @langwatch/prompt-browser/surfaces/prompt-reference re-exports Prompt model, behavior and ui modules
-    When architecture lint resolves the surface's production dependency closure
-    Then it accepts the package's own model, behavior and ui layers as the surface implementation
-    And a shareable component needs no copy hoisted into another layer to be exposed
+  Scenario: A browser package with a surfaces/* export entry is reported
+    Given a browser package's exports map declares an entry other than ./declaration
+    When its exports are checked
+    Then every such entry is reported as a side door
 
   @unit @architecture
-  Scenario: A door under surfaces reaches its package's own shared layers
-    Given a governed web package puts a door at src/surfaces/<id>/index.ts
-    When the door re-exports the package's own model, behavior and ui modules
-    Then architecture lint accepts it, the same shape every other package's door has
-    And a package-private feature module or an owner-only screen is still refused
+  Scenario: A kit with a named subpath export entry is reported
+    Given a kit's exports map declares an entry other than "."
+    When its exports are checked
+    Then every such entry is reported
 
   @unit @architecture
-  Scenario: A surface may build on another feature's declared surface
-    Given the Prompt reference surface renders the Model Provider model selector
-    When architecture lint resolves the Prompt surface's production dependency closure
-    Then it accepts the other feature's declared surfaces/<id> door as a collaborator
-    And the same package's bare entry, its screens and its private subpaths stay refused
+  Scenario: A kit depending on a browser or a sibling kit is reported
+    Given a kit declares a dependency on another kit or on a package that is not in the fixture's browser set
+    When its dependencies are checked
+    Then each dependency outside contracts, the Design System and browser-host is reported
 
   @unit @architecture
-  Scenario: A surface cannot pull in its feature's complete implementation
-    Given @langwatch/prompt-browser/surfaces/prompt-reference imports a Prompt table through a module outside those layers
-    When architecture lint resolves the surface's production dependency closure
-    Then it reports the full import path to the escaping or forbidden screen, internal, store, transport, query or route module
-    And the surface is not importable until its closure is narrow
-
-  @unit @architecture
-  Scenario: An owner-only screen remains browser-safe
-    Given @langwatch/prompt-browser/screens/prompt-studio reaches private Prompt presentation
-    When it directly imports transport, router, session, server, environment or Node.js implementation
-    Then architecture lint rejects the screen dependency closure
-    And it directs browser data and actions to the owning frontend feature and platform
-
-  @unit @architecture
-  Scenario: Exact public UI exports are the only package doors
-    Given a governed feature web package exports a screen and a surface
-    When another package imports the package root, a wildcard export, or a source path
-    Then architecture lint rejects the import
-    And it identifies the declared screens/<name> or surfaces/<name> entry point
-
-  @unit @architecture
-  Scenario: Governed web packages keep private code in two scoped hierarchies
-    Given a governed feature-web package has package-global model, behavior, or UI code
-    And it has named private features under features/<feature> with feature.json declarations
-    When architecture lint checks production source
-    Then flat root files and generic components folders fail
-    And model, behavior, elements, blocks, and sections follow their directed responsibilities
-    And package-global code does not depend on a private feature
-
-  @unit @architecture
-  Scenario: Private web features compose only through declared narrow entries
-    Given a private feature section declares another private feature in feature.json
-    When it imports that feature's exact index entry
-    Then architecture lint accepts the dependency
-    And the target entry may curate that target feature's public model, behavior, or UI API
-    And a lower layer, deep private import, undeclared dependency, or cycle fails
-
-  @unit @architecture
-  Scenario: Public screen and surface boundaries do not leak inward
-    Given a governed screen reaches its own private feature sections and surfaces
-    When private code imports a screen or surface, a screen imports another screen, or a surface reaches a package-private feature or a screen
-    Then architecture lint rejects the leaking edge
-    And browser-safety remains checked through the full recursive closure
-
-  @unit @architecture
-  Scenario: Browser dependency edges remain statically visible
-    Given apps/ui or a governed screen or surface loads a module through a variable specifier
-    When architecture lint checks the dependency closure
-    Then it rejects the non-literal dynamic import or require
-    And a static string or no-substitution template specifier remains analyzable
-
-  @unit @architecture
-  Scenario: Application, platform and frontend feature directions remain distinct
-    Given apps/ui production source imports a frontend feature from platform
-    Or a frontend feature imports another frontend feature implementation
-    Or source is placed outside app, platform, features or testing
-    When architecture lint checks the workspace
-    Then it reports the prohibited browser-layer dependency or source root
-    And app routing and browser capabilities remain in their named owners
-
-  @unit @architecture
-  Scenario: A framework-free first-party module is portable into browser UI
-    Given a screen imports a shared platform module such as the handled-error presentation table
-    And nothing that module pulls at runtime reaches React, a browser capability, server code or Node.js
-    When architecture lint resolves the screen dependency closure
-    Then it accepts the import as portable
-    And it does not name the module a first-party implementation package
-
-  @unit @architecture
-  Scenario: A shared module stops being portable the day its closure reaches React
-    Given a screen imports that same shared platform module
-    And a module it pulls one hop away begins importing React
-    When architecture lint resolves the screen dependency closure
-    Then it rejects the import and names the module the screen asked for
-    And a frontend feature importing the same module is rejected with it
-
-  @unit @architecture
-  Scenario: A docblock stays a comment after a template literal
-    Given a screen writes a template literal with a substitution
-    And a docblock below it names a browser capability to explain what the screen does not do
-    When architecture lint reads the source for browser capabilities
-    Then it reports nothing
-    And the capability check reads code rather than the comments about it
-
-  @unit @architecture
-  Scenario: Browser source remains independent of backend implementations
-    Given a frontend feature, screen or surface uses fetch, transport, router, session, Node.js, a feature server package, generated Prisma, AppRouter, an environment module or a legacy app alias
-    When architecture lint checks the source
-    Then it rejects the import and identifies the portable contract or platform capability boundary
-
-  @integration @architecture
-  Scenario: New browser architecture is strict while legacy application debt shrinks
-    Given Prompt is the opted-in frontend pilot
-    And a new apps/ui file or Prompt web export violates the frontend policy
-    When architecture lint runs
-    Then it fails without adding a baseline entry
-    And legacy platform/app findings remain only in the deterministic shrinking baseline until deleted
+  Scenario: A kit's contract, Design System and browser-host dependencies pass
+    Given a kit depends only on contracts, the Design System and browser-host
+    When its dependencies are checked
+    Then nothing is reported

@@ -1,23 +1,22 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  collectLegacyApplicationBoundaryEdges,
-  discoverClassifiedPackages,
-  formatLegacyApplicationBoundaryBaseline,
-  lintWorkspace,
-} from "../src/index.ts";
+
+import { discoverClassifiedPackages, lintWorkspace } from "../src/index.ts";
 import type {
   ApplicationPackageRole,
   ArchitectureViolation,
   EnterpriseCompositionRole,
 } from "../src/index.ts";
+import { writePolicyAnchors } from "./workspace.ts";
 
 let root = "";
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "langwatch-application-boundaries-"));
+  writePolicyAnchors(root);
 });
 
 afterEach(() => {
@@ -55,6 +54,7 @@ const APPLICATION_NAMES: Record<ApplicationPackageRole, string> = {
   api: "@langwatch/platform-api",
   worker: "@langwatch/worker",
   server: "@langwatch/server",
+  tasks: "@langwatch/tasks",
 };
 
 function application(
@@ -121,8 +121,8 @@ function policy(name: string): ArchitectureViolation[] {
 }
 
 describe("application workspace classification", () => {
-  it("classifies the four fixed application paths and names", () => {
-    for (const role of ["ui", "api", "worker", "server"] as const) {
+  it("classifies the five fixed application paths and names", () => {
+    for (const role of ["ui", "api", "worker", "server", "tasks"] as const) {
       application(role);
     }
 
@@ -136,6 +136,7 @@ describe("application workspace classification", () => {
       ["api", "@langwatch/platform-api"],
       ["worker", "@langwatch/worker"],
       ["server", "@langwatch/server"],
+      ["tasks", "@langwatch/tasks"],
     ]);
   });
 
@@ -166,20 +167,8 @@ describe("application workspace classification", () => {
 
 describe("combined contributor runtime", () => {
   function runtimeApplications(): void {
-    application("api", {
-      exports: {
-        ".": "./src/index.ts",
-        "./runtime": "./src/runtime.ts",
-      },
-    });
-    write("apps/api/src/runtime.ts", "export const apiRuntime = true;");
-    application("worker", {
-      exports: {
-        ".": "./src/index.ts",
-        "./runtime": "./src/runtime.ts",
-      },
-    });
-    write("apps/worker/src/runtime.ts", "export const workerRuntime = true;");
+    application("api", { source: "export const startApi = true;" });
+    application("worker", { source: "export const startWorker = true;" });
   }
 
   it("allows the private dev runtime to import both deliberate runtime exports", () => {
@@ -190,7 +179,7 @@ describe("combined contributor runtime", () => {
     });
     write(
       "tools/dev-runtime/src/index.ts",
-      'import { apiRuntime } from "@langwatch/platform-api/runtime"; import { workerRuntime } from "@langwatch/worker/runtime"; export { apiRuntime, workerRuntime };',
+      'import { startApi } from "@langwatch/platform-api"; import { startWorker } from "@langwatch/worker"; export { startApi, startWorker };',
     );
 
     expect(policy("application-layout")).toEqual([]);
@@ -206,7 +195,7 @@ describe("combined contributor runtime", () => {
     });
     write(
       "tools/dev-runtime/src/index.ts",
-      'import "@langwatch/platform-api/runtime"; import "@langwatch/worker/runtime";',
+      'import "@langwatch/platform-api"; import "@langwatch/worker";',
     );
     write("tools/dev-runtime/src/services/product.service.ts", "export class ProductService {}");
 
@@ -222,7 +211,7 @@ describe("combined contributor runtime", () => {
     });
     write(
       "tools/scripts/src/index.ts",
-      'import "@langwatch/platform-api/runtime"; import "@langwatch/worker/runtime";',
+      'import "@langwatch/platform-api"; import "@langwatch/worker";',
     );
 
     expect(policy("application-boundary")).toEqual([
@@ -312,78 +301,5 @@ describe("Enterprise aggregate boundaries", () => {
 
     expect(policy("enterprise-composition")).toHaveLength(2);
     expect(policy("composition-source")).toHaveLength(1);
-  });
-});
-
-describe("shrinking legacy application boundary baseline", () => {
-  const baselinePath = "packages/architecture-enforcer/src/legacy-application-boundary-baseline.json";
-
-  function legacyBrowserEdge(): void {
-    write(
-      "platform/app/src/components/view.ts",
-      'import type { Value } from "~/server/value"; export type View = Value;',
-    );
-    write("platform/app/src/server/value.ts", "export type Value = string;");
-  }
-
-  it("rejects a current legacy edge until its exact record is checked in", () => {
-    legacyBrowserEdge();
-    const edges = collectLegacyApplicationBoundaryEdges(root);
-
-    expect(edges).toEqual([
-      {
-        importer: "platform/app/src/components/view.ts",
-        specifier: "~/server/value",
-        kind: "browser-to-backend",
-      },
-    ]);
-    expect(policy("application-migration")).toHaveLength(1);
-
-    write(baselinePath, formatLegacyApplicationBoundaryBaseline(edges));
-    expect(policy("application-migration")).toEqual([]);
-    expect(policy("application-migration-baseline")).toEqual([]);
-  });
-
-  it("keeps legacy baseline reconciliation out of routine lint", () => {
-    legacyBrowserEdge();
-
-    const routine = lintWorkspace({
-      root,
-      declarations: false,
-      legacyApplicationMigration: false,
-    });
-
-    expect(
-      routine.filter((violation) => violation.policy.startsWith("application-migration")),
-    ).toEqual([]);
-  });
-
-  it("fails when a removed edge leaves a stale baseline entry", () => {
-    legacyBrowserEdge();
-    const edges = collectLegacyApplicationBoundaryEdges(root);
-    write(baselinePath, formatLegacyApplicationBoundaryBaseline(edges));
-    write("platform/app/src/components/view.ts", "export type View = string;");
-
-    expect(policy("application-migration-baseline")).toEqual([
-      expect.objectContaining({
-        message: expect.stringContaining("must be removed"),
-      }),
-    ]);
-  });
-
-  it("rejects new @ee aliases outside the legacy application", () => {
-    application("ui", {
-      source: 'import { value } from "@ee/licensing/value"; export { value };',
-    });
-
-    expect(policy("application-migration")).toHaveLength(1);
-  });
-
-  it("requires the baseline file to disappear after its final edge", () => {
-    write(baselinePath, formatLegacyApplicationBoundaryBaseline([]));
-
-    expect(policy("application-migration-baseline")).toEqual([
-      expect.objectContaining({ message: expect.stringContaining("deleted") }),
-    ]);
   });
 });

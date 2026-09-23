@@ -1,11 +1,9 @@
 import { defineRule } from "../define-rule.mjs";
 import { assignedFieldNameOf, idempotencyKeyTargetOf, mintedSourceOf } from "./idempotency-key.mjs";
 
-// An idempotency key exists so a retry of the same logical operation is
-// recognised as the same operation. Minting one where the request is built
-// gives every attempt a different key: the field is on the wire and the
-// guarantee is absent. Swapping the random for a house ksuid changes nothing —
-// what has to change is where the key comes from.
+// A key minted where the request is built differs on every retry: the field is
+// on the wire and the guarantee is absent. A house ksuid changes nothing; where
+// the key comes from is what has to change.
 
 const FUNCTION_TYPES = new Set([
   "ArrowFunctionExpression",
@@ -78,10 +76,15 @@ export const idempotencyKeyIsStableRule = defineRule({
       context.report({
         node: target.value,
         messageId: "mintedAtCallSite",
-        data: { name: "idempotencyKey", source },
+        data: { name: target.name, source },
       });
     };
 
-    return { AssignmentExpression: check, Property: check, VariableDeclarator: check };
+    return {
+      AssignmentExpression: check,
+      CallExpression: check,
+      Property: check,
+      VariableDeclarator: check,
+    };
   },
 });

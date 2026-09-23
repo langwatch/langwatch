@@ -1,30 +1,18 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import {
-  type BaselineEntry,
-  type BaselinePolicy,
-  baselinePath,
-  collectBaseline,
-  emptyBaselineRows,
-  liveKeys,
-  readBaseline,
-  staleRows,
-} from "../baseline.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
+import { getAnchor } from "../workspace/anchors.ts";
 import { listFiles } from "../workspace/layout.ts";
 import { sourceText } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
-
-const BASELINE_FILE = "feature-shape-baseline.json";
 
 /** Colocated tests are not the shape they test. */
 const TEST_DIRECTORIES = new Set(["__tests__"]);
 
 /**
  * Pieces of the pre-ADR-133 shape the annotation reference no longer has, and the
- * pieces of the reference a feature still lacks; the baseline of who carries which
- * may only shrink.
+ * pieces of the reference a feature still lacks.
  */
 export const FEATURE_SHAPE_LEGACY_KINDS = [
   "contract-service",
@@ -53,7 +41,7 @@ export type FeatureShapeFinding = {
   path: string;
 };
 
-type FeatureShapeBaselineEntry = { feature: string; kind: FeatureShapeLegacyKind };
+type FeatureShapeKey = { feature: string; kind: FeatureShapeLegacyKind };
 
 const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "contract-service":
@@ -81,7 +69,7 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "no-app":
     "One app: src/app/<feature>.app.ts is class <Feature>App implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
   "installer-not-booted":
-    "The generated module list is stale relative to the catalogue. Run `pnpm generate:modules` to regenerate modules/server-modules.generated.ts (and web-modules.generated.ts) from modules/catalogue.json, and check in the result.",
+    "The generated module list is stale relative to the catalogue. Run `pnpm generate:modules` to regenerate packages/installed-server-modules/src/server-modules.generated.ts from modules/catalogue.json, and check in the result.",
   "refusing-composition":
     "A process either installs the feature or does not. Delete the refusing*/absent twin; a missing provider fails boot by name.",
   "nested-web-entry":
@@ -89,10 +77,9 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
 };
 
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
-const GENERATED_MODULE_LISTS = [
-  "modules/server-modules.generated.ts",
-  "modules/web-modules.generated.ts",
-];
+/** What `pnpm generate:modules` writes from modules/catalogue.json (ARCHITECTURE.md §6). */
+const GENERATED_SERVER_MODULE_LIST =
+  "packages/installed-server-modules/src/server-modules.generated.ts";
 const GENERATED_MODULE_LIST_BLOCK = /export const \w+Modules = \[([\s\S]*?)\] as const/;
 const GENERATED_MODULE_LIST_ENTRY = /([A-Za-z0-9_]+)/g;
 const REFUSING_EXPORT = /export function refusing/;
@@ -150,28 +137,18 @@ function pascalCase(feature: string): string {
 }
 
 /**
- * Every `<x>Server`/`<x>Web` identifier the generated module lists install.
- * Composition no longer names an installer textually — `withModule(` never
- * appears beside a feature's identifier — so "installer not booted" now means
- * the catalogue entry the generator would install is absent from the
- * checked-in list: the generated file is stale relative to the catalogue.
+ * Every `<x>Server` identifier the generated server list installs, so "installer
+ * not booted" means the checked-in list is stale relative to the catalogue.
  */
 function bootedInstallers(root: string): Set<string> {
-  const booted = new Set<string>();
+  const path = getAnchor({ root, anchor: GENERATED_SERVER_MODULE_LIST, policy: "feature-shape" });
+  const block = GENERATED_MODULE_LIST_BLOCK.exec(sourceText({ file: path }));
 
-  for (const listFile of GENERATED_MODULE_LISTS) {
-    const path = join(root, listFile);
-    if (!existsSync(path)) continue;
-
-    const block = GENERATED_MODULE_LIST_BLOCK.exec(sourceText({ file: path }));
-    if (!block) continue;
-
-    for (const match of block[1]!.matchAll(GENERATED_MODULE_LIST_ENTRY)) {
-      booted.add(match[1]!);
-    }
+  if (!block) {
+    throw new Error(`feature-shape: ${GENERATED_SERVER_MODULE_LIST} declares no module list.`);
   }
 
-  return booted;
+  return new Set([...block[1]!.matchAll(GENERATED_MODULE_LIST_ENTRY)].map((match) => match[1]!));
 }
 
 function isBooted(feature: string, booted: ReadonlySet<string>): boolean {
@@ -181,7 +158,7 @@ function isBooted(feature: string, booted: ReadonlySet<string>): boolean {
   return [...booted].some((name) => name === `${camel}Server` || name.endsWith(`${pascal}Server`));
 }
 
-function compareEntries(left: FeatureShapeBaselineEntry, right: FeatureShapeBaselineEntry): number {
+function compareEntries(left: FeatureShapeKey, right: FeatureShapeKey): number {
   return left.feature.localeCompare(right.feature) || left.kind.localeCompare(right.kind);
 }
 
@@ -329,77 +306,14 @@ export function collectFeatureShapeFindings(
     .toSorted((left, right) => compareEntries(left, right) || left.path.localeCompare(right.path));
 }
 
-/** The key of a feature-shape row: `<feature>|<kind>`. */
-function entryKey(finding: { feature: string; kind: FeatureShapeLegacyKind }): string {
-  return `${finding.feature}|${finding.kind}`;
-}
-
-export const FEATURE_SHAPE_BASELINE: BaselinePolicy = {
-  id: "feature-shape",
-  file: BASELINE_FILE,
-  label: "Feature shape baseline",
-  keyRule: "A key is `<feature>|<kind>`.",
-  enforceExpiry: false,
-  refuseEmpty: true,
-  stale: (entry) => ({
-    message: `Feature shape baseline entry ${entry.key.split("|").join("/")} no longer matches anything and must be removed.`,
-    allowed: "Delete the stale entry so the checked-in inventory only shrinks.",
-  }),
-};
-
-export function collectFeatureShapeBaseline({
-  root,
-  catalogue,
-  packages,
-  previous = [],
-}: {
-  root: string;
-  catalogue: readonly FeatureCatalogueEntry[];
-  packages: readonly ClassifiedPackage[];
-  previous?: readonly BaselineEntry[];
-}): BaselineEntry[] {
-  const found = collectFeatureShapeFindings(root, catalogue, packages).map(entryKey);
-
-  return collectBaseline({ policy: FEATURE_SHAPE_BASELINE, found, previous });
-}
-
-function baselineFile(root: string): string {
-  return baselinePath({ root, policy: FEATURE_SHAPE_BASELINE });
-}
-
-/**
- * The ratchet: an unlisted legacy piece is a violation, a listed piece that is
- * gone is stale, so the inventory only shrinks.
- */
+/** Every legacy piece is a finding; the reference shape is the only allowance. */
 export function lintFeatureShape(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, catalogue, packages } = snapshot;
-  const file = baselineFile(root);
-  const baseline = readBaseline({ policy: FEATURE_SHAPE_BASELINE, file });
 
-  const violations = [
-    ...baseline.violations,
-    ...emptyBaselineRows({ read: baseline, policy: FEATURE_SHAPE_BASELINE, file }),
-  ];
-
-  const findings = collectFeatureShapeFindings(root, catalogue, packages);
-  const baselined = liveKeys({ entries: baseline.entries });
-  const found = new Set(findings.map(entryKey));
-
-  for (const finding of findings) {
-    const key = entryKey(finding);
-    if (baselined.has(key)) continue;
-
-    violations.push({
-      policy: "feature-shape",
-      file: join(root, finding.path),
-      message: `Feature ${finding.feature} carries a legacy ${finding.kind} the reference shape has no place for.`,
-      allowed: TARGET[finding.kind],
-    });
-  }
-
-  violations.push(
-    ...staleRows({ entries: baseline.entries, found, policy: FEATURE_SHAPE_BASELINE, file }),
-  );
-
-  return violations;
+  return collectFeatureShapeFindings(root, catalogue, packages).map((finding) => ({
+    policy: "feature-shape",
+    file: join(root, finding.path),
+    message: `Feature ${finding.feature} carries a legacy ${finding.kind} the reference shape has no place for.`,
+    allowed: TARGET[finding.kind],
+  }));
 }

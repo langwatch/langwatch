@@ -74,10 +74,3 @@ Feature: The clickhouse-table-ownership lint rule
     Given only a module's test files select from a table another module writes
     When the clickhouse-table-ownership rule runs over the workspace
     Then it reports no foreign reader for that module
-
-  @unit
-  Scenario: A baselined finding is excused and a stale row is reported
-    Given a baseline listing a foreign reader that no longer reads the table
-    When the clickhouse-table-ownership rule runs over the workspace
-    Then it reports the baseline row as stale
-    And it says to delete the row so the inventory only shrinks

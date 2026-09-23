@@ -5,27 +5,58 @@ import { defineRule } from "../define-rule.mjs";
 // the spy left behind. `createTestLogger()` gives a throwaway logger a test
 // can assert on directly, with no patching.
 
-const LOG_METHOD = /^(?:error|warn|info|debug)$/;
+const LOG_METHOD = /^(?:fatal|error|warn|info|debug|trace)$/;
+// `logger`, `log`, `appLogger`, `request_log`; never `catalog` or `dialog`.
+const LOGGER_NAME = /(?:^|_)(?:log|logger|Log|Logger|LOG|LOGGER)$|[\da-z](?:Log|Logger)$/;
 
 function isGoverned(file) {
   return file.isTest;
 }
 
 function isCreateLoggerCall(node) {
-  return node?.type === "CallExpression" && node.callee.type === "Identifier" &&
-    node.callee.name === "createLogger";
+  return (
+    node?.type === "CallExpression" &&
+    node.callee.type === "Identifier" &&
+    node.callee.name === "createLogger"
+  );
 }
 
 function isSpyOnCall(node) {
+  const { callee } = node;
+  if (callee.type !== "MemberExpression" || callee.computed) return false;
+
   return (
-    node.type === "CallExpression" &&
-    node.callee.type === "MemberExpression" &&
-    !node.callee.computed &&
-    node.callee.object.type === "Identifier" &&
-    node.callee.object.name === "vi" &&
-    node.callee.property.type === "Identifier" &&
-    node.callee.property.name === "spyOn"
+    callee.object.type === "Identifier" &&
+    callee.object.name === "vi" &&
+    callee.property.name === "spyOn"
   );
+}
+
+/** The name a spy target goes by: `logger`, or `deps.logger`'s `logger`. */
+function receiverName(target) {
+  if (target?.type === "Identifier") return target.name;
+  if (target?.type === "MemberExpression" && !target.computed) return target.property.name;
+
+  return undefined;
+}
+
+function isLogMethod(method) {
+  return (
+    method?.type === "Literal" && typeof method.value === "string" && LOG_METHOD.test(method.value)
+  );
+}
+
+function isLoggerTarget(target, loggerVariables) {
+  const name = receiverName(target);
+  if (name === undefined) return false;
+
+  return loggerVariables.has(name) || LOGGER_NAME.test(name);
+}
+
+function spiesOnALogger([target, method], loggerVariables) {
+  if (isCreateLoggerCall(target)) return true;
+
+  return isLogMethod(method) && isLoggerTarget(target, loggerVariables);
 }
 
 export const noLoggerSpyRule = defineRule({
@@ -34,7 +65,7 @@ export const noLoggerSpyRule = defineRule({
   messages: {
     spyOnLogger: {
       what: "`vi.spyOn` patches a real logger here.",
-      fix: "Inject `createTestLogger()` from `@langwatch/test-harness` and assert on `lines.find` instead.",
+      fix: "Inject the `logger` from `createTestLogger()` (`@langwatch/test-harness`) and assert with `lines.findLine(level, text)` instead.",
     },
   },
   create(context, file) {
@@ -49,17 +80,7 @@ export const noLoggerSpyRule = defineRule({
         }
       },
       CallExpression(node) {
-        if (!isSpyOnCall(node)) return;
-        const [target, method] = node.arguments;
-
-        if (isCreateLoggerCall(target)) {
-          context.report({ node, messageId: "spyOnLogger" });
-          return;
-        }
-
-        if (target?.type !== "Identifier" || !loggerVariables.has(target.name)) return;
-        const methodName = method?.type === "Literal" ? method.value : undefined;
-        if (typeof methodName === "string" && LOG_METHOD.test(methodName)) {
+        if (isSpyOnCall(node) && spiesOnALogger(node.arguments, loggerVariables)) {
           context.report({ node, messageId: "spyOnLogger" });
         }
       },

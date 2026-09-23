@@ -348,9 +348,10 @@ const enterpriseDirectionCheck: DependencyCheck = (pkg, target, dependency) => {
   };
 };
 
+/** A browser target is `browser-package-closure`'s edge, so it is reported there once. */
 const crossFeatureCheck: DependencyCheck = (pkg, target, dependency) => {
   const isForeignFeature = pkg.feature !== target.feature;
-  const isImplementationTarget = target.kind !== "contract";
+  const isImplementationTarget = target.kind !== "contract" && target.kind !== "browser";
   const hasFeaturePair = pkg.feature && target.feature;
   if (!hasFeaturePair || !isForeignFeature || !isImplementationTarget) return undefined;
 
@@ -417,28 +418,15 @@ function dependencyViolations(
   pkg: ClassifiedPackage,
   dependency: string,
   byName: Map<string, ClassifiedPackage>,
-  allowedWebDependencies: ReadonlySet<string>,
 ): ArchitectureViolation[] {
   const runtimeViolation = enterpriseRuntimeViolation(pkg, dependency);
   const target = byName.get(dependency);
   if (!target) return runtimeViolation ? [runtimeViolation] : [];
 
   const targetViolations = DEPENDENCY_TARGET_CHECKS.flatMap((check) => {
-    const runCheck = () => {
-      const violation = check(pkg, target, dependency);
+    const violation = check(pkg, target, dependency);
 
-      return violation ? [violation] : [];
-    };
-
-    if (check !== crossFeatureCheck) return runCheck();
-
-    if (pkg.kind !== "browser") return runCheck();
-
-    if (target.kind !== "browser") return runCheck();
-
-    if (!allowedWebDependencies.has(`${pkg.name}->${target.name}`)) return runCheck();
-
-    return [];
+    return violation ? [violation] : [];
   });
 
   return runtimeViolation ? [runtimeViolation, ...targetViolations] : targetViolations;
@@ -448,7 +436,6 @@ function dependencyViolations(
 function violationsForManifest(
   pkg: ClassifiedPackage,
   byName: Map<string, ClassifiedPackage>,
-  allowedWebDependencies: ReadonlySet<string>,
   root: string,
 ): ArchitectureViolation[] {
   const zodViolation = zodRuntimeViolation(pkg, root);
@@ -457,23 +444,15 @@ function violationsForManifest(
   return [
     ...exportViolations(pkg),
     ...(zodViolation ? [zodViolation] : []),
-    ...dependencies.flatMap((dependency) =>
-      dependencyViolations(pkg, dependency, byName, allowedWebDependencies),
-    ),
+    ...dependencies.flatMap((dependency) => dependencyViolations(pkg, dependency, byName)),
   ];
 }
 
-export function lintManifests(
-  snapshot: WorkspaceSnapshot,
-  allowedWebDependencies: ReadonlySet<string> = new Set(),
-): ArchitectureViolation[] {
+export function lintManifests(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const packages = snapshot.packages;
-
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
 
-  return packages.flatMap((pkg) =>
-    violationsForManifest(pkg, byName, allowedWebDependencies, snapshot.root),
-  );
+  return packages.flatMap((pkg) => violationsForManifest(pkg, byName, snapshot.root));
 }
 
 export function exportedSubpaths(pkg: ClassifiedPackage): Set<string> {

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { conditionShapeRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -21,20 +22,36 @@ function report(code, options = []) {
 describe("given a strict feature service module", () => {
   describe("when a condition chains more property hops than the limit and also combines", () => {
     /** @scenario "An unreadable condition is reported with its measured shape" */
-    it("reports nameCondition with the shape it measured and the fix", () => {
+    it("reports chainTooDeep naming the limit, its value and the fix", () => {
       const found = report(DEEP_AND_COMBINING);
 
       expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("nameCondition");
-      expect(found[0].data).toEqual({ calls: 0, hops: 3, operators: 1 });
+      expect(found[0].messageId).toBe("chainTooDeep");
+      expect(found[0].data).toEqual({ hops: 3, maxHops: 2 });
       expect(found[0].message).toBe(
-        "This test combines 0 calls and 1 logical operators across a chain 3 properties deep." +
-          " Split it into guard clauses: return, `continue`, or `break` as soon as one part fails," +
-          " so each remaining test keeps at most one call and no combined operator — a chain" +
-          " alone, however deep, is fine once it stops combining with anything else. For a" +
-          " `switch`, read the value once above it and switch on that read. Move a ternary out of" +
-          " the test entirely: decide it in the branch it already belongs to, not nested inside" +
-          " this one.",
+        "This test reads a chain 3 properties deep and also calls or combines; `maxHops` is 2." +
+          " Read the chain into a named `const` above the test; a chain alone, however deep, is" +
+          " fine once it stops combining with anything else.",
+      );
+    });
+  });
+
+  describe("when a condition exceeds several limits at once", () => {
+    /** @scenario "Each exceeded limit is its own report" */
+    it("reports one message per exceeded limit, each naming its limit", () => {
+      const found = report(
+        "export function all(a, b) {\n  if (a.b.c.d() && first(b) || (a ? b : !b) && (x ?? y)) { return 1; }\n  return 0;\n}",
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([
+        ["tooManyCalls", 2],
+        ["tooManyOperators", 2],
+        ["chainTooDeep", 2],
+        ["ternaryInTest", 2],
+      ]);
+      expect(found[0].message).toMatch(/^This test makes 2 calls; `maxCalls` is 1\./);
+      expect(found[1].message).toMatch(
+        /^This test joins 4 logical operators; `maxOperators` is 2\./,
       );
     });
   });
@@ -78,7 +95,7 @@ describe("given a strict feature service module", () => {
         "export function optional(input) { if (input?.meta?.owner?.name && input.active) { return 1; } return 0; }",
       );
 
-      expect(found.map((entry) => entry.messageId)).toEqual(["nameCondition"]);
+      expect(found.map((entry) => entry.messageId)).toEqual(["chainTooDeep"]);
     });
 
     it("reports more calls than the limit", () => {
@@ -86,7 +103,9 @@ describe("given a strict feature service module", () => {
         "export function calls(a, b) { if (first(a) && second(b)) { return 1; } return 0; }",
       );
 
-      expect(found[0]?.data).toEqual({ calls: 2, hops: 0, operators: 1 });
+      expect(found.map((entry) => [entry.messageId, entry.data])).toEqual([
+        ["tooManyCalls", { calls: 2, maxCalls: 1 }],
+      ]);
     });
 
     it("reports more logical operators than the limit", () => {
@@ -94,7 +113,9 @@ describe("given a strict feature service module", () => {
         "export function operators(a, b, c, d) { if (a && b || c && d) { return 1; } return 0; }",
       );
 
-      expect(found[0]?.data.operators).toBe(3);
+      expect(found.map((entry) => [entry.messageId, entry.data])).toEqual([
+        ["tooManyOperators", { maxOperators: 2, operators: 3 }],
+      ]);
     });
 
     it("reports a ternary nested inside the test", () => {
@@ -102,7 +123,7 @@ describe("given a strict feature service module", () => {
         "export function nested(a, b) { if (a ? b : !b) { return 1; } return 0; }",
       );
 
-      expect(found.map((entry) => entry.messageId)).toEqual(["nameCondition"]);
+      expect(found.map((entry) => entry.messageId)).toEqual(["ternaryInTest"]);
     });
 
     it("reports the discriminant of a switch statement", () => {
@@ -110,7 +131,7 @@ describe("given a strict feature service module", () => {
         "export function pick(input) { switch (input.meta.owner.name ?? fallback) { default: return 0; } }",
       );
 
-      expect(found.map((entry) => entry.messageId)).toEqual(["nameCondition"]);
+      expect(found.map((entry) => entry.messageId)).toEqual(["chainTooDeep"]);
     });
   });
 

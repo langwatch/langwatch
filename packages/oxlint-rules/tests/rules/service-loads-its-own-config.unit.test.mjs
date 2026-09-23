@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { serviceLoadsItsOwnConfigRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -55,20 +56,14 @@ describe("given a service", () => {
   });
 
   describe("when it reads process.env directly", () => {
-    /** @scenario "A service reading process.env directly is reported" */
-    it("reports environmentRead naming the key", () => {
+    /** @scenario "A service reading process.env is environment-boundaries' business" */
+    it("reports nothing", () => {
       const found = report(
         "export const domain = process.env.AUTH0_DOMAIN;",
         "modules/auth/process/src/services/auth0-password.service.ts",
       );
 
-      expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("environmentRead");
-      expect(found[0].message).toBe(
-        "`modules/auth/process/src/services/auth0-password.service.ts`" +
-          " reads `process.env.AUTH0_DOMAIN` directly instead of taking config as an argument." +
-          " Add a named member to the argument object `create` takes and resolve it once at the composition root.",
-      );
+      expect(found).toEqual([]);
     });
   });
 
@@ -87,13 +82,13 @@ describe("given a service", () => {
   });
 });
 
-describe("given a transport file", () => {
-  describe("when it reads process.env", () => {
-    /** @scenario "A transport file reading process.env is not this rule's business" */
+describe("given a file outside services/", () => {
+  describe("when it declares a loadConfig function", () => {
+    /** @scenario "A file outside services is not this rule's business" */
     it("reports nothing", () => {
       const found = report(
-        "export const domain = process.env.AUTH0_DOMAIN;",
-        "modules/auth/process/src/transport/auth.rest.ts",
+        "function loadConfig() { return {}; }",
+        "modules/auth/process/src/adapters/auth0.adapter.ts",
       );
 
       expect(found).toEqual([]);

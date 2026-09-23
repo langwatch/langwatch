@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { noAliasReexportRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -47,6 +48,28 @@ describe("given a barrel file", () => {
       expect(
         report("export { AgentApi } from './agent.api';", "modules/agent/process/src/index.ts"),
       ).toEqual([]);
+    });
+  });
+
+  describe("when it names a module's default export", () => {
+    /** @scenario "Naming a default export in a barrel is allowed" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          "export { default as DurationReporter } from './duration-reporter';",
+          "packages/vitest-config/src/index.ts",
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "A re-export alias hides which name is real" */
+    it("still reports a named alias on the same line", () => {
+      const found = report(
+        "export { default as Reporter, setup as armFloor } from './reporter';",
+        "packages/vitest-config/src/index.ts",
+      );
+
+      expect(found.map((finding) => [finding.data.local, finding.line])).toEqual([["setup", 1]]);
     });
   });
 

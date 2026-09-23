@@ -5,10 +5,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  FEATURE_SHAPE_BASELINE,
-  collectFeatureShapeBaseline,
   collectFeatureShapeFindings,
-  formatBaseline,
   lintFeatureShape,
   type ClassifiedPackage,
   type FeatureCatalogueEntry,
@@ -22,6 +19,7 @@ const catalogue: FeatureCatalogueEntry[] = [
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "feature-shape-"));
+  generatedModuleList();
 });
 
 afterEach(() => {
@@ -54,7 +52,7 @@ function pkg(kind: "contract" | "process" | "browser", feature = "widget"): Clas
 /** The generated module list a real process installs from; see generate-modules.mjs. */
 function generatedModuleList(identifiers: readonly string[] = []): void {
   write(
-    "modules/server-modules.generated.ts",
+    "packages/installed-server-modules/src/server-modules.generated.ts",
     `export const serverModules = [${identifiers.join(", ")}] as const;\n`,
   );
 }
@@ -93,21 +91,9 @@ function violations() {
   return lintFeatureShape(snapshotOf({ root, catalogue, packages: everyPackage() }));
 }
 
-/** Rows keyed `<feature>|<kind>`, sorted the way the reader validates them. */
-function baseline(pieces: readonly { feature: string; kind: string }[]): void {
-  const entries = pieces
-    .map((piece) => ({ key: `${piece.feature}|${piece.kind}`, measured: "2026-09-08" }))
-    .toSorted((a, b) => (a.key === b.key ? 0 : a.key < b.key ? -1 : 1));
-
-  write(
-    "packages/architecture-enforcer/src/feature-shape-baseline.json",
-    JSON.stringify({ version: 1, policy: "feature-shape", entries }),
-  );
-}
-
 describe("feature shape", () => {
   describe("given a feature laid out like the annotation reference", () => {
-    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
+    /** @scenario "A pre-reference feature shape is reported, never admitted" */
     it("reports nothing", () => {
       referenceFeature();
 
@@ -135,7 +121,7 @@ describe("feature shape", () => {
       );
     });
 
-    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
+    /** @scenario "A pre-reference feature shape is reported, never admitted" */
     it("names every legacy piece once, with the path that carries it", () => {
       expect(findings()).toEqual([
         {
@@ -171,8 +157,8 @@ describe("feature shape", () => {
       ]);
     });
 
-    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
-    it("rejects each piece that the baseline does not list, pointing at the reference shape", () => {
+    /** @scenario "A pre-reference feature shape is reported, never admitted" */
+    it("rejects each piece, pointing at the reference shape", () => {
       const rejected = violations().filter((violation) => violation.policy === "feature-shape");
 
       expect(rejected).toHaveLength(6);
@@ -180,66 +166,10 @@ describe("feature shape", () => {
         expect.arrayContaining([expect.stringContaining("defineTrpcRouter")]),
       );
     });
-
-    it("admits exactly the listed pieces", () => {
-      baseline([
-        { feature: "widget", kind: "contract-service" },
-        { feature: "widget", kind: "fixtures-directory" },
-        { feature: "widget", kind: "legacy-transport-runtime" },
-        { feature: "widget", kind: "nested-transport" },
-        { feature: "widget", kind: "persistence-adapter" },
-        { feature: "widget", kind: "testing-entry" },
-      ]);
-
-      expect(violations()).toEqual([]);
-    });
-
-    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
-    it("marks a baseline entry stale once the piece is gone", () => {
-      baseline([
-        { feature: "widget", kind: "contract-service" },
-        { feature: "widget", kind: "fixtures-directory" },
-        { feature: "widget", kind: "legacy-transport-runtime" },
-        { feature: "widget", kind: "nested-transport" },
-        { feature: "widget", kind: "persistence-adapter" },
-        { feature: "widget", kind: "testing-entry" },
-      ]);
-      rmSync(join(root, "modules/widget/process/src/testing.ts"));
-
-      expect(violations()).toMatchObject([
-        {
-          policy: "feature-shape-baseline",
-          message: expect.stringContaining("widget/testing-entry"),
-        },
-      ]);
-    });
-
-    /** @scenario "A collected baseline keeps the date an existing row carries" */
-    it("collects and formats the inventory as one sorted row per feature and kind", () => {
-      const entries = collectFeatureShapeBaseline({
-        root,
-        catalogue,
-        packages: everyPackage(),
-        previous: [{ key: "widget|nested-transport", measured: "2020-01-01" }],
-      });
-
-      expect(entries.map((entry) => entry.key)).toEqual([
-        "widget|contract-service",
-        "widget|fixtures-directory",
-        "widget|legacy-transport-runtime",
-        "widget|nested-transport",
-        "widget|persistence-adapter",
-        "widget|testing-entry",
-      ]);
-      expect(entries[3]?.measured).toBe("2020-01-01");
-      expect(formatBaseline({ policy: FEATURE_SHAPE_BASELINE, entries })).toBe(
-        `${JSON.stringify({ version: 1, policy: "feature-shape", entries }, null, 2)}\n`,
-      );
-    });
   });
 
   describe("given a flat transport that still names a legacy builder", () => {
-    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
+    /** @scenario "A pre-reference feature shape is reported, never admitted" */
     it("reports the family as running on the legacy runtime, naming the file", () => {
       referenceFeature();
       write(
@@ -335,7 +265,7 @@ describe("feature shape", () => {
       expect(findings().map((finding) => finding.kind)).toEqual(["no-app"]);
     });
 
-    /** @scenario "A pre-reference feature shape is inventoried, never admitted" */
+    /** @scenario "A pre-reference feature shape is reported, never admitted" */
     it("reports an installer the generated module list omits, naming the installer file", () => {
       referenceFeature();
       generatedModuleList([]);
@@ -387,42 +317,23 @@ describe("feature shape", () => {
     });
   });
 
-  describe("given the baseline file itself", () => {
-    it("refuses an empty baseline kept as an exception surface", () => {
-      referenceFeature();
-      baseline([]);
-
-      expect(violations()).toMatchObject([
-        { policy: "feature-shape-baseline", message: expect.stringContaining("empty") },
-      ]);
-    });
-
-    /** @scenario "An out-of-order or duplicated file is refused before it is read" */
-    it("refuses an unsorted or duplicated inventory", () => {
-      referenceFeature();
-      write("modules/widget/process/src/testing.ts");
-      write("modules/widget/contract/src/widget.service.ts");
-      write(
-        "packages/architecture-enforcer/src/feature-shape-baseline.json",
-        JSON.stringify({
-          version: 1,
-          policy: "feature-shape",
-          entries: [
-            { key: "widget|testing-entry", measured: "2026-09-08" },
-            { key: "widget|contract-service", measured: "2026-09-08" },
-          ],
-        }),
-      );
-
-      expect(violations()).toMatchObject([
-        { policy: "feature-shape-baseline", message: expect.stringContaining("sorted") },
-      ]);
-    });
-
+  describe("given a feature the catalogue does not name", () => {
     it("measures only catalogue features", () => {
       write("modules/other/process/src/testing.ts");
 
       expect(collectFeatureShapeFindings(root, catalogue, [pkg("process", "other")])).toEqual([]);
+    });
+  });
+
+  describe("given no generated server module list", () => {
+    /** @scenario "A policy whose anchor file is gone refuses the run by name" */
+    it("throws naming the policy and the list instead of reading every installer as booted", () => {
+      referenceFeature();
+      rmSync(join(root, "packages/installed-server-modules/src/server-modules.generated.ts"));
+
+      expect(() => findings()).toThrow(
+        "feature-shape: its anchor packages/installed-server-modules/src/server-modules.generated.ts does not exist",
+      );
     });
   });
 });

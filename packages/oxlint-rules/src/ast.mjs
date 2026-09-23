@@ -17,22 +17,19 @@ const NON_NODE_KEYS = new Set([
   "type",
 ]);
 
+function* nodesIn(value) {
+  const items = Array.isArray(value) ? value : [value];
+  for (const item of items) {
+    if (item && typeof item.type === "string") yield item;
+  }
+}
+
 /** The direct child nodes of `node`, in key order. */
 export function* childNodes(node) {
   if (!node) return;
 
   for (const key of Object.keys(node)) {
-    if (NON_NODE_KEYS.has(key)) continue;
-
-    const value = node[key];
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        if (item && typeof item.type === "string") yield item;
-      }
-      continue;
-    }
-
-    if (value && typeof value.type === "string") yield value;
+    if (!NON_NODE_KEYS.has(key)) yield* nodesIn(node[key]);
   }
 }
 

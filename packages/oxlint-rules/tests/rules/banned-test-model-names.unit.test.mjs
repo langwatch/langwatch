@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { bannedTestModelNamesRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, expectFix, runRule } from "../../src/testing.mjs";
 
@@ -70,17 +71,19 @@ describe("given a test file", () => {
   describe("when a bare literal names a banned model", () => {
     /** @scenario "A banned model literal is rewritten to gpt-5-mini" */
     it("rewrites the literal to gpt-5-mini", () => {
-      fix('const model = "gpt-4o";', 'const model = "gpt-5-mini";');
+      expect(() => fix('const model = "gpt-4o";', 'const model = "gpt-5-mini";')).not.toThrow();
     });
   });
 
   describe("when the banned name sits inside a longer string", () => {
     /** @scenario "A banned model name inside a longer string is rewritten in place" */
     it("replaces only the matched substring", () => {
-      fix(
-        'const note = "model: gpt-4.1-mini, temp 0";',
-        'const note = "model: gpt-5-mini, temp 0";',
-      );
+      expect(() =>
+        fix(
+          'const note = "model: gpt-4.1-mini, temp 0";',
+          'const note = "model: gpt-5-mini, temp 0";',
+        ),
+      ).not.toThrow();
     });
   });
 
@@ -100,17 +103,18 @@ describe("given a test file", () => {
   describe("when a template literal quasi names a banned model", () => {
     /** @scenario "A template literal naming a banned model is rewritten" */
     it("rewrites the quasi in place", () => {
-      fix("const model = `openai/gpt-4o`;", "const model = `openai/gpt-5-mini`;");
+      expect(() =>
+        fix("const model = `openai/gpt-4o`;", "const model = `openai/gpt-5-mini`;"),
+      ).not.toThrow();
     });
   });
 
   describe("when the banned name sits in a quasi after an interpolation", () => {
     /** @scenario "A template literal interpolation next to a banned name is left untouched" */
     it("rewrites only the literal text, not the interpolated expression", () => {
-      fix(
-        "const model = `${provider}/gpt-4o`;",
-        "const model = `${provider}/gpt-5-mini`;",
-      );
+      expect(() =>
+        fix("const model = `${provider}/gpt-4o`;", "const model = `${provider}/gpt-5-mini`;"),
+      ).not.toThrow();
     });
   });
 
@@ -131,6 +135,26 @@ describe("given a test file", () => {
     });
   });
 
+  describe("when the banned name is the prefix of a dated model id", () => {
+    /** @scenario "A dated model id is a different model and is left alone" */
+    it("neither reports nor rewrites it", () => {
+      const code = 'const model = "gpt-4o-2024-08-06"; const other = "openai/gpt-4.1.2";';
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when a banned name ends a sentence", () => {
+    /** @scenario "A banned name before a closing period is still reported" */
+    it("reports the name on its line", () => {
+      const found = report('const note = "we used gpt-4o.";');
+
+      expect(found).toHaveLength(1);
+      expect(found[0].data.name).toBe("gpt-4o");
+      expect(found[0].line).toBe(1);
+    });
+  });
+
   describe("when the banned name anchors a regex matching pattern", () => {
     /** @scenario "A banned model name inside a regex pattern is reported without a rewrite" */
     it("reports the literal but declines to fix it", () => {
@@ -146,8 +170,7 @@ describe("given a test file", () => {
 });
 
 describe("given a test inside modules/model-provider", () => {
-  const catalogueTest =
-    "modules/model-provider/contract/src/__tests__/model-cost.unit.test.ts";
+  const catalogueTest = "modules/model-provider/contract/src/__tests__/model-cost.unit.test.ts";
 
   describe("when the model name is the value under test", () => {
     /** @scenario "The model catalogue's own tests may name real models" */
@@ -155,8 +178,15 @@ describe("given a test inside modules/model-provider", () => {
       expect(report('expect(normalizeModelName("GPT-4O")).toBe("gpt-4o");', catalogueTest)).toEqual(
         [],
       );
-      expect(report('const row = { model: "openai/gpt-4o", inputCostPerToken: 0.0000025 };', catalogueTest)).toEqual([]);
-      expect(report('expect(normalizeModelName("gpt-4o-fp8")).toBe("gpt-4o");', catalogueTest)).toEqual([]);
+      expect(
+        report(
+          'const row = { model: "openai/gpt-4o", inputCostPerToken: 0.0000025 };',
+          catalogueTest,
+        ),
+      ).toEqual([]);
+      expect(
+        report('expect(normalizeModelName("gpt-4o-fp8")).toBe("gpt-4o");', catalogueTest),
+      ).toEqual([]);
     });
   });
 

@@ -1,6 +1,6 @@
 export type FeaturePackageRole = "contract" | "process" | "browser" | "browser-kit";
 
-export type ApplicationPackageRole = "ui" | "api" | "worker" | "server";
+export type ApplicationPackageRole = "ui" | "api" | "worker" | "server" | "tasks";
 
 export type EnterpriseCompositionRole = "api" | "worker";
 
@@ -55,14 +55,12 @@ export type ArchitectureViolation = {
   specifier?: string;
   message: string;
   allowed?: string;
-  /** A baseline row no live finding matches: an allowance that outlived what it allowed. */
-  stale?: true;
 };
 
 export type LintWorkspaceOptions = {
   root: string;
   changedFiles?: readonly string[];
   declarations?: boolean;
-  legacyApplicationMigration?: boolean;
-  legacyFeatureFragments?: boolean;
+  /** Registry ids to run; every policy when absent. */
+  only?: readonly string[];
 };

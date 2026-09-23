@@ -1,59 +1,29 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
 
-  // The entry point, and deliberately almost empty. What it points at owns
-  // the content: the architecture rules live beside the plugin that
-  // implements them. Later entries win, so anything restated below overrides
-  // them on purpose.
-  //
-  // There is no debt baseline any more. `dev/lint/oxlint.baseline.jsonc` and
-  // the per-file exemptions in the architecture config were deleted together:
-  // a rule is `error` for the whole tree and the count is driven to zero, so
-  // an exemption is only a finding nobody has read yet. Anything above zero
-  // is the work, not the configuration.
+  // The entry point. The langwatch/* rules live beside the plugin that
+  // implements them; the built-in rules are configured here. Every rule is
+  // `error` or absent: lint runs with --quiet, so `warn` reports nothing.
   "extends": ["./packages/architecture-enforcer/oxlint.architecture.jsonc"],
 
-  // A suppression that suppresses nothing is a lie about the code. Measured
-  // 2026-09-17: 172 of the tree's 458 disable directives report nothing.
-  // Not auto-fixable -- `--fix` leaves all 172 -- but each is one deleted line.
+  // A suppression that suppresses nothing is a lie about the code.
   "options": { "reportUnusedDisableDirectives": "error" },
 
-  // Oxlint's default plugin set plus vitest, which is what lets the
-  // test-quality rules in the baseline (noFocusedTests and friends, carried
-  // from the deleted biome.jsonc) be named at all. Setting this key
-  // REPLACES the default set, so the four defaults are restated here.
-  //
-  // jest is deliberately absent. The runner here is vitest, and enabling both
-  // made oxlint report one finding twice under two plugin names — 1,488
-  // duplicate warnings across valid-expect, no-conditional-expect,
-  // require-to-throw-message and five others.
-  // The lint runs from the repository root -- `oxlint .` -- rather than a hand
-  // written path list. That list was a denylist by omission: 25 workspace
-  // packages were never linted, `plugins/langwatch` (a published plugin) among
-  // them at 1,331 findings, and `packages/oxlint-rules`, which is the linter's
-  // own rules. Nobody chose those exclusions; they were never added.
-  //
-  // oxlint honours .gitignore, so node_modules and dist need no mention. A
-  // generated file is ignored because the fix for one is in its generator --
-  // which is also why the two entries below are here. `session-context.mjs` is
-  // a vendored bundle, 412 KB of minified output on a single 237,525-character
-  // line, and it carried 1,309 of this repository's findings on its own: 14.7%
-  // of the total, none of them actionable, because the plugin ships the
-  // artefact and builds it somewhere else. Reading them as debt overstated
-  // every count by a seventh and pointed the work at a file no edit survives.
+  // Generated files are fixed in their generator; `session-context.mjs` is a
+  // vendored minified bundle the plugin ships and builds elsewhere.
   "ignorePatterns": [
     "**/*.generated.ts",
     "**/*.generated.tsx",
     "**/*.generated.js",
-    "plugins/langwatch/scripts/session-context.mjs"
+    "plugins/langwatch/scripts/session-context.mjs",
   ],
 
-  // Oxlint's correctness tier defaults to `warn`, and lint:oxlint runs
-  // --quiet, which drops warnings -- so 146 rules reported nothing at all and
-  // exited 0 while doing it. Measured 2026-09-17: +696 findings once promoted.
+  // The correctness tier defaults to `warn`, which --quiet drops.
   "categories": { "correctness": "error" },
 
-"plugins": [
+  // Setting this key replaces oxlint's default set. jest is absent on purpose:
+  // the runner is vitest, and both together report every test finding twice.
+  "plugins": [
     "react",
     "unicorn",
     "typescript",
@@ -62,25 +32,19 @@
     "import",
     "promise",
     "jsx-a11y",
-    "node"
+    "node",
   ],
   "rules": {
-    "complexity": ["error", { "max": 25 }],
     "no-nested-ternary": "error",
-    // The house writes T[]: 14,836 annotations already use it against 2,477
-    // in the Array<T> form, and oxlint fixes the difference, parenthesising
-    // unions correctly. One sweep clears it and new code stays consistent.
+    // A comment inside the block counts as the decision to swallow the failure.
+    "no-empty": ["error", { "allowEmptyCatch": false }],
     "typescript/array-type": ["error", { "default": "array" }],
-
-    // Configuration is read through the config tier, never from the ambient
-    // environment. `langwatch/secrets-through-source` already refuses a
-    // classified secret read outside the secrets package; this is the same
-    // rule for everything else, because a setting reached through
-    // `process.env` is one no schema validated and no boot line printed.
+    // A binding used only as a type is imported as one, so nothing of the target runs.
+    "typescript/consistent-type-imports": "error",
+    // Settings are read through the config tier; the overrides below name the
+    // categories of path where that tier does not exist.
     "node/no-process-env": "error",
 
-    // The import graph. `no-cycle` is the reason the plugin is here: 50 real
-    // cycles that nothing else in this repository looks for.
     "import/no-cycle": "error",
     "import/export": "error",
     "import/no-self-import": "error",
@@ -89,18 +53,12 @@
     "import/no-mutable-exports": "error",
     "import/no-duplicates": "error",
 
-    // Promises that settle twice, or never. `no-multiple-resolved` is a real
-    // deadlock class, not a style preference.
     "promise/no-multiple-resolved": "error",
     "promise/catch-or-return": "error",
     "promise/no-return-wrap": "error",
 
-    // `.sort()` and `.reverse()` mutate the receiver in place; the fix is the
-    // copying form, and oxlint writes it.
     "unicorn/no-array-sort": "error",
 
-    // Keyboard and screen-reader correctness. These fire only on JSX, so they
-    // need no path scope.
     "jsx-a11y/no-autofocus": "error",
     "jsx-a11y/no-static-element-interactions": "error",
     "jsx-a11y/click-events-have-key-events": "error",
@@ -112,104 +70,121 @@
     "jsx-a11y/img-redundant-alt": "error",
     "jsx-a11y/autocomplete-valid": "error",
 
-    // The vitest plugin is enabled for its test-quality rules, and this one
-    // rode along with them: 11,741 findings across 1,700 files, every one of
-    // them a `vi.fn()` written without a type parameter. Nothing chose it,
-    // nothing fixes it -- the type argument has to be the mocked function's
-    // real signature, so there is no codemod -- and `vi.fn()` bare is the
-    // idiom the whole suite is written in. A rule that reports half of every
-    // finding in the repository and can never reach zero is a rule that
-    // teaches people to read past the linter, so it is off rather than
-    // baselined: it only ever fires in tests, which makes a baseline and an
-    // off switch the same thing said at different lengths.
+    // The type argument has to be the mocked function's real signature, so
+    // nothing can fix it mechanically, and bare `vi.fn()` is the suite's idiom.
     "vitest/require-mock-type-parameters": "off",
-
-    // Vitest's `expect` takes a second argument — `expect(actual, message)` is
-    // in its own types as `<T>(actual: T, message?: string): Assertion<T>` —
-    // and the repo uses it to label which loop iteration failed. The rule's
-    // default ceiling of 1 is a jest-era assumption: it reported 106 findings
-    // here, 97 of them that deliberate label, and its stated fix ("remove the
-    // extra arguments") deletes working failure diagnostics. The 9 real ones,
-    // an async matcher never awaited, report at `error` -- at `warn` they were
-    // dropped by --quiet and this comment was false for as long as it stood.
-    "vitest/valid-expect": ["error", { "maxArgs": 2 }]
+    // `expect(actual, message)` labels which loop iteration failed.
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }],
+    // A title states what the test does, not a prediction ("should ...").
+    "vitest/valid-title": [
+      "error",
+      { "mustNotMatch": { "it": "(?i)^should\\b", "test": "(?i)^should\\b" } },
+    ],
   },
 
-  // `node/no-process-env` is on at `error` because backend code reads its
-  // settings through the config layer, never through the ambient environment.
-  // These four categories are the addresses where that remedy does not exist,
-  // so the rule is scoped off them rather than answered with a suppression
-  // list. Each is a whole category named by what it is, not an enumeration of
-  // the files that happened to fail.
   "overrides": [
     {
-      // The spawn boundary. When this codebase starts a child process, the
-      // environment IS the transport: the parent computes a variable set and
-      // the child reads it back, because a subprocess has no other channel to
-      // receive its configuration on. Both sides are named here -- the
-      // processes that ARE a spawned child (the langy worker, the scenario
-      // voice worker), and the code that computes a child's environment.
-      // Values the child inherits rather than is given -- PATH, HOME, SHELL --
-      // have no config representation at all: they describe the machine, not
-      // the installation.
+      // `return await` belongs inside a try, where it decides which handler
+      // sees the rejection; anywhere else it is noise.
       "files": [
-        "services/langyworker/**",
-        "modules/scenario/contract/src/voice/**",
-        "**/*-child.entrypoint.ts"
+        "modules/**",
+        "enterprise/modules/**",
+        "apps/**",
+        "packages/**",
+        "sdks/typescript/src/**",
+        "mcp/typescript/src/**",
       ],
-      "rules": { "node/no-process-env": "off" }
+      "rules": { "typescript/return-await": ["error", "in-try-catch"] },
     },
     {
-      // Substrate that boots BELOW the config layer. The config layer cannot
-      // supply these because it depends on them: a config parse failure is
-      // reported through the logger, so the logger cannot wait for config to
-      // exist, and `createLogger` is called at module scope across the tree.
-      // The migration runner and the seed tool are the same shape from the
-      // other direction -- they run before, or instead of, a served process,
-      // so there is no composed config for them to read. This is the same
-      // reasoning that puts `platform/config/` itself on this list, applied to
-      // the things config is built on top of.
+      // More than three parameters is a call site nobody can read: take one
+      // object and destructure it (CLAUDE.md: named parameters).
+      "files": ["modules/**", "enterprise/modules/**", "packages/**", "apps/*/src/**"],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*", "**/tests/**", "**/e2e/**"],
+      "rules": { "max-params": ["error", { "max": 3 }] },
+    },
+    {
+      // Source, not tests: a test double may be loosely typed on purpose.
+      "files": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*", "**/tests/**", "**/e2e/**"],
+      "rules": { "typescript/no-explicit-any": "error" },
+    },
+    {
+      // Process source logs through `createLogger`, and a REST handler throws a
+      // HandledError rather than building its own error response.
+      "files": [
+        "apps/api/src/**",
+        "apps/worker/src/**",
+        "apps/tasks/src/**",
+        "modules/*/process/src/**",
+        "enterprise/modules/*/process/src/**",
+      ],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
+      "rules": {
+        "no-console": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@langwatch/api/rest",
+                "importNames": ["RestErrorHandler", "jsonResponse", "rateLimitedResponse"],
+                "message": "Delete it and throw a HandledError from the handler; the mount serialises every response.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // A module's contract and process export the shapes other modules call.
+      "files": [
+        "modules/*/contract/src/**",
+        "modules/*/process/src/**",
+        "enterprise/modules/*/contract/src/**",
+        "enterprise/modules/*/process/src/**",
+      ],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
+      "rules": { "typescript/explicit-module-boundary-types": "error" },
+    },
+    {
+      // A spawned child reads the environment its parent computed for it.
+      "files": ["services/langyworker/**"],
+      "rules": { "node/no-process-env": "off" },
+    },
+    {
+      // Substrate that boots below the config layer: the logger, the migration
+      // runner and the seed tool run before any composed config exists.
       "files": [
         "packages/observability/**",
         "packages/clickhouse-migrations/src/**",
-        "packages/storage-seed/**"
+        "packages/storage-seed/**",
       ],
-      "rules": { "node/no-process-env": "off" }
+      "rules": { "node/no-process-env": "off" },
     },
     {
-      // A test stands a process up under an environment it chooses. Reading
-      // and setting `process.env` there is the test writing its own fixture,
-      // which is the opposite of a feature routing around config.
+      // A test stands a process up under an environment it chooses.
       "files": [
         "**/__tests__/**",
         "**/*.test.ts",
         "**/*.test.tsx",
-        "**/*.test.mts",
         "**/*.test.mjs",
         "**/*.spec.ts",
-        "**/*.spec.tsx",
         "**/tests/**",
-        "**/test-utils/**",
         "**/e2e/**",
-        "**/*.e2e.ts",
         "packages/test-harness/**",
-        "skills/_tests/**"
+        "skills/_tests/**",
       ],
-      "rules": { "node/no-process-env": "off" }
+      "rules": { "node/no-process-env": "off" },
     },
     {
-      // Published artefacts. A customer running `npm i langwatch` has no
-      // `platform/config/` module to route through: for an SDK and a CLI the
-      // environment IS the configuration surface, and `LANGWATCH_API_KEY` read
-      // from it is the documented way to configure them. The rule's own fix is
-      // unavailable at this address, which is what makes this a scope and not
-      // an exemption.
+      // Published artefacts: for an SDK and a CLI the environment IS the
+      // documented configuration surface.
       "files": ["sdks/**", "mcp/**", "apps/server/**"],
-      "rules": { "node/no-process-env": "off" }
+      "rules": { "node/no-process-env": "off" },
     },
     {
-      // Build and development tooling. Runs on a contributor's machine or in
-      // CI, never inside a served process, and takes its settings from the
+      // Build and development tooling, run by a contributor or CI with the
       // environment its invoker exported.
       "files": [
         "dev/**",
@@ -219,23 +194,14 @@
         "**/vite.config.ts",
         "**/vitest.config.ts",
         "**/prisma.config.ts",
-        "apps/ui/vite/**"
+        "apps/ui/vite/**",
       ],
-      "rules": { "node/no-process-env": "off" }
+      "rules": { "node/no-process-env": "off" },
     },
     {
-      // The config layer itself and the boot seam that feeds it: the one place
-      // the environment is read so everything downstream can take a typed
-      // value. Forbidding it here would leave nothing to route through. This
-      // is the same carve-out `langwatch/secrets-through-source` already makes
-      // for secrets -- the config module, the boot file and the test.
-      "files": [
-        "**/platform/config/**",
-        "**/*.config.ts",
-        "**/boot.ts",
-        "**/*.entrypoint.ts"
-      ],
-      "rules": { "node/no-process-env": "off" }
-    }
-  ]
+      // The one place each process reads its environment into typed config.
+      "files": ["apps/*/src/config.ts", "**/*.entrypoint.ts"],
+      "rules": { "node/no-process-env": "off" },
+    },
+  ],
 }

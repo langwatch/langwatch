@@ -5,15 +5,14 @@
 Feature: The linter keeps a service from resolving its own configuration
 
   As a module author
-  I want the linter to refuse a service or adapter that loads its own
-  configuration
+  I want the linter to refuse a service that loads its own configuration
   So that config is validated once at the composition root and handed in as
   a named argument
 
   Background:
     Given the langwatch oxlint plugin runs over the workspace sources
 
-  Rule: A service or adapter that resolves its own config is reported
+  Rule: A service that resolves its own config is reported
 
     @unit
     Scenario: A service's own loadConfig function is reported
@@ -34,14 +33,13 @@ Feature: The linter keeps a service from resolving its own configuration
       When the rule runs
       Then it is reported too
 
+  Rule: A service given its config, a process.env read, or a file outside services is not this rule's business
+
     @unit
-    Scenario: A service reading process.env directly is reported
+    Scenario: A service reading process.env is environment-boundaries' business
       Given a service file reading process.env directly
       When the rule runs
-      Then it names the key read and says to take config as an argument
-        instead
-
-  Rule: A service given its config, or a file outside services and adapters, is not this rule's business
+      Then it reports nothing, because environment-boundaries refuses the read
 
     @unit
     Scenario: A service given its config as an argument is not this rule's business
@@ -51,7 +49,7 @@ Feature: The linter keeps a service from resolving its own configuration
       Then it reports nothing
 
     @unit
-    Scenario: A transport file reading process.env is not this rule's business
-      Given a transport file, not a service or adapter, reading process.env
+    Scenario: A file outside services is not this rule's business
+      Given a file outside services/ declaring a loadConfig function
       When the rule runs
       Then it reports nothing

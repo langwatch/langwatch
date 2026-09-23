@@ -42,12 +42,12 @@ export const idGenerationOriginRule = defineRule({
     foreignIdModule: {
       what: "`{{name}}` mints ids outside the house scheme.",
       why: "A second id scheme neither sorts by time nor names its kind, and two schemes in one table are a migration.",
-      fix: "Import `generate` from `@langwatch/ksuid` and prefix the kind: `{{kindPrefix}}_${generate()}`.",
+      fix: 'Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("{{kindPrefix}}").toString()`.',
     },
     randomUuid: {
       what: "`randomUUID()` mints an id outside the house scheme.",
       why: "A UUID neither sorts by time nor names its kind, and two schemes in one table are a migration.",
-      fix: "Import `generate` from `@langwatch/ksuid` and prefix the kind: `{{kindPrefix}}_${generate()}`.",
+      fix: 'Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("{{kindPrefix}}").toString()`.',
     },
   },
   create(context, file) {

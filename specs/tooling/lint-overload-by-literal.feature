@@ -19,3 +19,15 @@ Feature: The overload-by-literal lint rule
     Given a contract module whose function overloads take two different option types
     When the overload-by-literal rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: Class method overloads that differ only by a boolean literal are reported
+    Given a class whose method overloads differ only by `raw: true` versus `raw: false`
+    When the overload-by-literal rule runs over it
+    Then it reports splitTheOverloads at the first overload's line
+
+  @unit
+  Scenario: Same-named signatures in different scopes are not one overload set
+    Given two interfaces that each declare one `read` signature, one with `raw: true` and one with `raw: false`
+    When the overload-by-literal rule runs over it
+    Then it reports nothing

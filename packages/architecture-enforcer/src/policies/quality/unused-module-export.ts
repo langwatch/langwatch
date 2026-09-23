@@ -3,16 +3,6 @@ import { basename, join, relative, sep } from "node:path";
 
 import ts from "typescript";
 
-import {
-  type BaselineEntry,
-  type BaselinePolicy,
-  baselinePath,
-  collectBaseline,
-  emptyBaselineRows,
-  liveKeys,
-  readBaseline,
-  staleRows,
-} from "../../baseline.ts";
 import type { ArchitectureViolation } from "../../types.ts";
 import { SOURCE_ROOTS, listFiles } from "../../workspace/layout.ts";
 import {
@@ -28,8 +18,6 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
  * imports. The other half of `composed-exports`, which only sees what a package
  * index publishes. README, "The dead-code guards"; ADR-137.
  */
-
-const BASELINE_FILE = "unused-module-export-baseline.json";
 
 /** A module server package's own source, core and enterprise. */
 const MODULE_GROUPS = ["modules", join("enterprise", "modules")];
@@ -51,7 +39,7 @@ export type UnusedModuleExportFinding = {
   allowed: string;
 };
 
-/** Code-unit order, the order every baseline in this package is written in. */
+/** Code-unit order, so a report reads the same on every machine. */
 function byKey(left: string, right: string): number {
   if (left === right) return 0;
 
@@ -421,60 +409,13 @@ export function collectUnusedModuleExportFindings({
   return findings.toSorted((left, right) => byKey(entryKey(left), entryKey(right)));
 }
 
-export const UNUSED_MODULE_EXPORT_BASELINE: BaselinePolicy = {
-  id: "unused-module-export",
-  file: BASELINE_FILE,
-  label: "Unused module export baseline",
-  keyRule: "A key is `<repository-relative file>|<exported name>`.",
-  enforceExpiry: false,
-  refuseEmpty: true,
-  stale: (entry) => ({
-    message: `Unused module export baseline entry ${entry.key.split("|").join(" ")} no longer matches anything and must be removed.`,
-  }),
-};
-
-export function collectUnusedModuleExportBaseline({
-  root,
-  resolver,
-  previous = [],
-}: {
-  root: string;
-  resolver?: WorkspaceModuleResolver;
-  previous?: readonly BaselineEntry[];
-}): BaselineEntry[] {
-  const found = collectUnusedModuleExportFindings({ root, resolver }).map(entryKey);
-
-  return collectBaseline({ policy: UNUSED_MODULE_EXPORT_BASELINE, found, previous });
-}
-
 export function lintUnusedModuleExports(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, resolver } = snapshot;
-  const file = baselinePath({ root, policy: UNUSED_MODULE_EXPORT_BASELINE });
-  const baseline = readBaseline({ policy: UNUSED_MODULE_EXPORT_BASELINE, file });
 
-  const violations = [
-    ...baseline.violations,
-    ...emptyBaselineRows({ read: baseline, policy: UNUSED_MODULE_EXPORT_BASELINE, file }),
-  ];
-
-  const findings = collectUnusedModuleExportFindings({ root, resolver });
-  const baselined = liveKeys({ entries: baseline.entries });
-  const found = new Set(findings.map(entryKey));
-
-  const unlisted = findings.filter((one) => !baselined.has(entryKey(one)));
-
-  violations.push(
-    ...unlisted.map((one) => ({
-      policy: "unused-module-export",
-      file: join(root, one.path),
-      message: one.message,
-      allowed: one.allowed,
-    })),
-  );
-
-  violations.push(
-    ...staleRows({ entries: baseline.entries, found, policy: UNUSED_MODULE_EXPORT_BASELINE, file }),
-  );
-
-  return violations;
+  return collectUnusedModuleExportFindings({ root, resolver }).map((one) => ({
+    policy: "unused-module-export",
+    file: join(root, one.path),
+    message: one.message,
+    allowed: one.allowed,
+  }));
 }

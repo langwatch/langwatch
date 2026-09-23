@@ -1,20 +1,7 @@
 import { defineRule } from "../define-rule.mjs";
 
-// A test/fixture/scenario/seed that names a specific OpenAI model must use
-// one that is cheap and capable; the models below are retired or pricier.
-// Production source is ungoverned - a gateway's own catalogue must list every
-// model shipped. Autofix rewrites the substring to `gpt-5-mini`, except a
-// `regex: "..."` pattern value, which anchors a catalog row and is reported only.
-//
-// `modules/model-provider` is ungoverned for the same reason its production
-// source is: the catalogue IS its subject. Its tests name real models because
-// the model name is the value under test, not a choice of who to call - they
-// normalise `GPT-4O` to `gpt-4o`, strip a `-fp8` suffix back to the id it
-// qualifies, anchor a price row's regex, and assert the per-token cost of a
-// specific model. None of them calls a model, so none of them can cost anything,
-// and rewriting the literal would assert the wrong price against the wrong name.
-// The rule already concedes this for catalog rows by declining to fix a
-// `regex:` value; a catalogue's tests need the same concession.
+// Tests name a cheap model; production and the model catalogue are ungoverned.
+// Why each exemption holds: specs/tooling/lint-banned-test-model-names.feature.
 
 const TEST_DIRECTORY = /(?:^|\/)__tests__\//;
 const TEST_FILE = /\.test\.tsx?$/;
@@ -27,18 +14,23 @@ const MODEL_CATALOGUE_MODULE = /^modules\/model-provider\//;
 
 const REPLACEMENT = "gpt-5-mini";
 
-// Longer, more specific names first so an overlapping literal (`gpt-4o-mini`
-// also contains `gpt-4o`) is claimed by the name that actually names it, and
-// never double-reported under both. Each pattern carries its own `g` flag so
-// every non-overlapping occurrence in a literal is found, not just the first.
+// A match is the whole id: `gpt-4o-2024-08-06` is another model, and rewriting
+// its prefix would invent `gpt-5-mini-2024-08-06`. A closing period still ends one.
+const BEFORE = String.raw`(?<![-\w.])`;
+const AFTER = String.raw`(?![-\w]|\.\w)`;
+
+function bannedPattern(id) {
+  return new RegExp(`${BEFORE}${id.replaceAll(".", String.raw`\.`)}${AFTER}`, "gi");
+}
+
 const BANNED_MODELS = [
-  { name: "gpt-4o-mini", pattern: /\bgpt-4o-mini\b/gi },
-  { name: "gpt-4.1-mini", pattern: /\bgpt-4\.1-mini\b/gi },
-  { name: "gpt-4-turbo", pattern: /\bgpt-4-turbo\b/gi },
-  { name: "gpt-3.5-turbo", pattern: /\bgpt-3\.5-turbo\b/gi },
-  { name: "gpt-4o", pattern: /\bgpt-4o\b/gi },
-  { name: "gpt-4.1", pattern: /\bgpt-4\.1\b/gi },
-];
+  "gpt-4o-mini",
+  "gpt-4.1-mini",
+  "gpt-4-turbo",
+  "gpt-3.5-turbo",
+  "gpt-4o",
+  "gpt-4.1",
+].map((name) => ({ name, pattern: bannedPattern(name) }));
 
 function isGoverned(file) {
   const path = file.workspacePath;
@@ -54,24 +46,15 @@ function isGoverned(file) {
 }
 
 /**
- * Every non-overlapping banned-model match in `text`, in source order.
+ * Every banned-model id in `text`, in source order; the anchors keep them disjoint.
  * @param {string} text
  * @returns {{ name: string, start: number, end: number }[]}
  */
 function findBannedModels(text) {
-  const claimed = [];
   const matches = [];
   for (const { name, pattern } of BANNED_MODELS) {
-    pattern.lastIndex = 0;
-    let match = pattern.exec(text);
-    while (match) {
-      const start = match.index;
-      const end = start + match[0].length;
-      if (!claimed.some(([claimedStart, claimedEnd]) => start < claimedEnd && end > claimedStart)) {
-        claimed.push([start, end]);
-        matches.push({ end, name, start });
-      }
-      match = pattern.exec(text);
+    for (const match of text.matchAll(pattern)) {
+      matches.push({ end: match.index + match[0].length, name, start: match.index });
     }
   }
   return matches.toSorted((a, b) => a.start - b.start);

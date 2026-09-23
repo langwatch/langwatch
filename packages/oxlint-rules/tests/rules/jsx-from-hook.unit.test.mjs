@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { jsxFromHookRule } from "../../src/rules/jsx-from-hook.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -37,6 +38,21 @@ describe("given a production .tsx file", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("hookReturnsJsx");
+    });
+  });
+
+  describe("when a hook is a concise arrow whose body is JSX", () => {
+    /** @scenario "a concise-arrow hook returning JSX is reported" */
+    it("reports hookReturnsJsx on the body's line", () => {
+      const found = report(
+        "export const useBadge = () => <span />;\nexport const useMaybe = (on) =>\n  on ? <b /> : null;",
+        "modules/agent/browser/src/use-badge.tsx",
+      );
+
+      expect(found.map((entry) => [entry.data.name, entry.line])).toEqual([
+        ["useBadge", 1],
+        ["useMaybe", 3],
+      ]);
     });
   });
 

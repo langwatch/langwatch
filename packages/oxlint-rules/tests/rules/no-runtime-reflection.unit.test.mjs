@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { noRuntimeReflectionRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -50,6 +51,22 @@ describe("given a governed module source file", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("defineProperty");
+    });
+  });
+
+  describe("when it calls Object.defineProperties or Object.setPrototypeOf", () => {
+    /** @scenario "defineProperties and setPrototypeOf patch an object at runtime" */
+    it("reports each on its own line, quoting the target", () => {
+      const found = report(
+        "Object.defineProperties(target, { x: { value: 1 } });\nObject.setPrototypeOf(record, Base.prototype);\nObject.defineProperties(Agent.prototype, {});",
+        "modules/agent/process/src/services/agent.service.ts",
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.data.target, entry.line])).toEqual([
+        ["defineProperty", "target", 1],
+        ["setPrototypeOf", "record", 2],
+      ]);
+      expect(found[0].message).toMatch(/^`Object\.defineProperties` patches `target`/);
     });
   });
 

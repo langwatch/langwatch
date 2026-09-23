@@ -1,17 +1,13 @@
 import { defineRule } from "../define-rule.mjs";
 
-// Dynamic import() hides dependencies. Allowed only: CLI startup path (~30ms
-// cold start), web package entry files, and UI routes/drawers (code-split).
+// Dynamic import() hides dependencies. Allowed: the CLI and MCP startup paths,
+// web package entry files, UI routes/drawers, `lazy(() => import(...))`, and
+// tests, where an import after `vi.mock` is what makes the mock apply.
 
 const GENERATED = /(?:^|\/)(?:dist|node_modules|generated)\/|\.generated\.[cm]?tsx?$/;
 const CLI_STARTUP = /^sdks\/typescript\/src\/cli\//;
-// The published `langwatch-mcp-server` binary, which an editor or agent starts
-// per session. It registers ~100 tools and a session calls a handful, so each
-// handler -- and the 2,027-line generated evaluator catalogue behind one of
-// them -- is reached from inside the callback that needs it. That keeps the
-// boot graph at 21 modules. Same trade as the CLI above, same kind of artefact,
-// and pinned the same way: src/__tests__/create-mcp-server-boot.unit.test.ts
-// walks the static graph and fails if a handler moves onto the boot path.
+// Each MCP tool handler loads inside its callback to keep the boot graph small;
+// pinned by mcp/typescript/src/__tests__/create-mcp-server-boot.unit.test.ts.
 const MCP_SERVER_STARTUP = /^mcp\/typescript\/src\//;
 const CLI_TSUP_CONFIG = /^sdks\/typescript\/tsup\.config\.ts$/;
 const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/browser\/src\/[^/]+\.ts$/;
@@ -28,7 +24,32 @@ function isExempt(workspacePath) {
 }
 
 function isGoverned(file) {
-  return !GENERATED.test(file.workspacePath) && !isExempt(file.workspacePath);
+  return !file.isTest && !GENERATED.test(file.workspacePath) && !isExempt(file.workspacePath);
+}
+
+const LAZY = /^lazy$/;
+
+function isLazyCallee(callee) {
+  if (callee.type === "Identifier") return LAZY.test(callee.name);
+
+  return callee.type === "MemberExpression" && !callee.computed && LAZY.test(callee.property.name);
+}
+
+/** `lazy(() => import("./x"))`, also through a `.then(...)` that picks the export. */
+function isLazyLoader(node) {
+  let current = node;
+  while (
+    current.parent?.type === "MemberExpression" &&
+    current.parent.object === current &&
+    current.parent.parent?.type === "CallExpression" &&
+    current.parent.parent.callee === current.parent
+  ) {
+    current = current.parent.parent;
+  }
+  const loader = current.parent;
+  if (loader?.type !== "ArrowFunctionExpression" || loader.body !== current) return false;
+
+  return loader.parent?.type === "CallExpression" && isLazyCallee(loader.parent.callee);
 }
 
 export const noInlineDynamicImportRule = defineRule({
@@ -38,7 +59,7 @@ export const noInlineDynamicImportRule = defineRule({
     inlineDynamicImport: {
       what: "`import(...)` is used inline here.",
       why: "A dynamic import hides a dependency the reader expects to find as a top-level import.",
-      fix: "Use a top-level `import` / `import type` statement instead.",
+      fix: "Use a top-level `import` / `import type` statement instead; a code-split component loads through `lazy(() => import(...))`.",
     },
   },
   create(context, file) {
@@ -46,6 +67,7 @@ export const noInlineDynamicImportRule = defineRule({
 
     return {
       ImportExpression(node) {
+        if (isLazyLoader(node)) return;
         context.report({ node, messageId: "inlineDynamicImport" });
       },
     };

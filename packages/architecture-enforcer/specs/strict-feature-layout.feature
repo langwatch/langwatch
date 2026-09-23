@@ -41,13 +41,11 @@ Feature: Strict versioned feature source layout
     Then architecture lint accepts it as a rules module
 
   @unit @architecture
-  Scenario: A pre-reference feature shape is inventoried, never admitted
+  Scenario: A pre-reference feature shape is reported, never admitted
     Given a catalogue feature that still carries a piece the annotation reference has no place for, or lacks a piece the reference has
     And that piece is an abstract contract service, a persistence adapter, a fixtures directory, a testing entry, a nested transport folder, a transport still built on a legacy REST or tRPC builder, unselected repositories, Prisma repositories without memory twins, a memory twin no contract test runs against both backends, a nested web entry, a refusing composition twin, a missing installer or app, or an installer no process boots
     When architecture lint checks the workspace
-    Then a piece the feature-shape baseline does not list is reported with the reference shape it should take
-    And a baseline entry whose piece is gone is reported as stale
-    And the baseline only shrinks
+    Then the piece is reported with the reference shape it should take
 
   @integration @architecture
   Scenario: The reference feature carries no legacy piece
@@ -59,7 +57,7 @@ Feature: Strict versioned feature source layout
   Scenario: Strict services, ports, and contract builds remain mechanically bounded
     Given a layout-version-0 feature service, port, or declaration build
     When architecture lint and scoped Oxlint check it
-    Then a service exceeds neither its objective quality ceiling nor its shrinking reviewed inventory
+    Then a service exceeds no objective quality ceiling
     And a new port exports an abstract class ending in Port rather than a callback type bag
     And a contract build includes only src with rootDir src and explicitly excludes tests
 

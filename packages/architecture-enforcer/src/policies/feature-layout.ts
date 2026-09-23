@@ -46,7 +46,7 @@ function workspacePath(root: string, path: string): string {
 }
 
 function violation(file: string, message: string, allowed: string): ArchitectureViolation {
-  return { policy: "feature-source-layout", file, message, allowed };
+  return { policy: "feature-layout", file, message, allowed };
 }
 
 /**
@@ -738,11 +738,7 @@ function lintPrivateServerExports(pkg: ClassifiedPackage): ArchitectureViolation
   return violations;
 }
 
-/**
- * Contract and server layout, and private-runtime-export. `feature-app`
- * (contract vocabulary, factory shape, setup infrastructure) is its own
- * registered policy now, not nested here — see policies/index.ts.
- */
+/** Contract and server layout, and private-runtime-export. */
 export function lintFeatureLayouts(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
 

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { standInCastRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -38,23 +39,21 @@ describe("given a governed source file", () => {
     });
   });
 
-  describe("when a value is cast to any", () => {
-    /** @scenario "A cast to any drops the type" */
-    it("reports anyCast", () => {
-      const found = report("const loose = value as any;");
-
-      expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("anyCast");
+  describe("when a value is cast to any once", () => {
+    /** @scenario "A lone cast to any is left to no-explicit-any" */
+    it("reports nothing in either spelling", () => {
+      expect(report("const loose = value as any;\nconst other = <any>value;")).toEqual([]);
     });
   });
 
-  describe("when a value is cast to any with the angle-bracket form", () => {
-    /** @scenario "The angle-bracket cast to any drops the type too" */
-    it("reports anyCast", () => {
-      const found = report("const loose = <any>value;");
+  describe("when a frozen literal is then cast to a wider type", () => {
+    /** @scenario "A cast over as const is a single cast" */
+    it("reports nothing for the const, and still reports a real double cast on its line", () => {
+      const found = report(
+        "const roles = ['admin'] as const as readonly string[];\nconst client = raw as unknown as PrismaClient;",
+      );
 
-      expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("anyCast");
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([["doubleCast", 2]]);
     });
   });
 
@@ -92,16 +91,6 @@ describe("given a test file", () => {
       expect(found[0].messageId).toBe("doubleCastInTest");
       expect(found[0].data.through).toBe("unknown");
       expect(found[0].data.target).toBe("PrismaClient");
-    });
-  });
-
-  describe("when it casts a value to any", () => {
-    /** @scenario "An any cast inside a test reports the test message" */
-    it("reports anyCastInTest", () => {
-      const found = report("const loose = value as any;", TEST_SOURCE);
-
-      expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("anyCastInTest");
     });
   });
 

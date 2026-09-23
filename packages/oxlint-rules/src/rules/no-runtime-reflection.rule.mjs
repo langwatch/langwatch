@@ -1,15 +1,14 @@
 import { defineRule } from "../define-rule.mjs";
 
-// A module's shape is read at compile time, not discovered at runtime: no
-// Proxy standing in for a class, no Reflect call routing around a method, no
-// defineProperty patching an object that is not a class prototype. The one
-// sanctioned exception is `packages/test-harness`'s `createApiFixture`, which
-// builds a throwaway double for a test rather than production behaviour.
+// A module's shape is read at compile time, not discovered at runtime: no Proxy,
+// no Reflect around a method, no property or prototype patched in afterward.
+// `packages/test-harness`'s `createApiFixture` is the one sanctioned exception.
 
 const GOVERNED_SOURCE =
   /^(?:enterprise\/)?modules\/[^/]+\/(?:contract|process|browser|browser-kit)\/src\/|^apps\/api\/src\/features\/|^apps\/worker\/src\/app\//;
 const EXCLUDED = /(?:^|\/)__tests__(?:\/|$)|^packages\/test-harness\//;
 const REFLECT_MEMBERS = new Set(["get", "set", "has", "apply", "construct", "deleteProperty"]);
+const DEFINE_MEMBERS = new Set(["defineProperty", "defineProperties"]);
 const WHITESPACE = /\s+/g;
 const TARGET_BUDGET = 40;
 
@@ -35,6 +34,14 @@ function isPrototypeTarget(node) {
   );
 }
 
+/** `Object.defineProperty` as `["Object", "defineProperty"]`; anything else as empty. */
+function staticMemberCall(callee) {
+  if (callee.type !== "MemberExpression" || callee.computed) return [];
+  if (callee.object.type !== "Identifier") return [];
+
+  return [callee.object.name, callee.property.name];
+}
+
 export const noRuntimeReflectionRule = defineRule({
   name: "no-runtime-reflection",
   kind: "problem",
@@ -48,8 +55,12 @@ export const noRuntimeReflectionRule = defineRule({
       fix: "Call the method directly; add it to the interface if it is missing.",
     },
     defineProperty: {
-      what: "`Object.defineProperty` patches `{{target}}`, which is not a class prototype.",
+      what: "`Object.{{method}}` patches `{{target}}`, which is not a class prototype.",
       fix: "Declare the property directly where `{{target}}` is defined — in its class body or its object literal — instead of patching it in afterward.",
+    },
+    setPrototypeOf: {
+      what: "`Object.setPrototypeOf` rewires the prototype of `{{target}}` at runtime.",
+      fix: "Construct `{{target}}` as the class it should be — `new X(...)`, or `class X extends Y` — instead of swapping its prototype afterward.",
     },
   },
   create(context, file) {
@@ -63,26 +74,22 @@ export const noRuntimeReflectionRule = defineRule({
         }
       },
       CallExpression(node) {
-        const callee = node.callee;
-        if (callee.type !== "MemberExpression" || callee.computed) return;
-        if (callee.object.type === "Identifier" && callee.object.name === "Reflect") {
-          const member = callee.property.type === "Identifier" ? callee.property.name : undefined;
-          if (member && REFLECT_MEMBERS.has(member)) {
-            context.report({ node, messageId: "reflect", data: { member } });
-          }
-          return;
+        const [object, member] = staticMemberCall(node.callee);
+        if (object === "Reflect" && REFLECT_MEMBERS.has(member)) {
+          context.report({ node, messageId: "reflect", data: { member } });
         }
-        if (callee.object.type !== "Identifier") return;
-        if (callee.object.name !== "Object") return;
-        if (callee.property.type !== "Identifier") return;
-        if (callee.property.name !== "defineProperty") return;
+        if (object !== "Object") return;
         const target = node.arguments[0];
-        if (!isPrototypeTarget(target)) {
+        if (member === "setPrototypeOf") {
           context.report({
             node,
-            messageId: "defineProperty",
+            messageId: "setPrototypeOf",
             data: { target: targetTextOf(source, target) },
           });
+        }
+        if (DEFINE_MEMBERS.has(member) && !isPrototypeTarget(target)) {
+          const data = { method: member, target: targetTextOf(source, target) };
+          context.report({ node, messageId: "defineProperty", data });
         }
       },
     };

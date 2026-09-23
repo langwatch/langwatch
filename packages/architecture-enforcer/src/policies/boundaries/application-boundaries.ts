@@ -1,24 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import ts from "typescript";
-import { z } from "zod";
 
 import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import { exportedSubpaths } from "./manifests.ts";
 
 const SOURCE_FILE = /\.[cm]?[jt]sx?$/;
-const LEGACY_BASELINE_PATH = join(
-  "packages",
-  "architecture-enforcer",
-  "src",
-  "legacy-application-boundary-baseline.json",
-);
-const API_RUNTIME = "@langwatch/platform-api/runtime";
-const WORKER_RUNTIME = "@langwatch/worker/runtime";
+const API_RUNTIME = "@langwatch/platform-api";
+const WORKER_RUNTIME = "@langwatch/worker";
 
 const PRODUCT_IMPLEMENTATION_PATH =
   /(?:^|\/)(?:services?|repositories?|routes?|consumers?|jobs?)(?:\/|\.|$)/i;
@@ -36,42 +27,11 @@ const ENTERPRISE_ROOT_RUNTIME_IMPORT = [
   /^@langwatch\/api(?:\/|$)/,
 ];
 
-export type LegacyApplicationBoundaryKind =
-  | "ee-alias"
-  | "browser-to-backend"
-  | "backend-to-browser"
-  | "enterprise-to-application";
-
-export type LegacyApplicationBoundaryEdge = {
-  importer: string;
-  specifier: string;
-  kind: LegacyApplicationBoundaryKind;
-};
-
 type SourceImport = {
   file: string;
   line: number;
   specifier: string;
 };
-
-type LegacyBaselineDocument = {
-  version: 1;
-  edges: Partial<Record<LegacyApplicationBoundaryKind, Record<string, string[]>>>;
-};
-
-const legacyBaselineSchema = z
-  .object({
-    version: z.literal(1),
-    edges: z.record(z.string(), z.record(z.string(), z.array(z.string()))),
-  })
-  .strict();
-
-const LEGACY_KINDS: readonly LegacyApplicationBoundaryKind[] = [
-  "backend-to-browser",
-  "browser-to-backend",
-  "ee-alias",
-  "enterprise-to-application",
-];
 
 function workspacePath(root: string, path: string): string {
   return relative(root, path).split(sep).join("/");
@@ -223,7 +183,7 @@ function packageForPhysicalApplicationSpecifier(
   packages: readonly ClassifiedPackage[],
   specifier: string,
 ): ClassifiedPackage | undefined {
-  const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server)(?:\/|$)/);
+  const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server|tasks)(?:\/|$)/);
   if (!match) return void 0;
 
   return packages.find((pkg) => pkg.kind === "application" && pkg.applicationRole === match[1]);
@@ -465,424 +425,15 @@ function lintRuntimeConstructionImports(
     });
   }
 
-  for (const role of ["api", "worker"] as const) {
-    const application = packages.find(
-      (pkg) => pkg.kind === "application" && pkg.applicationRole === role,
-    );
-
-    if (!application) continue;
-
-    const subpaths = exportedSubpaths(application);
-    if (subpaths.has("./runtime")) continue;
-
-    violations.push({
-      policy: "application-boundary",
-      file: application.manifestPath,
-      specifier: "./runtime",
-      message: `${application.name} must deliberately export its runtime construction entry point for tools/dev-runtime.`,
-    });
-  }
-
   return violations;
 }
 
-type LegacyArea = "browser" | "backend" | "enterprise" | "unknown";
-
-function legacyArea(legacyRoot: string, file: string): LegacyArea {
-  const path = workspacePath(legacyRoot, file);
-  if (path.startsWith("ee/")) return "enterprise";
-
-  if (!path.startsWith("src/")) return "unknown";
-
-  const sourcePath = path.slice("src/".length);
-
-  if (
-    /^(?:server|app\/api|pages\/api|mcp|tasks|runtime\/(?:app|worker|combined|testing))(?:\/|$)/.test(
-      sourcePath,
-    )
-  ) {
-    return "backend";
-  }
-
-  if (/^(?:server\.mts|start\.ts|workers\.ts)$/.test(sourcePath)) {
-    return "backend";
-  }
-
-  if (/^(?:generated|factories|test-utils|types|utils)(?:\/|$)/.test(sourcePath)) {
-    return "unknown";
-  }
-
-  return "browser";
-}
-
-function resolveLegacySpecifier(
-  legacyRoot: string,
-  sourceImport: SourceImport,
-): string | undefined {
-  if (sourceImport.specifier.startsWith("@ee/")) {
-    return join(legacyRoot, "ee", sourceImport.specifier.slice("@ee/".length));
-  }
-
-  if (sourceImport.specifier.startsWith("~/")) {
-    return join(legacyRoot, "src", sourceImport.specifier.slice(2));
-  }
-
-  if (sourceImport.specifier.startsWith("@app/")) {
-    return join(
-      legacyRoot,
-      "src",
-      "server",
-      "app-layer",
-      sourceImport.specifier.slice("@app/".length),
-    );
-  }
-
-  if (sourceImport.specifier.startsWith(".")) {
-    return resolve(dirname(sourceImport.file), sourceImport.specifier);
-  }
-
-  return void 0;
-}
-
-function legacyEdgeKey(edge: LegacyApplicationBoundaryEdge): string {
-  return `${edge.kind}\0${edge.importer}\0${edge.specifier}`;
-}
-
-function legacyKind(
-  importer: LegacyArea,
-  target: LegacyArea,
-  specifier: string,
-): LegacyApplicationBoundaryKind | undefined {
-  if (specifier.startsWith("@ee/")) return "ee-alias";
-
-  if (importer === "browser" && target === "backend") {
-    return "browser-to-backend";
-  }
-
-  if (importer === "backend" && target === "browser") {
-    return "backend-to-browser";
-  }
-
-  if (importer === "enterprise" && target !== "enterprise" && target !== "unknown") {
-    return "enterprise-to-application";
-  }
-
-  return void 0;
-}
-
-export function collectLegacyApplicationBoundaryEdges(
-  root: string,
-): LegacyApplicationBoundaryEdge[] {
-  const legacyRoot = join(root, "platform", "app");
-  const edges = new Map<string, LegacyApplicationBoundaryEdge>();
-
-  const imports = [
-    ...sourceImports(join(legacyRoot, "src")),
-    ...sourceImports(join(legacyRoot, "ee")),
-  ];
-
-  for (const sourceImport of imports) {
-    const target = resolveLegacySpecifier(legacyRoot, sourceImport);
-
-    const kind = legacyKind(
-      legacyArea(legacyRoot, sourceImport.file),
-      target ? legacyArea(legacyRoot, target) : "unknown",
-      sourceImport.specifier,
-    );
-
-    if (!kind) continue;
-
-    const edge = {
-      importer: workspacePath(root, sourceImport.file),
-      specifier: sourceImport.specifier,
-      kind,
-    };
-
-    edges.set(legacyEdgeKey(edge), edge);
-  }
-
-  return [...edges.values()].toSorted((left, right) =>
-    legacyEdgeKey(left).localeCompare(legacyEdgeKey(right)),
-  );
-}
-
-export function formatLegacyApplicationBoundaryBaseline(
-  edges: readonly LegacyApplicationBoundaryEdge[],
-): string {
-  const grouped = new Map<LegacyApplicationBoundaryKind, Map<string, string[]>>();
-
-  for (const edge of [...edges].toSorted((left, right) =>
-    legacyEdgeKey(left).localeCompare(legacyEdgeKey(right)),
-  )) {
-    const importers = grouped.get(edge.kind) ?? new Map<string, string[]>();
-    const specifiers = importers.get(edge.importer) ?? [];
-    specifiers.push(edge.specifier);
-    importers.set(edge.importer, specifiers);
-    grouped.set(edge.kind, importers);
-  }
-
-  const lines = ["{", '  "version": 1,', '  "edges": {'];
-  const populatedKinds = LEGACY_KINDS.filter((kind) => grouped.has(kind));
-
-  for (const [kindIndex, kind] of populatedKinds.entries()) {
-    lines.push(`    ${JSON.stringify(kind)}: {`);
-
-    const importers = [...(grouped.get(kind) ?? new Map()).entries()].toSorted(([left], [right]) =>
-      left.localeCompare(right),
-    );
-
-    for (const [importerIndex, [importer, specifiers]] of importers.entries()) {
-      const sortedSpecifiers = [...new Set(specifiers)].toSorted();
-
-      lines.push(
-        `      ${JSON.stringify(importer)}: ${JSON.stringify(sortedSpecifiers)}${importerIndex + 1 === importers.length ? "" : ","}`,
-      );
-    }
-
-    lines.push(`    }${kindIndex + 1 === populatedKinds.length ? "" : ","}`);
-  }
-
-  lines.push("  }", "}");
-
-  return `${lines.join("\n")}\n`;
-}
-
-function readLegacyBaseline(root: string): {
-  baseline: LegacyApplicationBoundaryEdge[];
-  violations: ArchitectureViolation[];
-} {
-  const path = join(root, LEGACY_BASELINE_PATH);
-  if (!existsSync(path)) return { baseline: [], violations: [] };
-
-  const violations: ArchitectureViolation[] = [];
-  let value: unknown;
-
-  try {
-    value = JSON.parse(readFileSync(path, "utf8"));
-  } catch (error) {
-    return {
-      baseline: [],
-      violations: [
-        {
-          policy: "application-migration-baseline",
-          file: path,
-          message: `Legacy application boundary baseline must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
-    };
-  }
-
-  const documentResult = legacyBaselineSchema.safeParse(value);
-
-  if (!documentResult.success) {
-    return {
-      baseline: [],
-      violations: [
-        {
-          policy: "application-migration-baseline",
-          file: path,
-          message:
-            "Legacy application boundary baseline must contain version 1 and a grouped edges object.",
-        },
-      ],
-    };
-  }
-
-  const baseline: LegacyApplicationBoundaryEdge[] = [];
-  const document = documentResult.data;
-  const edges = document.edges as LegacyBaselineDocument["edges"];
-  const kindKeys = Object.keys(edges);
-  const canonicalKinds = LEGACY_KINDS.filter((kind) => kindKeys.includes(kind));
-
-  if (kindKeys.some((kind, index) => kind !== canonicalKinds[index])) {
-    violations.push({
-      policy: "application-migration-baseline",
-      file: path,
-      message: "Legacy application boundary baseline kinds are invalid or unsorted.",
-    });
-  }
-
-  for (const kind of canonicalKinds) {
-    const importers = edges[kind];
-
-    if (typeof importers !== "object" || importers === null || Array.isArray(importers)) {
-      violations.push({
-        policy: "application-migration-baseline",
-        file: path,
-        message: `Legacy application boundary baseline group ${kind} is invalid.`,
-      });
-
-      continue;
-    }
-
-    const importerKeys = Object.keys(importers);
-
-    const sortedImporterKeys = [...importerKeys].toSorted((left, right) =>
-      left.localeCompare(right),
-    );
-
-    let importerKeysUnsorted = false;
-
-    for (let index = 0; index < importerKeys.length; index++) {
-      if (importerKeys[index] !== sortedImporterKeys[index]) {
-        importerKeysUnsorted = true;
-        break;
-      }
-    }
-
-    if (importerKeysUnsorted) {
-      violations.push({
-        policy: "application-migration-baseline",
-        file: path,
-        message: `Legacy application boundary baseline group ${kind} must sort importers.`,
-      });
-    }
-
-    for (const importer of importerKeys) {
-      const specifiers = importers[importer];
-
-      if (!Array.isArray(specifiers)) {
-        violations.push({
-          policy: "application-migration-baseline",
-          file: path,
-          message: `Legacy application boundary baseline importer ${importer} has invalid specifiers.`,
-        });
-
-        continue;
-      }
-
-      if (specifiers.length === 0) {
-        violations.push({
-          policy: "application-migration-baseline",
-          file: path,
-          message: `Legacy application boundary baseline importer ${importer} has invalid specifiers.`,
-        });
-
-        continue;
-      }
-
-      if (specifiers.some((specifier) => typeof specifier !== "string")) {
-        violations.push({
-          policy: "application-migration-baseline",
-          file: path,
-          message: `Legacy application boundary baseline importer ${importer} has invalid specifiers.`,
-        });
-
-        continue;
-      }
-
-      const sortedSpecifiers = [...specifiers].toSorted();
-
-      if (
-        new Set(specifiers).size !== specifiers.length ||
-        specifiers.some((specifier, index) => specifier !== sortedSpecifiers[index])
-      ) {
-        violations.push({
-          policy: "application-migration-baseline",
-          file: path,
-          message: `Legacy application boundary baseline importer ${importer} must have unique sorted specifiers.`,
-        });
-      }
-
-      for (const specifier of specifiers) {
-        baseline.push({ kind, importer, specifier });
-      }
-    }
-  }
-
-  const keys = baseline.map(legacyEdgeKey);
-
-  if (new Set(keys).size !== keys.length) {
-    violations.push({
-      policy: "application-migration-baseline",
-      file: path,
-      message: "Legacy application boundary baseline contains duplicate edges.",
-    });
-  }
-
-  return { baseline, violations };
-}
-
-function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] {
-  const path = join(root, LEGACY_BASELINE_PATH);
-  const { baseline, violations } = readLegacyBaseline(root);
-  const actual = collectLegacyApplicationBoundaryEdges(root);
-
-  if (existsSync(path) && baseline.length === 0 && violations.length === 0) {
-    violations.push({
-      policy: "application-migration-baseline",
-      file: path,
-      message:
-        "An empty legacy application boundary baseline must be deleted rather than retained as an exception surface.",
-    });
-  }
-
-  const actualByKey = new Map(actual.map((edge) => [legacyEdgeKey(edge), edge]));
-  const baselineByKey = new Map(baseline.map((edge) => [legacyEdgeKey(edge), edge]));
-
-  for (const edge of actual) {
-    const key = legacyEdgeKey(edge);
-    if (baselineByKey.has(key)) continue;
-
-    violations.push({
-      policy: "application-migration",
-      file: join(root, edge.importer),
-      specifier: edge.specifier,
-      message: `New legacy application boundary edge (${edge.kind}) is not permitted.`,
-      allowed:
-        "Move the dependency behind a portable feature/package boundary; the migration baseline may not grow.",
-    });
-  }
-
-  for (const edge of baseline) {
-    const key = legacyEdgeKey(edge);
-    if (actualByKey.has(key)) continue;
-
-    violations.push({
-      policy: "application-migration-baseline",
-      file: path,
-      specifier: edge.specifier,
-      message: `Baseline edge from ${edge.importer} no longer exists and must be removed.`,
-      allowed: "Delete the stale entry so the checked-in baseline only shrinks.",
-    });
-  }
-
-  return violations;
-}
-
-function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
-  const violations: ArchitectureViolation[] = [];
-
-  for (const directory of ["apps", "enterprise", "modules", "packages", "tools"] as const) {
-    for (const sourceImport of sourceImports(join(root, directory))) {
-      if (!sourceImport.specifier.startsWith("@ee/")) continue;
-
-      violations.push({
-        policy: "application-migration",
-        file: sourceImport.file,
-        line: sourceImport.line,
-        specifier: sourceImport.specifier,
-        message: "The legacy @ee alias cannot be introduced.",
-        allowed: "Import the owning @langwatch/enterprise-<feature>-<surface> package.",
-      });
-    }
-  }
-
-  return violations;
-}
-
-export function lintApplicationBoundaries(
-  snapshot: WorkspaceSnapshot,
-  options?: { legacyMigration?: boolean },
-): ArchitectureViolation[] {
+export function lintApplicationBoundaries(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, packages } = snapshot;
 
   return [
     ...lintClassifiedSourceImports(packages),
     ...lintCompositionSourceShape(packages),
     ...lintRuntimeConstructionImports(root, packages),
-    ...(options?.legacyMigration === false
-      ? []
-      : [...lintLegacyApplicationBoundaries(root), ...lintNewEnterpriseAliases(root)]),
   ];
 }

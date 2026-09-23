@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
+
 import { POLICIES } from "../src/policies/index.ts";
 
 // ADR-135: every house rule has one address - a decision row in an ADR, a
@@ -44,20 +46,15 @@ function registryRuleIds() {
     .filter((name) => name.endsWith(".rule.mjs"))
     .map((name) => `langwatch/${name.slice(0, -".rule.mjs".length)}`);
 
-  const astGrepRules = readdirSync(join(root, "dev/lint/ast-grep/rules"))
-    .filter((name) => name.endsWith(".yml"))
-    .map((name) => {
-      const declared = readFileSync(join(root, "dev/lint/ast-grep/rules", name), "utf8");
-      return (declared.match(/^id:\s*(\S+)/m)?.[1] ?? "").replace(/-tsx?$/, "");
-    });
-
   const policyIds = POLICIES.map((policy) => policy.id);
 
   const builtIns = workspaceRuleLines()
     .map((line) => line.match(/^\s*"([^"]+)":/)?.[1])
     .filter((id) => id !== void 0 && !id.startsWith("langwatch/"));
 
-  return [...new Set([...pluginRules, ...astGrepRules, ...policyIds, ...builtIns])].toSorted();
+  return [...new Set([...pluginRules, ...policyIds, ...builtIns])].toSorted((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 /** Every rule id named in the first column of an ADR decision table. */
@@ -221,11 +218,6 @@ describe("given the workspace-wide oxlint rules", () => {
   const workspaceRules = workspaceRuleLines().join("\n");
 
   describe("when the complexity budgets are read", () => {
-    /** @scenario "The cyclomatic budget is declared workspace-wide at 25" */
-    it("declares the built-in branch counter at 25", () => {
-      expect(workspaceRules).toMatch(/"complexity":\s*\["error",\s*\{\s*"max":\s*25\s*\}\]/);
-    });
-
     /** @scenario "The cognitive budget is declared workspace-wide at 15" */
     it("declares the cognitive counter at 15", () => {
       expect(workspaceRules).toMatch(
@@ -253,6 +245,86 @@ describe("given the workspace-wide oxlint rules", () => {
     /** @scenario "The assertion-coverage rule carries no explicit config line" */
     it("does not add an explicit vitest/expect-expect line", () => {
       expect(workspaceRules).not.toMatch(/"vitest\/expect-expect":/);
+    });
+  });
+
+  describe("when the native built-ins ADR-135 records are read", () => {
+    const severityOf = (id) =>
+      workspaceRules.match(new RegExp(`"${id}":\\s*\\[?\\s*"(error|warn|off)"`))?.[1];
+    const severitiesOf = (ids) => Object.fromEntries(ids.map((id) => [id, severityOf(id)]));
+    const allAtError = (ids) => Object.fromEntries(ids.map((id) => [id, "error"]));
+
+    /** @scenario "The core built-ins are enabled workspace-wide at error" */
+    it("enables each core built-in at error", () => {
+      const ids = [
+        "no-empty",
+        "no-nested-ternary",
+        "typescript/array-type",
+        "typescript/consistent-type-imports",
+        "unicorn/no-array-sort",
+        "node/no-process-env",
+      ];
+
+      expect(severitiesOf(ids)).toEqual(allAtError(ids));
+    });
+
+    /** @scenario "The import built-ins are enabled workspace-wide at error" */
+    it("enables each import built-in at error", () => {
+      const ids = [
+        "import/no-cycle",
+        "import/export",
+        "import/no-self-import",
+        "import/no-empty-named-blocks",
+        "import/no-absolute-path",
+        "import/no-mutable-exports",
+        "import/no-duplicates",
+      ];
+
+      expect(severitiesOf(ids)).toEqual(allAtError(ids));
+    });
+
+    /** @scenario "The promise built-ins are enabled workspace-wide at error" */
+    it("enables each promise built-in at error", () => {
+      const ids = [
+        "promise/no-multiple-resolved",
+        "promise/catch-or-return",
+        "promise/no-return-wrap",
+      ];
+
+      expect(severitiesOf(ids)).toEqual(allAtError(ids));
+    });
+
+    /** @scenario "The accessibility built-ins are enabled workspace-wide at error" */
+    it("enables each jsx-a11y built-in at error", () => {
+      const ids = [
+        "jsx-a11y/no-autofocus",
+        "jsx-a11y/no-static-element-interactions",
+        "jsx-a11y/click-events-have-key-events",
+        "jsx-a11y/aria-role",
+        "jsx-a11y/media-has-caption",
+        "jsx-a11y/mouse-events-have-key-events",
+        "jsx-a11y/role-supports-aria-props",
+        "jsx-a11y/no-noninteractive-tabindex",
+        "jsx-a11y/img-redundant-alt",
+        "jsx-a11y/autocomplete-valid",
+      ];
+
+      expect(severitiesOf(ids)).toEqual(allAtError(ids));
+    });
+
+    /** @scenario "The vitest built-ins carry the settings ADR-142 records" */
+    it("sets each vitest built-in to the recorded severity", () => {
+      expect(
+        severitiesOf([
+          "vitest/valid-expect",
+          "vitest/valid-title",
+          "vitest/require-mock-type-parameters",
+        ]),
+      ).toEqual({
+        "vitest/valid-expect": "error",
+        "vitest/valid-title": "error",
+        "vitest/require-mock-type-parameters": "off",
+      });
     });
   });
 });

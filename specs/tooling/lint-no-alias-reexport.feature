@@ -27,6 +27,12 @@ Feature: The no-alias-reexport lint rule
     Then it reports nothing
 
   @unit
+  Scenario: Naming a default export in a barrel is allowed
+    Given a barrel file that re-exports another module's default export under a name
+    When the no-alias-reexport rule runs over it
+    Then it reports nothing, because a default export has no name to rename
+
+  @unit
   Scenario: An alias export outside a barrel is not governed
     Given a non-barrel file with the same alias export
     When the no-alias-reexport rule runs over it

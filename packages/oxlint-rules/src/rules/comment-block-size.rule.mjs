@@ -1,10 +1,8 @@
 import {
   COMMENT_BLOCK_ERROR_FIX,
-  COMMENT_BLOCK_ERROR_LINES,
   COMMENT_BLOCK_ERROR_WHAT,
   MAX_COMMENT_BLOCK_LINES,
   collectCommentBlocks,
-  inspectLintKeep,
   isExemptBlock,
   lineAtOffset,
   lineIndex,
@@ -16,9 +14,8 @@ import {
 } from "../../grammar/comment-block-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// A block past the maximum errors, as does a comment line wider than 100
-// columns. There is no warning tier. The analysis below walks a file's
-// comments exactly once and is memoised, so the second visitor is a cache hit.
+// Two checks, both errors: a block past five lines, and a comment line past
+// 100 columns. The narrative is ADR-140.
 
 export const MAX_COMMENT_COLUMNS = 100;
 
@@ -33,8 +30,6 @@ const COMMENT_EXCLUDED_DIRECTORIES = new Set([
   "node_modules",
   "vendor",
 ]);
-
-const analysisCache = new Map();
 
 export function isCommentScannedPath(workspacePath) {
   if (workspacePath.startsWith("../")) return false;
@@ -51,17 +46,11 @@ function commentRangesOf(program) {
     .toSorted((left, right) => left.pos - right.pos || left.end - right.end);
 }
 
-/**
- * One block, measured in commentary. Structural JSDoc tags and the `@lint-keep`
- * annotation are discounted: their count comes from the signature or the
- * annotation, so counting them would report a length the author cannot cut.
- */
+/** One block, measured in commentary; structural JSDoc tags come from the signature. */
 function describeBlock(block, lines) {
   const text = lines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
-  const keep = inspectLintKeep(text);
-  const structural = keep.annotationLines + structuralTagLines(text);
 
-  return { ...block, exempt: isExemptBlock(text), keep, lines: block.lines - structural };
+  return { ...block, exempt: isExemptBlock(text), lines: block.lines - structuralTagLines(text) };
 }
 
 /** Every comment line past the column limit, each reported once however many ranges cover it. */
@@ -86,17 +75,9 @@ function overlongCommentLines({ lines, ranges, source }) {
   return overflows;
 }
 
-/**
- * The one pass over a file's comments: oversized blocks and overlong comment
- * lines, computed together and memoised per file so the size and warning
- * rules — which both need it — pay for it once between them.
- */
-export function commentBlockAnalysis(context, file, program) {
+/** The one pass over a file's comments: oversized blocks and overlong comment lines. */
+export function commentBlockAnalysis(context, program) {
   const source = context.sourceCode.text;
-  const key = `${context.cwd}|${file.workspacePath}|${source.length}`;
-  const cached = analysisCache.get(key);
-  if (cached) return cached;
-
   const result = { blocks: [], columnOverflows: [] };
   const hasHeader = marksGeneratedHeader(source) || marksLicenseHeader(source);
   if (!hasHeader) {
@@ -110,7 +91,6 @@ export function commentBlockAnalysis(context, file, program) {
     result.columnOverflows = overlongCommentLines({ lines, ranges, source });
   }
 
-  analysisCache.set(key, result);
   return result;
 }
 
@@ -120,10 +100,14 @@ export const commentBlockSizeRule = defineRule({
   messages: {
     commentBlockSize: {
       what: COMMENT_BLOCK_ERROR_WHAT,
+      why:
+        "A comment is for what the code cannot say. The rule makes two checks: a block of" +
+        ` more than ${MAX_COMMENT_BLOCK_LINES} lines, and a comment line wider than ${MAX_COMMENT_COLUMNS} columns.`,
       fix: COMMENT_BLOCK_ERROR_FIX,
     },
     commentColumns: {
       what: "Comment line is {{width}} columns; wrap at {{max}}.",
+      why: `The rule's second check: a comment line is at most ${MAX_COMMENT_COLUMNS} columns wide.`,
       fix:
         "Wrap it at {{max}} columns, keeping the sentence whole across the break. If it only" +
         " restates the code beside it, delete it instead of wrapping it.",
@@ -134,21 +118,15 @@ export const commentBlockSizeRule = defineRule({
 
     return {
       Program(program) {
-        const analysis = commentBlockAnalysis(context, file, program);
-        const oversized = analysis.blocks.filter(
-          (block) => block.lines >= COMMENT_BLOCK_ERROR_LINES,
-        );
+        const analysis = commentBlockAnalysis(context, program);
+        const oversized = analysis.blocks.filter((block) => block.lines > MAX_COMMENT_BLOCK_LINES);
         if (oversized.length === 0 && analysis.columnOverflows.length === 0) return;
 
         for (const block of oversized) {
           context.report({
             loc: { line: block.line, column: 0 },
             messageId: "commentBlockSize",
-            data: {
-              error: COMMENT_BLOCK_ERROR_LINES,
-              lines: block.lines,
-              max: MAX_COMMENT_BLOCK_LINES,
-            },
+            data: { lines: block.lines, max: MAX_COMMENT_BLOCK_LINES },
           });
         }
         for (const overflow of analysis.columnOverflows) {

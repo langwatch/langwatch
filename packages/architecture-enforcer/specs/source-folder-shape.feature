@@ -28,11 +28,3 @@ Feature: A folder is one concept and a file is one readable part
     And only its own folder reads it
     When architecture lint checks the workspace
     Then it reports nothing, because the grammar asked for those files and the runtime set their size
-
-  @unit @architecture
-  Scenario: A baselined finding is silent and a stale baseline entry is reported
-    Given the source folder shape baseline lists a folder or file
-    When the finding still holds
-    Then no violation is reported for it
-    When the finding no longer holds
-    Then the baseline entry is reported as one that must be removed

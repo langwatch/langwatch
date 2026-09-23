@@ -1,261 +1,100 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
 
-  // The architecture rules themselves: the langwatch/* plugin this package
-  // implements, every rule it exposes, and the exemptions that are part of a
-  // rule's definition rather than debt against it. The root .oxlintrc.jsonc
-  // extends this file, so the rules live beside the code that enforces them.
-  //
-  // There is no debt tier any more. dev/lint/oxlint.baseline.jsonc, which
-  // used to hold a path exempted because it had not been paid down yet, is
-  // deleted outright: a rule is `error` for the whole tree it governs, and an
-  // exemption is only a finding nobody has read yet.
+  // Every rule the langwatch plugin registers, each at `error`: lint runs with
+  // --quiet, so `warn` is off. There is no baseline and no per-file exemption;
+  // an override only sets a threshold or scopes a rule to a category of path.
   "jsPlugins": [
     {
       "name": "langwatch",
-      "specifier": "./oxlint-plugin.mjs"
-    }
+      "specifier": "./oxlint-plugin.mjs",
+    },
   ],
   "rules": {
+    "langwatch/banned-test-model-names": "error",
+    "langwatch/enterprise-license-header": "error",
+    "langwatch/eventing-role-purity": "error",
+    "langwatch/signature-mirror": "error",
+    "langwatch/transport-declares": "error",
+    "langwatch/clickhouse-no-version-order-limit": "error",
+    "langwatch/clickhouse-tenant-id": "error",
+    "langwatch/no-form-watch-in-child": "error",
+    "langwatch/no-tautological-assertion": "error",
+    "langwatch/require-fetch-timeout": "error",
+    "langwatch/banned-verb-prefix": "error",
+    "langwatch/module-classes": "error",
+    "langwatch/module-layers": "error",
+    "langwatch/pass-through-class": "error",
+    "langwatch/rest-route": "error",
+    "langwatch/store-containment": "error",
+    "langwatch/unresolved-relative-import": "error",
     "langwatch/cognitive-complexity": ["error", { "max": 15 }],
-    // Tuned 2026-09-17 from the shape of what it was actually reporting. The
-    // default maxCalls of 1 fired on any condition with two calls in it, which
-    // was 323 of 630 findings and covers `isEnabled(flag) && isReady(row)` -
-    // two named predicates joined by an and, which is the readable form, not
-    // the unreadable one. What stays reported is a condition doing genuinely
-    // too much at once: three or more calls, five or more terms in a logical
-    // chain, a ternary nested inside the test, or a deep property walk that
-    // also combines with something else.
-    "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],
-    "langwatch/legacy-monolith-path": "error",
-    "langwatch/api-context-services": "error",
-    "langwatch/rest-declares-input-output": "error",
-    "langwatch/rest-declares-its-answer": "error",
-    "langwatch/rest-handler-throws": "error",
-    "langwatch/rest-no-error-handler-override": "error",
-    "langwatch/rest-schema-from-own-contract": "error",
     "langwatch/comment-block-size": "error",
+    // Two calls joined by `&&` read fine; three calls, four operators, a nested
+    // ternary or a deep chain that also combines are what a reader trips on.
+    "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],
     "langwatch/conditional-type-depth": "error",
-    "langwatch/zod-object-composition": "error",
+    "langwatch/em-dash-in-copy": "error",
+    "langwatch/environment-boundaries": "error",
     "langwatch/fallible-result-naming": "error",
-    // Measured 2026-09-15 over apps/ui/src, modules, enterprise/modules: 224
-    // reports across 122 files of shipped customer copy carrying an em dash
-    // that dev/docs/best_practices/copywriting.md bans. No fixer: the right
-    // replacement is a comma, a colon, a parenthetical or a rewritten
-    // sentence, which is an editorial choice. The 122 files are baselined.
-    "langwatch/em-dash-in-copy": "warn",
-    // Measured 2026-09-15: 85 files. A .unit.test file that imports a renderer
-    // is an integration test by this repository's own definition.
-    "langwatch/unit-test-does-not-render": "error",
-    // Measured 2026-09-15: 11 reports across 8 files, gated on the Prisma seam.
-    // Encodes the incident CLAUDE.md records: _count inside findMany becomes an
-    // uncorrelated join the planner may re-run per listed row (2.3s per call).
-    "langwatch/prisma-count-in-list-query": "error",
-    // Measured 2026-09-15: 223 reports across 168 files, baselined. Reports
-    // every describe whose sibling tests share a 3+ statement opening, not
-    // only the 10 that hoist mechanically — hoistability decides whether a
-    // fixer is worth its risk, not whether the finding is worth reading.
-    "langwatch/shared-setup-is-a-hook": "error",
-    // Measured 2026-09-15: 14 reports across 10 files, baselined. Reports
-    // `._def` on any object; only the tRPC host is exempt, by path, because
-    // the router type declares no accessor for which procedure lives at a
-    // path. An earlier name-based gate admitted only `*schema` locals and so
-    // missed the two shipped bugs in model-provider-credential.ts that
-    // dev/docs/best_practices/zod.md was written about.
-    "langwatch/zod-internals": "error",
-    // Measured 2026-09-15: zero. Ships clean as a guard against a defect class
-    // CLAUDE.md and react.md both name and that recurs in generated code.
-    "langwatch/jsx-from-hook": "error",
-    "langwatch/no-try-prefix": "error",
-    "langwatch/return-await-outside-try": "error",
-    // NOT enabled: `positional-parameter-list` is registered in the plugin
-    // above but deliberately left out of this map. Measured 2026-09-15 over
-    // apps/modules/enterprise/packages/sdks: 1513 findings / 722 files at 3+
-    // parameters, 398 / 222 at 4+, 122 / 86 at 5+. The drive that built it set
-    // a 150-file ceiling for landing and 4+ exceeds it. The findings sampled
-    // clean, so this is real debt rather than a detection fault; raising the
-    // threshold to 5+ would loosen what CLAUDE.md actually asks for, so the
-    // next step is narrowing `applies` to service and public-API surfaces
-    // rather than moving the number.
     "langwatch/feature-source-filename": "error",
     "langwatch/feature-source-layout": "error",
     "langwatch/feature-source-subject": "error",
     "langwatch/handled-error-outside-contract": "error",
-    "langwatch/layer-class": "error",
-    "langwatch/no-raw-hono-mount": "error",
-    "langwatch/overload-by-literal": "error",
-    "langwatch/plan-literals": "error",
-    "langwatch/prisma-containment": "error",
-    "langwatch/schema-outside-contract": "error",
-    "langwatch/service-loads-its-own-config": "error",
-    "langwatch/temporal-only": "error",
-    "langwatch/typed-prisma-seam": "error",
-    "langwatch/web-imports-server-shaped-value": "error",
-    "langwatch/environment-boundaries": "error",
-    "langwatch/secrets-through-source": "error",
-    "langwatch/package-boundaries": "error",
-    "langwatch/feature-module-classes": "error",
-    "langwatch/service-classes": "error",
-    "langwatch/service-dependencies": "error",
-    "langwatch/namespace-class": "error",
-    "langwatch/unbounded-loop": "error",
     "langwatch/id-generation-origin": "error",
-    // Measured 2026-09-15 over the `lint:oxlint` paths: 2 reports across 2
-    // files. One is fixed in the same change; the other is langy's chat
-    // transport, where a fresh key per send is the product decision. That one
-    // is reported now, like everything else, and is open debt.
     "langwatch/idempotency-key-is-stable": "error",
-    "langwatch/no-runtime-reflection": "error",
-    "langwatch/feature-side-holds-no-app": "error",
-    "langwatch/transport-middleware-is-a-gate": "error",
-    "langwatch/type-only-value-import": "error",
+    "langwatch/jsx-from-hook": "error",
+    "langwatch/legacy-monolith-path": "error",
+    "langwatch/namespace-class": "error",
     "langwatch/no-alias-reexport": "error",
-    "langwatch/no-prototype-stub": "error",
-    "langwatch/no-logger-spy": "error",
-    "langwatch/no-raw-error-output": "error",
     "langwatch/no-boot-hook-outside-guard": "error",
-    "langwatch/banned-legacy-names": "error",
-    // The word "port" is banned outright, in every file. It was once held to a
-    // per-file register of what already carried it; that went with the rest of
-    // the suppression ledger, so the count below is the real one and a new
-    // occurrence is no different from an old one.
-    "langwatch/no-port-vocabulary": "error",
-    // Measured 2026-09-10: 70 files, 80 reports, across 20 modules. The
-    // channel conversion (ADR-144 decision 9) empties services/ of conduits
-    // and these go with it.
-    "langwatch/refusal-is-a-handled-error": "error",
-    "langwatch/channel-takes-only-its-client": "error",
-    "langwatch/clickhouse-containment": "error",
-    "langwatch/redis-containment": "error",
-    "langwatch/repository-takes-only-its-store": "error",
-    "langwatch/service-does-not-open-a-channel": "error",
-    "langwatch/module-app-only-across-packages": "error",
-    // Measured 2026-09-10 over the `lint:oxlint` paths: 80 reports across 30
-    // files. Every one is a specifier no file answers to, left behind by an
-    // in-flight move, and every one is reported until those lanes land.
-    "langwatch/dangling-barrel-export": "error",
-    // Measured 2026-09-10 over the `lint:oxlint` paths: 320 reports across
-    // 216 files.
-    "langwatch/empty-catch": "error",
-    // Measured 2026-09-10 over the `lint:oxlint` paths: 328 reports across
-    // 178 files.
-    // Widened 2026-09-15 to cover test files, which it previously exempted:
-    // 1894 reports across 792 test files (362 `as any`, 1532 double casts).
-    // Those were held on the suppression ledger at the moment of widening; the
-    // ledger is gone, and stand-in-cast is now off in test files by category
-    // instead — a test double is a stand-in by definition. Tests kept their own
-    // message ids for the production rule: a test value crossed no trust
-    // boundary, so the fix there is a typed stub, not a schema.
-    "langwatch/stand-in-cast": "error",
-    // Measured 2026-09-10 over the `lint:oxlint` paths: 9 reports across 9
-    // files.
-    "langwatch/transport-imports-a-repository": "error",
-    // Measured 2026-09-15 with the suppression ledger cleared first, because
-    // while it existed the rule read its own entry to decide whether to report
-    // and so undercounted itself: 471 reports across 95 files. Every file was
-    // already known on 2026-09-10, minus 5 fixed since. The ledger has since
-    // been deleted outright, so this is simply what the rule reports.
-    "langwatch/banned-test-model-names": "warn",
-    // Measured 2026-09-15 the same way: 517 reports across 170 files, most of
-    // them either a dynamic import inside a test body (module load order
-    // depends on mocks set up first) or a deliberate lazy `import()` for
-    // code-splitting a heavy component (editor, chart, drawer). Neither can
-    // be flipped to a top-level import without a behavioural or bundle-size
-    // change, so the baseline holds them until each is converted
-    // deliberately.
     "langwatch/no-inline-dynamic-import": "error",
-    // Enabled 2026-09-15 after exempting the false-positive class: 1349
-    // reports across 336 files, baselined. The nested-describe check now
-    // permits the MDN-style unit nesting TESTING_PHILOSOPHY.md blesses
-    // (`describe(ClassName) > describe(methodName())`) and an "and "-prefixed
-    // title, which together accounted for 309 of the 1658 it used to report.
-    "langwatch/test-description-is-an-action": "warn",
-    "langwatch/awaited-return-chain": "error",
-    "langwatch/max-statements-per-line": "error",
-    // Measured 2026-09-15 over the `lint:oxlint` paths: 34 reports across 12
-    // service files. The rule does not read the oxlint baseline (it is a
-    // whitespace `layout` rule, not a `defineRule` baseline consumer), so
-    // there is nothing to seed; every report was auto-fixed with `--fix` in
-    // the same change instead.
-    "langwatch/service-member-spacing": "warn",
-    "langwatch/service-quality": "error"
+    "langwatch/no-logger-spy": "error",
+    "langwatch/no-port-vocabulary": "error",
+    "langwatch/no-prototype-stub": "error",
+    "langwatch/no-runtime-reflection": "error",
+    "langwatch/overload-by-literal": "error",
+    "langwatch/package-boundaries": "error",
+    "langwatch/plan-literals": "error",
+    "langwatch/prisma-count-in-list-query": "error",
+    "langwatch/refusal-is-a-handled-error": "error",
+    "langwatch/schema-outside-contract": "error",
+    "langwatch/service-does-not-open-a-channel": "error",
+    "langwatch/service-loads-its-own-config": "error",
+    "langwatch/shared-setup-is-a-hook": "error",
+    "langwatch/stand-in-cast": "error",
+    "langwatch/temporal-only": "error",
+    "langwatch/test-description-is-an-action": "error",
+    "langwatch/unbounded-loop": "error",
+    "langwatch/unit-test-does-not-render": "error",
+    "langwatch/web-imports-server-shaped-value": "error",
+    "langwatch/zod-internals": "error",
+    "langwatch/zod-object-composition": "error",
   },
   "overrides": [
     {
+      // The enforcer's own source holds conditions to two operators.
       "files": ["packages/architecture-enforcer/src/**/*.ts"],
       "rules": {
-        "langwatch/boolean-wall": "error",
-        "langwatch/logical-statement-spacing": "warn"
-      }
+        "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 2, "maxHops": 3 }],
+      },
     },
     {
-      // The reference shape reads in paragraphs. Enabled where the shape is
-      // already the annotation one; a feature turns it on as it converts
-      // (the rule auto-fixes: run oxlint --fix over the feature).
-      "files": [
-        "packages/api/src/**/*.ts",
-        "modules/annotation/**/*.ts",
-        "modules/annotation/**/*.tsx",
-        "apps/api/src/features/annotation/**/*.ts",
-        "apps/ui/src/features/annotation/**/*.ts",
-        "apps/ui/src/features/annotation/**/*.tsx"
-      ],
-      "rules": { "langwatch/logical-statement-spacing": "warn" }
-    },
-
-
-    // ------------------------------------------------------------------
-    // COGNITIVE COMPLEXITY, CONDITION SHAPE, NESTED TERNARIES. Every function
-    // is held to max 15 cognitive complexity; every condition test must stay
-    // readable (see langwatch/condition-shape); no ternary may nest inside
-    // another. All three rules are `langwatch/*` plugin rules, so unlike
-    // max-depth/complexity above they consult
-    // packages/architecture-enforcer/src/oxlint-baseline.json directly and report
-    // nothing for a baselined file -- no override needed here. Existing debt
-    // is recorded in that file (rule|file, with a measured date); add a file
-    // there to exempt it, or fix it and delete its line.
-    // ------------------------------------------------------------------
-    // A component is held to 20 rather than 15, because JSX scores higher for
-    // the same reading effort: every `&&` guard and ternary in a tree counts
-    // as a branch, though it renders flat beside what it produces.
-    //
-    // Measured 2026-09-14 over 11,611 scored functions in modules, apps/ui and
-    // packages/design-system. Both file kinds have a median of 4, so this is a
-    // tail effect, not a shift: .ts reaches p95 at 12 and p99 at 18, while .tsx
-    // reaches 14 and 24. At one shared max of 15, 1.40% of .ts functions
-    // report against 1.96% of .tsx -- the same line catching half again as
-    // much of the component tree. Parity lands at 19; 20 is the round number
-    // beside it and leaves .tsx a hair looser, at 1.29%.
-    //
-    // Re-measured 2026-09-17 over 3,787 scored functions in ten module, app and
-    // package trees, and 20 turned out to be the strict side of parity rather
-    // than the loose one: .ts at 15 reports 7.93% of its functions, while .tsx
-    // at 20 reported 9.29% of its own -- a component was MORE likely to be
-    // flagged than a plain function, which is the opposite of what the JSX
-    // argument above intends. Equal rates land at 24; 25 is the round number
-    // beside it, at 7.61%.
-    //
-    // 30 was considered and rejected: it reports 6.00%, which stops correcting
-    // for JSX and starts forgiving components specifically.
-    //
-    // This is a threshold, not an exemption: the components still above 25 are
-    // genuinely complex and stay reported, `LangyPanel` at 588 among them.
-    {
+      // JSX scores higher for the same reading effort: every `&&` guard and
+      // ternary in a tree is a branch. 25 is where .tsx and .ts report at the
+      // same rate (re-measured 2026-09-17).
       "files": ["**/*.tsx"],
       "rules": {
-        "langwatch/cognitive-complexity": ["error", { "max": 25 }]
-      }
+        "langwatch/cognitive-complexity": ["error", { "max": 25 }],
+      },
     },
-    // Test files are held to 40 -- a table-driven suite branches more than a
-    // service method -- and the 23 that sit above it are registered below.
-    // This entry follows the .tsx one on purpose: later entries win, so a
-    // component test keeps 40 rather than dropping to the component limit.
     {
+      // A table-driven suite branches more than a service method. Listed after
+      // the .tsx entry so a component test keeps 40: later entries win.
       "files": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
       "rules": {
-        "langwatch/cognitive-complexity": ["error", { "max": 40 }]
-      }
-    }
-
-  ]
+        "langwatch/cognitive-complexity": ["error", { "max": 40 }],
+      },
+    },
+  ],
 }

@@ -31,22 +31,6 @@ Feature: Feature package boundary lint
     And it rejects package runtimes that the architecture has explicitly retired
 
   @unit @architecture
-  Scenario: Legacy edge reconciliation stays out of the hot path
-    Given the temporary application split has a checked-in shrinking edge baseline
-    When routine architecture lint checks the workspace
-    Then it does not rebuild the legacy baseline
-    And the explicit migration audit reconciles stale and newly added legacy edges
-
-  @unit @architecture
-  Scenario: Legacy feature fragments only shrink
-    Given a migrated feature has remaining path-shaped implementation, transport, composition, page-shell, or infrastructure-adapter modules in platform/app
-    And those exact modules are recorded in the checked-in feature fragment inventory
-    When architecture lint checks the workspace
-    Then a new module matching a catalogue-owned subject is rejected
-    And a removed inventory module is reported as stale
-    And inventory ordering and duplicate feature/file entries are rejected
-
-  @unit @architecture
   Scenario: Physical package names match their feature roles
     Given a feature surface package name does not match its registered singular identifier, path and role
     When architecture lint checks the workspace
@@ -60,6 +44,15 @@ Feature: Feature package boundary lint
     Then it reports a feature-source-subject violation
     And adding that subject to feature.json does not suppress the violation
     And a catalogue expansion requires the owning feature ADR and spec
+
+  @unit @architecture @enterprise
+  Scenario: An Enterprise module may provide a core port it does not own
+    Given a core catalogue entry that owns a contract package and no process package
+    And an Enterprise root of the same id holding the provider of that contract
+    When architecture lint checks the workspace
+    Then no feature-catalogue violation is reported for the Enterprise root
+    And an Enterprise root is still refused when the core entry has its own process half
+    And an Enterprise root is still refused when no catalogue entry carries its id
 
   @unit @architecture
   Scenario: Two features cannot own the same subject
@@ -148,20 +141,6 @@ Feature: Feature package boundary lint
     And its export map does not expose that file
     When a consumer imports the internal subpath
     Then architecture lint reports a sealed-export violation
-
-  @unit @architecture
-  Scenario: A web feature collaborates only through another web feature's named surface
-    Given a web feature imports another web feature's surfaces entry
-    When architecture lint checks the importer
-    Then the dependency is allowed, because a surface is the web feature's public collaboration point
-    And the same importer is rejected for the bare package entry or any other subpath
-
-  @unit @architecture
-  Scenario: A web package's test seam is reachable from a test source
-    Given a web package declares a testing entry of fixture builders
-    When a test source in another web package or in the browser application imports it
-    Then the dependency is allowed, the same way a server package's testing entry is
-    And a production source importing that same entry is still rejected
 
   @unit @architecture
   Scenario: Wildcard exports are forbidden for feature packages

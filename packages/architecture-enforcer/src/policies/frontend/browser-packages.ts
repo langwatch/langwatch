@@ -376,6 +376,10 @@ export function lintBrowserKitExports(snapshot: WorkspaceSnapshot): Architecture
 export function lintBrowserKitDependencies(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const modulePackages = discoverModulePackages(snapshot.resolver, snapshot.root);
   const violations: ArchitectureViolation[] = [];
+  // An edge onto a browser package is the manifest closure's to report.
+  const browserPackageNames = new Set(
+    modulePackages.filter((pkg) => pkg.role === "browser").map((pkg) => pkg.name),
+  );
 
   for (const pkg of modulePackages) {
     if (pkg.role !== "browser-kit") continue;
@@ -384,7 +388,7 @@ export function lintBrowserKitDependencies(snapshot: WorkspaceSnapshot): Archite
     const dependencies = manifestDependencies(manifest);
 
     for (const name of Object.keys(dependencies)) {
-      if (!name.startsWith("@langwatch/")) continue;
+      if (!name.startsWith("@langwatch/") || browserPackageNames.has(name)) continue;
 
       const allowed =
         name.endsWith("-contract") ||

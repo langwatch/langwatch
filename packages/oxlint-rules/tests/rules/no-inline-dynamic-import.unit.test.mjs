@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { noInlineDynamicImportRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -34,10 +35,7 @@ describe("given a governed file", () => {
     /** @scenario "The CLI startup path is exempt" */
     it("reports nothing", () => {
       expect(
-        report(
-          'const mod = await import("./thing");',
-          "sdks/typescript/src/cli/program.ts",
-        ),
+        report('const mod = await import("./thing");', "sdks/typescript/src/cli/program.ts"),
       ).toEqual([]);
     });
   });
@@ -83,6 +81,41 @@ describe("given a governed file", () => {
           'const mod = () => import("./ui/sections/agent-drawers");',
           "apps/ui/src/features/agent/index.ts",
         ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a component is code-split through lazy", () => {
+    /** @scenario "A lazy-loaded component is allowed" */
+    it("reports nothing for lazy or React.lazy, with or without a .then", () => {
+      const code = [
+        'const Chart = lazy(() => import("./chart"));',
+        'const Editor = React.lazy(() => import("./editor").then((m) => ({ default: m.Editor })));',
+      ].join("\n");
+
+      expect(report(code, "modules/agent/browser/src/ui/sections/lazy-chart.tsx")).toEqual([]);
+    });
+
+    /** @scenario "An import inside a non-lazy callback is still reported" */
+    it("reports an import wrapped in any other call, on its line", () => {
+      const code = 'const a = 1;\nconst load = memo(() => import("./chart"));';
+      const found = report(code, "modules/agent/browser/src/ui/sections/lazy-chart.tsx");
+
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([
+        ["inlineDynamicImport", 2],
+      ]);
+    });
+  });
+});
+
+describe("given a test file", () => {
+  describe("when it imports the module under test after vi.mock", () => {
+    /** @scenario "A test file may import after its mocks" */
+    it("reports nothing", () => {
+      const code = 'vi.mock("./thing");\nconst { run } = await import("./run");';
+
+      expect(
+        report(code, "modules/agent/process/src/services/__tests__/agent.unit.test.ts"),
       ).toEqual([]);
     });
   });

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { noPortVocabularyRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -14,6 +15,7 @@ function report(code, filename) {
 
 describe("given a module source file", () => {
   describe("when it declares an interface whose name ends in Port", () => {
+    /** @scenario "A declared or imported name ending in Port is reported" */
     it("reports portVocabulary", () => {
       const found = report(
         "export interface AgentNormalizePort { normalize(): void; }",
@@ -50,6 +52,7 @@ describe("given a module source file", () => {
   });
 
   describe("when it re-exports from a ports folder", () => {
+    /** @scenario "A re-export from a ports folder is reported" */
     it("reports portVocabulary", () => {
       const found = report(
         "export { AgentClock } from './ports/agent-clock.port.ts';",
@@ -61,6 +64,7 @@ describe("given a module source file", () => {
   });
 
   describe("when the file itself lives under a ports folder", () => {
+    /** @scenario "A file living under a ports folder is reported" */
     it("reports portFile", () => {
       const found = report(
         "export const nothing = 1;",
@@ -74,6 +78,7 @@ describe("given a module source file", () => {
 
 describe("given source that names a network port or a word containing port", () => {
   describe("when it declares a lower camel case network port", () => {
+    /** @scenario "A network port and words containing port are left alone" */
     it("reports nothing", () => {
       const found = report(
         "const freePort = 5560; export const chosenPort = freePort;",

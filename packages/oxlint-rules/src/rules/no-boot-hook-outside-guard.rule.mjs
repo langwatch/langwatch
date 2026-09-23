@@ -4,37 +4,48 @@ import { defineRule } from "../define-rule.mjs";
 // `uncaughtException` or `unhandledRejection` listener races the boot guard
 // and can swallow the exit it relies on.
 
-const BOOT_GUARD_FILE = "packages/observability/src/boot-guard.ts";
+// A `Server` installs the first; a one-shot executable boots through the second.
+const BOOT_GUARD_FILES = new Set([
+  "packages/process-server/src/server.ts",
+  "packages/observability/src/boot-guard.ts",
+]);
+// A published SDK cannot reach either guard; it owns its own process.
+const PUBLISHED_SDK = /^sdks\//;
 const GOVERNED_EVENT = /^(?:uncaughtException|unhandledRejection)$/;
+const LISTEN_METHOD = /^(?:on|once|addListener|prependListener|prependOnceListener)$/;
+
+function isProcessListen(callee) {
+  return (
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    callee.object.type === "Identifier" &&
+    callee.object.name === "process" &&
+    LISTEN_METHOD.test(callee.property.name)
+  );
+}
 
 export const noBootHookOutsideGuardRule = defineRule({
   name: "no-boot-hook-outside-guard",
   kind: "problem",
   messages: {
     bootHookOutsideGuard: {
-      what: "`process.on(\"{{event}}\", ...)` is registered outside the boot guard.",
-      fix: "Delete this listener and move its handling into `packages/observability/src/boot-guard.ts`, the one place that owns process-level failure handling.",
+      what: '`process.{{method}}("{{event}}", ...)` is registered outside the boot guard.',
+      fix: "Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process-server`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.",
     },
   },
   create(context, file) {
-    if (file.workspacePath === BOOT_GUARD_FILE) return {};
+    if (BOOT_GUARD_FILES.has(file.workspacePath) || PUBLISHED_SDK.test(file.workspacePath))
+      return {};
 
     return {
       CallExpression(node) {
-        const callee = node.callee;
-        const isProcessOn =
-          callee.type === "MemberExpression" &&
-          !callee.computed &&
-          callee.object.type === "Identifier" &&
-          callee.object.name === "process" &&
-          callee.property.type === "Identifier" &&
-          callee.property.name === "on";
-        if (!isProcessOn) return;
+        if (!isProcessListen(node.callee)) return;
 
         const eventArgument = node.arguments[0];
         const event = eventArgument?.type === "Literal" ? eventArgument.value : undefined;
         if (typeof event === "string" && GOVERNED_EVENT.test(event)) {
-          context.report({ node, messageId: "bootHookOutsideGuard", data: { event } });
+          const method = node.callee.property.name;
+          context.report({ node, messageId: "bootHookOutsideGuard", data: { event, method } });
         }
       },
     };

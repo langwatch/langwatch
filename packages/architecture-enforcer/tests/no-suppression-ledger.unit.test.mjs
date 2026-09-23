@@ -1,16 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
-// specs/tooling/lint-baseline.feature
-//
-// The ledger these guards refuse held 6,925 `rule|file` rows hiding 8,904
-// findings, and its reader was a bare set lookup - so a listed file was exempt
-// from that rule however many NEW violations it gained. It is gone. What is
-// left is the property that made deleting it worth the 9,000-finding jump:
-// a rule now either runs everywhere, or is turned off by name where a reader
-// can see it.
+// specs/tooling/lint-baseline.feature: the suppression ledger is gone, and a rule
+// either runs everywhere or is turned off by name where a reader can see it.
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const root = resolve(packageRoot, "../..");
@@ -29,17 +24,11 @@ const CONFIGS = [["oxlint.architecture.jsonc", architecture]];
 const DELETED_OVERRIDE_CONFIG = join(root, "dev/lint/oxlint.baseline.jsonc");
 
 /**
- * The vocabulary a suppression list uses about itself. An exception that is
- * part of the design says what the exempt files ARE; a register says the
- * exemption is temporary and names the debt it defers. The block this guard
- * was written after called itself a DEBT REGISTER in its own header and
- * promised it "can only shrink", while listing one path twice.
- *
- * This is matched only against the comment attached to a block that turns a
- * rule off for named files. Prose elsewhere in a config is free to describe
- * the ledger's history -- and does.
+ * How a suppression list that defers debt describes itself, matched only against
+ * the comment on a block that turns a rule off for named files.
  */
-const DEFERRAL = /debt register|shrink-only|may only shrink|can only shrink|seeded into the|held here rather than/i;
+const DEFERRAL =
+  /debt register|shrink-only|may only shrink|can only shrink|seeded into the|held here rather than/i;
 
 /** Each `{ "files": [...], "rules": {...} }` block with the comment above it. */
 function overrideBlocks(source) {
@@ -174,7 +163,6 @@ describe("given the test-file tier", () => {
         "condition-shape",
         "comment-block-size",
         "cognitive-complexity",
-        "empty-catch",
         "no-inline-dynamic-import",
       ]) {
         expect(testTier).not.toMatch(new RegExp(`"langwatch/${rule}":\\s*"off"`));

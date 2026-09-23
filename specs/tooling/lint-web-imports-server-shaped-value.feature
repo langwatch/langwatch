@@ -22,6 +22,18 @@ Feature: The web-imports-server-shaped-value lint rule
     Then it reports serverShaped
 
   @unit
+  Scenario: The rule covers browser kits and the design system
+    Given a browser kit module or a design-system module that value-imports a database client
+    When the web-imports-server-shaped-value rule runs over it
+    Then it reports serverShaped
+
+  @unit
+  Scenario: The rule gates on the file's role, not a path fragment
+    Given a framework package whose path contains the word browser but is not a browser half
+    When the web-imports-server-shaped-value rule runs over it
+    Then it reports nothing
+
+  @unit
   Scenario: A type-only import of a server-shaped package is left alone
     Given a web feature module that imports the same package as a type
     When the web-imports-server-shaped-value rule runs over it

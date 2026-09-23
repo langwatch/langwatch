@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { sharedSetupIsAHookRule } from "../../src/rules/shared-setup-is-a-hook.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -65,6 +66,30 @@ describe("given a describe with sibling it blocks", () => {
           it("does another thing", () => {
             const a = setup();
             const b = prepare(a);
+            expect(a).toBe(2);
+          });
+        });
+      `;
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when the identical run continues past an assertion", () => {
+    /** @scenario "the shared prefix stops at the first assertion" */
+    it("counts only the setup before the first expect", () => {
+      const code = `
+        describe("AgentService", () => {
+          it("does one thing", async () => {
+            const a = setup();
+            await expect(load(a)).resolves.not.toBeNull();
+            assert.ok(a);
+            expect(a).toBe(1);
+          });
+          it("does another thing", async () => {
+            const a = setup();
+            await expect(load(a)).resolves.not.toBeNull();
+            assert.ok(a);
             expect(a).toBe(2);
           });
         });

@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { lintPolicies, POLICIES } from "../src/index.ts";
 import {
   lintBrowserKitDependencies,
   lintBrowserKitExports,
@@ -225,5 +226,45 @@ describe("when a kit's dependencies reach outside contracts, the Design System a
     const violations = lintBrowserKitDependencies(snapshotOf({ root }));
 
     expect(violations).toHaveLength(0);
+  });
+});
+
+describe("when one manifest edge onto a browser package could be read by three policies", () => {
+  /** @scenario "One manifest edge onto a browser package is reported once" */
+  it("reports it under the manifest closure alone, not again as cross-feature or kit debt", () => {
+    write(
+      "modules/catalogue.json",
+      JSON.stringify({
+        version: 0,
+        features: [
+          {
+            id: "scenario",
+            root: "modules/scenario",
+            classification: "core",
+            subjects: ["scenario"],
+          },
+          { id: "trace", root: "modules/trace", classification: "core", subjects: ["trace"] },
+        ],
+      }),
+    );
+    writePackage("modules/trace/browser", "@langwatch/trace-browser");
+    writePackage("modules/scenario/browser", "@langwatch/scenario-browser", {
+      dependencies: { "@langwatch/trace-browser": "workspace:*" },
+    });
+    writePackage("modules/trace/browser-kit", "@langwatch/trace-browser-kit", {
+      dependencies: { "@langwatch/scenario-browser": "workspace:*" },
+    });
+
+    const registry = POLICIES.filter((policy) =>
+      ["browser-package-closure", "browser-kit-dependencies", "manifests"].includes(policy.id),
+    );
+    const edges = lintPolicies(snapshotOf({ root }), registry)
+      .filter((violation) => violation.specifier?.endsWith("-browser"))
+      .map((violation) => `${violation.policy} ${violation.file} ${violation.specifier}`);
+
+    expect(edges).toEqual([
+      "browser-package-manifest-closure modules/scenario/browser/package.json @langwatch/trace-browser",
+      "browser-package-manifest-closure modules/trace/browser-kit/package.json @langwatch/scenario-browser",
+    ]);
   });
 });

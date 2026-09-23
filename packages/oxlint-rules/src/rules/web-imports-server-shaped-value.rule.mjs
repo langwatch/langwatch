@@ -30,10 +30,11 @@ function serverShapedPackage(specifier) {
   return SERVER_SHAPED.find((name) => specifier === name || specifier.startsWith(`${name}/`));
 }
 
-function isBrowserSource(workspacePath) {
-  const featureWeb = /^(?:enterprise\/)?modules\/[^/]+\/browser\/src\//.test(workspacePath);
-  const application = workspacePath.startsWith('apps/ui/src/');
-  return featureWeb || application;
+const BROWSER_ROLES = new Set(["browser", "browser-kit", "design-system"]);
+
+function isBrowserSource(file) {
+  if (BROWSER_ROLES.has(file.role)) return true;
+  return file.kind === "application" && file.workspacePath.startsWith("apps/ui/");
 }
 
 function importedSpecifier(node) {
@@ -58,10 +59,10 @@ export const webImportsServerShapedValueRule = defineRule({
     serverShaped: {
       what: "A browser module value-imports `{{name}}`, whose declarations are the server's and pull a database graph into the browser program.",
       why: "Loading declaration files is the largest bucket in a type-check, and this class of import is invisible in the bundle.",
-      fix: "Import it as a type only when only the type is needed here. Otherwise, add a server endpoint or a first-party wrapper module the browser calls instead of importing this package's value directly.",
+      fix: "Import it as a type when only the type is needed; otherwise read the data through the owning module's tRPC client, derived from its contract.",
     },
   },
-  applies: (file) => isBrowserSource(file.workspacePath) && file.isProduction,
+  applies: (file) => isBrowserSource(file) && file.isProduction,
   create(context) {
     const check = (node) => {
       if (!isValueImport(node)) return;

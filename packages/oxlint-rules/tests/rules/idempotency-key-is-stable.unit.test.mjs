@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { idempotencyKeyIsStableRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -68,6 +69,25 @@ describe("given a production source", () => {
       expect(found.map((entry) => entry.messageId)).toEqual([
         "mintedAtCallSite",
         "mintedAtCallSite",
+      ]);
+    });
+  });
+
+  describe("when the key is spelled as snake case or as an HTTP header", () => {
+    /** @scenario "A snake-case key or an Idempotency-Key header minted at the call site is reported" */
+    it("reports each spelling under its own name, on its line", () => {
+      const found = report(
+        "export function run(post, headers) {\n" +
+          "  post({ idempotency_key: crypto.randomUUID() });\n" +
+          '  post({ headers: { "Idempotency-Key": nanoid() } });\n' +
+          '  headers.set("idempotency-key", crypto.randomUUID());\n' +
+          "}\n",
+      );
+
+      expect(found.map((entry) => [entry.data.name, entry.data.source, entry.line])).toEqual([
+        ["idempotency_key", "crypto.randomUUID()", 2],
+        ["Idempotency-Key", "nanoid()", 3],
+        ["idempotency-key", "crypto.randomUUID()", 4],
       ]);
     });
   });

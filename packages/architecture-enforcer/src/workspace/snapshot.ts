@@ -11,7 +11,7 @@ import type {
   PackageManifest,
 } from "../types.ts";
 import { readFeatureCatalogue } from "./feature-catalogue.ts";
-import { forgetFileListings, listFiles } from "./layout.ts";
+import { forgetFileListings, IGNORED_DIRECTORIES, listFiles } from "./layout.ts";
 import {
   forgetWorkspaceModuleResolvers,
   workspaceModuleResolver,
@@ -34,6 +34,7 @@ const APPLICATION_PACKAGES: readonly {
   { role: "api", path: "api", name: "@langwatch/platform-api" },
   { role: "worker", path: "worker", name: "@langwatch/worker" },
   { role: "server", path: "server", name: "@langwatch/server" },
+  { role: "tasks", path: "tasks", name: "@langwatch/tasks" },
 ];
 
 const ENTERPRISE_COMPOSITION_PACKAGES: readonly {
@@ -52,9 +53,30 @@ function directories(path: string): string[] {
   if (!existsSync(path)) return [];
 
   return readdirSync(path, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    .filter((entry) => entry.isDirectory() && !IGNORED_DIRECTORIES.has(entry.name))
     .map((entry) => entry.name)
     .toSorted();
+}
+
+/** A core catalogue entry that owns a contract and no process half. */
+function isContractOnlyCoreEntry({
+  root,
+  catalogue,
+  id,
+}: {
+  root: string;
+  catalogue: readonly FeatureCatalogueEntry[];
+  id: string;
+}): boolean {
+  const entry = catalogue.find((candidate) => candidate.id === id);
+  if (entry?.classification !== "core") return false;
+
+  const entryRoot = join(root, entry.root);
+
+  return (
+    existsSync(join(entryRoot, "contract", "package.json")) &&
+    !existsSync(join(entryRoot, "process", "package.json"))
+  );
 }
 
 export function discoverClassifiedPackages(root: string): {
@@ -71,8 +93,12 @@ export function discoverClassifiedPackages(root: string): {
     for (const feature of directories(featuresRoot)) {
       const featureRoot = join(featuresRoot, feature);
       const catalogueEntry = catalogueByRoot.get(featureRoot);
+      // An Enterprise provider of a core port is unregistered by design:
+      // modules/audit-log/adrs/002-audit-log-port-boundary.md.
+      const providesCorePort =
+        enterprise && !catalogueEntry && isContractOnlyCoreEntry({ root, catalogue, id: feature });
 
-      if (!catalogueEntry) {
+      if (!catalogueEntry && !providesCorePort) {
         violations.push({
           policy: "feature-catalogue",
           file: featureRoot,
@@ -80,7 +106,10 @@ export function discoverClassifiedPackages(root: string): {
           allowed:
             "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
         });
-      } else if ((catalogueEntry.classification === "enterprise") !== enterprise) {
+      } else if (
+        catalogueEntry &&
+        (catalogueEntry.classification === "enterprise") !== enterprise
+      ) {
         violations.push({
           policy: "feature-catalogue",
           file: featureRoot,
@@ -172,7 +201,7 @@ export function discoverClassifiedPackages(root: string): {
       policy: "application-layout",
       file: unexpectedManifest,
       message: `Unknown application workspace apps/${directory}.`,
-      allowed: "The fixed application roots are ui, api, worker, and server.",
+      allowed: "The fixed application roots are ui, api, worker, server, and tasks.",
     });
   }
 

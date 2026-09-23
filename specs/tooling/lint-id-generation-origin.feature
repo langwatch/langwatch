@@ -12,7 +12,7 @@ Feature: The id-generation-origin lint rule
     Given a strict feature module or a process module importing nanoid or uuid
     When the id-generation-origin rule runs over it
     Then it reports foreignIdModule naming the module
-    And the fix names generate from @langwatch/ksuid with a kind prefix
+    And the fix names generate from @langwatch/ksuid, called with the kind as its resource
 
   @unit
   Scenario: A randomUUID call is reported with the house import

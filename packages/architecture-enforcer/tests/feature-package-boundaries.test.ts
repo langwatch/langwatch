@@ -5,11 +5,13 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { lintWorkspace } from "../src/index.ts";
+import { writePolicyAnchors } from "./workspace.ts";
 
 let root = "";
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "langwatch-architecture-enforcer-"));
+  writePolicyAnchors(root);
 });
 
 afterEach(() => {
@@ -244,14 +246,12 @@ describe("feature package boundary lint", () => {
     });
 
     const minimalFixturePolicies = new Set([
-      "feature-app-contract",
       "feature-shape",
       "browser-package-exports",
       "unused-module-export",
     ]);
     const violations = lintWorkspace({ root, declarations: false });
     expect(violations.filter((item) => !minimalFixturePolicies.has(item.policy))).toEqual([]);
-    expect(violations.filter((item) => item.policy === "feature-app-contract")).toHaveLength(3);
   });
 
   /** @scenario Physical package names match their feature roles */
@@ -713,7 +713,7 @@ describe("strict feature source layout", () => {
       "export class AgentBackfillTask { static create() { return new AgentBackfillTask(); } }",
     );
 
-    expect(policies()).not.toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-layout");
   });
 
   it("accepts a canonical API contract as the portable capability module", () => {
@@ -728,7 +728,7 @@ describe("strict feature source layout", () => {
       'import { moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
     );
 
-    expect(policies()).not.toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-layout");
   });
 
   it("rejects process wiring bound from the composition root by a portable API contract", () => {
@@ -743,7 +743,7 @@ describe("strict feature source layout", () => {
       'import { createApp, moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget"); export const app = createApp;',
     );
 
-    expect(policies()).toContain("feature-source-layout");
+    expect(policies()).toContain("feature-layout");
   });
 
   it("accepts the feature-API vocabulary bound from the composition root", () => {
@@ -758,7 +758,7 @@ describe("strict feature source layout", () => {
       'import { moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
     );
 
-    expect(policies()).not.toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-layout");
   });
 
   /**
@@ -788,7 +788,7 @@ describe("strict feature source layout", () => {
       "export const fixture = true;",
     );
 
-    expect(policies()).not.toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-layout");
     expect(policies()).not.toContain("feature-source-filename");
   });
 
@@ -846,7 +846,7 @@ describe("strict feature source layout", () => {
       ].join("\n"),
     );
 
-    expect(policies()).not.toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-layout");
   });
 
   it("accepts a rules module constructing a pure value", () => {
@@ -857,7 +857,7 @@ describe("strict feature source layout", () => {
       'export function names(): Set<string> {\n  return new Set(["a"]);\n}\n',
     );
 
-    expect(policies()).not.toContain("feature-source-layout");
+    expect(policies()).not.toContain("feature-layout");
   });
 
   it("rejects a rules module importing a service", () => {
@@ -875,7 +875,7 @@ describe("strict feature source layout", () => {
     );
 
     const violations = lintWorkspace({ root, declarations: false }).filter(
-      (violation) => violation.policy === "feature-source-layout",
+      (violation) => violation.policy === "feature-layout",
     );
     expect(
       violations.some(
@@ -902,7 +902,7 @@ describe("strict feature source layout", () => {
     );
 
     const violations = lintWorkspace({ root, declarations: false }).filter(
-      (violation) => violation.policy === "feature-source-layout",
+      (violation) => violation.policy === "feature-layout",
     );
     expect(
       violations.some(
@@ -951,18 +951,9 @@ describe("Prisma client containment", () => {
       "modules/agent/process/src/services/agent.service.ts",
       'import type { PrismaClient } from "@langwatch/prisma-client/generated"; export class AgentService { static create(_client: PrismaClient) { return new AgentService(); } }',
     );
-    write(
-      "modules/agent/process/src/subscribers/agent.subscriber.ts",
-      "export const handle = (events: { append(): void }) => events.append();",
-    );
 
     const reported = new Set(policies());
-    for (const family of [
-      "feature-catalogue",
-      "package-role",
-      "eventing-subscriber-idempotency",
-      "retired-package-runtime",
-    ]) {
+    for (const family of ["feature-catalogue", "package-role", "retired-package-runtime"]) {
       expect(reported).toContain(family);
     }
   });

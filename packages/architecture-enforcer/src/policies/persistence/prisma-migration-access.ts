@@ -18,7 +18,7 @@ const TEST = /(?:__tests__|__fixtures__|\.(?:test|spec)\.)/;
 function violation(file: string, message: string): ArchitectureViolation {
   return {
     file,
-    policy: "prisma-table-ownership",
+    policy: "prisma-migration-access",
     message,
     allowed:
       "Use PrismaRepository.for(...) for feature ownership. Only a private repository constructed by a SystemMigration may use a literal scopedPrismaClient capability. Never export that repository or pass it to an App.",

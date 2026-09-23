@@ -1,76 +1,25 @@
-// The comment-block grammar, shared by the two oxlint rules that report block
-// size and by the CLI's 4-5 line review queue. Each caller supplies the comment
-// ranges from the parser it already has; everything below is pure.
+// The comment-block grammar behind `langwatch/comment-block-size`. The caller
+// supplies the comment ranges from the parser it already has; all below is pure.
 
+// A file with no run of this many comment lines cannot hold an oversized block.
 export const REVIEW_LINE_COUNT = 4;
 export const MAX_COMMENT_BLOCK_LINES = 5;
-// One threshold, not two. The 6-to-8 line warning tier is gone: it reported
-// 5,212 blocks across 3,154 files, 2,139 of which carried exactly one, and a
-// warning that never becomes an error is a report nobody is obliged to answer.
-// The maximum is 5, and the line after the maximum is where it fails --
-// anything that genuinely needs more belongs in an ADR with one line pointing
-// at it, which is what this rule has always said to do.
-export const COMMENT_BLOCK_ERROR_LINES = MAX_COMMENT_BLOCK_LINES + 1;
 
-/**
- * The last resort, and almost never correct. It must name the ADR that holds
- * the narrative. It silenced the warning tier alone, and in the life of that
- * tier not one comment in the repository ever used it -- kept because the
- * grammar's messages still name it, not because it has earned a second tier.
- */
-export const LINT_KEEP_ANNOTATION = "@lint-keep";
-
-/** A reason is a clause, not a shrug: fewer words than this does not excuse the block. */
-export const LINT_KEEP_REASON_WORDS = 3;
-
-/**
- * The per-file command a reader can paste to get every comment finding in one
- * file at once, which is what turns a pile of single reports into one task.
- */
-export const COMMENT_SWEEP_COMMAND = "pnpm exec oxlint --config .oxlintrc.architecture.json <file>";
-
-/** The two answers that are almost always right, in the order to try them. */
 const WHERE_IT_BELONGS =
   "Delete it when the code already says it, or move the narrative into an ADR under" +
   " `dev/docs/adr/` and leave one line here linking it.";
 
-/** Named, not explained: the reasoning is ADR-140's job, which is the rule's own point. */
-const KEEP_IS_A_LAST_RESORT =
-  `Keeping a block this long needs \`${LINT_KEEP_ANNOTATION} <reason> dev/docs/adr/<file>.md\`` +
-  " inside it and is almost never right; see ADR-140.";
-
-/** Declared as `what` + `fix` so a rule can interpolate either half. */
-export const COMMENT_BLOCK_SIZE_WHAT = "Comment block has {{lines}} lines; the maximum is {{max}}.";
-
-export const COMMENT_BLOCK_SIZE_FIX = `${WHERE_IT_BELONGS} ${KEEP_IS_A_LAST_RESORT}`;
-
 export const COMMENT_BLOCK_ERROR_WHAT =
-  `${COMMENT_BLOCK_SIZE_WHAT} At {{error}} lines or more nothing suppresses this.`;
+  "Comment block has {{lines}} lines; the maximum is {{max}}.";
 
 export const COMMENT_BLOCK_ERROR_FIX = `${WHERE_IT_BELONGS} See ADR-140.`;
 
-export const COMMENT_KEEP_REASON_WHAT =
-  `\`${LINT_KEEP_ANNOTATION}\` needs both a reason of {{words}} words or more and the ADR` +
-  " recording it, so this {{lines}}-line block is still over {{max}}.";
-
-export const COMMENT_KEEP_REASON_FIX =
-  `Write \`${LINT_KEEP_ANNOTATION} <reason> dev/docs/adr/<file>.md\` on its own line inside the` +
-  " block, or delete the block and move its narrative into that ADR.";
-
-const WARN_MESSAGE = `${COMMENT_BLOCK_SIZE_WHAT} ${COMMENT_BLOCK_SIZE_FIX}`;
-const ERROR_MESSAGE = `${COMMENT_BLOCK_ERROR_WHAT} ${COMMENT_BLOCK_ERROR_FIX}`;
-
-/** The message for a block of `lines`, at whichever tier that count falls in. */
+/** The rendered message for a block of `lines`; retire once no test renders it by hand. */
 export function commentBlockSizeMessage(lines) {
-  const template = lines >= COMMENT_BLOCK_ERROR_LINES ? ERROR_MESSAGE : WARN_MESSAGE;
-
-  return template
+  return `${COMMENT_BLOCK_ERROR_WHAT} ${COMMENT_BLOCK_ERROR_FIX}`
     .replaceAll("{{lines}}", String(lines))
-    .replaceAll("{{max}}", String(MAX_COMMENT_BLOCK_LINES))
-    .replaceAll("{{error}}", String(COMMENT_BLOCK_ERROR_LINES));
+    .replaceAll("{{max}}", String(MAX_COMMENT_BLOCK_LINES));
 }
-
-const SOURCE_WHITESPACE = new Set([" ", "\t", "\r", "\n"]);
 
 export function marksGeneratedHeader(source) {
   const header = source.split("\n", 40).join("\n").toLowerCase();
@@ -124,33 +73,19 @@ export function isExemptBlock(text) {
   return lines.length > 0 && lines.every((line) => DIRECTIVE_LINE.test(line));
 }
 
-/** The ADR or best-practices page holding the narrative this block is a fragment of. */
-const LINT_KEEP_RECORD = /dev\/docs\/(?:adr|best_practices)\/[\w.-]+\.md\b/;
+function isCommentLikeLine(line, insideBlockComment) {
+  const text = line.trimStart();
 
-const LINT_KEEP_LINE = new RegExp(
-  String.raw`^\s*(?:\/\/|\/\*\*?|\*\/?|\*)?\s*@lint-keep\b[ \t]*(.*?)\s*(?:\*\/)?\s*$`,
-);
+  return insideBlockComment || text.startsWith("//") || text.startsWith("/*");
+}
 
-/**
- * The `@lint-keep` annotation a block carries, if any: whether it is present,
- * the reason written beside it, and how many lines it occupies - those lines
- * are the annotation, not the commentary, so they do not count toward length.
- */
-export function inspectLintKeep(text) {
-  let annotationLines = 0;
-  let reason = "";
+/** Whether a block comment is still open once `line` ends. */
+function blockCommentOpenAfter(line, insideBlockComment) {
+  const blockStart = line.indexOf("/*");
+  const blockEnd = line.indexOf("*/", insideBlockComment ? 0 : blockStart + 2);
+  if (insideBlockComment) return blockEnd === -1;
 
-  for (const line of text.split(/\r?\n/)) {
-    const match = LINT_KEEP_LINE.exec(line);
-    if (!match) continue;
-    annotationLines += 1;
-    if (!reason) reason = (match[1] ?? "").trim();
-  }
-
-  const words = reason.split(/\s+/).filter((word) => word.length > 0);
-  const records = LINT_KEEP_RECORD.test(reason);
-
-  return { annotationLines, present: annotationLines > 0, reason, records, words: words.length };
+  return blockStart !== -1 && blockEnd === -1;
 }
 
 export function mayContainReviewBlock(source) {
@@ -158,22 +93,9 @@ export function mayContainReviewBlock(source) {
   let insideBlockComment = false;
 
   for (const line of source.split(/\r?\n/)) {
-    const lineComment = line.trimStart().startsWith("//");
-    const blockStart = line.indexOf("/*");
-    const blockEnd = line.indexOf("*/", insideBlockComment ? 0 : blockStart + 2);
-    const commentLike = lineComment || insideBlockComment || line.trimStart().startsWith("/*");
-
-    if (commentLike) {
-      contiguousLines += 1;
-      if (contiguousLines >= REVIEW_LINE_COUNT) return true;
-    } else {
-      contiguousLines = 0;
-    }
-
-    if (insideBlockComment && blockEnd !== -1) insideBlockComment = false;
-    if (!insideBlockComment && blockStart !== -1 && blockEnd === -1) {
-      insideBlockComment = true;
-    }
+    contiguousLines = isCommentLikeLine(line, insideBlockComment) ? contiguousLines + 1 : 0;
+    if (contiguousLines >= REVIEW_LINE_COUNT) return true;
+    insideBlockComment = blockCommentOpenAfter(line, insideBlockComment);
   }
   return false;
 }
@@ -217,12 +139,23 @@ export function lineAtOffset(starts, position) {
   return lineAt(starts, position) + 1;
 }
 
+/** `source` with every comment's characters blanked, line breaks kept, so code is what remains. */
+function blankComments(source, ranges) {
+  let code = "";
+  let cursor = 0;
+  for (const { pos, end } of ranges) {
+    code += source.slice(cursor, pos) + source.slice(pos, end).replaceAll(/[^\r\n]/g, " ");
+    cursor = end;
+  }
+
+  return code + source.slice(cursor);
+}
+
 function commentLines(source, ranges) {
   const starts = lineIndex(source);
-  const lines = Array.from({ length: starts.length }, () => ({
-    hasCode: false,
-    hasComment: false,
-  }));
+  const lines = blankComments(source, ranges)
+    .split(/\r\n|\r|\n/)
+    .map((text) => ({ hasCode: /[^ \t]/.test(text), hasComment: false }));
 
   for (const comment of ranges) {
     const start = lineAt(starts, comment.pos);
@@ -231,26 +164,6 @@ function commentLines(source, ranges) {
       const current = lines[line];
       if (current) current.hasComment = true;
     }
-  }
-
-  let commentIndex = 0;
-  let line = 0;
-  for (let index = 0; index < source.length; index += 1) {
-    let completedComment = ranges[commentIndex];
-    while (completedComment !== undefined && completedComment.end <= index) {
-      commentIndex += 1;
-      completedComment = ranges[commentIndex];
-    }
-    const comment = ranges[commentIndex];
-    const inComment = comment !== undefined && comment.pos <= index && index < comment.end;
-    const character = source[index];
-    const code = !inComment && !SOURCE_WHITESPACE.has(character ?? "");
-    if (code) {
-      const current = lines[line];
-      if (current) current.hasCode = true;
-    }
-    if (character === "\r" && source[index + 1] !== "\n") line += 1;
-    if (character === "\n") line += 1;
   }
   return lines;
 }
@@ -282,4 +195,3 @@ export function collectCommentBlocks({ source, ranges }) {
   finish(lines.length);
   return blocks;
 }
-

@@ -16,6 +16,12 @@ Feature: The idempotency-key-is-stable lint rule
     And the fix says to derive the key from the request or bind it once for the operation
 
   @unit
+  Scenario: A snake-case key or an Idempotency-Key header minted at the call site is reported
+    Given a production source minting `idempotency_key`, an `Idempotency-Key` header property and a `headers.set("idempotency-key", …)` call
+    When the idempotency-key-is-stable rule runs over it
+    Then it reports mintedAtCallSite for each, naming the key as spelled, on its line
+
+  @unit
   Scenario: A key read from a binding is left alone
     Given a production source assigning idempotencyKey an identifier or a member expression
     When the idempotency-key-is-stable rule runs over it

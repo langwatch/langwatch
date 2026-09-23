@@ -18,6 +18,21 @@ function report(context, node, name) {
   context.report({ node, messageId: "portVocabulary", data: { name } });
 }
 
+function isPortSpecifier(source) {
+  return typeof source === "string" && (PORT_PATH.test(source) || PORT_FILE.test(source));
+}
+
+function reportPortSource(context, node) {
+  const source = node.source?.value;
+  if (isPortSpecifier(source)) report(context, node, source);
+}
+
+function reportPortName(context, node, identifier) {
+  if (identifier?.type === "Identifier" && namesAPort(identifier.name)) {
+    report(context, node, identifier.name);
+  }
+}
+
 export const noPortVocabularyRule = defineRule({
   name: "no-port-vocabulary",
   kind: "problem",
@@ -40,77 +55,27 @@ export const noPortVocabularyRule = defineRule({
   },
   create(context) {
     const filename = context.filename ?? context.getFilename?.() ?? "";
+    const named = (key) => (node) => reportPortName(context, node, node[key]);
+    const sourced = (node) => reportPortSource(context, node);
 
     return {
       Program(node) {
-        if (PORT_FILE.test(filename)) {
-          context.report({ node, messageId: "portFile", data: { name: filename } });
-          return;
-        }
-        if (PORT_PATH.test(filename)) {
+        if (isPortSpecifier(filename)) {
           context.report({ node, messageId: "portFile", data: { name: filename } });
         }
       },
-      ImportDeclaration(node) {
-        const source = typeof node.source.value === "string" ? node.source.value : "";
-        if (PORT_PATH.test(source)) {
-          report(context, node, source);
-          return;
-        }
-        if (PORT_FILE.test(source)) {
-          report(context, node, source);
-        }
-      },
-      ExportNamedDeclaration(node) {
-        const source = node.source && typeof node.source.value === "string" ? node.source.value : "";
-        const reExportsFromPortPath = source && (PORT_PATH.test(source) || PORT_FILE.test(source));
-
-        if (reExportsFromPortPath) {
-          report(context, node, source);
-        }
-      },
-      ExportAllDeclaration(node) {
-        const source = typeof node.source?.value === "string" ? node.source.value : "";
-        const reExportsAllFromPortPath = source && (PORT_PATH.test(source) || PORT_FILE.test(source));
-
-        if (reExportsAllFromPortPath) {
-          report(context, node, source);
-        }
-      },
-      ImportSpecifier(node) {
-        const name = node.imported.type === "Identifier" ? node.imported.name : undefined;
-        if (namesAPort(name)) report(context, node, name);
-      },
-      ClassDeclaration(node) {
-        if (node.id && namesAPort(node.id.name)) report(context, node, node.id.name);
-      },
-      FunctionDeclaration(node) {
-        if (node.id && namesAPort(node.id.name)) report(context, node, node.id.name);
-      },
-      VariableDeclarator(node) {
-        if (node.id.type === "Identifier" && namesAPort(node.id.name)) {
-          report(context, node, node.id.name);
-        }
-      },
-      TSInterfaceDeclaration(node) {
-        if (namesAPort(node.id.name)) report(context, node, node.id.name);
-      },
-      TSTypeAliasDeclaration(node) {
-        if (namesAPort(node.id.name)) report(context, node, node.id.name);
-      },
-      TSEnumDeclaration(node) {
-        if (node.id && namesAPort(node.id.name)) report(context, node, node.id.name);
-      },
-      PropertyDefinition(node) {
-        if (node.key.type === "Identifier" && namesAPort(node.key.name)) {
-          report(context, node, node.key.name);
-        }
-      },
-      TSPropertySignature(node) {
-        if (node.key.type === "Identifier" && namesAPort(node.key.name)) {
-          report(context, node, node.key.name);
-        }
-      },
+      ImportDeclaration: sourced,
+      ExportNamedDeclaration: sourced,
+      ExportAllDeclaration: sourced,
+      ImportSpecifier: named("imported"),
+      ClassDeclaration: named("id"),
+      FunctionDeclaration: named("id"),
+      VariableDeclarator: named("id"),
+      TSInterfaceDeclaration: named("id"),
+      TSTypeAliasDeclaration: named("id"),
+      TSEnumDeclaration: named("id"),
+      PropertyDefinition: named("key"),
+      TSPropertySignature: named("key"),
     };
   },
 });

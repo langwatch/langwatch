@@ -9,7 +9,7 @@ Feature: Every lint rule is recorded, and every record names a live rule
   So that a rule cannot be added without a reason or deleted without a trace
 
   Background:
-    Given the rules in the langwatch plugin, the ast-grep directory and the architecture-enforcer policy registry
+    Given the rules in the langwatch plugin, the oxlint configs and the architecture-enforcer policy registry
 
   Rule: The committed tree agrees with itself
 
@@ -50,17 +50,3 @@ Feature: Every lint rule is recorded, and every record names a live rule
       Given a registry holding a rule with no feature file and no Rule block
       When the drift guard runs
       Then it names the rule and says it has no spec record
-
-  Rule: An ast-grep rule keeps a fixture, so it cannot go dead unnoticed
-
-    @unit
-    Scenario: Every ast-grep rule has a fixture with a refused and an accepted case
-      Given the rules and fixtures under dev/lint/ast-grep
-      When the fixture gate runs
-      Then every rule id has a fixture holding at least one refused and one accepted case
-
-    @unit
-    Scenario: A fixture naming no rule is reported
-      Given the fixtures under dev/lint/ast-grep/rule-tests
-      When the fixture gate runs
-      Then every fixture names a rule the rules directory declares

@@ -5,7 +5,7 @@ import { defineRule } from "../define-rule.mjs";
 // file that looks like a service. Rules functions in a rules/ module are the
 // house shape for pure behaviour.
 
-function isStrictServerSource(file) {
+function isStrictProcessSource(file) {
   return file.role === "process" && Boolean(file.strictSource);
 }
 
@@ -30,7 +30,7 @@ function toKebab(name) {
 export const namespaceClassRule = defineRule({
   name: "namespace-class",
   kind: "problem",
-  applies: (file) => file.isProduction && isStrictServerSource(file),
+  applies: (file) => file.isProduction && isStrictProcessSource(file),
   messages: {
     namespaceClass: {
       what: "`{{name}}` has only static members ({{count}}), so it is a module wearing a class.",

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { featureSourceLayoutRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -19,21 +20,38 @@ describe("given a strict feature contract module", () => {
       const found = report("modules/agent/contract/src/commands.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["contractMissingSubject"]);
-      expect(found[0].data).toEqual({ name: "commands.ts", artifact: "commands" });
+      expect(found[0].data).toEqual({
+        feature: "agent",
+        name: "commands.ts",
+        artifact: "commands",
+      });
     });
   });
 
-  describe("when it names a server-only artifact", () => {
-    /** @scenario "A server-only artifact in contract source is reported" */
-    it("reports contractServerArtifact", () => {
+  describe("when it names a process-only artifact", () => {
+    /** @scenario "A process-only artifact in contract source is reported" */
+    it.each([
+      ["agent.repository.ts", "`repositories/`"],
+      ["agent.channel.ts", "`channels/`"],
+      ["agent.subscriber.ts", "`eventing/`"],
+    ])("reports contractProcessArtifact for %s and names its process home", (name, home) => {
+      const found = report(`modules/agent/contract/src/${name}`);
+
+      expect(found.map((e) => e.messageId)).toEqual(["contractProcessArtifact"]);
+      expect(found[0].message).toContain("modules/agent/process/src/");
+      expect(found[0].message).toContain(home);
+    });
+
+    /** @scenario "A process-only artifact in contract source is reported" */
+    it("never names an adapter or a port as a shape", () => {
       const found = report("modules/agent/contract/src/agent.repository.ts");
 
-      expect(found.map((e) => e.messageId)).toEqual(["contractServerArtifact"]);
+      expect(found[0].message).not.toMatch(/adapter|\.port/);
     });
   });
 });
 
-describe("given a strict feature server module", () => {
+describe("given a strict feature process module", () => {
   it.each([
     'export function check() { throw new Error("invalid"); }',
     'import { AgentBusyError } from "@langwatch/agent-contract"; export function check() { throw new AgentBusyError({}); }',
@@ -59,10 +77,13 @@ describe("given a strict feature server module", () => {
 
   describe("when a service filename ends in -process.service.ts", () => {
     /** @scenario "A process manager named as a service is reported" */
-    it("reports processManagerService", () => {
+    it("reports processManagerService pointing at the eventing folder", () => {
       const found = report("modules/agent/process/src/services/agent-process.service.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["processManagerService"]);
+      expect(found[0].message).toContain("`eventing/agent.process.ts`");
+      expect(found[0].message).not.toContain("processes/");
+      expect(report("modules/agent/process/src/eventing/agent.process.ts")).toEqual([]);
     });
   });
 
@@ -81,18 +102,19 @@ describe("given a strict feature server module", () => {
 
   describe("when a source path has no home in layout v0", () => {
     /** @scenario "A path with no strict layout home is reported with the allowed homes" */
-    it("reports serverPath listing the allowed directories", () => {
+    it("reports processPath listing the allowed directories", () => {
       const found = report("modules/agent/process/src/misc/agent.helper.ts");
 
-      expect(found.map((e) => e.messageId)).toEqual(["serverPath"]);
+      expect(found.map((e) => e.messageId)).toEqual(["processPath"]);
       expect(found[0].message).toContain("Only this shape is allowed");
       expect(found[0].message).toContain("services/<name>.service.ts");
       expect(found[0].message).not.toContain("transport/<surface>/");
+      expect(found[0].message).not.toMatch(/adapter|ports\//);
     });
   });
 
-  describe("when the path matches a recognized server pattern", () => {
-    /** @scenario "A recognized strict server path is left alone" */
+  describe("when the path matches a recognized process pattern", () => {
+    /** @scenario "A recognized strict process path is left alone" */
     it("reports nothing", () => {
       expect(report("modules/agent/process/src/services/agent.service.ts")).toEqual([]);
     });
@@ -100,32 +122,24 @@ describe("given a strict feature server module", () => {
     it("accepts direct API declarations and WebSocket protocol integrations", () => {
       expect(report("modules/agent/process/src/transport/agent.rest.ts")).toEqual([]);
       expect(report("modules/agent/process/src/transport/agent.trpc.ts")).toEqual([]);
-      expect(report("modules/agent/process/src/transport/agent-connect.ws.ts")).toEqual(
-        [],
-      );
+      expect(report("modules/agent/process/src/transport/agent-connect.ws.ts")).toEqual([]);
       expect(
         report("modules/agent/process/src/transport/agent.handler.ts").map(
           (finding) => finding.messageId,
         ),
-      ).toEqual(["serverPath"]);
+      ).toEqual(["processPath"]);
     });
 
     it("accepts repository provider bundles, registries, and local stores", () => {
       expect(
         report("modules/agent/process/src/repositories/agent-repositories.registry.ts"),
       ).toEqual([]);
+      expect(report("modules/agent/process/src/repositories/agent.repositories.ts")).toEqual([]);
       expect(
-        report("modules/agent/process/src/repositories/agent.repositories.ts"),
+        report("modules/agent/process/src/repositories/prisma/prisma.agent.repositories.ts"),
       ).toEqual([]);
       expect(
-        report(
-          "modules/agent/process/src/repositories/prisma/prisma.agent.repositories.ts",
-        ),
-      ).toEqual([]);
-      expect(
-        report(
-          "modules/agent/process/src/repositories/memory/memory.agent-session.database.ts",
-        ),
+        report("modules/agent/process/src/repositories/memory/memory.agent-session.database.ts"),
       ).toEqual([]);
     });
   });
@@ -140,9 +154,9 @@ it.each([
 });
 
 it("requires a subject on an app contract filename", () => {
-  expect(
-    report("modules/agent/contract/src/app.ts").map((entry) => entry.messageId),
-  ).toEqual(["contractMissingSubject"]);
+  expect(report("modules/agent/contract/src/app.ts").map((entry) => entry.messageId)).toEqual([
+    "contractMissingSubject",
+  ]);
 });
 
 it("accepts the canonical feature API contract", () => {
@@ -153,10 +167,10 @@ it.each([
   "modules/agent/contract/src/other.api.ts",
   "modules/agent/contract/src/nested/agent.api.ts",
 ])("keeps noncanonical API modules out of contracts: %s", (file) => {
-  expect(report(file).map((entry) => entry.messageId)).toEqual(["contractServerArtifact"]);
+  expect(report(file).map((entry) => entry.messageId)).toEqual(["contractProcessArtifact"]);
 });
 
-describe("given a channel in a strict feature server module", () => {
+describe("given a channel in a strict feature process module", () => {
   describe("when the interface sits at channels/<subject>.channel.ts", () => {
     /** @scenario "A channel interface lives at channels/<subject>.channel.ts" */
     it("reports nothing", () => {
@@ -168,9 +182,9 @@ describe("given a channel in a strict feature server module", () => {
     /** @scenario "A channel implementation is named for its tier folder" */
     it("reports nothing", () => {
       expect(report("modules/agent/process/src/channels/http/http.webhook.channel.ts")).toEqual([]);
-      expect(
-        report("modules/agent/process/src/channels/memory/memory.webhook.channel.ts"),
-      ).toEqual([]);
+      expect(report("modules/agent/process/src/channels/memory/memory.webhook.channel.ts")).toEqual(
+        [],
+      );
       expect(report("modules/agent/process/src/channels/agent-channels.registry.ts")).toEqual([]);
     });
   });
@@ -180,7 +194,7 @@ describe("given a channel in a strict feature server module", () => {
     it("reports serverPath", () => {
       const found = report("modules/agent/process/src/channels/http/redis.webhook.channel.ts");
 
-      expect(found.map((e) => e.messageId)).toEqual(["serverPath"]);
+      expect(found.map((e) => e.messageId)).toEqual(["processPath"]);
     });
   });
 });

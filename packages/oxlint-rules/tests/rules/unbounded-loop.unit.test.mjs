@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { unboundedLoopRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -72,6 +73,41 @@ describe("given a strict feature server module", () => {
 }`);
 
       expect(found).toEqual([]);
+    });
+  });
+
+  describe("when the loop drains a stream until it is done", () => {
+    /** @scenario "Draining a stream until done is left alone" */
+    it("reports nothing for a reader or an iterator read to its end", () => {
+      const found = report(`export async function drain(reader: Reader, iterator: Iterator) {
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    handle(value);
+  }
+
+  for (;;) {
+    const step = await iterator.next();
+    if (step.done) {
+      return;
+    }
+    handle(step.value);
+  }
+}`);
+
+      expect(found).toEqual([]);
+    });
+
+    /** @scenario "A read loop that never checks done is still reported" */
+    it("reports a read loop whose exit is not the stream ending, on its line", () => {
+      const found = report(`export async function drain(reader: Reader) {
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value === SENTINEL) break;
+  }
+}`);
+
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([["unboundedLoop", 2]]);
     });
   });
 

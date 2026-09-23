@@ -80,27 +80,3 @@ Feature: The composed-exports lint rule
     Given a contract package exporting a service the applications never build
     When the composed-exports rule runs over the workspace
     Then it reports nothing for that service
-
-  @unit
-  Scenario: A baselined export is accepted while it stays baselined
-    Given an uncomposed export listed in the composed-exports baseline
-    When the composed-exports rule runs over the workspace
-    Then it reports nothing for that export
-
-  @unit
-  Scenario: The baseline may only shrink
-    Given a baseline carrying an entry the merge base does not carry
-    When the composed-exports baseline is compared against the merge base
-    Then the new entry is reported as a growth the baseline does not allow
-
-  @unit
-  Scenario: An entry the merge base carried may be removed
-    Given a baseline with one fewer entry than the merge base
-    When the composed-exports baseline is compared against the merge base
-    Then nothing is reported
-
-  @unit
-  Scenario: A baseline entry without a measured date is refused
-    Given a composed-exports baseline entry with no measured date
-    When the baseline is read
-    Then it is reported as invalid

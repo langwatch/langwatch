@@ -2,8 +2,10 @@ Feature: The stand-in-cast lint rule
   A cast through unknown or any is a type hole with a comment attached: the
   value is whatever it was at runtime and the reader is told otherwise. In
   production, fix the type, or parse the value at the seam where it arrives.
-  A test file has no trust boundary to parse at, so it gets its own messages:
-  build the stub to the real shape instead of casting past the compiler.
+  A test file has no trust boundary to parse at, so it gets its own message:
+  build the stub to the real shape instead of casting past the compiler. A
+  lone `as any` is the native `typescript/no-explicit-any` rule's, and a cast
+  over `as const` only widens a frozen literal, so neither is reported here.
 
   Background:
     Given a workspace whose agent feature is at strict layout version 0
@@ -22,16 +24,16 @@ Feature: The stand-in-cast lint rule
     Then it reports doubleCast once
 
   @unit
-  Scenario: A cast to any drops the type
-    Given a governed source file that casts a value to any
+  Scenario: A lone cast to any is left to no-explicit-any
+    Given a governed source file that casts a value to any, with as and with the angle-bracket form
     When the stand-in-cast rule runs over it
-    Then it reports anyCast
+    Then it reports nothing
 
   @unit
-  Scenario: The angle-bracket cast to any drops the type too
-    Given a governed source file that casts a value to any with the angle-bracket form
+  Scenario: A cast over as const is a single cast
+    Given a governed source file that widens an as const literal with a second cast, and casts another value through unknown
     When the stand-in-cast rule runs over it
-    Then it reports anyCast
+    Then it reports doubleCast only for the cast through unknown, on its line
 
   @unit
   Scenario: An as const assertion is allowed
@@ -57,13 +59,6 @@ Feature: The stand-in-cast lint rule
     When the stand-in-cast rule runs over it
     Then it reports doubleCastInTest
     And the message tells the reader to build the stub to the target's real shape
-
-  @unit
-  Scenario: An any cast inside a test reports the test message
-    Given a test file that casts a value to any
-    When the stand-in-cast rule runs over it
-    Then it reports anyCastInTest
-    And the message tells the reader to build the stub to the real type
 
   @unit
   Scenario: A const assertion in a test is left alone

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { serviceDoesNotOpenAChannelRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -16,37 +17,71 @@ function report(code, filename = SERVICE) {
 }
 
 describe("given a service module", () => {
-  describe("when it imports the event bus", () => {
+  describe("when it imports what constructs the bus or a queue processor", () => {
     /** @scenario "A service may not open the event bus" */
-    it("reports serviceOpensAChannel naming the conduit", () => {
-      const found = report('import { EventBus } from "@langwatch/eventing";');
+    it("reports serviceOpensAChannel once per import, naming the constructors", () => {
+      const code = [
+        'import { createTenantId } from "@langwatch/eventing";',
+        'import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";',
+        'import { EventingServerRuntime } from "@langwatch/eventing/server";',
+      ].join("\n");
 
-      expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("serviceOpensAChannel");
-      expect(found[0].data.conduit).toBe("the event bus");
-      expect(found[0].data.specifier).toBe("@langwatch/eventing");
+      expect(report(code).map(({ data, line, messageId }) => ({ data, line, messageId }))).toEqual([
+        {
+          data: {
+            conduit: "the event bus",
+            specifier: "EventSourcing, mapCommands",
+            tier: "eventing",
+          },
+          line: 2,
+          messageId: "serviceOpensAChannel",
+        },
+        {
+          data: { conduit: "the event bus", specifier: "EventingServerRuntime", tier: "eventing" },
+          line: 3,
+          messageId: "serviceOpensAChannel",
+        },
+      ]);
+    });
+  });
+
+  describe("when it imports eventing helpers, errors and types", () => {
+    /** @scenario "A service may use eventing helpers without opening the bus" */
+    it("reports nothing", () => {
+      const code = [
+        'import { createTenantId, defineCommand, defineCommandSchema, EventUtils } from "@langwatch/eventing";',
+        'import { DispatchError, isDispatchError, type TenantId } from "@langwatch/eventing";',
+        'import type { EventSourcing } from "@langwatch/eventing";',
+        'import type { ScheduledJobFire } from "@langwatch/eventing/server";',
+      ].join("\n");
+
+      expect(report(code)).toEqual([]);
     });
   });
 
   describe("when it reaches a vendor over HTTP", () => {
     /** @scenario "A service may not reach a vendor over HTTP" */
-    it("reports serviceOpensAChannel for the client and for a bare fetch", () => {
-      expect(report('import { request } from "undici";').map((e) => e.messageId)).toEqual([
-        "serviceOpensAChannel",
-      ]);
-      expect(report("export const call = () => fetch(url);").map((e) => e.messageId)).toEqual([
-        "serviceOpensAChannel",
+    it("reports serviceOpensAChannel for the client, a bare fetch and globalThis.fetch", () => {
+      const code = [
+        'import { request } from "undici";',
+        "export const call = () => fetch(url);",
+        "export const viaGlobal = () => globalThis.fetch(url);",
+        'export const computed = () => globalThis["fetch"](url);',
+      ].join("\n");
+
+      expect(report(code).map(({ line, messageId }) => ({ line, messageId }))).toEqual([
+        { line: 1, messageId: "serviceOpensAChannel" },
+        { line: 2, messageId: "serviceOpensAChannel" },
+        { line: 3, messageId: "serviceOpensAChannel" },
+        { line: 4, messageId: "serviceOpensAChannel" },
       ]);
     });
   });
 
-  describe("when it publishes on Redis pub/sub", () => {
-    /** @scenario "A service may not publish on Redis pub/sub" */
-    it("reports serviceOpensAChannel", () => {
-      const found = report('import Redis from "ioredis";');
-
-      expect(found).toHaveLength(1);
-      expect(found[0].data.conduit).toBe("Redis pub/sub");
+  describe("when it imports a Redis client", () => {
+    /** @scenario "A Redis client is store-containment's, not this rule's" */
+    it("reports nothing", () => {
+      expect(report('import Redis from "ioredis";')).toEqual([]);
     });
   });
 
@@ -56,12 +91,12 @@ describe("given a service module", () => {
       expect(report('import { Resend } from "resend";').map((e) => e.data.conduit)).toEqual([
         "a mail sender",
       ]);
-      expect(report('import { WebClient } from "@slack/web-api";').map((e) => e.data.conduit)).toEqual([
-        "Slack",
-      ]);
-      expect(report('import { S3Client } from "@aws-sdk/client-s3";').map((e) => e.data.conduit)).toEqual([
-        "an AWS client",
-      ]);
+      expect(
+        report('import { WebClient } from "@slack/web-api";').map((e) => e.data.conduit),
+      ).toEqual(["Slack"]);
+      expect(
+        report('import { S3Client } from "@aws-sdk/client-s3";').map((e) => e.data.conduit),
+      ).toEqual(["an AWS client"]);
     });
   });
 

@@ -1,19 +1,11 @@
-# ADR-140: two complexity metrics run side by side with different budgets,
-# and the two numbers are not comparable. A budget nobody has written down is
-# a budget the next person rounds up, so both are pinned here.
+# ADR-140: cognitive complexity is the one complexity score. The native
+# branch counter is off (2026-09-23), so the only budget pinned here is the
+# cognitive one; a budget nobody has written down is one the next person rounds up.
 
-Feature: Two complexity budgets, declared once each
+Feature: The cognitive complexity budget, declared once
   As a platform maintainer
-  I want the branch counter and the cognitive counter to keep their own budgets
-  So that neither metric quietly inherits the other's number
-
-  Rule: `complexity` carries the workspace cyclomatic budget
-
-    @unit
-    Scenario: The cyclomatic budget is declared workspace-wide at 25
-      Given the oxlint configuration
-      When its workspace-wide rules are read
-      Then the built-in complexity rule is enabled with a maximum of 25
+  I want the cognitive counter's budget pinned in the configuration
+  So that nobody quietly rounds it up
 
   Rule: `langwatch/cognitive-complexity` carries the cognitive budget
 

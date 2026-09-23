@@ -57,10 +57,3 @@ Feature: One lint run is readable to the agent that has to act on it
     Then it exits with the failure code
     When the run is given an argument it does not know
     Then it exits with the usage code and prints the usage text
-
-  @unit @architecture
-  Scenario: Stale baseline rows are counted in the summary
-    Given a policy reports a baseline row that no longer earns its keep
-    When architecture lint checks the workspace
-    Then the summary counts the stale rows beside the findings
-    And the exit code is the failure one, because a stale allowance is a refusal

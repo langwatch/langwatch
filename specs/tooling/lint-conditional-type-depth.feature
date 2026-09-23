@@ -19,3 +19,10 @@ Feature: The conditional-type-depth lint rule
     Given a contract module whose type alias nests three conditional types
     When the conditional-type-depth rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: A deep conditional nested in an object type is reported
+    Given an interface property and a function's return object type, each typed by four nested conditional types
+    When the conditional-type-depth rule runs over it
+    Then it reports stateTheShape at each conditional's line
+    And the message names the enclosing interface, or "This type" where there is none

@@ -1,13 +1,9 @@
 import { defineRule } from "../define-rule.mjs";
-import { isEnvironmentObject, staticPropertyName } from "./secrets-through-source.rule.mjs";
 
-// A service or adapter takes its configuration as a named member of the
-// argument object `create` receives, resolved once at the composition root -
-// see fc80f65635, where three methods each re-validated Auth0 credentials the
-// caller already held instead of being handed one validated config.
+// A service takes its configuration as a named member of the argument object
+// `create` receives, resolved once where the process composes the module.
+// Reading `process.env` is environment-boundaries' to refuse, not this rule's.
 
-const SERVICE_OR_ADAPTER_SOURCE =
-  /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/(?:services|adapters)\/.+\.[cm]?[jt]sx?$/;
 const CONFIG_FUNCTION_NAMES = new Set(["loadConfig", "resolveConfig", "readConfig"]);
 
 function isFunctionLike(node) {
@@ -30,22 +26,21 @@ function isConfigProperty(node) {
 export const serviceLoadsItsOwnConfigRule = defineRule({
   name: "service-loads-its-own-config",
   kind: "problem",
-  applies: (file) => file.isProduction && SERVICE_OR_ADAPTER_SOURCE.test(file.workspacePath),
+  applies: (file) => !file.isTest && file.layer === "services",
   messages: {
     configFunction: {
       what: "`{{name}}` in `{{path}}` resolves its own configuration.",
       why: "A caller that already validated its config forces every callee to re-validate what it was handed.",
       fix: "Delete it; add a named `config` member to the argument object `create` takes and resolve it once at the composition root.",
     },
-    environmentRead: {
-      what: "`{{path}}` reads `process.env.{{key}}` directly instead of taking config as an argument.",
-      why: "A caller that already validated its config forces every callee to re-validate what it was handed.",
-      fix: "Add a named member to the argument object `create` takes and resolve it once at the composition root.",
-    },
   },
   create(context, file) {
     function reportFunction(node, name) {
-      context.report({ node, messageId: "configFunction", data: { name, path: file.workspacePath } });
+      context.report({
+        node,
+        messageId: "configFunction",
+        data: { name, path: file.workspacePath },
+      });
     }
 
     return {
@@ -57,22 +52,17 @@ export const serviceLoadsItsOwnConfigRule = defineRule({
         reportFunction(node, node.id.name);
       },
       MethodDefinition(node) {
-        if (!node.computed && node.key.type === "Identifier" && CONFIG_FUNCTION_NAMES.has(node.key.name)) {
+        if (
+          !node.computed &&
+          node.key.type === "Identifier" &&
+          CONFIG_FUNCTION_NAMES.has(node.key.name)
+        ) {
           reportFunction(node, node.key.name);
         }
       },
       Property(node) {
         if (!isConfigProperty(node)) return;
         reportFunction(node, node.key.name);
-      },
-      MemberExpression(node) {
-        if (!isEnvironmentObject(node.object)) return;
-        const key = staticPropertyName(node);
-        context.report({
-          node,
-          messageId: "environmentRead",
-          data: { path: file.workspacePath, key: key ?? "a dynamic key" },
-        });
       },
     };
   },

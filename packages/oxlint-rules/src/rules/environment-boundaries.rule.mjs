@@ -1,28 +1,23 @@
 import { defineRule } from "../define-rule.mjs";
 
-// Reusable packages and application features receive typed configuration;
-// only a config module or the process boot file may read the environment.
+// Config is drilled, never ambient: one parse per process, in the app's
+// `main.ts`/`config.ts`, and `@langwatch/secrets` resolves the classified keys.
+// `apps/server` is the published npx CLI, whose configuration surface is the environment.
 
-function isEnvironmentGovernedApp(workspacePath) {
-  return /^apps\/(?:api|worker|ui)\/src\//.test(workspacePath);
-}
+const GOVERNED_SOURCE = /^(?:(?:packages|modules|enterprise)\/.+|apps\/(?!server\/)[^/]+)\/src\//;
+const PROCESS_BOOT = /^apps\/[^/]+\/src\/(?:main|config)\.[cm]?tsx?$/;
+const SECRETS_PACKAGE = /^packages\/secrets\//;
+const BENCHMARK = /(?:^|\/)(?:__bench__|benchmarks?)(?:\/|$)|\.bench\.[cm]?[jt]sx?$/;
 
-function isApplicationCompositionRoot(workspacePath) {
-  const configModule = /(?:^|\/)platform\/config\//.test(workspacePath);
-  const processBoot = /\.(?:composition|executable|entrypoint|main|runtime)\.[cm]?tsx?$/.test(
-    workspacePath,
+function readsEnvironmentLegitimately(file) {
+  const path = file.workspacePath;
+  return (
+    !GOVERNED_SOURCE.test(path) ||
+    PROCESS_BOOT.test(path) ||
+    SECRETS_PACKAGE.test(path) ||
+    file.isTest ||
+    BENCHMARK.test(path)
   );
-  return configModule || processBoot;
-}
-
-function isNonProductionPackageSource(workspacePath) {
-  const nonProductionDirectory = /(?:^|\/)(?:__tests__|tests|__bench__|benchmarks?)(?:\/|$)/.test(
-    workspacePath,
-  );
-  const nonProductionFilename = /\.(?:test|unit|integration|spec|bench)\.[cm]?[jt]sx?$/.test(
-    workspacePath,
-  );
-  return nonProductionDirectory || nonProductionFilename;
 }
 
 /**
@@ -56,20 +51,11 @@ export const environmentBoundariesRule = defineRule({
   messages: {
     environment: {
       what: "Do not read `process.env` here.",
-      fix: "If the app already has a `platform/config/` module, add this key there and pass the typed value in; otherwise parse it directly in this file's own `*.composition.ts` and pass the typed value in.",
+      fix: "Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts` reads the environment.",
     },
   },
-  create(context, file) {
-    const workspacePath = file.workspacePath;
-    const reusablePackage = /^(?:packages|modules|enterprise)\/.+\/src\//.test(workspacePath);
-    const processApp = isEnvironmentGovernedApp(workspacePath);
-    const productionSource = !isNonProductionPackageSource(workspacePath);
-    if ((!reusablePackage && !processApp) || !productionSource) return {};
-    // A package may never read the environment. An app may, but only where it
-    // is composing the process — that is the one place a typed value can be
-    // parsed before anything downstream sees it.
-    if (processApp && isApplicationCompositionRoot(workspacePath)) return {};
-
+  applies: (file) => !readsEnvironmentLegitimately(file),
+  create(context) {
     return {
       MemberExpression(node) {
         const propertyName = staticMemberPropertyName(node);

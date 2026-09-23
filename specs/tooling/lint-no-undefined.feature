@@ -1,10 +1,6 @@
-# ADR-135's "Toolchain-owned policies" table used to carry
-# `langwatch/runtime-undefined` as a plugin rule wired into no config.
-# ADR-135's class-A migration deleted that plugin rule outright and measured
-# its built-in replacement, `no-undefined`, at 11,568 findings across 3,591
-# files -- a register that size is exactly the hand-written override the
-# oxlint baseline mechanism exists to replace, and no-undefined has no
-# baseline entries to re-key. The built-in is measured and left disabled.
+# ADR-135's class-A migration deleted the plugin rule `langwatch/runtime-undefined`
+# and measured its built-in replacement, `no-undefined`, at 11,568 findings
+# across 3,591 files. The built-in is measured and left disabled.
 
 Feature: The ambient-undefined built-in is measured and not adopted
   As a platform maintainer

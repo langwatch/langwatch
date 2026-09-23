@@ -19,6 +19,12 @@ Feature: The jsx-from-hook lint rule
     And the message names the hook and tells the reader to move the JSX into the calling component
 
   @unit
+  Scenario: a concise-arrow hook returning JSX is reported
+    Given a production .tsx file whose use-named concise arrow's body is JSX, directly or from a conditional
+    When the jsx-from-hook rule runs over it
+    Then it reports hookReturnsJsx on the line of the JSX, naming each hook
+
+  @unit
   Scenario: a hook returning state is left alone
     Given a production .tsx file whose use-named function returns an object of state and callbacks
     When the jsx-from-hook rule runs over it

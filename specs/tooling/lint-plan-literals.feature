@@ -10,13 +10,20 @@ Feature: The linter keeps plan facts in one catalogue
   Background:
     Given the langwatch oxlint plugin runs over the workspace sources
 
-  Rule: An object stating two or more limit fields is a plan definition
+  Rule: An object giving two or more limit fields literal values is a plan definition
 
     @unit
     Scenario: An object stating two limit fields is reported
       Given production source with an object assigning a member ceiling and a message ceiling
       When the rule runs
       Then it reports the literal and names both fields
+
+    @unit
+    Scenario: A schema or a mapping that reads limit fields is left alone
+      Given production source with a Zod schema and a DTO mapping that name limit fields without literal values
+      And a third object that gives two limit fields literal values
+      When the rule runs
+      Then it reports only the third object, on its line
 
     @unit
     Scenario: The message names the catalogue accessor
@@ -59,11 +66,5 @@ Feature: The linter keeps plan facts in one catalogue
     @unit
     Scenario: Test files keep their plan fixtures
       Given a test file with a plan fixture
-      When the rule runs
-      Then it reports nothing
-
-    @unit
-    Scenario: A file on the debt register is left alone
-      Given a file carrying a plan-literals baseline entry
       When the rule runs
       Then it reports nothing

@@ -3,17 +3,8 @@ import { basename, join, relative, resolve, sep } from "node:path";
 
 import ts from "typescript";
 
-import {
-  type BaselineEntry,
-  type BaselinePolicy,
-  baselinePath,
-  collectBaseline,
-  liveKeys,
-  readBaseline,
-  shrinkCheck,
-  staleRows,
-} from "../../baseline.ts";
 import type { ArchitectureViolation } from "../../types.ts";
+import { getAnchor } from "../../workspace/anchors.ts";
 import {
   workspaceModuleResolver,
   sourceFile,
@@ -22,10 +13,6 @@ import {
   type WorkspaceModuleResolver,
 } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-
-/** Guard that exported capabilities are actually composed (reachability, not just existence);
- * see composed-exports-baseline.json for exclusions and full rules */
-const BASELINE_FILE = "composed-exports-baseline.json";
 
 /**
  * The process entrypoints. Compositions are deliberately NOT roots: a
@@ -36,7 +23,7 @@ const ENTRYPOINTS = [
   "apps/api/src/main.ts",
   "apps/worker/src/main.ts",
   "packages/scenario-child/src/scenario-child.entrypoint.ts",
-  "apps/tasks/src/tasks.entrypoint.ts",
+  "apps/tasks/src/main.ts",
   "apps/server/src/cli.ts",
 ];
 
@@ -51,7 +38,7 @@ const EXCLUDED_SUFFIXES = ["Port", "Error", "Schema"];
 const EXCLUDED_PACKAGE_SUFFIXES = ["-web", "-contract", "-ui"];
 
 export type ComposedExportSubject = {
-  /** `<package directory>|<exported name>`, the baseline key. */
+  /** `<package directory>|<exported name>`. */
   key: string;
   name: string;
   packagePath: string;
@@ -287,7 +274,9 @@ export function reachableFiles({
   root: string;
   resolver?: WorkspaceModuleResolver;
 }): Set<string> {
-  const roots = ENTRYPOINTS.map((path) => join(root, path)).filter((path) => existsSync(path));
+  const roots = ENTRYPOINTS.map((anchor) =>
+    getAnchor({ root, anchor, policy: "composed-exports" }),
+  );
 
   const graph = walkValueImportGraph({
     roots,
@@ -414,103 +403,13 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
   return subjects.filter((subject) => !composed.has(subject.name));
 }
 
-export const COMPOSED_EXPORTS_BASELINE: BaselinePolicy = {
-  id: "composed-exports",
-  file: BASELINE_FILE,
-  label: "Composed-exports baseline",
-  keyRule: "A key is `<package directory>|<exported name>`.",
-  enforceExpiry: false,
-  stale: (entry) => ({
-    message: `Composed-exports baseline entry ${entry.key} names an export no application leaves uncomposed.`,
-    allowed: "Delete the stale entry; the register only shrinks.",
-  }),
-  growth: {
-    added: (entry) => ({
-      message: `Baseline entry ${entry.key} is not in the merge base; the composed-exports baseline is shrink-only.`,
-      allowed:
-        "Compose the capability in the owning *.composition.ts, or delete it, and remove the entry; do not add new ones.",
-    }),
-  },
-};
-
-function baselineFile(root: string): string {
-  return baselinePath({ root, policy: COMPOSED_EXPORTS_BASELINE });
-}
-
-export function collectComposedExportsBaseline({
-  root,
-  previous = [],
-}: {
-  root: string;
-  previous?: readonly BaselineEntry[];
-}): BaselineEntry[] {
-  const found = collectUncomposedExports({ root }).map((subject) => subject.key);
-
-  return collectBaseline({ policy: COMPOSED_EXPORTS_BASELINE, found, previous });
-}
-
-export function lintComposedExports(
-  snapshot: WorkspaceSnapshot,
-  options?: { baselineFile?: string },
-): ArchitectureViolation[] {
+export function lintComposedExports(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root } = snapshot;
-  const file = options?.baselineFile ?? baselineFile(root);
-  const baseline = readBaseline({ policy: COMPOSED_EXPORTS_BASELINE, file });
-  const baselined = liveKeys({ entries: baseline.entries });
-  const violations: ArchitectureViolation[] = [...baseline.violations];
-  const found = new Set<string>();
 
-  for (const subject of collectUncomposedExports({ root })) {
-    found.add(subject.key);
-    if (baselined.has(subject.key)) continue;
-
-    violations.push({
-      policy: "composed-exports",
-      // Absolute, matching every other policy's convention: `lintPolicies`
-      // relativizes to `root` once. `subject.indexFile` is already
-      // root-relative, so passing it through here double-joined it against
-      // `process.cwd()` instead, producing an unnavigable reported path.
-      file: join(root, subject.indexFile),
-      message: `\`${subject.name}\` is exported from \`${subject.packagePath}\` and composed by no application. Compose it in the owning \`*.composition.ts\`, or delete it and its tests.`,
-      allowed: `Construct it on a path reachable from ${ENTRYPOINTS.join(", ")}.`,
-    });
-  }
-
-  violations.push(
-    ...staleRows({ entries: baseline.entries, found, policy: COMPOSED_EXPORTS_BASELINE, file }),
-  );
-
-  return violations;
-}
-
-export function lintComposedExportsBaseline(
-  root: string,
-  baselineReference?: string,
-): { violations: ArchitectureViolation[] } {
-  const file = baselineFile(root);
-  const current = readBaseline({ policy: COMPOSED_EXPORTS_BASELINE, file });
-
-  if (!baselineReference) return { violations: current.violations };
-
-  const reference = readBaseline({
-    policy: COMPOSED_EXPORTS_BASELINE,
-    file: resolve(root, baselineReference),
-  });
-
-  // No merge-base copy is the one-time bootstrap the other ratchets already
-  // treat as such. Comparing against nothing would call every row an addition.
-  if (!reference.exists) return { violations: current.violations };
-
-  return {
-    violations: [
-      ...current.violations,
-      ...reference.violations,
-      ...shrinkCheck({
-        current: current.entries,
-        reference: reference.entries,
-        policy: COMPOSED_EXPORTS_BASELINE,
-        file,
-      }),
-    ],
-  };
+  return collectUncomposedExports({ root }).map((subject) => ({
+    policy: "composed-exports",
+    file: join(root, subject.indexFile),
+    message: `\`${subject.name}\` is exported from \`${subject.packagePath}\` and composed by no application. Compose it in the owning \`*.composition.ts\`, or delete it and its tests.`,
+    allowed: `Construct it on a path reachable from ${ENTRYPOINTS.join(", ")}.`,
+  }));
 }

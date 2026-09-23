@@ -1,15 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  collectUnusedModuleExportBaseline,
-  collectUnusedModuleExportFindings,
-  formatBaseline,
-  lintUnusedModuleExports,
-  UNUSED_MODULE_EXPORT_BASELINE,
-} from "../src/index.ts";
-import { snapshotOf } from "./workspace.ts";
+
+import { collectUnusedModuleExportFindings } from "../src/index.ts";
 
 let root = "";
 
@@ -28,16 +23,6 @@ function write(path: string, content: string): void {
 }
 
 const SERVER = "modules/widget/process/src";
-
-const BASELINE = "packages/architecture-enforcer/src/unused-module-export-baseline.json";
-
-/** Rows keyed `<path>|<name>`, written the way the one writer writes them. */
-function baselineText(keys: readonly string[]): string {
-  return formatBaseline({
-    policy: UNUSED_MODULE_EXPORT_BASELINE,
-    entries: keys.map((key) => ({ key, measured: "2026-09-10" })),
-  });
-}
 
 function findings(): ReturnType<typeof collectUnusedModuleExportFindings> {
   return collectUnusedModuleExportFindings({ root });
@@ -141,55 +126,6 @@ describe("unused module exports", () => {
       write(`${SERVER}/index.ts`, "export const widget = 1;\n");
 
       expect(findings()).toEqual([]);
-    });
-  });
-
-  describe("given a baseline", () => {
-    /** @scenario "A baselined unused export is silent and a stale baseline entry is reported" */
-    it("silences listed findings and refuses an entry that no longer holds", () => {
-      write(`${SERVER}/rules/pricing.rules.ts`, "export const rate = 3;\n");
-      write(
-        BASELINE,
-        baselineText([
-          `${SERVER}/rules/pricing.rules.ts|rate`,
-          `${SERVER}/rules/gone.rules.ts|cap`,
-        ]),
-      );
-
-      const violations = lintUnusedModuleExports(snapshotOf({ root }));
-
-      expect(violations.map((violation) => violation.policy)).toEqual([
-        "unused-module-export-baseline",
-      ]);
-      expect(violations[0]!.message).toContain(
-        `${SERVER}/rules/gone.rules.ts cap no longer matches anything`,
-      );
-    });
-
-    it("reports an unlisted finding under the policy name", () => {
-      write(`${SERVER}/rules/pricing.rules.ts`, "export const rate = 3;\n");
-      write(BASELINE, baselineText([`${SERVER}/rules/other.rules.ts|cap`]));
-
-      const policies = lintUnusedModuleExports(snapshotOf({ root })).map(
-        (violation) => violation.policy,
-      );
-
-      expect(policies).toContain("unused-module-export");
-      expect(policies).toContain("unused-module-export-baseline");
-    });
-
-    it("collects the baseline as rows sorted by key, keeping the date a row carries", () => {
-      write(`${SERVER}/rules/pricing.rules.ts`, "export const cap = 9;\nexport const rate = 3;\n");
-
-      const entries = collectUnusedModuleExportBaseline({
-        root,
-        previous: [{ key: `${SERVER}/rules/pricing.rules.ts|cap`, measured: "2020-01-01" }],
-      });
-
-      expect(entries).toEqual([
-        { key: `${SERVER}/rules/pricing.rules.ts|cap`, measured: "2020-01-01" },
-        { key: `${SERVER}/rules/pricing.rules.ts|rate`, measured: expect.any(String) },
-      ]);
     });
   });
 });

@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { featureSourceFilenameRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -43,8 +44,8 @@ describe("given a strict feature source file", () => {
     });
   });
 
-  describe("when a server filename hyphenates its architectural qualifier", () => {
-    /** @scenario "A qualifier-prefixed server filename names the dot-separated rename" */
+  describe("when a process filename hyphenates its architectural qualifier", () => {
+    /** @scenario "A qualifier-prefixed process filename names the dot-separated rename" */
     it("names the exact dot-separated rename instead of a folder move", () => {
       const found = report("modules/agent/process/src/repositories/prisma-agent.repository.ts");
 

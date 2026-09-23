@@ -1,9 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import ts from "typescript";
 
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
+import { getAnchor } from "../../workspace/anchors.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile as parsedSourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
@@ -13,20 +14,20 @@ const REPOSITORY_MODULE = "@langwatch/prisma-client";
 const TEST_FILE = /(?:__tests__|__fixtures__|\/fixtures\/|\.(?:test|spec)\.)/;
 const SCHEMA_PATH = "packages/prisma-client/prisma/schema.prisma";
 
-/** Whether `schema.prisma` exists; the schema-less workspace short-circuit both policies share. */
-export function hasPrismaSchema(root: string): boolean {
-  return existsSync(join(root, SCHEMA_PATH));
-}
-
 /**
  * The model names `schema.prisma` declares, mapped to their `@@map` table
  * name (or the model name itself). Shared with `prisma-migration-access.ts`,
  * which needs the same names to police who may reach them.
  */
-export function prismaModelNames(root: string): Map<string, string> {
-  const schemaFile = join(root, SCHEMA_PATH);
+export function prismaModelNames({
+  root,
+  policy,
+}: {
+  root: string;
+  policy: string;
+}): Map<string, string> {
+  const schemaFile = getAnchor({ root, anchor: SCHEMA_PATH, policy });
   const models = new Map<string, string>();
-  if (!existsSync(schemaFile)) return models;
 
   const schema = readFileSync(schemaFile, "utf8");
 
@@ -385,9 +386,7 @@ function checkOwners(
  */
 export function lintPrismaTableOwnership(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, catalogue } = snapshot;
-  if (!hasPrismaSchema(root)) return [];
-
-  const models = prismaModelNames(root);
+  const models = prismaModelNames({ root, policy: "prisma-table-ownership" });
   const violations: ArchitectureViolation[] = [];
   const claims = catalogue.flatMap((feature) => featureClaims(root, feature, violations));
 

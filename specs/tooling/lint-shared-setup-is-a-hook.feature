@@ -40,3 +40,10 @@ Feature: The shared-setup-is-a-hook lint rule
       blocks that still share a three-statement prefix
     When the shared-setup-is-a-hook rule runs over it
     Then it reports siblingTestsRepeatSetup
+
+  @unit
+  Scenario: the shared prefix stops at the first assertion
+    Given a test file whose sibling it blocks share one setup statement and
+      then the same three assertions
+    When the shared-setup-is-a-hook rule runs over it
+    Then it reports nothing, because an assertion ends the setup

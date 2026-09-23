@@ -1,9 +1,8 @@
 import { walk } from "../src/ast.mjs";
 
 // The three over-abstraction detectors, as one pass over the ESTree tree the
-// linter already built. The oxlint rules `layer-class`, `overload-by-literal`
-// and `conditional-type-depth` report what this returns; the CLI calls the
-// same function to tell a stale baseline entry from a live one.
+// linter already built: `layer-class`, `overload-by-literal` and
+// `conditional-type-depth` each report their share of what this returns.
 
 export const MIN_METHODS_FOR_LAYER = 5;
 export const LAYER_DELEGATION_RATIO = 0.6;
@@ -41,17 +40,23 @@ export function isOverengineeringSource(path) {
 }
 
 const PROPERTY_MEMBERS = new Set(["PropertyDefinition", "TSAbstractPropertyDefinition"]);
-const OVERLOADABLE = new Set(["FunctionDeclaration", "TSDeclareFunction", "TSMethodSignature"]);
+const OVERLOADABLE = new Set([
+  "FunctionDeclaration",
+  "MethodDefinition",
+  "TSAbstractMethodDefinition",
+  "TSDeclareFunction",
+  "TSMethodSignature",
+]);
+const EXPORT_WRAPPERS = new Set(["ExportNamedDeclaration", "ExportDefaultDeclaration"]);
+const NAMED_TYPE_DECLARATIONS = new Set(["TSTypeAliasDeclaration", "TSInterfaceDeclaration"]);
 
 function isHidden(member) {
   return member.accessibility === "private" || member.accessibility === "protected";
 }
 
 /**
- * A class member that behaves like a method: a method declaration with a
- * body, or a property initialised with an arrow. Facades that bind `this` by
- * field are written the second way, and counting only the first missed two
- * governance layers of 99 delegations each.
+ * A class member that behaves like a method: a method declaration with a body,
+ * or a property initialised with an arrow, which is how facades bind `this`.
  */
 function methodLike(member) {
   const key = member.key;
@@ -108,48 +113,94 @@ function transformsItsArguments(member, call) {
  * `this.<a>.<b>...<name>(...)`; `await` in front counts, a guard does not.
  */
 function delegationReceiver(member) {
-  const { body, name } = member;
-  if (!body) return undefined;
+  const call = soleCallOf(member.body);
+  const callee = call?.callee;
+  if (callee?.type !== "MemberExpression" || callee.computed) return undefined;
+  if (callee.property.name !== member.name || transformsItsArguments(member, call))
+    return undefined;
 
-  let expression = body;
-  if (body.type === "BlockStatement") {
-    if (body.body.length !== 1) return undefined;
-    const [only] = body.body;
-    if (!only || only.type !== "ReturnStatement" || !only.argument) return undefined;
-    expression = only.argument;
-  }
-  if (expression.type === "AwaitExpression") expression = expression.argument;
-  if (expression.type === "ChainExpression") expression = expression.expression;
-  if (expression.type !== "CallExpression") return undefined;
-
-  const callee = expression.callee;
-  if (!callee || callee.type !== "MemberExpression" || callee.computed) return undefined;
-  if (callee.property.type !== "Identifier" || callee.property.name !== name) return undefined;
-  if (transformsItsArguments(member, expression)) return undefined;
-
-  // The receiver must be a `this.…` chain, not a free function or an import.
-  const path = [];
-  let receiver = callee.object;
-  while (receiver.type === "MemberExpression" && !receiver.computed) {
-    if (receiver.property.type !== "Identifier") return undefined;
-    path.unshift(receiver.property.name);
-    receiver = receiver.object;
-  }
-  if (receiver.type !== "ThisExpression") return undefined;
-
-  return path.join(".");
+  return thisPath(callee.object);
 }
 
-function conditionalDepth(node) {
-  if (!node || node.type !== "TSConditionalType") return 0;
+/** The one call a body makes: `x()`, `return x()`, `await x()` or `x?.()`; else undefined. */
+function soleCallOf(body) {
+  if (!body) return undefined;
+  let expression = body;
+  if (body.type === "BlockStatement") {
+    const [only] = body.body;
+    if (body.body.length !== 1 || only?.type !== "ReturnStatement") return undefined;
+    expression = only.argument;
+  }
+  if (expression?.type === "AwaitExpression") expression = expression.argument;
+  if (expression?.type === "ChainExpression") expression = expression.expression;
 
-  return 1 + Math.max(conditionalDepth(node.trueType), conditionalDepth(node.falseType));
+  return expression?.type === "CallExpression" ? expression : undefined;
+}
+
+/** `this.a.b` as `"a.b"`; a chain not rooted at `this` is undefined. */
+function thisPath(receiver) {
+  const path = [];
+  let current = receiver;
+  while (current.type === "MemberExpression" && !current.computed) {
+    if (current.property.type !== "Identifier") return undefined;
+    path.unshift(current.property.name);
+    current = current.object;
+  }
+
+  return current.type === "ThisExpression" ? path.join(".") : undefined;
+}
+
+function conditionalDepth(node, covered) {
+  if (!node || node.type !== "TSConditionalType") return 0;
+  covered.add(node);
+
+  return (
+    1 +
+    Math.max(conditionalDepth(node.trueType, covered), conditionalDepth(node.falseType, covered))
+  );
+}
+
+/** The alias or interface a type sits in, for the message; nested object types included. */
+function enclosingTypeName(node) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (NAMED_TYPE_DECLARATIONS.has(current.type)) return `Type ${current.id.name}`;
+  }
+
+  return "This type";
+}
+
+function conditionalTypeFinding(node, covered) {
+  const depth = conditionalDepth(node, covered);
+  if (depth <= MAX_CONDITIONAL_TYPE_DEPTH) return undefined;
+
+  return {
+    allowed: CONDITIONAL_TYPE_DEPTH_ALLOWED,
+    message: `${enclosingTypeName(node)} nests ${depth} conditional types; the maximum is ${MAX_CONDITIONAL_TYPE_DEPTH}.`,
+    node,
+    policy: "conditional-type-depth",
+  };
+}
+
+/** The name an overload declares, with `static ` in front of a static class member. */
+function overloadName(node) {
+  const declared = node.id ?? node.key;
+  if (declared?.type !== "Identifier") return undefined;
+
+  return node.static ? `static ${declared.name}` : declared.name;
+}
+
+/** The scope an overload set lives in: the program, a namespace, an interface or a class body. */
+function overloadScope(node) {
+  let scope = node.parent;
+  while (scope && EXPORT_WRAPPERS.has(scope.type)) scope = scope.parent;
+
+  return scope;
 }
 
 /** The literal-typed property names a signature's parameters mention. */
 function booleanLiteralProperties(signature) {
   const found = new Map();
-  for (const parameter of signature.params ?? []) {
+  for (const parameter of signature.params ?? signature.value?.params ?? []) {
     walk(parameter, (node) => {
       if (node.type !== "TSPropertySignature") return;
       if (node.key?.type !== "Identifier") return;
@@ -172,23 +223,24 @@ function booleanLiteralProperties(signature) {
  */
 function fieldTypes(node, text) {
   const types = new Map();
-  const record = (name, annotation) => {
+  for (const [name, annotation] of (node.body?.body ?? []).flatMap(annotatedBindings)) {
     const declared = annotation?.typeAnnotation;
-    if (!declared || name?.type !== "Identifier") return;
-    types.set(name.name, text.slice(declared.start, declared.end));
-  };
-
-  for (const member of node.body?.body ?? []) {
-    if (PROPERTY_MEMBERS.has(member.type)) record(member.key, member.typeAnnotation);
-    if (member.type === "MethodDefinition" && member.kind === "constructor") {
-      for (const parameter of member.value?.params ?? []) {
-        const binding = parameter.type === "TSParameterProperty" ? parameter.parameter : parameter;
-        record(binding, binding.typeAnnotation);
-      }
-    }
+    if (declared && name?.type === "Identifier")
+      types.set(name.name, text.slice(declared.start, declared.end));
   }
 
   return types;
+}
+
+/** A field's `[key, annotation]`, or a constructor's parameter properties as the same pairs. */
+function annotatedBindings(member) {
+  if (PROPERTY_MEMBERS.has(member.type)) return [[member.key, member.typeAnnotation]];
+  if (member.type !== "MethodDefinition" || member.kind !== "constructor") return [];
+
+  return (member.value?.params ?? []).map((parameter) => {
+    const binding = parameter.type === "TSParameterProperty" ? parameter.parameter : parameter;
+    return [binding, binding.typeAnnotation];
+  });
 }
 
 /**
@@ -224,7 +276,7 @@ function layerClassFinding(node, text) {
     allowed: LAYER_CLASS_ALLOWED,
     message: `${node.id?.name ?? "This class"} forwards ${receivers.length} of its ${methods.length} public methods to a method of the same name on \`this.${[...distinct].join("`, `this.")}\`.`,
     node,
-    policy: "layer-class",
+    policy: "pass-through-class",
   };
 }
 
@@ -255,49 +307,48 @@ function overloadByLiteralFinding(name, signatures) {
   return undefined;
 }
 
+function layerFindingOf(node, { layersExempt, text }) {
+  if (node.type !== "ClassDeclaration" || layersExempt) return undefined;
+
+  return layerClassFinding(node, text);
+}
+
+function conditionalFindingOf(node, covered) {
+  if (node.type !== "TSConditionalType" || covered.has(node)) return undefined;
+
+  return conditionalTypeFinding(node, covered);
+}
+
+/** Files an overloadable declaration under its scope and name, so only true siblings group. */
+function recordOverload(overloads, node) {
+  const name = OVERLOADABLE.has(node.type) ? overloadName(node) : undefined;
+  if (name === undefined) return;
+  const scope = overloadScope(node);
+  const byName = overloads.get(scope) ?? new Map();
+  byName.set(name, [...(byName.get(name) ?? []), node]);
+  overloads.set(scope, byName);
+}
+
 /**
- * Every over-abstraction finding in one file, as
- * `{ policy, node, message, allowed }`, from one walk of the program.
- * `path` is only read for the layer-rule exemptions.
- *
+ * Every over-abstraction finding in one file, as `{ policy, node, message,
+ * allowed }`, from one walk; `path` is read only for the layer exemptions.
  * @param {{ path: string, program: object, text: string }} file
  */
 export function overengineeringFindings({ path, program, text }) {
   const findings = [];
   const overloads = new Map();
+  const covered = new WeakSet();
   const layersExempt = isExemptFromLayerRule(path);
 
   walk(program, (node) => {
-    if (node.type === "ClassDeclaration" && !layersExempt) {
-      const finding = layerClassFinding(node, text);
-      if (finding) findings.push(finding);
-    }
-
-    if (node.type === "TSTypeAliasDeclaration") {
-      const depth = conditionalDepth(node.typeAnnotation);
-      if (depth > MAX_CONDITIONAL_TYPE_DEPTH) {
-        findings.push({
-          allowed: CONDITIONAL_TYPE_DEPTH_ALLOWED,
-          message: `Type ${node.id.name} nests ${depth} conditional types; the maximum is ${MAX_CONDITIONAL_TYPE_DEPTH}.`,
-          node,
-          policy: "conditional-type-depth",
-        });
-      }
-    }
-
-    if (OVERLOADABLE.has(node.type)) {
-      // A free function declares its name in `id`; a method signature in an
-      // interface or type literal declares it in `key`.
-      const declared = node.type === "TSMethodSignature" ? node.key : node.id;
-      if (declared?.type !== "Identifier") return;
-      const list = overloads.get(declared.name) ?? [];
-      list.push(node);
-      overloads.set(declared.name, list);
-    }
+    const finding =
+      layerFindingOf(node, { layersExempt, text }) ?? conditionalFindingOf(node, covered);
+    if (finding) findings.push(finding);
+    recordOverload(overloads, node);
   });
 
-  for (const [name, signatures] of overloads) {
-    const finding = overloadByLiteralFinding(name, signatures);
+  for (const [name, signatures] of [...overloads.values()].flatMap((byName) => [...byName])) {
+    const finding = overloadByLiteralFinding(name.replace(/^static /, ""), signatures);
     if (finding) findings.push(finding);
   }
 

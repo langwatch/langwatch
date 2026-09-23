@@ -30,6 +30,13 @@ Feature: The no-runtime-reflection lint rule
     Then it reports defineProperty
 
   @unit
+  Scenario: defineProperties and setPrototypeOf patch an object at runtime
+    Given a governed module source file calling Object.defineProperties on a plain object and Object.setPrototypeOf on a record
+    When the no-runtime-reflection rule runs over it
+    Then it reports defineProperty and setPrototypeOf on their lines, quoting each target
+    And Object.defineProperties on a class prototype is left alone
+
+  @unit
   Scenario: Object.defineProperty on a class prototype is allowed
     Given a governed module source file that calls Object.defineProperty on a class prototype
     When the no-runtime-reflection rule runs over it

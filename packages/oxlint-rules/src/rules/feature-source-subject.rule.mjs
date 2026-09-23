@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import {
   SUBJECT_ARTIFACT,
   claimedSubjects,
@@ -10,36 +11,21 @@ import { defineRule } from "../define-rule.mjs";
 const subjectOwnerCache = new Map();
 
 /**
- * Which feature owns each subject, for the features that have a physical
- * package. Dormant catalogue entries are migration intent, not a demand for
- * placeholder packages, so they own nothing yet.
+ * Subject to `{ id, root }` of its owning module, from `modules/catalogue.json`.
+ * An entry whose `root` is not on disk yet is intent, not a module, so it owns nothing.
  */
 function subjectOwners(cwd) {
   if (subjectOwnerCache.has(cwd)) return subjectOwnerCache.get(cwd);
   const owners = new Map();
   const file = join(cwd, "modules", "catalogue.json");
-  const migrated = new Set();
-  for (const featuresRoot of [join(cwd, "modules"), join(cwd, "enterprise", "modules")]) {
-    if (!existsSync(featuresRoot)) continue;
-    // A feature is "migrated" once it has any physical contract/server/web
-    // package; that is the same fact `loadWorkspace` computes for
-    // package-boundaries, kept local here to avoid a cross-rule dependency.
-    for (const entry of readEntries(featuresRoot)) {
-      for (const role of ["contract", "server", "web"]) {
-        const packageJsonPath = join(featuresRoot, entry, role, "package.json");
-        if (existsSync(packageJsonPath)) {
-          migrated.add(entry);
-          break;
-        }
-      }
-    }
-  }
   if (existsSync(file)) {
     try {
       const value = JSON.parse(readFileSync(file, "utf8"));
       for (const entry of value.features ?? []) {
-        if (!migrated.has(entry.id)) continue;
-        for (const subject of entry.subjects ?? []) owners.set(subject, entry.id);
+        if (typeof entry.root !== "string" || !existsSync(join(cwd, entry.root))) continue;
+        for (const subject of entry.subjects ?? []) {
+          owners.set(subject, { id: entry.id, root: entry.root });
+        }
       }
     } catch {
       owners.clear();
@@ -49,21 +35,14 @@ function subjectOwners(cwd) {
   return owners;
 }
 
-function readEntries(path) {
-  if (!existsSync(path)) return [];
-  return readdirSync(path, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
-}
-
 /** The owner of `candidate`, other than `feature` itself, or undefined. */
 function foreignOwnerOf(owners, candidate, feature) {
   const direct = owners.get(candidate);
-  if (direct && direct !== feature) return [candidate, direct];
+  if (direct && direct.id !== feature) return [candidate, direct];
   if (candidate.startsWith(`${feature}-`)) {
     const stripped = candidate.slice(feature.length + 1);
     const strippedOwner = owners.get(stripped);
-    if (strippedOwner && strippedOwner !== feature) return [stripped, strippedOwner];
+    if (strippedOwner && strippedOwner.id !== feature) return [stripped, strippedOwner];
   }
   return undefined;
 }
@@ -73,8 +52,8 @@ export const featureSourceSubjectRule = defineRule({
   kind: "problem",
   messages: {
     foreignSubject: {
-      what: "Source module {{path}} claims {{subject}}, which belongs to the singular {{owner}} feature.",
-      fix: "Move the file to `modules/{{owner}}/{{role}}/src/{{path}}` (see the `feature-move` skill), or rename the subject if it is genuinely different.",
+      what: "Source module {{path}} claims {{subject}}, which the catalogue gives to the {{owner}} module.",
+      fix: "Move the file to `{{ownerRoot}}/{{role}}/src/{{path}}`, or rename the subject if it is genuinely different.",
     },
   },
   create(context, file) {
@@ -94,7 +73,7 @@ export const featureSourceSubjectRule = defineRule({
       if (!match) {
         match = [...owners].find(
           ([subject, owner]) =>
-            owner !== source.feature && claimsSubject(candidate, source.feature, subject),
+            owner.id !== source.feature && claimsSubject(candidate, source.feature, subject),
         );
       }
       if (match) break;
@@ -107,7 +86,13 @@ export const featureSourceSubjectRule = defineRule({
         context.report({
           node,
           messageId: "foreignSubject",
-          data: { path: source.sourcePath, subject, owner, role: source.role },
+          data: {
+            path: source.sourcePath,
+            subject,
+            owner: owner.id,
+            ownerRoot: owner.root,
+            role: source.role,
+          },
         });
       },
     };

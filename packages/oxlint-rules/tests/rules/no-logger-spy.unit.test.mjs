@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { noLoggerSpyRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -36,6 +37,40 @@ describe("given a test file", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("spyOnLogger");
+    });
+  });
+
+  describe("when it spies on an imported logger", () => {
+    /** @scenario "Spying on an imported logger patches a real logger" */
+    it("reports spyOnLogger on the spy's line", () => {
+      const found = report(
+        [
+          'import { logger } from "../logger";',
+          "",
+          'vi.spyOn(logger, "warn");',
+          'vi.spyOn(deps.appLogger, "fatal");',
+          'vi.spyOn(request_log, "trace");',
+        ].join("\n"),
+        "modules/agent/process/src/__tests__/agent.unit.test.ts",
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([
+        ["spyOnLogger", 3],
+        ["spyOnLogger", 4],
+        ["spyOnLogger", 5],
+      ]);
+    });
+  });
+
+  describe("when a name only ends in the letters log", () => {
+    /** @scenario "A catalog or dialog is not a logger" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          'vi.spyOn(catalog, "info");\nvi.spyOn(dialog, "warn");\nvi.spyOn(logger, "child");',
+          "modules/agent/process/src/__tests__/agent.unit.test.ts",
+        ),
+      ).toEqual([]);
     });
   });
 

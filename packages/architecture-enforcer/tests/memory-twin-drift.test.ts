@@ -1,21 +1,19 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  collectMemoryTwinDriftBaseline,
-  collectMemoryTwinDriftFindings,
-  formatBaseline,
-  lintMemoryTwinDrift,
-  MEMORY_TWIN_DRIFT_BASELINE,
-} from "../src/index.ts";
-import { snapshotOf } from "./workspace.ts";
+
+import { collectMemoryTwinDriftFindings } from "../src/index.ts";
 
 let root = "";
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "memory-twin-drift-"));
-  write("modules/widget/process/package.json", JSON.stringify({ name: "@langwatch/widget-server" }));
+  write(
+    "modules/widget/process/package.json",
+    JSON.stringify({ name: "@langwatch/widget-server" }),
+  );
 });
 
 afterEach(() => {
@@ -32,22 +30,12 @@ const REPOSITORIES = "modules/widget/process/src/repositories";
 
 const PACKAGE = "modules/widget/process";
 
-const BASELINE = "packages/architecture-enforcer/src/memory-twin-drift-baseline.json";
-
 function prisma(body: string, header = "export class PrismaWidgetRepository {"): void {
   write(`${REPOSITORIES}/prisma/prisma.widget.repository.ts`, `${header}\n${body}\n}\n`);
 }
 
 function memory(body: string, header = "export class MemoryWidgetRepository {"): void {
   write(`${REPOSITORIES}/memory/memory.widget.repository.ts`, `${header}\n${body}\n}\n`);
-}
-
-/** Rows keyed `<package directory>|<subject>|<side>|<method>`. */
-function baselineText(keys: readonly string[]): string {
-  return formatBaseline({
-    policy: MEMORY_TWIN_DRIFT_BASELINE,
-    entries: keys.map((key) => ({ key, measured: "2026-09-10" })),
-  });
 }
 
 describe("memory twin drift", () => {
@@ -127,58 +115,6 @@ describe("memory twin drift", () => {
       prisma("  findAll(): void {}");
 
       expect(collectMemoryTwinDriftFindings(root)).toEqual([]);
-    });
-  });
-
-  describe("given a baseline", () => {
-    /** @scenario "A baselined drift is silent and a stale baseline entry is reported" */
-    it("silences listed findings and refuses an entry that no longer holds", () => {
-      prisma("  findAll(): void {}");
-      memory("");
-      write(
-        BASELINE,
-        baselineText([
-          `${PACKAGE}|WidgetRepository|prisma|findAll`,
-          `${PACKAGE}|WidgetRepository|prisma|findGone`,
-        ]),
-      );
-
-      const violations = lintMemoryTwinDrift(snapshotOf({ root }));
-
-      expect(violations.map((violation) => violation.policy)).toEqual([
-        "memory-twin-drift-baseline",
-      ]);
-      expect(violations[0]!.message).toContain(
-        `${PACKAGE} WidgetRepository prisma findGone no longer matches anything`,
-      );
-    });
-
-    it("reports an unlisted finding under the policy name", () => {
-      prisma("  findAll(): void {}");
-      memory("");
-      write(BASELINE, baselineText([`${PACKAGE}|WidgetRepository|prisma|findGone`]));
-
-      const policies = lintMemoryTwinDrift(snapshotOf({ root })).map(
-        (violation) => violation.policy,
-      );
-
-      expect(policies).toContain("memory-twin-drift");
-      expect(policies).toContain("memory-twin-drift-baseline");
-    });
-
-    it("collects the baseline as rows sorted by key, keeping the date a row carries", () => {
-      prisma("  findAll(): void {}\n  findById(): void {}");
-      memory("");
-
-      const entries = collectMemoryTwinDriftBaseline({
-        root,
-        previous: [{ key: `${PACKAGE}|WidgetRepository|prisma|findAll`, measured: "2020-01-01" }],
-      });
-
-      expect(entries).toEqual([
-        { key: `${PACKAGE}|WidgetRepository|prisma|findAll`, measured: "2020-01-01" },
-        { key: `${PACKAGE}|WidgetRepository|prisma|findById`, measured: expect.any(String) },
-      ]);
     });
   });
 });

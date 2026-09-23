@@ -1,14 +1,16 @@
 import { walk } from "../ast.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// Hooks return state and callbacks; a component renders. CLAUDE.md and
-// dev/docs/best_practices/react.md both say so — a hook that returns JSX is a
-// component wearing the wrong name, and it recurs in generated code. Only the
-// hook's own top-level returns count: a returned render callback (a
-// render-prop factory) is a different function and stays out of scope.
+// A hook that returns JSX is a component wearing the wrong name
+// (dev/docs/best_practices/react.md). Only the hook's own returns count, a
+// concise arrow's body included; a returned render callback is out of scope.
 
 const HOOK_NAME = /^use[A-Z]/;
-const FUNCTION_TYPES = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
+const FUNCTION_TYPES = new Set([
+  "FunctionDeclaration",
+  "FunctionExpression",
+  "ArrowFunctionExpression",
+]);
 
 function isJsxReturn(node) {
   if (!node) return false;
@@ -22,7 +24,12 @@ function isJsxReturn(node) {
 }
 
 function checkHookBody(context, name, body) {
-  if (!body || body.type !== "BlockStatement") return;
+  if (!body) return;
+  if (body.type !== "BlockStatement") {
+    if (isJsxReturn(body))
+      context.report({ node: body, messageId: "hookReturnsJsx", data: { name } });
+    return;
+  }
 
   walk(body, (node) => {
     if (node !== body && FUNCTION_TYPES.has(node.type)) return false;
@@ -51,7 +58,10 @@ export const jsxFromHookRule = defineRule({
       },
       VariableDeclarator(node) {
         if (node.id.type !== "Identifier" || !HOOK_NAME.test(node.id.name)) return;
-        if (node.init?.type !== "FunctionExpression" && node.init?.type !== "ArrowFunctionExpression") {
+        if (
+          node.init?.type !== "FunctionExpression" &&
+          node.init?.type !== "ArrowFunctionExpression"
+        ) {
           return;
         }
         checkHookBody(context, node.id.name, node.init.body);

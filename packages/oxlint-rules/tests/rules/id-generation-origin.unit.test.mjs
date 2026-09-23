@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { idGenerationOriginRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -26,7 +27,7 @@ describe("given a strict feature or process source", () => {
       expect(found[0].messageId).toBe("foreignIdModule");
       expect(found[0].message).toBe(
         "`nanoid` mints ids outside the house scheme." +
-          " Import `generate` from `@langwatch/ksuid` and prefix the kind: `agent_${generate()}`.",
+          ' Import `generate` from `@langwatch/ksuid` and mint it with its kind: `generate("agent").toString()`.',
       );
     });
 
@@ -35,17 +36,14 @@ describe("given a strict feature or process source", () => {
       const found = report('import { v4 } from "uuid";\n', APPLICATION);
 
       expect(found.map((entry) => entry.messageId)).toEqual(["foreignIdModule"]);
-      expect(found[0].message).toContain("`agent_${generate()}`");
+      expect(found[0].message).toContain('`generate("agent").toString()`');
     });
 
     /** @scenario "An import of nanoid or uuid is reported with the house import" */
     it("falls back to a literal kind placeholder when none can be read from the path", () => {
-      const found = report(
-        'import { v4 } from "uuid";\n',
-        "apps/api/src/some-other-area/thing.ts",
-      );
+      const found = report('import { v4 } from "uuid";\n', "apps/api/src/some-other-area/thing.ts");
 
-      expect(found[0].message).toContain("`<kind>_${generate()}`");
+      expect(found[0].message).toContain('`generate("<kind>").toString()`');
     });
   });
 
@@ -64,7 +62,7 @@ describe("given a strict feature or process source", () => {
     /** @scenario "A ksuid import is left alone" */
     it("reports nothing", () => {
       const found = report(
-        'import { generate } from "@langwatch/ksuid";\nexport const id = `agent_${generate()}`;\n',
+        'import { generate } from "@langwatch/ksuid";\nexport const id = generate("agent").toString();\n',
       );
 
       expect(found).toEqual([]);

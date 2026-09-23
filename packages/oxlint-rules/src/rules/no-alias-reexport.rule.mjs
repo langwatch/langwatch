@@ -11,6 +11,21 @@ function isGoverned(workspacePath) {
   return BARREL_FILE.test(workspacePath);
 }
 
+function nameOf(node) {
+  return node.type === "Identifier" ? node.name : node.value;
+}
+
+/** The `{ local, exported }` pair when a specifier renames on the way out. */
+function aliasOf(specifier) {
+  if (specifier.type !== "ExportSpecifier") return undefined;
+  const local = nameOf(specifier.local);
+  const exported = nameOf(specifier.exported);
+  // A default export has no name to rename; naming it on the way out is the only spelling.
+  if (local === "default") return undefined;
+  if (!local || !exported || local === exported) return undefined;
+  return { exported, local };
+}
+
 export const noAliasReexportRule = defineRule({
   name: "no-alias-reexport",
   kind: "problem",
@@ -27,20 +42,8 @@ export const noAliasReexportRule = defineRule({
       ExportNamedDeclaration(node) {
         if (node.declaration) return;
         for (const specifier of node.specifiers) {
-          if (specifier.type !== "ExportSpecifier") continue;
-          const local =
-            specifier.local.type === "Identifier" ? specifier.local.name : specifier.local.value;
-          const exported =
-            specifier.exported.type === "Identifier"
-              ? specifier.exported.name
-              : specifier.exported.value;
-          if (local && exported && local !== exported) {
-            context.report({
-              node: specifier,
-              messageId: "aliasReexport",
-              data: { exported, local },
-            });
-          }
+          const alias = aliasOf(specifier);
+          if (alias) context.report({ node: specifier, messageId: "aliasReexport", data: alias });
         }
       },
     };

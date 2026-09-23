@@ -1,9 +1,7 @@
-# Semgrep rules — semantic patterns CodeRabbit's path_instructions can't
-# express deterministically. Loaded via reviews.tools.semgrep.config_file
-# in /.coderabbit.yaml.
-#
-# Highest-value rule per #3754 Investigation #6: PII-in-logger
-# (only 3 audit hits — easy to baseline-clear, high signal).
+# Semgrep rules: the two patterns the langwatch oxlint plugin cannot hold,
+# because one reads SQL migration files and the other is loaded by CodeRabbit
+# (reviews.tools.semgrep.config_file in /.coderabbit.yaml). Every other house
+# rule is an oxlint rule; see dev/lint/README.md.
 
 rules:
   # ── PII in logger calls ────────────────────────────────────────────────
@@ -28,6 +26,10 @@ rules:
         - "apps/**/src/**/*.tsx"
         - "packages/**/src/**/*.ts"
         - "packages/**/src/**/*.tsx"
+        - "modules/**/src/**/*.ts"
+        - "modules/**/src/**/*.tsx"
+        - "enterprise/**/src/**/*.ts"
+        - "enterprise/**/src/**/*.tsx"
       exclude:
         - "**/__tests__/**"
         - "**/*.test.ts"
@@ -66,102 +68,20 @@ rules:
           - pattern: "logger.$LEVEL(..., { ..., session, ... }, ...)"
           - pattern: "logger.$LEVEL(..., { ..., account, ... }, ...)"
 
-  # ── PII regex literals outside fixtures ────────────────────────────────
-  # SSN dropped: 3-2-4-digit regex false-positives on dates (`2026-05-21`),
-  # version strings, etc. The investigation didn't cite an SSN leak; bring
-  # the rule back when one exists.
-  - id: pii-literal-api-key
-    message: >
-      String literal matches API key prefix (`sk_live_`, `pk_live_`,
-      `xai-`, `sk-`, `lw_`). Use env-var indirection — never check live
-      keys into source. Gitleaks should also catch this; this rule
-      catches near-misses that gitleaks lets through.
-    severity: ERROR
-    languages: [typescript, javascript, python]
-    paths:
-      exclude:
-        - "**/__fixtures__/**"
-        - "**/*.test.*"
-        - "**/*.spec.*"
-    pattern-regex: '"(sk_live_|pk_live_|xai-|sk-proj-|sk-ant-)[A-Za-z0-9_-]{16,}"'
-
-  # ── ClickHouse migrations: unqualified table names only ────────────────
-  # Anchored to SQL DDL keywords to avoid matching `langwatch.io`,
-  # comment tokens, etc.
+  # ── ClickHouse migrations: no hard-coded database name ─────────────────
+  # Anchored to SQL DDL keywords to avoid matching `langwatch.io`, comment
+  # tokens, etc. `${CLICKHOUSE_DATABASE}.<table>` under ENVSUB is the house
+  # convention (.claude/skills/clickhouse-migration) and is not flagged.
   - id: clickhouse-no-qualified-table
     message: >
-      ClickHouse migrations must use unqualified table names — they run
-      against the connected database. `${CLICKHOUSE_DATABASE}.<table>`
-      or `langwatch.<table>` in a DDL context breaks BYOC deployments
-      where the database name differs.
+      ClickHouse migrations name the database through
+      `${CLICKHOUSE_DATABASE}.<table>` with `-- +goose ENVSUB ON`, never
+      `langwatch.<table>`: a hard-coded database name is wrong on every
+      installation that chose another.
     severity: WARNING
     languages: [generic]
     paths:
       include:
         - "packages/clickhouse-migrations/migrations/**/*.sql"
         - "packages/clickhouse-migrations/migrations/**/*.ts"
-    pattern-either:
-      - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
-      - pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'
-
-  # ── ClickHouse runtime queries must filter by TenantId ─────────────────
-  # Surfaced as a follow-up by CR on PR #4170: every ClickHouse query MUST
-  # include `WHERE TenantId = {tenantId:String}` to keep tenants isolated.
-  # Migrations (DDL) are exempt — they don't filter by tenant. This rule
-  # targets query files only, where a missing TenantId predicate is a
-  # cross-tenant leak.
-  - id: clickhouse-require-tenant-id
-    message: >
-      ClickHouse query missing `WHERE TenantId = {tenantId:String}`
-      predicate. Every runtime query must filter by TenantId to keep
-      tenants isolated. See
-      `dev/docs/best_practices/clickhouse-queries.md` § Tenant scoping.
-    severity: ERROR
-    languages: [typescript, javascript]
-    paths:
-      include:
-        - "packages/clickhouse-client/src/**/*.ts"
-        - "modules/*/server/src/clickhouse/**/*.ts"
-        - "modules/*/server/src/repositories/**/clickhouse*.ts"
-        - "enterprise/modules/*/server/src/repositories/**/clickhouse*.ts"
-        - "apps/api/src/**/clickhouse*.ts"
-      exclude:
-        - "**/migrations/**"
-        - "**/__tests__/**"
-        - "**/*.test.ts"
-        - "**/*.spec.ts"
-    patterns:
-      - pattern-either:
-          - pattern: "clickhouse.query({ query: $Q, ... })"
-          - pattern: "clickhouse.exec({ query: $Q, ... })"
-          - pattern: "clickhouseClient.query({ query: $Q, ... })"
-      - pattern-not-regex: 'TenantId\s*=\s*\{tenantId'
-
-  # ── ClickHouse dedup anti-pattern: ORDER BY … LIMIT 1 + heavy cols ─────
-  # Anti-pattern 1 from clickhouse-queries.md. Reading heavy columns while
-  # sorting all unmerged versions of a row saturates ClickHouse.
-  - id: clickhouse-no-version-order-limit
-    message: >
-      ClickHouse query selects heavy columns AND uses
-      `ORDER BY <Version|UpdatedAt> DESC LIMIT 1` to pick the latest
-      version. This loads every unmerged version of every matching row
-      into memory before sorting. Use the IN-tuple dedup pattern
-      (lightweight key columns inner subquery + heavy columns in the
-      outer select). See
-      `dev/docs/best_practices/clickhouse-queries.md` § Anti-Pattern 1.
-    severity: WARNING
-    languages: [generic]
-    paths:
-      include:
-        - "packages/clickhouse-client/src/**/*.ts"
-        - "modules/*/server/src/clickhouse/**/*.ts"
-        - "packages/clickhouse-migrations/src/**/*.ts"
-        - "packages/clickhouse-migrations/migrations/**/*.sql"
-      exclude:
-        - "**/migrations/**"
-        - "**/__tests__/**"
-        - "**/*.test.ts"
-        - "**/*.spec.ts"
-    patterns:
-      - pattern-regex: '(Messages|ComputedInput|Inputs|Details|SpanAttributes|RoleCosts|Metadata)\b'
-      - pattern-regex: 'ORDER\s+BY\s+\w*(Version|UpdatedAt)\s+DESC\s+LIMIT\s+1'
+    pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'

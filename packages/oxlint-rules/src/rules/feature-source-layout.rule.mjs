@@ -1,12 +1,14 @@
 import {
   CONTRACT_ARTIFACT,
+  CONTRACT_ARTIFACT_ONLY,
   CONTRACT_ARTIFACT_SUFFIX,
+  PROCESS_HOMES,
   PROCESS_MANAGER_SERVICE_PATTERN,
+  PROCESS_ONLY_ARTIFACT_LIST,
+  PROCESS_ONLY_CONTRACT_ARTIFACT,
+  PROCESS_PATTERNS,
   PURE_VALUE_CONSTRUCTORS,
   RULES_PATTERN,
-  SERVER_HOMES,
-  SERVER_ONLY_CONTRACT_ARTIFACT,
-  SERVER_PATTERNS,
   isLowerKebabFilename,
   isFeatureApiContract,
 } from "../../grammar/feature-layout-policy.mjs";
@@ -32,8 +34,12 @@ function isPureThrownError(context, node) {
   if (imported.type !== "ImportSpecifier") return false;
   const name = imported.imported.name ?? imported.imported.value;
   return (
-    name.endsWith('Error') && /^@langwatch\/[^/]+-contract(?:\/|$)/.test(declaration.source.value)
+    name.endsWith("Error") && /^@langwatch\/[^/]+-contract(?:\/|$)/.test(declaration.source.value)
   );
+}
+
+function processManagerSubject(sourcePath) {
+  return sourcePath.slice(sourcePath.lastIndexOf("/") + 1).replace(/-process\.service\.ts$/, "");
 }
 
 function contractVisitors(context, source) {
@@ -41,13 +47,13 @@ function contractVisitors(context, source) {
   if (name === "index.ts" || isFeatureApiContract(sourcePath, source.feature)) return {};
   const report = (messageId, data = {}) => ({
     Program(node) {
-      context.report({ node, messageId, data: { name, ...data } });
+      context.report({ node, messageId, data: { feature: source.feature, name, ...data } });
     },
   });
-  if (/^(?:app|commands|errors|events|queries|service)\.ts$/.test(name)) {
+  if (CONTRACT_ARTIFACT_ONLY.test(name)) {
     return report("contractMissingSubject", { artifact: name.replace(/\.ts$/, "") });
   }
-  if (SERVER_ONLY_CONTRACT_ARTIFACT.test(name)) return report("contractServerArtifact");
+  if (PROCESS_ONLY_CONTRACT_ARTIFACT.test(name)) return report("contractProcessArtifact");
   const malformedArtifact =
     CONTRACT_ARTIFACT_SUFFIX.test(name) &&
     !CONTRACT_ARTIFACT.test(name) &&
@@ -66,43 +72,43 @@ export const featureSourceLayoutRule = defineRule({
       what: "Rename `{{name}}` to `<subject>.{{artifact}}.ts`, e.g. `agent.commands.ts`.",
       fix: "Add the subject to the filename.",
     },
-    contractServerArtifact: {
-      what: "`{{name}}` is a server artifact: contract source may not hold `.adapter`, `.api`, `.mapper`, `.migration`, `.port`, `.projection`, `.repository` or `.store` files.",
+    contractProcessArtifact: {
+      what: `\`{{name}}\` is a process artifact: contract source holds none of ${PROCESS_ONLY_ARTIFACT_LIST}.`,
       fix:
-        "Move it into `modules/<feature>/process/src/`: `.repository`, `.store` and"
-        + " `.mapper` under `repositories/`, `.adapter` under `repositories/<backend>/`"
-        + " or `channels/<tier>/`, `.projection` under `eventing/`, `.migration` under"
-        + " `migrations/`, a `.port` rewritten as the `repositories/<subject>.repository.ts`"
-        + " interface it describes, and any `.api` other than `<feature>.api.ts` as"
-        + " `transport/<feature>.<rest|trpc|ws>.ts`.",
+        "Move it into `modules/{{feature}}/process/src/`: `.repository`, `.store` and" +
+        " `.mapper` under `repositories/`, `.channel` under `channels/`, `.projection`," +
+        " `.subscriber`, `.process` and `.intent` under `eventing/`, `.rules` under" +
+        " `rules/`, `.task` under `tasks/`, `.migration` under `migrations/`, and any" +
+        " `.api` other than `{{feature}}.api.ts` as `transport/{{feature}}.<rest|trpc|ws>.ts`.",
     },
     contractFilename: {
       what: "Rename `{{name}}` to `<subject>.<artifact>.ts` in lower kebab case, e.g. `trace-search.service.ts`.",
       fix:
-        "Take the artifact from `app`, `commands`, `errors`, `events`, `queries` or"
-        + " `service`, and write the subject and the artifact in lower kebab case with a"
-        + " single dot between them.",
+        "Take the artifact from `app`, `commands`, `errors`, `events`, `queries` or" +
+        " `service`, and write the subject and the artifact in lower kebab case with a" +
+        " single dot between them.",
     },
     processManagerService: {
-      what: "Rename `{{path}}` to `processes/<subject>.process.ts`; a process manager is not a service.",
-      fix: "Move the file to `processes/` and rename its `.service.ts` suffix to `.process.ts`.",
+      what: "`{{path}}` is a process manager named as a service.",
+      fix: "Move it to `eventing/{{subject}}.process.ts`, beside the pipeline that names it.",
     },
     rulesImpurity: {
       what: "Rules module `{{path}}` may only export functions and constants (found {{found}}).",
       fix: "Move the class or the `new` into `services/<name>.service.ts` and pass the constructed value into `{{path}}` as a function parameter.",
     },
-    serverPath: {
-      what: `\`{{path}}\` has no home in layout v0. Only this shape is allowed: ${SERVER_HOMES}.`,
+    processPath: {
+      what: `\`{{path}}\` has no home in layout v0. Only this shape is allowed: ${PROCESS_HOMES}.`,
       fix:
-        "Move `{{path}}` onto one of those paths: a service flattens to"
-        + " `services/<name>.service.ts`, with no subdirectory under `services/` and no"
-        + " qualifier before `.service`; an adapter or store becomes"
-        + " `repositories/<backend>/<backend>.<subject>.repository.ts` or"
-        + " `channels/<tier>/<tier>.<subject>.channel.ts`; a projection, subscriber,"
-        + " process manager or intent becomes"
-        + " `eventing/<feature>.<projection|subscriber|process|intent>.ts`; a transport"
-        + " becomes `transport/<feature>.<rest|trpc|ws>.ts`; a file with no artifact"
-        + " suffix moves into the module that already uses it.",
+        "Move `{{path}}` onto one of those paths: a service flattens to" +
+        " `services/<name>.service.ts`, with no subdirectory under `services/` and no" +
+        " qualifier before `.service`; owned state becomes" +
+        " `repositories/<backend>/<backend>.<subject>.repository.ts`, a message to" +
+        " anything the module does not own becomes" +
+        " `channels/<tier>/<tier>.<subject>.channel.ts`; a projection, subscriber," +
+        " process manager or intent becomes" +
+        " `eventing/<feature>.<projection|subscriber|process|intent>.ts`; a transport" +
+        " becomes `transport/<feature>.<rest|trpc|ws>.ts`; a file with no artifact" +
+        " suffix moves into the module that already uses it.",
     },
   },
   create(context, file) {
@@ -120,7 +126,7 @@ export const featureSourceLayoutRule = defineRule({
           context.report({
             node,
             messageId: "processManagerService",
-            data: { path: sourcePath },
+            data: { path: sourcePath, subject: processManagerSubject(sourcePath) },
           });
         },
       };
@@ -157,14 +163,14 @@ export const featureSourceLayoutRule = defineRule({
       };
     }
 
-    const hasServerHome = SERVER_PATTERNS.some((pattern) => pattern.test(sourcePath));
-    if (hasServerHome) return {};
+    const hasProcessHome = PROCESS_PATTERNS.some((pattern) => pattern.test(sourcePath));
+    if (hasProcessHome) return {};
 
     return {
       Program(node) {
         context.report({
           node,
-          messageId: "serverPath",
+          messageId: "processPath",
           data: { path: sourcePath },
         });
       },

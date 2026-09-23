@@ -1,9 +1,9 @@
 import {
   CANONICAL_ARTIFACTS,
   isLowerKebabFilename,
-  isStrictServerFilename,
-  SERVER_ARCHITECTURAL_QUALIFIERS,
-  SERVER_QUALIFIED_ARTIFACTS,
+  isStrictProcessFilename,
+  PROCESS_QUALIFIERS,
+  QUALIFIED_ARTIFACTS,
 } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
@@ -22,19 +22,14 @@ function toKebabWords(text) {
     .toLowerCase();
 }
 
-// A server filename with a flat qualifier prefix (`prisma-agent.repository.ts`)
-// is refused only because the qualifier is hyphen-joined to the subject
-// instead of living in its own dot segment; splitting it (`prisma.agent.repository.ts`)
-// is always the exact, always-valid fix, independent of which of the
-// `SERVER_QUALIFIED_ARTIFACTS` it is or which folder it sits in.
+// `prisma-agent.repository.ts` is refused only because the qualifier is
+// hyphen-joined to the subject; `prisma.agent.repository.ts` is always the fix.
 function qualifierPrefixRename(name) {
   const extension = extensionOf(name);
   if (!extension) return undefined;
   const parts = name.slice(0, -extension.length).split(".");
-  if (parts.length !== 2 || !SERVER_QUALIFIED_ARTIFACTS.has(parts[1])) return undefined;
-  const qualifier = SERVER_ARCHITECTURAL_QUALIFIERS.find((candidate) =>
-    parts[0].startsWith(`${candidate}-`),
-  );
+  if (parts.length !== 2 || !QUALIFIED_ARTIFACTS.has(parts[1])) return undefined;
+  const qualifier = PROCESS_QUALIFIERS.find((candidate) => parts[0].startsWith(`${candidate}-`));
   if (!qualifier) return undefined;
   return `${qualifier}.${parts[0].slice(qualifier.length + 1)}.${parts[1]}${extension}`;
 }
@@ -52,13 +47,9 @@ function kebabCaseRename(name) {
   let subjectWords;
   if (rawParts.length > 1 && CANONICAL_ARTIFACTS.has(lastRaw)) {
     artifact = lastRaw;
-    subjectWords = toKebabWords(rawParts.slice(0, -1).join("-"))
-      .split("-")
-      .filter(Boolean);
+    subjectWords = toKebabWords(rawParts.slice(0, -1).join("-")).split("-").filter(Boolean);
   } else {
-    const words = toKebabWords(rawParts.join("-"))
-      .split("-")
-      .filter(Boolean);
+    const words = toKebabWords(rawParts.join("-")).split("-").filter(Boolean);
     const tail = words.at(-1);
     if (words.length < 2 || !CANONICAL_ARTIFACTS.has(tail)) return undefined;
     artifact = tail;
@@ -96,7 +87,7 @@ export const featureSourceFilenameRule = defineRule({
     if (!/\.[cm]?[jt]sx?$/.test(source.name)) return {};
     const valid =
       source.role === "process"
-        ? isStrictServerFilename(source.name)
+        ? isStrictProcessFilename(source.name)
         : isLowerKebabFilename(source.name);
     if (valid) return {};
 

@@ -1,15 +1,16 @@
 import { defineRule } from "../define-rule.mjs";
 
-// `platform/app` was the monolith that `apps/*` and `modules/*` replaced, and
-// `~/` was the alias that only resolved inside it. No tsconfig maps `~/*` now,
-// so a stale path resolves to nothing and TypeScript says so only when something
-// reaches the file - which is how a moved test or a half-finished port keeps
-// compiling until the first import of it.
+// `platform/app` was the monolith `apps/*` and `modules/*` replaced; `~/` and
+// `@app/` were aliases that only resolved inside it. Nothing maps them now, so a
+// stale path compiles until the first import of it. Spec: lint-legacy-monolith-path.
 
-// `platform/app` is the monolith itself, anchored so the legitimate nested
-// `apps/api/src/platform/config/` is left alone, and `cross-platform/` with it.
-const LEGACY_PATH = /^~\//;
+// Anchored so an application's own `src/platform/` and `cross-platform/` are left alone.
+const LEGACY_ALIAS = /^(?:~|@app)\//;
 const MONOLITH_PATH = /(?:^|[./])platform\/app(?:\/|$)/;
+
+function isMonolithSpecifier(value) {
+  return LEGACY_ALIAS.test(value) || MONOLITH_PATH.test(value);
+}
 
 export const legacyMonolithPathRule = defineRule({
   name: "legacy-monolith-path",
@@ -17,60 +18,38 @@ export const legacyMonolithPathRule = defineRule({
   messages: {
     legacyMonolithPath: {
       what: "`{{name}}` names the deleted monolith.",
-      why: "Nothing maps `~/*` and `platform/` is gone, so the path resolves to nothing until something reaches the file.",
-      fix: "Find where the code lives now by searching its basename across `modules/*/{contract,server,web}/src`, `packages/*/src` and `apps/*/src`, then re-point this specifier at that package.",
+      why: "Nothing maps `~/*` or `@app/*` and `platform/` is gone, so the path resolves to nothing until something reaches the file.",
+      fix: "Find where the code lives now by searching its basename under `modules/*/*/src`, `enterprise/modules/*/*/src`, `packages/*/src` and `apps/*/src`, then import it by that package's name.",
     },
   },
   create(context, file) {
-    // A module specifier IS a string literal, so the `Literal` visitor below
-    // sees the same node again. The parent is visited first, so recording it
-    // here is what keeps one stale import from being reported twice.
+    // A specifier is also a `Literal`; recording it keeps one import from reporting twice.
     const asSpecifier = new Set();
 
-    const reportPath = (node, value) => {
-      if (typeof value !== "string") return false;
-      if (LEGACY_PATH.test(value) || MONOLITH_PATH.test(value)) {
-        context.report({ data: { name: value }, messageId: "legacyMonolithPath", node });
-        return true;
-      }
-      return false;
+    const report = (node) =>
+      context.report({ data: { name: node.value }, messageId: "legacyMonolithPath", node });
+
+    const specifier = (source) => {
+      if (source?.type !== "Literal") return;
+      asSpecifier.add(source);
+      if (typeof source.value === "string" && isMonolithSpecifier(source.value)) report(source);
     };
 
-    const specifier = (node) => {
-      if (!node?.source) return;
-      asSpecifier.add(node.source);
-      reportPath(node.source, node.source.value);
-    };
+    const isRequire = (node) =>
+      node.callee?.type === "Identifier" && node.callee.name === "require";
 
     return {
-      ImportDeclaration: specifier,
-      ImportExpression: specifier,
-      ExportNamedDeclaration: specifier,
-      ExportAllDeclaration: specifier,
-
+      ImportDeclaration: (node) => specifier(node.source),
+      ImportExpression: (node) => specifier(node.source),
+      ExportNamedDeclaration: (node) => specifier(node.source),
+      ExportAllDeclaration: (node) => specifier(node.source),
       CallExpression(node) {
-        if (node.callee?.type !== "Identifier" || node.callee.name !== "require") return;
-        const first = node.arguments?.[0];
-        if (first?.type !== "Literal") return;
-        asSpecifier.add(first);
-        reportPath(first, first.value);
+        if (isRequire(node)) specifier(node.arguments?.[0]);
       },
-
-      // A string that is not a module specifier. `~/` is NOT checked here: in
-      // specifier position it is the monolith's alias, but a bare string is a
-      // home directory, and `~/.codex/hooks.json` in the CLI is not a stale
-      // import. `platform/app` still is, because nothing else is called that -
-      // except in a test, which is the one place the old paths must be written
-      // down: the CI path-filter suites keep them under `wasFiles` precisely to
-      // prove the monolith is gone, and telling those to re-point a specifier
-      // asks for something that does not exist.
+      // A bare `~/` string is a home directory, and a test may name the old paths as data.
       Literal(node) {
-        if (asSpecifier.has(node)) return;
-        if (file.isTest) return;
-        if (typeof node.value !== "string") return;
-        if (MONOLITH_PATH.test(node.value)) {
-          context.report({ data: { name: node.value }, messageId: "legacyMonolithPath", node });
-        }
+        if (asSpecifier.has(node) || file.isTest) return;
+        if (typeof node.value === "string" && MONOLITH_PATH.test(node.value)) report(node);
       },
     };
   },

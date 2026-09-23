@@ -1,16 +1,17 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { webImportsServerShapedValueRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { auth: { layoutVersion: 0, roles: { browser: {}, process: {} } } },
+  features: { auth: { roles: { browser: {}, "browser-kit": {}, process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());
 
 const WEB_FILE = "modules/auth/browser/src/behavior/auth-client.ts";
 const UI_FILE = "apps/ui/src/behavior/ui-session-client.ts";
-const SERVER_FILE = "modules/auth/process/src/services/auth.service.ts";
+const PROCESS_FILE = "modules/auth/process/src/services/auth.service.ts";
 
 function report(filename, code) {
   return runRule(webImportsServerShapedValueRule, { code, cwd: workspace.cwd, filename });
@@ -24,6 +25,28 @@ describe("given a browser module", () => {
 
       expect(found.map((entry) => entry.messageId)).toEqual(["serverShaped"]);
       expect(found[0].message).toContain("kysely");
+    });
+  });
+
+  describe("when the browser source is a kit or the design system", () => {
+    /** @scenario "The rule covers browser kits and the design system" */
+    it.each([
+      "modules/auth/browser-kit/src/ui/elements/auth-badge.tsx",
+      "packages/design-system/src/elements/table.tsx",
+    ])("reports serverShaped in %s", (file) => {
+      const found = report(file, 'import { PrismaClient } from "@prisma/client";');
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["serverShaped"]);
+      expect(found[0].line).toBe(1);
+    });
+  });
+
+  describe("when a non-browser package sits under a path that merely contains browser", () => {
+    /** @scenario "The rule gates on the file's role, not a path fragment" */
+    it("reports nothing", () => {
+      expect(
+        report("packages/browser-host/src/host.ts", 'import { Kysely } from "kysely";'),
+      ).toEqual([]);
     });
   });
 
@@ -68,7 +91,7 @@ describe("given a server module", () => {
   describe("when it value-imports the same package", () => {
     /** @scenario "Server code may value-import a server-shaped package" */
     it("reports nothing", () => {
-      expect(report(SERVER_FILE, 'import { betterAuth } from "better-auth";')).toEqual([]);
+      expect(report(PROCESS_FILE, 'import { betterAuth } from "better-auth";')).toEqual([]);
     });
   });
 });

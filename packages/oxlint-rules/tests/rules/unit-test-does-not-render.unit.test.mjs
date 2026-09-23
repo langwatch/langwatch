@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { unitTestDoesNotRenderRule } from "../../src/rules/unit-test-does-not-render.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -19,19 +20,21 @@ describe("given a .unit.test.tsx file", () => {
       const found = report(
         'import { render } from "@testing-library/react";\n' +
           'import { screen } from "@testing-library/dom";\n' +
-          "test(\"x\", () => {});",
+          'test("x", () => {});',
         filename,
       );
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("unitTestImportsRenderer");
       expect(found[0].data).toEqual({
+        name: "agent-card.unit.test.tsx",
         specifier: "@testing-library/react",
         target: "agent-card.integration.test.tsx",
       });
       expect(found[0].message).toBe(
-        "`@testing-library/react` is imported by a `.unit.test` file, and it renders components." +
-          " Rename the file to `agent-card.integration.test.tsx` and leave the content unchanged.",
+        "`@testing-library/react` renders components, and `agent-card.unit.test.tsx` is not named" +
+          " as an integration test. Rename the file to `agent-card.integration.test.tsx` and leave" +
+          " the content unchanged.",
       );
     });
   });
@@ -57,6 +60,32 @@ describe("given a .unit.test.tsx file", () => {
         ),
       ).toEqual([]);
     });
+  });
+});
+
+describe("given a .test.tsx file that names no level", () => {
+  /** @scenario "An unlevelled component test importing testing-library is reported" */
+  it("reports it on the import's line, naming the integration-test target", () => {
+    const found = report(
+      '// @vitest-environment jsdom\nimport { render } from "@testing-library/react";\ntest("x", () => {});',
+      "modules/agent/browser/src/ui/blocks/__tests__/agent-card.test.tsx",
+    );
+
+    expect(found.map((entry) => [entry.data.target, entry.line])).toEqual([
+      ["agent-card.integration.test.tsx", 2],
+    ]);
+  });
+});
+
+describe("given a .e2e.test.tsx file", () => {
+  /** @scenario "An end-to-end test importing testing-library is left alone" */
+  it("reports nothing", () => {
+    const found = report(
+      'import { render } from "@testing-library/react";\ntest("x", () => {});',
+      "modules/agent/browser/src/ui/blocks/__tests__/agent-card.e2e.test.tsx",
+    );
+
+    expect(found).toEqual([]);
   });
 });
 

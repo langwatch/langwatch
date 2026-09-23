@@ -1,8 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import ts from "typescript";
 import { z } from "zod";
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+
 import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 const buildConfigSchema = z
   .object({
@@ -51,17 +54,17 @@ function violationForPackage(pkg: ClassifiedPackage): ArchitectureViolation | un
     };
   }
 
-  let rawConfig: unknown;
+  const parsed = ts.parseConfigFileTextToJson(file, readFileSync(file, "utf8"));
 
-  try {
-    rawConfig = JSON.parse(readFileSync(file, "utf8"));
-  } catch {
+  if (parsed.error) {
     return {
       policy: "contract-build-config",
       file,
-      message: "Strict contract declaration build config must be valid JSON.",
+      message: "Strict contract declaration build config must be valid JSONC.",
     };
   }
+
+  const rawConfig: unknown = parsed.config;
 
   const result = buildConfigSchema.safeParse(rawConfig);
 

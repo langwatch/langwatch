@@ -51,6 +51,12 @@ Feature: The linter keeps one clock
   Rule: The boundaries that can only speak Date are left alone
 
     @unit
+    Scenario: Date reached through globalThis is reported
+      Given production source constructing or calling Date through globalThis or window
+      When the rule runs
+      Then it reports each use on its line, as it would for a bare Date
+
+    @unit
     Scenario: The named boundary helpers keep their Date
       Given a conversion written inside a function named toDate or fromDate
       When the rule runs
@@ -63,10 +69,10 @@ Feature: The linter keeps one clock
       Then it reports nothing
 
     @unit
-    Scenario: The Postgres adapter keeps its Date
-      Given a Postgres adapter that holds a Date
+    Scenario: A module's adapters folder is not a seam
+      Given a module file under an adapters folder that holds a Date
       When the rule runs
-      Then it reports nothing
+      Then it reports the Date, because only repositories/prisma and repositories/clickhouse are seams
 
     @unit
     Scenario: The ClickHouse seam keeps its Date
@@ -75,10 +81,10 @@ Feature: The linter keeps one clock
       Then it reports nothing
 
     @unit
-    Scenario: The Postgres adapter keeps its Date under either spelling
-      Given a Postgres adapter written as a directory rather than a filename
+    Scenario: Eventing's Prisma stores keep their Date
+      Given a file under packages/eventing/src/server/adapters/postgres, which binds Prisma columns
       When the rule runs
-      Then it reports nothing
+      Then it reports nothing, until those stores move under a repositories/prisma folder
 
     @unit
     Scenario: The seam is the folder, not the word

@@ -1,14 +1,13 @@
 import { defineRule } from "../define-rule.mjs";
 import { unwrap } from "./zod-schema-origin.mjs";
 
-// A transport file declares routes and imports its shapes; it does not
-// author them. The browser, the SDK and another module all read the wire
-// through the contract package, and none of them may import a server
-// package, so a schema declared here is a shape only the server can see -
-// every other side of the wire ends up with a hand-written copy that drifts.
+// A transport file declares routes and imports its shapes. A schema authored
+// here is a shape only the process can see, so every other side of the wire
+// (browser, SDK, peer module) ends up with a hand-written copy that drifts.
 
 const TRANSPORT_SOURCE =
   /^(?:enterprise\/)?modules\/([^/]+)\/process\/src\/transport\/.+\.[cm]?[jt]sx?$/;
+const ZOD_ENTRYPOINTS = new Set(["zod", "zod/v3", "zod/v4", "zod/mini", "zod/v4/mini"]);
 const GENERATED = /(?:^|\/)(?:generated|dist|node_modules)\/|(?:\.generated|\.d)\.[cm]?[jt]sx?$/;
 
 function moduleOf(workspacePath) {
@@ -17,7 +16,9 @@ function moduleOf(workspacePath) {
 
 function contractPathOf(workspacePath, module) {
   const enterprise = workspacePath.startsWith("enterprise/");
-  return enterprise ? `enterprise/modules/${module}/contract/src` : `modules/${module}/contract/src`;
+  return enterprise
+    ? `enterprise/modules/${module}/contract/src`
+    : `modules/${module}/contract/src`;
 }
 
 /** The module specifier an identifier was imported from, or undefined for anything else. */
@@ -46,7 +47,7 @@ function isAuthoredHere(node, context, locals, seen) {
   if (object.type !== "Identifier") return isAuthoredHere(object, context, locals, seen);
 
   const source = importSourceOf(context, object);
-  if (source === "zod") return true;
+  if (ZOD_ENTRYPOINTS.has(source)) return true;
   if (source !== void 0) return false;
   if (seen.has(object.name)) return false;
 
@@ -54,9 +55,34 @@ function isAuthoredHere(node, context, locals, seen) {
   return local ? isAuthoredHere(local, context, locals, new Set(seen).add(object.name)) : false;
 }
 
+function constDeclarationOf(statement) {
+  const exported = statement.type === "ExportNamedDeclaration";
+  const declaration = exported ? statement.declaration : statement;
+  if (declaration?.type !== "VariableDeclaration" || declaration.kind !== "const") return undefined;
+  return { declaration, exported };
+}
+
+/** Every top-level `const name = …`, and whether it is exported. */
+function topLevelConstants(program) {
+  const locals = new Map();
+  const candidates = [];
+  for (const statement of program.body) {
+    const found = constDeclarationOf(statement);
+    if (!found) continue;
+    for (const declarator of found.declaration.declarations) {
+      if (declarator.id.type !== "Identifier" || !declarator.init) continue;
+      locals.set(declarator.id.name, declarator.init);
+      candidates.push({ declarator, exported: found.exported });
+    }
+  }
+  return { candidates, locals };
+}
+
 function isSchemaSource(file) {
   return (
-    file.isProduction && !GENERATED.test(file.workspacePath) && Boolean(moduleOf(file.workspacePath))
+    file.isProduction &&
+    !GENERATED.test(file.workspacePath) &&
+    Boolean(moduleOf(file.workspacePath))
   );
 }
 
@@ -76,30 +102,21 @@ export const schemaOutsideContractRule = defineRule({
 
     return {
       Program(program) {
-        const locals = new Map();
-        const candidates = [];
-
-        for (const statement of program.body) {
-          const exported = statement.type === "ExportNamedDeclaration";
-          const declaration = exported ? statement.declaration : statement;
-          if (declaration?.type !== "VariableDeclaration" || declaration.kind !== "const") continue;
-
-          for (const declarator of declaration.declarations) {
-            if (declarator.id.type !== "Identifier" || !declarator.init) continue;
-            locals.set(declarator.id.name, declarator.init);
-            candidates.push({ declarator, exported });
-          }
-        }
+        const { candidates, locals } = topLevelConstants(program);
 
         for (const { declarator, exported } of candidates) {
           const name = declarator.id.name;
-          if (!name.endsWith('Schema') && !exported) continue;
+          if (!name.endsWith("Schema") && !exported) continue;
           if (!isAuthoredHere(declarator.init, context, locals, new Set())) continue;
 
           context.report({
             node: declarator,
             messageId: "schema",
-            data: { name, path: file.workspacePath, contractPath: contractPathOf(file.workspacePath, module) },
+            data: {
+              name,
+              path: file.workspacePath,
+              contractPath: contractPathOf(file.workspacePath, module),
+            },
           });
         }
       },

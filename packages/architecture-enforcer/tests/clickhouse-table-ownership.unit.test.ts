@@ -216,37 +216,4 @@ CREATE TABLE IF NOT EXISTS \${CLICKHOUSE_DATABASE}.trace_summaries_rebuild (Tena
       expect([...clickhouseTables(workspace.root).keys()]).toEqual(["trace_summaries"]);
     });
   });
-
-  describe("given a baseline row nothing matches", () => {
-    /** @scenario "A baselined finding is excused and a stale row is reported" */
-    it("reports the row as stale and says to delete it", () => {
-      const workspace = fixture();
-      workspace.write(
-        "modules/trace/process/src/repositories/clickhouse/trace-summary.repository.ts",
-        writer("trace_summaries"),
-      );
-      workspace.write(
-        "packages/architecture-enforcer/src/clickhouse-table-ownership-baseline.json",
-        JSON.stringify({
-          version: 1,
-          policy: "clickhouse-table-ownership",
-          entries: [{ key: "analytics|trace_summaries", measured: "2026-09-10" }],
-        }),
-      );
-
-      expect(workspace.lint()).toEqual([
-        {
-          policy: "clickhouse-table-ownership-baseline",
-          file: join(
-            workspace.root,
-            "packages/architecture-enforcer/src/clickhouse-table-ownership-baseline.json",
-          ),
-          message:
-            "ClickHouse table ownership baseline entry analytics/trace_summaries no longer matches anything and must be removed.",
-          allowed: "Delete the stale entry so the checked-in inventory only shrinks.",
-          stale: true,
-        },
-      ]);
-    });
-  });
 });

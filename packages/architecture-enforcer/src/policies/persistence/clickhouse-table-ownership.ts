@@ -3,17 +3,8 @@ import { join, relative } from "node:path";
 
 import ts from "typescript";
 
-import {
-  type BaselineEntry,
-  type BaselinePolicy,
-  baselinePath,
-  collectBaseline,
-  emptyBaselineRows,
-  liveKeys,
-  readBaseline,
-  staleRows,
-} from "../../baseline.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
+import { getAnchor } from "../../workspace/anchors.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
@@ -25,7 +16,6 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
  */
 
 const MIGRATIONS = "packages/clickhouse-migrations/migrations";
-const BASELINE_FILE = "clickhouse-table-ownership-baseline.json";
 const UNOWNED = "unowned";
 const TEST_FILE = /(?:__tests__|__fixtures__|\/fixtures\/|\.(?:test|spec)\.)/;
 const SOURCE_FILE = /\.[cm]?tsx?$/;
@@ -66,9 +56,8 @@ function upStatements(text: string): string {
  * `*_mv` pair counts as one table with one owner.
  */
 export function clickhouseTables(root: string): Map<string, string> {
-  const directory = join(root, MIGRATIONS);
+  const directory = getAnchor({ root, anchor: MIGRATIONS, policy: "clickhouse-table-ownership" });
   const live = new Map<string, string>();
-  if (!existsSync(directory)) return live;
 
   for (const name of readdirSync(directory)
     .filter((file) => file.endsWith(".sql"))
@@ -98,13 +87,7 @@ function foldMaterialisedViews(live: ReadonlyMap<string, string>): Map<string, s
   return folded;
 }
 
-/**
- * The directories a module's ClickHouse access can live in, module by
- * module. Every feature root is registered centrally in
- * `modules/catalogue.json` now, so the catalogue is the whole answer; the
- * older per-application `features/` trees and the enterprise composition
- * roots this used to also scan are gone.
- */
+/** The directories a module's ClickHouse access can live in: its catalogue root. */
 function scanRoots(root: string, catalogue: readonly FeatureCatalogueEntry[]): ScanRoot[] {
   return catalogue.map((feature) => ({
     module: feature.id,
@@ -263,7 +246,7 @@ function collectFindings(
   const writers = owners(access);
   const findings = new Map<string, Finding>();
 
-  for (const [table, migration] of [...tables].toSorted()) {
+  for (const [table, migration] of [...tables].toSorted(([a], [b]) => a.localeCompare(b))) {
     const modules = writers.get(table) ?? [];
     const owner = modules[0];
 
@@ -310,41 +293,11 @@ export function collectClickhouseOwnershipFindings(
   catalogue: readonly FeatureCatalogueEntry[],
 ): Finding[] {
   const tables = clickhouseTables(root);
-  if (tables.size === 0) return [];
 
   return collectFindings(collectAccess(root, catalogue, tables), tables, root);
 }
 
-export const CLICKHOUSE_TABLE_OWNERSHIP_BASELINE: BaselinePolicy = {
-  id: "clickhouse-table-ownership",
-  file: BASELINE_FILE,
-  label: "ClickHouse table ownership baseline",
-  keyRule: "A key is `<module>|<table>`; the module `unowned` marks a table no module writes.",
-  enforceExpiry: false,
-  stale: (entry) => ({
-    message: `ClickHouse table ownership baseline entry ${entry.key.split("|").join("/")} no longer matches anything and must be removed.`,
-    allowed: "Delete the stale entry so the checked-in inventory only shrinks.",
-  }),
-};
-
-export function collectClickhouseTableOwnershipBaseline({
-  root,
-  catalogue,
-  previous = [],
-}: {
-  root: string;
-  catalogue: readonly FeatureCatalogueEntry[];
-  previous?: readonly BaselineEntry[];
-}): BaselineEntry[] {
-  const found = collectClickhouseOwnershipFindings(root, catalogue).map((finding) => finding.key);
-
-  return collectBaseline({ policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE, found, previous });
-}
-
-/**
- * The ratchet: an unlisted foreign reader, second writer or ownerless table is
- * a violation, and a listed one that is gone is stale.
- */
+/** A foreign reader, a second writer or an ownerless table is a violation. */
 export function lintClickhouseTableOwnershipAt({
   root,
   catalogue,
@@ -352,33 +305,9 @@ export function lintClickhouseTableOwnershipAt({
   root: string;
   catalogue: readonly FeatureCatalogueEntry[];
 }): ArchitectureViolation[] {
-  const file = baselinePath({ root, policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE });
-  const baseline = readBaseline({ policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE, file });
-
-  const violations = [
-    ...baseline.violations,
-    ...emptyBaselineRows({ read: baseline, policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE, file }),
-  ];
-
-  const findings = collectClickhouseOwnershipFindings(root, catalogue);
-  const baselined = liveKeys({ entries: baseline.entries });
-
-  for (const finding of findings) {
-    if (baselined.has(finding.key)) continue;
-
-    violations.push(issue(finding.file, finding.message, finding.line));
-  }
-
-  violations.push(
-    ...staleRows({
-      entries: baseline.entries,
-      found: new Set(findings.map((finding) => finding.key)),
-      policy: CLICKHOUSE_TABLE_OWNERSHIP_BASELINE,
-      file,
-    }),
+  return collectClickhouseOwnershipFindings(root, catalogue).map((finding) =>
+    issue(finding.file, finding.message, finding.line),
   );
-
-  return violations;
 }
 
 /** The registry entry: the same check, reading the catalogue off a snapshot. */

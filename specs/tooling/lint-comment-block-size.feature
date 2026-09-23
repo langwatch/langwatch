@@ -1,11 +1,11 @@
 Feature: The comment-block-size lint rule
   A contiguous comment block of 6 or more lines of commentary, or a comment
   line past 100 columns, is reported — comments exist to make code readable and
-  good code needs almost none. There is one tier, it is an error, and it cannot
-  be argued with: a `@lint-keep` annotation is refused at this size and the
-  message says so. A block carrying a `@scenario` annotation is exempt, and
-  lines the author cannot cut — structural JSDoc tags, and the annotations that
-  select a test's level and environment — are not counted as commentary.
+  good code needs almost none. There is one tier, it is an error, and nothing
+  suppresses it: a `@lint-keep` line is commentary like any other. A block
+  carrying a `@scenario` annotation is exempt, and lines the author cannot cut —
+  structural JSDoc tags, and the annotations that select a test's level and
+  environment — are not counted as commentary.
 
   @unit
   Scenario: An oversized comment block is reported with its measured line count
@@ -32,16 +32,22 @@ Feature: The comment-block-size lint rule
     Then it reports nothing
 
   @unit
-  Scenario: The keep annotation does not suppress the error tier
+  Scenario: The keep annotation does not suppress the error
     Given an 8-line comment block whose @lint-keep gives a reason and names an ADR
     When the comment-block-size rule runs over it
-    Then it reports the block and says the annotation does not apply
+    Then it reports the block
 
   @unit
-  Scenario: A keep annotation's own line is not commentary
-    Given a 5-line comment block whose @lint-keep gives a reason and names an ADR
+  Scenario: A keep annotation's lines count as commentary
+    Given five lines of prose followed by two @lint-keep lines, starting on line 2
     When the comment-block-size rule runs over it
-    Then it reports nothing, because the annotation's own line is not commentary
+    Then it reports a 7-line block on line 2
+
+  @unit
+  Scenario: A five-line block is at the maximum and passes
+    Given a source file with a 5-line comment block
+    When the comment-block-size rule runs over it
+    Then it reports nothing
 
   @unit
   Scenario: An overlong scenario binding is not reported

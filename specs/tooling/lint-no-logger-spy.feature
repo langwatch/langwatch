@@ -20,6 +20,19 @@ Feature: The no-logger-spy lint rule
     Then it reports spyOnLogger
 
   @unit
+  Scenario: Spying on an imported logger patches a real logger
+    Given a test file that spies on an imported `logger`, a `deps.appLogger` and a `request_log`
+    And the spied methods are warn, fatal and trace
+    When the no-logger-spy rule runs over it
+    Then it reports spyOnLogger on each spy's line
+
+  @unit
+  Scenario: A catalog or dialog is not a logger
+    Given a test file that spies on `catalog` and `dialog`, and on a logger's non-log method
+    When the no-logger-spy rule runs over it
+    Then it reports nothing
+
+  @unit
   Scenario: Spying on an unrelated object is allowed
     Given a test file that spies on an object unrelated to a logger
     When the no-logger-spy rule runs over it

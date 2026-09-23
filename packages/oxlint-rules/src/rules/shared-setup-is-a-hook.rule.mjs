@@ -9,6 +9,8 @@ import { defineRule } from "../define-rule.mjs";
 const WHITESPACE = /\s+/g;
 const MINIMUM_SHARED_STATEMENTS = 3;
 const FAMILY_ROOT_MAX_DEPTH = 4;
+const ASSERTION_CHAIN_MAX_DEPTH = 8;
+const ASSERTION_ROOT = /^(?:expect|assert)$/;
 
 function isDescribeCall(node) {
   return (
@@ -60,47 +62,56 @@ function siblingTestBodiesOf(describeCall) {
   const statements = blockBodyOf(describeCall.arguments[1]);
   if (!statements) return undefined;
 
-  let testFamilyCount = 0;
-  const siblingBodies = [];
-
-  for (const statement of statements) {
-    if (statement.type !== "ExpressionStatement") continue;
-    const expression = statement.expression;
-    if (expression.type !== "CallExpression") continue;
-
-    const root = familyRoot(expression.callee);
-    if (root === "describe") continue; // nested describe: ignored, never disqualifies
-    if (root !== "it" && root !== "test") continue; // hooks and anything else: not a sibling test
-
-    testFamilyCount += 1;
-    const isBareCall = expression.callee.type === "Identifier";
-    const body = isBareCall ? blockBodyOf(expression.arguments[1]) : undefined;
-    if (body) siblingBodies.push(body);
-  }
-
-  if (siblingBodies.length < 2) return undefined;
-  // Every it/test-family child qualified as a plain sibling body — if one
-  // didn't (it.skip, it.each, it.todo, a non-block body), the counts differ
-  // and the whole describe is left alone.
-  if (siblingBodies.length !== testFamilyCount) return undefined;
+  const tests = statements.map(testCallOf).filter(Boolean);
+  const siblingBodies = tests.map(bareTestBodyOf).filter(Boolean);
+  // One it.skip, it.each, it.todo or concise body among them leaves the describe alone.
+  if (siblingBodies.length < 2 || siblingBodies.length !== tests.length) return undefined;
 
   return siblingBodies;
+}
+
+/** The `it`/`test`-family call a statement makes; hooks and nested describes are not tests. */
+function testCallOf(statement) {
+  if (statement.type !== "ExpressionStatement") return undefined;
+  const { expression } = statement;
+  if (expression.type !== "CallExpression") return undefined;
+  const root = familyRoot(expression.callee);
+
+  return root === "it" || root === "test" ? expression : undefined;
+}
+
+/** A plain `it("...", () => { ... })` body; anything patterned or concise is undefined. */
+function bareTestBodyOf(call) {
+  return call.callee.type === "Identifier" ? blockBodyOf(call.arguments[1]) : undefined;
+}
+
+/** `expect(x).not.toBe(y)`, `await expect(p).rejects.toThrow()`, `assert.equal(...)`. */
+function isAssertion(statement) {
+  let current = statement.type === "ExpressionStatement" ? statement.expression : undefined;
+  for (let depth = 0; current && depth < ASSERTION_CHAIN_MAX_DEPTH; depth += 1) {
+    if (current.type === "Identifier") return ASSERTION_ROOT.test(current.name);
+    if (current.type === "AwaitExpression") current = current.argument;
+    else if (current.type === "CallExpression") current = current.callee;
+    else if (current.type === "MemberExpression") current = current.object;
+    else return false;
+  }
+  return false;
 }
 
 function normalizedStatementText(source, statement) {
   return source.slice(statement.range[0], statement.range[1]).replace(WHITESPACE, " ").trim();
 }
 
-/** The length of the leading run of statements that read identically, verbatim
- * (whitespace aside), across every sibling body. Compares each sibling only
- * against the first — never sibling against sibling — so the cost is linear
- * in siblings times shared statements, not quadratic in either. */
+/** The leading run of statements identical (whitespace aside) in every sibling,
+ * ending at the first assertion: setup is what precedes it. Each sibling is
+ * compared only against the first, so the cost is linear, not quadratic. */
 function sharedPrefixLength(source, siblingBodies) {
   const [first, ...rest] = siblingBodies;
   let index = 0;
 
   while (index < first.length) {
     const statement = first[index];
+    if (isAssertion(statement)) break;
     const text = normalizedStatementText(source, statement);
     const stillShared = rest.every((body) => {
       const candidate = body[index];
@@ -122,8 +133,8 @@ export const sharedSetupIsAHookRule = defineRule({
       what: "These {{count}} sibling tests each open with the same {{shared}} statements.",
       why: "Setup pasted into every sibling drifts one body at a time.",
       fix:
-        "Move the repeated statements into a `beforeEach(() => { ... })` at the top of this"
-        + " `describe` and delete them from each test.",
+        "Move the repeated statements into a `beforeEach(() => { ... })` at the top of this" +
+        " `describe` and delete them from each test.",
     },
   },
   create(context, _file) {

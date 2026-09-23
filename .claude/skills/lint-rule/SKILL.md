@@ -8,16 +8,23 @@ argument-hint: "<rule name or the message that fired>"
 # Add or change a langwatch lint rule
 
 Every rule lives in `packages/oxlint-rules/src/rules/<rule>.rule.mjs`, is registered once in
-`packages/architecture-enforcer/oxlint-plugin.mjs`, and is enabled once in
-`packages/architecture-enforcer/oxlint.architecture.jsonc`. `dev/docs/lint-rules.md` is generated from those
-declarations — read it before writing a new rule, so you extend the house grammar.
+the `rules` map of `packages/oxlint-rules/src/index.mjs` (keyed by the name its `defineRule`
+declaration carries), and is enabled once, at `error`, in
+`packages/architecture-enforcer/oxlint.architecture.jsonc`. The plugin-config guard
+(`packages/oxlint-rules/tests/plugin-config.unit.test.mjs`) refuses a rule at `warn`, a
+registered rule no config enables, and a configured rule the registry does not hold.
+`dev/docs/lint-rules.md` is generated from those declarations — read it before writing a new
+rule, so you extend the house grammar.
 
 ## 1. Decide the instrument first
 
 - **A rule** when the fact is per-file, syntactic, and the fix is mechanical enough to
   state in one sentence.
-- **A CLI graph check** (`packages/architecture-enforcer/src/*.ts`) when it needs the import
-  graph, package manifests or a shrink-only inventory.
+- **An architecture-enforcer policy** (`packages/architecture-enforcer/src/policies/`,
+  registered in `policies/index.ts`) when it needs the import graph, package manifests or
+  the whole catalogue. It runs under `pnpm lint:architecture`, not `pnpm lint`.
+- **A native oxlint rule or `overrides` block in `.oxlintrc.jsonc`** when a built-in already
+  means the same thing (ADR-135: the lowest layer that can express it).
 - **A test in the owning package** when only one module must hold the property.
 - **A doc in `dev/docs/best_practices/`** when the rule cannot name a fix. Do not lint taste.
 
@@ -76,20 +83,30 @@ A message is `what` + `fix`, joined. `why` is documentation and the linter never
 3. Write `packages/oxlint-rules/src/rules/<rule>.rule.mjs` with `defineRule`. Gate on
    `classify(context)` through the `applies` predicate — never parse the filename yourself,
    and never re-derive what `classify` already computed.
-4. Register in `packages/architecture-enforcer/oxlint-plugin.mjs` (one line) and in
-   `packages/architecture-enforcer/oxlint.architecture.jsonc` `rules` (one line, no filename lists).
+4. Register it: import it in `packages/oxlint-rules/src/index.mjs` and add it to `RULES` (and the
+   export list), then add one `"langwatch/<rule>": "error"` line to
+   `packages/architecture-enforcer/oxlint.architecture.jsonc` `rules` (no filename lists).
+   `pnpm --filter @langwatch/oxlint-rules test tests/plugin-config.unit.test.mjs` proves the two agree.
 5. Regenerate the reference and commit it:
-   `pnpm --filter @langwatch/architecture-enforcer docs`.
+   `pnpm --filter @langwatch/architecture-enforcer docs`. CI runs `docs:check`, which fails on a
+   stale reference.
 
 ## 5. Spec and binding
 
 `specs/tooling/lint-<rule>.feature`, tagged `@unit`, one scenario per message id, and a
 `/** @scenario "<exact title>" */` above each `it(`. An untagged or unannotated scenario
-enforces nothing — see `.claude/skills/spec-bind/SKILL.md`. Verify:
+enforces nothing — see `.claude/skills/core/testing-rules.md`. Verify:
 
 ```bash
 pnpm --filter @langwatch/architecture-enforcer check:feature-parity 2>&1 | grep -A3 lint-<rule>
 ```
+
+Then give the rule a decision row — first cell the rule id in backticks, layer `plugin`, one
+line of meaning — in the ADR table headed `| Rule | Layer | Meaning |` of the family it belongs
+to (ADR-135, 137 to 142). The
+guard `packages/architecture-enforcer/tests/lint-rule-records.unit.test.mjs` fails when a rule
+has no row or no spec, and when a row names a rule that no longer exists: deleting a rule
+deletes its row and its feature file in the same change.
 
 ## 6. There is no baseline any more
 
@@ -108,7 +125,7 @@ threshold cannot yet be met honestly.
 ## 7. Cost: the plugin runs on every save and over ~13k files
 
 - No `fs`, `child_process`, `new Date()` or JSON parsing inside `create` or a visitor.
-  Read config once through the `baseline` / `classify` memos.
+  Read config once through the `classify` memo.
 - No second parser. Use the ESTree node oxlint hands you; `import "typescript"` in a rule
   is a defect, and it is most of the plugin's cold start.
 - Hoist every RegExp. Visit the narrowest node type. One pass per file per fact, shared
@@ -128,5 +145,6 @@ threshold cannot yet be met honestly.
 
 ## Done when
 
-Fixtures green, the scenario bound, `dev/docs/lint-rules.md` regenerated and committed,
-the hit count and both timings recorded in the PR body, and the config diff is one line.
+Fixtures green, the scenario bound, the ADR row written, `dev/docs/lint-rules.md` regenerated
+and committed, the hit count and both timings recorded in the PR body, and the config diff is one
+line.

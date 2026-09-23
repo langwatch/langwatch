@@ -4,51 +4,25 @@ import { defineRule } from "../define-rule.mjs";
 // persistence seam, and the two named helpers in @langwatch/time that convert
 // for an SDK. Everywhere else a moment is a `Temporal.Instant`.
 
-const GOVERNED =
-  /^(?:apps\/[^/]+\/src\/|packages\/[^/]+\/|modules\/[^/]+\/[^/]+\/|enterprise\/)/;
+const GOVERNED = /^(?:apps\/[^/]+\/src\/|packages\/[^/]+\/|modules\/[^/]+\/[^/]+\/|enterprise\/)/;
 const TIME_PACKAGE = /^packages\/time\//;
 
-// The three artefacts we publish to npm are outside the one-clock rule, and
-// this is a scope boundary rather than an exemption: the rule's whole remedy
-// is "call it from @langwatch/time", and that package is `"private": true`
-// with `main` pointing at its own `src`. A customer running `npm i langwatch`
-// cannot resolve a private workspace package, so inside a published artefact
-// the fix the message names does not exist. Bundling @langwatch/time instead
-// was considered and rejected: it is built over Temporal and would push a
-// polyfill into every customer's runtime to settle a vocabulary question
-// internal to this repository.
-//
-// This lives here, in the rule, rather than as a config override, so that the
-// scope is stated once. It previously sat in both places and they disagreed --
-// the regex above governed `sdks/typescript/src/` while an override switched
-// the rule off for the same path.
-//
-// What this does NOT excuse: the wire contract. Every moment these packages
-// send or receive is an ISO 8601 string, never a Date -- see
-// `specs/tooling/lint-temporal-only.feature`. That is a property of the
-// contract, enforced where the contract is defined, and it does not depend on
-// which clock the platform reads.
-//
-// If @langwatch/time is ever published, delete this entry rather than
-// narrowing it; the reason will have gone away entirely.
+// The published SDK, MCP server and ksuid cannot resolve the private
+// @langwatch/time the fix names, so they are out of scope; their wire contract
+// stays ISO 8601 (specs/tooling/lint-temporal-only.feature).
 const PUBLISHED_ARTEFACT = /^(?:sdks\/typescript\/|mcp\/typescript\/|packages\/ksuid\/)/;
 // The seams where a driver binds a real `Date` and will not take an `Instant`.
-//
-// `adapters/postgres.` is the flat spelling (`adapters/postgres.foo.adapter.ts`)
-// and `adapters/postgres/` the directory one -- the second was missing, which
-// is why packages/eventing's own Prisma store was being asked to hold an
-// `Instant` for a column Prisma binds as a `Date`.
-//
-// ClickHouse is here for exactly the reason Prisma is, and was simply never
-// added: the client binds a `Date` for a `DateTime64` parameter. The
-// repositories under it already convert at the write boundary -- scenario's
-// simulation-run store maps its own date columns to `Date | null` through a
-// `WithDateWrites` type and imports `toDate` to fill them -- so the rule was
-// reporting, 81 times, the one shape those files are required to have.
+// Eventing's Prisma stores predate `repositories/prisma/`; the path goes when they move.
 const PERSISTENCE_SEAM =
-  /(?:^|\/)(?:repositories\/(?:prisma|clickhouse)\/|adapters\/postgres[./])/;
+  /(?:^|\/)repositories\/(?:prisma|clickhouse)\/|^packages\/eventing\/src\/server\/adapters\/postgres\//;
 const DECLARATION = /\.d\.[cm]?ts$/;
 const BOUNDARY_HELPER = new Set(["fromDate", "toDate"]);
+const GLOBAL_OBJECTS = new Set(["globalThis", "window", "global", "self"]);
+const DATE_STATIC_MESSAGE = {
+  now: "mintNowMilliseconds",
+  parse: "parseInstant",
+  UTC: "utcInstant",
+};
 const FUNCTION_NODE = new Set([
   "ArrowFunctionExpression",
   "FunctionDeclaration",
@@ -66,6 +40,18 @@ function isTemporalOnlySource(file) {
   if (DECLARATION.test(path)) return false;
 
   return file.isProduction;
+}
+
+/** `Date`, or `globalThis.Date` and its `window`/`global`/`self` spellings. */
+function isDateReference(node) {
+  if (node?.type === "Identifier") return node.name === "Date";
+  if (node?.type !== "MemberExpression" || node.computed) return false;
+
+  return (
+    node.object.type === "Identifier" &&
+    GLOBAL_OBJECTS.has(node.object.name) &&
+    node.property.name === "Date"
+  );
 }
 
 function enclosingFunctionName(node) {
@@ -109,6 +95,30 @@ function annotatedName(node) {
   return "This value";
 }
 
+function constructionFinding(node) {
+  if (!isDateReference(node.callee)) return undefined;
+  if ((node.arguments?.length ?? 0) === 0)
+    return { messageId: "mintNow", data: { name: "`new Date()`" } };
+
+  return { messageId: "constructInstant", data: { name: "`new Date(…)`" } };
+}
+
+function staticCallFinding(node) {
+  const { callee } = node;
+  if (callee?.type !== "MemberExpression" || callee.computed) return undefined;
+  const member = callee.property?.name;
+  if (!isDateReference(callee.object) || !Object.hasOwn(DATE_STATIC_MESSAGE, member))
+    return undefined;
+
+  return { messageId: DATE_STATIC_MESSAGE[member], data: { name: `\`Date.${member}()\`` } };
+}
+
+function dateTypeFinding(node) {
+  if (node.typeName?.type !== "Identifier" || node.typeName.name !== "Date") return undefined;
+
+  return { messageId: "dateType", data: { name: annotatedName(node) } };
+}
+
 export const temporalOnlyRule = defineRule({
   name: "temporal-only",
   kind: "problem",
@@ -142,39 +152,14 @@ export const temporalOnlyRule = defineRule({
     },
   },
   create(context, _file) {
+    const report = (node, finding) => {
+      if (finding && !insideBoundaryHelper(node)) context.report({ node, ...finding });
+    };
+
     return {
-      NewExpression(node) {
-        if (node.callee?.type !== "Identifier" || node.callee.name !== "Date") return;
-        if (insideBoundaryHelper(node)) return;
-        const empty = (node.arguments?.length ?? 0) === 0;
-        context.report({
-          node,
-          messageId: empty ? "mintNow" : "constructInstant",
-          data: { name: empty ? "`new Date()`" : "`new Date(…)`" },
-        });
-      },
-      CallExpression(node) {
-        const callee = node.callee;
-        if (callee?.type !== "MemberExpression" || callee.computed) return;
-        if (callee.object?.type !== "Identifier" || callee.object.name !== "Date") return;
-        const member = callee.property?.name;
-        const messageId =
-          member === "now"
-            ? "mintNowMilliseconds"
-            : member === "parse"
-              ? "parseInstant"
-              : member === "UTC"
-                ? "utcInstant"
-                : undefined;
-        if (!messageId) return;
-        if (insideBoundaryHelper(node)) return;
-        context.report({ node, messageId, data: { name: `\`Date.${member}()\`` } });
-      },
-      TSTypeReference(node) {
-        if (node.typeName?.type !== "Identifier" || node.typeName.name !== "Date") return;
-        if (insideBoundaryHelper(node)) return;
-        context.report({ node, messageId: "dateType", data: { name: annotatedName(node) } });
-      },
+      NewExpression: (node) => report(node, constructionFinding(node)),
+      CallExpression: (node) => report(node, staticCallFinding(node)),
+      TSTypeReference: (node) => report(node, dateTypeFinding(node)),
     };
   },
 });

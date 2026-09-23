@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { legacyMonolithPathRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -23,6 +24,25 @@ describe("given a source file", () => {
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("legacyMonolithPath");
       expect(found[0].data.name).toBe("~/utils/api");
+    });
+  });
+
+  describe("when it imports through the monolith's `@app/` alias", () => {
+    /** @scenario "An import through the monolith alias is refused" */
+    it("reports legacyMonolithPath at the specifier", () => {
+      const found = report('import { z } from "zod";\nexport { db } from "@app/server/db";');
+
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({ line: 2, messageId: "legacyMonolithPath" });
+      expect(found[0].data.name).toBe("@app/server/db");
+    });
+
+    /** @scenario "An import through the monolith alias is refused" */
+    it("names where to look without the retired folder names", () => {
+      const [finding] = report('import { api } from "~/utils/api";');
+
+      expect(finding.message).toContain("`modules/*/*/src`");
+      expect(finding.message).not.toMatch(/server|web\b/);
     });
   });
 
@@ -58,7 +78,9 @@ describe("given a source file", () => {
   describe("when the path is an application's own platform directory", () => {
     /** @scenario "An application's own platform directory is allowed" */
     it("reports nothing", () => {
-      const found = report('import { env } from "apps/api/src/platform/config/env.composition.ts";');
+      const found = report(
+        'import { env } from "apps/api/src/platform/config/env.composition.ts";',
+      );
 
       expect(found).toHaveLength(0);
     });

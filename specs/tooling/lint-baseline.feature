@@ -89,7 +89,7 @@ Feature: There is no lint suppression list
     # driven to zero, not granted wholesale to a category.
     @unit
     Scenario: The readability and stand-in tiers are enforced in tests too
-      Given a test file that fails stand-in-cast, condition-shape, comment-block-size, cognitive-complexity, empty-catch or no-inline-dynamic-import
+      Given a test file that fails stand-in-cast, condition-shape, comment-block-size, cognitive-complexity or no-inline-dynamic-import
       When those rules run over it
       Then each one is reported
       And no override block relaxes them for tests

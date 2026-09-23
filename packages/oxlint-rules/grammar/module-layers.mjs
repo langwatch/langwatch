@@ -1,19 +1,25 @@
-// The closed layer grammar of a module's server package, as one table.
-//
-// A service takes other services and the module's own repositories and
-// channels. A repository takes the store it reads. A channel takes the client
-// it speaks to. Nothing takes what sits above it, and nothing reaches into
-// another module's server package: outside its own package a module is its
-// App, named through the contract's `<F>Api` token.
+// The closed layer grammar of a module's process package, as tables.
+// A repository takes the store it reads, a channel the client it speaks to, a
+// transport declares and calls the module. A service works over repository
+// and channel interfaces, never the implementation below one. ARCHITECTURE.md §3.2, §8.
 
-/** What a layer may name, by folder. A folder absent from a row is a crossing. */
+/** What a layer may value-import, by folder. A known folder absent from a row is a crossing. */
 export const LAYER_MAY_TAKE = {
   channels: ["channels", "rules"],
   repositories: ["repositories", "rules"],
-  services: ["channels", "repositories", "rules", "services"],
 };
 
-/** How a crossed layer is named in a message. */
+/** Folders a layer never names, not even as a type. */
+export const LAYER_NEVER_NAMES = {
+  transport: ["channels", "repositories", "services"],
+};
+
+/** Folders a layer may name only at their top, where the interfaces sit, even as a type. */
+export const LAYER_TAKES_INTERFACES_OF = {
+  services: ["channels", "repositories"],
+};
+
+/** How a crossed layer is named in a message. A folder absent here is not a layer. */
 export const LAYER_NOUN = {
   app: "the app",
   channels: "a channel",
@@ -23,6 +29,12 @@ export const LAYER_NOUN = {
   services: "a service",
   tasks: "a task",
   transport: "a transport",
+};
+
+/** How the implementation below an interface folder is named in a message. */
+export const BACKEND_NOUN = {
+  channels: "a channel implementation",
+  repositories: "a repository backend",
 };
 
 function normalise(path) {
@@ -35,42 +47,63 @@ function normalise(path) {
   return parts.join("/");
 }
 
-/** The folder below `src/` a specifier lands in, or undefined for a package. */
-export function targetLayer({ sourcePath, specifier }) {
-  if (specifier.startsWith("#")) return specifier.slice(1).split("/")[0];
+/** The path below `src/` a specifier lands on, or undefined for a package. */
+export function targetPath({ sourcePath, specifier }) {
+  if (specifier.startsWith("#")) return specifier.slice(1);
   if (!specifier.startsWith(".")) return undefined;
 
   const directory = sourcePath.slice(0, sourcePath.lastIndexOf("/"));
-  return normalise(`${directory}/${specifier}`).split("/")[0];
+  return normalise(`${directory}/${specifier}`);
 }
 
-/** The layer a file sits in, or undefined when it sits outside the table. */
-export function layerOf(sourcePath) {
-  const folder = sourcePath?.split("/")[0];
-  return folder && folder in LAYER_MAY_TAKE ? folder : undefined;
+/** The folder below `src/` a specifier lands in, or undefined for a package. */
+export function targetLayer({ sourcePath, specifier }) {
+  return targetPath({ sourcePath, specifier })?.split("/")[0];
 }
 
-/**
- * The layer this import crosses into, or undefined when the import is allowed.
- * A specifier naming another module's server package always crosses.
- */
-export function crossingFor({ layer, sourcePath, specifier }) {
-  if (/^@langwatch\/[a-z0-9-]+-process(?:\/|$)/.test(specifier)) return "another module";
+/** Whether the layers table governs a layer at all. */
+export function isGovernedLayer(layer) {
+  if (!layer) return false;
 
-  const target = targetLayer({ sourcePath, specifier });
-  if (!target || target === layer) return undefined;
+  return (
+    layer in LAYER_MAY_TAKE || layer in LAYER_NEVER_NAMES || layer in LAYER_TAKES_INTERFACES_OF
+  );
+}
+
+/** A crossing whatever the import binds: a refused folder, or a backend below an interface. */
+function namedCrossing({ layer, path }) {
+  const segments = path.split("/");
+  const folder = segments[0];
+  if (LAYER_NEVER_NAMES[layer]?.includes(folder)) return LAYER_NOUN[folder];
+  const below = segments.length > 2;
+
+  return below && LAYER_TAKES_INTERFACES_OF[layer]?.includes(folder)
+    ? BACKEND_NOUN[folder]
+    : undefined;
+}
+
+function rowCrossing({ layer, target, specifier }) {
+  const row = LAYER_MAY_TAKE[layer];
+  if (!row || target === layer || row.includes(target)) return undefined;
   if (layer === "repositories" && isEventingStore({ specifier, target })) return undefined;
 
-  return LAYER_MAY_TAKE[layer].includes(target) ? undefined : (LAYER_NOUN[target] ?? undefined);
+  return LAYER_NOUN[target];
 }
 
-// A store is the one thing a repository is *for*, and event sourcing keeps its
-// stores in `eventing/` beside the pipeline that names them rather than in a
-// folder of their own. The table is keyed by folder, so without this the
-// eventing folder answers for all eight of its artifact kinds at once and a
-// repository naming the store it reads is refused by the rule named after
-// letting it. Only the store kind passes: a projection, process, subscriber,
-// intent or pipeline in the same folder is a real crossing and still reports.
+/** What an import crosses into, or undefined when the layer may take it. */
+export function layerCrossing({ layer, sourcePath, specifier, typeOnly }) {
+  const path = targetPath({ sourcePath, specifier });
+  if (!path) return undefined;
+
+  const named = namedCrossing({ layer, path });
+  if (named || typeOnly) return named;
+
+  return rowCrossing({ layer, target: path.split("/")[0], specifier });
+}
+
+// Event sourcing keeps a store in `eventing/` beside the pipeline naming it, so
+// a repository may name a `*.store.ts` there; any other eventing artifact is a
+// real crossing and still reports.
 function isEventingStore({ specifier, target }) {
-  return target === "eventing" && specifier.endsWith('.store.ts');
+  return target === "eventing" && specifier.endsWith(".store.ts");
 }

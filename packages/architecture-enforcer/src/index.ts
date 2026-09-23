@@ -5,6 +5,7 @@ import type { PolicyDefinition } from "./policies/index.ts";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types.ts";
 import { changedSourceFiles } from "./workspace/changed-files.ts";
 import { buildWorkspaceSnapshot } from "./workspace/snapshot.ts";
+import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 
 export type {
   ApplicationPackageRole,
@@ -20,55 +21,12 @@ export type { PolicyDefinition } from "./policies/index.ts";
 export { definePolicy, POLICIES } from "./policies/index.ts";
 export { readFeatureCatalogue } from "./workspace/feature-catalogue.ts";
 export { lintFeatureConfiguration } from "./policies/feature-configuration.ts";
-export {
-  BOUNDARY_EDGE_BASELINE,
-  boundaryEdgeBaselineFile,
-  boundaryEdgesFromViolations,
-  filterBaselinedBoundaryEdges,
-  lintBoundaryEdgeBaseline,
-} from "./policies/boundaries/boundary-edge-baseline.ts";
-export type {
-  BoundaryEdge,
-  BoundaryEdgeBaselineCheck,
-  BoundaryEdgeKind,
-} from "./policies/boundaries/boundary-edge-baseline.ts";
-export {
-  BASELINE_VERSION,
-  baselinePath,
-  collectBaseline,
-  emptyBaselineRows,
-  expiredRows,
-  formatBaseline,
-  liveKeys,
-  readBaseline,
-  shrinkCheck,
-  staleRows,
-} from "./baseline.ts";
-export type { Baseline, BaselineEntry, BaselinePolicy } from "./baseline.ts";
-export { lintApiTransportBoundaries, lintApiTransportFramework } from "./policies/api-transport.ts";
 export { changedSourceFiles } from "./workspace/changed-files.ts";
-export type {
-  LegacyApplicationBoundaryEdge,
-  LegacyApplicationBoundaryKind,
-} from "./policies/boundaries/application-boundaries.ts";
-export {
-  collectLegacyApplicationBoundaryEdges,
-  formatLegacyApplicationBoundaryBaseline,
-} from "./policies/boundaries/application-boundaries.ts";
-export type {
-  LegacyFeatureFragment,
-  LegacyFeatureFragmentKind,
-} from "./policies/legacy-feature-fragments.ts";
-export {
-  collectLegacyFeatureFragments,
-  formatLegacyFeatureFragmentBaseline,
-} from "./policies/legacy-feature-fragments.ts";
 export { buildWorkspaceSnapshot, discoverClassifiedPackages } from "./workspace/snapshot.ts";
 export type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
-import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 export { walkFiles } from "./workspace/layout.ts";
+export { getAnchor, MissingAnchorError } from "./workspace/anchors.ts";
 export { lintFeatureLayouts } from "./policies/feature-layout.ts";
-export { lintFeatureAppContracts, lintFeatureSetupInfrastructure } from "./policies/feature-app.ts";
 export { lintManifests } from "./policies/boundaries/manifests.ts";
 export {
   lintServiceCeilings,
@@ -77,10 +35,6 @@ export {
 export { lintServiceProjectionBoundaries } from "./policies/quality/service-projection-boundaries.ts";
 export { lintStrictContractBuildConfigs } from "./policies/quality/contract-build-config.ts";
 export { lintDeclarationProjectReferences } from "./policies/quality/declaration-project-references.ts";
-export {
-  declaredWebDependencyPairs,
-  lintFrontendUiBoundaries,
-} from "./policies/frontend/frontend-ui-boundaries.ts";
 export { lintBrowserNodeLeaks } from "./policies/frontend/browser-node-leak.ts";
 export type {
   ModuleImport,
@@ -103,25 +57,16 @@ export {
 export { lintTestQuality } from "./policies/test-quality.ts";
 export type { TestQualityLintOptions } from "./policies/test-quality.ts";
 export {
-  collectGlobalAppAccesses,
-  formatGlobalAppAccessBaseline,
-  lintGlobalAppAccess,
-} from "./policies/global-app-access.ts";
-export {
-  collectFeatureShapeBaseline,
   collectFeatureShapeFindings,
-  FEATURE_SHAPE_BASELINE,
   FEATURE_SHAPE_LEGACY_KINDS,
   lintFeatureShape,
 } from "./policies/feature-shape.ts";
 export type { FeatureShapeFinding, FeatureShapeLegacyKind } from "./policies/feature-shape.ts";
 export {
-  collectSourceFolderShapeBaseline,
   collectSourceFolderShapeFindings,
   FOLDER_BUDGET,
   FRAGMENT_FLOOR,
   lintSourceFolderShape,
-  SOURCE_FOLDER_SHAPE_BASELINE,
   SOURCE_FOLDER_SHAPE_KINDS,
 } from "./policies/source-folder-shape.ts";
 export type {
@@ -129,31 +74,13 @@ export type {
   SourceFolderShapeKind,
 } from "./policies/source-folder-shape.ts";
 export {
-  collectPortsAndAdaptersFoldersBaseline,
-  collectPortsAndAdaptersFoldersFindings,
-  lintPortsAndAdaptersFolders,
-  PORTS_AND_ADAPTERS_FOLDERS_BASELINE,
-} from "./policies/shape-counters.ts";
-export { lintStrictPortModules } from "./policies/boundaries/port-modules.ts";
-export {
-  collectUnusedModuleExportBaseline,
   collectUnusedModuleExportFindings,
   lintUnusedModuleExports,
-  UNUSED_MODULE_EXPORT_BASELINE,
 } from "./policies/quality/unused-module-export.ts";
 export type { UnusedModuleExportFinding } from "./policies/quality/unused-module-export.ts";
 export {
-  collectInfrastructureMemberBaseline,
-  collectInfrastructureMemberFindings,
-  INFRASTRUCTURE_MEMBER_UNUSED_BASELINE,
-  lintInfrastructureMembers,
-} from "./policies/quality/infrastructure-member-unused.ts";
-export type { InfrastructureMemberFinding } from "./policies/quality/infrastructure-member-unused.ts";
-export {
-  collectMemoryTwinDriftBaseline,
   collectMemoryTwinDriftFindings,
   lintMemoryTwinDrift,
-  MEMORY_TWIN_DRIFT_BASELINE,
   MEMORY_TWIN_DRIFT_SIDES,
 } from "./policies/persistence/memory-twin-drift.ts";
 export type {
@@ -161,61 +88,28 @@ export type {
   MemoryTwinDriftSide,
 } from "./policies/persistence/memory-twin-drift.ts";
 export {
-  COMPOSED_EXPORTS_BASELINE,
   collectComposedExportSubjects,
-  collectComposedExportsBaseline,
   collectUncomposedExports,
   lintComposedExports,
-  lintComposedExportsBaseline,
   reachableFiles,
   serverPackageIndexes,
 } from "./policies/quality/composed-exports.ts";
 export type { ComposedExportSubject } from "./policies/quality/composed-exports.ts";
-export {
-  applyFilenameMigration,
-  collectFilenameMigrationMappings,
-  planFilenameMigration,
-} from "./tools/filename-migration.ts";
-export type { FilenameMigrationPlan, FilenameRename } from "./tools/filename-migration.ts";
 
-/**
- * The registry ids a `false` option means "do not compute at all" — running a
- * policy just to discard its findings isn't free. `declarations` reads every
- * `.d.ts` the build already wrote, so it is seconds; it is also the one policy
- * that needs `tsc -b` to have run, and refuses a package it has not.
- */
+/** Needs `tsc -b` to have run, so `declarations: false` skips it rather than discarding it. */
 const DECLARATIONS_POLICY = "declarations";
-const LEGACY_FEATURE_FRAGMENTS_POLICY = "legacy-feature-fragments";
 
-/** The registry entries `lintWorkspace` and the CLI actually call, given its options. */
+/** The registry entries a run calls: all, less `declarations` when asked, narrowed to `only`. */
 export function enabledPolicies(
-  options: Pick<LintWorkspaceOptions, "declarations" | "legacyFeatureFragments"> = {},
+  options: Pick<LintWorkspaceOptions, "declarations" | "only"> = {},
 ): readonly PolicyDefinition[] {
-  const skipped = new Set<string>();
+  const only = options.only ? new Set(options.only) : void 0;
 
-  if (options.declarations === false) skipped.add(DECLARATIONS_POLICY);
+  return POLICIES.filter((policy) => {
+    if (options.declarations === false && policy.id === DECLARATIONS_POLICY) return false;
 
-  if (options.legacyFeatureFragments === false) skipped.add(LEGACY_FEATURE_FRAGMENTS_POLICY);
-
-  return skipped.size === 0 ? POLICIES : POLICIES.filter((policy) => !skipped.has(policy.id));
-}
-
-/**
- * `application-boundaries` mixes edges the legacy-migration option can turn
- * off with ones it cannot (`application-boundary`); unlike those it always
- * runs. A `false` option only drops findings its own `policy` field names.
- */
-export function excludedPolicyIds(
-  options: Pick<LintWorkspaceOptions, "legacyApplicationMigration">,
-): ReadonlySet<string> {
-  const excluded = new Set<string>();
-
-  if (options.legacyApplicationMigration === false) {
-    excluded.add("application-migration-baseline");
-    excluded.add("application-migration");
-  }
-
-  return excluded;
+    return only === void 0 || only.has(policy.id);
+  });
 }
 
 export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolation[] {
@@ -226,18 +120,10 @@ export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolat
     changedFiles: options.changedFiles ?? changedSourceFiles(root),
   });
 
-  const excluded = excludedPolicyIds(options);
-
-  return lintPolicies(snapshot, enabledPolicies(options)).filter(
-    (violation) => !excluded.has(violation.policy),
-  );
+  return lintPolicies(snapshot, enabledPolicies(options));
 }
 
-/**
- * The same run against a snapshot the caller already built, so a run reads the
- * tree once. A subset caller uses `lintPolicies` with a filtered registry
- * (`enabledPolicies`) so an expensive policy asked to be skipped never runs.
- */
+/** The whole registry against a snapshot the caller already built, so a run reads the tree once. */
 export function lintSnapshot(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   return lintPolicies(snapshot, POLICIES);
 }

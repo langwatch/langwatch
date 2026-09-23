@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { planLiteralsRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -53,6 +54,21 @@ describe("given production source outside the catalogue", () => {
       expect(
         ids("const plan = { prices: { USD: 0, EUR: 0 }, userPrice: { USD: 32, EUR: 29 } };"),
       ).toEqual(["statesPlanFacts"]);
+    });
+  });
+
+  describe("when the limit fields read their values rather than state them", () => {
+    /** @scenario "A schema or a mapping that reads limit fields is left alone" */
+    it("reports nothing, and still reports a literal definition on its line", () => {
+      const found = report(
+        [
+          "const schema = z.object({ maxMembers: z.number(), maxMembersLite: z.number() });",
+          "const view = { maxMembers: plan.maxMembers, canPublish: plan.canPublish, maxMembersLite: 3 };",
+          "const FREE = { maxMembers: 2, canPublish: false };",
+        ].join("\n"),
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([["statesPlanFacts", 3]]);
     });
   });
 

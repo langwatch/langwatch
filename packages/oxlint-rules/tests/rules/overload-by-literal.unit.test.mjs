@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { overloadByLiteralRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -43,6 +44,38 @@ export function configUrl(options?: { env?: string; optional?: boolean }): Leaf<
 }`);
 
       expect(found.map((entry) => entry.messageId)).toEqual(["splitTheOverloads"]);
+    });
+  });
+
+  describe("when a class declares overloads that differ only by a boolean literal", () => {
+    /** @scenario "Class method overloads that differ only by a boolean literal are reported" */
+    it("reports splitTheOverloads at the first overload's line", () => {
+      const found = report(`export class Store {
+  id = 1;
+  read(options: { raw: true }): Buffer;
+  read(options: { raw: false }): string;
+  read(options: { raw: boolean }): Buffer | string {
+    return load(options);
+  }
+}`);
+
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([
+        ["splitTheOverloads", 3],
+      ]);
+    });
+  });
+
+  describe("when the same name is declared in two separate scopes", () => {
+    /** @scenario "Same-named signatures in different scopes are not one overload set" */
+    it("reports nothing", () => {
+      expect(
+        report(`export interface Raw {
+  read(options: { raw: true }): Buffer;
+}
+export interface Text {
+  read(options: { raw: false }): string;
+}`),
+      ).toEqual([]);
     });
   });
 

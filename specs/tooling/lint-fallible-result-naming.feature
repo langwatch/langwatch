@@ -1,20 +1,15 @@
 Feature: The fallible-result-naming lint rule
-  A method on a strict feature API, app, port, service, repository or store
-  answers or throws. A `try`-prefixed method whose own body catches a failure
-  and hands the caller null or undefined instead is refused, and the fix is to
-  delete that catch and drop the prefix — renaming it `find*` only moves the
-  hedge into the name. A `try`-prefixed declaration with no such catch — an
-  interface signature, an abstract method, or a body that never converts a
-  failure into an absence — carries a naming defect too, but that defect
-  belongs to a separate rule (`langwatch/no-try-prefix`) whose message does
-  not claim a catch it cannot see; this rule falls through to whichever of its
-  own checks already applies to that name, except one: a nullable `try`-prefixed
-  name is exempt from nullableWithoutFind here, since no-try-prefix already
-  prescribes the same `find<Noun>` rename for it, and reporting both would be
-  one defect stated twice. Absence as a normal outcome, decided on its own
-  merits rather than to escape a `try`, is a `find*` method returning
-  undefined, and only a `find*` method may carry a nullable result. No
-  redundant `require` prefix, and every method states its result type.
+  A method, function or module-scope arrow const in a module's contract or
+  process source names its absence contract the ADR-146 way: `get*` answers
+  exactly one thing or throws, `find*` answers an array whose empty case is
+  the absence, a derivation may answer undefined because its input carried
+  none, and nothing new answers null. A nullable result under any other name
+  is reported, including one declared through a local type alias such as
+  `type Maybe<T> = T | null`. The fix never prescribes a new nullable
+  `find*`; the existing nullable ones stay as they are. The `try*` and
+  `require*` prefixes are `langwatch/banned-verb-prefix`'s, so a nullable
+  `try*` name is left to that rule rather than reported twice. A missing
+  result type is `typescript/explicit-module-boundary-types`'s.
 
   A repository answers `find*`; `get*` and `list*` are the service layer's
   vocabulary. A repository's interface file and both its backends
@@ -22,42 +17,11 @@ Feature: The fallible-result-naming lint rule
   checked for a public method or interface signature named with that
   vocabulary, and told to rename to `find*` instead — in the interface and in
   every implementation. A `get*`/`list*` repository method that is also
-  nullable draws only this one message: the same rename that fixes the
-  vocabulary is what makes the nullable return legal, so nullableWithoutFind
-  stays silent for it rather than prescribing the same fix twice. Outside a
-  repository file, `get*` keeps its ordinary meaning and this check says
-  nothing.
-
-  One `get*` in a repository is not the service layer's vocabulary borrowed:
-  it is the one-or-throw shape, and it is correct there. A repository method
-  whose declared result cannot be null or undefined answers or raises, which
-  is what `get*` means, so the vocabulary check passes over it. `list*` is not
-  exempted the same way — a list answers an array, and an array is what
-  `find*` names — and neither is a `get*` that can still answer with absence,
-  because that one really is the `find*` shape wearing the wrong prefix.
+  nullable draws only this one message. A `get*` whose declared result can be
+  neither null nor an array is the one-or-throw shape and is left alone.
 
   Background:
     Given a workspace whose agent feature is at strict layout version 0
-
-  @unit
-  Scenario: A try-prefixed method with a swallowing catch is refused
-    Given a try-prefixed method whose body catches a failure and returns null, undefined, or nothing, or whose promise chain ends in a `.catch(() => null)`
-    When the fallible-result-naming rule runs over it
-    Then it reports tryPrefix with the plain rename, whatever the declared return type
-
-  @unit
-  Scenario: A try-prefixed declaration with no catch is not accused of one
-    Given a try-prefixed declaration that has no body, or a body with no catch, or a catch that rethrows
-    When the fallible-result-naming rule runs over it
-    Then it does not report tryPrefix
-    And it falls through to noResultType when that already applies to the name
-
-  @unit
-  Scenario: Dropping the try prefix means throwing, not renaming to find
-    Given a try-prefixed method whose catch swallows the failure
-    When the fallible-result-naming rule runs over it
-    Then the fix tells the author to name it without the prefix and make the body throw
-    And it says renaming it to find is not the fix
 
   @unit
   Scenario: A nullable result is reported unless the name is find-prefixed
@@ -68,24 +32,31 @@ Feature: The fallible-result-naming lint rule
     And the fix it offers names get or getBy and throwing, never a new nullable find*
 
   @unit
+  Scenario: A nullable type alias does not hide the absence
+    Given a method whose result is a local type alias of T | null, directly or through another alias
+    When the fallible-result-naming rule runs over it
+    Then it reports nullableWithoutFind on the method's line
+    But a method whose alias is not nullable is left alone
+
+  @unit
+  Scenario: A nullable arrow const is reported like a function
+    Given a module-scope arrow const that declares a nullable result
+    When the fallible-result-naming rule runs over it
+    Then it reports nullableWithoutFind on the const's line
+    But an arrow declared inside a function body is left alone
+
+  @unit
+  Scenario: A missing result type is left to the native boundary rule
+    Given a method or function that states no result type
+    When the fallible-result-naming rule runs over it
+    Then it reports nothing, since typescript/explicit-module-boundary-types owns that defect
+
+  @unit
   Scenario: A nullable try-prefixed method reports the rename once, not twice
-    Given a try-prefixed method whose result type is nullable, whether or not its body swallows a failure
-    When both the fallible-result-naming and no-try-prefix rules run over it
-    Then fallible-result-naming does not report nullableWithoutFind for it
-    And no-try-prefix reports noTryPrefix for the same method, so the rename is prescribed exactly once
-
-  @unit
-  Scenario: The require prefix is reported with a rename fix
-    Given a port method named with the redundant require prefix
-    When the fallible-result-naming rule runs over it
-    Then it reports requirePrefix naming the method
-
-  @unit
-  Scenario: A missing result type is reported
-    Given a port method with no explicit return type
-    When the fallible-result-naming rule runs over it
-    Then it reports noResultType
-    But a method of a class that implements an interface is left alone, since the interface states the type
+    Given a try-prefixed method or interface signature whose result type is nullable
+    When both the fallible-result-naming and banned-verb-prefix rules run over it
+    Then fallible-result-naming reports nothing for it
+    And banned-verb-prefix reports it once, so the rename is prescribed exactly once
 
   @unit
   Scenario: A repository get method is reported
@@ -131,14 +102,6 @@ Feature: The fallible-result-naming lint rule
     When the fallible-result-naming rule runs over it
     Then it does not report nullableWithoutFind for that function
     But a lookup-named nullable function in the same file is still reported
-    And a try-prefixed conversion whose catch swallows the failure is still reported, because the try prefix is a separate fault
-
-  @unit
-  Scenario: A conversion with no declared result type is still reported
-    Given a function whose name begins with a conversion verb and which declares no return type
-    When the fallible-result-naming rule runs over it
-    Then it still reports noResultType
-    Because the exemption answers what absence means, and an undeclared result states nothing at all
 
   @unit
   Scenario: A derivation verb may answer undefined

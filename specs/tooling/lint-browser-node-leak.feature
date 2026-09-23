@@ -55,15 +55,3 @@ Feature: The browser-node-leak policy
     Given a process package, never a contract, browser or browser-kit package, imports "node:fs"
     When the browser-node-leak policy runs over the workspace
     Then it reports nothing
-
-  @unit
-  Scenario: A finding matching a live baseline row is not reported
-    Given a leak the baseline already names by file and specifier
-    When the browser-node-leak policy runs over the workspace
-    Then it reports nothing for that leak
-
-  @unit
-  Scenario: A baseline row no live finding matches is reported stale
-    Given a baseline row naming a leak the import no longer has
-    When the browser-node-leak policy runs over the workspace
-    Then it reports the row as stale and no longer matching anything

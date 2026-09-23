@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { temporalOnlyRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -70,6 +71,21 @@ describe("given production source", () => {
     });
   });
 
+  describe("when it reaches Date through globalThis", () => {
+    /** @scenario "Date reached through globalThis is reported" */
+    it("reports each use on its line", () => {
+      const found = report(
+        "const a = new globalThis.Date();\nconst b = globalThis.Date.now();\nconst c = new window.Date(0);",
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.line])).toEqual([
+        ["mintNow", 1],
+        ["mintNowMilliseconds", 2],
+        ["constructInstant", 3],
+      ]);
+    });
+  });
+
   describe("when a boundary helper owns the conversion", () => {
     /** @scenario "The named boundary helpers keep their Date" */
     it("reports nothing inside fromDate or toDate", () => {
@@ -103,15 +119,15 @@ describe("given a file outside the governed source", () => {
     });
   });
 
-  describe("when it is the Postgres adapter", () => {
-    /** @scenario "The Postgres adapter keeps its Date" */
-    it("reports nothing", () => {
+  describe("when a module file sits in an adapters folder", () => {
+    /** @scenario "A module's adapters folder is not a seam" */
+    it("reports the Date, because only repositories/prisma is the seam", () => {
       expect(
         ids(
           "const at = new Date();",
           "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
         ),
-      ).toEqual([]);
+      ).toEqual(["mintNow"]);
     });
   });
 
@@ -127,8 +143,8 @@ describe("given a file outside the governed source", () => {
     });
   });
 
-  describe("when the Postgres adapter is a directory rather than a filename", () => {
-    /** @scenario "The Postgres adapter keeps its Date under either spelling" */
+  describe("when it is eventing's Prisma store", () => {
+    /** @scenario "Eventing's Prisma stores keep their Date" */
     it("reports nothing", () => {
       expect(
         ids(

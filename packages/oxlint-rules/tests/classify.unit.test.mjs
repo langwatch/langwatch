@@ -1,14 +1,15 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { classify, resetClassificationCache } from "../src/classify.mjs";
+
+import {
+  classify,
+  modulePackageOf,
+  modulePackages,
+  resetClassificationCache,
+} from "../src/classify.mjs";
 import { createFixtureWorkspace } from "../src/testing.mjs";
 
-// The five helpers this replaces, and the question each one asked:
-//   normalizedFilename    -> `filename`
-//   classifyFile          -> `role`, `feature`, `enterprise`, `relative`
-//   prismaPackageOf       -> `kind`, `sourcePath`
-//   isStrictServiceModule -> `isServiceModule`
-//   strictFeatureSource   -> `strictSource`
-// plus the inline seam regexes of `typed-prisma-seam` -> `isPrismaSeam`.
+// Replaces normalizedFilename, classifyFile, prismaPackageOf, isStrictServiceModule,
+// strictFeatureSource and typed-prisma-seam's inline seam regexes.
 
 const workspace = createFixtureWorkspace({
   features: {
@@ -37,6 +38,8 @@ const CASES = [
       isTest: false,
       isServiceModule: true,
       isPrismaSeam: false,
+      layer: "services",
+      module: "agent",
       strictSource: {
         enterprise: false,
         feature: "agent",
@@ -70,7 +73,19 @@ const CASES = [
   },
   {
     path: "modules/agent/process/src/adapters/postgres.agent.adapter.ts",
-    expected: { role: "process", isPrismaSeam: true },
+    expected: { role: "process", isPrismaSeam: false, layer: undefined },
+  },
+  {
+    path: "modules/agent/process/src/channels/memory/agent-mail.channel.ts",
+    expected: { role: "process", layer: "channels", module: "agent", moduleEnterprise: false },
+  },
+  {
+    path: "modules/agent/browser-kit/src/agent-card.tsx",
+    expected: { role: "browser-kit", module: "agent", layer: undefined, strictSource: undefined },
+  },
+  {
+    path: "modules/agent/process/vitest.config.ts",
+    expected: { role: "other", feature: undefined, module: "agent" },
   },
   {
     path: "modules/agent/process/src/adapters/redis.agent.adapter.ts",
@@ -104,7 +119,7 @@ const CASES = [
   },
   {
     path: "apps/langy/src/index.ts",
-    expected: { role: "other", kind: undefined, sourcePath: undefined },
+    expected: { role: "other", kind: undefined, module: undefined, sourcePath: undefined },
   },
   {
     path: "enterprise/packages/composition/api/src/wiring.ts",
@@ -147,8 +162,50 @@ describe("given the one classification every rule gates on", () => {
         enterprise: true,
         feature: "governance",
         isServiceModule: true,
+        module: "governance",
+        moduleEnterprise: true,
         role: "process",
       });
+    });
+  });
+
+  describe("when it is asked for the workspace's module packages", () => {
+    it("finds every role's package by name, the kit and the enterprise mirror included", () => {
+      const fixture = createFixtureWorkspace({
+        features: { trace: { roles: { contract: {}, "browser-kit": {} } } },
+        files: {
+          "enterprise/modules/sso/process/package.json": JSON.stringify({
+            name: "@langwatch/enterprise-sso-process",
+            exports: { ".": ".", "./testing": "./testing" },
+          }),
+        },
+      });
+      resetClassificationCache();
+
+      try {
+        expect(modulePackageOf(fixture.cwd, "@langwatch/trace-browser-kit")?.pkg).toMatchObject({
+          enterprise: false,
+          module: "trace",
+          role: "browser-kit",
+          root: "modules/trace/browser-kit",
+        });
+        expect(
+          modulePackageOf(fixture.cwd, "@langwatch/enterprise-sso-process/testing"),
+        ).toMatchObject({
+          pkg: { enterprise: true, module: "sso", role: "process" },
+          subpath: "./testing",
+        });
+        expect(modulePackageOf(fixture.cwd, "zod")).toBeUndefined();
+        expect(
+          [...modulePackages(fixture.cwd).keys()].toSorted((a, b) => a.localeCompare(b)),
+        ).toEqual([
+          "@langwatch/enterprise-sso-process",
+          "@langwatch/trace-browser-kit",
+          "@langwatch/trace-contract",
+        ]);
+      } finally {
+        fixture.cleanup();
+      }
     });
   });
 
@@ -169,9 +226,7 @@ describe("given the one classification every rule gates on", () => {
         filename: `${workspace.cwd}/modules/agent/process/src/services/agent.service.ts`,
       });
 
-      expect(file.workspacePath).toBe(
-        "modules/agent/process/src/services/agent.service.ts",
-      );
+      expect(file.workspacePath).toBe("modules/agent/process/src/services/agent.service.ts");
     });
   });
 });

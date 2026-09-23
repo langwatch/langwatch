@@ -1,8 +1,14 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
-import { readFeatureCatalogue, type ArchitectureViolation } from "../src/index.ts";
+
+import {
+  discoverClassifiedPackages,
+  readFeatureCatalogue,
+  type ArchitectureViolation,
+} from "../src/index.ts";
 
 let root = "";
 
@@ -130,5 +136,60 @@ describe("feature catalogue", () => {
     expect(result.violations.map((violation) => violation.message)).toContain(
       'Subject "membership" is owned by both "organization" and "user".',
     );
+  });
+});
+
+describe("enterprise provider of a core port", () => {
+  afterEach(() => {
+    if (root) {
+      rmSync(root, { recursive: true, force: true });
+    }
+
+    root = "";
+  });
+
+  function manifest(path: string, name: string): void {
+    mkdirSync(join(root, path), { recursive: true });
+    writeFileSync(join(root, path, "package.json"), JSON.stringify({ name }));
+  }
+
+  function catalogueFindings({ coreProcess }: { coreProcess: boolean }): ArchitectureViolation[] {
+    root = mkdtempSync(join(tmpdir(), "feature-catalogue-"));
+    writeCatalogue({
+      version: 0,
+      features: [
+        {
+          classification: "core",
+          id: "audit-log",
+          root: "modules/audit-log",
+          subjects: ["audit-log"],
+        },
+      ],
+    });
+    manifest("modules/audit-log/contract", "@langwatch/audit-log-contract");
+    if (coreProcess) manifest("modules/audit-log/process", "@langwatch/audit-log-process");
+    manifest("enterprise/modules/audit-log/process", "@langwatch/enterprise-audit-log-process");
+    manifest("enterprise/modules/unknown/process", "@langwatch/enterprise-unknown-process");
+
+    return discoverClassifiedPackages(root).violations.filter(
+      (violation) => violation.policy === "feature-catalogue",
+    );
+  }
+
+  /** @scenario "An Enterprise module may provide a core port it does not own" */
+  it("accepts an enterprise root providing a contract-only core entry", () => {
+    const files = catalogueFindings({ coreProcess: false }).map((violation) => violation.file);
+
+    expect(files).toEqual([join(root, "enterprise/modules/unknown")]);
+  });
+
+  /** @scenario "An Enterprise module may provide a core port it does not own" */
+  it("refuses the enterprise root when the core entry has its own process half", () => {
+    const files = catalogueFindings({ coreProcess: true }).map((violation) => violation.file);
+
+    expect(files).toEqual([
+      join(root, "enterprise/modules/audit-log"),
+      join(root, "enterprise/modules/unknown"),
+    ]);
   });
 });

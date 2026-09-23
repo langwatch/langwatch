@@ -1,11 +1,14 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
+
 import { buildReport, formatReport, POLICY_FINDING_CAP } from "../src/report.ts";
 import type { ArchitectureViolation } from "../src/types.ts";
+import { writePolicyAnchors } from "./workspace.ts";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(packageRoot, "src/cli.ts");
@@ -30,6 +33,7 @@ function writeFixture(root: string, file: string, source: string): void {
 function writeSealedWorkspace(root: string): void {
   writeFixture(root, "src/base.ts", "export const base = 1;");
   writeFixture(root, "modules/catalogue.json", '{ "version": 0, "features": [] }');
+  writePolicyAnchors(root);
 }
 
 /** A committed base plus uncommitted files, so `changedSourceFiles` sees them. */
@@ -63,7 +67,7 @@ function finding(policy: string, file: string, message: string): ArchitectureVio
 
 /** No colour codes: every control character but the newline is a formatting escape. */
 function controlCharacters(text: string): string[] {
-  return [...text].filter((character) => character !== "\n" && character.codePointAt(0)! < 32);
+  return text.split("").filter((character) => character !== "\n" && character.codePointAt(0)! < 32);
 }
 
 describe("given a report of findings from several policies", () => {
@@ -77,7 +81,9 @@ describe("given a report of findings from several policies", () => {
       ]);
       const lines = formatReport(report).split("\n");
 
-      expect(lines[0]).toBe("architecture-enforcer: 3 findings across 2 policies, exit 1 (3 findings)");
+      expect(lines[0]).toBe(
+        "architecture-enforcer: 3 findings across 2 policies, exit 1 (3 findings)",
+      );
       expect(lines.slice(0, 40)).toContain("      2  alpha");
       expect(lines.slice(0, 40)).toContain("      1  beta");
       expect(lines.indexOf("--- alpha: 2 findings ---")).toBeGreaterThan(
@@ -87,24 +93,6 @@ describe("given a report of findings from several policies", () => {
       expect(lines).toContain("  Alpha refused.");
       expect(lines).toContain("  allowed: Fix a.ts.");
       expect(controlCharacters(formatReport(report))).toEqual([]);
-    });
-
-    /** @scenario "Stale baseline rows are counted in the summary" */
-    it("counts a stale baseline row beside the findings and still fails", () => {
-      const report = buildReport([
-        finding("alpha", "a.ts", "Alpha refused."),
-        {
-          ...finding("beta-baseline", "beta.json", "Baseline entry no longer exists."),
-          stale: true,
-        },
-      ]);
-
-      expect(report.staleRowCount).toBe(1);
-      expect(report.exitCode).toBe(1);
-      expect(formatReport(report).split("\n")[0]).toBe(
-        "architecture-enforcer: 2 findings across 2 policies, exit 1 (1 finding and 1 stale baseline row)",
-      );
-      expect(formatReport(report)).toContain("(1 stale baseline)");
     });
   });
 
@@ -152,10 +140,30 @@ describe("given a workspace the lint can check", () => {
       expect(failure.status).toBe(1);
       expect(failure.stderr).toContain("exit 1 (1 finding)");
 
+      const unknownPolicy = runCli(["--root", clean, "--policies", "no-such-policy"]);
+      expect(unknownPolicy.status).toBe(2);
+      expect(unknownPolicy.stderr).toContain("--policies names unknown policy no-such-policy");
+
       const misuse = runCli(["--root", clean, "--not-a-flag"]);
       expect(misuse.status).toBe(2);
       expect(misuse.stderr).toContain("unknown argument --not-a-flag");
       expect(misuse.stderr).toContain("architecture-enforcer [options]");
+    }, 120_000);
+  });
+
+  describe("when an anchor a selected policy reads is missing", () => {
+    /** @scenario "A missing anchor fails the run by name" */
+    it("exits 2 naming the policy and the file rather than reading clean", () => {
+      const root = mkdtempSync(join(tmpdir(), "lint-report-anchor-"));
+      writeSealedWorkspace(root);
+      rmSync(join(root, "packages/prisma-client/prisma/schema.prisma"));
+
+      const selected = runCli(["--root", root, "--policies", "prisma-table-ownership"]);
+
+      expect(selected.status).toBe(2);
+      expect(selected.stderr).toContain(
+        "prisma-table-ownership: its anchor packages/prisma-client/prisma/schema.prisma does not exist",
+      );
     }, 120_000);
   });
 
@@ -182,6 +190,4 @@ describe("given a workspace the lint can check", () => {
       expect(all.stderr).not.toContain("hidden by the cap");
     }, 120_000);
   });
-
 });
-

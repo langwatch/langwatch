@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { testDescriptionIsAnActionRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -11,30 +12,10 @@ function report(code, filename = "modules/agent/process/src/__tests__/agent.unit
 }
 
 describe("given a test file", () => {
-  describe("when an it title starts with \"should\"", () => {
-    /** @scenario "A should-prefixed it title is a failure" */
-    it("reports titleStartsWithShould", () => {
-      const found = report('it("should check local first", () => {});');
-
-      expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("titleStartsWithShould");
-    });
-  });
-
-  describe("when a test title starts with \"Should\"", () => {
-    /** @scenario "A Should-prefixed test title is a failure regardless of case" */
-    it("reports titleStartsWithShould", () => {
-      const found = report('test("Should check local first", () => {});');
-
-      expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("titleStartsWithShould");
-    });
-  });
-
-  describe("when an it title is an action", () => {
-    /** @scenario "An action-phrased it title is allowed" */
-    it("reports nothing", () => {
-      expect(report('it("checks local first", () => {});')).toEqual([]);
+  describe('when an it title starts with "should"', () => {
+    /** @scenario "A should-prefixed title is left to vitest/valid-title" */
+    it("reports nothing, because the native rule owns titles", () => {
+      expect(report('it("should check local first", () => {});')).toEqual([]);
     });
   });
 
@@ -57,19 +38,65 @@ describe("given a test file", () => {
 
   describe("when a describe is nested inside another describe without a given/when title", () => {
     /** @scenario "A nested describe missing given or when is a failure" */
-    it("reports nestedDescribeMissingGivenWhen", () => {
-      const code = `
-        describe("AgentService", () => {
-          describe("submit behavior", () => {
-            it("does something", () => {});
-          });
-        });
-      `;
+    it("reports nestedDescribeMissingGivenWhen on the title", () => {
+      const code = [
+        'describe("AgentService", () => {',
+        '  describe("submit behavior", () => {',
+        '    it("does something", () => {});',
+        "  });",
+        "});",
+      ].join("\n");
 
       const found = report(code);
 
       expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("nestedDescribeMissingGivenWhen");
+      expect(found[0]).toMatchObject({ messageId: "nestedDescribeMissingGivenWhen", line: 2 });
+    });
+  });
+
+  describe("when a nested describe is the table form describe.each(rows)(title)", () => {
+    /** @scenario "A nested describe.each title missing given or when is a failure" */
+    it("reports nestedDescribeMissingGivenWhen on the table's title", () => {
+      const code = [
+        'describe("AgentService", () => {',
+        "  describe.each([[1], [2]])(",
+        '    "submit %s",',
+        "    () => {},",
+        "  );",
+        "});",
+      ].join("\n");
+
+      const found = report(code);
+
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({ messageId: "nestedDescribeMissingGivenWhen", line: 3 });
+    });
+
+    /** @scenario "A nested describe.each titled when is allowed" */
+    it("reports nothing for a when title", () => {
+      const code = `
+        describe("AgentService", () => {
+          describe.each([[1]])("when the request is %s", () => {});
+        });
+      `;
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when a describe nests inside a describe.each table", () => {
+    /** @scenario "A describe inside a describe.each table is nested" */
+    it("reports the inner title", () => {
+      const code = [
+        'describe.each([[1]])("AgentService %s", () => {',
+        '  describe("submit behavior", () => {});',
+        "});",
+      ].join("\n");
+
+      const found = report(code);
+
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({ messageId: "nestedDescribeMissingGivenWhen", line: 2 });
     });
   });
 
@@ -80,7 +107,7 @@ describe("given a test file", () => {
     });
   });
 
-  describe("when a nested describe is titled \"and \"", () => {
+  describe('when a nested describe is titled "and "', () => {
     /** @scenario "An and-prefixed nested describe is left alone" */
     it("reports nothing", () => {
       const code = `
@@ -134,27 +161,27 @@ describe("given a test file", () => {
   describe("when a nested describe title is a capitalized phrase, not a unit name", () => {
     /** @scenario "A capitalized phrase is still a failure, not a unit name" */
     it("reports nestedDescribeMissingGivenWhen", () => {
-      const code = `
-        describe("AgentService", () => {
-          describe("Basic rendering", () => {
-            it("does something", () => {});
-          });
-        });
-      `;
+      const code = [
+        'describe("AgentService", () => {',
+        '  describe("Basic rendering", () => {',
+        '    it("does something", () => {});',
+        "  });",
+        "});",
+      ].join("\n");
 
       const found = report(code);
 
       expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("nestedDescribeMissingGivenWhen");
+      expect(found[0]).toMatchObject({ messageId: "nestedDescribeMissingGivenWhen", line: 2 });
     });
   });
 
   describe("when the file is not a *.test.ts file", () => {
-    /** @scenario "A should-prefixed title outside a test file is not governed" */
+    /** @scenario "A nested describe outside a test file is not governed" */
     it("reports nothing", () => {
-      expect(
-        report('it("should check local first", () => {});', "modules/agent/process/src/agent.service.ts"),
-      ).toEqual([]);
+      const code = 'describe("AgentService", () => { describe("submit behavior", () => {}); });';
+
+      expect(report(code, "modules/agent/process/src/agent.service.ts")).toEqual([]);
     });
   });
 });

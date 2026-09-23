@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { rules } from "../oxlint-plugin.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -115,12 +116,29 @@ export function renderLintRuleDocs(root = workspaceRoot) {
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
+/**
+ * What the reference says without its prose: each rule's heading, its facts and its
+ * message ids. A reworded message changes the prose only, so this stays equal.
+ */
+export function lintRuleDocStructure(text) {
+  return text
+    .split("\n")
+    .filter((line) => /^## |^- (?:Kind|Applies to|Fixable|Spec|Enforced): |^- `\w+`$/.test(line));
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const check = process.argv.includes("--check");
   const target = join(workspaceRoot, LINT_RULES_DOC);
   const rendered = renderLintRuleDocs();
   const current = existsSync(target) ? readFileSync(target, "utf8") : "";
+
   if (current === rendered) {
     process.stdout.write(`architecture-enforcer: ${LINT_RULES_DOC} is up to date\n`);
+  } else if (check) {
+    process.stderr.write(
+      `architecture-enforcer: ${LINT_RULES_DOC} is stale; run pnpm --filter @langwatch/architecture-enforcer docs and commit it\n`,
+    );
+    process.exitCode = 1;
   } else {
     writeFileSync(target, rendered);
     process.stdout.write(`architecture-enforcer: wrote ${LINT_RULES_DOC}\n`);

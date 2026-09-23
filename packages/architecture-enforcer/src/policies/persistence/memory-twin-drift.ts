@@ -3,16 +3,6 @@ import { basename, join, relative, sep } from "node:path";
 
 import ts from "typescript";
 
-import {
-  type BaselineEntry,
-  type BaselinePolicy,
-  baselinePath,
-  collectBaseline,
-  emptyBaselineRows,
-  liveKeys,
-  readBaseline,
-  staleRows,
-} from "../../baseline.ts";
 import type { ArchitectureViolation } from "../../types.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
@@ -23,8 +13,6 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
  * method sets — `feature-shape` only checks a twin exists, so one three
  * methods short still passes. README "The dead-code guards"; ADR-137.
  */
-
-const BASELINE_FILE = "memory-twin-drift-baseline.json";
 
 /** Where a module's server package lives, core and enterprise. */
 const MODULE_GROUPS = ["modules", join("enterprise", "modules")];
@@ -48,7 +36,7 @@ export type MemoryTwinDriftFinding = {
   allowed: string;
 };
 
-/** Code-unit order, the order every baseline in this package is written in. */
+/** Code-unit order, so a report reads the same on every machine. */
 function byKey(left: string, right: string): number {
   if (left === right) return 0;
 
@@ -383,58 +371,13 @@ export function collectMemoryTwinDriftFindings(root: string): MemoryTwinDriftFin
   return findings.toSorted((left, right) => byKey(entryKey(left), entryKey(right)));
 }
 
-export const MEMORY_TWIN_DRIFT_BASELINE: BaselinePolicy = {
-  id: "memory-twin-drift",
-  file: BASELINE_FILE,
-  label: "Memory twin drift baseline",
-  keyRule:
-    "A key is `<package directory>|<subject>|<side>|<method>`, side one of prisma, memory: the side that declares the method.",
-  enforceExpiry: false,
-  refuseEmpty: true,
-  stale: (entry) => ({
-    message: `Memory twin drift baseline entry ${entry.key.split("|").join(" ")} no longer matches anything and must be removed.`,
-  }),
-};
-
-export function collectMemoryTwinDriftBaseline({
-  root,
-  previous = [],
-}: {
-  root: string;
-  previous?: readonly BaselineEntry[];
-}): BaselineEntry[] {
-  const found = collectMemoryTwinDriftFindings(root).map(entryKey);
-
-  return collectBaseline({ policy: MEMORY_TWIN_DRIFT_BASELINE, found, previous });
-}
-
 export function lintMemoryTwinDrift(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root } = snapshot;
-  const policy = MEMORY_TWIN_DRIFT_BASELINE;
-  const file = baselinePath({ root, policy });
-  const baseline = readBaseline({ policy, file });
 
-  const violations = [
-    ...baseline.violations,
-    ...emptyBaselineRows({ read: baseline, policy, file }),
-  ];
-
-  const findings = collectMemoryTwinDriftFindings(root);
-  const baselined = liveKeys({ entries: baseline.entries });
-  const found = new Set(findings.map(entryKey));
-
-  const unlisted = findings.filter((one) => !baselined.has(entryKey(one)));
-
-  violations.push(
-    ...unlisted.map((one) => ({
-      policy: "memory-twin-drift",
-      file: join(root, one.path),
-      message: one.message,
-      allowed: one.allowed,
-    })),
-  );
-
-  violations.push(...staleRows({ entries: baseline.entries, found, policy, file }));
-
-  return violations;
+  return collectMemoryTwinDriftFindings(root).map((one) => ({
+    policy: "memory-twin-drift",
+    file: join(root, one.path),
+    message: one.message,
+    allowed: one.allowed,
+  }));
 }

@@ -8,15 +8,8 @@ import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  COMPOSED_EXPORTS_BASELINE,
-  lintComposedExports,
-  lintComposedExportsBaseline,
-  lintPolicies,
-  POLICIES,
-  readBaseline,
-} from "../src/index.ts";
-import { snapshotOf } from "./workspace.ts";
+import { lintComposedExports, lintPolicies, POLICIES } from "../src/index.ts";
+import { snapshotOf, writePolicyAnchors } from "./workspace.ts";
 
 let root = "";
 
@@ -28,19 +21,6 @@ function write(path: string, contents: string): void {
 
 function manifest(path: string, name: string): void {
   write(`${path}/package.json`, JSON.stringify({ name, main: "./src/index.ts" }));
-}
-
-function baseline(keys: readonly string[], path = "packages/architecture-enforcer/src"): string {
-  write(
-    `${path}/composed-exports-baseline.json`,
-    JSON.stringify({
-      version: 1,
-      policy: "composed-exports",
-      entries: keys.map((key) => ({ key, measured: "2026-09-07" })),
-    }),
-  );
-
-  return join(root, path, "composed-exports-baseline.json");
 }
 
 function reported(): string[] {
@@ -80,6 +60,7 @@ describe("composed exports", () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), "composed-exports-"));
     writeWorkspace();
+    writePolicyAnchors(root);
   });
 
   afterEach(() => {
@@ -268,56 +249,14 @@ describe("composed exports", () => {
     });
   });
 
-  describe("when the export is baselined", () => {
-    /** @scenario "A baselined export is accepted while it stays baselined" */
-    it("reports nothing for it", () => {
-      baseline(["modules/thing/process|UncomposedService"]);
+  describe("when a process entrypoint the walk starts from is missing", () => {
+    /** @scenario "A policy whose anchor file is gone refuses the run by name" */
+    it("throws naming the policy and the entrypoint instead of reporting every export", () => {
+      rmSync(join(root, "apps/tasks/src/main.ts"));
 
-      expect(reported()).toEqual([]);
-    });
-  });
-
-  describe("when the baseline is compared against the merge base", () => {
-    /** @scenario "The baseline may only shrink" */
-    it("reports an entry the merge base does not carry", () => {
-      baseline(["modules/thing/process|OtherService", "modules/thing/process|UncomposedService"]);
-      baseline(["modules/thing/process|UncomposedService"], "merge-base");
-
-      const messages = lintComposedExportsBaseline(
-        root,
-        "merge-base/composed-exports-baseline.json",
-      ).violations.map((violation) => violation.message);
-
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toContain("modules/thing/process|OtherService");
-      expect(messages[0]).toContain("shrink-only");
-    });
-
-    /** @scenario "An entry the merge base carried may be removed" */
-    it("accepts a baseline with one fewer entry", () => {
-      baseline(["modules/thing/process|UncomposedService"]);
-      baseline(
-        ["modules/thing/process|OtherService", "modules/thing/process|UncomposedService"],
-        "merge-base",
+      expect(() => reported()).toThrow(
+        "composed-exports: its anchor apps/tasks/src/main.ts does not exist",
       );
-
-      expect(
-        lintComposedExportsBaseline(root, "merge-base/composed-exports-baseline.json").violations,
-      ).toEqual([]);
-    });
-
-    /** @scenario "A baseline entry without a measured date is refused" */
-    it("refuses an entry with no measured date", () => {
-      const file = join(root, "packages/architecture-enforcer/src/composed-exports-baseline.json");
-      write(
-        "packages/architecture-enforcer/src/composed-exports-baseline.json",
-        JSON.stringify({ version: 1, policy: "composed-exports", entries: [{ key: "a|B" }] }),
-      );
-
-      const violations = readBaseline({ policy: COMPOSED_EXPORTS_BASELINE, file }).violations;
-
-      expect(violations).toHaveLength(1);
-      expect(violations[0]?.message).toContain("must be version 1");
     });
   });
 });

@@ -11,28 +11,16 @@ export const POLICY_FINDING_CAP = 25;
 export type PolicyGroup = {
   policy: string;
   findings: readonly ArchitectureViolation[];
-  /** Baseline rows this policy reports as no longer earning their keep. */
-  staleRows: number;
 };
 
 export type LintReport = {
   groups: readonly PolicyGroup[];
   findingCount: number;
-  staleRowCount: number;
   policyCount: number;
   exitCode: 0 | 1;
   /** Why the exit code is what it is, in the words the summary prints. */
   reason: string;
 };
-
-/**
- * A stale baseline row is a finding saying an allowance no longer applies.
- * Every ratchet reports one through `baseline.ts`, which sets the field; the
- * report never reads the prose to guess.
- */
-export function isStaleBaselineRow(finding: ArchitectureViolation): boolean {
-  return finding.stale === true;
-}
 
 /** `[policy] file:line`, the message, and the way out when the policy names one. */
 export function formatFinding(finding: ArchitectureViolation): string {
@@ -60,7 +48,6 @@ function groupByPolicy(findings: readonly ArchitectureViolation[]): PolicyGroup[
   const groups = [...byPolicy.entries()].map(([policy, policyFindings]) => ({
     policy,
     findings: policyFindings,
-    staleRows: policyFindings.filter(isStaleBaselineRow).length,
   }));
 
   return groups.toSorted(
@@ -68,27 +55,19 @@ function groupByPolicy(findings: readonly ArchitectureViolation[]): PolicyGroup[
   );
 }
 
-function reasonFor(findingCount: number, staleRowCount: number): string {
-  if (findingCount === 0) return "no policy refused anything";
-
-  if (staleRowCount === 0) return plural(findingCount, "finding");
-
-  const refusals = plural(findingCount - staleRowCount, "finding");
-
-  return `${refusals} and ${plural(staleRowCount, "stale baseline row")}`;
+function reasonFor(findingCount: number): string {
+  return findingCount === 0 ? "no policy refused anything" : plural(findingCount, "finding");
 }
 
 export function buildReport(findings: readonly ArchitectureViolation[]): LintReport {
   const groups = groupByPolicy(findings);
-  const staleRowCount = groups.reduce((total, group) => total + group.staleRows, 0);
 
   return {
     groups,
     findingCount: findings.length,
-    staleRowCount,
     policyCount: groups.length,
     exitCode: findings.length === 0 ? 0 : 1,
-    reason: reasonFor(findings.length, staleRowCount),
+    reason: reasonFor(findings.length),
   };
 }
 
@@ -106,9 +85,7 @@ function summaryLines(report: LintReport, all: boolean): string[] {
   ];
 
   for (const group of report.groups) {
-    const stale = group.staleRows > 0 ? `  (${group.staleRows} stale baseline)` : "";
-
-    lines.push(`  ${String(group.findings.length).padStart(5)}  ${group.policy}${stale}`);
+    lines.push(`  ${String(group.findings.length).padStart(5)}  ${group.policy}`);
   }
 
   if (overCap && !all) {

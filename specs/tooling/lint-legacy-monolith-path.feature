@@ -1,6 +1,6 @@
 Feature: The legacy-monolith-path lint rule
   `platform/app` was the monolith that `apps/*` and `modules/*` replaced, and
-  `~/` was the alias that only ever resolved inside it. No tsconfig maps `~/*`
+  `~/` and `@app/` were the aliases that only ever resolved inside it. No tsconfig maps `~/*`
   now, so a stale path resolves to nothing and TypeScript says so only when
   something reaches the file - which is how a moved test or a half-finished
   port keeps compiling until the first import of it.
@@ -10,10 +10,11 @@ Feature: The legacy-monolith-path lint rule
 
   @unit
   Scenario: An import through the monolith alias is refused
-    Given a source file that imports through the monolith's `~/` alias
+    Given a source file that imports through the monolith's `~/` or `@app/` alias
     When the legacy-monolith-path rule runs over it
-    Then it reports legacyMonolithPath
+    Then it reports legacyMonolithPath at the specifier
     And the message names the offending path
+    And the fix names where modules live today, not the retired folder names
 
   @unit
   Scenario: An import naming the deleted platform directory is refused

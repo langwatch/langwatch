@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { cognitiveComplexityRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -27,6 +28,18 @@ describe("given a function", () => {
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("tooComplex");
       expect(found[0].data.name).toBe("deep");
+    });
+  });
+
+  describe("when the fix names where the extracted block goes", () => {
+    /** @scenario "The fix sends the extracted block to module level" */
+    it("says module-level, because a nested closure still counts toward the parent", () => {
+      const found = report(`const a = 1;\n${ifChain(6)}`);
+
+      expect(found.map((entry) => entry.line)).toEqual([2]);
+      expect(found[0].message).toContain(
+        "into a module-level function (a nested closure still counts toward `deep`)",
+      );
     });
   });
 

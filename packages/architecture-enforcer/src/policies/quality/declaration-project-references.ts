@@ -1,10 +1,13 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+
 import ts from "typescript";
 import { z } from "zod";
-import { deriveWorkspaceReferences } from "../../workspace/tsconfig-references.ts";
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+
 import type { ArchitectureViolation } from "../../types.ts";
+import { getAnchor } from "../../workspace/anchors.ts";
+import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
+import { deriveWorkspaceReferences } from "../../workspace/tsconfig-references.ts";
 
 const configSchema = z.object({
   references: z.array(z.object({ path: z.string() })).optional(),
@@ -88,8 +91,13 @@ function projectGraph(root: string, violations: ArchitectureViolation[]): Map<st
     active.delete(file);
   };
 
-  const solution = join(root, "dev/tsconfig.declarations.json");
-  if (existsSync(solution)) visit(solution, solution);
+  const solution = getAnchor({
+    root,
+    anchor: "dev/tsconfig.declarations.json",
+    policy: "declaration-project-references",
+  });
+
+  visit(solution, solution);
 
   return projects;
 }
@@ -143,7 +151,7 @@ function lintReferenceSync(root: string): ArchitectureViolation[] {
 
     violations.push({
       policy: "declaration-project-references",
-      file: relative(root, project.file),
+      file: project.file,
       message: `Project references are out of sync with package.json: ${reasons.join(", ") || "the derived order differs"}.`,
       allowed:
         "Run pnpm sync:references, or record an entry no rule derives under langwatchExtraReferences.",

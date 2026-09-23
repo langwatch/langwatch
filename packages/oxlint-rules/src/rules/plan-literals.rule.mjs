@@ -1,9 +1,8 @@
 import { defineRule } from "../define-rule.mjs";
 
-// Plan facts are stated once, in @langwatch/plans. One limit field in an
-// object is a fixture; two or more is a plan definition, and a second plan
-// definition is how two parts of the product come to quote a customer
-// different numbers.
+// Plan facts are stated once, in @langwatch/plans. Two or more limit fields
+// given literal values is a second plan definition; a schema or a mapping
+// that reads `plan.maxMembers` restates no number and is left alone.
 
 const GOVERNED = /^(?:apps\/[^/]+\/src\/|packages\/|modules\/|enterprise\/)/;
 const CATALOGUE = /^packages\/plans\//;
@@ -43,12 +42,30 @@ function propertyName(property) {
   return undefined;
 }
 
-/** The limit fields this object literal states, in source order. */
+function isScalarLiteral(value) {
+  if (value?.type === "UnaryExpression" && value.operator === "-")
+    return isScalarLiteral(value.argument);
+
+  return (
+    value?.type === "Literal" &&
+    (typeof value.value === "number" || typeof value.value === "boolean")
+  );
+}
+
+/** `2`, `-1`, `true`, or a price table such as `{ USD: 32, EUR: 29 }`. */
+function isLiteralFact(value) {
+  if (value?.type !== "ObjectExpression") return isScalarLiteral(value);
+  const { properties } = value;
+
+  return properties.length > 0 && properties.every((entry) => isScalarLiteral(entry.value));
+}
+
+/** The limit fields this object literal states as literal values, in source order. */
 function statedFields(node) {
   const found = [];
   for (const property of node.properties ?? []) {
     const name = propertyName(property);
-    if (name && PLAN_LIMIT_FIELDS.has(name)) found.push(name);
+    if (name && PLAN_LIMIT_FIELDS.has(name) && isLiteralFact(property.value)) found.push(name);
   }
 
   return found;
@@ -77,7 +94,7 @@ export const planLiteralsRule = defineRule({
   messages: {
     statesPlanFacts: {
       what: "{{name}} states {{fields}} itself.",
-      why: "An object assigning two or more limit fields is a plan definition, and there is one catalogue of those.",
+      why: "An object giving two or more limit fields literal values is a plan definition, and there is one catalogue of those.",
       fix: 'Read them from the catalogue: `planCatalogue.plan("<TYPE>").limits` from @langwatch/plans. If this is a fixture, build it from `planCatalogue.plan(...)` and override the one field the test is about.',
     },
   },

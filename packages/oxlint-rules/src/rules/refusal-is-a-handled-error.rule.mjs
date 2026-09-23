@@ -1,21 +1,11 @@
 import { defineRule } from "../define-rule.mjs";
 
-// A refusal written as a status and a body never reaches the error boundary,
-// so it carries no `code` — and the code is the whole contract: it is what the
-// client presentation registry keys the customer's words on, and what a test
-// asserts instead of prose. `{ ok: false, status, body }` is the same mistake
-// wearing a result type: the caller unwraps it and hand-renders it again.
+// A refusal written as a result carries no `code`, and the code is the whole contract: the client
+// presentation registry keys the customer's words on it. A REST handler's hand-built answer is
+// `rest-route`'s `manualAnswer`; this rule keeps the `{ ok: false, status, body }` result shape.
 
 /** The one place a status and a body legitimately meet: the boundary itself. */
 const BOUNDARY = /canonical-error|error-response|handled-error|\.boundary\.ts$/;
-
-// A family that published `{ status, message }` before the house shape existed
-// renders its own refusals; that renderer travels with the declaration so a
-// published body cannot change because the installer moved. Exempting the
-// whole FILE would exempt the route handlers beside it - the actual mistake.
-const FAMILY_RENDERER = "RestErrorHandler";
-
-const REFUSING_STATUS = /^[45]\d\d$/;
 
 function isServerTransport(file) {
   return (
@@ -25,66 +15,7 @@ function isServerTransport(file) {
   );
 }
 
-function typeNameOf(annotation) {
-  const reference = annotation?.typeAnnotation ?? annotation;
-  return reference?.typeName?.name ?? reference?.typeName?.right?.name;
-}
-
-function collectCalls(node, into, seen = new Set()) {
-  if (!node || typeof node !== "object" || seen.has(node)) return;
-  seen.add(node);
-  if (Array.isArray(node)) {
-    for (const child of node) collectCalls(child, into, seen);
-    return;
-  }
-  if (node.type === "CallExpression" && node.callee?.type === "Identifier") {
-    into.add(node.callee.name);
-  }
-  for (const [key, child] of Object.entries(node)) {
-    if (key === "parent") continue;
-    if (child && typeof child === "object") collectCalls(child, into, seen);
-  }
-}
-
-/** The family's own renderer, and the names of the helpers it calls. */
-function renderersIn(program) {
-  const renderers = new Set();
-  const helpers = new Set();
-
-  for (const statement of program?.body ?? []) {
-    const declaration =
-      statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-    if (declaration?.type !== "VariableDeclaration") continue;
-
-    for (const declarator of declaration.declarations) {
-      if (typeNameOf(declarator.id?.typeAnnotation) !== FAMILY_RENDERER) continue;
-      renderers.add(declarator.init);
-      collectCalls(declarator.init, helpers);
-    }
-  }
-
-  return { helpers, renderers };
-}
-
-function insideFamilyRenderer(node, renderers, helpers) {
-  for (let scope = node.parent; scope; scope = scope.parent) {
-    if (renderers.has(scope)) return true;
-    if (scope.type === "FunctionDeclaration" && helpers.has(scope.id?.name)) return true;
-    if (
-      scope.type === "VariableDeclarator" &&
-      scope.id?.type === "Identifier" &&
-      helpers.has(scope.id.name)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function keysOf(node) {
-  if (node?.type !== "ObjectExpression") return [];
-
   return node.properties
     .filter((property) => property.type === "Property" && !property.computed)
     .map((property) =>
@@ -92,8 +23,12 @@ function keysOf(node) {
     );
 }
 
-function isRefusingStatus(node) {
-  return node?.type === "Literal" && REFUSING_STATUS.test(String(node.value));
+function isFalseOk(node) {
+  const ok = node.properties.find(
+    (property) => property.type === "Property" && property.key?.name === "ok",
+  );
+
+  return ok?.value?.type === "Literal" && ok.value.value === false;
 }
 
 export const refusalIsAHandledErrorRule = defineRule({
@@ -103,42 +38,16 @@ export const refusalIsAHandledErrorRule = defineRule({
     handWrittenRefusal: {
       what: "A refusal is written as a status and a body ({{shape}}).",
       why: "Nothing hand-rendered reaches the error boundary, so the answer carries no code: the client presentation registry has nothing to key the customer's words on, and a test can only assert prose that will change.",
-      fix: "Throw a `HandledError` with a stable `code` — set `fault: \"platform\"` or `\"provider\"` explicitly if the status is 5xx — and let the boundary render it; register the code in `packages/handled-error/src/app-codes.ts` (sorted) and give it a customer-safe entry in `packages/handled-error/src/presentation.ts`.",
+      fix: 'Throw a `HandledError` with a stable `code` — set `fault: "platform"` or `"provider"` explicitly if the status is 5xx — and let the boundary render it; register the code in `packages/handled-error/src/app-codes.ts` (sorted) and give it a customer-safe entry in `packages/handled-error/src/presentation.ts`.',
     },
   },
   applies: isServerTransport,
   create(context) {
-    const { helpers, renderers } = renderersIn(context.sourceCode.ast);
-
     return {
-      CallExpression(node) {
-        const callee = node.callee;
-        if (callee?.type !== "MemberExpression" || callee.computed) return;
-        if (callee.property?.name !== "json" || node.arguments.length < 2) return;
-        if (insideFamilyRenderer(node, renderers, helpers)) return;
-
-        const keys = keysOf(node.arguments[0]);
-        const second = node.arguments[1];
-        const status =
-          second?.type === "ObjectExpression"
-            ? second.properties.find(
-                (property) => property.type === "Property" && property.key?.name === "status",
-              )?.value
-            : second;
-
-        if (!isRefusingStatus(status)) return;
-        if (!keys.some((key) => key === "error" || key === "message")) return;
-        context.report({ node, messageId: "handWrittenRefusal", data: { shape: "c.json" } });
-      },
       ObjectExpression(node) {
         const keys = keysOf(node);
-        if (!keys.includes("status")) return;
-        if (!keys.includes("body")) return;
-
-        const ok = node.properties.find(
-          (property) => property.type === "Property" && property.key?.name === "ok",
-        );
-        if (ok && ok.value?.type === "Literal" && ok.value.value === false) {
+        if (!keys.includes("status") || !keys.includes("body")) return;
+        if (isFalseOk(node)) {
           context.report({ node, messageId: "handWrittenRefusal", data: { shape: "ok: false" } });
         }
       },

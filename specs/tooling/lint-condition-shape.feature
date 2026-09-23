@@ -1,8 +1,9 @@
 Feature: The condition-shape lint rule
   A condition is readable at a glance or it is named. What costs a reader is a test
   that calls or combines — more than one call, a stack of logical operators, or a
-  ternary inside the test — and the rule reports the measurement alongside the fix,
-  so the reader knows which of them tripped it without counting by hand. A property
+  ternary inside the test — and the rule reports each exceeded limit on its own,
+  naming the limit and the value it measured, so the reader knows which of them
+  tripped it without counting by hand. A property
   chain is a path to a value rather than complexity of its own, so its depth counts
   only once the test already calls or combines.
 
@@ -22,9 +23,16 @@ Feature: The condition-shape lint rule
   Scenario: An unreadable condition is reported with its measured shape
     Given a service module whose if-statement tests a three-hop property chain against another
     When the condition-shape rule runs over it
-    Then it reports nameCondition
-    And the message states the hops, calls and operators it measured
-    And the message tells the reader to name the condition for what the branch means
+    Then it reports chainTooDeep
+    And the message states the hops it measured and the maxHops limit
+    And the message tells the reader to read the chain into a named const
+
+  @unit
+  Scenario: Each exceeded limit is its own report
+    Given a service module whose if-statement makes two calls, joins four operators, reads a deep chain and nests a ternary
+    When the condition-shape rule runs over it
+    Then it reports tooManyCalls, tooManyOperators, chainTooDeep and ternaryInTest on that line
+    And each message names its limit and the value it measured
 
   @unit
   Scenario: A property chain on its own is never reported

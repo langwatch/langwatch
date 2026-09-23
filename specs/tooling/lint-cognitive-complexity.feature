@@ -10,6 +10,13 @@ Feature: The cognitive-complexity lint rule
     Then it reports tooComplex naming the function and its measured complexity
 
   @unit
+  Scenario: The fix sends the extracted block to module level
+    Given a function past the default maximum
+    When the cognitive-complexity rule runs over it
+    Then the fix says to extract the heaviest block into a module-level function
+    And it says a nested closure would still count toward the function
+
+  @unit
   Scenario: A simple function is left alone
     Given a function with a single if statement
     When the cognitive-complexity rule runs over it
@@ -20,12 +27,6 @@ Feature: The cognitive-complexity lint rule
     Given a function with a single if statement
     When the cognitive-complexity rule runs with max set to zero
     Then it reports tooComplex
-
-  @unit
-  Scenario: A baselined file reports nothing
-    Given a file listed in the baseline for cognitive-complexity
-    When the cognitive-complexity rule runs over a function past the maximum
-    Then it reports nothing
 
   # Attribution is by the weight of a whole block, not by the single node with
   # the largest delta. The two answers differ whenever nesting is spread thin,

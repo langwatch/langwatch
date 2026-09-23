@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { commentBlockSizeMessage } from "../../grammar/comment-block-policy.mjs";
+
 import { commentBlockSizeRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -25,32 +25,41 @@ describe("given a source file outside the burn-down allowlist", () => {
       const found = report(`${commentLines(9)}\nexport const x = 1;`);
 
       expect(found).toHaveLength(1);
-      expect(found[0].message).toBe(commentBlockSizeMessage(9));
-      expect(found[0].message).toContain("Comment block has 9 lines; the maximum is 5.");
-      expect(found[0].message).toContain("dev/docs/adr/");
+      expect(found[0].message).toBe(
+        "Comment block has 9 lines; the maximum is 5. Delete it when the code already says it," +
+          " or move the narrative into an ADR under `dev/docs/adr/` and leave one line here" +
+          " linking it. See ADR-140.",
+      );
     });
   });
 
   describe("when an oversized block carries a @lint-keep annotation", () => {
-    /** @scenario "The keep annotation does not suppress the error tier" */
-    it("still reports, and says the annotation does not apply", () => {
+    /** @scenario "The keep annotation does not suppress the error" */
+    it("still reports the block", () => {
       const keep = "// @lint-keep the ordering table is the contract dev/docs/adr/140-x.md";
       const code = `${commentLines(8)}\n${keep}\nexport const x = 1;`;
       const found = report(code);
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("commentBlockSize");
-      expect(found[0].message).toContain("nothing suppresses this");
     });
   });
 
-  describe("when a block at the maximum carries the annotation", () => {
-    /** @scenario "A keep annotation's own line is not commentary" */
-    it("discounts the annotation line so the block stays at the maximum", () => {
+  describe("when a block carries two keep lines beside five lines of prose", () => {
+    /** @scenario "A keep annotation's lines count as commentary" */
+    it("reports all seven lines at the block's first line", () => {
       const keep = "// @lint-keep the ordering table is the contract dev/docs/adr/140-x.md";
-      const code = `${commentLines(5)}\n${keep}\nexport const x = 1;`;
+      const code = `export const before = 0;\n${commentLines(5)}\n${keep}\n${keep}\nexport const x = 1;`;
+      const found = report(code);
 
-      expect(report(code)).toEqual([]);
+      expect(found.map((entry) => [entry.data.lines, entry.line])).toEqual([[7, 2]]);
+    });
+  });
+
+  describe("when a block is exactly the maximum", () => {
+    /** @scenario "A five-line block is at the maximum and passes" */
+    it("reports nothing", () => {
+      expect(report(`${commentLines(5)}\nexport const x = 1;`)).toEqual([]);
     });
   });
 
@@ -127,7 +136,7 @@ describe("given a source file outside the burn-down allowlist", () => {
     });
   });
 
-  describe("when the block sits under the warn threshold", () => {
+  describe("when the block sits under the maximum", () => {
     /** @scenario "A comment block under the size thresholds is left alone" */
     it("reports nothing", () => {
       expect(report(`${commentLines(2)}\nexport const x = 1;`)).toEqual([]);

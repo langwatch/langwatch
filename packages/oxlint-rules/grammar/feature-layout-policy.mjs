@@ -7,46 +7,55 @@
 export const NAME = "[a-z0-9]+(?:-[a-z0-9]+)*";
 const NAME_RE = new RegExp(`^${NAME}$`);
 
-export const CANONICAL_ARTIFACTS = new Set([
-  "app",
-  "api",
-  "channel",
-  "commands",
-  // The ported process composition a converted module still carries; admitted
-  // so recovery is not a redline, expected to shrink to nothing as
-  // repositories and members conversion completes (ADR-144).
-  "composition",
-  "errors",
-  "events",
-  "intent",
-  "migration",
-  "process",
-  "projection",
-  "queries",
-  "repository",
-  "rules",
-  "service",
-  "store",
-  "subscriber",
-  "task",
-]);
+/**
+ * Every artifact suffix the layout knows, once. `side` is the half it may sit
+ * in; `canonical` lets it end a filename; `subject` makes the name before it a
+ * claimed subject; `qualified` lets a tier or backend segment precede that name.
+ */
+const ARTIFACT_TABLE = {
+  api: { side: "process", canonical: true },
+  app: { side: "contract", canonical: true, subject: true },
+  channel: { side: "process", canonical: true, subject: true, qualified: true },
+  commands: { side: "contract", canonical: true, subject: true },
+  composition: { side: "process", canonical: true },
+  errors: { side: "contract", canonical: true, subject: true },
+  events: { side: "contract", canonical: true, subject: true },
+  fixture: {},
+  intent: { side: "process", canonical: true, subject: true },
+  mapper: { side: "process", qualified: true },
+  migration: { side: "process", canonical: true, qualified: true },
+  process: { side: "process", canonical: true, subject: true },
+  projection: { side: "process", canonical: true, subject: true },
+  queries: { side: "contract", canonical: true, subject: true },
+  repository: { side: "process", canonical: true, subject: true, qualified: true },
+  rules: { side: "process", canonical: true },
+  service: { side: "contract", canonical: true, subject: true },
+  store: { side: "process", canonical: true, subject: true, qualified: true },
+  subscriber: { side: "process", canonical: true, subject: true },
+  task: { side: "process", canonical: true },
+};
+
+function artifactsWhere(predicate) {
+  return Object.keys(ARTIFACT_TABLE).filter((name) => predicate(ARTIFACT_TABLE[name]));
+}
+
+export const CANONICAL_ARTIFACTS = new Set(artifactsWhere((artifact) => artifact.canonical));
+export const ARTIFACT_PARTS = new Set(Object.keys(ARTIFACT_TABLE));
+export const QUALIFIED_ARTIFACTS = new Set(artifactsWhere((artifact) => artifact.qualified));
+const CONTRACT_ARTIFACTS = artifactsWhere((artifact) => artifact.side === "contract").join("|");
+const PROCESS_ONLY_ARTIFACTS = artifactsWhere((artifact) => artifact.side === "process");
+
+/** The process-only suffixes, in prose, for the message that refuses one in a contract. */
+export const PROCESS_ONLY_ARTIFACT_LIST = PROCESS_ONLY_ARTIFACTS.map((name) => `\`.${name}\``).join(
+  ", ",
+);
 
 export const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
 
-/**
- * A test lives in a `__tests__` directory beside the code it covers. The
- * grammar below describes production source; a test is named for the
- * behaviour it pins, so anything under `__tests__` is exempt at any depth.
- */
-export const TEST_DIRECTORY = /(?:^|\/)__tests__\//;
+/** Test sources, at any depth; the same definition `classify` uses, so the two cannot disagree. */
+export const TEST_DIRECTORY = /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)/;
 
-export const SERVER_QUALIFIED_ARTIFACTS = new Set([
-  "channel",
-  "mapper",
-  "repository",
-  "store",
-]);
-export const SERVER_ARCHITECTURAL_QUALIFIERS = [
+export const PROCESS_QUALIFIERS = [
   "clickhouse",
   "eventing",
   "in-memory",
@@ -71,24 +80,18 @@ export function isFeatureApiContract(sourcePath, feature) {
   return sourcePath === `${feature}.api.ts`;
 }
 
-export const CONTRACT_ARTIFACT = new RegExp(
-  `^${NAME}\\.(?:app|commands|errors|events|queries|service)\\.ts$`,
+export const CONTRACT_ARTIFACT = new RegExp(`^${NAME}\\.(?:${CONTRACT_ARTIFACTS})\\.ts$`);
+export const PROCESS_ONLY_CONTRACT_ARTIFACT = new RegExp(
+  `\\.(?:${PROCESS_ONLY_ARTIFACTS.join("|")})\\.ts$`,
 );
-export const SERVER_ONLY_CONTRACT_ARTIFACT =
-  /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
-export const CONTRACT_ARTIFACT_SUFFIX = /\.(?:app|commands|errors|events|queries|service)\.ts$/;
-
-// This list is closed: a server source file must be one of these shapes, named
-// by role, not technique — repository (owned state), channel (messages to
-// something the module doesn't own), service (behaviour), or an Infrastructure
-// member beside the app (a client the process supplies).
+export const CONTRACT_ARTIFACT_SUFFIX = new RegExp(`\\.(?:${CONTRACT_ARTIFACTS})\\.ts$`);
+export const CONTRACT_ARTIFACT_ONLY = new RegExp(`^(?:${CONTRACT_ARTIFACTS})\\.ts$`);
 
 /**
- * The closed list, in prose, for the message a refused file prints — telling
- * the reader the shape to move to instead of leaving them to guess. Sits beside
- * `SERVER_PATTERNS`; a test pins the two together so the message can't drift.
+ * The closed list of process-source homes, in prose, for the message a refused
+ * file prints. A test pins it to `PROCESS_PATTERNS` so the two cannot drift.
  */
-export const SERVER_HOMES =
+export const PROCESS_HOMES =
   "index.ts, <feature>.server.ts, app/<feature>.app.ts, app/<feature>.members.ts, " +
   "transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, " +
   "repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), " +
@@ -97,10 +100,9 @@ export const SERVER_HOMES =
   "tasks/<name>.task.ts, migrations/, " +
   "app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks)";
 
-export const SERVER_PATTERNS = [
+export const PROCESS_PATTERNS = [
   /^index\.ts$/,
   new RegExp(`^${NAME}\\.server\\.ts$`),
-  // A feature app groups its public services; transport adapters stay outside it.
   new RegExp(`^app/${NAME}\\.app\\.ts$`),
   // The closed record of members a process hands the app (ADR-144), declared
   // beside the app it feeds.
@@ -202,49 +204,20 @@ export function isLowerKebabFilename(name) {
   return parts.every((part) => NAME_RE.test(part));
 }
 
-export function isStrictServerFilename(name) {
+export function isStrictProcessFilename(name) {
   if (!isLowerKebabFilename(name)) return false;
 
   const extension = name.match(/\.[cm]?[jt]sx?$/)?.[0];
   if (!extension) return false;
   const parts = name.slice(0, -extension.length).split(".");
-  if (parts.length !== 2 || !SERVER_QUALIFIED_ARTIFACTS.has(parts[1])) return true;
+  if (parts.length !== 2 || !QUALIFIED_ARTIFACTS.has(parts[1])) return true;
 
-  return !SERVER_ARCHITECTURAL_QUALIFIERS.some((qualifier) => parts[0].startsWith(`${qualifier}-`));
+  return !PROCESS_QUALIFIERS.some((qualifier) => parts[0].startsWith(`${qualifier}-`));
 }
 
-export const ARTIFACT_PARTS = new Set([
-  "app",
-  "adapter",
-  "api",
-  "channel",
-  "commands",
-  "errors",
-  "events",
-  "fixture",
-  "mapper",
-  "migration",
-  "process",
-  "projection",
-  "queries",
-  "repository",
-  "service",
-  "store",
-  "subscriber",
-  "intent",
-]);
-
-export const QUALIFIED_ARTIFACTS = new Set([
-  "adapter",
-  "channel",
-  "mapper",
-  "migration",
-  "repository",
-  "store",
-]);
-
-export const SUBJECT_ARTIFACT =
-  /\.(?:adapter|app|channel|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/;
+export const SUBJECT_ARTIFACT = new RegExp(
+  `\\.(?:${artifactsWhere((artifact) => artifact.subject).join("|")})\\.tsx?$`,
+);
 
 export function claimsSubject(candidate, feature, subject) {
   if (candidate === subject) return true;

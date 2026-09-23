@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+
 import { schemaOutsideContractRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
@@ -28,6 +29,20 @@ describe("given a transport file", () => {
           " `modules/agent/process/src/transport/agent.rest.ts`." +
           " Move it to `modules/agent/contract/src` and import it here.",
       );
+    });
+  });
+
+  describe("when it authors the schema through another zod entrypoint", () => {
+    /** @scenario "A Zod schema authored through zod/v4 or zod/mini is reported" */
+    it.each(["zod/v4", "zod/mini"])("reports schema for %s on the declaring line", (entrypoint) => {
+      const found = report(
+        `import { z } from "${entrypoint}";\nconst CreateAgentSchema = z.object({ name: z.string() });`,
+        "modules/agent/process/src/transport/agent.rest.ts",
+      );
+
+      expect(found.map((finding) => [finding.data.name, finding.line])).toEqual([
+        ["CreateAgentSchema", 2],
+      ]);
     });
   });
 
@@ -66,10 +81,7 @@ describe("given a transport file", () => {
         "modules/agent/process/src/transport/agent.rest.ts",
       );
 
-      expect(found.map((e) => e.data.name).toSorted()).toEqual([
-        "budgetListQuerySchema",
-        "pageQuerySchema",
-      ]);
+      expect(found.map((e) => e.data.name)).toEqual(["pageQuerySchema", "budgetListQuerySchema"]);
     });
   });
 
@@ -86,7 +98,7 @@ describe("given a transport file", () => {
   });
 });
 
-describe("given a server file outside transport", () => {
+describe("given a process file outside transport", () => {
   describe("when it declares a top-level Schema constant", () => {
     /** @scenario "A Zod schema outside transport is not this rule's business" */
     it("reports nothing", () => {

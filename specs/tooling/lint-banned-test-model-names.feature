@@ -105,6 +105,18 @@ Feature: The banned-test-model-names lint rule
     Then it reports nothing
 
   @unit
+  Scenario: A dated model id is a different model and is left alone
+    Given a test file naming gpt-4o-2024-08-06 and gpt-4.1.2
+    When the banned-test-model-names rule runs over it
+    Then it reports nothing, and the autofix never produces gpt-5-mini-2024-08-06
+
+  @unit
+  Scenario: A banned name before a closing period is still reported
+    Given a test file whose string ends a sentence with gpt-4o
+    When the banned-test-model-names rule runs over it
+    Then it reports bannedModelName naming gpt-4o on that line
+
+  @unit
   Scenario: A banned model name inside a regex pattern is reported without a rewrite
     Given a `regex:` property value that anchors a banned model name as a matching pattern
     When the banned-test-model-names rule runs over it

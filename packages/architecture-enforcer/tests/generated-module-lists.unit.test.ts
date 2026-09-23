@@ -1,8 +1,9 @@
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+
 import { generateModuleLists } from "@langwatch/dev-scripts/generate-modules";
+import { afterAll, describe, expect, it } from "vitest";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const scratch: string[] = [];
@@ -25,12 +26,15 @@ function moduleTree(app: string): string {
       features: [{ id: "annotation", root: "modules/annotation" }],
     }),
   );
-  // The generator derives this file's dependencies, so it has to exist to be
-  // rewritten. Without it `generateModuleLists` throws ENOENT on a scratch tree.
-  writeFileSync(
-    join(root, "modules/package.json"),
-    '{"name":"@langwatch/installed-modules","dependencies":{}}',
-  );
+  // The generator derives these packages' dependencies, so they have to exist
+  // to be rewritten. Without them `generateModuleLists` throws ENOENT.
+  for (const half of ["server", "web"]) {
+    mkdirSync(join(root, `packages/installed-${half}-modules`), { recursive: true });
+    writeFileSync(
+      join(root, `packages/installed-${half}-modules/package.json`),
+      `{"name":"@langwatch/installed-${half}-modules","dependencies":{}}`,
+    );
+  }
   writeFileSync(join(root, "modules/annotation/process/package.json"), '{"name":"x"}');
   writeFileSync(join(server, "annotation.app.ts"), app);
   return root;
@@ -39,7 +43,9 @@ function moduleTree(app: string): string {
 /** What the generator wrote for the one module in that tree. */
 function membersIn(root: string): string {
   const generated = generateModuleLists({ root });
-  return generated["modules/server-module-members.generated.ts"] ?? "";
+  return (
+    generated["packages/installed-server-modules/src/server-module-members.generated.ts"] ?? ""
+  );
 }
 
 describe("given the checked-in module lists", () => {
@@ -63,7 +69,9 @@ describe("given the checked-in module lists", () => {
      */
     it("installs the enterprise modules beside the core ones", () => {
       const source =
-        generateModuleLists({ root: REPOSITORY_ROOT })["modules/server-modules.generated.ts"] ?? "";
+        generateModuleLists({ root: REPOSITORY_ROOT })[
+          "packages/installed-server-modules/src/server-modules.generated.ts"
+        ] ?? "";
 
       // Named rather than derived from the catalogue: deriving the list here
       // would restate the generator's own four conditions and assert nothing.
@@ -97,7 +105,9 @@ describe("given the checked-in module lists", () => {
 
     it("names each installed module exactly once", () => {
       const source =
-        generateModuleLists({ root: REPOSITORY_ROOT })["modules/server-modules.generated.ts"] ?? "";
+        generateModuleLists({ root: REPOSITORY_ROOT })[
+          "packages/installed-server-modules/src/server-modules.generated.ts"
+        ] ?? "";
       const imported = [...source.matchAll(/from "(@langwatch\/[^"]+)";/g)].map(
         (match) => match[1],
       );
@@ -109,19 +119,28 @@ describe("given the checked-in module lists", () => {
 
   describe("when the package that owns the lists is read", () => {
     /** @scenario "The generated module lists have a home that type-checks" */
-    it("depends on exactly the packages the server list imports", () => {
+    it("depends on exactly the packages the server list imports, and the kernel", () => {
       const source = readFileSync(
-        resolve(REPOSITORY_ROOT, "modules/server-modules.generated.ts"),
+        resolve(
+          REPOSITORY_ROOT,
+          "packages/installed-server-modules/src/server-modules.generated.ts",
+        ),
         "utf8",
       );
       const imported = [...source.matchAll(/from "(@langwatch\/[^"]+)";/g)].map(
-        (match) => match[1],
+        (match) => match[1] ?? "",
       );
       const owner = JSON.parse(
-        readFileSync(resolve(REPOSITORY_ROOT, "modules/package.json"), "utf8"),
+        readFileSync(
+          resolve(REPOSITORY_ROOT, "packages/installed-server-modules/package.json"),
+          "utf8",
+        ),
       ) as { dependencies: Record<string, string> };
 
-      expect(Object.keys(owner.dependencies).toSorted()).toEqual([...imported].toSorted());
+      // The generator keeps the kernel declared on the server half (generate-modules.mjs).
+      expect(Object.keys(owner.dependencies).toSorted((a, b) => a.localeCompare(b))).toEqual(
+        [...imported, "@langwatch/kernel"].toSorted((a, b) => a.localeCompare(b)),
+      );
     });
   });
 });
