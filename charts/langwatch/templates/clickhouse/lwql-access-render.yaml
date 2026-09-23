@@ -1,0 +1,255 @@
+{{/*
+  LangWatchQL access-model delivery for chart-managed ClickHouse (issue #8258,
+  epic tasks#889 AC3/AC5/AC7).
+
+  The application owns the whole LangWatchQL access model in code. On
+  chart-managed ClickHouse the model is DELIVERED to every replica as rendered
+  server-config files, not provisioned by SQL DDL against the one pod behind the
+  Service (which is why `replicas > 1` used to leave every other pod without the
+  user, profile, grants, row policies or named collection — see the epic).
+
+  This hook runs the APP IMAGE once per install/upgrade as a Job, renders the
+  two files with `renderLwqlAccessConfig`, and writes them into the Secret
+  `<release>-lwql-clickhouse-access` (keys `lwql-access.yaml`,
+  `lwql-named-collection.yaml`). Every chart-managed ClickHouse pod mounts that
+  Secret (see values.yaml `clickhouse.extraVolumes`/`extraVolumeMounts`) at
+  `/etc/clickhouse-server/users.d/lwql-access.yaml` and
+  `/etc/clickhouse-server/config.d/lwql-named-collection.yaml`, so the restricted
+  identity lands in every replica's `users_xml` store.
+
+  Patterns reused, nothing new invented (AC7): the app image run as a deploy-time
+  hook Job (like the stored-objects upgrade hooks), a dedicated ServiceAccount +
+  namespaced Role (like those hooks), and the app Secret for the LWQL passwords.
+
+  Why the Job writes the Secret through the Kubernetes API rather than the chart
+  templating it (AC8e): only the app image can render the catalog, so the file
+  contents are not known at chart-render time. The app image ships node + curl
+  but no kubectl, so the writer is a small node script that PUTs/POSTs the Secret
+  with the pod's ServiceAccount token — no extra tooling image.
+
+  Why no `SYSTEM RELOAD CONFIG` hook and no per-secret checksum: ClickHouse 25.10
+  hot-reloads users.d and config.d from disk within ~3s of a file change
+  (verified against clickhouse/clickhouse-server:25.10.2.65). But the files are
+  nested single-file (subPath) mounts inside ch-config's own writable dirs, and
+  Kubernetes does not propagate Secret updates into a subPath mount — so a pod
+  only picks up a changed model on (re)start. The refresh on upgrade therefore
+  rides the release-version annotation on the ClickHouse pod template
+  (`clickhouse.podAnnotations`, bumped in release lockstep with the app image /
+  catalog), which rolls the StatefulSet so every pod re-mounts the freshly
+  rendered Secret. Install, scale-up and disk-rebuild pods mount it at boot.
+
+  Gated on chart-managed ClickHouse. When `lwql.enabled=false` the Job still
+  renders — but writes two empty documents — so the pods' unconditional mount is
+  always satisfiable and disabling the feature never wedges ClickHouse boot;
+  `lwql.enabled` toggles the CONTENT, not the topology.
+*/}}
+{{- if .Values.clickhouse.chartManaged }}
+{{- $name := printf "%s-lwql-access-render" .Release.Name }}
+{{- $secretName := include "langwatch.lwql.accessSecretName" . }}
+{{- $appSecret := .Values.secrets.existingSecret | default (include "langwatch.appSecretName" .) }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  # Read, replace and patch ONLY the one access Secret, by name (AC5: the Role is
+  # scoped to that single Secret name).
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: [{{ $secretName | quote }}]
+    verbs: ["get", "update", "patch"]
+  # Create needs its own rule: Kubernetes RBAC cannot restrict `create` by
+  # resourceName (the object name is not known at authorization time), so the
+  # create verb is namespaced. The get/update/patch above stay name-scoped, and
+  # this Role reaches no other namespace and nothing cluster-wide. The Job only
+  # ever writes the one Secret above.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ $name }}
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    # Weight -5: after the SA/Role/RoleBinding (-10) so the token can write the
+    # Secret, and still before the ClickHouse StatefulSet (a normal, post-hook
+    # resource) so the Secret exists before the first pod mounts it.
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "langwatch.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      {{- with (.Values.global).imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: lwql-access-render
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: {{ .Values.images.app.pullPolicy }}
+          # readOnlyRootFilesystem omitted: `pnpm run task` writes a store cache
+          # under $HOME, the same reason the stored-objects hook and the subchart
+          # preflight Job omit it.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            - name: LWQL_ENABLED
+              value: {{ .Values.lwql.enabled | quote }}
+            - name: LWQL_RENDER_SECRET_NAME
+              value: {{ $secretName | quote }}
+            # node trusts the in-cluster API server's serving cert via the SA CA.
+            - name: NODE_EXTRA_CA_CERTS
+              value: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              mkdir -p /render/users.d /render/config.d
+
+              if [ "${LWQL_ENABLED}" = "true" ]; then
+                # Render the two files from the same env the app reads for LWQL.
+                # The renderer is offline (no ClickHouse connection), so it is
+                # safe to run before the ClickHouse StatefulSet exists.
+                cd /app/platform/app
+                pnpm run task renderLwqlAccessConfig --out /render
+              else
+                # Feature off: write empty, valid YAML so the pods' mount is
+                # always satisfiable and ClickHouse merges a no-op.
+                printf '{}\n' > /render/users.d/lwql-access.yaml
+                printf '{}\n' > /render/config.d/lwql-named-collection.yaml
+              fi
+
+              # Write the Secret through the Kubernetes API with the pod's SA
+              # token (the app image has node + curl, no kubectl). The writer
+              # never prints the file contents, the password, or any statement
+              # text (AC5) — only a one-line outcome and, on failure, the HTTP
+              # status code.
+              cat > /tmp/write-secret.mjs <<'WRITE_SECRET'
+              import { readFileSync } from "node:fs";
+
+              const saDir = "/var/run/secrets/kubernetes.io/serviceaccount";
+              const token = readFileSync(`${saDir}/token`, "utf8").trim();
+              const namespace = readFileSync(`${saDir}/namespace`, "utf8").trim();
+              const name = process.env.LWQL_RENDER_SECRET_NAME;
+              const b64 = (p) => readFileSync(p).toString("base64");
+
+              const secret = {
+                apiVersion: "v1",
+                kind: "Secret",
+                metadata: {
+                  name,
+                  labels: { "app.kubernetes.io/managed-by": "langwatch-lwql-access-render" },
+                },
+                type: "Opaque",
+                data: {
+                  "lwql-access.yaml": b64("/render/users.d/lwql-access.yaml"),
+                  "lwql-named-collection.yaml": b64("/render/config.d/lwql-named-collection.yaml"),
+                },
+              };
+
+              const api = "https://kubernetes.default.svc";
+              const headers = {
+                authorization: `Bearer ${token}`,
+                "content-type": "application/json",
+                accept: "application/json",
+              };
+              const collection = `${api}/api/v1/namespaces/${namespace}/secrets`;
+              const object = `${collection}/${name}`;
+
+              const get = await fetch(object, { headers });
+              let res;
+              if (get.status === 200) {
+                const current = await get.json();
+                secret.metadata.resourceVersion = current.metadata.resourceVersion;
+                res = await fetch(object, { method: "PUT", headers, body: JSON.stringify(secret) });
+              } else if (get.status === 404) {
+                res = await fetch(collection, { method: "POST", headers, body: JSON.stringify(secret) });
+              } else {
+                console.error(`lwql-access-render: could not read the access Secret (HTTP ${get.status})`);
+                process.exit(1);
+              }
+
+              if (!res.ok) {
+                console.error(`lwql-access-render: Kubernetes API rejected the access Secret write (HTTP ${res.status})`);
+                process.exit(1);
+              }
+              console.log("lwql-access-render: access Secret written to every ClickHouse pod's mount source");
+              WRITE_SECRET
+              node /tmp/write-secret.mjs
+          volumeMounts:
+            - name: render
+              mountPath: /render
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: render
+          emptyDir:
+            sizeLimit: 16Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+{{- end }}

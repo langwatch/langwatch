@@ -1260,6 +1260,28 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end -}}
 {{- end -}}
 
+{{/*
+  Umbrella fullname. Every resource this chart renders is named after the
+  release (`<release>-app`, `<release>-postgresql`, …), so fullname IS the
+  release name. Kept as a named helper so cross-references read intentionally
+  and a future naming change has one edit site.
+*/}}
+{{- define "langwatch.fullname" -}}
+  {{- .Release.Name -}}
+{{- end -}}
+
+{{/*
+  Name of the Secret the LangWatchQL access-render Job writes and every
+  chart-managed ClickHouse pod mounts (issue #8258). Holds the two rendered
+  files `lwql-access.yaml` (users.d) and `lwql-named-collection.yaml` (config.d).
+  The subchart mount in values.yaml reconstructs this same name from
+  `.Release.Name` (a subchart cannot call a parent helper), so the two must
+  stay in lockstep: `<release>-lwql-clickhouse-access`.
+*/}}
+{{- define "langwatch.lwql.accessSecretName" -}}
+  {{- printf "%s-lwql-clickhouse-access" (include "langwatch.fullname" .) -}}
+{{- end -}}
+
 {{/* ClickHouse: Password secret key */}}
 {{- define "langwatch.clickhouse.secretKey" -}}
   {{- .Values.clickhouse.auth.secretKeys.passwordKey | default "password" -}}
