@@ -142,6 +142,8 @@ export class ScimDirectoryStreamService {
       return { status: "unauthorized" };
     }
 
+    await this.scim.recordTokenUse({ tokenId: entitlement.id });
+
     const parsed = findEvents(delivery.body);
 
     if (!parsed) return { status: "invalid-json" };

@@ -324,6 +324,20 @@ Feature: Enterprise SCIM package boundary
       Then the answer is application/scim+json at 403 naming the plan the feature needs
 
     @unit
+    Scenario: A token whose connection is being retired cannot write, and is refused as SCIM's 403
+      Given a valid token issued against a connection whose teardown is pending, or which is gone
+      When a provisioning route is called with it, to read or to write
+      Then the answer is application/scim+json at 403 saying the token can no longer write through its connection
+      And nothing is written, the token is not marked used, and the refusal is filed on the request log
+
+    @unimplemented
+    Scenario: A token whose connection is replaced by one that has begun finalizing cannot write
+      Given a valid token issued against a connection still live
+      And a replacement for that connection whose migration is finalizing or finalized
+      When a provisioning route is called with it
+      Then the answer is application/scim+json at 403 saying the token can no longer write through its connection
+
+    @unit
     Scenario: A body that is not JSON, or not a resource we accept, is refused as SCIM's 400
       Given the SCIM family mounted behind the process's own error boundary
       When a directory pushes a body that does not parse, or a resource missing a field
@@ -347,3 +361,17 @@ Feature: Enterprise SCIM package boundary
       Given a member the directory deprovisions
       When the delete succeeds
       Then the answer is 204 with no body and no Content-Type
+
+  Rule: A request is read the way main read it
+
+    @unit
+    Scenario: A repeated query parameter is read by its first value, as main read it
+      Given a directory that sends a list query parameter twice
+      When it reads a collection
+      Then the first value is the one served, and the page is not refused
+
+    @unit
+    Scenario: A pushed resource is read as JSON whatever media type it names, as main read it
+      Given a directory that pushes a JSON resource under a media type that is not JSON
+      When the resource is valid
+      Then it is provisioned as if the media type had named JSON

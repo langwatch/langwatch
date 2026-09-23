@@ -36,7 +36,10 @@ export abstract class ScimService {
     organizationId: string;
     connectionId: string;
   }): Promise<{ revoked: number }>;
+  /** Who a bearer is, and whether its plan still entitles it. Records no use. */
   abstract verifyToken(input: { token: string }): Promise<ScimTokenEntitlement>;
+  /** Marks a token used, once every check on the request it carried has passed. */
+  abstract recordTokenUse(input: { tokenId: string }): Promise<void>;
 
   // ── What the directory asked, and what we answered (ADR-126) ─────────────
 

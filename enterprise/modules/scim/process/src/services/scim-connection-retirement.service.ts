@@ -9,11 +9,14 @@
 import type { ScimConnectionsService } from "./scim-connections.service.ts";
 
 /**
- * The states a connection is gone in. A suspended connection is paused, not
- * gone — an operator stopped it deciding sign-ins, and the directory it
- * provisions through is the same directory when it resumes.
+ * The states a connection is gone in, and so takes its tokens with it. A
+ * suspended connection is paused, not gone: the directory it provisions
+ * through is the same directory when it resumes.
  */
-const RETIRED_STATES: ReadonlySet<string> = new Set(["DISCARDED", "REJECTED", "TORN_DOWN"]);
+const RETIRED_STATES: ReadonlySet<string> = new Set(["DISCARDED", "TORN_DOWN"]);
+
+/** Going, not gone: its grace can still be served, so its tokens stay. */
+const RETIRING_STATES: ReadonlySet<string> = new Set(["TEARDOWN_PENDING"]);
 
 /** The one thing retirement does to this module's rows. */
 export interface ScimTokenRetirement {
@@ -39,10 +42,9 @@ export class ScimConnectionRetirementService {
   ) {}
 
   /**
-   * Whether a credential naming this connection may still write. The refusal
-   * retires the connection's tokens on its way out, so the directory is told
-   * once rather than told every push that its credential is unknown, and the
-   * sync history says the provisioning ended.
+   * Whether a credential naming this connection may still write, as main's
+   * `connectionAcceptsDirectoryWrites` answered by state. Refusing a gone
+   * connection retires its tokens too, so the sync history says it ended.
    */
   async admits({
     organizationId,
@@ -55,6 +57,7 @@ export class ScimConnectionRetirementService {
       (connection) => connection.connectionId === connectionId,
     );
 
+    if (held && RETIRING_STATES.has(held.state)) return false;
     if (held && !RETIRED_STATES.has(held.state)) return true;
 
     await this.deps.tokens.revokeTokensForConnection({ organizationId, connectionId });

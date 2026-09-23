@@ -226,14 +226,16 @@ export class ScimService extends ScimServiceContract {
       };
     }
 
-    await this.repository.recordTokenUse({ tokenId: stored.id, usedAt: nowInstant() });
-
     return {
       status: "ok",
       id: stored.id,
       organizationId: stored.organizationId,
       connectionId: stored.connectionId,
     };
+  }
+
+  async recordTokenUse(input: { tokenId: string }): Promise<void> {
+    await this.repository.recordTokenUse({ tokenId: input.tokenId, usedAt: nowInstant() });
   }
 
   private hashToken(token: string): string {

@@ -52,11 +52,18 @@ describe("given a connection the organization still holds", () => {
     expect(paused.revokeTokensForConnection).not.toHaveBeenCalled();
   });
 
-  it("admits it while a teardown is still pending, because that teardown is reversible", async () => {
+  it("refuses it while a teardown is pending, as main did, but keeps its tokens", async () => {
     const leaving = retirement([connection("TEARDOWN_PENDING")]);
 
-    await expect(leaving.admits()).resolves.toBe(true);
+    await expect(leaving.admits()).resolves.toBe(false);
     expect(leaving.revokeTokensForConnection).not.toHaveBeenCalled();
+  });
+
+  it("admits a connection whose domain claim was rejected, as main did", async () => {
+    const rejected = retirement([connection("REJECTED")]);
+
+    await expect(rejected.admits()).resolves.toBe(true);
+    expect(rejected.revokeTokensForConnection).not.toHaveBeenCalled();
   });
 });
 

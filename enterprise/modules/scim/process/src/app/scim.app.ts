@@ -25,22 +25,22 @@ import {
   ScimApi,
   ScimProtocolError,
   scimConfig,
+  scimCreateGroupRequestSchema,
+  scimCreateUserRequestSchema,
+  scimPatchRequestSchema,
+  scimReplaceGroupRequestSchema,
   scimSecrets,
   type IssuedScimToken,
   type ScimApi as ScimApiContract,
-  type ScimCreateGroupRequest,
-  type ScimCreateUserRequest,
   type ScimDirectoryScope,
   type ScimError,
   type OrganizationReconciliation,
   type ScimGroup,
   type ScimListResponse,
-  type ScimPatchRequest,
   type ScimConnectionRequestsInput,
   type ScimRefusalReason,
   type ScimRequestEntry,
   type ScimReconciliationScope,
-  type ScimReplaceGroupRequest,
   type ScimServerConfig,
   type ScimService,
   type ScimDeliveryAdmission,
@@ -71,7 +71,7 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
-import type { ZodError } from "zod";
+import type { ZodError, ZodType } from "zod";
 
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
@@ -103,6 +103,9 @@ type ScimSetup = FeatureSetup<
   ScimServerConfig,
   ScimRepositories
 >;
+
+const CONNECTION_NOT_WRITABLE =
+  "This directory token can no longer write through its single sign-on connection";
 
 /** The protocol's own document for one refusal, at one status. */
 function scimRefusal(status: number, detail: string): ScimProtocolError {
@@ -181,6 +184,15 @@ function scimResourceOf(path: string): string {
   const [head, ...rest] = tail.split("/");
 
   return rest.length > 0 ? `${head}/:id` : (head ?? "/");
+}
+
+/** The posted document, or null where the text is not JSON, as main's `parseJsonBody` read it. */
+function readJson(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
 }
 
 /** The bearer a request presented, or nothing where it presented none. */
@@ -376,8 +388,7 @@ export class ScimApp implements ScimApiContract {
     }
 
     // The token reaches no further than the connection it was issued against
-    // reaches: one the organization has taken away provisions nothing, and
-    // the refusal retires the rest of that connection's tokens with it.
+    // reaches, checked before the token is marked used, as main did.
     if (
       entitlement.connectionId !== null &&
       !(await this.#retirement.admits({
@@ -385,16 +396,12 @@ export class ScimApp implements ScimApiContract {
         connectionId: entitlement.connectionId,
       }))
     ) {
-      this.#refused(
-        input,
-        entitlement,
-        401,
-        "unauthorized",
-        "This directory token can no longer write through its single sign-on connection",
-      );
+      this.#refused(input, entitlement, 403, "forbidden", CONNECTION_NOT_WRITABLE);
 
-      throw scimRefusal(401, "Bearer token is not valid");
+      throw scimRefusal(403, CONNECTION_NOT_WRITABLE);
     }
+
+    await this.#scim.recordTokenUse({ tokenId: entitlement.id });
 
     return {
       id: entitlement.id,
@@ -504,19 +511,29 @@ export class ScimApp implements ScimApiContract {
     });
   }
 
-  async refuseRequestBody(input: {
+  /**
+   * The posted text as the resource it must be, read after the door as main
+   * read it. A body that is not JSON, or not a resource we accept, is filed on
+   * the request log (ADR-126) and refused as the protocol's 400.
+   */
+  #read<T>(asked: {
     organizationId: string;
     connectionId?: string | null | undefined;
     method: string;
     resource: string;
-    invalid?: ZodError | undefined;
-  }): Promise<never> {
-    const refusal = requestBodyRefusal(input.invalid);
+    body: string;
+    schema: ZodType<T>;
+  }): T {
+    const document = readJson(asked.body);
+    const parsed = document === null ? undefined : asked.schema.safeParse(document);
+    if (parsed?.success) return parsed.data;
+
+    const refusal = requestBodyRefusal(parsed?.error);
     void this.#scim.recordRequest({
-      organizationId: input.organizationId,
-      connectionId: input.connectionId ?? null,
-      method: input.method,
-      resource: input.resource,
+      organizationId: asked.organizationId,
+      connectionId: asked.connectionId ?? null,
+      method: asked.method,
+      resource: asked.resource,
       status: 400,
       reason: refusal.reason,
       detail: refusal.detail,
@@ -540,9 +557,20 @@ export class ScimApp implements ScimApiContract {
   createUser(input: {
     organizationId: string;
     connectionId?: string | null | undefined;
-    request: ScimCreateUserRequest;
+    body: string;
   }): Promise<ScimUser> {
-    return this.#served(input, "POST", "Users", 201, () => this.#scim.createUser(input));
+    const { body, ...scope } = input;
+    const request = this.#read({
+      ...scope,
+      method: "POST",
+      resource: "Users",
+      body,
+      schema: scimCreateUserRequestSchema,
+    });
+
+    return this.#served(input, "POST", "Users", 201, () =>
+      this.#scim.createUser({ ...scope, request }),
+    );
   }
 
   getUser(input: { organizationId: string; id: string }): Promise<ScimUser> {
@@ -553,18 +581,40 @@ export class ScimApp implements ScimApiContract {
     organizationId: string;
     id: string;
     connectionId?: string | null | undefined;
-    request: ScimCreateUserRequest;
+    body: string;
   }): Promise<ScimUser> {
-    return this.#served(input, "PUT", "Users/:id", 200, () => this.#scim.replaceUser(input));
+    const { body, ...scope } = input;
+    const request = this.#read({
+      ...scope,
+      method: "PUT",
+      resource: "Users/:id",
+      body,
+      schema: scimCreateUserRequestSchema,
+    });
+
+    return this.#served(input, "PUT", "Users/:id", 200, () =>
+      this.#scim.replaceUser({ ...scope, request }),
+    );
   }
 
   updateUser(input: {
     organizationId: string;
     id: string;
     connectionId?: string | null | undefined;
-    patchRequest: ScimPatchRequest;
+    body: string;
   }): Promise<ScimUser> {
-    return this.#served(input, "PATCH", "Users/:id", 200, () => this.#scim.updateUser(input));
+    const { body, ...scope } = input;
+    const patchRequest = this.#read({
+      ...scope,
+      method: "PATCH",
+      resource: "Users/:id",
+      body,
+      schema: scimPatchRequestSchema,
+    });
+
+    return this.#served(input, "PATCH", "Users/:id", 200, () =>
+      this.#scim.updateUser({ ...scope, patchRequest }),
+    );
   }
 
   deleteUser(input: {
@@ -629,9 +679,20 @@ export class ScimApp implements ScimApiContract {
   createGroup(input: {
     organizationId: string;
     connectionId?: string | null | undefined;
-    request: ScimCreateGroupRequest;
+    body: string;
   }): Promise<ScimGroup> {
-    return this.#served(input, "POST", "Groups", 201, () => this.#scim.createGroup(input));
+    const { body, ...scope } = input;
+    const request = this.#read({
+      ...scope,
+      method: "POST",
+      resource: "Groups",
+      body,
+      schema: scimCreateGroupRequestSchema,
+    });
+
+    return this.#served(input, "POST", "Groups", 201, () =>
+      this.#scim.createGroup({ ...scope, request }),
+    );
   }
 
   getGroup(input: {
@@ -647,18 +708,40 @@ export class ScimApp implements ScimApiContract {
     organizationId: string;
     externalScimId: string;
     connectionId?: string | null | undefined;
-    request: ScimReplaceGroupRequest;
+    body: string;
   }): Promise<ScimGroup> {
-    return this.#served(input, "PUT", "Groups/:id", 200, () => this.#scim.replaceGroup(input));
+    const { body, ...scope } = input;
+    const request = this.#read({
+      ...scope,
+      method: "PUT",
+      resource: "Groups/:id",
+      body,
+      schema: scimReplaceGroupRequestSchema,
+    });
+
+    return this.#served(input, "PUT", "Groups/:id", 200, () =>
+      this.#scim.replaceGroup({ ...scope, request }),
+    );
   }
 
   updateGroup(input: {
     organizationId: string;
     externalScimId: string;
     connectionId?: string | null | undefined;
-    patchRequest: ScimPatchRequest;
+    body: string;
   }): Promise<ScimGroup> {
-    return this.#served(input, "PATCH", "Groups/:id", 200, () => this.#scim.updateGroup(input));
+    const { body, ...scope } = input;
+    const patchRequest = this.#read({
+      ...scope,
+      method: "PATCH",
+      resource: "Groups/:id",
+      body,
+      schema: scimPatchRequestSchema,
+    });
+
+    return this.#served(input, "PATCH", "Groups/:id", 200, () =>
+      this.#scim.updateGroup({ ...scope, patchRequest }),
+    );
   }
 
   deleteGroup(input: {

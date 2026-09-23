@@ -28,12 +28,8 @@ import {
 } from "@langwatch/api/rest";
 import {
   ScimApi,
-  scimCreateGroupRequestSchema,
-  scimCreateUserRequestSchema,
   scimGroupSchema,
   scimListResponseSchema,
-  scimPatchRequestSchema,
-  scimReplaceGroupRequestSchema,
   scimResourceTypeSchema,
   scimSchemaDefinitionSchema,
   scimServiceProviderConfigSchema,
@@ -113,6 +109,15 @@ export const scimRestCredential = defineRestMiddleware(
 
 const idParams = z.object({ id: z.string().min(1) });
 
+/** A query value as main read it: the first one, where the parameter is repeated. */
+function firstQueryValue(description: string) {
+  return z
+    .union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => (Array.isArray(value) ? value[0] : value))
+    .describe(description);
+}
+
 /**
  * The three query parameters a collection reads, each optional and each read
  * leniently: a value that is not a positive integer is the documented default
@@ -120,33 +125,21 @@ const idParams = z.object({ id: z.string().min(1) });
  * still get its page.
  */
 const listQuery = z.object({
-  filter: z
-    .string()
-    .optional()
-    .describe(
-      'A SCIM filter. Only `attribute eq "..."` is understood; any other expression is refused.',
-    ),
-  startIndex: z
-    .string()
-    .optional()
-    .describe(
-      "1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1.",
-    ),
-  count: z
-    .string()
-    .optional()
-    .describe(
-      "How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100.",
-    ),
+  filter: firstQueryValue(
+    'A SCIM filter. Only `attribute eq "..."` is understood; any other expression is refused.',
+  ),
+  startIndex: firstQueryValue(
+    "1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1.",
+  ),
+  count: firstQueryValue(
+    "How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100.",
+  ),
 });
 
 const excludedAttributesQuery = z.object({
-  excludedAttributes: z
-    .string()
-    .optional()
-    .describe(
-      "Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership.",
-    ),
+  excludedAttributes: firstQueryValue(
+    "Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership.",
+  ),
 });
 
 const groupListQuery = z.object({ ...listQuery.shape, ...excludedAttributesQuery.shape });
@@ -390,15 +383,6 @@ function excludesMembers(raw: string | undefined): boolean {
     .includes("members");
 }
 
-/** The posted document, or nothing where the request did not carry JSON. */
-async function posted(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    return null;
-  }
-}
-
 export const scimProtocolRest = defineRestRouter(ScimApi)
   .withNamespace("scim")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -484,6 +468,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .post("/Users", "scimCreateUser")
+  .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
@@ -503,35 +488,17 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       },
     ],
   })
-  .handle(async ({ app, scope, request, response }, { connectionId }) => {
-    const body = await posted(request);
-
-    if (body === null)
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "POST",
-        resource: "Users",
-      });
-
-    const parsed = scimCreateUserRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "POST",
-        resource: "Users",
-        invalid: parsed.error,
-      });
-    }
-
-    return scimJson({
+  .handle(async ({ app, raw, scope, response }, { connectionId }) =>
+    scimJson({
       response,
-      data: await app.createUser({ organizationId: scope.id, connectionId, request: parsed.data }),
+      data: await app.createUser({
+        organizationId: scope.id,
+        connectionId,
+        body: raw,
+      }),
       status: 201,
-    });
-  })
+    }),
+  )
 
   .get("/Users/:id", "scimGetUser")
   .withParams(idParams)
@@ -552,6 +519,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
   .put("/Users/:id", "scimReplaceUser")
   .withParams(idParams)
+  .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
@@ -563,42 +531,21 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated user.", scimUserSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
-    const body = await posted(request);
-
-    if (body === null)
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PUT",
-        resource: "Users/:id",
-      });
-
-    const parsed = scimCreateUserRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PUT",
-        resource: "Users/:id",
-        invalid: parsed.error,
-      });
-    }
-
-    return scimJson({
+  .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
+    scimJson({
       response,
       data: await app.replaceUser({
         id: input.id,
         organizationId: scope.id,
         connectionId,
-        request: parsed.data,
+        body: raw,
       }),
-    });
-  })
+    }),
+  )
 
   .patch("/Users/:id", "scimPatchUser")
   .withParams(idParams)
+  .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
@@ -610,39 +557,17 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated user.", scimUserSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, USER_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
-    const body = await posted(request);
-
-    if (body === null)
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PATCH",
-        resource: "Users/:id",
-      });
-
-    const parsed = scimPatchRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PATCH",
-        resource: "Users/:id",
-        invalid: parsed.error,
-      });
-    }
-
-    return scimJson({
+  .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
+    scimJson({
       response,
       data: await app.updateUser({
         id: input.id,
         organizationId: scope.id,
         connectionId,
-        patchRequest: parsed.data,
+        body: raw,
       }),
-    });
-  })
+    }),
+  )
 
   .delete("/Users/:id", "scimDeleteUser")
   .withParams(idParams)
@@ -697,6 +622,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   )
 
   .post("/Groups", "scimCreateGroup")
+  .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
@@ -717,35 +643,17 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
       },
     ],
   })
-  .handle(async ({ app, scope, request, response }, { connectionId }) => {
-    const body = await posted(request);
-
-    if (body === null)
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "POST",
-        resource: "Groups",
-      });
-
-    const parsed = scimCreateGroupRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "POST",
-        resource: "Groups",
-        invalid: parsed.error,
-      });
-    }
-
-    return scimJson({
+  .handle(async ({ app, raw, scope, response }, { connectionId }) =>
+    scimJson({
       response,
-      data: await app.createGroup({ organizationId: scope.id, connectionId, request: parsed.data }),
+      data: await app.createGroup({
+        organizationId: scope.id,
+        connectionId,
+        body: raw,
+      }),
       status: 201,
-    });
-  })
+    }),
+  )
 
   .get("/Groups/:id", "scimGetGroup")
   .withParams(idParams)
@@ -775,6 +683,7 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
 
   .put("/Groups/:id", "scimReplaceGroup")
   .withParams(idParams)
+  .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
@@ -786,42 +695,21 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated group.", scimGroupSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
-    const body = await posted(request);
-
-    if (body === null)
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PUT",
-        resource: "Groups/:id",
-      });
-
-    const parsed = scimReplaceGroupRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PUT",
-        resource: "Groups/:id",
-        invalid: parsed.error,
-      });
-    }
-
-    return scimJson({
+  .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
+    scimJson({
       response,
       data: await app.replaceGroup({
         externalScimId: input.id,
         organizationId: scope.id,
         connectionId,
-        request: parsed.data,
+        body: raw,
       }),
-    });
-  })
+    }),
+  )
 
   .patch("/Groups/:id", "scimPatchGroup")
   .withParams(idParams)
+  .withRawBody("text", { mediaType: SCIM_MEDIA_TYPE })
   .withAccess(anyAuthenticated({ reason: BEARER_IS_THE_WHOLE_GATE }))
   .withMiddleware(scimRestCredential)
   .withResponse("protocol", SCIM_PROTOCOL)
@@ -833,39 +721,17 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
     responses: scimAnswer(200, "The updated group.", scimGroupSchema),
     errors: [INVALID_BODY, UNAUTHORIZED, PLAN_NOT_ENTITLED, GROUP_NOT_FOUND],
   })
-  .handle(async ({ app, input, scope, request, response }, { connectionId }) => {
-    const body = await posted(request);
-
-    if (body === null)
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PATCH",
-        resource: "Groups/:id",
-      });
-
-    const parsed = scimPatchRequestSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return app.refuseRequestBody({
-        organizationId: scope.id,
-        connectionId,
-        method: "PATCH",
-        resource: "Groups/:id",
-        invalid: parsed.error,
-      });
-    }
-
-    return scimJson({
+  .handle(async ({ app, input, raw, scope, response }, { connectionId }) =>
+    scimJson({
       response,
       data: await app.updateGroup({
         externalScimId: input.id,
         organizationId: scope.id,
         connectionId,
-        patchRequest: parsed.data,
+        body: raw,
       }),
-    });
-  })
+    }),
+  )
 
   .delete("/Groups/:id", "scimDeleteGroup")
   .withParams(idParams)

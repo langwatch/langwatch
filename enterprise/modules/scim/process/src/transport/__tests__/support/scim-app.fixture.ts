@@ -53,6 +53,7 @@ export class ScimServiceFake extends ScimService {
   readonly listTokens = vi.fn();
   readonly revokeToken = vi.fn();
   readonly revokeTokensForConnection = vi.fn();
+  readonly recordTokenUse = vi.fn(async (_input: { tokenId: string }): Promise<void> => void 0);
   readonly getUser = vi.fn();
   readonly replaceUser = vi.fn();
   readonly updateUser = vi.fn();

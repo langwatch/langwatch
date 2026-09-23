@@ -42,7 +42,10 @@ describe("the SCIM request log", () => {
     await app.createUser({
       organizationId: ORGANIZATION,
       connectionId: CONNECTION,
-      request: { schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"], userName: "a@b.test" },
+      body: JSON.stringify({
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "a@b.test",
+      }),
     });
 
     expect(recordedBy(scim)).toEqual([

@@ -120,7 +120,7 @@ function service(
 
 describe("SCIM characterization: token lifecycle", () => {
   /** @scenario "Token values are stored only as hashes" */
-  it("mints only a hash, lists summaries, updates use on entitled verification, and retains 404 revocation", async () => {
+  it("mints only a hash, lists summaries, updates use only when asked after verification, and retains 404 revocation", async () => {
     const repo = repository({
       listTokens: vi.fn(async () => [
         {
@@ -161,6 +161,8 @@ describe("SCIM characterization: token lifecycle", () => {
       organizationId: "org_1",
       connectionId: "connection_1",
     });
+    expect(repo.recordTokenUse).not.toHaveBeenCalled();
+    await scim.recordTokenUse({ tokenId: "token_1" });
     expect(repo.recordTokenUse).toHaveBeenCalledWith(
       expect.objectContaining({ tokenId: "token_1" }),
     );

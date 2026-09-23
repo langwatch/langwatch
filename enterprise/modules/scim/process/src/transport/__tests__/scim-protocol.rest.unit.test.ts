@@ -63,6 +63,17 @@ class RetiredConnectionDirectory extends DirectoryFake {
   );
 }
 
+function heldConnection(state: OrganizationSsoConnection["state"]): OrganizationSsoConnection {
+  return {
+    connectionId: RETIRED_CONNECTION_ID,
+    displayName: "Okta",
+    providerId: "Okta",
+    verifiedDomains: [],
+    type: "oidc",
+    state,
+  };
+}
+
 /**
  * The family mounted the way the process mounts it: through RestHost, whose own
  * boundary is the canonical envelope, so every SCIM document below is the route's.
@@ -84,7 +95,11 @@ function mount(
     },
     identify: ({ request }) =>
       app
-        .authenticateDirectory({ authorization: request.headers.get("authorization") })
+        .authenticateDirectory({
+          authorization: request.headers.get("authorization"),
+          method: request.method,
+          path: new URL(request.url).pathname,
+        })
         .then((directory) => {
           directories.set(request, { connectionId: directory.connectionId });
 
@@ -168,6 +183,39 @@ describe("given a directory holding this organization's SCIM bearer token", () =
       expect(response.headers.get("content-type")).toContain("application/scim+json");
       expect(api.scim.listUsers).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: ORGANIZATION_ID, startIndex: 1, count: 100 }),
+      );
+    });
+  });
+
+  describe("when it repeats a query parameter", () => {
+    /** @scenario "A repeated query parameter is read by its first value, as main read it" */
+    it("reads the first value of each, as main did, rather than refusing the page", async () => {
+      const api = mount();
+
+      const response = await api.get(
+        "/api/scim/v2/Users?filter=userName%20eq%20%22a%40b.c%22&filter=x&startIndex=3&startIndex=9&count=5&count=7",
+        BEARER,
+      );
+
+      expect(response.status).toBe(200);
+      expect(api.scim.listUsers).toHaveBeenCalledWith(
+        expect.objectContaining({ filter: 'userName eq "a@b.c"', startIndex: 3, count: 5 }),
+      );
+    });
+
+    /** @scenario "A repeated query parameter is read by its first value, as main read it" */
+    it("reads the first excludedAttributes of a group read", async () => {
+      const api = mount();
+      api.scim.getGroup.mockResolvedValue({ id: "group_1" });
+
+      const response = await api.get(
+        "/api/scim/v2/Groups/group_1?excludedAttributes=members&excludedAttributes=displayName",
+        BEARER,
+      );
+
+      expect(response.status).toBe(200);
+      expect(api.scim.getGroup).toHaveBeenCalledWith(
+        expect.objectContaining({ externalScimId: "group_1", excludeMembers: true }),
       );
     });
   });
@@ -266,7 +314,7 @@ describe("given a directory holding this organization's SCIM bearer token", () =
 
       const response = await api.get("/api/scim/v2/Users", BEARER);
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403);
       expect(scim.revokeTokensForConnection).toHaveBeenCalledWith({
         organizationId: ORGANIZATION_ID,
         connectionId: RETIRED_CONNECTION_ID,
@@ -304,6 +352,73 @@ describe("given a directory holding this organization's SCIM bearer token", () =
 
       expect(response.status).toBe(200);
       expect(scim.revokeTokensForConnection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the token's connection can no longer write through single sign-on", () => {
+    const deleteUser = (api: ReturnType<typeof mount>) =>
+      api.send("/api/scim/v2/Users/user_1", {
+        method: "DELETE",
+        headers: { authorization: BEARER },
+      });
+
+    /** @scenario "A token whose connection is being retired cannot write, and is refused as SCIM's 403" */
+    it("refuses a write through a connection whose teardown is pending, before any write or use", async () => {
+      const scim = new RetiredConnectionDirectory();
+      const api = mount({ scim, connections: [heldConnection("TEARDOWN_PENDING")] });
+
+      await expectMainWire(await deleteUser(api), 403, MAIN_WIRE.connectionNotWritable);
+      expect(scim.deleteUser).not.toHaveBeenCalled();
+      expect(scim.recordTokenUse).not.toHaveBeenCalled();
+      expect(scim.revokeTokensForConnection).not.toHaveBeenCalled();
+      expect(scim.recordRequest).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION_ID,
+        connectionId: RETIRED_CONNECTION_ID,
+        method: "DELETE",
+        resource: "Users/:id",
+        status: 403,
+        reason: "forbidden",
+        detail: "This directory token can no longer write through its single sign-on connection",
+      });
+    });
+
+    /** @scenario "A token whose connection is being retired cannot write, and is refused as SCIM's 403" */
+    it("refuses a read through the same token too, as main's door did", async () => {
+      const scim = new RetiredConnectionDirectory();
+      const api = mount({ scim, connections: [heldConnection("TEARDOWN_PENDING")] });
+
+      await expectMainWire(
+        await api.get("/api/scim/v2/Users", BEARER),
+        403,
+        MAIN_WIRE.connectionNotWritable,
+      );
+      expect(scim.listUsers).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A token whose connection is being retired cannot write, and is refused as SCIM's 403" */
+    it.each(["TORN_DOWN", "DISCARDED"] as const)(
+      "refuses a write through a %s connection as main's 403 and retires its tokens",
+      async (state) => {
+        const scim = new RetiredConnectionDirectory();
+        const api = mount({ scim, connections: [heldConnection(state)] });
+
+        await expectMainWire(await deleteUser(api), 403, MAIN_WIRE.connectionNotWritable);
+        expect(scim.deleteUser).not.toHaveBeenCalled();
+        expect(scim.recordTokenUse).not.toHaveBeenCalled();
+        expect(scim.revokeTokensForConnection).toHaveBeenCalledWith({
+          organizationId: ORGANIZATION_ID,
+          connectionId: RETIRED_CONNECTION_ID,
+        });
+      },
+    );
+
+    it("admits a connection whose domain claim was rejected, as main did", async () => {
+      const scim = new RetiredConnectionDirectory();
+      scim.deleteUser.mockResolvedValue(undefined);
+      const api = mount({ scim, connections: [heldConnection("REJECTED")] });
+
+      expect((await deleteUser(api)).status).toBe(204);
+      expect(scim.recordTokenUse).toHaveBeenCalledWith({ tokenId: "scim_token_1" });
     });
   });
 
@@ -351,6 +466,8 @@ const MAIN_WIRE = {
     '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"400","detail":"Only eq filters are supported","scimType":"invalidFilter"}',
   writeOutsideConnection:
     '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"403","scimType":"scim_write_outside_connection","detail":"This directory token cannot change resources provisioned by another connection"}',
+  connectionNotWritable:
+    '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"403","detail":"This directory token can no longer write through its single sign-on connection"}',
   unhandled:
     '{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"500","detail":"The request could not be completed"}',
 } as const;
@@ -426,6 +543,66 @@ describe("given the SCIM family behind the process's own error boundary", () => 
         await api.post("/api/scim/v2/Groups", JSON.stringify({ schemas: [] })),
         400,
         MAIN_WIRE.invalidGroup,
+      );
+    });
+  });
+
+  describe("when a directory pushes a resource", () => {
+    /** @scenario "A pushed resource is read as JSON whatever media type it names, as main read it" */
+    it("reads JSON sent under a media type that is not JSON, as main did", async () => {
+      const api = mount();
+      api.scim.createUser.mockResolvedValue({ id: "user_1" });
+      const user = {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "a@b.test",
+      };
+
+      const response = await api.send("/api/scim/v2/Users", {
+        method: "POST",
+        headers: { authorization: BEARER, "content-type": "text/plain" },
+        body: JSON.stringify(user),
+      });
+
+      expect(response.status).toBe(201);
+      expect(api.scim.createUser).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION_ID,
+        connectionId: null,
+        request: user,
+      });
+    });
+
+    /** @scenario "A body that is not JSON, or not a resource we accept, is refused as SCIM's 400" */
+    it("answers a JSON null as a body that could not be read, as main did", async () => {
+      const api = mount();
+
+      await expectMainWire(
+        await api.post("/api/scim/v2/Users", "null"),
+        400,
+        MAIN_WIRE.malformedBody,
+      );
+      expect(api.scim.createUser).not.toHaveBeenCalled();
+    });
+
+    it("hands a patch to the group it names, parsed", async () => {
+      const api = mount();
+      api.scim.updateGroup.mockResolvedValue({ id: "group_1" });
+      const patch = {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        Operations: [{ op: "replace", path: "displayName", value: "Ops" }],
+      };
+
+      const response = await api.send("/api/scim/v2/Groups/group_1", {
+        method: "PATCH",
+        headers: { authorization: BEARER, "content-type": "application/scim+json" },
+        body: JSON.stringify(patch),
+      });
+
+      expect(response.status).toBe(200);
+      expect(api.scim.updateGroup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          externalScimId: "group_1",
+          patchRequest: expect.objectContaining(patch),
+        }),
       );
     });
   });

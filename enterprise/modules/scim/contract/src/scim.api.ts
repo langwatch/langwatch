@@ -10,7 +10,6 @@
  * three places to live. It has one.
  */
 import { moduleApi } from "@langwatch/kernel/module-api";
-import type { ZodError } from "zod";
 
 import type {
   DirectoryIdentityRow,
@@ -30,15 +29,7 @@ import type {
   ScimTokenEntitlement,
   ScimTokenSummary,
 } from "./scim-token.ts";
-import type {
-  ScimCreateGroupRequest,
-  ScimCreateUserRequest,
-  ScimGroup,
-  ScimListResponse,
-  ScimPatchRequest,
-  ScimReplaceGroupRequest,
-  ScimUser,
-} from "./scim.contract.ts";
+import type { ScimGroup, ScimListResponse, ScimUser } from "./scim.contract.ts";
 
 /** The organization a directory credential resolved to. */
 export type ScimDirectoryScope = Readonly<{
@@ -105,7 +96,8 @@ export interface ScimApi {
    * The tenant behind a SCIM bearer, or the protocol's own refusal.
    *
    * @throws {ScimProtocolError} 401 for a missing, malformed or unknown
-   * bearer, 403 for one whose organization no longer holds the plan.
+   * bearer, 403 for one whose organization no longer holds the plan or whose
+   * connection can no longer write through single sign-on.
    */
   authenticateDirectory(input: {
     authorization: string | null;
@@ -163,35 +155,28 @@ export interface ScimApi {
     startIndex?: number | undefined;
     count?: number | undefined;
   }): Promise<ScimListResponse<ScimUser>>;
+  /**
+   * `body` is the posted text, read here: one that is not JSON, or not a
+   * resource we accept, is filed on the request log (ADR-126) and refused as
+   * the protocol's 400 naming only the fields.
+   */
   createUser(input: {
     organizationId: string;
     connectionId?: string | null | undefined;
-    request: ScimCreateUserRequest;
+    body: string;
   }): Promise<ScimUser>;
-  /**
-   * A request body refused before any handler ran — unreadable JSON, or a
-   * resource we would not accept — recorded on the connection's request log
-   * (ADR-126), then raised as the protocol's 400 naming only the fields.
-   */
-  refuseRequestBody(input: {
-    organizationId: string;
-    connectionId?: string | null | undefined;
-    method: string;
-    resource: string;
-    invalid?: ZodError | undefined;
-  }): Promise<never>;
   getUser(input: { organizationId: string; id: string }): Promise<ScimUser>;
   replaceUser(input: {
     organizationId: string;
     id: string;
     connectionId?: string | null | undefined;
-    request: ScimCreateUserRequest;
+    body: string;
   }): Promise<ScimUser>;
   updateUser(input: {
     organizationId: string;
     id: string;
     connectionId?: string | null | undefined;
-    patchRequest: ScimPatchRequest;
+    body: string;
   }): Promise<ScimUser>;
   deleteUser(input: {
     organizationId: string;
@@ -212,7 +197,7 @@ export interface ScimApi {
   createGroup(input: {
     organizationId: string;
     connectionId?: string | null | undefined;
-    request: ScimCreateGroupRequest;
+    body: string;
   }): Promise<ScimGroup>;
   getGroup(input: {
     organizationId: string;
@@ -224,13 +209,13 @@ export interface ScimApi {
     organizationId: string;
     externalScimId: string;
     connectionId?: string | null | undefined;
-    request: ScimReplaceGroupRequest;
+    body: string;
   }): Promise<ScimGroup>;
   updateGroup(input: {
     organizationId: string;
     externalScimId: string;
     connectionId?: string | null | undefined;
-    patchRequest: ScimPatchRequest;
+    body: string;
   }): Promise<ScimGroup>;
   deleteGroup(input: {
     organizationId: string;
