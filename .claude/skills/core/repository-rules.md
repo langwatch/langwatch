@@ -132,7 +132,8 @@ Cost is the sum of the context over every turn, so it grows with the square of
 the number of turns. Cache misses are already near zero; the lever is **fewer,
 fatter turns**, not a warmer cache.
 
-- Join shell commands with `&&` into one call rather than three.
+- Join shell commands with `&&` into one call rather than three, and send
+  independent tool calls together in one response, never one per response.
 - Read a file once. Prefer `tslsp-cli outline FILE`, then read the one range you
   need. Never read a large file whole to find one function.
 - Filter every tool output: `tail`, `grep`, `--reporter=dot`. A raw log is re-read

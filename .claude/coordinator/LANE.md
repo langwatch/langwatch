@@ -118,6 +118,17 @@ of the number of turns, so the lever is fewer, fatter turns - join commands with
 every edit, and keep any single call under about four minutes because your prompt
 cache lives five.
 
+Two habits the 2026-09-23 lint lanes measurably lacked (5,821 of 5,980 responses
+made exactly one tool call; context grew about 1.8k tokens per call):
+
+- **Batch independent calls.** When the next reads, greps or checks do not depend
+  on each other, send them in the same response, or join them in one command.
+  One tool call per response is the pattern to break, not the default.
+- **Hand off at 70 tool calls, whatever your manifest's cap.** By then your
+  context is near 150k and every further call costs more than a fresh lane
+  started from your handoff. Write the handoff, stop, and let the coordinator
+  respawn. A lint lane's per-call cost at 300k context is double its cost at 50k.
+
 What is yours alone to judge: a whole-file rewrite of a file you already rewrote
 is a smell - reach for targeted edits. And if you are on your third attempt at
 the same failing check, stop and hand it over; a fourth costs more than the round
