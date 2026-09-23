@@ -6,12 +6,39 @@ import type { SpanDetail, TraceHeader, TraceEditOverlayPatch } from "@langwatch/
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const header = vi.hoisted(() => ({
+const header = vi.hoisted((): { current: TraceHeader } => ({
   current: {
     traceId: "trace-1",
     name: "chat turn",
+    conversationId: null,
+    input: null,
     output: "the answer is 41",
-  } as unknown as TraceHeader,
+    timestamp: 1_000,
+    serviceName: "svc",
+    origin: "application",
+    userId: null,
+    durationMs: 1,
+    models: [],
+    totalCost: null,
+    nonBilledCost: 0,
+    totalTokens: 0,
+    inputTokens: null,
+    outputTokens: null,
+    tokensEstimated: false,
+    traceName: "trace",
+    rootSpanType: null,
+    scenarioRunId: null,
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    status: "ok",
+    spanCount: 1,
+    attributes: {},
+  },
 }));
 
 const spansFull = vi.hoisted(() => ({ current: [] as SpanDetail[] }));
@@ -39,7 +66,7 @@ function renderDialog(patch: TraceEditOverlayPatch) {
   );
 }
 
-const capturedSpan = {
+const capturedSpan: SpanDetail = {
   spanId: "span-1",
   parentSpanId: null,
   name: "web_search",
@@ -50,7 +77,7 @@ const capturedSpan = {
   status: "ok",
   params: {},
   events: [],
-} as unknown as SpanDetail;
+};
 
 describe("TraceEditDiffDialog", () => {
   afterEach(() => {

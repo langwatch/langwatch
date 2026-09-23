@@ -210,10 +210,13 @@ describe("<SearchBar /> unified error banner", () => {
     });
 
     describe("when the user clicks the expand chevron", () => {
-      it("reveals the structured detail fields", async () => {
+      beforeEach(async () => {
         renderSearchBar();
         const user = userEvent.setup();
         await user.click(screen.getByLabelText(/expand error details/i));
+      });
+
+      it("reveals the structured detail fields", () => {
         // Provider, model, status should now be visible
         expect(screen.getByText("openai")).toBeInTheDocument();
         expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
@@ -221,10 +224,7 @@ describe("<SearchBar /> unified error banner", () => {
         expect(screen.getByText("Service unavailable")).toBeInTheDocument();
       });
 
-      it("shows a collapse chevron after expanding", async () => {
-        renderSearchBar();
-        const user = userEvent.setup();
-        await user.click(screen.getByLabelText(/expand error details/i));
+      it("shows a collapse chevron after expanding", () => {
         expect(screen.getByLabelText(/collapse error details/i)).toBeInTheDocument();
       });
     });

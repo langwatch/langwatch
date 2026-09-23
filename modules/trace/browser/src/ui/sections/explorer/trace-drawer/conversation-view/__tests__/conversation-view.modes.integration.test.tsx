@@ -8,10 +8,30 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const turns = [
-  { traceId: "trace-1", timestamp: 1, input: null, output: null },
-  { traceId: "trace-2", timestamp: 2, input: null, output: null },
-];
+function turn(traceId: string, timestamp: number): TraceListItem {
+  return {
+    traceId,
+    timestamp,
+    name: traceId,
+    serviceName: "svc",
+    durationMs: 1,
+    totalCost: 0,
+    totalTokens: 0,
+    models: [],
+    labels: [],
+    status: "ok",
+    spanCount: 1,
+    evaluations: [],
+    events: NO_TRACE_EVENTS,
+    nonBilledCost: 0,
+    sizeBytes: 0,
+    input: null,
+    output: null,
+    origin: "application",
+  };
+}
+
+const turns: TraceListItem[] = [turn("trace-1", 1), turn("trace-2", 2)];
 
 vi.mock("../../../hooks/use-conversation-turns.ts", () => ({
   useConversationTurns: () => ({
@@ -49,6 +69,7 @@ vi.mock("../annotated-turn-row.tsx", () => ({
 }));
 
 import type { TraceListItem } from "../../../types/trace.ts";
+import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
 import { ConversationView } from "../conversation-view.tsx";
 
 function renderView({
@@ -109,7 +130,7 @@ describe("given a trace that belongs to no conversation", () => {
     renderView({
       conversationId: null,
       currentTraceId: "trace-1",
-      fallbackTurns: [turns[0] as unknown as TraceListItem],
+      fallbackTurns: turns.slice(0, 1),
     });
 
     expect(conversationHeader()).toHaveTextContent("trace-1");

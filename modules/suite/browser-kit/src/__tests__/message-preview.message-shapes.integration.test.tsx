@@ -32,9 +32,7 @@ describe("<MessagePreview/>", () => {
 
   describe("when message content is a string", () => {
     it("renders the string content directly", () => {
-      const messages = [
-        { id: "msg_1", role: "user", content: "Hello world" },
-      ] as unknown as Messages;
+      const messages: Messages = [{ id: "msg_1", role: "user", content: "Hello world" }];
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
@@ -44,7 +42,7 @@ describe("<MessagePreview/>", () => {
 
   describe("when message content is an array with text objects", () => {
     it("renders text from { type: 'text', text } items", () => {
-      const messages = [
+      const messages: Messages = [
         {
           id: "msg_1",
           role: "assistant",
@@ -53,7 +51,7 @@ describe("<MessagePreview/>", () => {
             { type: "text", text: "Second part" },
           ],
         },
-      ] as unknown as Messages;
+      ];
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
@@ -63,14 +61,14 @@ describe("<MessagePreview/>", () => {
 
   describe("when message content contains tool calls", () => {
     it("renders tool function name", () => {
-      const messages = [
+      const messages: Messages = [
         {
           id: "msg_1",
           role: "assistant",
           content: "None",
           tool_calls: [{ function: { name: "search_db" } }],
         },
-      ] as unknown as Messages;
+      ];
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
@@ -80,13 +78,13 @@ describe("<MessagePreview/>", () => {
 
   describe("when message content contains tool results", () => {
     it("renders the tool result content", () => {
-      const messages = [
+      const messages: Messages = [
         {
           id: "msg_1",
           role: "tool",
           content: "Result data here",
         },
-      ] as unknown as Messages;
+      ];
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
@@ -96,10 +94,10 @@ describe("<MessagePreview/>", () => {
 
   describe("when message content is 'None'", () => {
     it("skips the message", () => {
-      const messages = [
+      const messages: Messages = [
         { id: "msg_1", role: "user", content: "None" },
         { id: "msg_2", role: "assistant", content: "Visible" },
-      ] as unknown as Messages;
+      ];
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
@@ -110,9 +108,7 @@ describe("<MessagePreview/>", () => {
 
   describe("when rendering user vs assistant messages", () => {
     it("aligns user messages to flex-end", () => {
-      const messages = [
-        { id: "msg_1", role: "user", content: "User message" },
-      ] as unknown as Messages;
+      const messages: Messages = [{ id: "msg_1", role: "user", content: "User message" }];
 
       const { container } = render(<MessagePreview messages={messages} />, {
         wrapper: Wrapper,
@@ -128,9 +124,7 @@ describe("<MessagePreview/>", () => {
     });
 
     it("aligns assistant messages to flex-start", () => {
-      const messages = [
-        { id: "msg_1", role: "assistant", content: "Bot reply" },
-      ] as unknown as Messages;
+      const messages: Messages = [{ id: "msg_1", role: "assistant", content: "Bot reply" }];
 
       const { container } = render(<MessagePreview messages={messages} />, {
         wrapper: Wrapper,

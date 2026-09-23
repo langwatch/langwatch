@@ -30,8 +30,11 @@ function comment(over: Partial<AnnotationByTrace>): AnnotationByTrace {
     id: "annotation-1",
     traceId: TRACE_ID,
     comment: "",
+    projectId: "proj-1",
+    userId: "user-2",
+    updatedAt: "2026-01-01T10:00:00Z",
     email: null,
-    createdAt: new Date("2026-01-01T10:00:00Z"),
+    createdAt: "2026-01-01T10:00:00Z",
     expectedOutput: null,
     isThumbsUp: null,
     scoreOptions: {},
@@ -40,7 +43,7 @@ function comment(over: Partial<AnnotationByTrace>): AnnotationByTrace {
     anchorId: null,
     anchorPath: null,
     ...over,
-  } as unknown as AnnotationByTrace;
+  };
 }
 
 const onTheSpan = comment({

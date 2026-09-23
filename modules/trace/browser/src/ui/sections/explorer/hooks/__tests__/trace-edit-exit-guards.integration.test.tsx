@@ -3,7 +3,7 @@
 // @vitest-environment jsdom
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -121,27 +121,24 @@ afterEach(cleanup);
 
 describe("given a correction with unsaved changes", () => {
   describe("when the drawer is closed", () => {
-    /** @scenario "Closing the drawer with unsaved changes asks first" */
-    it("asks before the drawer goes", async () => {
-      const close = vi.fn();
-      renderHarness();
+    let close: Mock<() => void>;
 
+    beforeEach(() => {
+      close = vi.fn();
+      renderHarness();
       act(() => {
         guardTraceEditExit(close);
       });
+    });
 
+    /** @scenario "Closing the drawer with unsaved changes asks first" */
+    it("asks before the drawer goes", async () => {
       expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
       expect(close).not.toHaveBeenCalled();
     });
 
     /** @scenario "Closing the drawer with unsaved changes asks first" */
     it("closes it once the reviewer discards", async () => {
-      const close = vi.fn();
-      renderHarness();
-      act(() => {
-        guardTraceEditExit(close);
-      });
-
       fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
       expect(close).toHaveBeenCalledTimes(1);

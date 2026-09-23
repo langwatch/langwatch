@@ -48,7 +48,12 @@ function row(traceId: string): TraceListItem {
     spanCount: 1,
     evaluations: [],
     events: NO_TRACE_EVENTS,
-  } as unknown as TraceListItem;
+    nonBilledCost: 0,
+    sizeBytes: 0,
+    input: null,
+    output: null,
+    origin: "application",
+  };
 }
 
 /** What the hook asked for on its most recent render. */

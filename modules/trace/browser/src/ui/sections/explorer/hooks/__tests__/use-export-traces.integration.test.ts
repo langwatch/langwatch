@@ -1,4 +1,4 @@
-import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
+import { setUiFeedbackHost, type UiFeedbackSink } from "@langwatch/browser-host/toaster";
 /**
  * Integration tests for the useExportTraces hook.
  * @vitest-environment jsdom
@@ -7,7 +7,7 @@ import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceFailureNotice, TraceHostApi } from "../../../../../behavior/trace-host.ts";
+import type { TraceFailureNotice } from "../../../../../behavior/trace-host.ts";
 import { showErrorToast } from "../../../errors/index.ts";
 import { useExportTraces } from "../use-export-traces.ts";
 
@@ -253,12 +253,9 @@ describe("useExportTraces()", () => {
       // The abort would cause an AbortError, returning false from catch.
       // Resolve with an error response to trigger the catch path with a non-abort error.
       await act(async () => {
-        firstFetchResolve!({
-          ok: false,
-          status: 500,
-          statusText: "Internal Server Error",
-          headers: new Headers(),
-        } as unknown as Response);
+        firstFetchResolve!(
+          new Response(null, { status: 500, statusText: "Internal Server Error" }),
+        );
         // Allow microtasks to flush
         await new Promise((r) => setTimeout(r, 0));
       });
@@ -275,9 +272,13 @@ describe("useExportTraces()", () => {
       // words from its own code-keyed registry, so what is asserted here is
       // that it was HANDED OVER, not what it was made to say.
       const failures: TraceFailureNotice[] = [];
-      setUiFeedbackHost({
-        failed: (failure: TraceFailureNotice) => failures.push(failure),
-      } as unknown as TraceHostApi);
+      const host: UiFeedbackSink = {
+        succeeded: () => void 0,
+        failed: (failure) => {
+          failures.push(failure);
+        },
+      };
+      setUiFeedbackHost(host);
 
       const { result } = renderHook(() => useExportTraces({ projectId: undefined }));
 

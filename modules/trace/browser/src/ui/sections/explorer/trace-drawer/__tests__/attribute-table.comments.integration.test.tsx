@@ -82,7 +82,7 @@ const RESTRICTED: RestrictedAttribute[] = [
     pattern: "gen_ai.request.temperature",
     visibleTo: "Admins",
     canSee: false,
-  } as unknown as RestrictedAttribute,
+  },
 ];
 
 function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
@@ -90,8 +90,11 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
     id: "annotation-1",
     traceId: TRACE_ID,
     comment: "this model was not the one we pinned",
+    projectId: "proj-1",
+    userId: "user-2",
+    updatedAt: "2026-01-01T10:00:00Z",
     email: null,
-    createdAt: new Date("2026-01-01T10:00:00Z"),
+    createdAt: "2026-01-01T10:00:00Z",
     expectedOutput: null,
     isThumbsUp: null,
     scoreOptions: {},
@@ -100,7 +103,7 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
     anchorId: SPAN_ID,
     anchorPath: `params.${MODEL_KEY}`,
     ...over,
-  } as unknown as AnnotationByTrace;
+  };
 }
 
 function renderTable({

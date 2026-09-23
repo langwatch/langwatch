@@ -4,7 +4,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { availableGroupByOptions } from "../model/run-history-transforms.ts";
 import {
@@ -33,7 +33,9 @@ describe("Unified run view layout", () => {
   });
 
   describe("when viewing an external set detail panel", () => {
-    it("renders group-by selector with only None and Scenario options", () => {
+    let renderedOptions: HTMLElement[];
+
+    beforeEach(() => {
       const options = availableGroupByOptions({ viewContext: "external" });
 
       render(
@@ -49,28 +51,15 @@ describe("Unified run view layout", () => {
       );
 
       const selector = screen.getByLabelText("Group by");
-      const renderedOptions = within(selector).getAllByRole("option");
+      renderedOptions = within(selector).getAllByRole("option");
+    });
+
+    it("renders group-by selector with only None and Scenario options", () => {
       const optionTexts = renderedOptions.map((o) => o.textContent);
       expect(optionTexts).toEqual(["None", "Scenario"]);
     });
 
     it("does not render a Target option", () => {
-      const options = availableGroupByOptions({ viewContext: "external" });
-
-      render(
-        <RunHistoryFilters
-          scenarioOptions={scenarioOptions}
-          filters={emptyFilters}
-          onFiltersChange={vi.fn()}
-          groupBy="none"
-          onGroupByChange={vi.fn()}
-          groupByOptions={options}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      const selector = screen.getByLabelText("Group by");
-      const renderedOptions = within(selector).getAllByRole("option");
       const optionValues = renderedOptions.map((o) => (o as HTMLOptionElement).value);
       expect(optionValues).not.toContain("target");
     });

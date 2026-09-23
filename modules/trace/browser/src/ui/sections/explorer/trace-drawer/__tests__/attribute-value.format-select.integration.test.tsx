@@ -3,7 +3,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { AttributeValue } from "../attribute-value.tsx";
@@ -35,15 +35,19 @@ describe("given an attribute holding a chat-shaped value", () => {
     { role: "assistant", content: "on its way" },
   ];
 
-  /** @scenario "Attribute values use the same format selector" */
-  it("offers chat, JSON and text through the format selector", async () => {
-    const user = userEvent.setup();
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(async () => {
+    user = userEvent.setup();
     render(<AttributeValue attrKey="gen_ai.input.messages" value={chat} />, {
       wrapper,
     });
 
     await openValue({ user, preview: /Detected format: chat/ });
+  });
 
+  /** @scenario "Attribute values use the same format selector" */
+  it("offers chat, JSON and text through the format selector", async () => {
     const select = await screen.findByRole("button", {
       name: "Attribute value format",
     });
@@ -58,12 +62,6 @@ describe("given an attribute holding a chat-shaped value", () => {
   });
 
   it("switches the rendering when another format is picked", async () => {
-    const user = userEvent.setup();
-    render(<AttributeValue attrKey="gen_ai.input.messages" value={chat} />, {
-      wrapper,
-    });
-
-    await openValue({ user, preview: /Detected format: chat/ });
     await user.click(await screen.findByRole("button", { name: "Attribute value format" }));
     await user.click(await screen.findByRole("menuitem", { name: "Text" }));
 

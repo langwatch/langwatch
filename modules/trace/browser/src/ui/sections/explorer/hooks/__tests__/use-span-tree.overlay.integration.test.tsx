@@ -63,7 +63,7 @@ import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
 import { useSpanTree, useSpanTreeWithCaptured } from "../use-span-tree.ts";
 
-function node(over: { spanId: string; parentSpanId?: string; name?: string }) {
+function node(over: { spanId: string; parentSpanId?: string; name?: string }): SpanTreeNode {
   return {
     spanId: over.spanId,
     parentSpanId: over.parentSpanId ?? null,
@@ -73,7 +73,8 @@ function node(over: { spanId: string; parentSpanId?: string; name?: string }) {
     endTimeMs: 1,
     durationMs: 1,
     status: "ok",
-  } as unknown as SpanTreeNode;
+    model: null,
+  };
 }
 
 describe("useSpanTree with a correction", () => {

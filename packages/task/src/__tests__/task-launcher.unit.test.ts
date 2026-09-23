@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { TaskCatalogue } from "../task-catalogue.ts";
 import { TaskHost } from "../task-host.port.ts";
@@ -67,12 +67,18 @@ describe("runTask", () => {
   });
 
   describe("given a catalogue that registers one or more tasks", () => {
+    let catalogue: TaskCatalogue;
+    let close: Mock<() => Promise<void>>;
+    let logger: ReturnType<typeof silentLogger>;
+
+    beforeEach(() => {
+      catalogue = TaskCatalogue.create({ tasks: [new RecordingTask()] });
+      close = vi.fn().mockResolvedValue(undefined);
+      logger = silentLogger();
+    });
+
     /** @scenario "An unknown task name lists the available names and exits non-zero" */
     it("lists the available names and exits non-zero for an unknown name", async () => {
-      const catalogue = TaskCatalogue.create({ tasks: [new RecordingTask()] });
-      const close = vi.fn().mockResolvedValue(undefined);
-      const logger = silentLogger();
-
       const code = await runTask({ catalogue, argv: ["nonexistent"], close, logger });
 
       expect(code).not.toBe(0);
@@ -87,10 +93,6 @@ describe("runTask", () => {
     });
 
     it("lists the available names and exits non-zero when no name is given", async () => {
-      const catalogue = TaskCatalogue.create({ tasks: [new RecordingTask()] });
-      const close = vi.fn().mockResolvedValue(undefined);
-      const logger = silentLogger();
-
       const code = await runTask({ catalogue, argv: [], close, logger });
 
       expect(code).not.toBe(0);

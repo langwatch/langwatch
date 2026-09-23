@@ -60,10 +60,38 @@ function annotation(over: Record<string, unknown> = {}) {
 }
 
 function renderChips({ conversationId }: { conversationId: string | null }) {
-  const trace = {
+  const trace: TraceHeader = {
     traceId: "trace-1",
+    name: "trace",
     conversationId,
-  } as unknown as TraceHeader;
+    input: null,
+    output: null,
+    timestamp: 1_000,
+    serviceName: "svc",
+    origin: "application",
+    userId: null,
+    durationMs: 1,
+    models: [],
+    totalCost: null,
+    nonBilledCost: 0,
+    totalTokens: 0,
+    inputTokens: null,
+    outputTokens: null,
+    tokensEstimated: false,
+    traceName: "trace",
+    rootSpanType: null,
+    scenarioRunId: null,
+    containsPrompt: false,
+    selectedPromptId: null,
+    selectedPromptSpanId: null,
+    lastUsedPromptId: null,
+    lastUsedPromptVersionNumber: null,
+    lastUsedPromptVersionId: null,
+    lastUsedPromptSpanId: null,
+    status: "ok",
+    spanCount: 1,
+    attributes: {},
+  };
   return render(
     <ChakraProvider value={defaultSystem}>
       <TraceHeaderChips trace={trace} onSelectSpan={vi.fn()} onOpenPromptsTab={vi.fn()} />

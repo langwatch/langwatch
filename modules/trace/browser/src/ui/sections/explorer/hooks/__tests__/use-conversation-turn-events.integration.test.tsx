@@ -46,7 +46,12 @@ function turn(traceId: string, timestamp: number): TraceListItem {
     spanCount: 1,
     evaluations: [],
     events: NO_TRACE_EVENTS,
-  } as unknown as TraceListItem;
+    nonBilledCost: 0,
+    sizeBytes: 0,
+    input: null,
+    output: null,
+    origin: "application",
+  };
 }
 
 const rollup = (name: string, count: number) => ({
