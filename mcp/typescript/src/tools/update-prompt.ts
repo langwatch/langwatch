@@ -72,6 +72,36 @@ function deploymentTagsOf(prompt: PromptDetailResponse): PromptTag[] {
   return (prompt.tags ?? []).filter((tag) => tag?.name !== "latest");
 }
 
+function deploymentLines({
+  prompt,
+  newVersion,
+}: {
+  prompt: PromptDetailResponse;
+  newVersion: IdentifiedVersion;
+}): string[] {
+  const allDeployments = deploymentTagsOf(prompt);
+  const newTags = allDeployments
+    .filter((tag) => newVersion.versionId != null && tag.versionId === newVersion.versionId)
+    .map((tag) => tag.name);
+  if (newTags.length > 0) {
+    return [`**Deployed to**: ${newTags.join(", ")}`];
+  }
+  const lines = [`**Deployment**: not deployed`];
+
+  // Tags pointing at other versions are untouched by this update —
+  // surface them on their own line so no line pairs a version number
+  // with a deployment tag name.
+  const otherTags = Array.from(
+    new Set(
+      allDeployments.filter((tag) => tag.versionId !== newVersion.versionId).map((tag) => tag.name),
+    ),
+  );
+  if (otherTags.length > 0) {
+    lines.push(`**Existing deployments (untouched)**: ${otherTags.join(", ")}`);
+  }
+  return lines;
+}
+
 async function renderUpdateSuccess({
   idOrHandle,
   params,
@@ -125,29 +155,7 @@ async function renderUpdateSuccess({
   }
 
   if (newVersion) {
-    const allDeployments = deploymentTagsOf(prompt);
-    const newTags = allDeployments
-      .filter((tag) => newVersion.versionId != null && tag.versionId === newVersion.versionId)
-      .map((tag) => tag.name);
-    if (newTags.length > 0) {
-      lines.push(`**Deployed to**: ${newTags.join(", ")}`);
-    } else {
-      lines.push(`**Deployment**: not deployed`);
-
-      // Tags pointing at other versions are untouched by this update —
-      // surface them on their own line so no line pairs a version number
-      // with a deployment tag name.
-      const otherTags = Array.from(
-        new Set(
-          allDeployments
-            .filter((tag) => tag.versionId !== newVersion.versionId)
-            .map((tag) => tag.name),
-        ),
-      );
-      if (otherTags.length > 0) {
-        lines.push(`**Existing deployments (untouched)**: ${otherTags.join(", ")}`);
-      }
-    }
+    lines.push(...deploymentLines({ prompt, newVersion }));
   }
 
   return lines.join("\n");

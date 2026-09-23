@@ -128,6 +128,29 @@ function withAppliedEventIds(
   return { ...context, appliedEventIds };
 }
 
+function applyUnseenEvents<State, E extends Event>({
+  projection,
+  events,
+  seen,
+  state,
+}: {
+  projection: FoldProjectionDefinition<State, E>;
+  events: readonly Event[];
+  seen: Set<string>;
+  state: State;
+}): { state: State; appliedCount: number } {
+  let next = state;
+  let appliedCount = 0;
+  for (const event of events) {
+    const dedupKey = event.idempotencyKey || event.id;
+    if (seen.has(dedupKey)) continue;
+    seen.add(dedupKey);
+    next = projection.apply(next, event as E);
+    appliedCount++;
+  }
+  return { state: next, appliedCount };
+}
+
 // Incremental fold execution: load state, re-fold on miss/out-of-order,
 // apply event, store result. See ADR-066 for store-miss and re-fold logic.
 export class FoldProjectionExecutor {
@@ -980,13 +1003,9 @@ export class FoldProjectionExecutor {
       });
       if (page.length === 0) break;
 
-      for (const event of page) {
-        const dedupKey = event.idempotencyKey || event.id;
-        if (seen.has(dedupKey)) continue;
-        seen.add(dedupKey);
-        state = projection.apply(state, event as E);
-        refoldEventCount++;
-      }
+      const applied = applyUnseenEvents({ projection, events: page, seen, state });
+      state = applied.state;
+      refoldEventCount += applied.appliedCount;
 
       const last = page[page.length - 1]!;
       after = { timestamp: last.createdAt, eventId: last.id };

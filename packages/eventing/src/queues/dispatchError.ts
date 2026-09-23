@@ -75,19 +75,30 @@ export function isRetryableHttpStatus(status: number): boolean {
   return status >= 500 && status < 600;
 }
 
+function readPath(value: unknown, path: readonly string[]): unknown {
+  let current = value;
+  for (const key of path) {
+    if (current === null || (typeof current !== "object" && typeof current !== "function")) {
+      return undefined;
+    }
+    current = Reflect.get(current, key);
+  }
+  return current;
+}
+
 /** Best-effort extraction of HTTP status from dispatch provider errors. */
 export function extractHttpStatus(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) return undefined;
-  const e = error as Record<string, any>;
+  const code = readPath(error, ["code"]);
   const candidates = [
-    e.$metadata?.httpStatusCode,
-    e.response?.status,
-    e.response?.statusCode,
-    e.statusCode,
-    e.status,
-    e.original?.response?.status,
-    e.original?.response?.statusCode,
-    typeof e.code === "number" ? e.code : undefined,
+    readPath(error, ["$metadata", "httpStatusCode"]),
+    readPath(error, ["response", "status"]),
+    readPath(error, ["response", "statusCode"]),
+    readPath(error, ["statusCode"]),
+    readPath(error, ["status"]),
+    readPath(error, ["original", "response", "status"]),
+    readPath(error, ["original", "response", "statusCode"]),
+    typeof code === "number" ? code : undefined,
   ];
   for (const candidate of candidates) {
     if (typeof candidate === "number" && candidate >= 100 && candidate < 600) {

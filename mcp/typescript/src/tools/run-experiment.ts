@@ -110,6 +110,31 @@ async function statusFromResults(params: {
   return lines.join("\n");
 }
 
+async function statusAfterFailedRead({
+  params,
+  error,
+}: {
+  params: { runId: string; experimentSlug?: string };
+  error: unknown;
+}): Promise<string> {
+  const code = error instanceof LangWatchApiError ? error.status : undefined;
+  const message = error instanceof Error ? error.message : String(error);
+  if (code === 404 || /404|not found/i.test(message)) {
+    const fallback = await statusFromResults(params);
+    if (fallback) return fallback;
+    return [
+      `# Evaluation Run ${params.runId}`,
+      "",
+      "**Status**: not found",
+      "",
+      `Could not find run \`${params.runId}\`. SDK-logged runs and runs older than 24h are not in the live run-state and must be resolved by experiment slug.`,
+      "",
+      "> Pass `experimentSlug`: discover it with `platform_experiment_list`, then use `platform_experiment_list_runs` for the run ids. Or fetch the rows directly with `platform_experiment_results`.",
+    ].join("\n");
+  }
+  throw error;
+}
+
 export async function handleExperimentStatus(params: {
   runId: string;
   experimentSlug?: string;
@@ -121,22 +146,7 @@ export async function handleExperimentStatus(params: {
       `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}`,
     )) as EvaluationStatusResponse;
   } catch (error) {
-    const code = error instanceof LangWatchApiError ? error.status : undefined;
-    const message = error instanceof Error ? error.message : String(error);
-    if (code === 404 || /404|not found/i.test(message)) {
-      const fallback = await statusFromResults(params);
-      if (fallback) return fallback;
-      return [
-        `# Evaluation Run ${params.runId}`,
-        "",
-        "**Status**: not found",
-        "",
-        `Could not find run \`${params.runId}\`. SDK-logged runs and runs older than 24h are not in the live run-state and must be resolved by experiment slug.`,
-        "",
-        "> Pass `experimentSlug`: discover it with `platform_experiment_list`, then use `platform_experiment_list_runs` for the run ids. Or fetch the rows directly with `platform_experiment_results`.",
-      ].join("\n");
-    }
-    throw error;
+    return statusAfterFailedRead({ params, error });
   }
 
   const lines: string[] = [];

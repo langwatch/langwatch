@@ -1,6 +1,40 @@
-import { searchTraces as apiSearchTraces } from "../langwatch-api.js";
+import { searchTraces as apiSearchTraces, type TraceSearchResult } from "../langwatch-api.js";
 import { parseRelativeDate } from "../utils/date-parsing.js";
 import { formatEvaluationLines } from "../utils/format-evaluations.js";
+
+function previewLine({
+  label,
+  text,
+}: {
+  label: string;
+  text: { value: string } | undefined;
+}): string {
+  const value = text?.value ? String(text.value) : "N/A";
+  return `- **${label}**: ${value.slice(0, 100)}${value.length > 100 ? "..." : ""}`;
+}
+
+function traceLines(trace: TraceSearchResult): string[] {
+  const lines = [`### Trace: ${trace.trace_id}`];
+
+  if (trace.formatted_trace) {
+    lines.push(trace.formatted_trace);
+  } else {
+    lines.push(previewLine({ label: "Input", text: trace.input }));
+    lines.push(previewLine({ label: "Output", text: trace.output }));
+  }
+
+  if (trace.timestamps) {
+    lines.push(`- **Time**: ${trace.timestamps.started_at || "N/A"}`);
+  }
+  if (trace.error) {
+    lines.push(`- **Error**: ${JSON.stringify(trace.error)}`);
+  }
+  if (trace.evaluations && trace.evaluations.length > 0) {
+    lines.push(...formatEvaluationLines(trace.evaluations));
+  }
+  lines.push("");
+  return lines;
+}
 
 /**
  * Handles the search_traces MCP tool: searches with optional filters,
@@ -48,27 +82,7 @@ export async function handleSearchTraces(params: {
   lines.push(`Found ${result.pagination?.totalHits ?? traces.length} traces:\n`);
 
   for (const trace of traces) {
-    lines.push(`### Trace: ${trace.trace_id}`);
-
-    if (trace.formatted_trace) {
-      lines.push(trace.formatted_trace);
-    } else {
-      const inputStr = trace.input?.value ? String(trace.input.value) : "N/A";
-      const outputStr = trace.output?.value ? String(trace.output.value) : "N/A";
-      lines.push(`- **Input**: ${inputStr.slice(0, 100)}${inputStr.length > 100 ? "..." : ""}`);
-      lines.push(`- **Output**: ${outputStr.slice(0, 100)}${outputStr.length > 100 ? "..." : ""}`);
-    }
-
-    if (trace.timestamps) {
-      lines.push(`- **Time**: ${trace.timestamps.started_at || "N/A"}`);
-    }
-    if (trace.error) {
-      lines.push(`- **Error**: ${JSON.stringify(trace.error)}`);
-    }
-    if (trace.evaluations && trace.evaluations.length > 0) {
-      lines.push(...formatEvaluationLines(trace.evaluations));
-    }
-    lines.push("");
+    lines.push(...traceLines(trace));
   }
 
   if (result.pagination?.scrollId) {
