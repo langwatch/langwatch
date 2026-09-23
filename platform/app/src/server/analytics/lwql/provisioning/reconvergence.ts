@@ -29,6 +29,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { LwqlAccessModelOwner } from "./accessModelOwner";
+import { clickHouseErrorSummary } from "./clickhouseStatementRunner";
 
 const logger = createLogger("langwatch:analytics:lwql:reconvergence");
 
@@ -138,7 +139,9 @@ class ReconvergenceWatcher {
       // A probe failure is never a decision: the ownership snapshot is unknown,
       // so keep polling. It never re-provisions on its own.
       logger.debug(
-        { error },
+        // AC5: summarise to code/type only — a raw ClickHouse error carries the
+        // statement text.
+        { error: clickHouseErrorSummary(error) },
         "lwql reconvergence probe failed — the ClickHouse config store is unreadable (pod rolling?), still waiting",
       );
       this.arm();
@@ -188,7 +191,8 @@ class ReconvergenceWatcher {
       );
     } catch (error) {
       logger.error(
-        { error },
+        // AC5: summarise to code/type only — never the statement text.
+        { error: clickHouseErrorSummary(error) },
         "lwql reconvergence: re-provisioning after the config store released the access model failed — fail-closed until the next boot",
       );
     }

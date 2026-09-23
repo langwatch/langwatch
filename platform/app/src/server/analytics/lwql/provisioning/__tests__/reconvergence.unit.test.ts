@@ -207,7 +207,10 @@ describe("startLwqlReconvergenceWatch", () => {
   });
 
   describe("when a probe resolves none after stop() was called mid-flight", () => {
-    /** @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model" */
+    /**
+     * @scenario "The app re-provisions once the ClickHouse config store releases the LangWatchQL access model"
+     * @scenario "A probe that resolves after shutdown never re-provisions"
+     */
     it("discards the in-flight snapshot and never re-provisions during shutdown", async () => {
       // A deferred probe: it stays pending until this test resolves it, so
       // shutdown can begin while the poll is in flight — the exact race where a

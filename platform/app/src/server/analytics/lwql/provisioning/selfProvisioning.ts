@@ -50,6 +50,7 @@ import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
+import { clickHouseErrorSummary } from "./clickhouseStatementRunner";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   postgresNamedCollectionStatements,
@@ -327,7 +328,9 @@ export async function probeAppFunctionStore({
     };
   } catch (error) {
     logger.error(
-      { error },
+      // AC5: summarise to code/type only — a raw ClickHouse error carries the
+      // statement text.
+      { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
     );
     return null;
