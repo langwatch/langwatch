@@ -7,10 +7,8 @@ import {
   type StoredObjectOwnerLookupSpan,
   type StoredObjectOwnerLookupTelemetry,
 } from "../app/stored-object.members.ts";
-import {
-  StoredObjectOwnerRepository,
-  type StoredObjectOwnerLookupResult,
-} from "../repositories/stored-object-owner.repository.ts";
+import type { StoredObjectOwnerRepository } from "../repositories/stored-object-owner.repository.ts";
+import { type StoredObjectOwnerLookupResult } from "../repositories/stored-object-owner.repository.ts";
 
 /**
  * The legacy id-only file URL crosses tenant boundaries solely to identify an

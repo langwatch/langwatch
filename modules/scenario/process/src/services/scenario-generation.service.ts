@@ -1,8 +1,8 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import type { scenarioGenerateRequestSchema } from "@langwatch/scenario-contract";
 import {
   scenarioGenerateResultSchema,
-  scenarioGenerateRequestSchema,
   ScenarioGenerationFailedError,
   ScenarioGenerationTimedOutError,
 } from "@langwatch/scenario-contract";
@@ -12,7 +12,7 @@ import {
   isAbortLikeError,
   nlpgoHandledErrorFrom,
 } from "../rules/scenario-generate-nlpgo-error.rules.ts";
-import { ScenarioGenerateBoundsService } from "./scenario-generate-bounds.service.ts";
+import type { ScenarioGenerateBoundsService } from "./scenario-generate-bounds.service.ts";
 
 export interface ScenarioGenerationDependencies {
   bounds: ScenarioGenerateBoundsService;

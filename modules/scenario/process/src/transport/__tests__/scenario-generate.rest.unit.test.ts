@@ -1,11 +1,12 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * `POST /api/scenario/generate` binds body projectId to the declared permission target.
  * @vitest-environment node
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { ScenarioApi, type ScenarioGenerateResponse } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { type ScenarioGenerateResponse } from "@langwatch/scenario-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 

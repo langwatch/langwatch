@@ -10,7 +10,7 @@ import type {
 } from "../../app/scenario.app.ts";
 import { ScenarioService } from "../../services/scenario.service.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
-import { ScenarioRepository } from "../scenario.repository.ts";
+import type { ScenarioRepository } from "../scenario.repository.ts";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
 

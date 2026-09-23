@@ -59,7 +59,7 @@ function transactionDouble(members: { id: string }[]) {
 
   return {
     database: {
-      $transaction: async (work: (tx: unknown) => Promise<unknown>) => await work(transaction),
+      $transaction: async (work: (tx: unknown) => Promise<unknown>) => work(transaction),
     } as unknown as PrismaClient,
     scenarioFindMany,
     suiteUpdate,

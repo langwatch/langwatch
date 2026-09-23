@@ -1,9 +1,9 @@
 import type { EventEmitter } from "node:events";
 
 import type { FeatureSetup } from "@langwatch/kernel";
+import type { PresenceBroadcastFabric } from "@langwatch/presence-contract";
 import {
   PresenceApi,
-  PresenceBroadcastFabric,
   type PresenceApi as PresenceApiContract,
   type PresenceCursorSubscription,
   type PresenceCursorTickInput,

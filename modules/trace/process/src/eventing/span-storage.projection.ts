@@ -14,7 +14,7 @@ import {
   spanStorageMapGroupKey,
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
 } from "../rules/trace-span-storage-group.rules.ts";
-import { SpanCostService } from "../services/span-cost.service.ts";
+import type { SpanCostService } from "../services/span-cost.service.ts";
 
 const spanEvents = [spanReceivedEventSchema] as const;
 

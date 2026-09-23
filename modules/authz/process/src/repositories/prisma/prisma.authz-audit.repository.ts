@@ -1,4 +1,4 @@
-import { Prisma } from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
 import { type AuthzAuditRow, AuthzAuditTrailStore } from "../authz-audit-trail.repository.ts";

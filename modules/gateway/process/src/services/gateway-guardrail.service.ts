@@ -17,7 +17,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayAudit } from "../app/gateway.members.ts";
-import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
+import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 
 /** Private guardrail catalogue collaborator owned by the singular Gateway service. */
 export class GatewayGuardrailService {

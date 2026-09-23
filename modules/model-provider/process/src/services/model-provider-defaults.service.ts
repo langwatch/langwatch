@@ -15,7 +15,7 @@ import {
 import type { ModelProviderCatalog } from "../app/model-provider.members.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
-import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
+import type { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type DefaultScope = { id: string; name: string };

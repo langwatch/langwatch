@@ -74,7 +74,7 @@ function transportFor(batch: BatchClearPIIFunction) {
   return {
     tryClearGoogleDlp: async ({ text }: { text: string }) =>
       (await batch([text], {} as PIICheckOptions))[0] ?? null,
-    clearPresidio: async (texts: string[]) => await batch(texts, {} as PIICheckOptions),
+    clearPresidio: async (texts: string[]) => batch(texts, {} as PIICheckOptions),
     close: async () => undefined,
   };
 }

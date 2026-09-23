@@ -1,4 +1,4 @@
-import { PullerRegistryService } from "./puller-registry.service.ts";
+import type { PullerRegistryService } from "./puller-registry.service.ts";
 
 export class BuiltInPullerRegistryService {
   private constructor(private readonly registry: PullerRegistryService) {}

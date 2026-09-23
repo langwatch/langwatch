@@ -8,8 +8,8 @@ import type {
   SeedAiToolStarterPackInput,
   UpdateAiToolEntryInput,
 } from "@langwatch/enterprise-governance-contract";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import {
-  Prisma,
   type AiToolEntry as PrismaAiToolEntry,
   type AiToolEntryDepartment,
   type PrismaClient,

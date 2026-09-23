@@ -38,7 +38,7 @@ export class CachedLuaScript {
     } catch (err) {
       if (isNoScript(err)) {
         if (isCancelled?.()) return null;
-        return await redis.eval(this.source, numKeys, ...keysAndArgs);
+        return redis.eval(this.source, numKeys, ...keysAndArgs);
       }
       throw err;
     }
@@ -48,11 +48,7 @@ export class CachedLuaScript {
    * Queue into pipeline (no NOSCRIPT fallback; caller handles error via
    * {@link isNoScriptResult} and re-runs with {@link run} to warm cache).
    */
-  queue(
-    pipeline: ChainableCommander,
-    numKeys: number,
-    ...keysAndArgs: (string | number)[]
-  ): void {
+  queue(pipeline: ChainableCommander, numKeys: number, ...keysAndArgs: (string | number)[]): void {
     pipeline.evalsha(this.sha, numKeys, ...keysAndArgs);
   }
 }

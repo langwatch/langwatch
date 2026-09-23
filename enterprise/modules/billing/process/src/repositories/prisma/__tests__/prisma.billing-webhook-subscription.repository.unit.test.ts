@@ -5,8 +5,8 @@ import { Temporal } from "@langwatch/time";
  */
 import { describe, expect, it, vi } from "vitest";
 
+import type { BillingSubscription } from "../../subscription.repository.ts";
 import {
-  BillingSubscription,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../../subscription.repository.ts";

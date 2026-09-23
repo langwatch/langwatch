@@ -90,7 +90,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
           "tenant.id": command.tenantId,
         },
       },
-      async () => await this.record(command),
+      async () => this.record(command),
     );
   }
 

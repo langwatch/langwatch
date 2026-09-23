@@ -51,7 +51,7 @@ export function ReplayHistoryTable() {
                     key={run.runId}
                     cursor="pointer"
                     _hover={{ bg: "bg.subtle" }}
-                    onClick={() => void router.push(`/ops/projections/${run.runId}`)}
+                    onClick={() => router.push(`/ops/projections/${run.runId}`)}
                   >
                     <Table.Cell>
                       <HStack gap={2}>

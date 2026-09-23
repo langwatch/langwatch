@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayJwtService } from "../../services/gateway-jwt.service.ts";
-import { VirtualKeyService } from "../../services/virtual-key.service.ts";
+import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
 import { PostgresVirtualKeyAdapter } from "../../testing.ts";
 import {
   mountGatewayInternalRest,

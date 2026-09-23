@@ -7,7 +7,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
+import type { CodingAgentSessionEventRepository as SessionEventsRepository } from "../coding-agent-session-event.repository.ts";
 import {
   clickHouseMomentOf,
   routingTenantOf,

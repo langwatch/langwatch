@@ -26,11 +26,11 @@ import {
   type LlmConfigWithLatestVersion,
   type PromptConfigRow,
 } from "../prompt.repository.ts";
+import type { MemoryPromptState } from "./memory-prompt.state.ts";
 import {
   clone,
   displayHandle,
   latestVersion,
-  MemoryPromptState,
   type StoredConfig,
   type StoredVersion,
   schemaVersionOf,

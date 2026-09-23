@@ -117,7 +117,7 @@ export class TraceIngestCredentialService {
 
   /** The receiver calls this only after it has parsed a valid signal body. */
   markOtlpCredentialUsed(input: { apiKeyId: string }): void {
-    void this.#apiKeys.markUsed({ id: input.apiKeyId });
+    this.#apiKeys.markUsed({ id: input.apiKeyId });
   }
 
   /**

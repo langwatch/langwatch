@@ -79,7 +79,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
   };
 
   const createDashboard = async (ownerProject: Project): Promise<Dashboard> =>
-    await database().dashboard.create({
+    database().dashboard.create({
       data: {
         id: randomUUID(),
         name: "Test dashboard",

@@ -8,9 +8,9 @@ import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contrac
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { type BucketSpend } from "../app/gateway.members.ts";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
+import type { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {

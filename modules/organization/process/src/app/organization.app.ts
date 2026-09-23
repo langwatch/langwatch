@@ -19,7 +19,6 @@ import {
   LiteMemberViewerOnlyError,
   OrganizationApi,
   OrganizationCapabilityUnavailableError,
-  OrganizationGroupService,
   OrganizationNotFoundForTeamError,
   type OrganizationUsageCount,
 } from "@langwatch/organization-contract";
@@ -84,6 +83,7 @@ import type {
   GroupMembershipView,
   TeamWithProjects,
   OrganizationMemberProvenance,
+  OrganizationGroupService,
 } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -99,7 +99,7 @@ import {
   organizationMemberDatesFromDate,
   organizationProvisioningSummaryFromDate,
 } from "../rules/organization-time-boundary.rules.ts";
-import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
+import type { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";

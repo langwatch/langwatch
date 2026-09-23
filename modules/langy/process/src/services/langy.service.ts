@@ -16,22 +16,23 @@ import {
   type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
-import { LangyConversationCommands } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../app/langy.members.ts";
 import type {
   ConversationDetail,
   ConversationListItem,
   ConversationListPage,
 } from "../rules/langy-conversation-shape.rules.ts";
+import type { LangyConversationService } from "./langy-conversation.service.ts";
 import {
-  LangyConversationService,
   ADOPTABLE_CONVERSATION_ID,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy-conversation.service.ts";
-import { LangyCredentialService } from "./langy-credential.service.ts";
-import { LangyFeedbackPromptPolicy } from "./langy-feedback-prompt.service.ts";
-import { LangyMessageService, type LangyTrustedMessageReader } from "./langy-message.service.ts";
-import { LangyTurnService } from "./langy-turn.service.ts";
+import type { LangyCredentialService } from "./langy-credential.service.ts";
+import type { LangyFeedbackPromptPolicy } from "./langy-feedback-prompt.service.ts";
+import type { LangyMessageService } from "./langy-message.service.ts";
+import { type LangyTrustedMessageReader } from "./langy-message.service.ts";
+import type { LangyTurnService } from "./langy-turn.service.ts";
 
 /**
  * How this process opens a relay connection for a conversation runtime.

@@ -1,7 +1,7 @@
 import { emptyMfaEnrollment, type MfaEnrollmentState } from "@langwatch/identity-contract";
 
 import type { MfaEnrollmentRepository } from "../mfa-enrollment.repository.ts";
-import { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory-identity.store.ts";
 
 /**
  * The MFA twin: the folded enrollment and the organizations that require one.

@@ -8,8 +8,8 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import {
-  Prisma,
   type PrismaClient,
   type RoutingPolicy as PrismaRoutingPolicy,
   type RoutingPolicyScope as PrismaRoutingPolicyScope,

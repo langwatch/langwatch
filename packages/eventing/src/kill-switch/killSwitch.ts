@@ -1,10 +1,11 @@
 import type { createLogger } from "@langwatch/observability";
+
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { KillSwitchComponentType } from "./killSwitchKeys.ts";
 
 /** One component's stop question, asked for one tenant. */
 export interface KillSwitchQuery {
-  aggregateType: AggregateType | string;
+  aggregateType: AggregateType;
   componentType: KillSwitchComponentType;
   componentName: string;
   /**

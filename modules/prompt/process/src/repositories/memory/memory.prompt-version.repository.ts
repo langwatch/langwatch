@@ -12,13 +12,8 @@ import {
   type PromptVersionAuthor,
   type PromptVersionRow,
 } from "../prompt-version.repository.ts";
-import {
-  clone,
-  latestVersion,
-  maxVersion,
-  MemoryPromptState,
-  schemaVersionOf,
-} from "./memory-prompt.state.ts";
+import type { MemoryPromptState } from "./memory-prompt.state.ts";
+import { clone, latestVersion, maxVersion, schemaVersionOf } from "./memory-prompt.state.ts";
 import type { MemoryLlmConfigRepository } from "./memory.prompt.repository.ts";
 
 export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsRepository {

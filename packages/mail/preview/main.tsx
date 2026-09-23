@@ -4,15 +4,17 @@ import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { useTheme } from "next-themes";
 import { StrictMode, useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createRoot } from "react-dom/client";
+
 import { GalleryView, type Density } from "./gallery-view.tsx";
 import { InspectView } from "./inspect-view.tsx";
+import type { WIDTHS } from "./studio-shared.ts";
+import { type PreviewScheme, type GalleryEntry, type TemplateSummary } from "./studio-shared.ts";
 import {
-  type PreviewScheme,
-  type GalleryEntry,
-  type TemplateSummary,
-  WIDTHS,
-} from "./studio-shared.ts";
-import { buildSearch, decodePropsFragment, encodePropsFragment, parseUrlState } from "./studio-url.ts";
+  buildSearch,
+  decodePropsFragment,
+  encodePropsFragment,
+  parseUrlState,
+} from "./studio-url.ts";
 import type { View } from "./studio-url.ts";
 
 const initialUrl = parseUrlState(window.location.search);

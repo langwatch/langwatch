@@ -4,10 +4,10 @@
  */
 import { gzipSync, gunzipSync } from "node:zlib";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { ScenarioApi } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 

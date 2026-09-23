@@ -387,7 +387,7 @@ export const store = (
       | WorkflowStore
       | Partial<WorkflowStore>
       | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>),
-    replace?: boolean | undefined,
+    replace?: boolean,
   ) => void,
   get: () => WorkflowStore,
 ): WorkflowStore => ({

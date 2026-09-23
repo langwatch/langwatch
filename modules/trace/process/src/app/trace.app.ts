@@ -109,7 +109,7 @@ import {
   buildParsedTurns,
   renderConversationMarkdown,
 } from "@langwatch/trace-contract/conversation";
-import { z } from "zod";
+import type { z } from "zod";
 
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";

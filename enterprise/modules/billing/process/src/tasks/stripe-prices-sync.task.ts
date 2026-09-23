@@ -149,7 +149,7 @@ export const fetchAllStripePrices = async (stripe: Stripe): Promise<Stripe.Price
   for (let page = 0; page < MAX_PAGE_COUNT; page += 1) {
     const response = await withRetry(
       async () =>
-        await stripe.prices.list({
+        stripe.prices.list({
           limit: PAGE_LIMIT,
           starting_after: startingAfter,
           expand: ["data.product"],
@@ -173,8 +173,7 @@ export const fetchAllStripeMeters = async (stripe: Stripe): Promise<Stripe.Billi
 
   for (let page = 0; page < MAX_PAGE_COUNT; page += 1) {
     const response = await withRetry(
-      async () =>
-        await stripe.billing.meters.list({ limit: PAGE_LIMIT, starting_after: startingAfter }),
+      async () => stripe.billing.meters.list({ limit: PAGE_LIMIT, starting_after: startingAfter }),
       "stripe.billing.meters.list",
     );
     allMeters.push(...response.data);

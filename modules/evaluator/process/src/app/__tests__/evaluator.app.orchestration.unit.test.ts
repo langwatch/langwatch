@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
+import type { MemoryEvaluatorRepository } from "../../repositories/memory/memory.evaluator.repository.ts";
 import type { EvaluatorGraph } from "../evaluator.app.ts";
 import {
   createEvaluatorTestApp,

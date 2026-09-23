@@ -9,8 +9,8 @@ import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { Cron } from "croner";
 
 import type { AutomationClock } from "../app/automation.members.ts";
-import { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
-import { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
+import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
+import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 export class ReportScheduleService {
   private constructor(

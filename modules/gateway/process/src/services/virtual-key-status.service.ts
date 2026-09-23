@@ -15,7 +15,7 @@ import {
   type GatewayGovernanceSignals,
 } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
-import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
+import type { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {
   VirtualKeyValidationService,
   type RevokeVirtualKeyInput,

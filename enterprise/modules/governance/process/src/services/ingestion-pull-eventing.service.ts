@@ -26,10 +26,8 @@ import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
 } from "../eventing/ingestion-pull-run-status-eventing.projection.ts";
-import {
-  INGESTION_PULL_PROCESS_NAME,
-  IngestionPullProcess,
-} from "../eventing/ingestion-pull.process.ts";
+import type { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
+import { INGESTION_PULL_PROCESS_NAME } from "../eventing/ingestion-pull.process.ts";
 
 type EventingIngestionPullEvent = IngestionPullProcessingEvent & Event;
 

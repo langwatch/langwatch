@@ -1,11 +1,11 @@
 /** tRPC input shapes; accept unknown keys for forward-compatible clients. */
 import { z } from "zod";
 
+import type { nodeDatasetSchema } from "./prompt.field-schemas.ts";
 import {
   handleSchema,
   inputsSchema,
   messageSchema,
-  nodeDatasetSchema,
   outputsSchema,
   responseFormatSchema,
   runtimeParametersSchema,

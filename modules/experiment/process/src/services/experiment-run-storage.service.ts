@@ -20,7 +20,7 @@ import { nowInstant } from "@langwatch/time";
 import type { SeededTargetOutput } from "./experiment-cell-plan.service.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
-import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
+import type { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 /**

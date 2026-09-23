@@ -1,7 +1,7 @@
 import type { AgentCallSignal } from "@langwatch/agent-contract";
 import { instanceGoneSchema, replyNudgeSchema } from "@langwatch/agent-contract";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
-import { z } from "zod";
+import type { z } from "zod";
 
 import {
   INSTANCE_GONE_CHANNEL,

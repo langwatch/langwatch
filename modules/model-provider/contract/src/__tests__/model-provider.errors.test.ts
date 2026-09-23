@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import type { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 import {

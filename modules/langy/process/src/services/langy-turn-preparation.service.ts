@@ -17,7 +17,7 @@ import {
   LANGY_REFERENT_POLICY,
   LangyConversationMemoryService,
 } from "./langy-conversation-memory.service.ts";
-import { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
+import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
 import {
   LANGY_OVERRIDE,

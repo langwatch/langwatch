@@ -18,13 +18,11 @@ import {
 } from "@langwatch/coding-agent-contract";
 
 import type { CodingAgentClock } from "../app/coding-agent.members.ts";
-import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
-import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
-import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
-import {
-  SessionMetricSeriesRepository,
-  type SessionMetricTotal,
-} from "../repositories/session-metric-series.repository.ts";
+import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
+import type { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository.ts";
+import { type SessionMetricTotal } from "../repositories/session-metric-series.repository.ts";
 
 export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 

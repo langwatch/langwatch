@@ -20,8 +20,7 @@
 
 import chalk from "chalk";
 
-import type { InstantEvalRun } from "@/client-sdk/services/instant-evals";
-import type { InstantEvalsApiService } from "@/client-sdk/services/instant-evals";
+import type { InstantEvalRun, InstantEvalsApiService } from "@/client-sdk/services/instant-evals";
 
 import { createSpinner } from "../../utils/spinner";
 
@@ -50,15 +49,11 @@ export interface InstantEvalWaitResult {
 }
 
 /** `--wait` with no value means the default; `--wait 5` means five minutes. */
-export function readWaitMinutes(
-  raw: boolean | string | undefined,
-): number | undefined {
+export function readWaitMinutes(raw: boolean | string | undefined): number | undefined {
   if (raw === undefined || raw === false) return undefined;
   if (raw === true) return DEFAULT_INSTANT_EVAL_WAIT_MINUTES;
   const minutes = Number(raw);
-  return Number.isFinite(minutes) && minutes > 0
-    ? minutes
-    : DEFAULT_INSTANT_EVAL_WAIT_MINUTES;
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_INSTANT_EVAL_WAIT_MINUTES;
 }
 
 /** Whether a run has stopped moving. */
@@ -71,8 +66,7 @@ const grouped = (value: number): string => value.toLocaleString("en-US");
 /** `Judging... 3,200/10,000 (412 matched)`. */
 export function instantEvalProgressLine(run: InstantEvalRun): string {
   const total = run.total ?? run.limit;
-  const matched =
-    run.matched === null ? "" : ` (${grouped(run.matched)} matched)`;
+  const matched = run.matched === null ? "" : ` (${grouped(run.matched)} matched)`;
   return `Judging... ${grouped(run.progress)}/${grouped(total)}${matched}`;
 }
 
@@ -116,9 +110,7 @@ export async function waitForInstantEvalRun({
         ),
       );
       if (!machine) {
-        console.log(
-          chalk.yellow(`Follow it with: langwatch instant-eval status ${runId}`),
-        );
+        console.log(chalk.yellow(`Follow it with: langwatch instant-eval status ${runId}`));
       }
       return {
         outcome: "timeout",
@@ -159,16 +151,12 @@ export async function waitForInstantEvalRun({
     if (run.status === "finished") {
       spinner.succeed(
         `Judged ${grouped(run.progress)} row${run.progress === 1 ? "" : "s"}` +
-          (run.matched === null
-            ? ""
-            : `, ${chalk.green(`${grouped(run.matched)} matched`)}`),
+          (run.matched === null ? "" : `, ${chalk.green(`${grouped(run.matched)} matched`)}`),
       );
       return { outcome: "finished", run };
     }
     if (run.status === "cancelled") {
-      spinner.warn(
-        `The run was cancelled after judging ${grouped(run.progress)} rows.`,
-      );
+      spinner.warn(`The run was cancelled after judging ${grouped(run.progress)} rows.`);
       return { outcome: "cancelled", run };
     }
     process.exitCode = 1;

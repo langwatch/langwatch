@@ -29,7 +29,7 @@ const EPOCH = new Date(0);
 
 const createMockDb = ({
   findFirstResult = null,
-  orgFindUniqueResult = undefined,
+  orgFindUniqueResult,
 }: {
   findFirstResult?: unknown;
   orgFindUniqueResult?: unknown;

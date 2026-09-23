@@ -15,7 +15,7 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import type { ModelProviderCatalog } from "../app/model-provider.members.ts";
-import { ModelProviderQueryService } from "./model-provider-query.service.ts";
+import type { ModelProviderQueryService } from "./model-provider-query.service.ts";
 
 type ModelProviderExecutionOptions = {
   query: ModelProviderQueryService;

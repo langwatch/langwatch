@@ -33,7 +33,8 @@ import {
 } from "../rules/connected-agent-keys.rules.ts";
 import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
-import { AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
+import type { AgentSessionService } from "./connected-agent-session.service.ts";
+import { type SessionInfo } from "./connected-agent-session.service.ts";
 
 /** The most call ids a poll may announce as in flight. */
 const MAX_IN_FLIGHT_IDS = 1000;

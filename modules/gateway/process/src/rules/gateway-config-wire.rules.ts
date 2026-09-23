@@ -1,3 +1,4 @@
+import type { parseVirtualKeyConfig } from "@langwatch/gateway-contract";
 import {
   type GatewayBudget,
   type ModelProvider,
@@ -9,7 +10,6 @@ import {
   type GatewayMoney,
   type GatewayResolvedBudget,
   effectiveBudgetPeriod,
-  parseVirtualKeyConfig,
   type GatewayBudgetResource,
 } from "@langwatch/gateway-contract";
 /**

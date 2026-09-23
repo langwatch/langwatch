@@ -29,10 +29,8 @@ import {
 } from "@langwatch/eventing";
 
 import type { GovernanceEventsProcessingEvent } from "../app/governance.members.ts";
-import {
-  GOVERNANCE_EVENTS_PROCESS_NAME,
-  GovernanceEventDeliveryProcess,
-} from "../eventing/governance-event-delivery.process.ts";
+import type { GovernanceEventDeliveryProcess } from "../eventing/governance-event-delivery.process.ts";
+import { GOVERNANCE_EVENTS_PROCESS_NAME } from "../eventing/governance-event-delivery.process.ts";
 
 type GovernanceVkLifecycleEvent = Extract<
   GovernanceEventsProcessingEvent,

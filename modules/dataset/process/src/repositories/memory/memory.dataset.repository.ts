@@ -12,7 +12,7 @@ import type {
   DatasetRepository,
   DatasetUpdateInput,
 } from "../dataset.repository.ts";
-import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
+import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** The same projection the Prisma twin returns rows through. */
 export function toDataset(row: DatasetRow): Dataset {

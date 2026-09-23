@@ -32,9 +32,9 @@ import type {
 } from "../app/model-provider.members.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
-import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
+import type { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
-import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
+import type { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
 
 type ModelProviderCommandOptions = {
   repository: ModelProviderRepository;

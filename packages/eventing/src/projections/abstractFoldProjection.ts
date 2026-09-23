@@ -1,4 +1,6 @@
+import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
+
 import type { Event } from "../domain/types.ts";
 import {
   type DotSnakeToPascal,
@@ -8,7 +10,6 @@ import {
   type UnionToIntersection,
 } from "./eventTypeTransforms.ts";
 import type { FoldProjectionOptions, FoldProjectionStore } from "./foldProjection.types.ts";
-import { nowInstant } from "@langwatch/time";
 
 // ---------------------------------------------------------------------------
 // Schema → event type extraction
@@ -27,7 +28,6 @@ type AllTimestampKeys =
   | "UpdatedAt"
   | "createdAt"
   | "updatedAt"
-  | "LastEventOccurredAt"
   | "LastEventOccurredAt";
 
 /** Full derivation: `"lw.suite_run.started"` → `"handleSuiteRunStarted"` */

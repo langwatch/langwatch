@@ -3,7 +3,7 @@
  * them: the person a request carried where it carried one, and an
  * authorization answer the test decides.
  */
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import type { createTrpcRuntime } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request. Both halves are absent when signed out. */
 export type AuthTrpcTestContext = {

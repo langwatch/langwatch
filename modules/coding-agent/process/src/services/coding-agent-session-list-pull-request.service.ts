@@ -2,7 +2,7 @@ import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
 import type { GithubPullRequest, GithubApi } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
+import type { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 
 /** Private GitHub enrichment collaborator for the bounded session-list view. */
 export class CodingAgentSessionListPullRequestService {

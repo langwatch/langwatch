@@ -20,7 +20,7 @@ import { fromDate } from "@langwatch/time";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
-import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const logger = createLogger("langwatch:api-key:lifecycle");

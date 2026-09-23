@@ -55,7 +55,7 @@ const renderSection = ({ datasetId = "" }: { datasetId?: string } = {}) => {
 };
 
 const chooseToCreate = async () =>
-  await userEvent.click(screen.getByRole("button", { name: /Create a new dataset/ }));
+  userEvent.click(screen.getByRole("button", { name: /Create a new dataset/ }));
 
 afterEach(() => {
   cleanup();

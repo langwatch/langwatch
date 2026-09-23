@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import * as contract from "../index.ts";
+import type { AuthzGrantsService } from "../index.ts";
 import {
   type AuthzAttachBindingsInput,
   type AuthzAttachBindingsOutput,
@@ -8,7 +9,6 @@ import {
   type AuthzChangeBindingRoleInput,
   type AuthzDefineRoleInput,
   type AuthzDeleteRoleInput,
-  AuthzGrantsService,
   type AuthzOffboardMemberInput,
   type AuthzRevokeBindingsInput,
   type AuthzRevokeBindingsWhereInput,

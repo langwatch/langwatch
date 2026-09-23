@@ -20,7 +20,7 @@ export function CopyValueButton({ value, label }: { value: string; label: string
         aria-label={`Copy ${label.toLowerCase()}`}
         onClick={(event) => {
           event.stopPropagation();
-          void copy(value);
+          copy(value);
         }}
       >
         {copied ? <Check size={12} /> : <Copy size={12} />}

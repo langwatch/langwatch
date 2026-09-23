@@ -11,11 +11,8 @@ import {
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  IdentityBirth,
-  type IdentityNewborn,
-  type IdentityBirthLedger,
-} from "../app/identity.members.ts";
+import type { IdentityBirth } from "../app/identity.members.ts";
+import { type IdentityNewborn, type IdentityBirthLedger } from "../app/identity.members.ts";
 import { identityEventsFor } from "../eventing/identity-events.intent.ts";
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";

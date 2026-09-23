@@ -6,7 +6,7 @@ import {
 } from "@langwatch/api-key-contract";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
+import type { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 export class ApiKeyEnrichmentService {

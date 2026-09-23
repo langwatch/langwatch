@@ -250,7 +250,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           // With a hint and `fallback: "none"` the fragment is always
           // present; the null arm exists only to satisfy the contract.
           window
-            ? await this.queryByTraceId(tenantId, traceId, {
+            ? this.queryByTraceId(tenantId, traceId, {
                 fromMs: window.fromMs,
                 toMs: window.toMs,
               })

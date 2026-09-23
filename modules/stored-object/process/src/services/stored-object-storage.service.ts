@@ -13,7 +13,7 @@ import {
   StoredObjectStorage,
   type StoredObjectStorageAddress,
 } from "../app/stored-object.members.ts";
-import { StoredObjectStorageRuntimeAdapter } from "./stored-object-storage-runtime.service.ts";
+import type { StoredObjectStorageRuntimeAdapter } from "./stored-object-storage-runtime.service.ts";
 
 export class StoredObjectStoragePortAdapter extends StoredObjectStorage {
   static create(input: {

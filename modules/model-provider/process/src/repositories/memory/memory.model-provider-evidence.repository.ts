@@ -1,7 +1,8 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 
 import type { ModelProviderEvidenceRepository } from "../model-provider-evidence.repository.ts";
-import { matchesAnyScope, MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
+import type { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
+import { matchesAnyScope } from "./memory.model-provider.database.ts";
 
 /**
  * The setup checklist's provider step over the shared rows, and it decodes no

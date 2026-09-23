@@ -8,7 +8,8 @@ import {
   TagValidationError,
   type PromptTagAssignmentRow,
 } from "../prompt-tag-assignment.repository.ts";
-import { clone, MemoryPromptState, type StoredAssignment } from "./memory-prompt.state.ts";
+import type { MemoryPromptState } from "./memory-prompt.state.ts";
+import { clone, type StoredAssignment } from "./memory-prompt.state.ts";
 
 export class MemoryPromptTagAssignmentRepository extends PromptTagAssignmentRepository {
   readonly #state: MemoryPromptState;

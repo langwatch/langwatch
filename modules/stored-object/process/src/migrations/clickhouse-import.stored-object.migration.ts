@@ -13,13 +13,11 @@ import {
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
-import { StoredObjectLegacyLocation } from "../repositories/stored-object-legacy-location.repository.ts";
-import {
-  StoredObjectLegacySource,
-  type LegacyStoredObjectRow,
-} from "../repositories/stored-object-legacy-source.repository.ts";
-import { StoredObjectLegacyWriterDrain } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
-import { StoredObjectProjectSource } from "../repositories/stored-object-project-source.repository.ts";
+import type { StoredObjectLegacyLocation } from "../repositories/stored-object-legacy-location.repository.ts";
+import type { StoredObjectLegacySource } from "../repositories/stored-object-legacy-source.repository.ts";
+import { type LegacyStoredObjectRow } from "../repositories/stored-object-legacy-source.repository.ts";
+import type { StoredObjectLegacyWriterDrain } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
+import type { StoredObjectProjectSource } from "../repositories/stored-object-project-source.repository.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,

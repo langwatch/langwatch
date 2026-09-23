@@ -16,10 +16,8 @@ import {
 } from "../rules/identity-command-id.rules.ts";
 import type { IdentityAdoptionWrites } from "../rules/identity-writes.rules.ts";
 import { mintUserHashKey } from "../rules/user-hash-key.rules.ts";
-import {
-  IdentityBackfillPlanService,
-  type PlannedIdentifier,
-} from "./identity-backfill-plan.service.ts";
+import type { IdentityBackfillPlanService } from "./identity-backfill-plan.service.ts";
+import { type PlannedIdentifier } from "./identity-backfill-plan.service.ts";
 import type { IdentitySecretCarryService } from "./identity-secret-carry.service.ts";
 
 export const IDENTITY_BACKFILL_ACTOR = {

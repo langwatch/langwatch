@@ -11,11 +11,8 @@ import {
   type UpdateGatewayCacheRuleInput,
   serializeRowForAudit,
 } from "@langwatch/gateway-contract";
-import {
-  Prisma,
-  type GatewayCacheRule,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { type GatewayCacheRule, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
 import type { GatewayAudit, GatewayChangeEvents } from "../../app/gateway.members.ts";

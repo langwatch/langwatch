@@ -1,5 +1,5 @@
+import type { LangyWorkerMetrics } from "../app/langy.members.ts";
 import {
-  LangyWorkerMetrics,
   LangyWorker,
   type LangyDispatchOutcome,
   type LangyWorkerCancelInput,

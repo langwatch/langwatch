@@ -3,7 +3,7 @@
  *
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
-import { ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";

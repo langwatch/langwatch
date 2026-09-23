@@ -5,8 +5,8 @@
  */
 import * as z from "zod";
 
+import type { CARD_SHAPE } from "./schemas.ts";
 import {
-  CARD_SHAPE,
   choicesCardFields,
   statsCardFields,
   tableCardFields,

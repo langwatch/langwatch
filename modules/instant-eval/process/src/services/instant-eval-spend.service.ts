@@ -68,9 +68,7 @@ export class InstantEvalSpendService {
       return;
     }
 
-    const requestId = instantEvalSpendRequestId({
-      ...(record.runId ? { runId: record.runId } : {}),
-    });
+    const requestId = instantEvalSpendRequestId(record.runId ? { runId: record.runId } : {});
     await this.peers.recordPricedSpend(
       instantEvalPricedSpend({
         record,

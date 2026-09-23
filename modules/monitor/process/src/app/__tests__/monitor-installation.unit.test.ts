@@ -1,13 +1,13 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The installer over memory persistence, in both roles that boot it.
  */
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
-import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { monitorServer } from "../../monitor.server.ts";

@@ -19,7 +19,7 @@ import {
 } from "@langwatch/api-key-contract";
 import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzPermission, PermissionDecision } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
+import type { HandledError } from "@langwatch/handled-error";
 import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";

@@ -8,10 +8,8 @@ import {
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
-import {
-  type CodingAgentSessionData,
-  CodingAgentSessionStateProjection,
-} from "./coding-agent-session-state.projection.ts";
+import type { CodingAgentSessionStateProjection } from "./coding-agent-session-state.projection.ts";
+import { type CodingAgentSessionData } from "./coding-agent-session-state.projection.ts";
 
 const SPAN_STATUS_ERROR = 2;
 const CLAUDE = {

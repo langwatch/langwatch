@@ -48,7 +48,7 @@ import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.se
 import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentRunDriverService } from "./experiment-run-driver.service.ts";
-import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
+import type { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
 import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
 
 /**

@@ -17,7 +17,7 @@ import type { ScimGroupRecord, ScimRepository } from "../repositories/scim.repos
 import { parseScimFilter } from "../rules/scim-filter.rules.ts";
 import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
 import type { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
-import { ScimGrantsService } from "./scim-grants.service.ts";
+import type { ScimGrantsService } from "./scim-grants.service.ts";
 import {
   ScimGroupMembershipService,
   type ScimGroupMembershipRepository,

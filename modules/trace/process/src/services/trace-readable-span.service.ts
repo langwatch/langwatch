@@ -125,7 +125,7 @@ function assignIo({
   plainKey,
 }: {
   attrs: Attributes;
-  value: Span["input"] | Span["output"];
+  value: Span["input"];
   messagesKey: string;
   plainKey: string;
 }): void {

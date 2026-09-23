@@ -20,6 +20,7 @@ import {
   type ScenarioTestSuite,
   runActorFromRequest,
 } from "@langwatch/scenario-contract";
+import type { suiteResponseSchema } from "@langwatch/suite-contract";
 import {
   isSuiteKind,
   SuiteApi,
@@ -33,7 +34,6 @@ import {
   listSuitesQuerySchema,
   runSuiteInputSchema,
   suiteAliasIdParamsSchema,
-  suiteResponseSchema,
   suiteResponseWithPlatformUrlSchema,
   suiteRunResultSchema,
   updateSuiteInputSchema,

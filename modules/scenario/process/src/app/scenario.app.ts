@@ -103,7 +103,7 @@ import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 
-import { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
+import type { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
 import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,

@@ -57,14 +57,11 @@ export interface LocalWriteParams {
  * One edit: a replacement of text the file already holds, or text appended
  * at the end of the file.
  */
-export type LocalEditReplace =
-  | { oldText: string; newText: string }
-  | { append: string };
+export type LocalEditReplace = { oldText: string; newText: string } | { append: string };
 
 /** True for the form of an edit that adds text at the end of the file. */
-export const isAppendEdit = (
-  edit: LocalEditReplace,
-): edit is { append: string } => "append" in edit;
+export const isAppendEdit = (edit: LocalEditReplace): edit is { append: string } =>
+  "append" in edit;
 
 export interface LocalEditParams {
   path: string;
@@ -491,9 +488,7 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
     case "local_langwatch_env":
       return {
         tool: "local_langwatch_env",
-        params: {
-          ...(isString(params.path) ? { path: params.path } : {}),
-        },
+        params: isString(params.path) ? { path: params.path } : {},
       };
     default:
       return null;

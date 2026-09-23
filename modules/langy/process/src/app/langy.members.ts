@@ -29,7 +29,7 @@ import type {
 import type { LanguageModel } from "ai";
 import type { z } from "zod";
 
-import {
+import type {
   LANGY_ID_RESOURCES,
   LANGY_PROCESS_INTENT_TYPES,
   langyGenerateTitleIntentSchema,

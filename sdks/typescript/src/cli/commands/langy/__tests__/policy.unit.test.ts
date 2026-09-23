@@ -220,7 +220,7 @@ describe("given a folder shared with a Langy conversation", () => {
      * already read, or change git outside the folder. Each is decided by
      * parsing the command, never by what the model says about it.
      */
-    const destructive: Array<[string, string, string]> = [
+    const destructive: [string, string, string][] = [
       ["git push --force", "git push --force", "rewrites history on the remote"],
       ["git push -f origin main", "git push -f", "rewrites history on the remote"],
       [

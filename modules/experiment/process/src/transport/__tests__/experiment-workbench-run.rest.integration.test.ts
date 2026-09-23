@@ -1,14 +1,14 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * Browser workbench runs receive route authorization before their operation.
  */
 import { createRestRuntime, HttpError, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
-import { ExperimentV3RestApi } from "../experiment-v3.rest.ts";
+import type { ExperimentV3RestApi } from "../experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts";
 
 const refusal: RestErrorHandler = (error, c) => {

@@ -8,7 +8,7 @@ import type {
   UserCredentialAccount,
   UserCredentialRepository,
 } from "../user-signin-credential.repository.ts";
-import { MemoryUserDatabase } from "./memory.user.database.ts";
+import type { MemoryUserDatabase } from "./memory.user.database.ts";
 
 /** better-auth's own provider name for an email-and-password sign-in method. */
 const CREDENTIAL_PROVIDER = "credential";

@@ -16,7 +16,7 @@ import type {
   ShareRepository,
   ShareResourceScope,
 } from "../share.repository.ts";
-import { MemoryShareDatabase } from "./memory.share.database.ts";
+import type { MemoryShareDatabase } from "./memory.share.database.ts";
 
 function isActive(link: ShareLink, now: Instant): boolean {
   return link.expiresAt === null || link.expiresAt.getTime() > now.epochMilliseconds;

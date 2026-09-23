@@ -1,5 +1,5 @@
 import type { UsageMembershipRepository } from "../usage-membership.repository.ts";
-import { MemoryEntitlementDatabase } from "./memory.entitlement.database.ts";
+import type { MemoryEntitlementDatabase } from "./memory.entitlement.database.ts";
 
 /**
  * The membership reader over rows a test put there. An organization nobody

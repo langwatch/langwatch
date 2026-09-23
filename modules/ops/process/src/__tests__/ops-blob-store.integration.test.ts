@@ -9,7 +9,7 @@ import {
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ProjectApi } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";

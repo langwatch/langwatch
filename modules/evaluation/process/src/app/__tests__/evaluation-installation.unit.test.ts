@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The feature boots as a whole: the installer, its repositories and the one app
@@ -6,9 +7,8 @@
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
-import { TraceApi } from "@langwatch/trace-contract";
-import { WorkflowApi } from "@langwatch/workflow-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { evaluationServer } from "../../evaluation.server.ts";

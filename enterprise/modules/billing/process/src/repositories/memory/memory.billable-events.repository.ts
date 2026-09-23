@@ -7,7 +7,7 @@ import {
   type BillableEventsWindow,
 } from "../billable-events.repository.ts";
 import type { MemoryBillableEvent } from "./memory-billing.store.ts";
-import { MemoryBillingStore } from "./memory-billing.store.ts";
+import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /** In-memory read twin of billing's ClickHouse event and trace-summary queries. */
 export class MemoryBillableEventsRepository extends BillableEventsRepository {

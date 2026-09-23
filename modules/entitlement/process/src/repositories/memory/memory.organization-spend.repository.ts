@@ -4,7 +4,7 @@ import type {
 } from "@langwatch/entitlement-contract";
 
 import type { OrganizationSpendRepository } from "../organization-spend.repository.ts";
-import { MemoryEntitlementDatabase } from "./memory.entitlement.database.ts";
+import type { MemoryEntitlementDatabase } from "./memory.entitlement.database.ts";
 
 /**
  * The spend rollup over rows a test put there, narrowed by caller the same way

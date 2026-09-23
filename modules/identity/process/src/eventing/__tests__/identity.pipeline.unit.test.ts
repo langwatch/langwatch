@@ -1,16 +1,16 @@
 /** Spec: specs/identity/sso-process-composition.feature */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthApi } from "@langwatch/auth-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { UserApi } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { identityServer } from "../../identity.server.ts";

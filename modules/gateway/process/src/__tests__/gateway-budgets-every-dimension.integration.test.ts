@@ -55,7 +55,7 @@ import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/cl
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { VirtualKeyService } from "../services/virtual-key.service.ts";
+import type { VirtualKeyService } from "../services/virtual-key.service.ts";
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 

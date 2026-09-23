@@ -3,8 +3,8 @@
  * resolved scope: one question, "any of these", and two batch forms. Each
  * collects the principal's grants ONCE and answers every candidate from it.
  */
+import type { AuthzEngine } from "@langwatch/authz-contract";
 import {
-  AuthzEngine,
   scopeOrganizationId,
   type AuthzDecision,
   type AuthzPermission,

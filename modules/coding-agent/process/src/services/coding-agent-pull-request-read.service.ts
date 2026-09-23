@@ -21,26 +21,24 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { CodingAgentBillingPolicy, CodingAgentClock } from "../app/coding-agent.members.ts";
-import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
-import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import {
   assignablePullRequests,
   pullRequestIdentity,
 } from "../rules/coding-agent-pull-request.rules.ts";
+import type { CodingAgentPersonalPullRequestValuesService } from "./coding-agent-personal-pull-request-values.service.ts";
+import { type CodingAgentPersonalRepositoryGroup } from "./coding-agent-personal-pull-request-values.service.ts";
+import type { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
+import type { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
+import type { CodingAgentPullRequestUsageService } from "./coding-agent-pull-request-usage.service.ts";
 import {
-  CodingAgentPersonalPullRequestValuesService,
-  type CodingAgentPersonalRepositoryGroup,
-} from "./coding-agent-personal-pull-request-values.service.ts";
-import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
-import { CodingAgentPullRequestShareService } from "./coding-agent-pull-request-share.service.ts";
-import {
-  CodingAgentPullRequestUsageService,
   type CodingAgentModelUsage,
   type CodingAgentUsageRow,
 } from "./coding-agent-pull-request-usage.service.ts";
 import { CodingAgentSessionCandidatesService } from "./coding-agent-session-candidates.service.ts";
-import { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
-import { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
+import type { CodingAgentSessionListPullRequestService } from "./coding-agent-session-list-pull-request.service.ts";
+import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
 
 export const SESSIONS_LIST_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SESSIONS_LIST_LIMIT = 200;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { IngestionPullService } from "../services/ingestion-pull.service.ts";
+import type { IngestionPullService } from "../services/ingestion-pull.service.ts";
 
 export const ingestionPullRunIntentSchema = z.object({
   sourceId: z.string(),

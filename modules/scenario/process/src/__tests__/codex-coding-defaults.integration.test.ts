@@ -6,6 +6,7 @@
 import { randomBytes } from "node:crypto";
 
 import type { Agent } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -32,7 +33,6 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -93,7 +93,7 @@ function realModelProviders(prisma: PrismaClient): ModelProviderApi {
     database: prisma,
     projects: {
       findWithTeam: async (id: string) =>
-        await prisma.project.findUnique({ where: { id }, include: { team: true } }),
+        prisma.project.findUnique({ where: { id }, include: { team: true } }),
       getWithTeam: async (id: string) => {
         const project = await prisma.project.findUnique({
           where: { id },

@@ -49,7 +49,7 @@ import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
 import { datasetSlugOf } from "../rules/dataset-selection.rules.ts";
 import { DatasetNamingService } from "./dataset-naming.service.ts";
 import { DatasetRecordService } from "./dataset-record.service.ts";
-import { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
+import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
 
 export type DatasetServiceOptions = {
   repository: DatasetRepository;

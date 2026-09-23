@@ -9,11 +9,8 @@ import { useCallback, useState, type ComponentProps, type ReactNode } from "reac
 
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog.tsx";
-import {
-  WorkflowCardActions,
-  WorkflowCardBase,
-  WorkflowCardDisplay,
-} from "../elements/workflow-card.tsx";
+import type { WorkflowCardBase } from "../elements/workflow-card.tsx";
+import { WorkflowCardActions, WorkflowCardDisplay } from "../elements/workflow-card.tsx";
 import { WorkflowPushToCopiesDialog } from "./workflow-push-to-copies-dialog.tsx";
 import { WorkflowReplicateDialog } from "./workflow-replicate-dialog.tsx";
 

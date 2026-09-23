@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 
 import type { DefaultGovernanceAdminWorkspaceViewAuditService } from "./admin-workspace-view-audit.service.ts";
 import type { DefaultGovernanceCliSessionInventoryService } from "./cli-session-inventory.service.ts";

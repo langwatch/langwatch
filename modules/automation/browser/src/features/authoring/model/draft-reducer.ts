@@ -1,5 +1,5 @@
+import type { AlertType } from "@langwatch/automation-contract";
 import {
-  AlertType,
   DEFAULT_TRACE_DEBOUNCE_MS,
   findGraphAlertFromTriggerRow as parseGraphAlertRow,
   type AutomationFilterValue,

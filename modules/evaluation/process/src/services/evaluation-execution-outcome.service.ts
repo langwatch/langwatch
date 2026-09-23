@@ -8,10 +8,8 @@ import { createLogger } from "@langwatch/observability";
 
 import { type EvaluationExecutionReceipt } from "../app/evaluation.members.ts";
 import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
-import {
-  EvaluationReportedEventService,
-  type EvaluationReportedResult,
-} from "./evaluation-reported-event.service.ts";
+import type { EvaluationReportedEventService } from "./evaluation-reported-event.service.ts";
+import { type EvaluationReportedResult } from "./evaluation-reported-event.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 

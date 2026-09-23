@@ -24,12 +24,12 @@ import {
 } from "@langwatch/stored-object-contract";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
-import {
+import type {
   StoredObjectDelivery,
   StoredObjectStorage,
   StoredObjectUploadTokenCodec,
-  type StoredObjectStorageAddress,
 } from "../app/stored-object.members.ts";
+import { type StoredObjectStorageAddress } from "../app/stored-object.members.ts";
 import type {
   StoredObjectRecord,
   StoredObjectRecordRepository,

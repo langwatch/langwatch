@@ -351,7 +351,7 @@ function VirtualKeysPage() {
                             key={vk.id}
                             cursor="pointer"
                             _hover={{ bg: "bg.subtle" }}
-                            onClick={() => void router.push(`/gateway/virtual-keys/${vk.id}`)}
+                            onClick={() => router.push(`/gateway/virtual-keys/${vk.id}`)}
                           >
                             <Table.Cell>
                               <VStack align="start" gap={1}>
@@ -511,9 +511,7 @@ function VirtualKeysPage() {
                                   <Menu.Content>
                                     <Menu.Item
                                       value="details"
-                                      onClick={() =>
-                                        void router.push(`/gateway/virtual-keys/${vk.id}`)
-                                      }
+                                      onClick={() => router.push(`/gateway/virtual-keys/${vk.id}`)}
                                     >
                                       <Eye size={14} /> Details
                                     </Menu.Item>
@@ -521,9 +519,7 @@ function VirtualKeysPage() {
                                       <Menu.Item
                                         value="view-traces"
                                         data-testid={`vk-view-traces-${vk.id}`}
-                                        onClick={() =>
-                                          void router.push(traceHrefByKeyId.get(vk.id)!)
-                                        }
+                                        onClick={() => router.push(traceHrefByKeyId.get(vk.id)!)}
                                       >
                                         <Bird size={14} /> View traces
                                       </Menu.Item>

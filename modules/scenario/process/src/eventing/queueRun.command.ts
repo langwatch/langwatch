@@ -19,7 +19,7 @@ import type {
   SimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId } from "@langwatch/suite-contract";
-import { z } from "zod";
+import type { z } from "zod";
 
 const logger = createLogger("langwatch:simulation-processing:queue-run");
 

@@ -12,7 +12,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { type TraceSpanNormalization } from "../app/trace.members.ts";
-import { SpanCostService } from "../services/span-cost.service.ts";
+import type { SpanCostService } from "../services/span-cost.service.ts";
 
 /**
  * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent. Field

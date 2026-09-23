@@ -1,4 +1,5 @@
-import { HandledError, type SerializedHandledError } from "@langwatch/handled-error";
+import type { HandledError } from "@langwatch/handled-error";
+import { type SerializedHandledError } from "@langwatch/handled-error";
 import {
   MASKED_KEY_PLACEHOLDER,
   findModelProviderDefinition,

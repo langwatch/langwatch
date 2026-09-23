@@ -351,7 +351,7 @@ export type End = BaseComponent & {
   isEvaluator?: boolean;
 };
 
-export type Component = BaseComponent | Entry | Signature | Code | Evaluator | End | Custom;
+export type Component = BaseComponent | Entry | Signature | Evaluator | End | Custom;
 
 /**
  * Portable graph values. The contract deliberately describes the persisted

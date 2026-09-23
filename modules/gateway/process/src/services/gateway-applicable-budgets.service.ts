@@ -13,7 +13,7 @@ import {
 import type { ProjectApi, TraceDestinationProject } from "@langwatch/project-contract";
 
 import { type BudgetSpendTarget, type GatewayBudgetSpend } from "../app/gateway.members.ts";
-import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
+import type { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
 export type DraftVirtualKey = {

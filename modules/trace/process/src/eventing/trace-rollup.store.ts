@@ -1,6 +1,6 @@
 import type { AppendStore, ProjectionStoreContext } from "@langwatch/eventing";
 
-import { TraceAnalyticsRollupRepository } from "../repositories/projection/trace-analytics-rollup.repository.ts";
+import type { TraceAnalyticsRollupRepository } from "../repositories/projection/trace-analytics-rollup.repository.ts";
 import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
 
 /**

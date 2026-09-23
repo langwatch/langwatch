@@ -9,7 +9,7 @@ import {
 /** Repositories contract: memory tier tested here, Prisma tier in prisma/__tests__/. */
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryOrganizationDatabase } from "../memory/memory.organization.database.ts";
+import type { MemoryOrganizationDatabase } from "../memory/memory.organization.database.ts";
 import { organizationRepositories } from "../organization-repositories.registry.ts";
 import type { OrganizationRepositories } from "../organization.repositories.ts";
 

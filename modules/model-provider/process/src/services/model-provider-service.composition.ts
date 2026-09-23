@@ -3,14 +3,14 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import {
+import type {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
   CodexTokenRefresher,
   ModelProviderConnectionRateLimiter,
   ModelTranslation,
-  type ModelProviderIdService,
 } from "../app/model-provider.members.ts";
+import { type ModelProviderIdService } from "../app/model-provider.members.ts";
 import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
 import { PrismaModelDefaultRepository } from "../repositories/prisma/prisma.model-default.repository.ts";
 import { PrismaModelProviderRepository } from "../repositories/prisma/prisma.model-provider.repository.ts";

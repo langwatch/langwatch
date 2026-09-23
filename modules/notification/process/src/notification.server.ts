@@ -7,7 +7,8 @@ import type {
   EmailOutboundProxyConfig,
   MailerConfiguration,
 } from "./channels/email-delivery.channel.ts";
-import { TenantBroadcast, TenantBroadcastPublisher } from "./channels/tenant-broadcast.channel.ts";
+import type { TenantBroadcast } from "./channels/tenant-broadcast.channel.ts";
+import { TenantBroadcastPublisher } from "./channels/tenant-broadcast.channel.ts";
 import { notificationRepositories } from "./repositories/notification-repositories.registry.ts";
 import { RedisTenantBroadcastRepository } from "./repositories/redis/redis.tenant-broadcast.repository.ts";
 import { EmailDeliveryAdapter } from "./services/email-delivery.service.ts";

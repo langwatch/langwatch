@@ -3,15 +3,12 @@
  * engine runs on, and answers with its ARN — reconciling because
  * `UpdateFunctionCode` touches only the image, not the rest of the config.
  */
-import {
-  CloudWatchLogsClient,
-  CreateLogGroupCommand,
-  PutRetentionPolicyCommand,
-} from "@aws-sdk/client-cloudwatch-logs";
+import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { CreateLogGroupCommand, PutRetentionPolicyCommand } from "@aws-sdk/client-cloudwatch-logs";
+import type { LambdaClient } from "@aws-sdk/client-lambda";
 import {
   CreateFunctionCommand,
   GetFunctionCommand,
-  LambdaClient,
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
   type FunctionConfiguration,

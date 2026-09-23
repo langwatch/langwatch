@@ -1,7 +1,8 @@
 import type { BatchEvaluationRecord, BatchEvaluationSummary } from "@langwatch/dataset-contract";
 
 import type { BatchEvaluationRepository } from "../batch-evaluation.repository.ts";
-import { MemoryDatasetDatabase, type MemoryBatchEvaluation } from "./memory.dataset.database.ts";
+import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
+import { type MemoryBatchEvaluation } from "./memory.dataset.database.ts";
 
 export class MemoryBatchEvaluationRepository implements BatchEvaluationRepository {
   #database: MemoryDatasetDatabase;

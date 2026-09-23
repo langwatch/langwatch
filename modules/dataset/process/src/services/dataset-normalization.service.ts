@@ -1,5 +1,5 @@
+import type { DatasetNormalizationWorker } from "@langwatch/dataset-contract";
 import {
-  DatasetNormalizationWorker,
   datasetNormalizePayloadSchema,
   type DatasetNormalizePayload,
   type DatasetNormalizationSender,

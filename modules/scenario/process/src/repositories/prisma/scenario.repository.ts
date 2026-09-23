@@ -799,7 +799,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       // apart, and costs one query on a path that runs once per project.
       const raced = await this.findDefaultTestSuite(input);
       if (raced) return raced;
-      return await this.insertDefaultTestSuite({
+      return this.insertDefaultTestSuite({
         ...input,
         slug: await this.pickFreeDefaultSlug(input.projectId),
       });

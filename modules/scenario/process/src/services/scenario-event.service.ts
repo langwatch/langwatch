@@ -22,7 +22,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
+import type { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
 
 const logger = createLogger("langwatch:scenario-events");
 

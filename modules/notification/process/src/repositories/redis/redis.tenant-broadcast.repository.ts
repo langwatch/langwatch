@@ -1,9 +1,9 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
+import type { TenantBroadcastPublisher } from "../../channels/tenant-broadcast.channel.ts";
 import {
   TenantBroadcast,
-  TenantBroadcastPublisher,
   type TenantBroadcastEventType,
   type TenantBroadcastMessage,
 } from "../../channels/tenant-broadcast.channel.ts";

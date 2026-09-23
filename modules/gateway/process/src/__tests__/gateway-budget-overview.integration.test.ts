@@ -8,8 +8,8 @@ import type { ProjectApi } from "@langwatch/project-contract";
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -125,7 +125,7 @@ const overviewService = (): BudgetOverviewService =>
     featureFlags: featureFlags.api,
     personalVirtualKeys: {
       listActiveForPrincipal: async ({ userId, organizationId }) =>
-        await prisma.virtualKey.findMany({
+        prisma.virtualKey.findMany({
           where: { organizationId, principalUserId: userId, revokedAt: null },
           select: { id: true },
         }),

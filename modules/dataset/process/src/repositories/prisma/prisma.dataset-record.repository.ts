@@ -5,7 +5,8 @@ import {
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 

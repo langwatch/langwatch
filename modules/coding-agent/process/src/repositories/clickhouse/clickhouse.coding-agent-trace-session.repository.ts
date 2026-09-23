@@ -4,7 +4,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
+import type { CodingAgentTraceSessionRepository as TraceSessionRepository } from "../coding-agent-trace-session.repository.ts";
 import {
   clickHouseMomentOf,
   parseClickHouseDateTimeMs,

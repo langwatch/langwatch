@@ -1,9 +1,11 @@
-import { getLatestConfigVersionSchema, NotFoundError } from "@langwatch/prompt-contract";
+import type { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
+import { NotFoundError } from "@langwatch/prompt-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { z } from "zod";
 
 import { createPromptServiceForTest } from "../repositories/prisma/__tests__/prompt-service.test-fixture.ts";
-import { PromptService, type VersionedPrompt } from "../services/prompt.service.ts";
+import type { PromptService } from "../services/prompt.service.ts";
+import { type VersionedPrompt } from "../services/prompt.service.ts";
 
 type SyncConfigData = z.infer<ReturnType<typeof getLatestConfigVersionSchema>>["configData"];
 

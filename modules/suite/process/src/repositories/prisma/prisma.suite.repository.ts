@@ -269,7 +269,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
       // failed statement aborts its transaction, so the retry is the whole
       // locked block, which picks a free slug on its second read.
       if (isUniqueConstraintError(error)) {
-        return await resolveUnderLock();
+        return resolveUnderLock();
       }
       throw error;
     }

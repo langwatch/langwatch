@@ -175,7 +175,7 @@ beforeEach(() => {
   seedProvedConnection("dns-txt");
 });
 
-const held = async () => await connections.tryFindConnection({ connectionId: CONNECTION });
+const held = async () => connections.tryFindConnection({ connectionId: CONNECTION });
 const proofOf = async () =>
   (await held())?.domainVerifications.find((entry) => entry.domain === "acme.com");
 const recorded = (): string[] =>

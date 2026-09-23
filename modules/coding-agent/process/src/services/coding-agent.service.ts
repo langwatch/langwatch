@@ -25,10 +25,10 @@ import type { GithubApi } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { CodingAgentBillingPolicy, CodingAgentClock } from "../app/coding-agent.members.ts";
-import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
-import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
-import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
-import { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository.ts";
+import type { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
+import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
+import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";
+import type { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository.ts";
 import { CodingAgentPersonalPullRequestValuesService } from "./coding-agent-personal-pull-request-values.service.ts";
 import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 import { CodingAgentPullRequestMappingBackfillService } from "./coding-agent-pull-request-mapping-backfill.service.ts";

@@ -113,7 +113,7 @@ function usageService(): GatewayUsageService {
     projects: { listIdsByOrganization: async () => [PROJECT_ID, GOV_PROJECT_ID] },
     virtualKeys: {
       findMetaByIds: async ({ organizationId, ids }) =>
-        await prisma.virtualKey.findMany({
+        prisma.virtualKey.findMany({
           where: { organizationId, id: { in: ids } },
           select: { id: true, name: true, displayPrefix: true },
         }),

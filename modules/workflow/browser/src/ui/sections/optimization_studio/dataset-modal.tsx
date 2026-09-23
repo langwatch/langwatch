@@ -99,7 +99,7 @@ export function DatasetModal({
   open,
   onClose,
   node,
-  editingDataset: editingDataset_ = undefined,
+  editingDataset: editingDataset_,
 }: {
   open: boolean;
   onClose: () => void;

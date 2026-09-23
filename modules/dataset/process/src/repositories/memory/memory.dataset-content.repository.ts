@@ -7,7 +7,7 @@ import type {
   UpdateDatasetInput,
 } from "../dataset-content.repository.ts";
 import type { DatasetRow } from "../dataset.repository.ts";
-import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
+import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** The defaults a stored dataset row carries when a write did not name them. */
 const STORED_DEFAULTS = {

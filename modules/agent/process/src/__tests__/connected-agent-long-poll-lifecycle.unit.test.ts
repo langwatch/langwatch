@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AgentService } from "../services/agent.service.ts";
 import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
-import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
+import type { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import { AgentSessionService } from "../services/connected-agent-session.service.ts";
 import { createConnectedAgentFixture, createLongPollFixture } from "./connected-agent.fixture.ts";

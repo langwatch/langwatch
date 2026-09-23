@@ -1,8 +1,8 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { createApp } from "@langwatch/kernel";
 import { MetricApi } from "@langwatch/metric-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { metricServer } from "../../metric.server.ts";

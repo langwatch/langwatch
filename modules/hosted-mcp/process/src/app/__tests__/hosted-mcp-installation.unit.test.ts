@@ -1,13 +1,13 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
  * The hosted MCP feature, booted over its store members and peers alone.
  */
-import { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
 import { createApp } from "@langwatch/kernel";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { hostedMcpServer } from "../../hosted-mcp.server.ts";

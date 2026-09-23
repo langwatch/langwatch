@@ -4,11 +4,12 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * is handled: the process maps the status to its door's code and the browser
  * reads its copy from the code, so none of them reaches a customer as unknown.
  */
-import { AuthzApi, type AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
-import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { type AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import { dataPrivacyServer } from "../../data-privacy.server.ts";

@@ -1,5 +1,5 @@
 import type { TraceSpanSpool, TraceSpanSpoolIdentity } from "../app/trace.members.ts";
-import { TraceSpoolService } from "./trace-spool.service.ts";
+import type { TraceSpoolService } from "./trace-spool.service.ts";
 
 /**
  * Renames the spool service onto the narrow members `EventingRecordSpanAdapter`

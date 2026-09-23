@@ -6,6 +6,7 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
 } from "@langwatch/api/rest";
+import type { gatewayBudgetWireSchema } from "@langwatch/gateway-contract";
 import {
   GatewayApi,
   GatewayWindow,
@@ -24,7 +25,6 @@ import {
   gatewayVkSpendWindowSchema,
   gatewayCreateVirtualKeySchema,
   gatewayUpdateVirtualKeySchema,
-  gatewayBudgetWireSchema,
   gatewayCreateBudgetSchema,
   gatewayUpdateBudgetSchema,
   gatewayDisableVkSchema,

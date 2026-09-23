@@ -1,9 +1,9 @@
 import { normalizeMetricName } from "@langwatch/coding-agent-contract";
 
+import type { CodingAgentSessionStateProjection } from "./coding-agent-session-state.projection.ts";
 import {
   type CodingAgentSessionData,
   type MetricSeriesFact,
-  CodingAgentSessionStateProjection,
 } from "./coding-agent-session-state.projection.ts";
 
 const MAX_METRIC_SERIES = 200;

@@ -15,7 +15,7 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import { type SchedulerWake } from "../app/ops.app.ts";
-import { SchedulerAuditRepository } from "../repositories/process/ops-audit.repository.ts";
+import type { SchedulerAuditRepository } from "../repositories/process/ops-audit.repository.ts";
 import type {
   SchedulerOpsRepository,
   ScheduledJobRecord,

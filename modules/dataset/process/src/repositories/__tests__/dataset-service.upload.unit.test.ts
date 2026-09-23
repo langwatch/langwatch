@@ -2,7 +2,7 @@ import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
-import { DatasetUpload } from "../../app/dataset.app.ts";
+import type { DatasetUpload } from "../../app/dataset.app.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";

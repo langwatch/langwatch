@@ -200,7 +200,7 @@ function BudgetsPage() {
                             key={b.id}
                             cursor="pointer"
                             _hover={{ bg: "bg.subtle" }}
-                            onClick={() => void router.push(`/gateway/budgets/${b.id}`)}
+                            onClick={() => router.push(`/gateway/budgets/${b.id}`)}
                           >
                             <Table.Cell>
                               <VStack align="start" gap={0}>
@@ -350,7 +350,7 @@ function BudgetsPage() {
                                 <Menu.Content>
                                   <Menu.Item
                                     value="details"
-                                    onClick={() => void router.push(`/gateway/budgets/${b.id}`)}
+                                    onClick={() => router.push(`/gateway/budgets/${b.id}`)}
                                   >
                                     <Eye size={14} /> Details
                                   </Menu.Item>

@@ -1,16 +1,18 @@
+import type {
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+  ROLE_DEFINED_EVENT_TYPE,
+  ROLE_DELETED_EVENT_TYPE,
+  ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
+} from "@langwatch/authz-contract";
 import {
   type GrantAttachedPayload,
-  GRANT_ATTACHED_EVENT_TYPE,
   type GrantRevokedPayload,
-  GRANT_REVOKED_EVENT_TYPE,
   type GrantRoleChangedPayload,
-  GRANT_ROLE_CHANGED_EVENT_TYPE,
   type RoleDefinedPayload,
-  ROLE_DEFINED_EVENT_TYPE,
   type RoleDeletedPayload,
-  ROLE_DELETED_EVENT_TYPE,
   type RolePermissionsChangedPayload,
-  ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
 import type { Event } from "@langwatch/eventing";
 

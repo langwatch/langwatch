@@ -42,12 +42,12 @@ const id = (prefix: string) => `${prefix}_${randomUUID()}`;
 
 function contractCases(backend: Backend): void {
   const dashboard = async (name = "Reports", order = 0) =>
-    await backend
+    backend
       .repository()
       .createDashboard({ id: id("dash"), projectId: backend.projectId(), name, order });
 
   const graph = async (dashboardId: string | null, name = "Latency", layout = LAYOUT) =>
-    await backend.repository().createGraph({
+    backend.repository().createGraph({
       id: id("graph"),
       projectId: backend.projectId(),
       name,
@@ -58,7 +58,7 @@ function contractCases(backend: Backend): void {
     });
 
   const chart = async (name = "Spend") =>
-    await backend.repository().createSavedWorkbenchChart({
+    backend.repository().createSavedWorkbenchChart({
       id: id("chart"),
       projectId: backend.projectId(),
       name,

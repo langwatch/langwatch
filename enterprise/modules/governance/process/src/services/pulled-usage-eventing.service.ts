@@ -21,14 +21,10 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import {
-  COST_ROLLUP_WATCH_PROCESS_NAME,
-  CostRollupWatchProcess,
-} from "../eventing/cost-rollup-watch.process.ts";
-import {
-  PULLED_USAGE_LEDGER_PROCESS_NAME,
-  PulledUsageLedgerProcess,
-} from "../eventing/pulled-usage-ledger.process.ts";
+import type { CostRollupWatchProcess } from "../eventing/cost-rollup-watch.process.ts";
+import { COST_ROLLUP_WATCH_PROCESS_NAME } from "../eventing/cost-rollup-watch.process.ts";
+import type { PulledUsageLedgerProcess } from "../eventing/pulled-usage-ledger.process.ts";
+import { PULLED_USAGE_LEDGER_PROCESS_NAME } from "../eventing/pulled-usage-ledger.process.ts";
 
 /**
  * Both events the aggregate declares. The retraction is in the type as well as

@@ -65,7 +65,7 @@ export class ConnectedSeatChangeService {
 
     const existing = await this.repository.findSeatChange(input.licenseRowId);
     if (existing) {
-      return existing.state === "intent" ? await this.complete(existing) : existing.state;
+      return existing.state === "intent" ? this.complete(existing) : existing.state;
     }
 
     const record = this.decide({ account, ...input });

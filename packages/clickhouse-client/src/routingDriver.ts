@@ -27,7 +27,7 @@ async function serverFor<Client extends RoutableStatementClient>(
     return connection.resolveOrganization(request.organizationId);
   }
 
-  return request.tenantId === "" ? connection.shared() : await connection.resolve(request.tenantId);
+  return request.tenantId === "" ? connection.shared() : connection.resolve(request.tenantId);
 }
 
 function insertParams(request: InsertRequest): Record<string, unknown> {

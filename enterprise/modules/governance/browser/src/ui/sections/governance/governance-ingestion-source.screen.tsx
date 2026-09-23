@@ -450,7 +450,7 @@ function useSourceDetailMutations({
   const archive = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Source archived", type: "success" });
-      void router.push("/governance/inventory?tab=sources");
+      router.push("/governance/inventory?tab=sources");
     },
     onError: (e) =>
       showErrorToast({

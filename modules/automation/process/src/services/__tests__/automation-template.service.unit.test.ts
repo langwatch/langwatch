@@ -12,7 +12,7 @@ import {
 } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 
-import { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
+import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 
 const BASE_HOST = "https://app.langwatch.ai";

@@ -3,16 +3,16 @@
  * Logs for when each last spoke. Every "not found" is answered as an absence
  * rather than raised — a fleet that changed under a sweep is the normal case.
  */
+import type { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import {
-  CloudWatchLogsClient,
   DeleteLogGroupCommand,
   DescribeLogGroupsCommand,
   DescribeLogStreamsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import type { LambdaClient } from "@aws-sdk/client-lambda";
 import {
   DeleteFunctionCommand,
   GetFunctionCommand,
-  LambdaClient,
   ListFunctionsCommand,
 } from "@aws-sdk/client-lambda";
 import type { Logger } from "@langwatch/observability";

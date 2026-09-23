@@ -8,7 +8,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
-import { AuthzCollectorService } from "./authz-collector.service.ts";
+import type { AuthzCollectorService } from "./authz-collector.service.ts";
 
 const MAX_CACHE_ENTRIES = 10_000;
 const DEFAULT_CACHE_MAX_AGE_MS = 30_000;

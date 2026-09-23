@@ -1,9 +1,7 @@
 import { SessionPolicyOutOfRangeError } from "@langwatch/enterprise-governance-contract";
 
-import {
-  OrganizationSessionPolicyRepository,
-  type OrganizationSessionPolicy,
-} from "../repositories/session-policy.repository.ts";
+import type { OrganizationSessionPolicyRepository } from "../repositories/session-policy.repository.ts";
+import { type OrganizationSessionPolicy } from "../repositories/session-policy.repository.ts";
 
 /**
  * The maximum lifetime an organization admin may enforce on CLI/device sessions. Zero means

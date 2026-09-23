@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -10,8 +11,8 @@ import {
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { MonitorApi, type MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import { type MonitorWithEvaluator } from "@langwatch/monitor-contract";
 
 import {
   createMonitorTestApp,

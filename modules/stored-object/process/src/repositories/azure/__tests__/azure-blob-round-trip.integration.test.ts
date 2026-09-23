@@ -4,7 +4,7 @@
  * @see specs/features/scenarios/externalize-event-byte-content.feature
  */
 import { createHash } from "node:crypto";
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 
 import { TieredBlobStore } from "@langwatch/group-queue/operational";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";

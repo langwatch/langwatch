@@ -6,10 +6,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TrackedEventSync } from "../tracked-event-sync.subscriber.ts";
+import type { createOtlpSpan } from "./trace-subscriber.fixtures.ts";
 import {
   createContext,
   createFoldState,
-  createOtlpSpan,
   createSpanReceivedEvent,
   OCCURRED_AT,
 } from "./trace-subscriber.fixtures.ts";

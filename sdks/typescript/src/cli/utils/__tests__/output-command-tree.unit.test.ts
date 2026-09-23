@@ -1,15 +1,12 @@
+import type { Command } from "commander";
 /**
  * The port wired into the REAL command tree: proves it is connected, since a
  * migration that forgets `emitsResult` registration would leave a command
  * silently unmigrated. Split from `output-port.unit.test.ts`.
  */
 import { describe, it, expect } from "vitest";
-import { Command } from "commander";
-import {
-  assertFormatIsSupported,
-  isOutputAware,
-  resolveActionOutputOptions,
-} from "../output";
+
+import { assertFormatIsSupported, isOutputAware, resolveActionOutputOptions } from "../output";
 import { installOutputHarness } from "./output-harness";
 
 const { warned } = installOutputHarness();
@@ -108,19 +105,14 @@ describe("the real command tree", () => {
   describe("when a tool wrapper runs inside a coding agent", () => {
     /** @scenario "A wrapper run inside a coding agent prints no table note" */
     it("prints no note about a table for any wrapper", async () => {
-      const { buildProgram, TOOL_WRAPPER_COMMANDS } = await import(
-        "../../program.js"
-      );
+      const { buildProgram, TOOL_WRAPPER_COMMANDS } = await import("../../program.js");
       const root = buildProgram();
       process.env.CLAUDECODE = "1";
 
       for (const tool of TOOL_WRAPPER_COMMANDS) {
         const wrapper = findCommand(root, [tool]);
         expect(wrapper, tool).toBeDefined();
-        await assertFormatIsSupported(
-          wrapper!,
-          resolveActionOutputOptions(wrapper!),
-        );
+        await assertFormatIsSupported(wrapper!, resolveActionOutputOptions(wrapper!));
       }
 
       expect(warned.join("")).not.toContain("not machine-readable");

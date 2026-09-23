@@ -1,7 +1,7 @@
 import { datasetRecordSchema, type DatasetRecord } from "@langwatch/dataset-contract";
 
 import type { DatasetRecordContentRepository } from "../dataset-record-content.repository.ts";
-import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
+import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 export class MemoryDatasetRecordContentRepository implements DatasetRecordContentRepository {
   #database: MemoryDatasetDatabase;

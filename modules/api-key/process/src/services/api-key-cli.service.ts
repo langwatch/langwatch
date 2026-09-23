@@ -16,8 +16,8 @@ import {
 import { Temporal, fromDate, type Instant } from "@langwatch/time";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
-import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
-import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
+import type { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
+import type { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 export class ApiKeyCliService {

@@ -6,7 +6,7 @@ import {
 
 import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
 import type { ModelCostRecord, ModelCostRepository } from "../model-cost.repository.ts";
-import { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
+import type { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
 
 export class MemoryModelCostRepository implements ModelCostRepository {
   static create(

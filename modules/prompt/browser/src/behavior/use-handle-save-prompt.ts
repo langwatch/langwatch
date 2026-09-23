@@ -122,13 +122,13 @@ export function useHandleSavePrompt() {
         });
       };
 
-      void triggerChangeHandle({
+      triggerChangeHandle({
         id: configId,
         onSuccess: onSuccessChangeHandle,
         onError,
       });
     } else if (configId) {
-      void triggerSaveVersion({
+      triggerSaveVersion({
         id: configId,
         data,
         nextVersion,
@@ -136,7 +136,7 @@ export function useHandleSavePrompt() {
         onError,
       });
     } else {
-      void triggerCreatePrompt({ data, onSuccess, onError });
+      triggerCreatePrompt({ data, onSuccess, onError });
     }
   }, [
     triggerSaveVersion,

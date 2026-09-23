@@ -1,5 +1,4 @@
-import type { IntentSpec, ProcessManagerApplier, WakeHandler } from "@langwatch/eventing";
-import type { Event } from "@langwatch/eventing";
+import type { IntentSpec, ProcessManagerApplier, WakeHandler, Event } from "@langwatch/eventing";
 import { z } from "zod";
 
 import { isUsageReportDue } from "../rules/usage-report-schedule.rules.ts";

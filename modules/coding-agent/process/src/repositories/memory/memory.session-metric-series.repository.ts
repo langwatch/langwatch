@@ -4,7 +4,7 @@ import {
   SessionMetricSeriesRepository,
   type SessionMetricTotal,
 } from "../session-metric-series.repository.ts";
-import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
+import type { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 
 /** Metric-only session overlays, held in the process. */
 export class MemorySessionMetricSeriesRepository extends SessionMetricSeriesRepository {

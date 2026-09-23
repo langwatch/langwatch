@@ -3,7 +3,8 @@
  * specs/features/agent-testing/*.feature). Steps that need an agent, suite
  * or scenario create one when missing, so the test runs on an empty project.
  */
-import { Page, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 
 import { getProjectSlug } from "../helpers";
 
@@ -90,9 +91,7 @@ export async function thenISeeTheResultsTab(page: Page) {
  * state, reads that as "already set up", and skips the setup it needed.
  */
 export async function givenTheScenariosPanelHasSettled(page: Page) {
-  await page
-    .getByTestId("agent-testing-cases-panel")
-    .waitFor({ state: "visible", timeout: 30000 });
+  await page.getByTestId("agent-testing-cases-panel").waitFor({ state: "visible", timeout: 30000 });
   await page
     .getByTestId("agent-testing-cases-skeleton")
     .waitFor({ state: "detached", timeout: 30000 });

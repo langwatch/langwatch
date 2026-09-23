@@ -1029,7 +1029,7 @@ describe("a source that names a warehouse", () => {
     costPlan = { rows: [], nextChunkIndex: 1 };
 
     const runFrom = async (cursor: string) =>
-      await makePuller().runOnce(
+      makePuller().runOnce(
         { cursor, credentials: { token: "dapi-fixture" } },
         {
           adapter: DATABRICKS_GENIE_ADAPTER_ID,

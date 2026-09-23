@@ -94,7 +94,7 @@ const batchClearPII = async (
     // ever widens the analysis-service entities on a presidio outage. The
     // policy's do-not-redact exceptions do carry over, so the fallback cannot
     // re-redact a value an exception kept.
-    return await runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
+    return runGoogleDlpBatch(transport, texts, piiRedactionLevel, exceptPatterns);
   }
 };
 

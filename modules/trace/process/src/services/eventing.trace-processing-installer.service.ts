@@ -1,8 +1,7 @@
-import {
-  DatasetNormalizationWorker,
-  type DatasetNormalizePayload,
-} from "@langwatch/dataset-contract";
-import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
+import type { DatasetNormalizationWorker } from "@langwatch/dataset-contract";
+import { type DatasetNormalizePayload } from "@langwatch/dataset-contract";
+import type { EventSourcing } from "@langwatch/eventing";
+import { mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
 

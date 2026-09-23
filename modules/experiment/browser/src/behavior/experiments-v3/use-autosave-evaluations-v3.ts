@@ -425,7 +425,7 @@ export const useAutosaveEvaluationsV3 = () => {
           setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
           return "refused";
         }
-        return await attemptSave({ isRetry: true });
+        return attemptSave({ isRetry: true });
       }
     };
     const link = inFlightRef.current

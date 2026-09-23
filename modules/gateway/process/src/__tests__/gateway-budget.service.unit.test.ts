@@ -2,9 +2,9 @@ import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { type LedgerEventRow } from "../app/gateway.members.ts";
-import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
+import type { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 
 function mockChRepoWithEvents(
   events: (Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">)[],

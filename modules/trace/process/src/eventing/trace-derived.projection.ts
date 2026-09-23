@@ -36,7 +36,7 @@ import {
 
 import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules.ts";
 import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
-import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
+import type { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
 import {
   MAX_PROCESSED_SPANS,

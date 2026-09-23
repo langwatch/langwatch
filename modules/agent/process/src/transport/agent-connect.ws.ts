@@ -1,8 +1,5 @@
-import {
-  AgentApi,
-  agentConnectCredentialsSchema,
-  relayPayloadCaps,
-} from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { agentConnectCredentialsSchema, relayPayloadCaps } from "@langwatch/agent-contract";
 import { WebSocketProtocol } from "@langwatch/api";
 
 export const CONNECT_PATH = "/api/v1/agents/connect";

@@ -225,7 +225,7 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
                 variant="outline"
                 flex={1}
                 onClick={() => {
-                  void router.push(`/ops/projections/${status.runId}`);
+                  router.push(`/ops/projections/${status.runId}`);
                   onClose();
                 }}
               >

@@ -2,9 +2,9 @@ import { Readable } from "node:stream";
 
 import { describe, expect, it, vi } from "vitest";
 
+import type { DatasetStorageResolver } from "../../../app/dataset.app.ts";
 import {
   type DatasetAzureConfigResolver,
-  DatasetStorageResolver,
   type DatasetBlobDriver,
   type DatasetStorage,
   type PresignedUpload,

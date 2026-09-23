@@ -10,7 +10,7 @@ import {
   type UpdateGatewayCacheRuleInput,
 } from "@langwatch/gateway-contract";
 
-import { GatewayCacheRuleRepository } from "../repositories/gateway-cache-rule.repository.ts";
+import type { GatewayCacheRuleRepository } from "../repositories/gateway-cache-rule.repository.ts";
 
 /** Private cache-rule collaborator owned by the singular Gateway service. */
 export class GatewayCacheRuleService {

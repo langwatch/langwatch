@@ -31,7 +31,7 @@ let repo: MetricDataPointClickHouseRepository;
  */
 function metricClient(client: ClickHouseClient): MetricClickHouseClient {
   return {
-    insert: async (params) => await client.insert(params),
+    insert: async (params) => client.insert(params),
     query: async ({ unscoped: _unscoped, ...params }) => {
       const resultSet = await client.query(params);
       return {
@@ -343,7 +343,7 @@ describe("given a cumulative series long enough to span several rollup buckets",
           reads += 1;
           return delegate.query(args);
         },
-        insert: async (args) => await delegate.insert(args),
+        insert: async (args) => delegate.insert(args),
       };
 
       await MetricDataPointClickHouseRepository.create({

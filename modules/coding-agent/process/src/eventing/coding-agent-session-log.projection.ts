@@ -11,10 +11,8 @@ import {
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 
-import {
-  type CodingAgentSessionData,
-  CodingAgentSessionStateProjection,
-} from "./coding-agent-session-state.projection.ts";
+import type { CodingAgentSessionStateProjection } from "./coding-agent-session-state.projection.ts";
+import { type CodingAgentSessionData } from "./coding-agent-session-state.projection.ts";
 
 const CLAUDE = {
   EVENT: {

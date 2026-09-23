@@ -2,7 +2,8 @@
  * Step definitions for Invitation Approval Workflow tests.
  * Source: specs/members/update-pending-invitation.feature
  */
-import { Page, expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
 

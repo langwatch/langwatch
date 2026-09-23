@@ -12,11 +12,11 @@ import type {
 } from "@langwatch/eventing";
 
 import type { IngestionPullScheduler } from "../app/governance.members.ts";
+import type { IngestionPullService } from "../services/ingestion-pull.service.ts";
 import {
   INGESTION_PULL_CONCURRENCY,
   INGESTION_PULL_LEASE_DURATION_MS,
   INGESTION_PULL_MAX_ATTEMPTS,
-  IngestionPullService,
 } from "../services/ingestion-pull.service.ts";
 import { IngestionPullIntent, ingestionPullRunIntentSchema } from "./ingestion-pull.intent.ts";
 

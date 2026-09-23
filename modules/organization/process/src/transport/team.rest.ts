@@ -11,12 +11,12 @@ import { moduleApi } from "@langwatch/kernel/module-api";
  * Routes that address a single team (`:id`) check permissions at team scope;
  * collection routes stay at organization scope as they operate on that whole set.
  */
+import type { organizationTeamRestMemberSchema } from "@langwatch/organization-contract";
 import {
   organizationTeamRestAddMemberSchema,
   organizationTeamRestArchivedSchema,
   organizationTeamRestCreateSchema,
   organizationTeamRestMemberListSchema,
-  organizationTeamRestMemberSchema,
   organizationTeamRestMemberParamsSchema,
   organizationTeamRestPageSchema,
   organizationTeamRestPaginationQuerySchema,
@@ -30,7 +30,7 @@ import {
   type OrganizationTeam,
   type UpdateOrganizationTeamInput,
 } from "@langwatch/organization-contract";
-import { z } from "zod";
+import type { z } from "zod";
 
 /**
  * What the `/api/teams` family reaches, as flat operations the organization's

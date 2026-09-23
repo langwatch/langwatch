@@ -77,7 +77,7 @@ function transportFor(batch: BatchClearPIIFunction) {
       piiRedactionLevel: "ESSENTIAL" | "STRICT" | "DISABLED",
       entities?: readonly string[],
     ) =>
-      await batch(texts, {
+      batch(texts, {
         piiRedactionLevel,
         mainMethod: "presidio",
         ...(entities ? { entities } : {}),

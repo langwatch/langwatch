@@ -4,7 +4,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository.ts";
+import type { SessionMetricSeriesRepository as MetricSeriesRepository } from "../session-metric-series.repository.ts";
 import { clickHouseMomentOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "session_metric_series" as const;

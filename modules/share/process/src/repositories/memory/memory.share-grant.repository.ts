@@ -5,7 +5,7 @@ import type {
   ShareGrantRepository,
   ShareGrantScope,
 } from "../share-grant.repository.ts";
-import { MemoryShareDatabase } from "./memory.share.database.ts";
+import type { MemoryShareDatabase } from "./memory.share.database.ts";
 
 export class MemoryShareGrantRepository implements ShareGrantRepository {
   #database: MemoryShareDatabase;

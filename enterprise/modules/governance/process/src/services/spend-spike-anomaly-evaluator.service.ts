@@ -11,7 +11,7 @@ import type {
   AnomalySpendReader,
   AnomalySpendSourceFilter,
 } from "../app/governance.members.ts";
-import { SpendSpikeAnomalyRepository } from "../repositories/spend-spike-anomaly.repository.ts";
+import type { SpendSpikeAnomalyRepository } from "../repositories/spend-spike-anomaly.repository.ts";
 import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 

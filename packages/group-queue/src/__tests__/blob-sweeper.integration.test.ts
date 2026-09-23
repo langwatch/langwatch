@@ -69,7 +69,7 @@ describe("BlobSweeper", () => {
    * asserts so the expectations stay in the test that owns them.
    */
   const blobTtls = async (hashes: string[]) =>
-    await Promise.all(hashes.map((hash) => redis.ttl(blobKey(hash))));
+    Promise.all(hashes.map((hash) => redis.ttl(blobKey(hash))));
 
   /** A blob the runner has judged sits on the grace window, not the backstop. */
   const notOnGraceWindow = (ttls: number[]) =>

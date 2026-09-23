@@ -10,7 +10,7 @@ import {
   RESERVED_CAUSALITY_DEPTH,
   TraceAttributeExtractionService,
 } from "./trace-attribute-extraction.service.ts";
-import { TraceOriginService } from "./trace-origin.service.ts";
+import type { TraceOriginService } from "./trace-origin.service.ts";
 
 /**
  * Trace-level model metadata stamped by the fold from the models its spans (or

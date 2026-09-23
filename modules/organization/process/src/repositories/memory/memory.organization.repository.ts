@@ -111,7 +111,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   }): Promise<GuidedOnboardingRecord> {
     const organization = this.requireOrganization(organizationId);
     organization.signupData = {
-      ...(organization.signupData ?? {}),
+      ...organization.signupData,
       guidedOnboarding: record.state,
       onboardingVariant: record.variant,
     };

@@ -1,17 +1,15 @@
-import scenario, {
-  type AgentAdapter,
-  AgentRole,
-  ScenarioExecutionStateLike,
-} from "@langwatch/scenario";
-import fs from "fs";
 import { execSync } from "child_process";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
+import fs from "fs";
 import os from "os";
 import path from "path";
-import * as pty from "node-pty";
-import chalk from "chalk";
+
 import { anthropic } from "@ai-sdk/anthropic";
+import type { ScenarioExecutionStateLike } from "@langwatch/scenario";
+import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
+import chalk from "chalk";
+import dotenv from "dotenv";
+import * as pty from "node-pty";
+import { describe, it, expect } from "vitest";
 
 dotenv.config();
 
@@ -71,7 +69,7 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
             .map((line) => {
               try {
                 return JSON.parse(line.trim());
-              } catch  {
+              } catch {
                 return null;
               }
             })

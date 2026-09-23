@@ -4,8 +4,9 @@
  * @see specs/auth/signup-does-not-strand-an-account.feature
  */
 import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/api/trpc";
-import { type AuthApi, FrontDoorRateLimitedError } from "@langwatch/auth-contract";
-import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
+import type { FrontDoorRateLimitedError } from "@langwatch/auth-contract";
+import { type AuthApi } from "@langwatch/auth-contract";
+import type { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

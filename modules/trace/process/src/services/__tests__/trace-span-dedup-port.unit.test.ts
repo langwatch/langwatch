@@ -3,7 +3,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { TraceSpanDedup, type SpanDedupRef } from "../trace-ingestion.service.ts";
+import type { TraceSpanDedup } from "../trace-ingestion.service.ts";
+import { type SpanDedupRef } from "../trace-ingestion.service.ts";
 
 describe("TraceSpanDedup", () => {
   describe("given a plain object with the port's three methods", () => {

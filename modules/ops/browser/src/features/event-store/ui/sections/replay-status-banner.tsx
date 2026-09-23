@@ -44,7 +44,7 @@ export function ReplayStatusBanner() {
               <Button
                 size="xs"
                 variant="outline"
-                onClick={() => void router.push(`/ops/projections/${status.runId}`)}
+                onClick={() => router.push(`/ops/projections/${status.runId}`)}
               >
                 View Progress
               </Button>

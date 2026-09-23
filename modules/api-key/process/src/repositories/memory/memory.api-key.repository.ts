@@ -12,7 +12,7 @@ import type {
   ApiKeyRow,
   ApiKeyUpdateRecord,
 } from "../api-key.repository.ts";
-import { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
+import type { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
 
 const API_KEY_KSUID_RESOURCE = "apikey";
 

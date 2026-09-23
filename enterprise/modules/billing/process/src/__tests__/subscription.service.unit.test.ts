@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type BillingSubscription, type BillingSubscriptionNotifier } from "../index.ts";
 import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
-import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import type { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { type SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import {

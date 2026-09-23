@@ -498,7 +498,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     metadata: GroupQueueContextMetadata | undefined,
     operation: () => Promise<T>,
   ): Promise<T> {
-    return this.contextPort ? await this.contextPort.run(metadata, operation) : await operation();
+    return this.contextPort ? this.contextPort.run(metadata, operation) : operation();
   }
 
   private failureDecision(error: unknown): {

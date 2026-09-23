@@ -2,8 +2,11 @@ import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabiliti
 import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { createUiApplication, type UiApplicationInstall } from "@langwatch/ui-kernel/application";
-import type { UiFeatureInstall } from "@langwatch/ui-kernel/feature-install";
-import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
+import {
+  type UiFeatureInstall,
+  uiRoutePageKeys,
+  type UiPageLoaderRegistry,
+} from "@langwatch/ui-kernel/feature-install";
 import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { Outlet } from "react-router";

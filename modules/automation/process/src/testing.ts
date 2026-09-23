@@ -1,12 +1,14 @@
+import type {
+  AutomationGraphNotifier,
+  AutomationRunawayNotice,
+  AutomationRunawaySignals,
+} from "./index.ts";
 import {
   AutomationDispatchError,
   AutomationEmailCapService,
-  AutomationGraphNotifier,
   AutomationLogger,
   AutomationHeartbeat,
   AutomationRunaway,
-  AutomationRunawayNotice,
-  AutomationRunawaySignals,
   AutomationSlackBotTokenDecryptor,
   AutomationTestFire,
 } from "./index.ts";

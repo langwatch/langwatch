@@ -51,7 +51,7 @@ export default function SsoConnectionsView() {
     } else {
       delete query.connection;
     }
-    void router.replace({ query }, undefined, { shallow: true });
+    router.replace({ query }, undefined, { shallow: true });
   };
 
   return (

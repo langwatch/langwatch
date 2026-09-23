@@ -7,7 +7,7 @@ import {
 } from "@langwatch/langy-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
 
-import { LangyConversationCommands } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../app/langy.members.ts";
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import {

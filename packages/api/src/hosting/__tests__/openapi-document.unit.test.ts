@@ -70,7 +70,7 @@ describe("given a route whose schema carries a recursive definition", () => {
     const document = await response.json();
     const refs: string[] = [];
     const walk = (node: unknown): void => {
-      if (Array.isArray(node)) return void node.forEach(walk);
+      if (Array.isArray(node)) return node.forEach(walk);
       if (typeof node !== "object" || node === null) return;
       const record = node as Record<string, unknown>;
       if (typeof record.$ref === "string") refs.push(record.$ref);

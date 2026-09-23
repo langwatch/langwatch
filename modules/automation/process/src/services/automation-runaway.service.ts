@@ -13,8 +13,8 @@ import {
   AutomationRunaway,
   type ClaimLease,
 } from "../repositories/automation-runaway.repository.ts";
-import { AutomationHeartbeat } from "./automation-graph-runtime.service.ts";
-import { AutomationRunawayMetricsSink } from "./automation-runaway-metrics.service.ts";
+import type { AutomationHeartbeat } from "./automation-graph-runtime.service.ts";
+import type { AutomationRunawayMetricsSink } from "./automation-runaway-metrics.service.ts";
 
 /**
  * Who a limit notice goes to, resolved through this process's own

@@ -3,9 +3,9 @@
  * reads back. It sends the search bar's vocabulary and the shorthand writes
  * the statement, so this is the run a CLI caller starts with `--target`.
  */
+import type { instantEvalEstimateSchema } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_TARGETS,
-  instantEvalEstimateSchema,
   instantEvalRunSchema,
   isInstantEvalRunActive,
 } from "@langwatch/instant-eval-contract";

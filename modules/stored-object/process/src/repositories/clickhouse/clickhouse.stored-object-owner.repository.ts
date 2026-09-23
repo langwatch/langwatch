@@ -1,4 +1,4 @@
-import { StoredObjectOwnerInstanceDirectoryRepository } from "../stored-object-owner-instance-directory.repository.ts";
+import type { StoredObjectOwnerInstanceDirectoryRepository } from "../stored-object-owner-instance-directory.repository.ts";
 import {
   StoredObjectOwnerRepository,
   type StoredObjectOwnerHit,

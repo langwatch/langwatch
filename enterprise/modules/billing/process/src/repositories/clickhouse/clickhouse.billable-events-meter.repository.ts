@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 import {

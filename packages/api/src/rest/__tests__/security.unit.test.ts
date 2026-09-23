@@ -6,7 +6,7 @@
  */
 
 import { moduleApi } from "@langwatch/kernel";
-import { Hono } from "hono";
+import type { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

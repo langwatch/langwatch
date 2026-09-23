@@ -1,7 +1,7 @@
 import type { ModelProviderStructuredGenerationInput } from "@langwatch/model-provider-contract";
 import { generateObject } from "ai";
 
-import { ModelProviderExecutionHandleService } from "./model-provider-execution-handle.service.ts";
+import type { ModelProviderExecutionHandleService } from "./model-provider-execution-handle.service.ts";
 
 /** Executes feature-owned structured prompts without exposing a vendor model handle to peers. */
 export class ModelProviderStructuredGenerationService {

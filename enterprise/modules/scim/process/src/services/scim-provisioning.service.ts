@@ -27,7 +27,7 @@ import {
   ScimDeprovisionService,
   type ScimOrganizationAdministration,
 } from "./scim-deprovision.service.ts";
-import { ScimGrantsService } from "./scim-grants.service.ts";
+import type { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimUserPatchService } from "./scim-user-patch.service.ts";
 
 /**

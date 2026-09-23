@@ -7,7 +7,7 @@ import {
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "@langwatch/langy-contract";
 
-import {
+import type {
   LangyGithubPermit,
   LangyHarness,
   LangyModel,
@@ -15,19 +15,19 @@ import {
   LangyTurnContextRenderer,
   LangyTurnMetrics,
   LangyUiActionSurface,
-  type LangyWorkerProbeInput,
   LangyWorker,
 } from "../app/langy.members.ts";
+import { type LangyWorkerProbeInput } from "../app/langy.members.ts";
 import type {
   LangyTurnAccessRepository,
   LangyTurnHandoffRepository,
 } from "../repositories/langy-live-turn.repository.ts";
-import { LangyMessageRepository } from "../repositories/langy-message.repository.ts";
+import type { LangyMessageRepository } from "../repositories/langy-message.repository.ts";
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
-import { LangyTurnAdmissionRepository } from "../repositories/langy-turn-admission.repository.ts";
-import { LangyConversationService } from "./langy-conversation.service.ts";
-import { LangyCredentialService } from "./langy-credential.service.ts";
-import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import type { LangyTurnAdmissionRepository } from "../repositories/langy-turn-admission.repository.ts";
+import type { LangyConversationService } from "./langy-conversation.service.ts";
+import type { LangyCredentialService } from "./langy-credential.service.ts";
+import type { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import type { LangyPrompt } from "./langy-prompt-registry.service.ts";
 
 export const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;

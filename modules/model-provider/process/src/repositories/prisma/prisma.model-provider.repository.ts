@@ -6,11 +6,11 @@ import {
   type ModelProvider,
   type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type ModelProvider as PrismaModelProvider,
   type ModelProviderScope,
   Prisma,
-  PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { z } from "zod";
 

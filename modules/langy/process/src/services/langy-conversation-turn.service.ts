@@ -8,12 +8,13 @@ import type {
 import { langyJsonValueSchema, LangyTurnErrors } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { LangyConversationCommands } from "../app/langy.members.ts";
+import type { LangyConversationCommands } from "../app/langy.members.ts";
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import { turnMessageId } from "../rules/langy-conversation-shape.rules.ts";
 import type { LangyConversationRuntime } from "./langy-conversation.service.ts";
-import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";
+import type { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import { type LangyFinalToolCall } from "./langy-final-parts.service.ts";
 import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 /**

@@ -9,7 +9,8 @@
   // links from a package.json. So this directory is the package.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["es2023"],
+    "lib": ["es2023", "dom"],
+    "jsx": "react-jsx",
     "types": [],
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,

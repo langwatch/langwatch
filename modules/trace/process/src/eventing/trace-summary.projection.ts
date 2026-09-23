@@ -35,7 +35,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
-import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
+import type { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,

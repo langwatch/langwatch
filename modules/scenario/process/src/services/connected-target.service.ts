@@ -1,5 +1,5 @@
+import type { AgentApi } from "@langwatch/agent-contract";
 import {
-  AgentApi,
   AgentOfflineError,
   AgentOwnerOnlyError,
   parseConnectedReference,

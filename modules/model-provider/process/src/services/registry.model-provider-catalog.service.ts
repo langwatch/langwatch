@@ -8,9 +8,9 @@ import {
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
+import type { ModelProviderManagedGateway } from "../app/model-provider.members.ts";
 import {
   ModelProviderCatalog,
-  ModelProviderManagedGateway,
   type ModelProviderCredentialProbe,
 } from "../app/model-provider.members.ts";
 

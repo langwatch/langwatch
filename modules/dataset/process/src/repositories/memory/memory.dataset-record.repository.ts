@@ -6,7 +6,7 @@ import {
 } from "@langwatch/dataset-contract";
 
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
-import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
+import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** `[createdAt asc, id asc]`, the canonical order every read path uses. */
 function canonical(left: DatasetRecord, right: DatasetRecord): number {

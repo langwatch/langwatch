@@ -3,7 +3,8 @@ import {
   type ModelCost,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import { type CustomLLMModelCost, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { type CustomLLMModelCost } from "@langwatch/prisma-client/generated";
 
 import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
 import type { ModelCostRepository } from "../model-cost.repository.ts";

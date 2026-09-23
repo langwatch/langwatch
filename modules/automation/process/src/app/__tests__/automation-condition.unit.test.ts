@@ -3,7 +3,8 @@
  * An automation with no condition matches every trace forever, so the easiest create call
  * produced the most expensive automation. Editing is the other route to the same state.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type { vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { AutomationApp } from "../automation.app.ts";
 import { createCanonicalAutomationApp } from "./automation-app.fixture.ts";

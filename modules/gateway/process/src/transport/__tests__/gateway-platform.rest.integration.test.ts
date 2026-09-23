@@ -4,6 +4,8 @@
  * @see specs/security/resource-scope-permission-checks.feature
  */
 
+// @vitest-environment node
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   apiErrorBody,
   createRestRuntime,
@@ -11,8 +13,8 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import {
-  GatewayApi,
   type GatewayBudgetResource,
   type GatewayBudgetWithSeats,
   type GatewayCacheRuleResource,
@@ -20,8 +22,6 @@ import {
 } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@langwatch/prisma-client/generated";
-// @vitest-environment node
-import { createApiFixture } from "@langwatch/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";

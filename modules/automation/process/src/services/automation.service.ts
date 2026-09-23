@@ -31,18 +31,18 @@ import {
 import { type Instant } from "@langwatch/time";
 
 import type { AutomationClock } from "../app/automation.members.ts";
-import { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
-import { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository.ts";
-import { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
-import { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
-import { TriggerRepository } from "../repositories/trigger.repository.ts";
-import { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
-import { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { EmailSuppressionNameRepository } from "../repositories/email-suppression-name.repository.ts";
+import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
+import type { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
+import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
-import { AutomationTemplateService } from "./automation-template.service.ts";
+import type { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
-import { ReportScheduleService } from "./report-schedule.service.ts";
-import { AutomationGraphService } from "./trigger-graph.service.ts";
+import type { ReportScheduleService } from "./report-schedule.service.ts";
+import type { AutomationGraphService } from "./trigger-graph.service.ts";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 

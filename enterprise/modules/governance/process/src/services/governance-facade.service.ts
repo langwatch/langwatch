@@ -3,7 +3,7 @@ import type {
   GovernanceOtlpReceiverPolicies,
 } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 
 import type { GovernanceActivityOperationsService } from "./governance-activity-operations.service.ts";
 import type { GovernanceIngestionOperationsService } from "./governance-ingestion-operations.service.ts";

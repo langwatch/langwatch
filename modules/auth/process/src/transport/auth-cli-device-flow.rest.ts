@@ -16,9 +16,9 @@ import {
   type RestProtocolProducer,
   type RestAnswer,
 } from "@langwatch/api/rest";
+import type { clientInfoSchema } from "@langwatch/auth-contract";
 import {
   approveRequestSchema,
-  clientInfoSchema,
   denyRequestSchema,
   deviceCodeRequestSchema,
   exchangeRequestSchema,

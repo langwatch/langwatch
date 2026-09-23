@@ -379,7 +379,7 @@ function VersionHistoryList({
             // The list is newest-first, so the version saved before this one
             // is the next entry down.
             previous={versions[index + 1]}
-            onLoad={() => void onLoad({ versionId: version.versionId })}
+            onLoad={() => onLoad({ versionId: version.versionId })}
             isCurrent={isCurrent}
           />
         );

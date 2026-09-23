@@ -6,7 +6,7 @@ import {
   type GithubRepositoryRef,
   type UpsertGithubInstallationInput,
 } from "../github-installations.repository.ts";
-import { MemoryGithubDatabase } from "./memory.github.database.ts";
+import type { MemoryGithubDatabase } from "./memory.github.database.ts";
 
 /**
  * The organization's connections in memory, keyed by installation id exactly

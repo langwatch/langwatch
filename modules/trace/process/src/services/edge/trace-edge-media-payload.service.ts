@@ -44,6 +44,6 @@ export class TraceEdgeMediaPayloadService extends TraceIngressPayload {
       logger: this.options.logger,
     });
 
-    return this.options.next ? await this.options.next.prepare(extracted) : extracted;
+    return this.options.next ? this.options.next.prepare(extracted) : extracted;
   }
 }

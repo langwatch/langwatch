@@ -6,11 +6,8 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import type { ModelProviderRecord, ModelProviderRepository } from "../model-provider.repository.ts";
-import {
-  byCreatedAtAscending,
-  matchesAnyScope,
-  MemoryModelProviderDatabase,
-} from "./memory.model-provider.database.ts";
+import type { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
+import { byCreatedAtAscending, matchesAnyScope } from "./memory.model-provider.database.ts";
 
 /**
  * A write refused because another row in the organization already answers

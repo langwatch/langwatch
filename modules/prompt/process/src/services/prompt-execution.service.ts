@@ -20,7 +20,7 @@ import {
   outputConfigsFor,
 } from "../rules/prompt-execution-event.rules.ts";
 import { handleEngineEvent } from "../rules/prompt-execution-stream.rules.ts";
-import { PromptExecuteBoundsService } from "./prompt-execute-bounds.service.ts";
+import type { PromptExecuteBoundsService } from "./prompt-execute-bounds.service.ts";
 
 const logger = createLogger("langwatch:prompt-playground");
 

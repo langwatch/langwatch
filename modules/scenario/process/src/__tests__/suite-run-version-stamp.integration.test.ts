@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -23,15 +24,14 @@ import {
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { SimulationService, type Scenario, type ScenarioApi } from "@langwatch/scenario-contract";
 import type { SuiteApi, StartSuiteRunCommandData } from "@langwatch/suite-contract";
+import type { SuiteRunCommands } from "@langwatch/suite-process";
 import {
   PostgresSuiteRepositories,
   SuiteApp,
   SuiteExecutionService,
-  SuiteRunCommands,
   type QueueSimulationRunCommandData,
 } from "@langwatch/suite-process";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 

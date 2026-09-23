@@ -34,12 +34,12 @@ import {
   claudeCacheWritesLongLived,
   isConversationalQuerySource,
 } from "../rules/claude-code-call-policy.rules.ts";
-import type { ExtractorContext, LogExtractorContext } from "./canonical-attributes.service.ts";
-import {
+import type {
+  ExtractorContext,
+  LogExtractorContext,
   AttributeCanonicaliser,
-  CanonicalLogRecordStore,
-  CanonicalSpanStore,
 } from "./canonical-attributes.service.ts";
+import { CanonicalLogRecordStore, CanonicalSpanStore } from "./canonical-attributes.service.ts";
 import { ClaudeCodeCanonicaliserService } from "./claude-code-canonicaliser.service.ts";
 import { ClaudeCodeRequestService } from "./claude-code-request.service.ts";
 import { ClaudeCodeResponseService } from "./claude-code-response.service.ts";

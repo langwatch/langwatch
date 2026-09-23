@@ -1,12 +1,10 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { describe, expect, it } from "vitest";
-import {
-  listNativeSkills,
-  listPublishedSkills,
-  renderSkill,
-} from "../_compiler/native.js";
+
+import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.js";
 
 // Backs the skill rules of specs/langy/langy-guided-onboarding.feature: the
 // skill ships with Langy only, and every line the product says is in it
@@ -18,8 +16,7 @@ const skillsRoot = path.resolve(__dirname, "..");
 const VERBATIM_LINES = {
   "the llmops opener":
     "Ok, let's set up your agent with LangWatch. Can I access your code? If I can see it, I can figure out your agent myself and wire everything up for you.",
-  "the first describe fallback line":
-    "No problem. What does your agent do? One line is enough.",
+  "the first describe fallback line": "No problem. What does your agent do? One line is enough.",
   "the second describe fallback line":
     "Perfect. To write a scenario for that and run it against your real agent, and wire tracing in while I'm at it, I still need to reach the code. How should I connect?",
   "the proposal":
@@ -30,8 +27,7 @@ const VERBATIM_LINES = {
     "No pull request was opened, since the folder has no remote or gh is not signed in: branch {branch} holds the commit.",
   "the failed-open line":
     "The branch {branch} is pushed; opening the pull request failed with: {error}.",
-  "the branch line":
-    "I left branch {branch} checked out: the agent you started runs on it.",
+  "the branch line": "I left branch {branch} checked out: the agent you started runs on it.",
   "the chat-about-this line":
     "Of course. Tell me what the scenario should cover and I'll write it with you.",
   "the why-a-scenario line":
@@ -43,8 +39,7 @@ const VERBATIM_LINES = {
   "the coding opener":
     "You're a developer, so this one is easy. Run this in any repo where you use Claude Code:",
   "the coding command": "npx langwatch claude",
-  "the coding closer":
-    "Then I can show you around once your first traces are flying through.",
+  "the coding closer": "Then I can show you around once your first traces are flying through.",
   "the gateway opener":
     "Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:",
   "the gateway base url":
@@ -69,10 +64,7 @@ describe("the guided-onboarding skill", () => {
     });
 
     it("is compiled into the native tree Langy loads", () => {
-      const compiled = path.join(
-        skillsRoot,
-        "_compiled/native/guided-onboarding/SKILL.md",
-      );
+      const compiled = path.join(skillsRoot, "_compiled/native/guided-onboarding/SKILL.md");
       expect(fs.existsSync(compiled), compiled).toBe(true);
       const rendered = renderSkill(
         listNativeSkills(skillsRoot).find((s) => s.slug === "guided-onboarding")!,
@@ -125,9 +117,7 @@ describe("the guided-onboarding skill", () => {
       expect(proposal).toBeGreaterThan(bare);
       expect(create).toBeGreaterThan(proposal);
       expect(chat).toBeGreaterThan(create);
-      expect(rendered).toContain(
-        "so the proposal is the `question` field itself, verbatim",
-      );
+      expect(rendered).toContain("so the proposal is the `question` field itself, verbatim");
       expect(rendered).toContain(
         "With the three step 2 lines said, ask with the `question` tool with `bare: true`, in that same turn, with no reply text before the call",
       );
@@ -141,7 +131,9 @@ describe("the guided-onboarding skill", () => {
       const lines = rendered.indexOf(
         "These three lines of step 2, the framework line, the pull request line, the no-remote line or the failed-open line, and the branch line, are said with the `say` tool, one call each, in that order, in this same step, right after the pull request command answered and right before the question of step 3: never after the answer, and never in the reply text.",
       );
-      const ask = rendered.indexOf("With the three step 2 lines said, ask with the `question` tool");
+      const ask = rendered.indexOf(
+        "With the three step 2 lines said, ask with the `question` tool",
+      );
       const go = rendered.indexOf(
         'The answer to the question is the go. On the create option, or on the scenario agreed after "Chat about this", the next thing you do is this list, then the first command: no sentence between the answer and them, and nothing from step 2 said again; a reply that only speaks after the answer ends the turn with the path open. So, before any command, write this list into `todowrite`',
       );
@@ -189,9 +181,7 @@ describe("the guided-onboarding skill", () => {
 
     /** @scenario "Every scripted line is said with the say tool at its moment" */
     it("says every scripted line with the say tool, and leaves the proposal in the question field", () => {
-      expect(rendered).toContain(
-        "**Every line below is verbatim, and said with the `say` tool.**",
-      );
+      expect(rendered).toContain("**Every line below is verbatim, and said with the `say` tool.**");
       expect(rendered).toContain(
         "a turn whose lines were all said this way ends with no reply text at all",
       );
@@ -227,9 +217,7 @@ describe("the guided-onboarding skill", () => {
 
     /** @scenario "The governance path ends with one line" */
     it("closes the governance path with no question and no page opened, then the one line", () => {
-      const section = rendered.slice(
-        rendered.indexOf("## governance: Governance"),
-      );
+      const section = rendered.slice(rendered.indexOf("## governance: Governance"));
       expect(section).toContain(
         "this path has no setup of its own: no question, no page opened, no command on the pages",
       );
@@ -255,7 +243,7 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "When it returns, say the closing line with `say`, verbatim, as the last thing the turn does, and the turn is over: no reply text after it, and never the line twice.",
       );
-      const endings: Array<[string, string]> = [
+      const endings: [string, string][] = [
         ["langwatch onboarding complete-path llmops", VERBATIM_LINES["the closing line"]],
         ["langwatch onboarding complete-path coding", VERBATIM_LINES["the coding closer"]],
         ["langwatch onboarding complete-path governance", VERBATIM_LINES["the governance line"]],
@@ -280,12 +268,16 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The gateway snippet points at the instance's own gateway" */
     it("takes the gateway address from the brief and never from a remembered host", () => {
       expect(rendered).not.toContain("gateway.langwatch.ai");
-      expect(rendered).toContain("The gateway address is the value after `Gateway:` in the brief, exactly as it stands there");
+      expect(rendered).toContain(
+        "The gateway address is the value after `Gateway:` in the brief, exactly as it stands there",
+      );
     });
 
     /** @scenario "A key the tour minted gets the live line, not an apology" */
     it("opens on the live line when the tour already minted the key, with the reveal id from the brief", () => {
-      expect(rendered).toContain("Say nothing about the key having existed; open with the line below as if it were just made.");
+      expect(rendered).toContain(
+        "Say nothing about the key having existed; open with the line below as if it were just made.",
+      );
       expect(rendered).toContain(
         "the `Virtual key:` line of the brief carries its name, its preview and its reveal id, and that is where they come from",
       );
@@ -314,12 +306,18 @@ describe("the guided-onboarding skill", () => {
 
     /** @scenario "The reveal id in the brief is used before any list, question or mint" */
     it("tries the reveal id in hand first, and only lists or asks when the brief carries none", () => {
-      expect(rendered).toContain("Three cases, checked in this order. The first that matches is the whole path; the ones after it never run.");
+      expect(rendered).toContain(
+        "Three cases, checked in this order. The first that matches is the whole path; the ones after it never run.",
+      );
       const inHand = rendered.indexOf("1. **The brief carries a reveal id.**");
-      const noIdKeyExists = rendered.indexOf("2. **No reveal id in the brief, and the key exists.**");
+      const noIdKeyExists = rendered.indexOf(
+        "2. **No reveal id in the brief, and the key exists.**",
+      );
       const noIdNoKey = rendered.indexOf("3. **No reveal id in the brief, and no key.**");
       const list = rendered.indexOf("langwatch virtual-keys list --format json");
-      const create = rendered.indexOf("langwatch virtual-keys create --name production-app --reveal-once --format json");
+      const create = rendered.indexOf(
+        "langwatch virtual-keys create --name production-app --reveal-once --format json",
+      );
       const question = rendered.indexOf("Do you still have it?");
       expect(inHand).toBeGreaterThan(-1);
       expect(noIdKeyExists).toBeGreaterThan(inHand);
@@ -328,10 +326,14 @@ describe("the guided-onboarding skill", () => {
       expect(list).toBeLessThan(noIdNoKey);
       expect(create).toBeGreaterThan(noIdNoKey);
       expect(question).toBeGreaterThan(create);
-      expect(rendered).toContain("No list, no question, no minting: go straight to \"Show the key\" with the brief's reveal id and preview.");
+      expect(rendered).toContain(
+        'No list, no question, no minting: go straight to "Show the key" with the brief\'s reveal id and preview.',
+      );
       expect(rendered).toContain("Never mint a second key while the brief carries a reveal id");
       expect(rendered).toContain("### No reveal id in hand: ask first");
-      expect(rendered).toContain("Reached only from case 2: the brief carries no reveal id and a `production-app` row exists.");
+      expect(rendered).toContain(
+        "Reached only from case 2: the brief carries no reveal id and a `production-app` row exists.",
+      );
       expect(rendered).not.toContain("When the key exists but the brief carries no reveal id");
     });
 
@@ -376,15 +378,11 @@ describe("the guided-onboarding skill", () => {
       );
       expect(rendered).toContain('1. "Create a new key"');
       expect(rendered).toContain('2. "I saved it"');
+      expect(rendered).toContain('On "Create a new key": mint one with `--reveal-once` as above');
       expect(rendered).toContain(
-        "On \"Create a new key\": mint one with `--reveal-once` as above",
+        'On "I saved it": there is no card to show, so describe the two lines instead of writing a snippet.',
       );
-      expect(rendered).toContain(
-        "On \"I saved it\": there is no card to show, so describe the two lines instead of writing a snippet.",
-      );
-      expect(rendered).toContain(
-        "Never write a placeholder in a snippet: no angle brackets",
-      );
+      expect(rendered).toContain("Never write a placeholder in a snippet: no angle brackets");
       expect(rendered).not.toContain("<your production-app key>");
       expect(rendered).not.toContain("<your gateway URL>");
       expect(rendered).not.toMatch(/OPENAI_API_KEY="<[^>]*>"/);
@@ -419,33 +417,29 @@ describe("the guided-onboarding skill", () => {
 
     it("checks for the production-app key before minting one", () => {
       const list = rendered.indexOf("langwatch virtual-keys list --format json");
-      const create = rendered.indexOf(
-        "langwatch virtual-keys create --name production-app",
-      );
+      const create = rendered.indexOf("langwatch virtual-keys create --name production-app");
       expect(list).toBeGreaterThan(-1);
       expect(create).toBeGreaterThan(list);
     });
 
     /** @scenario "The brief is the whole input" */
     it("never reads the onboarding state during a guided path", () => {
-      expect(rendered).toContain(
-        "Never run `langwatch onboarding state` during a guided path",
-      );
+      expect(rendered).toContain("Never run `langwatch onboarding state` during a guided path");
       expect(rendered).not.toContain("run it only when a line you need is missing");
     });
 
     /** @scenario "The work happens on a Langy branch" */
     it("works on a langy branch, never on the user's checked-out branch", () => {
-      expect(rendered).toContain(
-        "never on the branch the user has checked out",
-      );
+      expect(rendered).toContain("never on the branch the user has checked out");
       expect(rendered).toContain("`git checkout -b langy/<slug> origin/<default>`");
       expect(rendered).toContain("Leave the branch checked out");
     });
 
     /** @scenario "The instrumentation is committed once the agent is online" */
     it("commits the instrumentation on the langy branch as soon as the agent is online, with one fixed message", () => {
-      const online = rendered.indexOf("run `langwatch agent list --wait-online \"<agent name>\" --format json` once");
+      const online = rendered.indexOf(
+        'run `langwatch agent list --wait-online "<agent name>" --format json` once',
+      );
       const commit = rendered.indexOf(
         'git add <the files you changed> && git commit -m "Add LangWatch tracing and the connect endpoint"',
       );
@@ -478,7 +472,9 @@ describe("the guided-onboarding skill", () => {
       expect(sentence).toBeGreaterThan(push);
       expect(noRemote).toBeGreaterThan(sentence);
       expect(proposal).toBeGreaterThan(noRemote);
-      expect(rendered).toContain("The proposal of step 3 comes right after them, in the same turn.");
+      expect(rendered).toContain(
+        "The proposal of step 3 comes right after them, in the same turn.",
+      );
     });
 
     /** @scenario "Step 2 is a checklist Langy keeps" */
@@ -577,7 +573,9 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The langwatch package is installed before the tracing edit" */
     it("installs the package through the project's own package manager, as a checklist item between the branch and the tracing edit", () => {
       const branch = rendered.indexOf("2. The langy branch checked out");
-      const install = rendered.indexOf("3. The langwatch package added through the project's own package manager");
+      const install = rendered.indexOf(
+        "3. The langwatch package added through the project's own package manager",
+      );
       const tracingItem = rendered.indexOf("4. The tracing edit");
       expect(install).toBeGreaterThan(branch);
       expect(tracingItem).toBeGreaterThan(install);
@@ -614,7 +612,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The wait for the agent gets more room than it takes" */
     it("runs the wait with a shell timeout above the wait itself, so the CLI's own line is what it reads", () => {
       expect(rendered).toContain(
-        "run `langwatch agent list --wait-online \"<agent name>\" --format json` once, with the `timeout` parameter of the shell tool set to 150:",
+        'run `langwatch agent list --wait-online "<agent name>" --format json` once, with the `timeout` parameter of the shell tool set to 150:',
       );
       expect(rendered).toContain(
         "The wait takes up to 120 seconds, so a shell limit at or under that cuts the command before the CLI prints its line",
@@ -640,7 +638,7 @@ describe("the guided-onboarding skill", () => {
         "On this path the SDK is always installed, item 3 of the checklist, so the adapter is the SDK connect call: the `@langwatch.connect_agent` decorator in Python, `connectAgent` in TypeScript.",
       );
       expect(rendered).toContain(
-        "The HTTP fallback at the bottom of `connect-agent` is never used here: a route on a path, `@app.post(\"/langwatch/connect\")` or the like, registers nothing with the SDK",
+        'The HTTP fallback at the bottom of `connect-agent` is never used here: a route on a path, `@app.post("/langwatch/connect")` or the like, registers nothing with the SDK',
       );
       expect(rendered).toContain("A route is not an adapter.");
     });
@@ -652,7 +650,9 @@ describe("the guided-onboarding skill", () => {
       const cleanLog = section.indexOf(
         "A log that shows a clean start, the server up and no exception, with the row never online means the adapter did not register with the SDK, which is your own work of this step too: the repair is to rewrite the adapter as the SDK connect call of item 3, start the agent again and run the wait once more.",
       );
-      const once = section.indexOf("The repair happens once and never touches the env file or reads the key");
+      const once = section.indexOf(
+        "The repair happens once and never touches the env file or reads the key",
+      );
       expect(cleanLog).toBeGreaterThan(-1);
       expect(once).toBeGreaterThan(cleanLog);
     });
@@ -662,7 +662,9 @@ describe("the guided-onboarding skill", () => {
       const body = rendered.indexOf(
         "The body goes in a file: write `.langwatch/pr-body.md` with `local_write` first, and only then the command that reads it with `--body-file`",
       );
-      const branch = rendered.indexOf("Then run `git branch --show-current`: its output is the name the lines below carry.");
+      const branch = rendered.indexOf(
+        "Then run `git branch --show-current`: its output is the name the lines below carry.",
+      );
       expect(body).toBeGreaterThan(-1);
       expect(branch).toBeGreaterThan(body);
       const rule = rendered.indexOf(
@@ -681,10 +683,10 @@ describe("the guided-onboarding skill", () => {
         "whatever `gh` prints afterwards.** That rule is read against the push command's own answer.",
       );
       expect(rendered).toContain(
-        "The no-remote line has exactly two triggers, quoted as git and gh print them: `git push` with no remote, \"fatal: No configured push destination.\" or \"'origin' does not appear to be a git repository\", and `gh` not signed in, \"To get started with GitHub CLI, please run:  gh auth login\" or \"You are not logged into any GitHub hosts\".",
+        'The no-remote line has exactly two triggers, quoted as git and gh print them: `git push` with no remote, "fatal: No configured push destination." or "\'origin\' does not appear to be a git repository", and `gh` not signed in, "To get started with GitHub CLI, please run:  gh auth login" or "You are not logged into any GitHub hosts".',
       );
       expect(rendered).toContain(
-        "After a push that worked, a `gh` failure is the failed-open line. \"none of the git remotes configured for this repository point to a known GitHub host\" has nothing to fix and gets no retry: the line is said at once with that sentence in the brace.",
+        'After a push that worked, a `gh` failure is the failed-open line. "none of the git remotes configured for this repository point to a known GitHub host" has nothing to fix and gets no retry: the line is said at once with that sentence in the brace.',
       );
       expect(rendered).toContain(
         "Any other `gh` error, a missing body file, a wrong base, gets one fix of its cause and one retry of the command; when it still fails, this line, verbatim, takes the place of both, with the second brace filled with the one line the command printed, and the step is done:",
@@ -698,7 +700,10 @@ describe("the guided-onboarding skill", () => {
       const branchLine = rendered.indexOf(VERBATIM_LINES["the branch line"]);
       expect(failedOpen).toBeGreaterThan(noRemote);
       expect(branchLine).toBeGreaterThan(failedOpen);
-      expect(VERBATIM_LINES["the failed-open line"].match(/\{[a-z]+\}/g)).toEqual(["{branch}", "{error}"]);
+      expect(VERBATIM_LINES["the failed-open line"].match(/\{[a-z]+\}/g)).toEqual([
+        "{branch}",
+        "{error}",
+      ]);
     });
 
     /** @scenario "An env file is never printed" */
@@ -776,11 +781,9 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "Nothing runs against an agent that is not online" */
     it("waits for the agent row to be online through one CLI call, before any run", () => {
       expect(rendered).toContain(
-        "run `langwatch agent list --wait-online \"<agent name>\" --format json` once",
+        'run `langwatch agent list --wait-online "<agent name>" --format json` once',
       );
-      expect(rendered).toContain(
-        "it fails after two minutes when the row never does.",
-      );
+      expect(rendered).toContain("it fails after two minutes when the row never does.");
       expect(rendered).toContain(
         "the wait always gets more room than it takes. Never write a loop of your own around `agent list`.",
       );
@@ -807,9 +810,15 @@ describe("the guided-onboarding skill", () => {
       for (const [index, position] of positions.entries()) {
         expect(position, items[index]).toBeGreaterThan(index === 0 ? -1 : positions[index - 1]!);
       }
-      expect(rendered).toContain("before any command, write this list into `todowrite`, in this order and these words, every item pending");
-      expect(rendered).toContain("**a turn never ends with an open item**, unless a command answered an error");
-      expect(rendered).toContain("Mark each item done as you finish it, and read the list before you end a turn");
+      expect(rendered).toContain(
+        "before any command, write this list into `todowrite`, in this order and these words, every item pending",
+      );
+      expect(rendered).toContain(
+        "**a turn never ends with an open item**, unless a command answered an error",
+      );
+      expect(rendered).toContain(
+        "Mark each item done as you finish it, and read the list before you end a turn",
+      );
     });
 
     /** @scenario "A folder with no remote still completes the path" */
@@ -869,7 +878,9 @@ describe("the guided-onboarding skill", () => {
         `uv run python -c "from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))"`,
       );
       expect(rendered).toContain("never `python -` with a heredoc");
-      expect(rendered).toContain("`False` is not a failed step: fix the load order of item 2 and run the same command again.");
+      expect(rendered).toContain(
+        "`False` is not a failed step: fix the load order of item 2 and run the same command again.",
+      );
     });
 
     /** @scenario "The connect endpoint comes from the connect-agent skill" */
@@ -946,7 +957,7 @@ describe("the guided-onboarding skill", () => {
       );
       expect(section).toContain("`gh` not signed in is not a dead end");
       expect(rendered).toContain(
-        "When the workspace facts say `git: not a repository`, there is no branch to make: that is the first unlock question of \"When a step fails\", asked before any command of this step.",
+        'When the workspace facts say `git: not a repository`, there is no branch to make: that is the first unlock question of "When a step fails", asked before any command of this step.',
       );
     });
 
@@ -958,9 +969,7 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "The interpreter's pip never runs before the named manager or the folder's own interpreter.",
       );
-      const tracing = renderSkill(
-        listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!,
-      );
+      const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
       expect(tracing).toContain(
         "the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line",
       );
@@ -969,7 +978,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "A missing pip climbs the install ladder before it asks" */
     it("climbs the Python install ladder on a command not found and asks only when every rung is missing", () => {
       expect(rendered).toContain(
-        "Each attempt is one command, and a command not found (exit 127, \"command not found\") moves to the next rung without a retry: it is a missing spelling, never a missing capability.",
+        'Each attempt is one command, and a command not found (exit 127, "command not found") moves to the next rung without a retry: it is a missing spelling, never a missing capability.',
       );
       expect(rendered).toContain(
         "For JavaScript, `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile, and a 127 on the named manager falls back to `npm`.",
@@ -993,7 +1002,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "The install is checked for the API before code is written" */
     it("checks the installed package for the API before any code is written against it", () => {
       expect(rendered).toContain(
-        "Then, before any code edit, check that the installed package carries the API, through the interpreter the install worked with: `python -c \"import langwatch; langwatch.setup; langwatch.connect_agent\"` for Python (`.venv/bin/python -c` when `.venv` exists, `uv run python -c` for a uv project), `node -e \"require('langwatch')\"` for JavaScript.",
+        'Then, before any code edit, check that the installed package carries the API, through the interpreter the install worked with: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python (`.venv/bin/python -c` when `.venv` exists, `uv run python -c` for a uv project), `node -e "require(\'langwatch\')"` for JavaScript.',
       );
       expect(rendered).toContain(
         "`uv run` is the runner only in a uv project, one where the facts name uv or the folder has a `pyproject.toml` or a `uv.lock`; anywhere else a Python command runs through the interpreter the ladder worked with, `.venv/bin/python` when `.venv` exists, else the `python` or `python3` whose pip installed the package, and never through `uv run`, which in a folder with no project file builds an environment of its own, with nothing of what the ladder installed in it.",
@@ -1007,11 +1016,9 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "`pip install langwatch --upgrade` never runs there: that interpreter has no newer release to get.",
       );
-      const tracing = renderSkill(
-        listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!,
-      );
+      const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
       expect(tracing).toContain(
-        "Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c \"import langwatch; langwatch.setup; langwatch.connect_agent\"` for Python, `node -e \"require('langwatch')\"` for TypeScript.",
+        'Before any code is written against it, check the install carries the API through the interpreter that installed it: `python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` for Python, `node -e "require(\'langwatch\')"` for TypeScript.',
       );
       expect(tracing).toContain("`pip install langwatch --upgrade` cannot help there.");
     });
@@ -1019,11 +1026,13 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "An installed SDK without the tracing API is an interpreter question, not a stop" */
     it("asks about the interpreter when the installed SDK has no tracing API", () => {
       expect(rendered).toContain(
-        "When the check fails, or the version the show command reads (`python -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of \"When a step fails\", asked before any edit.",
+        'When the check fails, or the version the show command reads (`python -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of "When a step fails", asked before any edit.',
       );
       const failed = rendered.indexOf("### When a step fails");
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
-      expect(section).toContain("Three dead ends have a known unlock, and an unlock is asked, never stopped on:");
+      expect(section).toContain(
+        "Three dead ends have a known unlock, and an unlock is asked, never stopped on:",
+      );
       expect(section).toContain(
         "The third: the check of item 1 fails, or the installed version is below 1.3.0, after an install that reported success.",
       );
@@ -1031,10 +1040,10 @@ describe("the guided-onboarding skill", () => {
         "Your Python 3.14 is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API. Want me to set up a supported Python for this folder?",
       );
       expect(section).toContain(
-        "Options, in this order: \"Install Python 3.13 with uv for me\" and \"I'll pick the interpreter myself\".",
+        'Options, in this order: "Install Python 3.13 with uv for me" and "I\'ll pick the interpreter myself".',
       );
       expect(section).toContain(
-        "On \"Install Python 3.13 with uv for me\": `uv python install 3.13` (when `uv` is a command not found, the installer of the second question runs first), then the ladder's uv rung against that interpreter: `uv add --python 3.13 langwatch` when the folder has a `pyproject.toml`; `uv venv --python 3.13` then `uv pip install langwatch` when it has none, and the manifest line of item 1 goes into the requirements file as for any pip project.",
+        'On "Install Python 3.13 with uv for me": `uv python install 3.13` (when `uv` is a command not found, the installer of the second question runs first), then the ladder\'s uv rung against that interpreter: `uv add --python 3.13 langwatch` when the folder has a `pyproject.toml`; `uv venv --python 3.13` then `uv pip install langwatch` when it has none, and the manifest line of item 1 goes into the requirements file as for any pip project.',
       );
       expect(section).toContain(
         "Then the check of item 1 runs again through `.venv/bin/python`, and item 1 goes on; the agent of item 6 starts through that interpreter, `uv run` or `.venv/bin/python`, never the machine's `python3`.",
@@ -1079,7 +1088,8 @@ describe("the guided-onboarding skill", () => {
     it("reruns a command it wrote wrong instead of reporting a failed step", () => {
       const failed = rendered.indexOf("### When a step fails");
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));
-      const rule = "A command that fails for a cause you can act on from what you already know is fixed and run once more, never reported.";
+      const rule =
+        "A command that fails for a cause you can act on from what you already know is fixed and run once more, never reported.";
       expect(section).toContain(rule);
       expect(section).toContain(
         "The command was written wrong: a usage error, `too many arguments`, `unknown option`, `missing required argument`, an exit code 2 with the usage printed, so fix the shape, a name with a space in double quotes.",
@@ -1099,7 +1109,9 @@ describe("the guided-onboarding skill", () => {
         'A `say` that ends the turn on what is "not done yet because" of a cause like these, with no fix tried and no question asked, is never the reply.',
       );
       expect(section.indexOf(rule)).toBeLessThan(
-        section.indexOf("A step fails when a command answers an error, never when a judge answers a verdict"),
+        section.indexOf(
+          "A step fails when a command answers an error, never when a judge answers a verdict",
+        ),
       );
     });
 
@@ -1122,9 +1134,7 @@ describe("the guided-onboarding skill", () => {
       expect(section).toContain(
         "A step fails when a command answers an error, never when a judge answers a verdict",
       );
-      expect(rendered).toContain(
-        "never one that stopped at a failed step",
-      );
+      expect(rendered).toContain("never one that stopped at a failed step");
     });
 
     /** @scenario "An agent that never comes online is explained by its own output" */
@@ -1134,8 +1144,12 @@ describe("the guided-onboarding skill", () => {
       expect(section).toContain(
         "when the agent is not online after two minutes, the cause is in the agent process itself, so read the log the background command named",
       );
-      expect(section).toContain("report its last lines, the exception if there is one, as the reason");
-      expect(section).toContain("Never a guess about the CLI, the login or the project in its place");
+      expect(section).toContain(
+        "report its last lines, the exception if there is one, as the reason",
+      );
+      expect(section).toContain(
+        "Never a guess about the CLI, the login or the project in its place",
+      );
     });
 
     /** @scenario "LangWatch initialises after the project's environment is loaded" */

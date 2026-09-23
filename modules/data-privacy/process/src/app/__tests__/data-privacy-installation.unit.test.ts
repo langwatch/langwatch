@@ -1,9 +1,9 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import { dataPrivacyServer } from "../../data-privacy.server.ts";

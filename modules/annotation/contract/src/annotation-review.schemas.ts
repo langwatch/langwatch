@@ -5,10 +5,10 @@ import {
   annotationQueueListedItemSchema,
   annotationQueuePageItemSchema,
 } from "./annotation-queue.schemas.ts";
+import type { annotationWithUserSummarySchema } from "./annotation-response.schemas.ts";
 import {
   annotationQueueDetailSchema,
   annotationWithFullUserSchema,
-  annotationWithUserSummarySchema,
 } from "./annotation-response.schemas.ts";
 
 export type AnnotationWithFullUser = z.infer<typeof annotationWithFullUserSchema>;

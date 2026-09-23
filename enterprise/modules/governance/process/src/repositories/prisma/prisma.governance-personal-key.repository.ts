@@ -1,6 +1,6 @@
 import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contract";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import {
-  Prisma,
   type PrismaClient,
   type VirtualKey,
   type VirtualKeyScope,

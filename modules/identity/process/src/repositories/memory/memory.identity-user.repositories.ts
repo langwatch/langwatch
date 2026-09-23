@@ -26,7 +26,7 @@ import type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
 } from "../identity-verification.repository.ts";
-import { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory-identity.store.ts";
 
 const ACTIVE_STATES = new Set(["VERIFIED", "PRIMARY"]);
 

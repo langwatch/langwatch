@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Tests the playground execution endpoint: authentication, RBAC, and workflow engine
  * integration. Verifies request order (origin gate, session, project permission) and
@@ -8,13 +9,12 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   PROMPT_EXECUTE_ENDPOINT,
   CrossOriginRefusedError,
-  PromptApi,
   PromptPlaygroundSignInRequiredError,
 } from "@langwatch/prompt-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { StudioClientEvent, WorkflowApi } from "@langwatch/workflow-contract";
 import type { ErrorHandler } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";

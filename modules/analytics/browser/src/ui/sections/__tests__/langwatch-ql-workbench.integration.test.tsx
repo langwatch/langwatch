@@ -14,9 +14,8 @@ import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 // the one the URL names — and "the window the member is looking at is the
 // window that is sent" is precisely what these cases are about.
 vi.unmock("~/utils/compat/next-router");
-vi.mock(
-  "~/utils/compat/next-router",
-  async () => await vi.importActual<object>("~/utils/compat/next-router"),
+vi.mock("~/utils/compat/next-router", async () =>
+  vi.importActual<object>("~/utils/compat/next-router"),
 );
 
 import {

@@ -1,9 +1,9 @@
+import type { connectBudgetSchema } from "@langwatch/enterprise-licensing-contract";
 import {
   type ConnectBudgetView,
   type ConnectClassifyAnswer,
   type ConnectCredential,
   type ConnectUsageView,
-  connectBudgetSchema,
   connectClassifyAnswerSchema,
   connectSetBudgetAnswerSchema,
   connectUsageAnswerSchema,

@@ -15,7 +15,7 @@ import type { GatewayModelProviderCredentials } from "../../app/gateway.members.
 import { PrismaGatewayAdapter } from "../../app/prisma.gateway.composition.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
-import { VirtualKeyService } from "../../services/virtual-key.service.ts";
+import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
 import { PostgresVirtualKeyAdapter } from "../../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;

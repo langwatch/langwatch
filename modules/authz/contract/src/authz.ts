@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-import { authzPermissionSchema, shareableResourceKindSchema } from "./registry.ts";
-import { bindingScopeTierSchema, storedBindingScopeTierSchema } from "./vocabulary.ts";
+import type { authzPermissionSchema } from "./registry.ts";
+import { shareableResourceKindSchema } from "./registry.ts";
+import type { bindingScopeTierSchema } from "./vocabulary.ts";
+import { storedBindingScopeTierSchema } from "./vocabulary.ts";
 
 /** Portable AuthZ vocabulary. Persisted and transport values validate here. */
 export const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);

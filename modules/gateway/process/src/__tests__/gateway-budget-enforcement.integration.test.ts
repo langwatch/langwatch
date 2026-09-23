@@ -10,8 +10,8 @@ import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -67,7 +67,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
   "given a blocking budget on traffic the gateway is serving",
   () => {
     const decide = async () =>
-      await service.check({
+      service.check({
         organizationId: ORG_ID,
         teamId: TEAM_ID,
         projectId: PROJECT_ID,

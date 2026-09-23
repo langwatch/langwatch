@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createHash } from "node:crypto";
 
-import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
+import type { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";

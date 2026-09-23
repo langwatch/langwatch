@@ -8,9 +8,9 @@ import {
   SsoConnectionLedgerWriterAdapter,
   type SsoConnectionStagedSender,
 } from "../../services/eventing-sso-connection-ledger.service.ts";
+import type { SsoConnectionDirectoryRevocation } from "../../services/eventing-sso-connection-teardown.service.ts";
 import {
   EventingSsoConnectionTeardownAdapter,
-  SsoConnectionDirectoryRevocation,
   UnrevokedSsoConnectionDirectory,
 } from "../../services/eventing-sso-connection-teardown.service.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../../services/local-door-break-glass-binding.service.ts";

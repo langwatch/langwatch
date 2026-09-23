@@ -26,7 +26,7 @@ import type {
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
-import { MemoryProjectDatabase } from "./memory.project.database.ts";
+import type { MemoryProjectDatabase } from "./memory.project.database.ts";
 
 /** Newest first, then id, which is the order both listings are read in. */
 function newestFirst(left: Project, right: Project): number {

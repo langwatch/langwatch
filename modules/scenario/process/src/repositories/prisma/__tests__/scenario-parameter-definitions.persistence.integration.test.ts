@@ -9,7 +9,8 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { type Scenario, SimulationService } from "@langwatch/scenario-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
+import { type Scenario } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

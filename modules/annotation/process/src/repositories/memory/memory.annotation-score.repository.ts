@@ -13,7 +13,7 @@ import {
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type { AnnotationScoreRepository } from "../annotation-score.repository.ts";
-import { MemoryAnnotationQueueDatabase } from "./memory.annotation-queue.database.ts";
+import type { MemoryAnnotationQueueDatabase } from "./memory.annotation-queue.database.ts";
 
 export class MemoryAnnotationScoreRepository implements AnnotationScoreRepository {
   #database: MemoryAnnotationQueueDatabase;

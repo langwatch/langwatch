@@ -35,7 +35,7 @@
 
 import { createHash } from "node:crypto";
 
-import { exportTraceServiceRequestSchema, spanSchema } from "@langwatch/trace-contract";
+import type { exportTraceServiceRequestSchema, spanSchema } from "@langwatch/trace-contract";
 import type { z } from "zod";
 
 const PROVENANCE_ATTR_SOURCE = "langwatch.source";

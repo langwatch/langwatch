@@ -5,7 +5,8 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangyPrompt, LangyPromptRegistryService } from "../langy-prompt-registry.service.ts";
+import type { LangyPrompt } from "../langy-prompt-registry.service.ts";
+import { LangyPromptRegistryService } from "../langy-prompt-registry.service.ts";
 
 const FALLBACK = "IN-REPO FALLBACK PROMPT";
 const PROJECT_ID = "project_system";

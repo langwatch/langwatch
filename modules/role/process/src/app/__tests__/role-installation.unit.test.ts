@@ -1,10 +1,10 @@
-import { AuthzApi } from "@langwatch/authz-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import { RoleApi } from "@langwatch/role-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import { UserApi } from "@langwatch/user-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { RoleApi } from "@langwatch/role-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { roleServer } from "../../role.server.ts";

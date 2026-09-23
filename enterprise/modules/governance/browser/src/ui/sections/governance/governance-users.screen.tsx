@@ -102,7 +102,7 @@ function GovernanceUsersListPage() {
   const setSortBy = (next: SortField) => {
     const params = new URLSearchParams();
     if (next !== "spend") params.set("sort", next);
-    void router.replace(params.toString() ? `?${params.toString()}` : "?");
+    router.replace(params.toString() ? `?${params.toString()}` : "?");
   };
 
   return (

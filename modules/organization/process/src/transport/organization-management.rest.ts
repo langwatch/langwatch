@@ -5,20 +5,22 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import type {
+  OrganizationUserRole,
+  organizationManagementRestInviteSchema,
+  organizationManagementRestMemberSchema,
+  organizationManagementRestMemberTeamSchema,
+} from "@langwatch/organization-contract";
 import {
   OrganizationApi,
-  OrganizationUserRole,
   type OrganizationCaller,
   organizationManagementRestAccessBreakdownSchema,
   organizationManagementRestCreateInvitesSchema,
   organizationManagementRestCreatedInvitesSchema,
   organizationManagementRestInviteIdParamsSchema,
   organizationManagementRestInviteListSchema,
-  organizationManagementRestInviteSchema,
   organizationManagementRestListMembersQuerySchema,
   organizationManagementRestMemberListSchema,
-  organizationManagementRestMemberSchema,
-  organizationManagementRestMemberTeamSchema,
   organizationManagementRestMemberWithTeamsSchema,
   organizationManagementRestSettingsSchema,
   organizationManagementRestStoredTeamAssignmentSchema,

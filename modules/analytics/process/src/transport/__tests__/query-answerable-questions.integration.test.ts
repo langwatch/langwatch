@@ -1426,7 +1426,7 @@ function mountQueryDoor({
 
   return {
     fetch: async (path: string, init?: RequestInit) =>
-      await app.fetch(new Request(`http://api.test${path}`, init)),
+      app.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
 

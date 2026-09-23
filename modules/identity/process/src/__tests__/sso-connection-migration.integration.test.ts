@@ -104,7 +104,7 @@ function seedLegacy(over: Partial<SsoConnectionState> = {}): void {
 }
 
 const registerReplacement = async (connectionId = REPLACEMENT) =>
-  await service.registerReplacementConnection({
+  service.registerReplacementConnection({
     ...command(connectionId),
     type: "oidc",
     idp: {

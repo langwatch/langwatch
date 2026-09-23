@@ -8,7 +8,7 @@ import {
   CodingAgentSessionEventRepository,
   type SessionModelTotalsRow,
 } from "../coding-agent-session-event.repository.ts";
-import { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
+import type { MemoryCodingAgentDatabase } from "./memory.coding-agent.database.ts";
 
 /** The ordered session event read model, held in the process. */
 export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionEventRepository {

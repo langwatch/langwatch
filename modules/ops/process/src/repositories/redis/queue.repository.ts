@@ -1912,7 +1912,7 @@ export class QueueRedisRepository extends QueueRepository {
       // longer holds the marker cannot know whether a newer one has already written, so anything
       // it computed is a candidate for overwriting fresher state with staler state.
       const refreshLease = async (): Promise<boolean> =>
-        await this.setReconcileMarkerTtl({
+        this.setReconcileMarkerTtl({
           markerKey,
           holderToken,
           ttlMs: PENDING_RECONCILE_LEASE_MS,

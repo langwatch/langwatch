@@ -1,7 +1,7 @@
 import { AUTHZ_GRANTS_EVENT_TYPES } from "@langwatch/authz-contract";
 import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 
-import { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
+import type { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,

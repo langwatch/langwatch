@@ -1,17 +1,17 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The prepared export owns the rate window, redactions, progress signals and
  * slot lifetime, before the HTTP bytes door starts consuming its stream.
  * @vitest-environment node
  */
 import type { PresenceApi } from "@langwatch/presence-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { TraceExportRateLimitedError, type Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceExportBounds, TraceExportSlot } from "../trace-export-bounds.service.ts";
 import { TraceExportDownloadService } from "../trace-export-download.service.ts";
-import { TraceExportService } from "../trace-export.service.ts";
-import { TraceViewerProtectionService } from "../trace-viewer-protection.service.ts";
+import type { TraceExportService } from "../trace-export.service.ts";
+import type { TraceViewerProtectionService } from "../trace-viewer-protection.service.ts";
 
 const protections = { canSeeCapturedInput: true, canSeeCapturedOutput: true } as Protections;
 const request = {

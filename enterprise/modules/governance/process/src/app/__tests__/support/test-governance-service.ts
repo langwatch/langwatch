@@ -1,4 +1,4 @@
-import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 
 const unsupported = <Method>(): Method =>
   (() => Promise.reject(new Error("not used by this test"))) as Method;

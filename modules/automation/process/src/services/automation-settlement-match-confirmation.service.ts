@@ -5,10 +5,8 @@ import type {
   AutomationSettlementEvaluationReader,
   AutomationSettlementTraceReader,
 } from "../repositories/automation-settlement-read.repository.ts";
-import {
-  AutomationSettlementFilterEvaluator,
-  AutomationSettlementMatchConfirmation,
-} from "./automation-settlement-policy.service.ts";
+import type { AutomationSettlementFilterEvaluator } from "./automation-settlement-policy.service.ts";
+import { AutomationSettlementMatchConfirmation } from "./automation-settlement-policy.service.ts";
 
 const EVENT_FILTER_FIELDS = new Set([
   "events.event_type",

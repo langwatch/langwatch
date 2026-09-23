@@ -10,7 +10,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { format, nowInstant } from "@langwatch/time";
 
-import { ScenarioRunExportService } from "./scenario-run-export.service.ts";
+import type { ScenarioRunExportService } from "./scenario-run-export.service.ts";
 
 const logger = createLogger("langwatch:scenario-run-export-download");
 

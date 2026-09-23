@@ -81,7 +81,7 @@ function findCopyButton(pattern: RegExp): HTMLElement | undefined {
  * `AnimatePresence mode="wait"`, so the incoming one mounts only once the
  * outgoing one exits — querying right after the click finds the previous tab.
  */
-async function goToTab(name: keyof typeof TAB_MARKER | string): Promise<void> {
+async function goToTab(name: keyof typeof TAB_MARKER): Promise<void> {
   fireEvent.click(screen.getByRole("button", { name }));
   const marker = TAB_MARKER[name];
   if (marker) {

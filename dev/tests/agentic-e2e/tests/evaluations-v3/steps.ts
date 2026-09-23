@@ -2,7 +2,8 @@
  * Step definitions for Evaluations V3 HTTP Agent feature tests.
  * Source: specs/evaluations-v3/http-agent-support.feature
  */
-import { Page, expect } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 
 import { getProjectSlug } from "../helpers";
 

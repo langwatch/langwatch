@@ -112,7 +112,7 @@ export class AutomationProviderRegistryService {
     args: PersistActionParamsArgs,
   ): Promise<unknown> {
     const hook = this.providers[action].server.persistActionParams;
-    return hook ? await hook(args) : args.incoming;
+    return hook ? hook(args) : args.incoming;
   }
 
   /** Strips secrets from stored `actionParams` before the row leaves. */

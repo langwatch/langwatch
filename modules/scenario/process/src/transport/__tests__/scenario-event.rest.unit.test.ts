@@ -1,4 +1,4 @@
-import * as observability from "@langwatch/observability";
+import type * as observability from "@langwatch/observability";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import type {
   ScenarioTabRegistry,

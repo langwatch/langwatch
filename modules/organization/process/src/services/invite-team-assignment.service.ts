@@ -3,9 +3,9 @@
  * assignments, and refusing a custom role this organization may not assign.
  */
 import { CustomRoleIdRequiredError } from "@langwatch/authz-contract";
+import type { OrganizationUserRole } from "@langwatch/organization-contract";
 import {
   CustomRoleNotAssignableError,
-  OrganizationUserRole,
   TeamNotInOrganizationError,
   TeamUserRole,
 } from "@langwatch/organization-contract";

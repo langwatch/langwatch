@@ -30,7 +30,8 @@ import type {
   SetFirstUserPasswordRow,
   UserRepository,
 } from "../user.repository.ts";
-import { MemoryUserDatabase, type MemoryUserRow } from "./memory.user.database.ts";
+import type { MemoryUserDatabase } from "./memory.user.database.ts";
+import { type MemoryUserRow } from "./memory.user.database.ts";
 
 /** better-auth's own provider name for an email-and-password sign-in method. */
 const CREDENTIAL_PROVIDER = "credential";

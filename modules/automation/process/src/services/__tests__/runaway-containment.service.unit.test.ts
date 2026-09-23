@@ -6,9 +6,9 @@ import type {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
+import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
-import { AutomationRunawaySignals } from "../automation-runaway-signals.service.ts";
+import type { AutomationRunawaySignals } from "../automation-runaway-signals.service.ts";
 import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service.ts";
 
 class TestRunawaySignals

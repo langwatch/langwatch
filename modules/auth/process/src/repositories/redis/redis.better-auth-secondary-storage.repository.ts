@@ -11,10 +11,10 @@ export class RedisBetterAuthSecondaryStorageRepository {
 
   static create(redis: RedisConnection): SecondaryStorage {
     return {
-      get: async (key) => await redis.get(`${NAMESPACE}${key}`),
+      get: async (key) => redis.get(`${NAMESPACE}${key}`),
       // Read-and-clear in one round trip, so two callers racing for a
       // single-use value cannot both be handed it.
-      getAndDelete: async (key) => await redis.getdel(`${NAMESPACE}${key}`),
+      getAndDelete: async (key) => redis.getdel(`${NAMESPACE}${key}`),
       // The counter behind distributed rate limiting. The TTL is applied only
       // on creation: extending it on every hit would mean a key under
       // sustained traffic never expires, and the limit becomes permanent.

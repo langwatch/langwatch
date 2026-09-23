@@ -5,7 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as configMod from "../config";
+import type * as configMod from "../config";
 import { resolveControlPlaneEndpoint, resolveControlPlaneUrl } from "../resolveEndpoint";
 
 // Stub loadConfig so the tests don't leak the developer's local

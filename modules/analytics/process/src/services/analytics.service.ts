@@ -24,8 +24,8 @@ import {
 import { addDays, differenceInCalendarDays, nowInstant } from "@langwatch/time";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 
-import { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
-import { AnalyticsRepository } from "../repositories/analytics.repository.ts";
+import type { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
+import type { AnalyticsRepository } from "../repositories/analytics.repository.ts";
 
 const MINUTES_PER_DAY = 24 * 60;
 const MAX_TIMESERIES_BUCKETS = 1000;

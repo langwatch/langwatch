@@ -8,10 +8,8 @@ import { PrismaOrganizationTenantSourceRepository } from "../../repositories/pri
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
-import {
-  OpsSystemMigrations,
-  UserStartupMigrationsUnsupportedError,
-} from "../ops-system-migrations.ts";
+import type { UserStartupMigrationsUnsupportedError } from "../ops-system-migrations.ts";
+import { OpsSystemMigrations } from "../ops-system-migrations.ts";
 
 const clients: PrismaClient[] = [];
 

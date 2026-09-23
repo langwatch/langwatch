@@ -22,7 +22,7 @@ import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-rea
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
 import { type TraceLogRecordReader } from "./claude-code-log-enrichment.service.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
-import { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
+import type { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
 import { TraceReadEnrichmentService } from "./trace-read-enrichment.service.ts";
 
 /**

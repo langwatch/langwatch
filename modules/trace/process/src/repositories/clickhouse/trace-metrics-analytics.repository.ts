@@ -218,7 +218,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
         fallback: "none",
         isEmpty: (result) => result === null,
         run: async (fragment) =>
-          await this.queryLatestVersion({
+          this.queryLatestVersion({
             tenantId,
             traceId,
             window: fragment ? { fromMs: fragment.fromMs, toMs: fragment.toMs } : undefined,

@@ -125,7 +125,7 @@ async function pickPaths({
   picks,
 }: {
   page: Page;
-  picks: Array<{ id: string; title: string }>;
+  picks: { id: string; title: string }[];
 }): Promise<void> {
   await expect(page.getByTestId("value-line")).toContainText(
     "what are the most valuable things we can set up for",
@@ -151,14 +151,14 @@ async function readGuidedState({
   providerSkippedAt?: string;
   tourSkippedAt?: string;
 }> {
-  const organizations = await trpcQuery<Array<{ id: string; name: string }>>({
+  const organizations = await trpcQuery<{ id: string; name: string }[]>({
     page,
     procedure: "organization.getAll",
     input: {},
   });
   const organization = organizations.find((o) => o.name === organizationName);
   if (!organization) throw new Error(`no organization named ${organizationName}`);
-  return await trpcQuery({
+  return trpcQuery({
     page,
     procedure: "onboarding.getGuidedState",
     input: { organizationId: organization.id },

@@ -131,8 +131,8 @@ export async function startTestClickHouseEndpoints({
 }): Promise<TestClickHouseEndpoint[]> {
   const baseUrl = nativeClickHouseBaseUrl();
   return baseUrl
-    ? await startNativeEndpoints({ suite, names, baseUrl })
-    : await startContainerEndpoints({ suite, names });
+    ? startNativeEndpoints({ suite, names, baseUrl })
+    : startContainerEndpoints({ suite, names });
 }
 
 /** One database per endpoint on the shared native server. */

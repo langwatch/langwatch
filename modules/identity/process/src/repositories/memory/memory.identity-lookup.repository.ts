@@ -1,14 +1,14 @@
 import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
 
+import type { IdentityLookupRepository } from "../identity-lookup.repository.ts";
 import {
-  IdentityLookupRepository,
   type LookupConnectionRow,
   type LookupIdentifierRow,
   type LookupInvitationRow,
   type LookupMembershipRow,
   type LookupUserRow,
 } from "../identity-lookup.repository.ts";
-import { MemoryIdentityStore } from "./memory-identity.store.ts";
+import type { MemoryIdentityStore } from "./memory-identity.store.ts";
 
 /**
  * The lookup twin. Identifiers and connections come off the shared store;

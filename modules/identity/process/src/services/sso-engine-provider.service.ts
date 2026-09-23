@@ -72,8 +72,8 @@ export class SsoEngineProviderService implements SsoEngineProviderProjection {
     };
 
     return connection.type === "oidc"
-      ? await this.oidcRow({ connection, base })
-      : await this.samlRow({ connection, base });
+      ? this.oidcRow({ connection, base })
+      : this.samlRow({ connection, base });
   }
 
   private async oidcRow({

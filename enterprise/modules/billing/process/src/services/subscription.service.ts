@@ -23,12 +23,10 @@ import type {
   BillingSubscriptionRecord,
   BillingSubscription,
 } from "../repositories/subscription.repository.ts";
-import { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
+import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
-import {
-  SubscriptionItemCalculatorService,
-  type SubscriptionItemUpdate,
-} from "./subscription-item-calculator.service.ts";
+import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { type SubscriptionItemUpdate } from "./subscription-item-calculator.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionService");
 

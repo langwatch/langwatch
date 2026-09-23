@@ -3,7 +3,7 @@
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
 
 import { mergeNameParts, namePartsIn, namesAName } from "../rules/scim-name.rules.ts";
-import { ScimCostCenterService } from "./scim-cost-center.service.ts";
+import type { ScimCostCenterService } from "./scim-cost-center.service.ts";
 
 /** What one PATCH asks of a directory resource, once every operation is read. */
 export interface ScimPatchedUser {

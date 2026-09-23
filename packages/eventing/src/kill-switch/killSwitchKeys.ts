@@ -24,7 +24,7 @@ export interface KillSwitchOptions {
  * `es-<aggregate>-<componentType>-<componentName>-killswitch`.
  */
 export function generateKillSwitchKey(
-  aggregateType: AggregateType | string,
+  aggregateType: AggregateType,
   componentType: KillSwitchComponentType,
   componentName: string,
 ): EsKillSwitchKey {

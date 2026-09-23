@@ -8,11 +8,8 @@ import type {
   ModelDefaultConfigSaveInput,
   ModelDefaultRepository,
 } from "../model-default.repository.ts";
-import {
-  byCreatedAtDescending,
-  matchesAnyScope,
-  MemoryModelProviderDatabase,
-} from "./memory.model-provider.database.ts";
+import type { MemoryModelProviderDatabase } from "./memory.model-provider.database.ts";
+import { byCreatedAtDescending, matchesAnyScope } from "./memory.model-provider.database.ts";
 
 /**
  * The default-models cascade in memory. A scope is held by at most one

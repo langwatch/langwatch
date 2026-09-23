@@ -10,7 +10,7 @@ import type {
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
-import {
+import type {
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
   graphDetailSchema,

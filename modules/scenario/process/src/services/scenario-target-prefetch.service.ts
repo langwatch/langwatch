@@ -21,7 +21,7 @@ import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-con
 import { z } from "zod";
 
 import type { ModelParamsFailureReason } from "./scenario-model-parameters.service.ts";
-import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
+import type { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 import { ScenarioWorkflowMappingService } from "./scenario-workflow-mapping.service.ts";
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */

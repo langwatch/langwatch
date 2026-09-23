@@ -12,7 +12,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 
 import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
-import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
+import type { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import {
   type ApplicableBudget,
   GatewayApplicableBudgetsService,

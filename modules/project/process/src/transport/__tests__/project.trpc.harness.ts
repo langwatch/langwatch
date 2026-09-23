@@ -2,7 +2,7 @@
  * The process ports a mounted project declaration runs on, as a test supplies
  * them: one signed-in person, and an authorization answer the test decides.
  */
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import type { createTrpcRuntime } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request: the caller, and nothing else. */
 export type ProjectTrpcTestContext = { actor: { id: string } };

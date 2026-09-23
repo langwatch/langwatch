@@ -144,7 +144,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
             _hover={{ bg: "bg.muted", color: "fg" }}
             onClick={() => {
               analytics.track({ boundary, action: "clicked", name: "sign_out" });
-              void host.signOut();
+              host.signOut();
             }}
           >
             <LogOut size={16} />

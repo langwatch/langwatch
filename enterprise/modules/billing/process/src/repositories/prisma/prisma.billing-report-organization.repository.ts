@@ -85,7 +85,7 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
       // The second read runs only for an organization an operator marked as a
       // self-hosted customer, which is a handful of rows.
       return organization.selfHostedCustomer
-        ? await this.connectedOrganizationForBilling(organizationId)
+        ? this.connectedOrganizationForBilling(organizationId)
         : { outcome: "not_usage_billed" };
     }
 

@@ -1861,7 +1861,7 @@ function LangyPanel({
   const onHistoryErrorAction = useCallback(
     (kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry") => {
       if (kind !== "retry") return;
-      void refetchHistory();
+      refetchHistory();
     },
     [refetchHistory],
   );

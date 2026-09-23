@@ -7,8 +7,8 @@ import {
 
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
-import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
-import { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
+import type { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
+import type { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
 import { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
 import {

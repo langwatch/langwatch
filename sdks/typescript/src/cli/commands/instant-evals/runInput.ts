@@ -15,10 +15,7 @@
 
 import type { InstantEvalRunBody } from "@/client-sdk/services/instant-evals";
 
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { parseInstantOrNull } from "../../utils/instant";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import {
@@ -29,11 +26,7 @@ import {
 } from "./questionFlags";
 
 /** What a run may be asked of. `llm-spans` is the spelling on the line. */
-export const INSTANT_EVAL_CLI_TARGETS = [
-  "traces",
-  "threads",
-  "llm-spans",
-] as const;
+export const INSTANT_EVAL_CLI_TARGETS = ["traces", "threads", "llm-spans"] as const;
 
 export type InstantEvalCliTarget = (typeof INSTANT_EVAL_CLI_TARGETS)[number];
 
@@ -101,13 +94,10 @@ export function readLast(raw: string): number {
 }
 
 /** The window the line asked for, as two instants, or nothing. */
-function readWindow({
-  flags,
-  now,
-}: {
-  flags: InstantEvalRunFlags;
-  now: number;
-}): { start?: string; end?: string } {
+function readWindow({ flags, now }: { flags: InstantEvalRunFlags; now: number }): {
+  start?: string;
+  end?: string;
+} {
   if (flags.last !== undefined && (flags.start ?? flags.end) !== undefined) {
     refuse("Use --last, or --start with --end, not both.");
   }
@@ -127,9 +117,7 @@ function readWindow({
 function readInstant(raw: string, flag: string): string {
   const ms = parseInstantOrNull(raw);
   if (ms === null) {
-    refuse(
-      `Invalid ${flag} value: ${raw} (write an ISO 8601 timestamp, or epoch milliseconds)`,
-    );
+    refuse(`Invalid ${flag} value: ${raw} (write an ISO 8601 timestamp, or epoch milliseconds)`);
   }
   return new Date(ms).toISOString();
 }
@@ -144,9 +132,7 @@ function readLimit(raw: string | undefined): number {
 }
 
 /** The statement the line named, read from the flag or from the file. */
-async function readStatement(
-  flags: InstantEvalRunFlags,
-): Promise<string | undefined> {
+async function readStatement(flags: InstantEvalRunFlags): Promise<string | undefined> {
   if (flags.sql !== undefined && flags.sqlFile !== undefined) {
     refuse("Use --sql, or --sql-file, not both.");
   }
@@ -229,14 +215,17 @@ async function readQuestions({
   drafts: readonly QuestionDraft[];
   flags: InstantEvalRunFlags;
 }): Promise<InstantEvalQuestionInput[]> {
-  const written = readQuestionFlags({ drafts, ...(instructions === undefined ? {} : { instructions }) });
+  const written = readQuestionFlags({
+    drafts,
+    ...(instructions === undefined ? {} : { instructions }),
+  });
   if (flags.questionsFile === undefined) return written;
   if (written.length > 0) {
     refuse(
       "Ask with the flags, or with --questions-file, not both: a file is the way to ask several questions that each carry their own criteria, scale or options.",
     );
   }
-  return await readQuestionsFile(flags.questionsFile);
+  return readQuestionsFile(flags.questionsFile);
 }
 
 /** `llm-spans` on the line is `llm_spans` on the wire. */
@@ -244,9 +233,7 @@ function apiTarget(raw: string | undefined): "traces" | "threads" | "llm_spans" 
   const named = (raw ?? DEFAULT_INSTANT_EVAL_TARGET).trim().toLowerCase();
   if (named === "traces" || named === "threads") return named;
   if (named === "llm-spans" || named === "llm_spans") return "llm_spans";
-  refuse(
-    `Invalid --target value: ${raw} (a row is one of ${INSTANT_EVAL_CLI_TARGETS.join(", ")})`,
-  );
+  refuse(`Invalid --target value: ${raw} (a row is one of ${INSTANT_EVAL_CLI_TARGETS.join(", ")})`);
 }
 
 function parametersOf(flags: InstantEvalRunFlags) {
