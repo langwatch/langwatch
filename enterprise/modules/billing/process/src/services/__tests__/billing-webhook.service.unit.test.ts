@@ -5,11 +5,12 @@ import {
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { traced } from "@langwatch/observability/node";
 import { Temporal } from "@langwatch/time";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { type BillingWebhookHost, type SubscriptionWithOrg } from "../../index.ts";
 import { type BillingWebhookOrganization } from "../../repositories/billing-webhook-organization.repository.ts";
 import { type BillingWebhookSubscription } from "../../repositories/billing-webhook-subscription.repository.ts";
+import { type BillingSubscriptionRecord } from "../../repositories/subscription.repository.ts";
 import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../annual-events-billing-threshold.service.ts";
 import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
 
@@ -22,7 +23,7 @@ const mockSetOrganizationRetention = vi.fn().mockResolvedValue(undefined);
 const mockListOrganizationRetentionRules = vi.fn().mockResolvedValue([]);
 
 const createMockHost = (): {
-  [K in keyof BillingWebhookHost]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingWebhookHost]: Mock<BillingWebhookHost[K]>;
 } => ({
   sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
   sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
@@ -31,7 +32,7 @@ const createMockHost = (): {
 });
 
 const createMockBillingSubscription = (): {
-  [K in keyof BillingWebhookSubscription]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingWebhookSubscription]: Mock<BillingWebhookSubscription[K]>;
 } => ({
   findLastNonCancelled: vi.fn(),
   createPending: vi.fn(),
@@ -48,7 +49,7 @@ const createMockBillingSubscription = (): {
 });
 
 const createMockOrganizationRepository = (): {
-  [K in keyof BillingWebhookOrganization]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingWebhookOrganization]: Mock<BillingWebhookOrganization[K]>;
 } => ({
   findByStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
@@ -88,30 +89,40 @@ const createMockItemCalculator = () => ({
   },
 });
 
-const makeSubscription = (overrides: Record<string, unknown> = {}) => ({
+const makeSubscription = (
+  overrides: Partial<BillingSubscriptionRecord> = {},
+): BillingSubscriptionRecord => ({
   id: "sub_db_1",
   organizationId: "org_123",
   status: SubscriptionStatus.PENDING,
   plan: "LAUNCH",
   stripeSubscriptionId: "sub_stripe_1",
-  startDate: new Date(),
+  createdAt: Temporal.Now.instant(),
+  startDate: Temporal.Now.instant(),
   endDate: null,
   lastPaymentFailedDate: null,
   maxMembers: null,
+  maxMembersLite: null,
   maxMessagesPerMonth: null,
   ...overrides,
 });
 
-const makeSubscriptionWithOrg = (overrides: Record<string, unknown> = {}): SubscriptionWithOrg => {
+const makeSubscriptionWithOrg = (
+  overrides: Partial<BillingSubscriptionRecord> & {
+    organization?: Partial<SubscriptionWithOrg["organization"]>;
+  } = {},
+): SubscriptionWithOrg => {
   const { organization, ...subscriptionOverrides } = overrides;
   return {
     ...makeSubscription(subscriptionOverrides),
     organization: {
+      id: "org_123",
       name: "Acme",
+      stripeCustomerId: null,
       license: null,
-      ...(organization as Record<string, unknown>),
+      ...organization,
     },
-  } as unknown as SubscriptionWithOrg;
+  };
 };
 
 const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
@@ -145,11 +156,11 @@ describe("EEWebhookService", () => {
     mockStripeInstance = createMockStripe();
     host = createMockHost();
     service = EEWebhookService.create({
-      subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
-      organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
+      subscriptionRepository: subRepo,
+      organizationRepository: orgRepo,
       stripe: mockStripeInstance as any,
       itemCalculator,
-      host: host as unknown as BillingWebhookHost,
+      host: host,
     });
   });
 
@@ -271,11 +282,11 @@ describe("EEWebhookService", () => {
         const published = () =>
           traced(
             EEWebhookService.create({
-              subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
-              organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
+              subscriptionRepository: subRepo,
+              organizationRepository: orgRepo,
               stripe: mockStripeInstance as any,
               itemCalculator,
-              host: host as unknown as BillingWebhookHost,
+              host: host,
             }),
             "EEWebhookService",
           );
@@ -322,11 +333,11 @@ describe("EEWebhookService", () => {
           approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
         };
         service = EEWebhookService.create({
-          subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
-          organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
+          subscriptionRepository: subRepo,
+          organizationRepository: orgRepo,
           stripe: mockStripeInstance as any,
           itemCalculator,
-          host: host as unknown as BillingWebhookHost,
+          host: host,
           inviteApprover: mockInviteApprover,
         });
 
@@ -617,11 +628,11 @@ describe("EEWebhookService", () => {
       it("migrates tiered subscriptions and cancels old Stripe subs", async () => {
         const localStripe = createMockStripe();
         service = EEWebhookService.create({
-          subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
-          organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
+          subscriptionRepository: subRepo,
+          organizationRepository: orgRepo,
           stripe: localStripe as any,
           itemCalculator,
-          host: host as unknown as BillingWebhookHost,
+          host: host,
         });
 
         subRepo.findByStripeId.mockResolvedValue(
@@ -665,11 +676,11 @@ describe("EEWebhookService", () => {
         const localStripe = createMockStripe();
         localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
         service = EEWebhookService.create({
-          subscriptionRepository: subRepo as unknown as BillingWebhookSubscription,
-          organizationRepository: orgRepo as unknown as BillingWebhookOrganization,
+          subscriptionRepository: subRepo,
+          organizationRepository: orgRepo,
           stripe: localStripe as any,
           itemCalculator,
-          host: host as unknown as BillingWebhookHost,
+          host: host,
         });
 
         subRepo.findByStripeId.mockResolvedValue(

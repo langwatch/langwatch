@@ -10,8 +10,27 @@ import { createDashboardTestApp, createDashboardTestAutomation } from "./dashboa
 
 const WEBHOOK_URL = "https://hooks.slack.example/services/T000/B000/TheRealWebhookToken";
 
-const trigger = {
+const trigger: Trigger = {
   id: "trigger-1",
+  projectId: "project-1",
+  name: "Errors alert",
+  triggerKind: "ALERT",
+  filters: {},
+  filterQuery: null,
+  pausedReason: null,
+  pausedAt: null,
+  message: null,
+  notificationCadence: "immediate",
+  traceDebounceMs: 0,
+  templates: {
+    slackTemplateType: null,
+    slackTemplate: null,
+    emailSubjectTemplate: null,
+    emailBodyTemplate: null,
+  },
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  lastRunAt: null,
   active: true,
   deleted: false,
   alertType: "CRITICAL",
@@ -25,7 +44,7 @@ const trigger = {
     members: ["someone@example.com"],
     slackWebhook: WEBHOOK_URL,
   },
-} as unknown as Trigger;
+};
 
 function appWithAlert() {
   return createDashboardTestApp({
@@ -63,7 +82,7 @@ describe("the alert watching a graph", () => {
       it("reads as no alert at all", async () => {
         const app = createDashboardTestApp({
           dependencies: {
-            automation: createDashboardTestAutomation([{ ...trigger, active: false } as Trigger]),
+            automation: createDashboardTestAutomation([{ ...trigger, active: false }]),
           },
         });
 
@@ -77,7 +96,7 @@ describe("the alert watching a graph", () => {
       it("reads as no alert at all", async () => {
         const app = createDashboardTestApp({
           dependencies: {
-            automation: createDashboardTestAutomation([{ ...trigger, deleted: true } as Trigger]),
+            automation: createDashboardTestAutomation([{ ...trigger, deleted: true }]),
           },
         });
 

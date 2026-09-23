@@ -20,12 +20,25 @@ vi.mock("../../../behavior/gateway-api.ts", () => ({
 
 import { WebhookDeliveriesDrawer } from "../ui/sections/webhook-deliveries-drawer.tsx";
 
-const endpoint = {
+const endpoint: Parameters<typeof WebhookDeliveriesDrawer>[0]["endpoint"] = {
   id: "ep_1",
+  organizationId: "org_1",
+  destinationKind: "http",
   url: "https://example.com/hook",
+  sqs: null,
   enabledEvents: ["gateway.request.completed"],
-  status: "ACTIVE" as const,
-} as unknown as Parameters<typeof WebhookDeliveriesDrawer>[0]["endpoint"];
+  status: "ACTIVE",
+  disabledReason: null,
+  disabledAt: null,
+  failingSince: null,
+  lastSuccessAt: null,
+  lastFailureAt: null,
+  maxBatchSize: 100,
+  maxBatchDelayMs: 1000,
+  maxInFlight: 1,
+  createdAt: "2026-07-31T00:00:00.000Z",
+  updatedAt: "2026-07-31T00:00:00.000Z",
+};
 
 function delivery(id: string) {
   return {
