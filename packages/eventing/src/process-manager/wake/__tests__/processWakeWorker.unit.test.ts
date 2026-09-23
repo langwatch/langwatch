@@ -1,16 +1,12 @@
-import type { Logger } from "@langwatch/observability";
+import { createTestLogger, type TestLogLine, type TestLogLines } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DueWake } from "../../stores/processStore.types.ts";
 import { ProcessWakeWorker } from "../processWakeWorker.ts";
 
-function makeLogger(): Logger {
-  return {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  } as unknown as Logger;
+function linesAt(lines: TestLogLines, level: "warn" | "error"): TestLogLine[] {
+  const wanted = level === "warn" ? 40 : 50;
+  return lines.filter((line) => line.level === wanted);
 }
 
 function dueWake(overrides: Partial<DueWake["ref"]> = {}): DueWake {
@@ -46,7 +42,7 @@ describe("ProcessWakeWorker", () => {
       const worker = new ProcessWakeWorker({
         store: { findDueWakes },
         managers: { topicClustering: { handleWake } },
-        logger: makeLogger(),
+        logger: createTestLogger().logger,
         notifyOutbox,
         batchSize: 7,
         now: () => 123,
@@ -71,7 +67,7 @@ describe("ProcessWakeWorker", () => {
       const worker = new ProcessWakeWorker({
         store: { findDueWakes: vi.fn().mockResolvedValue([dueWake()]) },
         managers: { topicClustering: { handleWake } },
-        logger: makeLogger(),
+        logger: createTestLogger().logger,
         notifyOutbox,
       });
 
@@ -85,7 +81,7 @@ describe("ProcessWakeWorker", () => {
 
   describe("when a wake is stale because the process advanced", () => {
     it("stands down without logging an error", async () => {
-      const logger = makeLogger();
+      const { logger, lines } = createTestLogger();
       const handleWake = vi.fn().mockResolvedValue({ outcome: "staleWake" });
       const worker = new ProcessWakeWorker({
         store: { findDueWakes: vi.fn().mockResolvedValue([dueWake()]) },
@@ -96,15 +92,15 @@ describe("ProcessWakeWorker", () => {
       worker.start();
       await vi.waitFor(() => expect(handleWake).toHaveBeenCalledTimes(1));
 
-      expect(logger.error).not.toHaveBeenCalled();
-      expect(logger.warn).not.toHaveBeenCalled();
+      expect(linesAt(lines, "error")).toHaveLength(0);
+      expect(linesAt(lines, "warn")).toHaveLength(0);
       await worker.stop();
     });
   });
 
   describe("when a due wake has no registered process manager", () => {
     it("logs and skips it without failing the scan", async () => {
-      const logger = makeLogger();
+      const { logger, lines } = createTestLogger();
       const handleWake = vi.fn().mockResolvedValue(committed);
       const worker = new ProcessWakeWorker({
         store: {
@@ -119,7 +115,7 @@ describe("ProcessWakeWorker", () => {
       worker.start();
       await vi.waitFor(() => expect(handleWake).toHaveBeenCalledTimes(1));
 
-      expect(logger.warn).toHaveBeenCalledTimes(1);
+      expect(linesAt(lines, "warn")).toHaveLength(1);
       expect(handleWake).toHaveBeenCalledWith({
         wake: dueWake(),
         now: expect.any(Number),
@@ -131,7 +127,7 @@ describe("ProcessWakeWorker", () => {
   describe("when handling one wake throws", () => {
     it("logs it, continues the batch, and the next poll retries", async () => {
       vi.useFakeTimers();
-      const logger = makeLogger();
+      const { logger, lines } = createTestLogger();
       const handleWake = vi
         .fn()
         .mockRejectedValueOnce(new Error("database unavailable"))
@@ -154,8 +150,8 @@ describe("ProcessWakeWorker", () => {
       expect(handleWake).toHaveBeenCalledTimes(2);
       // Warning, not error: the wake is retried on the next poll, which the
       // log line says in as many words.
-      expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.error).not.toHaveBeenCalled();
+      expect(linesAt(lines, "warn")).toHaveLength(1);
+      expect(linesAt(lines, "error")).toHaveLength(0);
 
       await vi.advanceTimersByTimeAsync(100);
       expect(handleWake).toHaveBeenCalledTimes(3);
@@ -177,7 +173,7 @@ describe("ProcessWakeWorker", () => {
       const worker = new ProcessWakeWorker({
         store: { findDueWakes },
         managers: {},
-        logger: makeLogger(),
+        logger: createTestLogger().logger,
         intervalMs: 50,
       });
 

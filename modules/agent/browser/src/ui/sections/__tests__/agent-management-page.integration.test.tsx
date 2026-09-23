@@ -11,7 +11,7 @@ import type {
 } from "@langwatch/agent-contract";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { AgentClient } from "../../../model/agent-client.ts";
 import {
@@ -254,65 +254,60 @@ function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) 
 }
 
 describe("AgentManagementPage", () => {
-  it("replicates the selected agent to the project chosen by the host dialog", async () => {
-    const browser = new TestAgentBrowser();
-    const lifecycle = new TestLifecycle();
-    renderPage(browser, lifecycle);
+  describe("given the project has an agent with a replica", () => {
+    let browser: TestAgentBrowser;
+    let lifecycle: TestLifecycle;
 
-    fireEvent.click(await screen.findByText("Replicate to another project"));
-    fireEvent.click(screen.getByText("Confirm copy"));
-
-    await waitFor(() => {
-      expect(browser.copyCalls).toEqual([
-        {
-          agentId: "agent_1",
-          projectId: "project_2",
-          sourceProjectId: "project_1",
-        },
-      ]);
-      expect(lifecycle.agentsChangedCalls).toBe(1);
+    beforeEach(() => {
+      browser = new TestAgentBrowser();
+      lifecycle = new TestLifecycle();
+      renderPage(browser, lifecycle);
     });
-  });
 
-  it("loads replicas and pushes only the selected replica identifiers", async () => {
-    const browser = new TestAgentBrowser();
-    const lifecycle = new TestLifecycle();
-    renderPage(browser, lifecycle);
+    it("replicates the selected agent to the project chosen by the host dialog", async () => {
+      fireEvent.click(await screen.findByText("Replicate to another project"));
+      fireEvent.click(screen.getByText("Confirm copy"));
 
-    fireEvent.click(await screen.findByText("Push to replicas"));
-    fireEvent.click(await screen.findByText("Confirm push"));
-
-    await waitFor(() => {
-      expect(browser.pushCalls).toEqual([
-        {
-          agentId: "agent_1",
-          projectId: "project_1",
-          copyIds: ["agent_copy"],
-        },
-      ]);
-      expect(lifecycle.agentsChangedCalls).toBe(1);
+      await waitFor(() => {
+        expect(browser.copyCalls).toEqual([
+          {
+            agentId: "agent_1",
+            projectId: "project_2",
+            sourceProjectId: "project_1",
+          },
+        ]);
+        expect(lifecycle.agentsChangedCalls).toBe(1);
+      });
     });
-  });
 
-  it("refreshes the visible agent data after syncing a copied agent", async () => {
-    const browser = new TestAgentBrowser();
-    const lifecycle = new TestLifecycle();
-    renderPage(browser, lifecycle);
+    it("loads replicas and pushes only the selected replica identifiers", async () => {
+      fireEvent.click(await screen.findByText("Push to replicas"));
+      fireEvent.click(await screen.findByText("Confirm push"));
 
-    fireEvent.click(await screen.findByText("Sync from source"));
+      await waitFor(() => {
+        expect(browser.pushCalls).toEqual([
+          {
+            agentId: "agent_1",
+            projectId: "project_1",
+            copyIds: ["agent_copy"],
+          },
+        ]);
+        expect(lifecycle.agentsChangedCalls).toBe(1);
+      });
+    });
 
-    await waitFor(() => expect(lifecycle.agentsChangedCalls).toBe(1));
-  });
+    it("refreshes the visible agent data after syncing a copied agent", async () => {
+      fireEvent.click(await screen.findByText("Sync from source"));
 
-  it("keeps archive confirmation in the host dialog and runs the archive lifecycle", async () => {
-    const browser = new TestAgentBrowser();
-    const lifecycle = new TestLifecycle();
-    renderPage(browser, lifecycle);
+      await waitFor(() => expect(lifecycle.agentsChangedCalls).toBe(1));
+    });
 
-    fireEvent.click(await screen.findByText("Delete agent"));
-    fireEvent.click(await screen.findByText("Confirm archive"));
+    it("keeps archive confirmation in the host dialog and runs the archive lifecycle", async () => {
+      fireEvent.click(await screen.findByText("Delete agent"));
+      fireEvent.click(await screen.findByText("Confirm archive"));
 
-    await waitFor(() => expect(lifecycle.agentArchivedCalls).toBe(1));
+      await waitFor(() => expect(lifecycle.agentArchivedCalls).toBe(1));
+    });
   });
 
   describe("given the project has no agent of any kind", () => {

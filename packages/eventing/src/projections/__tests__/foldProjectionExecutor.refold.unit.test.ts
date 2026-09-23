@@ -64,7 +64,7 @@ function makeFold({
   return { fold, store, eventLoader };
 }
 
-const refoldMetric = incrementEsFoldRefoldTotal as unknown as ReturnType<typeof vi.fn>;
+const refoldMetric = vi.mocked(incrementEsFoldRefoldTotal);
 
 describe("FoldProjectionExecutor out-of-order re-fold", () => {
   const tenantId = createTestTenantId();
@@ -224,11 +224,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         appliedEventIds: string[];
       }) {
         const store = createMockFoldProjectionStore<OrderState>();
-        (
-          store as unknown as {
-            getWithApplied: ReturnType<typeof vi.fn>;
-          }
-        ).getWithApplied = vi.fn().mockResolvedValue({
+        store.getWithApplied = vi.fn().mockResolvedValue({
           state: {
             sequence: [1_000, 2_000, CHECKPOINT_MS],
             LastEventOccurredAt: CHECKPOINT_MS,

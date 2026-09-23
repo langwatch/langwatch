@@ -69,7 +69,7 @@ describe("fold redelivery telemetry", () => {
       deliveryAttempt: number;
     }): Promise<void> {
       const store = createMockFoldProjectionStore<{ count: number }>();
-      (store as unknown as { getWithApplied: ReturnType<typeof vi.fn> }).getWithApplied = vi
+      store.getWithApplied = vi
         .fn()
         .mockResolvedValue({ state: { count: 7 }, appliedEventIds: [] });
 

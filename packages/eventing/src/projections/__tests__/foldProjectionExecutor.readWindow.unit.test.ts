@@ -64,9 +64,7 @@ function makeFold({
   return { fold, store };
 }
 
-const fallbackMetric = incrementEsFoldReadWindowFallbackTotal as unknown as ReturnType<
-  typeof vi.fn
->;
+const fallbackMetric = vi.mocked(incrementEsFoldReadWindowFallbackTotal);
 
 describe("FoldProjectionExecutor declared read window", () => {
   const tenantId = createTestTenantId();

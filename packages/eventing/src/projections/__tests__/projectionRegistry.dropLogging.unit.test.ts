@@ -5,8 +5,12 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Event } from "../../domain/types.ts";
-import type { FoldProjectionDefinition } from "../foldProjection.types.ts";
+import {
+  createMockFoldProjectionDefinition,
+  createTestAggregateType,
+  createTestEvent,
+  createTestTenantId,
+} from "../../services/__tests__/testHelpers.ts";
 import { ProjectionRegistry } from "../projectionRegistry.ts";
 
 // `createLogger` hands back one instance per name, so every registry in this
@@ -18,9 +22,7 @@ afterEach(() => {
 
 function registryWithAProjection() {
   const registry = new ProjectionRegistry();
-  registry.registerFoldProjection({
-    name: "any-fold",
-  } as unknown as FoldProjectionDefinition<unknown, Event>);
+  registry.registerFoldProjection(createMockFoldProjectionDefinition("any-fold"));
   return registry;
 }
 
@@ -43,7 +45,10 @@ function spyOnLogger(registry: ProjectionRegistry, level: "warn" | "error") {
   return vi.spyOn(logger as never, level as never) as ReturnType<typeof vi.spyOn>;
 }
 
-const events = [{ id: "event-1" }, { id: "event-2" }] as unknown as Event[];
+const events = [
+  createTestEvent("aggregate-1", createTestAggregateType(), createTestTenantId()),
+  createTestEvent("aggregate-2", createTestAggregateType(), createTestTenantId()),
+];
 const context = {} as never;
 
 describe("dispatching to a projection registry with no router", () => {

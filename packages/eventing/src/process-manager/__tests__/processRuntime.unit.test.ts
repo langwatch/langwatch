@@ -1,4 +1,4 @@
-import type { Logger } from "@langwatch/observability";
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -12,15 +12,6 @@ import type { ProcessStore } from "../stores/processStore.types.ts";
 const tenantId = createTenantId("project-1");
 const TEST_PROCESS_EVENT_TYPE = "test.process.triggered";
 type ProcessTestEvent = Event<{ traceId: string }>;
-
-function makeLogger(): Logger {
-  return {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  } as unknown as Logger;
-}
 
 /** A store stub that never has a persisted instance and always reports the
  * given commit outcome — used to force outcomes InMemoryProcessStore cannot
@@ -409,7 +400,7 @@ describe("ProcessRuntime", () => {
           throw new Error("boom");
         },
       });
-      const logger = makeLogger();
+      const { logger, lines } = createTestLogger();
       const runtime = new ProcessRuntime({
         store,
         consumersEnabled: true,
@@ -432,14 +423,13 @@ describe("ProcessRuntime", () => {
         }),
       ).not.toThrow();
 
-      await vi.waitFor(() => expect(logger.error).toHaveBeenCalledTimes(1));
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          processName: "scheduledFailure",
-          error: "boom",
-        }),
-        "Schedule arming failed; the next worker boot will retry",
-      );
+      await vi.waitFor(() => expect(lines.filter((line) => line.level === 50)).toHaveLength(1));
+      expect(
+        lines.findLine("error", "Schedule arming failed; the next worker boot will retry"),
+      ).toMatchObject({
+        processName: "scheduledFailure",
+        error: "boom",
+      });
 
       await runtime.stop();
     });
