@@ -301,6 +301,12 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    sanctioned fix at all. A cycle is broken by moving that symbol into the
    owner's existing kit; where the owner has no kit, the three-consumer rule
    decides whether one is warranted, and if it is not, rule 5 still applies.
+7. **Owner UI that fetches is lent, not copied** (Alex, 2026-09-23). When another
+   module needs a component that fetches its owner's data (presence, annotation,
+   share, trace's own surfaces), the owner publishes it through its declaration's
+   `withCapabilities` slot, as `joinOffer` does, and the consumer renders what it is
+   handed. The owner keeps its UI and its data; rule 5's duplicate is for thin,
+   non-fetching surfaces only.
 
 ---
 
