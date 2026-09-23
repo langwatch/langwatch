@@ -140,18 +140,17 @@ export class RenderTimeoutError extends Error {
   }
 }
 
+function hasSegment(current: unknown, segment: PathSegment): current is object {
+  if (typeof segment === "number") {
+    return Array.isArray(current) && !(segment < 0 || segment >= current.length);
+  }
+  return typeof current === "object" && current !== null && Object.hasOwn(current, segment);
+}
+
 function hasNestedPath(context: object, segments: PathSegment[]): boolean {
   let current: unknown = context;
   for (const segment of segments) {
-    if (current == null) return false;
-    if (typeof segment === "number") {
-      if (!Array.isArray(current)) return false;
-      if (segment < 0 || segment >= current.length) return false;
-      current = current[segment];
-      continue;
-    }
-    if (typeof current !== "object") return false;
-    if (!Object.hasOwn(current, segment)) return false;
+    if (!hasSegment(current, segment)) return false;
     current = Reflect.get(current, segment);
   }
   return true;
