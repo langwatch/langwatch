@@ -13,6 +13,105 @@ import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { createSpinner } from "../utils/spinner";
 
+type RemoteDependency = [name: string, dependency: PromptsConfig["prompts"][string]];
+
+const fetchRemotePrompt = async ({
+  name,
+  dependency,
+  lock,
+  promptsApiService,
+  result,
+  tag,
+  fetchSpinner,
+}: {
+  name: string;
+  dependency: PromptsConfig["prompts"][string];
+  lock: PromptsLock;
+  promptsApiService: PromptsApiService;
+  result: SyncResult;
+  tag?: string;
+  fetchSpinner: ReturnType<typeof createSpinner>;
+}): Promise<void> => {
+  const versionSpec =
+    typeof dependency === "string" ? dependency : (dependency.version ?? "latest");
+
+  const displaySpec = tag ?? versionSpec;
+
+  const lockEntry = lock.prompts[name];
+
+  const prompt = tag
+    ? await promptsApiService.get(name, { tag })
+    : await promptsApiService.get(name, { version: versionSpec });
+
+  if (!prompt) {
+    result.errors.push({ name, error: "Prompt not found" });
+    return;
+  }
+
+  const needsUpdate =
+    lockEntry?.version !== prompt.version ||
+    !lockEntry.materialized ||
+    !fs.existsSync(path.resolve(lockEntry.materialized));
+
+  if (!needsUpdate) {
+    result.unchanged.push(name);
+    return;
+  }
+
+  const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
+
+  const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
+  const relativePath = path.relative(process.cwd(), savedPath);
+  result.fetched.push({
+    name,
+    version: prompt.version,
+    versionSpec: displaySpec,
+  });
+
+  FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
+
+  fetchSpinner.text = `Fetched ${chalk.cyan(
+    `${name}@${displaySpec}`,
+  )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(relativePath)}`;
+};
+
+const fetchRemotePrompts = async ({
+  remoteDeps,
+  lock,
+  promptsApiService,
+  result,
+  tag,
+}: {
+  remoteDeps: RemoteDependency[];
+  lock: PromptsLock;
+  promptsApiService: PromptsApiService;
+  result: SyncResult;
+  tag?: string;
+}): Promise<void> => {
+  if (remoteDeps.length === 0) return;
+
+  const fetchSpinner = createSpinner(`Checking ${remoteDeps.length} remote prompts...`).start();
+
+  for (const [name, dependency] of remoteDeps) {
+    try {
+      await fetchRemotePrompt({
+        name,
+        dependency,
+        lock,
+        promptsApiService,
+        result,
+        tag,
+        fetchSpinner,
+      });
+    } catch (error) {
+      const errorMessage = formatApiErrorMessage({ error });
+      result.errors.push({ name, error: errorMessage });
+    }
+  }
+
+  fetchSpinner.stop();
+};
+
 /**
  * Core pull logic: fetches remote prompts and materializes them locally.
  * Returns the result and mutates the lock object in place.
@@ -40,58 +139,7 @@ export const pullPrompts = async ({
     return true;
   });
 
-  if (remoteDeps.length > 0) {
-    const fetchSpinner = createSpinner(`Checking ${remoteDeps.length} remote prompts...`).start();
-
-    for (const [name, dependency] of remoteDeps) {
-      try {
-        const versionSpec =
-          typeof dependency === "string" ? dependency : (dependency.version ?? "latest");
-
-        const displaySpec = tag ?? versionSpec;
-
-        const lockEntry = lock.prompts[name];
-
-        const prompt = tag
-          ? await promptsApiService.get(name, { tag })
-          : await promptsApiService.get(name, { version: versionSpec });
-
-        if (prompt) {
-          const needsUpdate =
-            lockEntry?.version !== prompt.version ||
-            !lockEntry.materialized ||
-            !fs.existsSync(path.resolve(lockEntry.materialized));
-
-          if (needsUpdate) {
-            const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
-
-            const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
-            const relativePath = path.relative(process.cwd(), savedPath);
-            result.fetched.push({
-              name,
-              version: prompt.version,
-              versionSpec: displaySpec,
-            });
-
-            FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
-
-            fetchSpinner.text = `Fetched ${chalk.cyan(
-              `${name}@${displaySpec}`,
-            )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(relativePath)}`;
-          } else {
-            result.unchanged.push(name);
-          }
-        } else {
-          result.errors.push({ name, error: "Prompt not found" });
-        }
-      } catch (error) {
-        const errorMessage = formatApiErrorMessage({ error });
-        result.errors.push({ name, error: errorMessage });
-      }
-    }
-
-    fetchSpinner.stop();
-  }
+  await fetchRemotePrompts({ remoteDeps, lock, promptsApiService, result, tag });
 
   // Cleanup orphaned materialized files
   const currentDependencies = new Set(
@@ -152,18 +200,23 @@ const printPullResults = ({
     }
   }
 
+  printPullSummary({ result, duration });
+};
+
+const printPullSummary = ({ result, duration }: { result: SyncResult; duration: string }): void => {
   const totalActions = result.fetched.length + result.cleaned.length;
 
   if (totalActions === 0 && result.errors.length === 0) {
     console.log(chalk.gray(`Pulled in ${duration}s, no changes`));
-  } else {
-    const summary = [];
-    if (result.fetched.length > 0) summary.push(`${result.fetched.length} fetched`);
-    if (result.cleaned.length > 0) summary.push(`${result.cleaned.length} cleaned`);
-    if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
-
-    console.log(chalk.gray(`Pulled ${summary.join(", ")} in ${duration}s`));
+    return;
   }
+
+  const summary = [];
+  if (result.fetched.length > 0) summary.push(`${result.fetched.length} fetched`);
+  if (result.cleaned.length > 0) summary.push(`${result.cleaned.length} cleaned`);
+  if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
+
+  console.log(chalk.gray(`Pulled ${summary.join(", ")} in ${duration}s`));
 };
 
 export const pullCommand = async (options?: { tag?: string }): Promise<void> => {

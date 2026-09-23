@@ -28,7 +28,7 @@ const handleConflict = async (
     localVersion: number;
     remoteVersion: number;
     differences: string[];
-    remoteConfigData: any;
+    remoteConfigData: unknown;
   },
 
   forceResolution?: "local" | "remote",
@@ -119,7 +119,7 @@ export const pushPrompts = async ({
         // preserved verbatim as one json_schema output. Exact inverse of the
         // pull direction (outputsToResponseFormat) so push/pull is lossless.
         const outputs: ConfigData["outputs"] = (responseFormatToOutputs(
-          (localConfig as any).response_format,
+          localConfig.response_format,
         ) as ConfigData["outputs"]) ?? [{ identifier: "output", type: "str" }];
 
         const configData: ConfigData = {
@@ -328,19 +328,24 @@ const printPushResults = ({ result, duration }: { result: SyncResult; duration: 
     }
   }
 
+  printPushSummary({ result, duration });
+};
+
+const printPushSummary = ({ result, duration }: { result: SyncResult; duration: string }): void => {
   const totalActions = result.fetched.length + result.pushed.length;
 
   if (totalActions === 0 && result.errors.length === 0) {
     console.log(chalk.gray(`Pushed in ${duration}s, no changes`));
-  } else {
-    const summary = [];
-    if (result.pushed.length > 0) summary.push(`${result.pushed.length} pushed`);
-    if (result.fetched.length > 0)
-      summary.push(`${result.fetched.length} pulled (conflict resolution)`);
-    if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
-
-    console.log(chalk.gray(`Pushed ${summary.join(", ")} in ${duration}s`));
+    return;
   }
+
+  const summary = [];
+  if (result.pushed.length > 0) summary.push(`${result.pushed.length} pushed`);
+  if (result.fetched.length > 0)
+    summary.push(`${result.fetched.length} pulled (conflict resolution)`);
+  if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
+
+  console.log(chalk.gray(`Pushed ${summary.join(", ")} in ${duration}s`));
 };
 
 export const pushCommand = async (options?: {
