@@ -2035,13 +2035,14 @@ clickhouse:
   # and `helm install --wait --wait-for-jobs` fails, instead of ClickHouse coming
   # up healthy with NO LWQL access set — the silent-success failure that shipped
   # once and was only caught much later by an in-cluster row-count assertion.
-  # The secretName is tpl-rendered by the subchart, so .Release.Name resolves;
-  # it must equal langwatch.lwql.accessSecretName (<release>-lwql-clickhouse-access).
+  # statefulset.yaml renders extraVolumes through `tpl (toYaml .) $`, so `$` is
+  # the parent (root) context and this calls the parent helper directly — the
+  # single source of truth for the Secret name, no hand-copied literal to drift.
   ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod (LWQL access Secret by default).
   extraVolumes:
     - name: lwql-access
       secret:
-        secretName: "{{ .Release.Name }}-lwql-clickhouse-access"
+        secretName: '{{ include "langwatch.lwql.accessSecretName" $ }}'
         optional: false
   ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container (LWQL access files by default).
   extraVolumeMounts:

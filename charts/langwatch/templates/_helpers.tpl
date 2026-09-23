@@ -1274,9 +1274,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   Name of the Secret the LangWatchQL access-render Job writes and every
   chart-managed ClickHouse pod mounts (issue #8258). Holds the two rendered
   files `lwql-access.yaml` (users.d) and `lwql-named-collection.yaml` (config.d).
-  The subchart mount in values.yaml reconstructs this same name from
-  `.Release.Name` (a subchart cannot call a parent helper), so the two must
-  stay in lockstep: `<release>-lwql-clickhouse-access`.
+  The subchart mount in values.yaml calls this helper directly: statefulset.yaml
+  renders extraVolumes through `tpl (toYaml .) $`, so `$` is the parent context
+  and the helper resolves there — one source of truth, no literal to keep in sync.
 */}}
 {{- define "langwatch.lwql.accessSecretName" -}}
   {{- printf "%s-lwql-clickhouse-access" (include "langwatch.fullname" .) -}}
