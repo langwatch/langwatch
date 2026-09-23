@@ -1,0 +1,34 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`lwqlClickHouseSetupStatements after the accessModelDdl move > given fixed names, password and tables > emits the shipped access statements byte-for-byte 1`] = `
+[
+  "CREATE DATABASE IF NOT EXISTS langwatch",
+  "CREATE TABLE IF NOT EXISTS langwatch.lwql_api_key_tenant_map (KeyHash String, TenantId String) ENGINE = MergeTree ORDER BY KeyHash",
+  "CREATE SETTINGS PROFILE OR REPLACE langwatch_profile
+  SETTINGS custom_api_key_hash = '' CHANGEABLE_IN_READONLY,
+           readonly = 1 CONST,
+           max_execution_time = 10 CONST,
+           max_memory_usage = 1000000000 CONST,
+           max_threads = 4 CONST,
+           max_concurrent_queries_for_user = 10 CONST,
+           max_rows_to_read = 1000000000 CONST,
+           max_bytes_to_read = 10000000000 CONST,
+           read_overflow_mode = 'throw' CONST,
+           max_result_rows = 10000 CONST,
+           max_result_bytes = 8000000 CONST,
+           result_overflow_mode = 'throw' CONST",
+  "CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY 's3cr3t-lwql' SETTINGS PROFILE langwatch_profile",
+  "CREATE ROW POLICY OR REPLACE lwql_api_key_tenant_map_self ON langwatch.lwql_api_key_tenant_map
+  USING has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE trace_summaries_tenant ON langwatch.trace_summaries
+  USING TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "CREATE ROW POLICY OR REPLACE stored_objects_tenant ON langwatch.stored_objects
+  USING project_id IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map WHERE has(splitByChar(',', getSetting('custom_api_key_hash')), KeyHash) GROUP BY KeyHash HAVING uniqExact(TenantId) = 1)
+  TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.lwql_api_key_tenant_map TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.trace_summaries TO langwatch_lwql",
+  "GRANT SELECT ON langwatch.stored_objects TO langwatch_lwql",
+]
+`;
