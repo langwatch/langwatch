@@ -276,7 +276,7 @@ const traceColumnDefs = {
     minSize: 110,
     meta: num,
   }),
-} satisfies Record<string, ColumnDef<TraceListItem, any>>;
+} satisfies Record<string, ColumnDef<TraceListItem, unknown>>;
 
 /**
  * Union of every id present in `traceColumnDefs`. Used to constrain the
@@ -285,7 +285,7 @@ const traceColumnDefs = {
  */
 export type TraceColumnId = keyof typeof traceColumnDefs;
 
-const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, any>> = {
+const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, unknown>> = {
   conversation: convCol.accessor("conversationId", {
     id: "conversation",
     header: "Conversation",
@@ -419,7 +419,7 @@ const GROUP_BY_LABEL: Record<"service" | "model" | "user", string> = {
 
 function buildGroupColumnDefs(
   groupBy: "service" | "model" | "user",
-): Record<string, ColumnDef<TraceGroup, any>> {
+): Record<string, ColumnDef<TraceGroup, unknown>> {
   return {
     group: groupCol.accessor("label", {
       id: "group",
@@ -474,13 +474,13 @@ function buildGroupColumnDefs(
 // some values may not be a known column.
 const traceColumnDefsByString = traceColumnDefs as Record<
   string,
-  ColumnDef<TraceListItem, any> | undefined
+  ColumnDef<TraceListItem, unknown> | undefined
 >;
 
-export function buildTraceColumns(ids: string[]): ColumnDef<TraceListItem, any>[] {
+export function buildTraceColumns(ids: string[]): ColumnDef<TraceListItem, unknown>[] {
   return ids
     .map((id) => traceColumnDefsByString[id])
-    .filter((def): def is ColumnDef<TraceListItem, any> => Boolean(def));
+    .filter((def): def is ColumnDef<TraceListItem, unknown> => Boolean(def));
 }
 
 /**
@@ -492,18 +492,20 @@ export function getTraceColumnDef(id: string): ColumnDef<TraceListItem, unknown>
   return traceColumnDefsByString[id];
 }
 
-export function buildConversationColumns(ids: string[]): ColumnDef<ConversationGroup, any>[] {
+export function buildConversationColumns(ids: string[]): ColumnDef<ConversationGroup, unknown>[] {
   return ids
     .map((id) => conversationColumnDefs[id])
-    .filter((def): def is ColumnDef<ConversationGroup, any> => Boolean(def));
+    .filter((def): def is ColumnDef<ConversationGroup, unknown> => Boolean(def));
 }
 
 export function buildGroupColumns(
   ids: string[],
   groupBy: "service" | "model" | "user",
-): ColumnDef<TraceGroup, any>[] {
+): ColumnDef<TraceGroup, unknown>[] {
   const defs = buildGroupColumnDefs(groupBy);
-  return ids.map((id) => defs[id]).filter((def): def is ColumnDef<TraceGroup, any> => Boolean(def));
+  return ids
+    .map((id) => defs[id])
+    .filter((def): def is ColumnDef<TraceGroup, unknown> => Boolean(def));
 }
 
 export const allTraceColumnIds = Object.keys(traceColumnDefs);

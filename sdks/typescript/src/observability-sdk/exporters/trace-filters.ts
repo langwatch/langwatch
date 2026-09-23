@@ -37,10 +37,7 @@ export function applyFilters(
  */
 export function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan[] {
   if ("preset" in rule && rule.preset) {
-    return applyPreset(
-      (rule as { preset: TraceFilter extends { preset: infer P } ? P : never }).preset as any,
-      spans,
-    );
+    return applyPreset(rule.preset, spans);
   }
 
   if ("include" in rule && rule.include) {

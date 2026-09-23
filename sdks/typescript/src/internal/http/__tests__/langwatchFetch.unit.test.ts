@@ -36,8 +36,10 @@ const scripted = (...responses: Response[]) => {
   return { fetchImpl, calls };
 };
 
-const urlOf = (input: RequestInfo | URL): string =>
-  typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+const urlOf = (input: RequestInfo | URL): string => {
+  if (typeof input === "string") return input;
+  return input instanceof URL ? input.href : input.url;
+};
 
 const headersOf = (call: { input: RequestInfo | URL; init?: RequestInit }): Headers =>
   call.input instanceof Request ? call.input.headers : new Headers(call.init?.headers);
