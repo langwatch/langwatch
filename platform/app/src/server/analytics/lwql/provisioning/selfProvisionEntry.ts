@@ -246,7 +246,7 @@ async function convergeClickHouse({
       query: async (sql) =>
         (await (
           await client.query({ query: sql, format: "JSONEachRow" })
-        ).json()) as Record<string, string>[],
+        ).json()) as Record<string, unknown>[],
     });
   }
   const result = await runClickHouseStatements({

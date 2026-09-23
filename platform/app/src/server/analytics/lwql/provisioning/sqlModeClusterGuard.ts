@@ -26,10 +26,15 @@ import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:analytics:lwql:sqlModeClusterGuard");
 
-/** Query the guard runs against `system.user_directories` and `system.clusters`. */
+/**
+ * Query the guard runs against `system.*`. The rows are `unknown`-valued on
+ * purpose: under `JSONEachRow` a UInt8 column (`is_local`, `total_replicas`)
+ * arrives as a JS number, not a string, so the guard counts in SQL and parses
+ * with {@link Number} rather than comparing wire values in TS.
+ */
 export type ClusterGuardQuery = (
   sql: string,
-) => Promise<Record<string, string>[]>;
+) => Promise<Record<string, unknown>[]>;
 
 /**
  * `sql` mode was requested on a multi-host cluster with no replicated access
@@ -71,33 +76,38 @@ async function hasReplicatedUserDirectory(
 }
 
 /**
- * The largest host count of any cluster this server belongs to. A cluster is
- * "ours" when it carries an `is_local = 1` row; its size is the count of
- * distinct hosts. Zero when the server belongs to no configured cluster.
+ * The largest host count of any cluster this server belongs to, counted in SQL
+ * and returned as a string so the result never depends on the wire type of
+ * `is_local`. Counting in TS over `is_local === "1"` was the AC9 bug: under
+ * `JSONEachRow` the UInt8 arrives as the number 1, the filter matched nothing,
+ * and a real 3-host cluster reported zero hosts. A cluster is "ours" when it
+ * carries an `is_local = 1` row; its size is the count of distinct hosts. Zero
+ * when the server belongs to no configured cluster.
  */
-async function maxOwnClusterHostCount(
+export async function maxOwnClusterHostCount(
   query: ClusterGuardQuery,
 ): Promise<number> {
   const rows = await query(
-    "SELECT cluster, host_name, is_local FROM system.clusters",
+    "SELECT toString(max(hosts)) AS host_count FROM (" +
+      "SELECT cluster, uniqExact(host_name) AS hosts FROM system.clusters " +
+      "WHERE cluster IN (SELECT cluster FROM system.clusters WHERE is_local = 1) " +
+      "GROUP BY cluster)",
   );
-  const ownClusters = new Set(
-    rows.filter((row) => row.is_local === "1").map((row) => row.cluster),
+  return Number(rows[0]?.host_count ?? "0") || 0;
+}
+
+/**
+ * A second, independent signal: a replicated table spanning N replicas proves
+ * at least N hosts even when `is_local` matches no cluster row. Counted in SQL
+ * with the same `toString(max(...))` shape as {@link probeAppFunctionStore}.
+ */
+export async function maxReplicaHostCount(
+  query: ClusterGuardQuery,
+): Promise<number> {
+  const rows = await query(
+    "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
   );
-  const hostsByCluster = new Map<string, Set<string>>();
-  for (const row of rows) {
-    const { cluster, host_name: hostName } = row;
-    if (cluster === undefined || hostName === undefined) continue;
-    if (!ownClusters.has(cluster)) continue;
-    const hosts = hostsByCluster.get(cluster) ?? new Set<string>();
-    hosts.add(hostName);
-    hostsByCluster.set(cluster, hosts);
-  }
-  let max = 0;
-  for (const hosts of hostsByCluster.values()) {
-    max = Math.max(max, hosts.size);
-  }
-  return max;
+  return Number(rows[0]?.max_total_replicas ?? "0") || 0;
 }
 
 /**
@@ -118,11 +128,17 @@ export async function assertLwqlSqlModeClusterSafe({
   const replicatedDirectoryCount = await hasReplicatedUserDirectory(query);
   if (replicatedDirectoryCount > 0) return;
 
-  const hostCount = await maxOwnClusterHostCount(query);
+  const [clusterHostCount, replicaHostCount] = await Promise.all([
+    maxOwnClusterHostCount(query),
+    maxReplicaHostCount(query),
+  ]);
+  const hostCount = Math.max(clusterHostCount, replicaHostCount);
   if (hostCount <= 1) return;
 
+  const decidedBy =
+    replicaHostCount > clusterHostCount ? "replicas" : "clusters";
   logger.error(
-    { hostCount, replicatedDirectoryCount },
+    { hostCount, replicatedDirectoryCount, decidedBy },
     "lwql sql mode refused: multi-host cluster with no replicated access storage",
   );
   throw new LwqlSqlModeUnsafeOnClusterError({

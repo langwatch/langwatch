@@ -14,30 +14,33 @@ import {
   LwqlSqlModeUnsafeOnClusterError,
 } from "../sqlModeClusterGuard";
 
-/** A fake `system.*` query serving fixed user-directory and cluster rows. */
+/**
+ * A fake `system.*` query serving the aggregated rows the guard's SQL now
+ * returns: `{ host_count }` from the cluster count, `{ max_total_replicas }`
+ * from the replica probe, and the user-directory rows. Values mirror the real
+ * `JSONEachRow` wire shape, which the fixtures below vary between string and
+ * number to lock in the coercion.
+ */
 function fakeQuery({
   userDirectories = [],
-  clusters = [],
+  clusterHostCount = [{ host_count: "0" }],
+  replicaHostCount = [{ max_total_replicas: "0" }],
 }: {
-  userDirectories?: Record<string, string>[];
-  clusters?: Record<string, string>[];
+  userDirectories?: Record<string, unknown>[];
+  clusterHostCount?: Record<string, unknown>[];
+  replicaHostCount?: Record<string, unknown>[];
 }): ClusterGuardQuery {
   return async (sql: string) => {
     if (sql.includes("system.user_directories")) return userDirectories;
-    if (sql.includes("system.clusters")) return clusters;
+    if (sql.includes("system.replicas")) return replicaHostCount;
+    if (sql.includes("system.clusters")) return clusterHostCount;
     throw new Error(`unexpected query: ${sql}`);
   };
 }
 
-const SINGLE_NODE_CLUSTER: Record<string, string>[] = [
-  { cluster: "default", host_name: "ch-0", is_local: "1" },
-];
+const SINGLE_NODE: Record<string, unknown>[] = [{ host_count: "1" }];
 
-const THREE_HOST_CLUSTER: Record<string, string>[] = [
-  { cluster: "main", host_name: "ch-0", is_local: "1" },
-  { cluster: "main", host_name: "ch-1", is_local: "0" },
-  { cluster: "main", host_name: "ch-2", is_local: "0" },
-];
+const THREE_HOSTS: Record<string, unknown>[] = [{ host_count: "3" }];
 
 describe("assertLwqlSqlModeClusterSafe", () => {
   describe("when the server is a single node", () => {
@@ -45,7 +48,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
     it("passes", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
-          query: fakeQuery({ clusters: SINGLE_NODE_CLUSTER }),
+          query: fakeQuery({ clusterHostCount: SINGLE_NODE }),
           env: {},
         }),
       ).resolves.toBeUndefined();
@@ -56,7 +59,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
     /** @scenario "A multi-host cluster without replicated access storage aborts sql-mode provisioning" */
     it("aborts with the named error carrying the counts", async () => {
       const promise = assertLwqlSqlModeClusterSafe({
-        query: fakeQuery({ clusters: THREE_HOST_CLUSTER }),
+        query: fakeQuery({ clusterHostCount: THREE_HOSTS }),
         env: {},
       });
 
@@ -77,7 +80,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
         assertLwqlSqlModeClusterSafe({
           query: fakeQuery({
             userDirectories: [{ name: "replicated", type: "replicated" }],
-            clusters: THREE_HOST_CLUSTER,
+            clusterHostCount: THREE_HOSTS,
           }),
           env: {},
         }),
@@ -90,7 +93,7 @@ describe("assertLwqlSqlModeClusterSafe", () => {
     it("passes regardless of the cluster topology", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
-          query: fakeQuery({ clusters: THREE_HOST_CLUSTER }),
+          query: fakeQuery({ clusterHostCount: THREE_HOSTS }),
           env: { LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: "true" },
         }),
       ).resolves.toBeUndefined();
@@ -98,18 +101,55 @@ describe("assertLwqlSqlModeClusterSafe", () => {
   });
 
   describe("when this server belongs to no configured cluster", () => {
-    it("passes — a lone server has one host", async () => {
+    it("passes — a lone server counts zero hosts", async () => {
       await expect(
         assertLwqlSqlModeClusterSafe({
-          query: fakeQuery({
-            clusters: [
-              { cluster: "other", host_name: "ch-a", is_local: "0" },
-              { cluster: "other", host_name: "ch-b", is_local: "0" },
-            ],
-          }),
+          query: fakeQuery({ clusterHostCount: [{ host_count: "0" }] }),
           env: {},
         }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when the cluster row count arrives as a JSON number (the AC9 wire bug)", () => {
+    // Regression for issue #8258: under `JSONEachRow` a UInt8 arrives as the
+    // number 3, not the string "3". The old guard filtered `is_local === "1"`
+    // in TS, so a numeric-typed row matched nothing and a real 3-host cluster
+    // slipped through as zero hosts. Counting in SQL and parsing with Number()
+    // must now abort whether the value is a string or a number.
+    it("aborts — Number() coerces the numeric host_count the string compare dropped", async () => {
+      const promise = assertLwqlSqlModeClusterSafe({
+        query: fakeQuery({ clusterHostCount: [{ host_count: 3 }] }),
+        env: {},
+      });
+
+      await expect(promise).rejects.toBeInstanceOf(
+        LwqlSqlModeUnsafeOnClusterError,
+      );
+      await promise.catch((error: LwqlSqlModeUnsafeOnClusterError) => {
+        expect(error.hostCount).toBe(3);
+      });
+    });
+  });
+
+  describe("when a replicated table spans hosts that no cluster row claims", () => {
+    // Second, independent signal: even if `is_local` matches no cluster row,
+    // a replicated table with N replicas proves N hosts.
+    it("aborts on the replica count alone", async () => {
+      const promise = assertLwqlSqlModeClusterSafe({
+        query: fakeQuery({
+          clusterHostCount: [{ host_count: "0" }],
+          replicaHostCount: [{ max_total_replicas: "2" }],
+        }),
+        env: {},
+      });
+
+      await expect(promise).rejects.toBeInstanceOf(
+        LwqlSqlModeUnsafeOnClusterError,
+      );
+      await promise.catch((error: LwqlSqlModeUnsafeOnClusterError) => {
+        expect(error.hostCount).toBe(2);
+      });
     });
   });
 });
