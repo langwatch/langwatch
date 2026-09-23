@@ -63,10 +63,11 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 
 	// Replicated mode: zookeeper client, macros and remote_servers for the
 	// ReplicatedMergeTree engine. The server writes NO keeper-backed access or
-	// named-collection store: the app owns the LangWatchQL access model and
-	// self-provisions the user, profile, grants, row filters and the
-	// lwql_postgres named collection via SQL DDL at boot (issue #8258), so the
-	// renderer never has to accept SQL-created entities into a replicated
+	// named-collection store: the app owns the LangWatchQL access model, and on
+	// chart-managed ClickHouse (which this replicated topology is) the chart
+	// DELIVERS it as rendered users.d/config.d files mounted on every pod, not
+	// via SQL DDL — DDL is the bring-your-own path only (issue #8258). Either
+	// way the renderer never has to accept SQL-created entities into a replicated
 	// directory. That deletes the AC8 defect class outright — no
 	// `user_directories` merge hazard, no startup-fatal keeper-backed
 	// named-collection dependency — instead of patching it.
