@@ -237,8 +237,8 @@ async function convergeClickHouse({
   // objects and skips the user, profile, grants, row policies and named
   // collection. `sql` mode provisions the whole model as DDL (its cluster
   // safety is gated separately by the AC9 guard).
-  const includeAccessStatements = lwqlAccessModelMode() === "sql";
-  if (includeAccessStatements) {
+  const mode = lwqlAccessModelMode();
+  if (mode === "sql") {
     // AC9: refuse sql-mode DDL on a multi-host cluster with no replicated access
     // storage — it would reach one host only. Throws (fail-closed) unless the
     // operator has replicated storage or the single-node bypass set.
@@ -261,7 +261,7 @@ async function convergeClickHouse({
         readerPassword: selfProvision.postgresReaderPassword,
       },
       includeAppFunctions,
-      includeAccessStatements,
+      mode,
     }),
   });
   if (result.skipped.length > 0) {

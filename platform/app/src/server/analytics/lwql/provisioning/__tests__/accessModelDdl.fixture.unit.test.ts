@@ -1,21 +1,34 @@
 /**
- * Byte-identity guard for the access-statement move (issue #8258).
+ * Single-source byte-identity guard (issue #8258, AC6).
  *
- * The access-statement builders moved from `accessModel.ts` to
- * `accessModelDdl.ts`. This captures `lwqlClickHouseSetupStatements` output for
- * fixed inputs as a committed snapshot, so the move — and any later edit to the
- * builders — is proven byte-for-byte against the shipped statements rather than
- * eyeballed. `includeAppFunctions: false` keeps the snapshot to the access model
- * and independent of the app-function catalog.
+ * Production `sql` mode now renders its access DDL from the one shared
+ * definition via {@link renderLwqlAccessModelDdl} / {@link renderLwqlNamedCollectionDdl}
+ * — the same definition the chart's `users.d` / `config.d` YAML renders from —
+ * so there is a single source of the access model. This snapshots that output
+ * for fixed inputs and asserts, statement by statement, that it is byte-identical
+ * to the shipped reference builders, with one deliberate exception: the
+ * restricted-user statement now carries `IDENTIFIED WITH sha256_hash BY '<hex>'`
+ * instead of `sha256_password BY '<plaintext>'`. The stored digest is identical,
+ * so an existing sql-store user reconverges without any password change; the
+ * definition never holds the plaintext (AC5).
  *
  * @see ../accessModelDdl.ts
+ * @see ../accessModelDefinition.ts
  * @scenario "The DDL emitter output is byte-identical to the shipped access statements"
  */
 
 import { describe, expect, it } from "vitest";
 
-import type { LangWatchQLNames, LangWatchQLTable } from "../accessModel";
-import { lwqlClickHouseSetupStatements } from "../accessModelDdl";
+import type { LangWatchQLNames } from "../accessModel";
+import {
+  lwqlGrantStatement,
+  lwqlKeyMapRowPolicyStatement,
+  lwqlSettingsProfileStatement,
+  renderLwqlAccessModelDdl,
+  renderLwqlNamedCollectionDdl,
+} from "../accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "../accessModelDefinition";
+import type { PostgresNamedCollection } from "../postgresMapping";
 
 const NAMES: LangWatchQLNames = {
   database: "langwatch",
@@ -25,49 +38,86 @@ const NAMES: LangWatchQLNames = {
   tenantSetting: "custom_api_key_hash",
 };
 
-const LWQL_TABLES: LangWatchQLTable[] = [
-  { table: "trace_summaries", tenantColumn: "TenantId", database: "langwatch" },
-  {
-    table: "stored_objects",
-    tenantColumn: "project_id",
-    database: "langwatch",
-  },
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: "langwatch",
+  user: "lwql_ro",
+  password: "reader-secret",
+};
+
+const HEX = "a".repeat(64);
+
+const definition = buildLwqlAccessModelDefinition({
+  names: NAMES,
+  passwordSha256Hex: HEX,
+  namedCollection: NAMED_COLLECTION,
+  sourceDatabase: NAMES.database,
+});
+
+// The whole access model, as the sql-mode converge composes it: the users.d
+// half (profile, user, policies, grants) plus the config.d half (the named
+// collection). One definition, so this is the single shipped source.
+const ddl = [
+  ...renderLwqlAccessModelDdl(definition),
+  ...renderLwqlNamedCollectionDdl(definition),
 ];
 
-describe("lwqlClickHouseSetupStatements after the accessModelDdl move", () => {
-  describe("given fixed names, password and tables", () => {
-    it("emits the shipped access statements byte-for-byte", () => {
-      const statements = lwqlClickHouseSetupStatements({
-        names: NAMES,
-        password: "s3cr3t-lwql",
-        lwqlTables: LWQL_TABLES,
-        sourceDatabase: "langwatch",
-        includeAppFunctions: false,
-      });
-
-      expect(statements).toMatchSnapshot();
+describe("the definition-driven access DDL", () => {
+  describe("given fixed names, password hash and named collection", () => {
+    it("renders the whole shipped access model, snapshotted", () => {
+      expect(ddl).toMatchSnapshot();
     });
 
-    it("omits the access statements in rendered mode, keeping the structural ones", () => {
-      const rendered = lwqlClickHouseSetupStatements({
-        names: NAMES,
-        password: "s3cr3t-lwql",
-        lwqlTables: LWQL_TABLES,
-        sourceDatabase: "langwatch",
-        includeAppFunctions: false,
-        includeAccessStatements: false,
-      });
+    it("identifies the restricted user by sha256 hash, never the plaintext (AC5)", () => {
+      const userStatement = ddl.find((statement) =>
+        statement.startsWith("CREATE USER OR REPLACE"),
+      );
+      expect(userStatement).toBe(
+        `CREATE USER OR REPLACE ${NAMES.restrictedUser} ` +
+          `IDENTIFIED WITH sha256_hash BY '${HEX}' ` +
+          `SETTINGS PROFILE ${NAMES.settingsProfile}`,
+      );
+      expect(userStatement).not.toContain("sha256_password");
+    });
 
-      // Only the database and the key-map table survive; no profile, user,
-      // grant or row policy.
-      expect(rendered).toEqual([
-        "CREATE DATABASE IF NOT EXISTS langwatch",
-        "CREATE TABLE IF NOT EXISTS langwatch.lwql_api_key_tenant_map " +
-          "(KeyHash String, TenantId String) ENGINE = MergeTree ORDER BY KeyHash",
-      ]);
-      expect(rendered.some((s) => s.includes("CREATE USER"))).toBe(false);
-      expect(rendered.some((s) => s.includes("ROW POLICY"))).toBe(false);
-      expect(rendered.some((s) => s.startsWith("GRANT"))).toBe(false);
+    // Every statement the reference builders also produce must remain byte-for-
+    // byte identical — the single-source refactor changed only the user line.
+    it("keeps the settings profile byte-identical to the reference builder", () => {
+      expect(ddl).toContain(lwqlSettingsProfileStatement({ names: NAMES }));
+    });
+
+    it("keeps the key-map row policy byte-identical to the reference builder", () => {
+      expect(ddl).toContain(
+        lwqlKeyMapRowPolicyStatement({
+          names: NAMES,
+          sourceDatabase: NAMES.database,
+        }),
+      );
+    });
+
+    it("keeps the key-map grant byte-identical to the reference builder", () => {
+      expect(ddl).toContain(
+        lwqlGrantStatement({
+          names: NAMES,
+          table: NAMES.keyMapTable,
+          database: NAMES.database,
+        }),
+      );
+    });
+
+    it("orders every row policy before every grant (fail-closed)", () => {
+      const lastPolicy = ddl.reduce(
+        (last, statement, index) =>
+          statement.startsWith("CREATE ROW POLICY") ? index : last,
+        -1,
+      );
+      const firstGrant = ddl.findIndex((statement) =>
+        statement.startsWith("GRANT SELECT"),
+      );
+      expect(lastPolicy).toBeGreaterThanOrEqual(0);
+      expect(firstGrant).toBeGreaterThan(lastPolicy);
     });
   });
 });

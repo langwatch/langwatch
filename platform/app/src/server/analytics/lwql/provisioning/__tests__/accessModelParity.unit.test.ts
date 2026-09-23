@@ -21,7 +21,10 @@ import { load } from "js-yaml";
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLNames } from "../accessModel";
-import { renderLwqlAccessModelDdl } from "../accessModelDdl";
+import {
+  renderLwqlAccessModelDdl,
+  renderLwqlNamedCollectionDdl,
+} from "../accessModelDdl";
 import {
   buildLwqlAccessModelDefinition,
   type LwqlAccessModelDefinition,
@@ -257,7 +260,10 @@ describe("LangWatchQL access-model emitter parity", () => {
     sourceDatabase: NAMES.database,
   });
   const expected = projectDefinition(definition);
-  const fromDdl = projectDdl(renderLwqlAccessModelDdl(definition));
+  const fromDdl = projectDdl([
+    ...renderLwqlAccessModelDdl(definition),
+    ...renderLwqlNamedCollectionDdl(definition),
+  ]);
   const fromYaml = projectYaml(
     renderLwqlUsersDConfig(definition),
     renderLwqlNamedCollectionConfig(definition),

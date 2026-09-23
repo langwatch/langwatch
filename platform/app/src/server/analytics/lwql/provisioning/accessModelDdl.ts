@@ -483,11 +483,24 @@ function renderRowPolicyDdl(policy: LwqlRowPolicyTarget, user: string): string {
 }
 
 /**
- * Renders the whole LangWatchQL access model from the shared definition as
- * ClickHouse DDL: the settings profile, the restricted user, every grant, every
- * row policy and the PostgreSQL named collection. The counterpart of
- * {@link ../accessModelUsersConfig.ts renderLwqlAccessModelUsersConfig}; a
- * parity test proves the two name the identical model.
+ * Renders the access model — the `users.d` half — from the shared definition as
+ * ClickHouse DDL: the settings profile, the restricted user, every row policy,
+ * then every grant. This is the one source production runs in `sql` mode (see
+ * {@link ../selfProvisioning.ts selfHostedClickHouseProvisioningStatements}), and
+ * the DDL side of the AC6 parity test against the users.d YAML emitter.
+ *
+ * Order is load-bearing. `CREATE USER OR REPLACE` mints a new access-entity id,
+ * so the user precedes every grant and policy that names it. Every row policy
+ * precedes every grant: this list executes statement by statement, and a table
+ * granted before it is policed returns every row, so policy-first makes a
+ * partial run refuse rather than leak across tenants. Every object the grants
+ * and policies name (the key map, the fact tables, the postgres-engine tables,
+ * the views) already exists by the time this block runs — the composition places
+ * it after the structural DDL.
+ *
+ * The named collection is emitted separately ({@link renderLwqlNamedCollectionDdl}):
+ * it is the one access statement the postgres-engine tables depend on, so it must
+ * precede them, whereas this block follows them.
  */
 export function renderLwqlAccessModelDdl(
   definition: LwqlAccessModelDefinition,
@@ -496,10 +509,21 @@ export function renderLwqlAccessModelDdl(
   return [
     renderProfileDdl(definition),
     renderUserDdl(definition),
-    ...definition.grants.map((grant) => renderGrantDdl(grant, user)),
     ...definition.rowPolicies.map((policy) => renderRowPolicyDdl(policy, user)),
-    ...postgresNamedCollectionStatements({
-      connection: definition.namedCollection,
-    }),
+    ...definition.grants.map((grant) => renderGrantDdl(grant, user)),
   ];
+}
+
+/**
+ * Renders the PostgreSQL named collection — the `config.d` half — from the
+ * shared definition. Separate from {@link renderLwqlAccessModelDdl} because the
+ * postgres-engine tables reference the collection, so the composition emits this
+ * before them while the rest of the access model follows them.
+ */
+export function renderLwqlNamedCollectionDdl(
+  definition: LwqlAccessModelDefinition,
+): string[] {
+  return postgresNamedCollectionStatements({
+    connection: definition.namedCollection,
+  });
 }

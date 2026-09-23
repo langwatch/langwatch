@@ -29,6 +29,8 @@
  * @see specs/lwql/api.feature
  */
 
+import { createHash } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
@@ -44,6 +46,11 @@ import {
   qualified,
 } from "./accessModel";
 import {
+  renderLwqlAccessModelDdl,
+  renderLwqlNamedCollectionDdl,
+} from "./accessModelDdl";
+import { buildLwqlAccessModelDefinition } from "./accessModelDefinition";
+import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
@@ -53,7 +60,6 @@ import {
 import { clickHouseErrorSummary } from "./clickhouseStatementRunner";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
-  postgresNamedCollectionStatements,
   postgresReaderRoleStatements,
 } from "./postgresMapping";
 import { LWQL_POSTGRES_READER_ROLE } from "./productionProvisioning";
@@ -162,11 +168,28 @@ export function lwqlPostgresEndpointFromDatabaseUrl(
 }
 
 /**
- * Every ClickHouse statement a self-provisioning boot runs, in the order the
- * integration harness proves: access model first (`CREATE USER OR REPLACE`
- * mints a new access-entity id, so everything pointing at the user follows
- * it), then the PostgreSQL bridge, then the views with their grants and row
- * policies.
+ * Every ClickHouse statement a self-provisioning boot runs.
+ *
+ * The whole access model is single-sourced from one
+ * {@link buildLwqlAccessModelDefinition} object (AC6): in `sql` mode the access
+ * DDL is emitted by {@link renderLwqlAccessModelDdl} /
+ * {@link renderLwqlNamedCollectionDdl} — the very same definition the chart's
+ * `users.d` / `config.d` YAML renders from — so the two delivery paths cannot
+ * drift. Nothing here reaches for the individual statement builders.
+ *
+ * Order is the order the integration harness proves. The named collection comes
+ * before the postgres-engine tables that reference it; those tables and the
+ * views are created next; then, in `sql` mode, the rest of the access model
+ * (profile, restricted user, every row policy, every grant) lands last, once
+ * every object it names exists. `CREATE USER OR REPLACE` mints a new
+ * access-entity id, so it precedes every grant and policy naming it, and every
+ * policy precedes every grant (a partial run then refuses reads rather than
+ * leaking across tenants).
+ *
+ * In `rendered` mode the access model ships as per-pod `users.d` / `config.d`
+ * config the chart mounts, so the converge provisions only the structural
+ * objects — the database, the app functions, the key-map table, the
+ * postgres-engine tables and the views — and emits no access DDL at all.
  *
  * The engine tables are dropped and recreated rather than left to
  * `IF NOT EXISTS`: they are metadata only (no rows live in ClickHouse), and a
@@ -179,7 +202,7 @@ export function selfHostedClickHouseProvisioningStatements({
   sourceDatabase,
   postgres,
   includeAppFunctions = true,
-  includeAccessStatements = true,
+  mode = "sql",
 }: {
   names: LangWatchQLNames;
   restrictedPassword: string;
@@ -191,15 +214,12 @@ export function selfHostedClickHouseProvisioningStatements({
   /** See {@link canProvisionAppFunctions}. */
   includeAppFunctions?: boolean;
   /**
-   * Whether the access statements (the restricted user, the settings profile,
-   * every grant, both row policies and the named collection) are emitted as
-   * DDL. `false` is the `rendered` mode ({@link lwqlAccessModelMode}): they ship
-   * as per-pod `users.d` / `config.d` config, so the converge provisions only
-   * the structural objects — the database, the app functions, the key-map
-   * table, the postgres-engine tables and the views. Default `true` keeps the
-   * `sql` mode output unchanged.
+   * How the access model is delivered ({@link lwqlAccessModelMode}). `sql`
+   * (the default) emits the whole model as DDL from the shared definition;
+   * `rendered` ships it as per-pod `users.d` / `config.d` config and provisions
+   * only the structural objects.
    */
-  includeAccessStatements?: boolean;
+  mode?: LwqlAccessModelMode;
 }): string[] {
   if (names.database !== sourceDatabase) {
     throw new Error(
@@ -207,42 +227,56 @@ export function selfHostedClickHouseProvisioningStatements({
     );
   }
   const collection = LWQL_SELF_PROVISION_DEFAULTS.namedCollection;
-  return [
-    // Fact tables come from migrations and their grants/policies from
-    // lwqlViewSetupStatements below, so the setup list provisions only the
-    // identity, the profile, and the key map's grant + policy.
-    ...lwqlClickHouseSetupStatements({
-      names,
-      password: restrictedPassword,
-      lwqlTables: [],
-      includeAppFunctions,
-      includeAccessStatements,
-    }),
-    // The named collection is an access statement — in rendered mode it ships as
-    // config.d/lwql-named-collection.yaml, so the postgres-engine tables below
-    // still reference `lwql_postgres` and find it in the server config.
-    ...(includeAccessStatements
-      ? postgresNamedCollectionStatements({
-          connection: {
-            collection,
-            host: postgres.endpoint.host,
-            port: postgres.endpoint.port,
-            database: postgres.endpoint.database,
-            user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
-            password: postgres.readerPassword,
-          },
-        })
-      : []),
+  // The one definition both delivery paths read (AC6). The plaintext never
+  // enters it — only the sha256 hex the user statement identifies with (AC5).
+  const definition = buildLwqlAccessModelDefinition({
+    names,
+    passwordSha256Hex: createHash("sha256")
+      .update(restrictedPassword)
+      .digest("hex"),
+    namedCollection: {
+      collection,
+      host: postgres.endpoint.host,
+      port: postgres.endpoint.port,
+      database: postgres.endpoint.database,
+      user: LWQL_SELF_PROVISION_DEFAULTS.postgresReaderRole,
+      password: postgres.readerPassword,
+    },
+    sourceDatabase,
+  });
+
+  // The structural objects only — the setup builder emits no access DDL here
+  // (that is single-sourced from the definition below or shipped as config).
+  const structural = lwqlClickHouseSetupStatements({
+    names,
+    password: restrictedPassword,
+    lwqlTables: [],
+    includeAppFunctions,
+    includeAccessStatements: false,
+    sourceDatabase,
+  });
+  const engineTables = [
     ...lwqlPostgresViews(LWQL_VIEW_CATALOG).map(
       (view) => `DROP TABLE IF EXISTS ${qualified(names, view.sourceTable)}`,
     ),
     ...lwqlPostgresEngineTableStatements({ names, collection }),
-    ...lwqlViewSetupStatements({
-      names,
-      sourceDatabase,
-      dedup: SHIPPED_LWQL_DEDUP,
-      includeAccessStatements,
-    }),
+  ];
+  const views = lwqlViewSetupStatements({
+    names,
+    sourceDatabase,
+    dedup: SHIPPED_LWQL_DEDUP,
+    includeAccessStatements: false,
+  });
+
+  if (mode === "rendered") {
+    return [...structural, ...engineTables, ...views];
+  }
+  return [
+    ...structural,
+    ...renderLwqlNamedCollectionDdl(definition),
+    ...engineTables,
+    ...views,
+    ...renderLwqlAccessModelDdl(definition),
   ];
 }
 

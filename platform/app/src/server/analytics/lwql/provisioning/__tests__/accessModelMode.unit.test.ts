@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLNames } from "../accessModel";
 import {
+  type LwqlAccessModelMode,
   lwqlAccessModelMode,
   selfHostedClickHouseProvisioningStatements,
 } from "../selfProvisioning";
@@ -29,18 +30,14 @@ const POSTGRES = {
   readerPassword: "reader-secret",
 };
 
-function statements({
-  includeAccessStatements,
-}: {
-  includeAccessStatements: boolean;
-}): string[] {
+function statements(mode: LwqlAccessModelMode): string[] {
   return selfHostedClickHouseProvisioningStatements({
     names: NAMES,
     restrictedPassword: "restricted-secret",
     sourceDatabase: "langwatch",
     postgres: POSTGRES,
     includeAppFunctions: false,
-    includeAccessStatements,
+    mode,
   });
 }
 
@@ -69,7 +66,7 @@ describe("lwqlAccessModelMode", () => {
 
 describe("selfHostedClickHouseProvisioningStatements access-statement gating", () => {
   describe("when rendered mode omits the access statements", () => {
-    const rendered = statements({ includeAccessStatements: false });
+    const rendered = statements("rendered");
 
     it("provisions the structural objects", () => {
       expect(rendered.some((s) => s.startsWith("CREATE DATABASE"))).toBe(true);
@@ -98,7 +95,7 @@ describe("selfHostedClickHouseProvisioningStatements access-statement gating", (
   });
 
   describe("when sql mode runs the full DDL access path", () => {
-    const sql = statements({ includeAccessStatements: true });
+    const sql = statements("sql");
 
     it("emits the restricted user, profile, grants, row policies and named collection", () => {
       expect(
