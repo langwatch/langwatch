@@ -17,7 +17,7 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
-import type { Context, MiddlewareHandler, Next, ValidationTargets } from "hono";
+import type { Context, HonoRequest, MiddlewareHandler, Next, ValidationTargets } from "hono";
 import { validator as openApiValidator } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
@@ -598,6 +598,17 @@ export function declaredSize(headers: Headers): number | null {
   const declared = Number(header);
 
   return Number.isSafeInteger(declared) ? declared : null;
+}
+
+/** No body at all: none attached, a declared length of zero, or a stream that ends empty. */
+export async function isBodyAbsent(request: HonoRequest): Promise<boolean> {
+  const declared = declaredSize(request.raw.headers);
+
+  if (!request.raw.body || declared === 0) return true;
+  if (declared !== null) return false;
+
+  // Read through Hono's body cache, so the validator after this parses the same text.
+  return (await request.text()) === "";
 }
 
 /** The request a route reads after the body has been drained to measure it. */

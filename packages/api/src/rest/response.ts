@@ -546,6 +546,26 @@ export function requestTraceIds(c: Context): {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * A family's `onError`, with a handled refusal's `meta.retryAfterMs` rendered as `Retry-After`
+ * in whole seconds (ARCHITECTURE.md §8). The body and status are the family's, untouched, and a
+ * `Retry-After` the answer already carries, the rate limiter's included, is kept.
+ */
+export function withRetryAfter(onError: ErrorHandler): ErrorHandler {
+  return async (error, c) => {
+    const answer = await onError(error, c);
+    const waitMs = HandledError.isHandled(error) ? error.meta.retryAfterMs : undefined;
+
+    const isWait = typeof waitMs === "number" && Number.isFinite(waitMs) && waitMs >= 0;
+    if (!isWait || answer.headers.has("Retry-After")) return answer;
+
+    const rendered = new Response(answer.body, answer);
+    rendered.headers.set("Retry-After", String(Math.ceil(waitMs / 1000)));
+
+    return rendered;
+  };
+}
+
+/**
  * The status precedence: a family's {@link HttpError}, a handled error's own
  * status, a framework refusal's, else an internal 500.
  */

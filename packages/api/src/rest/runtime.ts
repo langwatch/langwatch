@@ -68,6 +68,7 @@ import {
 import {
   bodyLimit,
   cachedRestAnswer,
+  isBodyAbsent,
   loggerMiddleware,
   multipartMiddleware,
   requestValidationErrorFrom,
@@ -81,7 +82,13 @@ import {
   type RestTransportMiddleware,
 } from "./request.ts";
 import { isProducedAnswer, producedKind, producerFor, type RestEvent } from "./response-kind.ts";
-import { DECLARED_ANSWER, ENDPOINT_ROUTE, isDeclined, REQUEST_FAMILY } from "./response.ts";
+import {
+  DECLARED_ANSWER,
+  ENDPOINT_ROUTE,
+  isDeclined,
+  REQUEST_FAMILY,
+  withRetryAfter,
+} from "./response.ts";
 import { registerRoutePolicy } from "./security.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
@@ -324,7 +331,7 @@ export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
 
       if (dated) mountVersionGuards({ app, basePath, declaration, ports, options, facts });
 
-      app.onError(options.onError);
+      app.onError(withRetryAfter(options.onError));
 
       return app;
     },
@@ -673,7 +680,7 @@ function validators({
   const add = (target: "param" | "query" | "json", schema: z.ZodType | undefined): void => {
     if (!schema) return;
 
-    const middleware = openApiValidator(target, schema, (result) => {
+    const validate = openApiValidator(target, schema, (result) => {
       // The typed refusal, raised here rather than left for a boundary to
       // recognise: a family with an `onError` of its own must not answer 500
       // for a request every other family answers 422 for.
@@ -681,6 +688,8 @@ function validators({
         throw requestValidationErrorFrom({ target, error: result.error, input: result.data });
       }
     });
+
+    const middleware = readingAbsentBody({ route, target, schema, validate });
 
     if (!documented) {
       delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[uniqueSymbol];
@@ -713,6 +722,55 @@ function validators({
   add("json", route.input);
 
   return stack;
+}
+
+/** The JSON body validator reads an absent body; multipart and raw-body routes read their own. */
+function readingAbsentBody({
+  route,
+  target,
+  schema,
+  validate,
+}: {
+  route: RestTransportRoute<unknown>;
+  target: "param" | "query" | "json";
+  schema: z.ZodType;
+  validate: MiddlewareHandler;
+}): MiddlewareHandler {
+  if (target !== "json" || route.multipart || route.rawBody) return validate;
+
+  return absentBodyAsEmptyObject({ schema, validate });
+}
+
+/**
+ * An absent body is read as the empty object (ARCHITECTURE.md §8), so a bodiless action keeps
+ * working; any body that was sent, `null` and malformed ones included, is parsed as sent.
+ */
+function absentBodyAsEmptyObject({
+  schema,
+  validate,
+}: {
+  schema: z.ZodType;
+  validate: MiddlewareHandler;
+}): MiddlewareHandler {
+  const middleware: MiddlewareHandler = async (context, next) => {
+    if (!(await isBodyAbsent(context.req))) return validate(context, next);
+
+    const parsed = schema.safeParse({});
+
+    if (!parsed.success) {
+      throw requestValidationErrorFrom({ target: "json", error: parsed.error, input: {} });
+    }
+
+    if (typeof parsed.data !== "object" || parsed.data === null) {
+      throw new TypeError("REST body schemas must produce an object");
+    }
+
+    context.req.addValidatedData("json", parsed.data);
+    await next();
+  };
+
+  // The route's OpenAPI input schema hangs off the validator; the document reads it back.
+  return Object.assign(middleware, validate);
 }
 
 /** The one validated handler input: path, query and body fields, flattened. */
