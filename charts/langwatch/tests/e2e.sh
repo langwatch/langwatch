@@ -10,6 +10,15 @@
 #   CLUSTER_NAME       — Kind cluster name (default: lw-test)
 #   TIMEOUT            — helm --wait timeout in seconds (default: 480)
 #   KEEP_CLUSTER and CLUSTER_NAME are passed through to test-helpers.sh
+#
+# Usage:
+#   e2e.sh                       run today's full suite list in order
+#   e2e.sh <suite> [suite ...]   run exactly the named suites, in the given order
+#   e2e.sh --list [suite ...]    print the suites that would run and exit (no cluster)
+#
+# Suite names are the test_* function names below. An unknown name exits 2.
+# The workflow's matrix legs pass a subset each; run with no arguments (or the
+# whole list) reproduces the single-leg behaviour byte for byte.
 
 set -euo pipefail
 
@@ -966,7 +975,60 @@ RUSTFS_EOF
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Suite registry — today's full list in today's order. This is the single
+# source of truth for both the default run and `--list`, and it is what the
+# workflow-shape assertion (tests/chart-workflow-matrix.sh) checks the matrix
+# legs' arguments against: every name here must appear in exactly one leg.
+ALL_SUITES=(
+  test_install
+  test_clickhouse
+  test_clickhouse_url_secret
+  test_postgresql
+  test_redis
+  test_resources
+  test_app
+  test_lwql
+  test_workers
+  test_metrics_collection
+  test_upgrade_strategy_boundary
+  test_upgrade
+  test_external_clickhouse
+  test_lwql_external_postgres_secret_guard
+  test_cold_storage_and_backup
+)
+
+is_known_suite() {
+  local candidate="$1" s
+  for s in "${ALL_SUITES[@]}"; do
+    [[ "$s" == "$candidate" ]] && return 0
+  done
+  return 1
+}
+
+# Resolve the run list from the argument vector into SUITES: no arguments means
+# the full list; otherwise exactly the names given, in order, each validated
+# against ALL_SUITES. An unknown name is a hard error (exit 2) — a silent skip
+# would let a matrix leg drop a suite and still go green.
+resolve_suites() {
+  SUITES=()
+  if [[ $# -eq 0 ]]; then
+    SUITES=("${ALL_SUITES[@]}")
+    return
+  fi
+  local s
+  for s in "$@"; do
+    if ! is_known_suite "$s"; then
+      echo "e2e.sh: unknown suite '$s'" >&2
+      echo "known suites: ${ALL_SUITES[*]}" >&2
+      exit 2
+    fi
+    SUITES+=("$s")
+  done
+}
+
 main() {
+  resolve_suites "$@"
+
   local ch_values="${CHART_DIR}/../clickhouse-serverless/values.yaml"
   setup_kind "$ch_values"
 
@@ -988,24 +1050,24 @@ main() {
   fi
   wait_api
 
-  test_install
-  test_clickhouse
-  test_clickhouse_url_secret
-  test_postgresql
-  test_redis
-  test_resources
-  test_app
-  test_lwql
-  test_workers
-  test_metrics_collection
-  test_upgrade_strategy_boundary
-  test_upgrade
-  test_external_clickhouse
-  test_lwql_external_postgres_secret_guard
-  test_cold_storage_and_backup
+  local suite
+  for suite in "${SUITES[@]}"; do
+    "$suite"
+  done
 
   sep
   pass "All langwatch chart tests passed"
 }
+
+# `--list` enumerates the resolved run order without touching a cluster, so CI
+# and check-feature-parity can read what would run. Clear the cleanup trap first
+# — there is no cluster to delete and `kind` need not even be installed here.
+if [[ "${1:-}" == "--list" ]]; then
+  trap - EXIT
+  shift
+  resolve_suites "$@"
+  printf '%s\n' "${SUITES[@]}"
+  exit 0
+fi
 
 main "$@"
