@@ -1,45 +1,32 @@
-Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by default
+Feature: Every catalogued Postgres model is queryable through LangWatchQL
 
   As a LangWatch project member or API client using the LangWatchQL query door
-  I want every Postgres table that holds data my project can access to be a view, without anyone hand-adding it
-  So that a topic name, a dataset size, or an alert count is as reachable as a trace, and a new table cannot silently stay off the catalog
+  I want every Postgres model the catalog explicitly lists to be a view my project can query
+  So that a topic name, a dataset size, or an alert count is as reachable as a trace, and no model is exposed unless it is deliberately listed
 
-  Issue: #8207.
+  Issue: #8207, #8258.
 
-  # The ClickHouse half of the catalog already works this way: catalog/derivedViews.ts
-  # derives every table unless it is hand-written or named, with a reason, in
-  # catalog/skippedTables.ts, and tenantTableCoverage.unit.test.ts fails on a table
-  # that is neither. This feature gives the Postgres half the same contract.
+  # The ClickHouse half of the catalog works the same way: catalog/lwqlViews.ts
+  # lists every ClickHouse table with an explicit defineCatalogTable call, and a
+  # table not listed is not queryable. This feature is the Postgres half:
+  # catalog/postgresViews.ts lists every model with an explicit defineCatalogModel
+  # call. There is no derivation over the manifest and no skip list — a model not
+  # listed is simply not in the catalog (see catalog-inclusion.feature).
   #
-  # Bound by the derivation in catalog/derivePostgresCatalog.ts and its tests.
+  # Bound by the per-model builder in catalog/derivePostgresCatalog.ts and its tests.
 
   Background:
-    Given the LangWatchQL Postgres catalog is derived from the Prisma schema
+    Given the LangWatchQL Postgres catalog listing every catalogued model
 
-  Rule: Exposure is the default, not a decision
+  Rule: A listed model becomes a view, built from its own schema
 
     @unit
     Scenario: A model with a project column becomes a view without a hand-written definition
-      Given a Prisma model that carries a projectId column and is not on the skip list
-      When the Postgres catalog is derived
+      Given a Prisma model that carries a projectId column and is listed in the catalog
+      When the catalog builds its entry
       Then a view named after the model in snake_case exists in the catalog
       And its projectId column is exposed as TenantId
       And every other column is exposed in PascalCase
-
-    @unit
-    Scenario: A new tenant-scoped model that is neither derived, overridden nor skipped fails the build
-      Given a Prisma model with a tenant column that no view, override or skip entry names
-      When the tenant model coverage check runs
-      Then it fails and names the model
-      And the failure says to catalogue it or skip it with a reason
-
-    @unit
-    Scenario: A skip needs a recorded reason
-      Given a model placed on the Postgres skip list
-      When the skip list is validated
-      Then every entry carries a non-empty reason
-      And the only accepted reasons are: no tenant column, an internal-only tenant, data already exposed through another view, or access-control plumbing
-      And "low value" is not one of them
 
     @unit
     Scenario: A hand-written view is an override on the derived default, not a second definition
@@ -190,11 +177,3 @@ Feature: Every tenant-scoped Postgres table is queryable through LangWatchQL by 
       Then no error occurs
       And the view's columns match the derived catalog's order
       And the reader role can still select from it
-
-  Rule: The gap list burns down to zero
-
-    @unit
-    Scenario: No model is left on the skip list with a TODO reason
-      Given the Postgres skip list
-      When it is validated
-      Then no entry's reason contains TODO(#8207)
