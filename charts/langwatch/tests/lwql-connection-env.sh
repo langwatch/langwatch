@@ -81,6 +81,20 @@ is_secret_ref() {
   ' "$render" | grep -qxF "yes"
 }
 
+# Echoes the plain `value:` of the `- name: <var>` entry within ONE deployment's
+# Source block ($2). Empty if the var is absent or is a valueFrom entry.
+env_value_in() {
+  local render="$1" src="$2" var="$3"
+  awk -v want="$src" -v v="$var" '
+    /^# Source:/ { insrc = (index($0, want) > 0); found=0 }
+    insrc && $0 ~ "- name: " v "$" { found=1; next }
+    insrc && /^[[:space:]]*- name:[[:space:]]/ && $0 !~ ("- name: " v "$") { found=0 }
+    found && /^[[:space:]]*value:[[:space:]]/ {
+      sub(/^[[:space:]]*value:[[:space:]]*/, ""); gsub(/"/, ""); print; exit
+    }
+  ' "$render"
+}
+
 assert_two_passwords_only() {
   local names="$1" workload="$2" label="$3" render="$4"
   local var
@@ -192,10 +206,54 @@ $(cat "$err")"
   done
 }
 
+# @scenario "Chart-managed ClickHouse leaves the access-model mode at its rendered default"
+test_chart_managed_mode_is_rendered_default() {
+  local out="${TMPDIR:-/tmp}/lwql-mode-managed.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-mode-managed.err"
+  if ! render_to "$out" "$err" t --set autogen.enabled=true; then
+    fail "managed-mode-render" "default render failed:
+$(cat "$err")"
+    return
+  fi
+  local names
+  names="$(env_names_in "$out" "app/deployment.yaml")"
+  if has_env "$names" "LWQL_ACCESS_MODEL_MODE"; then
+    fail "managed-mode-set" \
+      "app/deployment.yaml sets LWQL_ACCESS_MODEL_MODE on chart-managed ClickHouse. It must stay unset so the app renders (the chart delivers the model via the access Secret + Job), not run SQL DDL. The default when unset is 'rendered'."
+  fi
+}
+
+# @scenario "The external-ClickHouse overlay selects sql mode"
+test_external_overlay_selects_sql_mode() {
+  local out="${TMPDIR:-/tmp}/lwql-mode-external.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-mode-external.err"
+  if ! render_to "$out" "$err" t \
+      --set autogen.enabled=true \
+      -f examples/overlays/clickhouse-external.yaml \
+      --set clickhouse.external.url.value="http://user:pass@ch.example:8123/langwatch"; then
+    fail "external-mode-render" "external overlay render failed:
+$(cat "$err")"
+    return
+  fi
+  local mode single
+  mode="$(env_value_in "$out" "app/deployment.yaml" "LWQL_ACCESS_MODEL_MODE")"
+  if [[ "$mode" != "sql" ]]; then
+    fail "external-mode-not-sql" \
+      "app/deployment.yaml sets LWQL_ACCESS_MODEL_MODE=${mode:-<unset>} under the clickhouse-external overlay; BYO ClickHouse cannot receive a rendered config file, so it must be 'sql'."
+  fi
+  single="$(env_value_in "$out" "app/deployment.yaml" "LWQL_ACCESS_MODEL_SQL_SINGLE_NODE")"
+  if [[ "$single" != "true" ]]; then
+    fail "external-mode-no-single-node-ack" \
+      "the clickhouse-external overlay does not acknowledge single-node scope (LWQL_ACCESS_MODEL_SQL_SINGLE_NODE=true) — AC9 aborts sql-mode provisioning on an unacknowledged single node."
+  fi
+}
+
 test_chart_managed_two_passwords_only
 test_external_clickhouse_two_passwords_only
 test_external_postgres_two_passwords_only
 test_disabled_emits_nothing
+test_chart_managed_mode_is_rendered_default
+test_external_overlay_selects_sql_mode
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -203,4 +261,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all 4 LangWatchQL connection postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all"
+echo "PASS: all 6 LangWatchQL connection/mode postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope"

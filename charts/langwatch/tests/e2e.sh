@@ -400,24 +400,22 @@ test_app() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SUITE: LangWatchQL access model — app self-provisioning (issue #8258)
-# Runs after test_app. The app always owns the access model, on every path —
-# chart-managed ClickHouse included. At boot it derives the ClickHouse target
-# from CLICKHOUSE_URL and self-provisions the restricted user, its settings
-# profile, grants, tenant row filters and the lwql_postgres named collection
-# via SQL DDL (no chart template renders any of it any more). Asserts the
-# access model exists (identity, profile, row policies, named collection — the
-# single-replica scenario's contract), that the restricted identity is genuinely
-# restricted, that the endpoint refuses while the backend objects stand (the
-# flag-off AC), and that a re-run is idempotent.
-#
-# The PostgreSQL-engine tables, the lwql_ro reader role and the approved
-# PostgreSQL views are NOT asserted here: they are the full-model scenario
-# deferred to tracking issue #7387 (specs/lwql/api.feature, "Clustered
-# chart-managed ClickHouse provisions the full LangWatchQL access model",
-# @unimplemented).
+# SUITE: LangWatchQL access model — rendered delivery (issue #8258, epic tasks#889)
+# Runs after test_app. The app owns the access model in code; on chart-managed
+# ClickHouse it is DELIVERED as rendered users.d/config.d files carried in the
+# <release>-lwql-clickhouse-access Secret and mounted on EVERY replica — not
+# provisioned by SQL DDL against the one pod behind the Service. So the
+# restricted user, its settings profile and its row policies live in the
+# users_xml store (AC3), and the PostgreSQL named collection comes from a
+# config.d file. This single-replica suite asserts the whole set on every
+# ClickHouse pod (one here), the restricted identity is genuinely restricted,
+# a tenant-filtered query succeeds through the ClusterIP Service, the endpoint
+# refuses while the backend objects stand (flag-off AC), and the app's
+# view/backfill provisioning is idempotent. test_lwql_replicas covers the
+# multi-replica and scale-up cases.
 # ─────────────────────────────────────────────────────────────────────────────
 # @scenario "A single-replica deployment provisions LangWatchQL unchanged"
+# @scenario "The access model is delivered by one Job into one Secret, mounted once per pod"
 test_lwql() {
   sep; info "Suite: LangWatchQL access model (app self-provisioned)"
 
@@ -433,52 +431,76 @@ test_lwql() {
   local pod
   pod=$(echo "$pods" | head -1)
 
-  # ClickHouse access model
-  assert_eq "restricted user langwatch_lwql exists" \
-    "$(ch_query "$pod" "SELECT count() FROM system.users WHERE name='langwatch_lwql'")" "1"
-  # The app derives the profile name as `<database>_profile`
-  # (productionProvisioning.ts) — "langwatch_profile" for the e2e values'
-  # ClickHouse database "langwatch".
-  assert_eq "settings profile langwatch_profile exists" \
-    "$(ch_query "$pod" "SELECT count() FROM system.settings_profiles WHERE name='langwatch_profile'")" "1"
-  assert_eq "langwatch_profile lives in the SQL store" \
-    "$(ch_query "$pod" "SELECT storage FROM system.settings_profiles WHERE name='langwatch_profile'")" "local_directory"
-  local policies
-  policies=$(ch_query "$pod" "SELECT count() FROM system.row_policies WHERE database='langwatch'")
-  if [ "${policies:-0}" -ge 1 ]; then
-    pass "row policies provisioned on langwatch ($policies)"
-  else
-    fail "no row policies on the langwatch database"
-  fi
-
-  # PostgreSQL bridge, ClickHouse side: the lwql_postgres named collection the
-  # app self-provisions from DATABASE_URL, dialing the in-cluster PostgreSQL.
-  # Existence only here — the engine tables that consume it, plus the
-  # PostgreSQL reader role and approved views, are the full-model scenario
-  # deferred to #7387.
-  assert_eq "named collection lwql_postgres exists" \
-    "$(ch_query "$pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
-
-  # The restricted identity: authenticates, reads zero key-map rows without a
-  # tenant capability (row policy default-deny), and has no admin surface.
-  # Issue #8258: the app self-provisions langwatch_lwql on every posture from
-  # LWQL_CLICKHOUSE_PASSWORD, which it reads from the APP Secret (not the
-  # ClickHouse credentials Secret — that Secret holds no LWQL material any more).
+  # ClickHouse access model — DELIVERED as rendered users.d/config.d files in the
+  # <release>-lwql-clickhouse-access Secret, mounted on every replica (issue
+  # #8258). The restricted identity, its profile and its row policies therefore
+  # live in the users_xml store (not the SQL/local_directory store the old DDL
+  # path used), and the PostgreSQL named collection comes from a config.d file.
+  # AC3: assert the whole set on every ClickHouse pod, not just the one behind
+  # the Service.
+  #
+  # langwatch_lwql authenticates with LWQL_CLICKHOUSE_PASSWORD, which the render
+  # Job read from the APP Secret and wrote into the mounted user file as its
+  # password_sha256_hex.
   local lwql_pw
   lwql_pw=$(kc get secret "langwatch-app-secrets" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
-  assert_eq "langwatch_lwql lives in the SQL store" \
-    "$(ch_query "$pod" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "local_directory"
-  assert_eq "restricted identity authenticates" \
-    "$(kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
-  assert_eq "key map reads empty without a tenant capability" \
-    "$(kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT count() FROM langwatch.lwql_api_key_tenant_map')" "0"
-  if kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" \
-    -q 'SELECT count() FROM system.users' &>/dev/null; then
-    fail "restricted identity can read system.users"
-  else
-    pass "restricted identity denied system.users"
-  fi
+
+  local p
+  for p in $pods; do
+    assert_eq "[$p] restricted user langwatch_lwql exists" \
+      "$(ch_query "$p" "SELECT count() FROM system.users WHERE name='langwatch_lwql'")" "1"
+    assert_eq "[$p] langwatch_lwql delivered as a rendered users_xml user" \
+      "$(ch_query "$p" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "users_xml"
+    # The app names the profile `<database>_profile` — "langwatch_profile" for
+    # the e2e ClickHouse database "langwatch".
+    assert_eq "[$p] settings profile langwatch_profile exists" \
+      "$(ch_query "$p" "SELECT count() FROM system.settings_profiles WHERE name='langwatch_profile'")" "1"
+    assert_eq "[$p] langwatch_profile delivered as a rendered users_xml profile" \
+      "$(ch_query "$p" "SELECT storage FROM system.settings_profiles WHERE name='langwatch_profile'")" "users_xml"
+    local pol
+    pol=$(ch_query "$p" "SELECT count() FROM system.row_policies WHERE database='langwatch'")
+    if [ "${pol:-0}" -ge 2 ]; then
+      pass "[$p] both row policies delivered on langwatch ($pol)"
+    else
+      fail "[$p] expected the two LangWatchQL row policies on langwatch, found ${pol:-0}"
+    fi
+    # PostgreSQL bridge, ClickHouse side: the lwql_postgres named collection,
+    # delivered in the config.d file. The engine tables that consume it, the
+    # lwql_ro reader role and the approved views are exercised on the first pod
+    # below and by the app's own suites.
+    assert_eq "[$p] named collection lwql_postgres exists" \
+      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+    # The restricted identity, on this pod: authenticates, reads zero key-map
+    # rows without a tenant capability (row policy default-deny), no admin surface.
+    assert_eq "[$p] restricted identity authenticates" \
+      "$(kc exec "$p" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
+    assert_eq "[$p] key map reads empty without a tenant capability" \
+      "$(kc exec "$p" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT count() FROM langwatch.lwql_api_key_tenant_map')" "0"
+    if kc exec "$p" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" \
+      -q 'SELECT count() FROM system.users' &>/dev/null; then
+      fail "[$p] restricted identity can read system.users"
+    else
+      pass "[$p] restricted identity denied system.users"
+    fi
+  done
+
+  # AC3: a tenant-filtered query succeeds through the ClusterIP Service no matter
+  # which pod answers. Send it several times so a multi-replica deployment lands
+  # on more than one backend; the row policy default-denies (0 rows) without a
+  # capability, which is the tenant filter doing its job. The app pod is the
+  # client, dialing the Service by name over HTTP as the restricted identity
+  # (headers, not URL params, so the base64 password needs no escaping).
+  local svc_ok=0 svc_try svc_out
+  for svc_try in 1 2 3 4 5 6; do
+    svc_out=$(kc exec "$app_pod" -- curl -s -m 10 \
+      -H "X-ClickHouse-User: langwatch_lwql" \
+      -H "X-ClickHouse-Key: $lwql_pw" \
+      "http://${RELEASE}-clickhouse:8123/" \
+      --data-binary "SELECT count() FROM langwatch.lwql_api_key_tenant_map" 2>/dev/null | tr -d ' \r\n')
+    if [ "$svc_out" = "0" ]; then svc_ok=$((svc_ok + 1)); fi
+  done
+  assert_eq "tenant-filtered query through the ClusterIP Service succeeds on every hit" "$svc_ok" "6"
 
   # The endpoint stays shut while the backend objects above all stand
   # provisioned. Asserted unauthenticated, so this pins the auth gate, not the
@@ -550,6 +572,101 @@ $provision_out"
     fail "lwql_postgres bridge failed to read through the named collection — lwql_ro is likely absent or its password diverged from the collection's reader key:
 $bridge_out"
   fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: LangWatchQL access model on THREE replicas, then scaled to FOUR (AC3)
+# The single-replica suite proves the delivery mechanism; this proves the whole
+# point of the epic — that every pod of a multi-replica deployment carries the
+# access set, and a pod added by scaling up gets it with no application action.
+#
+# Runs LAST and does its own clean install at replicas=3 (a StatefulSet cannot
+# transition MergeTree->ReplicatedMergeTree in place), so it does not disturb the
+# shared single-replica release the earlier suites use. The kind cluster is torn
+# down on exit by the EXIT trap.
+# ─────────────────────────────────────────────────────────────────────────────
+# @scenario "Every replica of a three-replica deployment carries the whole access set"
+# @scenario "A pod added by scaling up carries the access set with no application action"
+test_lwql_replicas() {
+  sep; info "Suite: LangWatchQL access model across replicas (3, then scaled to 4)"
+
+  # Clean slate so ClickHouse comes up as a 3-node ReplicatedMergeTree cluster.
+  helm_uninstall
+  helm_install \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
+    --set app.replicaCount=1
+  pass "helm install (chart-managed ClickHouse, replicas=3)"
+
+  # Every one of the three pods must carry the whole access set, delivered by the
+  # mounted Secret (the render Job ran as a pre-install hook before the pods).
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+
+  local app_pod pods p lwql_pw
+  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
+    -o jsonpath='{.items[0].metadata.name}')
+  pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
+  lwql_pw=$(kc get secret "langwatch-app-secrets" \
+    -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
+
+  local pod_count
+  pod_count=$(printf '%s\n' "$pods" | grep -c . || true)
+  assert_eq "three ClickHouse replicas are up" "$pod_count" "3"
+
+  for p in $pods; do
+    assert_eq "[$p] langwatch_lwql delivered as a rendered users_xml user" \
+      "$(ch_query "$p" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "users_xml"
+    assert_eq "[$p] settings profile langwatch_profile present" \
+      "$(ch_query "$p" "SELECT count() FROM system.settings_profiles WHERE name='langwatch_profile'")" "1"
+    local pol
+    pol=$(ch_query "$p" "SELECT count() FROM system.row_policies WHERE database='langwatch'")
+    if [ "${pol:-0}" -ge 2 ]; then
+      pass "[$p] both row policies present ($pol)"
+    else
+      fail "[$p] expected the two LangWatchQL row policies, found ${pol:-0}"
+    fi
+    assert_eq "[$p] named collection lwql_postgres present" \
+      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+    assert_eq "[$p] restricted identity authenticates" \
+      "$(kc exec "$p" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
+  done
+
+  # AC3: the tenant-filtered query succeeds through the ClusterIP Service across
+  # many hits, so it holds no matter which of the three pods answers.
+  local svc_ok=0 svc_try svc_out
+  for svc_try in $(seq 1 12); do
+    svc_out=$(kc exec "$app_pod" -- curl -s -m 10 \
+      -H "X-ClickHouse-User: langwatch_lwql" \
+      -H "X-ClickHouse-Key: $lwql_pw" \
+      "http://${RELEASE}-clickhouse:8123/" \
+      --data-binary "SELECT count() FROM langwatch.lwql_api_key_tenant_map" 2>/dev/null | tr -d ' \r\n')
+    if [ "$svc_out" = "0" ]; then svc_ok=$((svc_ok + 1)); fi
+  done
+  assert_eq "tenant-filtered query through the Service succeeds on every hit across three pods" "$svc_ok" "12"
+
+  # AC3: scale the StatefulSet to a fourth pod and assert it carries the access
+  # set with NO application action — the pod mounts the same Secret at boot.
+  # Scaled with kubectl (not helm) on purpose: the chart requires odd replicas
+  # for Keeper quorum, and this exercises the raw "a new pod appears" case a
+  # rebuild or autoscale would produce. Keeper stays at three.
+  info "Scaling ClickHouse StatefulSet to 4 replicas (kubectl, bypassing the odd-replicas chart guard)"
+  kc scale statefulset "${RELEASE}-clickhouse" --replicas=4
+  local new_pod="${RELEASE}-clickhouse-3"
+  # Wait until the new pod can answer at all, then assert the mounted access set.
+  local attempts=0
+  until kc exec "$new_pod" -- clickhouse-client -q 'SELECT 1' &>/dev/null; do
+    sleep 5; attempts=$((attempts + 1))
+    if [[ $attempts -ge 60 ]]; then
+      fail "scaled-up pod $new_pod never became queryable after 300s"
+      return
+    fi
+  done
+  assert_eq "scaled-up pod $new_pod carries langwatch_lwql in the users_xml store, no app action" \
+    "$(ch_query "$new_pod" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "users_xml"
+  assert_eq "scaled-up pod $new_pod carries the lwql_postgres named collection" \
+    "$(ch_query "$new_pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+  assert_eq "scaled-up pod $new_pod authenticates the restricted identity" \
+    "$(kc exec "$new_pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -933,6 +1050,8 @@ main() {
   test_upgrade
   test_external_clickhouse
   test_cold_storage_and_backup
+  # Runs last: reinstalls the release at replicas=3, then scales to 4 (AC3).
+  test_lwql_replicas
 
   sep
   pass "All langwatch chart tests passed"
