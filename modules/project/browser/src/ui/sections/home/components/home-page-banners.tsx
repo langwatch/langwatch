@@ -535,10 +535,10 @@ export function HomePageBanners({
   const slide = eligible[active];
 
   // Target palette + shape for the active slide, resolved for the theme.
-  const targetColors = useMemo(
-    () => (slide ? (isDark ? slide.colorsDark : slide.colorsLight) : []),
-    [slide, isDark],
-  );
+  const targetColors = useMemo(() => {
+    if (!slide) return [];
+    return isDark ? slide.colorsDark : slide.colorsLight;
+  }, [slide, isDark]);
   const targetMesh = slide?.mesh;
 
   // What the canvas is CURRENTLY showing (mid-morph). Seeded to the target so
@@ -639,7 +639,8 @@ export function HomePageBanners({
   // The lantern is lit whether or not there is anything to announce, so when
   // every slide has been dismissed it falls back to Langy's own palette rather
   // than going dark. Same canvas, different bed.
-  const lanternColors = colors.length >= 3 ? colors : isDark ? LANTERN_COLORS_DARK : LANTERN_COLORS;
+  const themeLanternColors = isDark ? LANTERN_COLORS_DARK : LANTERN_COLORS;
+  const lanternColors = colors.length >= 3 ? colors : themeLanternColors;
   const multi = eligible.length > 1;
   const selectSlide = (nextIndex: number) => {
     setIndex((nextIndex + eligible.length) % eligible.length);

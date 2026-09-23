@@ -8,7 +8,11 @@ import { LuCalendarClock } from "react-icons/lu";
 import { homeApi } from "../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { BriefingMockSwitcher, HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
-import { chartVariantFor, useHomeDevState } from "./components/dev/home-dev-state.ts";
+import {
+  chartVariantFor,
+  type HomeDevState,
+  useHomeDevState,
+} from "./components/dev/home-dev-state.ts";
 import { HomeStateSwitcher } from "./components/dev/home-state-switcher.tsx";
 import { DocsGuides } from "./components/docs-guides.tsx";
 import { HomeFortune } from "./components/home-fortune.tsx";
@@ -61,9 +65,8 @@ export function HomePage() {
               <ConsideringLangWatch />
             </HStack>
 
-            {composition === "undecided" ? (
-              <HomeCompositionSkeleton />
-            ) : composition === "signal-focused" ? (
+            {composition === "undecided" && <HomeCompositionSkeleton />}
+            {composition === "signal-focused" && (
               <>
                 <HomeBriefingSection />
                 {/* The chrome grid: two equal-height columns whose interior
@@ -93,9 +96,9 @@ export function HomePage() {
                 </Grid>
                 <RecentItemsSection />
               </>
-            ) : composition === "langy" ? (
-              <LangyHome />
-            ) : (
+            )}
+            {composition === "langy" && <LangyHome />}
+            {composition === "classic" && (
               <>
                 <HomePageBanners variant="legacy" />
                 <TracesOverview />
@@ -197,6 +200,12 @@ function HomeCompositionSkeleton() {
   );
 }
 
+function isNewProjectFor(devState: HomeDevState | null, detected: boolean): boolean {
+  if (devState === "empty") return true;
+  if (devState === "populated") return false;
+  return detected;
+}
+
 /**
  * The Langy home's spine: lit block leads, page continues as before. The
  * setup checklist moves — on a no-data project it takes the figures' place
@@ -205,7 +214,7 @@ function HomeCompositionSkeleton() {
 function LangyHome() {
   const { isNewProject } = useProjectReach();
   const devState = useHomeDevState();
-  const empty = devState === "empty" ? true : devState === "populated" ? false : isNewProject;
+  const empty = isNewProjectFor(devState, isNewProject);
 
   return (
     <>

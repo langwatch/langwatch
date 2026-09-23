@@ -20,7 +20,7 @@ export interface HorizontalFormControlProps extends SystemStyleObject {
   inputWidth?: string;
   direction?: "horizontal" | "vertical";
   size?: "sm" | "md";
-  error?: FieldErrors<any>[0] | ReactNode;
+  error?: FieldErrors[0] | ReactNode;
   align?: "start" | "end";
   labelProps?: SystemStyleObject;
 }
