@@ -104,27 +104,15 @@ export class ModelProviderResolutionService {
     for (const tier of TIERS.slice(skipIndex + 1)) {
       const tierConfigs = this.tierConfigs(configs, chain, tier);
 
-      for (const key of [feature.key, feature.role]) {
-        for (const config of tierConfigs) {
-          const value = readConfiguredModel(config.config[key]);
+      const [first] = findConfiguredModels({ tierConfigs, feature });
 
-          if (!value) {
-            continue;
-          }
-
-          const model = expandLatestAlias(value);
-
-          if (isLatestAlias(value) && model === value) {
-            continue;
-          }
-
-          return modelProviderResolutionSchema.parse({
-            model,
-            source: key === feature.key ? "feature_override" : "role_default",
-            scope: tier.label,
-            feature,
-          });
-        }
+      if (first) {
+        return modelProviderResolutionSchema.parse({
+          model: first.model,
+          source: first.key === feature.key ? "feature_override" : "role_default",
+          scope: tier.label,
+          feature,
+        });
       }
     }
 
@@ -187,32 +175,18 @@ export class ModelProviderResolutionService {
     for (const tier of TIERS) {
       const tierConfigs = this.tierConfigs(configs, chain, tier);
 
-      for (const key of [feature.key, feature.role]) {
-        for (const config of tierConfigs) {
-          const value = readConfiguredModel(config.config[key]);
+      for (const { key, model } of findConfiguredModels({ tierConfigs, feature })) {
+        if (!isModelAllowedForFeature({ modelId: model, featureKey: feature.key })) {
+          restrictedModels.add(model);
 
-          if (!value) {
-            continue;
-          }
-
-          const model = expandLatestAlias(value);
-
-          if (isLatestAlias(value) && model === value) {
-            continue;
-          }
-
-          if (!isModelAllowedForFeature({ modelId: model, featureKey: feature.key })) {
-            restrictedModels.add(model);
-
-            continue;
-          }
-
-          return {
-            model,
-            source: key === feature.key ? "feature_override" : "role_default",
-            scope: tier.label,
-          };
+          continue;
         }
+
+        return {
+          model,
+          source: key === feature.key ? "feature_override" : "role_default",
+          scope: tier.label,
+        };
       }
     }
 
@@ -237,6 +211,36 @@ export class ModelProviderResolutionService {
       )
       .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
   }
+}
+
+function findConfiguredModels({
+  tierConfigs,
+  feature,
+}: {
+  tierConfigs: ModelDefaultConfig[];
+  feature: ModelDefaultFeature;
+}): { key: string; model: string }[] {
+  const models: { key: string; model: string }[] = [];
+
+  for (const key of [feature.key, feature.role]) {
+    for (const config of tierConfigs) {
+      const value = readConfiguredModel(config.config[key]);
+
+      if (!value) {
+        continue;
+      }
+
+      const model = expandLatestAlias(value);
+
+      if (isLatestAlias(value) && model === value) {
+        continue;
+      }
+
+      models.push({ key, model });
+    }
+  }
+
+  return models;
 }
 
 function readConfiguredModel(value: unknown): string | null {
