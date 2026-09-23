@@ -7,7 +7,6 @@ import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import {
   subscriptionTrpc,
   billingCallerEmailSchema,
-  UserEmailRequiredError,
   type BillingDisplayInvoice,
   type Currency,
   type SubscribablePlan,
@@ -62,7 +61,8 @@ export interface BillingSubscriptionApi {
     customerName?: string;
     customerEmail?: string;
     note?: string;
-    actorEmail: string;
+    /** The caller's own address; an account without one is refused by name. */
+    actorEmail: string | null;
   }): Promise<unknown>;
   createSubscriptionWithInvites(input: {
     organizationId: string;
@@ -183,18 +183,16 @@ export const subscriptionTrpcTransport = defineTrpcRouter(BillingSubscriptionApi
   .withFacts(billingCallerEmailFact)
   .withPermission("organization:manage")
   // Tells sales an organization asked about a plan that is not self-serve.
-  .handle(({ app, input }, email) => {
-    if (!email) throw new UserEmailRequiredError();
-
-    return app.notifyProspective({
+  .handle(({ app, input }, email) =>
+    app.notifyProspective({
       organizationId: input.organizationId,
       plan: input.plan,
       actorEmail: email,
       ...(input.customerName === undefined ? {} : { customerName: input.customerName }),
       ...(input.customerEmail === undefined ? {} : { customerEmail: input.customerEmail }),
       ...(input.note === undefined ? {} : { note: input.note }),
-    });
-  })
+    }),
+  )
 
   .procedure("listInvoices")
   .withPermission("organization:view")

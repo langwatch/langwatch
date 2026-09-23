@@ -1,10 +1,10 @@
-import { Currency, type Currency as CurrencyType } from "@langwatch/enterprise-billing-contract";
+import {
+  Currency,
+  type Currency as CurrencyType,
+  type CurrencyRequest,
+} from "@langwatch/enterprise-billing-contract";
 // @ts-expect-error — no type definitions for geoip-country
 import geoip from "geoip-country";
-
-export type CurrencyRequest = {
-  headers?: Record<string, string | string[] | undefined>;
-};
 
 const DEFAULT_CURRENCY = Currency.EUR;
 

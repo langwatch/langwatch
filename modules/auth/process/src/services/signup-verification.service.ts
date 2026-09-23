@@ -5,6 +5,7 @@ import {
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 
 import type { SignUpVerificationTokenRepository } from "../repositories/signup-verification.repository.ts";
 
@@ -89,6 +90,15 @@ export class SignUpVerificationService {
    */
   async requestVerification({ email }: { email: string }): Promise<void> {
     await this.issueLink({ email, passwordHash: null });
+  }
+
+  /** A sign-up's link: an address that already holds an account is told so rather than mailed. */
+  async requestNewAccountVerification({ email }: { email: string }): Promise<void> {
+    if (await this.addressIsRegistered({ email })) {
+      throw new EmailAlreadyRegisteredError();
+    }
+
+    await this.requestVerification({ email });
   }
 
   /**

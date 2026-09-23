@@ -15,6 +15,10 @@ import {
   type AuthzAuditRow,
 } from "../../repositories/authz-audit-trail.repository.ts";
 import {
+  type GrantProjectionWrite,
+  AuthzGrantProjectionRepository,
+} from "../../repositories/authz-grant-projection.repository.ts";
+import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
   ChangeRolePermissionsCommand,
@@ -24,7 +28,6 @@ import {
 } from "../authz-grant.commands.ts";
 import { AUTHZ_GRANT_AGGREGATE_TYPE } from "../authz-grant.events.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME, EventingAuthzAdapter } from "../authz-grant.pipeline.ts";
-import { type GrantProjectionWrite, GrantProjectionWriteStore } from "../authz-grant.projection.ts";
 
 const ORGANIZATION_ID = "org_acme";
 const OCCURRED_AT = 1_755_000_000_000;
@@ -51,7 +54,7 @@ const ROLE = {
   occurredAtMs: OCCURRED_AT,
 } as const;
 
-class NullGrantProjectionWriteStore extends GrantProjectionWriteStore {
+class NullAuthzGrantProjectionRepository extends AuthzGrantProjectionRepository {
   async append(_write: GrantProjectionWrite, _context: ProjectionStoreContext): Promise<void> {}
 }
 
@@ -74,7 +77,7 @@ async function emit(handler: EventEmitter, data: unknown): Promise<Event[]> {
 
 function buildPipeline() {
   return EventingAuthzAdapter.build({
-    authzGrantsWriteStore: new NullGrantProjectionWriteStore(),
+    authzGrantsWriteStore: new NullAuthzGrantProjectionRepository(),
     authzAuditTrailStore: new NullAuthzAuditTrailStore(),
   });
 }

@@ -882,3 +882,92 @@ describe("API key verification", () => {
     });
   });
 });
+
+describe("API keys on a credential's behalf", () => {
+  async function serviceWithOneServiceKey(canManage: boolean) {
+    const hasApiKeyPermission = vi.fn().mockResolvedValue(canManage);
+    const service = createService(
+      new MemoryApiKeys(),
+      dependencies({
+        authz: createApiFixture<AuthzApi>({
+          listApiKeyBindings,
+          hasApiKeyPermission,
+          can: vi.fn().mockResolvedValue(true),
+          hasPermission: vi.fn().mockResolvedValue(true),
+        }),
+      }),
+    );
+    const created = await service.create({
+      name: "service key",
+      organizationId: "org-1",
+      permissionMode: "default",
+      bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-1" }],
+    });
+
+    return { service, hasApiKeyPermission, key: created.apiKey };
+  }
+
+  describe("when a member credential lists", () => {
+    it("lists that member's own keys without asking about organization:manage", async () => {
+      const { service, hasApiKeyPermission } = await serviceWithOneServiceKey(true);
+
+      const listed = await service.listForCaller({
+        apiKeyId: "credential-1",
+        userId: "user-1",
+        organizationId: "org-1",
+      });
+
+      expect(listed).toEqual(await service.list({ userId: "user-1", organizationId: "org-1" }));
+      expect(hasApiKeyPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a service credential lists", () => {
+    it("lists every key in the organization when it holds organization:manage", async () => {
+      const { service, hasApiKeyPermission, key } = await serviceWithOneServiceKey(true);
+
+      const listed = await service.listForCaller({
+        apiKeyId: "credential-1",
+        userId: null,
+        organizationId: "org-1",
+      });
+
+      expect(listed.map((row) => row.id)).toEqual([key.id]);
+      expect(hasApiKeyPermission).toHaveBeenCalledWith({
+        apiKeyId: "credential-1",
+        userId: null,
+        organizationId: "org-1",
+        scope: { type: "org", id: "org-1" },
+        permission: "organization:manage",
+      });
+    });
+
+    it("refuses the organization-wide listing without organization:manage", async () => {
+      const { service } = await serviceWithOneServiceKey(false);
+
+      await expect(
+        service.listForCaller({ apiKeyId: "credential-1", userId: null, organizationId: "org-1" }),
+      ).rejects.toMatchObject({ code: "api_key_permission_denied" });
+    });
+  });
+
+  describe("when a member edits a key that is not theirs", () => {
+    it("answers not found, where a plain update answers not owned", async () => {
+      const { service, key } = await serviceWithOneServiceKey(true);
+      const foreignEdit = {
+        id: key.id,
+        organizationId: "org-1",
+        callerUserId: "user-2",
+        callerIsAdmin: false,
+        name: "renamed",
+      };
+
+      await expect(service.update(foreignEdit)).rejects.toMatchObject({
+        code: "api_key_not_owned",
+      });
+      await expect(service.updateAsCaller(foreignEdit)).rejects.toMatchObject({
+        code: "api_key_not_found",
+      });
+    });
+  });
+});

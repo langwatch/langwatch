@@ -11,6 +11,7 @@ import {
   stripePricesFile,
   type StripePriceName,
   SubscriptionCreationFailedError,
+  UserEmailRequiredError,
   SubscriptionStatus,
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
@@ -307,8 +308,10 @@ export class BillingSubscriptionService {
     customerName?: string;
     customerEmail?: string;
     note?: string;
-    actorEmail: string;
+    actorEmail: string | null;
   }): Promise<{ success: boolean }> {
+    if (!actorEmail) throw new UserEmailRequiredError();
+
     const organization = await this.organizationRepository.findName(organizationId);
     if (!organization) {
       throw new OrganizationNotFoundError();

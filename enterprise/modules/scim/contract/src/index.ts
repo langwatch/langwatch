@@ -6,6 +6,8 @@ export {
   type ScimTokenAuditEntry,
 } from "./scim.api.ts";
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
+export * from "./scim-token.rest.ts";
+export * from "./scim-webhook.rest.ts";
 export { ScimService } from "./scim.service.ts";
 export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";
 export { scimOversightTrpc } from "./scim-oversight.trpc.ts";

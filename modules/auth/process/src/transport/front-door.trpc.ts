@@ -5,13 +5,7 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import { callerAddressFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
-import {
-  AuthApi,
-  FrontDoorRateLimitedError,
-  frontDoorTrpc,
-  NoAddressToConfirmError,
-} from "@langwatch/auth-contract";
-import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
+import { AuthApi, FrontDoorRateLimitedError, frontDoorTrpc } from "@langwatch/auth-contract";
 import { z } from "zod";
 
 /**
@@ -90,11 +84,7 @@ export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
       refusal: "Too many signup attempts. Please try again later.",
     });
 
-    if (await app.addressIsRegistered({ email: input.email })) {
-      throw new EmailAlreadyRegisteredError();
-    }
-
-    await app.requestSignUpVerification({ email: input.email });
+    await app.requestNewAccountVerification({ email: input.email });
 
     return { sent: true as const };
   })
@@ -170,21 +160,7 @@ export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
   .withFacts(callerEmailFact)
   .noPermission({ reason: OWN_ADDRESS })
   .handle(async ({ app, actor }, email) => {
-    if (!email) {
-      throw new NoAddressToConfirmError();
-    }
-
-    const budget = await app.isWithinBudget({
-      key: `frontDoor.sendMyAddressConfirmation:${actor.id}`,
-      windowSeconds: HOUR_SECONDS,
-      max: 10,
-    });
-
-    if (!budget.allowed) {
-      throw throttled("Too many attempts. Please try again later.", budget.retryAfterSeconds);
-    }
-
-    await app.requestSignUpVerification({ email });
+    await app.sendMyAddressConfirmation({ actorId: actor.id, email });
 
     return { sent: true as const };
   })

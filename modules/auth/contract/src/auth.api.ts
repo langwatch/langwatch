@@ -122,6 +122,15 @@ export interface AuthApi {
   addressIsRegistered(input: Readonly<{ email: string }>): Promise<boolean>;
   /** Mails a fresh confirmation link. Asking twice sends twice. */
   requestSignUpVerification(input: Readonly<{ email: string }>): Promise<void>;
+  /** Mails a sign-up confirmation link, refusing an address that already has an account. */
+  requestNewAccountVerification(input: Readonly<{ email: string }>): Promise<void>;
+  /**
+   * Mails the signed-in caller's own address its confirmation link, metered per
+   * caller; refuses an account the process resolved no address for.
+   */
+  sendMyAddressConfirmation(
+    input: Readonly<{ actorId: string; email: string | null }>,
+  ): Promise<void>;
   /** Spends a confirmation link and answers the address it confirmed. */
   completeSignUpVerification(input: Readonly<{ token: string }>): Promise<SignUpVerificationResult>;
   /**

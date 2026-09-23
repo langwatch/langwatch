@@ -6,6 +6,7 @@ import {
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
+  ApiKeyPermissionDeniedError,
   ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
   LANGY_SESSION_API_KEY_NAME,
@@ -466,21 +467,20 @@ describe("the api-keys REST family", () => {
   describe("when keys are listed", () => {
     /** @scenario A view-only member lists only their own API keys */
     it("lists the caller's own keys, without the secret or its lookup id", async () => {
-      const list = vi.fn(async () => [apiKey()]);
-      const listAll = vi.fn(async () => [apiKey()]);
+      const listForCaller = vi.fn(async () => [apiKey()]);
       const { send } = mountApiKeyRest({
-        apiKeys: { list, listAll },
+        apiKeys: { listForCaller },
         granted: ["organization:view"],
       });
 
       const response = await send("/api/api-keys");
 
       expect(response.status).toBe(200);
-      expect(list).toHaveBeenCalledWith({
+      expect(listForCaller).toHaveBeenCalledWith({
+        apiKeyId: API_KEY_ID,
         userId: CALLER_USER_ID,
         organizationId: ORGANIZATION_ID,
       });
-      expect(listAll).not.toHaveBeenCalled();
       const body = (await response.json()) as { data: Record<string, unknown>[] };
       expect(body.data).toEqual([
         {
@@ -503,34 +503,35 @@ describe("the api-keys REST family", () => {
 
     /** @scenario A view-only service credential cannot list every key in the organization */
     it("refuses the org-wide listing to a credential without organization:manage", async () => {
-      const listAll = vi.fn(async () => [apiKey()]);
       const { send } = mountApiKeyRest({
-        apiKeys: { listAll, credentialCanManageOrganization: vi.fn(async () => false) },
+        apiKeys: {
+          listForCaller: vi.fn(async (): Promise<ApiKey[]> => {
+            throw new ApiKeyPermissionDeniedError("organization:manage");
+          }),
+        },
         granted: ["organization:view"],
       });
 
       const response = await send("/api/api-keys", { as: AS_SERVICE });
 
       expect(response.status).toBe(403);
-      expect(listAll).not.toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({ error: "api_key_permission_denied" });
     });
 
     it("returns the org-wide listing to a credential that does hold it", async () => {
-      const listAll = vi.fn(async () => [apiKey({ userId: null })]);
-      const credentialCanManageOrganization = vi.fn(async () => true);
+      const listForCaller = vi.fn(async () => [apiKey({ userId: null })]);
       const { send } = mountApiKeyRest({
-        apiKeys: { listAll, credentialCanManageOrganization },
+        apiKeys: { listForCaller },
       });
 
       const response = await send("/api/api-keys", { as: AS_SERVICE });
 
       expect(response.status).toBe(200);
-      expect(credentialCanManageOrganization).toHaveBeenCalledWith({
+      expect(listForCaller).toHaveBeenCalledWith({
         apiKeyId: API_KEY_ID,
         userId: null,
         organizationId: ORGANIZATION_ID,
       });
-      expect(listAll).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
     });
   });
 
@@ -728,7 +729,7 @@ describe("the api-keys REST family", () => {
     it("records the edit on the trail, naming the key and the organization", async () => {
       const { send, audit } = mountApiKeyRest({
         apiKeys: {
-          update: vi.fn(async () => apiKey({ name: "rename-after" })),
+          updateAsCaller: vi.fn(async () => apiKey({ name: "rename-after" })),
           getByIdForCaller: vi.fn(async () => apiKeyDetail({ name: "rename-after" })),
           isOrgAdmin: vi.fn(async () => true),
         },
@@ -752,7 +753,7 @@ describe("the api-keys REST family", () => {
       const update = vi.fn(async () => apiKey({ name: "rename-after" }));
       const getByIdForCaller = vi.fn(async () => apiKeyDetail({ name: "rename-after" }));
       const { send } = mountApiKeyRest({
-        apiKeys: { update, getByIdForCaller, isOrgAdmin: vi.fn(async () => true) },
+        apiKeys: { updateAsCaller: update, getByIdForCaller, isOrgAdmin: vi.fn(async () => true) },
       });
 
       const response = await send("/api/api-keys/api-key-1", {
@@ -783,7 +784,7 @@ describe("the api-keys REST family", () => {
       const update = vi.fn(async () => apiKey());
       const { send } = mountApiKeyRest({
         apiKeys: {
-          update,
+          updateAsCaller: update,
           getByIdForCaller: vi.fn(async () => apiKeyDetail()),
           isOrgAdmin: vi.fn(async () => true),
         },
@@ -822,7 +823,7 @@ describe("the api-keys REST family", () => {
     it("names the scope violation the application refused", async () => {
       const { send } = mountApiKeyRest({
         apiKeys: {
-          update: vi.fn(async (): Promise<ApiKey> => {
+          updateAsCaller: vi.fn(async (): Promise<ApiKey> => {
             throw new ApiKeyScopeViolationError("Beyond the owner's access");
           }),
           isOrgAdmin: vi.fn(async () => false),
@@ -849,8 +850,8 @@ describe("the api-keys REST family", () => {
     it("reports a key the caller does not own as not found, not forbidden", async () => {
       const { send } = mountApiKeyRest({
         apiKeys: {
-          update: vi.fn(async (): Promise<ApiKey> => {
-            throw new ApiKeyNotOwnedError("api-key-1");
+          updateAsCaller: vi.fn(async (): Promise<ApiKey> => {
+            throw new ApiKeyNotFoundError("api-key-1");
           }),
           isOrgAdmin: vi.fn(async () => false),
         },

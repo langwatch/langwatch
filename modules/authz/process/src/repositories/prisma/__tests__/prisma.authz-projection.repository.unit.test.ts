@@ -7,8 +7,8 @@ import { Temporal } from "@langwatch/time";
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-import type { GrantProjectionWrite } from "../../../eventing/authz-grant.projection.ts";
 import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";
+import type { GrantProjectionWrite } from "../../authz-grant-projection.repository.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 
 const ORG = "org_acme";

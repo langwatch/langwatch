@@ -9,6 +9,7 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import {
+  guidedPathCompleteRestInputSchema,
   guidedPathRestParamsSchema,
   guidedStateOutputSchema,
   guidedStateWithVariantOutputSchema,
@@ -50,6 +51,7 @@ export const onboardingRest = defineRestRouter(OnboardingApi)
 
   .post("/guided/paths/:path/complete", "postApiOnboardingGuidedPathComplete")
   .withParams(guidedPathRestParamsSchema)
+  .withInput(guidedPathCompleteRestInputSchema)
   .withPermission("project:view")
   .withOutput(guidedStateOutputSchema)
   .withMiddleware(onboardingRestCredential)

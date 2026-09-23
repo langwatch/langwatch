@@ -1,12 +1,12 @@
 /** Sign-up ceremony: organization is durable; everything after is non-fatal. */
 
-import { HandledError } from "@langwatch/handled-error";
 import type {
   OnboardingInitializeOrganizationInput,
   OrganizationCaller,
   OrganizationInitialized,
   OrganizationIntent,
 } from "@langwatch/organization-contract";
+import { OnboardingProjectNotCreatedError } from "@langwatch/organization-contract";
 
 import type { OrganizationCeremony, OrganizationSignals } from "../app/organization.members.ts";
 
@@ -201,26 +201,5 @@ export class OrganizationOnboardingService {
     } catch (error) {
       this.deps.signals.reportError(error);
     }
-  }
-}
-
-/**
- * The organization was created and its first project was not. Handled because
- * the customer can act on it - the project screen creates one directly - and
- * because an unnamed 500 here reads as "sign-up is broken" when it is not.
- */
-class OnboardingProjectNotCreatedError extends HandledError {
-  declare readonly code: "project_creation_failed";
-
-  constructor() {
-    super(
-      "project_creation_failed",
-      "The organization was created, but its first project was not",
-      {
-        httpStatus: 500,
-        fault: "platform",
-      },
-    );
-    this.name = "OnboardingProjectNotCreatedError";
   }
 }

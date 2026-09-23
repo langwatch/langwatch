@@ -71,6 +71,8 @@ export type UpdateApiKeyManagementInput = Readonly<{
 export interface ApiKeyApi {
   create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }>;
   update(input: UpdateApiKeyInput): Promise<ApiKey>;
+  /** `update`, answering somebody else's key as not found so the id confirms nothing. */
+  updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey>;
   /** Authentication is an attempted lookup: invalid credentials return null. */
   findVerifiedToken(input: ApiKeyVerifyInput): Promise<ApiKeyVerification | null>;
   /** Resolves either a current API key or the deprecated project credential. */
@@ -85,6 +87,11 @@ export interface ApiKeyApi {
   markUsed(input: ApiKeyIdInput): void;
   list(input: ApiKeyListInput): Promise<ApiKey[]>;
   listAll(input: ApiKeyListAllInput): Promise<ApiKey[]>;
+  /**
+   * The keys a credential may list: a member's own, or every key in the
+   * organization for a service key that holds `organization:manage`.
+   */
+  listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]>;
   revoke(input: RevokeApiKeyInput): Promise<ApiKey>;
   ensureCallerIsOrgMember(input: ApiKeyMembershipInput): Promise<void>;
   assertSelectionWithinCeiling(input: ApiKeySelectionInput): Promise<void>;

@@ -23,3 +23,8 @@ export const currencyTrpc = defineTrpcContract("currency")
 export const currencyRequestHeadersSchema = z
   .record(z.string(), z.union([z.string(), z.array(z.string())]).optional())
   .nullable();
+
+/** The request a currency is detected from: only its headers are read. */
+export type CurrencyRequest = {
+  headers?: Record<string, string | string[] | undefined>;
+};

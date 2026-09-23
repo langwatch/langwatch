@@ -4,6 +4,7 @@
  * permission each is behind, and the two-step every checkout is.
  */
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { UserEmailRequiredError } from "@langwatch/enterprise-billing-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -265,11 +266,17 @@ describe("when sales is told an organization asked about a negotiated plan", () 
   });
 
   describe("given a caller the process resolved no address for", () => {
-    it("refuses with the code the account page writes its copy against", async () => {
+    it("hands the application no address, and answers the refusal it raises", async () => {
+      notifyProspective.mockRejectedValueOnce(new UserEmailRequiredError());
+
       await expect(
         callerWith(null).prospective({ organizationId: ORGANIZATION, plan: "ACCELERATE" }),
       ).rejects.toMatchObject({ cause: { code: "billing_customer_email_required" } });
-      expect(notifyProspective).not.toHaveBeenCalled();
+      expect(notifyProspective).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        plan: "ACCELERATE",
+        actorEmail: null,
+      });
     });
   });
 });

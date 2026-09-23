@@ -20,6 +20,7 @@ export * from "./subscription.trpc.ts";
 export * from "./billing.config.ts";
 
 export {
+  type HandleEventResult,
   billingStripeWebhookReceiptSchema,
   billingStripeWebhookHeadersSchema,
 } from "./billing-webhook.schemas.ts";

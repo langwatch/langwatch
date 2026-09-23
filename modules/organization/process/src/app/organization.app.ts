@@ -5,7 +5,6 @@ import {
   type AuthzTeamMemberBinding,
 } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
@@ -15,6 +14,7 @@ import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
  * logic; most operations are the services' own, via {@link organizations} and {@link projects}.
  */
 import {
+  AuditTrailDeniedError,
   isOrganizationApiCustomRole,
   LiteMemberViewerOnlyError,
   OrganizationApi,
@@ -235,23 +235,6 @@ const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
 
 /** The page size the group list is read at. */
 const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
-
-/**
- * The caller may not read this audit trail through the project they
- * filtered it by. Separate from the organization-tier refusal, same code,
- * so the customer reads one sentence either way.
- */
-class AuditTrailDeniedError extends HandledError {
-  declare readonly code: "permission_denied";
-
-  constructor() {
-    super("permission_denied", "You do not have permission to read this audit trail", {
-      httpStatus: 403,
-      fault: "customer",
-    });
-    this.name = "AuditTrailDeniedError";
-  }
-}
 
 /**
  * A door this deployment composed nothing behind. Every member REJECTS rather

@@ -5,10 +5,11 @@
  */
 import { createHmac } from "node:crypto";
 
-import { createRestRuntime } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { describe, expect, it, vi } from "vitest";
 
-import { scimWebhookRest } from "../scim-webhook.rest.ts";
+import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "../../rules/scim-webhook-signature.rules.ts";
+import { scimWebhookDelivery, scimWebhookRest } from "../scim-webhook.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
 
 const SECRET = "deployment-shared-secret";
@@ -67,6 +68,12 @@ function mount(options: { secret?: string | undefined } = {}) {
     app: () => app,
     credential: "public",
     onError: (error, context) => context.json({ error: String(error) }, 500),
+    facts: [
+      bindRestMiddleware(scimWebhookDelivery, (context) => ({
+        signature: context.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER) ?? null,
+        authorization: context.req.header("authorization") ?? null,
+      })),
+    ],
   });
 
   return {

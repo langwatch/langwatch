@@ -11,17 +11,17 @@ import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import type { AuthzGrantsEvent } from "../authz-grant.events.ts";
 import {
-  AuthzGrantProjection,
   type GrantProjectionWrite,
-  GrantProjectionWriteStore,
-} from "../authz-grant.projection.ts";
+  AuthzGrantProjectionRepository,
+} from "../../repositories/authz-grant-projection.repository.ts";
+import type { AuthzGrantsEvent } from "../authz-grant.events.ts";
+import { AuthzGrantProjection } from "../authz-grant.projection.ts";
 
 const TENANT_ID = "org_acme";
 const ACTOR = { type: "user", id: "user_admin" } as const;
 
-class NullGrantProjectionWriteStore extends GrantProjectionWriteStore {
+class NullAuthzGrantProjectionRepository extends AuthzGrantProjectionRepository {
   async append(_write: GrantProjectionWrite, _context: ProjectionStoreContext): Promise<void> {}
 }
 
@@ -44,7 +44,7 @@ function event(
   } as unknown as AuthzGrantsEvent;
 }
 
-const projection = AuthzGrantProjection.create(new NullGrantProjectionWriteStore());
+const projection = AuthzGrantProjection.create(new NullAuthzGrantProjectionRepository());
 
 describe("AuthzGrantProjection", () => {
   it("takes grant and role ownership from tenantId, never aggregateId", () => {

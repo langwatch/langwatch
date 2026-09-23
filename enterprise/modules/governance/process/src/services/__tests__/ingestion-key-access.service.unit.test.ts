@@ -38,6 +38,7 @@ class FakeApiKeyApi implements ApiKeyApi {
   isOrgAdminApiKey = unsupported<ApiKeyApi["isOrgAdminApiKey"]>();
   list = unsupported<ApiKeyApi["list"]>();
   listAll = unsupported<ApiKeyApi["listAll"]>();
+  listForCaller = unsupported<ApiKeyApi["listForCaller"]>();
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
   listIngestionKeysForProject = unsupported<ApiKeyApi["listIngestionKeysForProject"]>();
   listKeys = unsupported<ApiKeyApi["listKeys"]>();
@@ -54,6 +55,7 @@ class FakeApiKeyApi implements ApiKeyApi {
   revokeCliLoginKeysForDevice = unsupported<ApiKeyApi["revokeCliLoginKeysForDevice"]>();
   revokeKey = unsupported<ApiKeyApi["revokeKey"]>();
   update = unsupported<ApiKeyApi["update"]>();
+  updateAsCaller = unsupported<ApiKeyApi["updateAsCaller"]>();
   updateKey = unsupported<ApiKeyApi["updateKey"]>();
   validateCliSelection = unsupported<ApiKeyApi["validateCliSelection"]>();
 }

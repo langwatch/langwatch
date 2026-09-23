@@ -10,15 +10,24 @@
  * @see enterprise/modules/scim/specs/scim.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
-import { ScimApi } from "@langwatch/enterprise-scim-contract";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestAnswer,
+  type RestProtocolProducer,
+} from "@langwatch/api/rest";
+import { ScimApi, scimWebhookDeliveryHeadersSchema } from "@langwatch/enterprise-scim-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 
-import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "../rules/scim-webhook-signature.rules.ts";
+const JSON_MEDIA_TYPE = "application/json";
 
-/** The headers the intake's own bodies are written with. */
-const JSON_HEADERS = { "Content-Type": "application/json" } as const;
+/** The signature and the directory token a delivery presents, read off it by the process. */
+export const scimWebhookDelivery = defineRestMiddleware(
+  "scimWebhookDelivery",
+  scimWebhookDeliveryHeadersSchema,
+);
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
@@ -27,8 +36,12 @@ const payloadTooLarge = (): Error =>
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 /** One of the four sentences a refused delivery reads in Auth0's log. */
-function refusal(status: 400 | 401 | 403 | 404, error: string): RestRawAnswer {
-  return { status, headers: JSON_HEADERS, body: JSON.stringify({ error }) };
+function refusal(
+  response: RestProtocolProducer<typeof JSON_MEDIA_TYPE>,
+  status: 400 | 401 | 403 | 404,
+  error: string,
+): RestAnswer<"protocol"> {
+  return response.write({ status, mediaType: JSON_MEDIA_TYPE, body: JSON.stringify({ error }) });
 }
 
 /**
@@ -54,30 +67,40 @@ export const scimWebhookRest = defineRestRouter(ScimApi)
         "credential opens this door",
     }),
   )
-  .withRawResponse({ produces: ["application/json"] })
+  .withMiddleware(scimWebhookDelivery)
+  .withResponse("protocol", {
+    produces: JSON_MEDIA_TYPE,
+    because: "Auth0's log stream reads its own delivery acknowledgement, status and body.",
+  })
   .withDocs({
     tags: ["SCIM"],
     summary: "Receive an Auth0 SCIM log-stream delivery",
     description:
       "Auth0's SCIM log stream, signed with the deployment's shared secret and tenanted by the SCIM token the delivery presents. A deployment that configured no secret answers 404, so a probe cannot learn whether the path is served here.",
   })
-  .handle(async ({ app, raw, request }) => {
+  .handle(async ({ app, raw, response }, delivery) => {
     const admission = await app.admitDirectoryDelivery({
       body: raw,
-      signature: request.headers.get(SCIM_WEBHOOK_SIGNATURE_HEADER),
-      authorization: request.headers.get("authorization"),
+      signature: delivery.signature,
+      authorization: delivery.authorization,
     });
 
-    if (admission.status === "not-configured") return refusal(404, "Webhook not configured");
-    if (admission.status === "unauthorized") return refusal(401, "Unauthorized");
-    if (admission.status === "forbidden") return refusal(403, "Forbidden");
-    if (admission.status === "invalid-json") return refusal(400, "Invalid JSON");
+    if (admission.status === "not-configured") {
+      return refusal(response, 404, "Webhook not configured");
+    }
+    if (admission.status === "unauthorized") return refusal(response, 401, "Unauthorized");
+    if (admission.status === "forbidden") return refusal(response, 403, "Forbidden");
+    if (admission.status === "invalid-json") return refusal(response, 400, "Invalid JSON");
 
     await app.relayDirectoryEvents({
       organizationId: admission.organizationId,
       events: admission.events,
     });
 
-    return { status: 200, headers: JSON_HEADERS, body: JSON.stringify({ received: true }) };
+    return response.write({
+      status: 200,
+      mediaType: JSON_MEDIA_TYPE,
+      body: JSON.stringify({ received: true }),
+    });
   })
   .build();

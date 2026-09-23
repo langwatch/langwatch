@@ -37,6 +37,9 @@ export const projectRestUpdateSchema = z.object({
 
 export const projectRestParamsSchema = z.object({ projectId: z.string().min(1) });
 
+/** Regenerating the key takes no body; an absent one is read as this. */
+export const projectRestRegenerateApiKeyInputSchema = z.object({});
+
 /**
  * The organization credential a management-door middleware resolves: the
  * key, and the member it acts as — null for a service key, which acts as

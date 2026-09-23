@@ -1,7 +1,10 @@
 import {
+  ApiKeyNotFoundError,
+  ApiKeyNotOwnedError,
   type ApiKey,
   type ApiKeyBinding,
   type ApiKeyBindingNames,
+  type ApiKeyCredentialCheck,
   type ApiKeyDetail,
   type ApiKeyListEnrichment,
   type ApiKeyName,
@@ -82,6 +85,17 @@ export class ApiKeyService {
     return this.lifecycle.update(input);
   }
 
+  async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
+    try {
+      return await this.lifecycle.update(input);
+    } catch (error) {
+      if (error instanceof ApiKeyNotOwnedError) {
+        throw new ApiKeyNotFoundError(input.id, { reasons: [error] });
+      }
+      throw error;
+    }
+  }
+
   async findVerifiedToken(input: { token: string }): Promise<ApiKeyVerification | null> {
     return this.tokens.findVerifiedToken(input);
   }
@@ -118,6 +132,10 @@ export class ApiKeyService {
 
   async listAll(input: { organizationId: string }): Promise<ApiKey[]> {
     return this.catalog.listAll(input);
+  }
+
+  async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {
+    return this.catalog.listForCaller(input);
   }
 
   async revoke(input: RevokeApiKeyInput): Promise<ApiKey> {

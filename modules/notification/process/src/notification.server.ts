@@ -7,10 +7,10 @@ import type {
   EmailOutboundProxyConfig,
   MailerConfiguration,
 } from "./channels/email-delivery.channel.ts";
+import { RedisTenantBroadcastChannel } from "./channels/redis/redis.tenant-broadcast.channel.ts";
 import type { TenantBroadcast } from "./channels/tenant-broadcast.channel.ts";
 import { TenantBroadcastPublisher } from "./channels/tenant-broadcast.channel.ts";
 import { notificationRepositories } from "./repositories/notification-repositories.registry.ts";
-import { RedisTenantBroadcastRepository } from "./repositories/redis/redis.tenant-broadcast.repository.ts";
 import { EmailDeliveryAdapter } from "./services/email-delivery.service.ts";
 import type { SesAwsClientConfiguration } from "./services/ses.email-gateway.service.ts";
 
@@ -54,7 +54,7 @@ export function createRedisTenantBroadcast(input: {
   publish(channel: string, message: string): Promise<number>;
   logger?: Logger;
 }): TenantBroadcast {
-  return RedisTenantBroadcastRepository.create({
+  return RedisTenantBroadcastChannel.create({
     publisher: new BoundTenantBroadcastPublisher(input.publish.bind(input)),
     ...(input.logger ? { logger: input.logger } : {}),
   });

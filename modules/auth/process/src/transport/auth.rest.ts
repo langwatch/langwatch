@@ -4,7 +4,7 @@
  * door's own. @see specs/auth/auth-rest-family-mounted.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
@@ -83,6 +83,10 @@ const JSON_MEDIA_TYPE = "application/json";
  */
 const AUTH_ANSWER = [JSON_MEDIA_TYPE, "text/html", "*/*"];
 
+/** Better Auth's cookie and redirect protocol, answered as its own response. */
+const BETTER_AUTH_FORWARDS =
+  "Better Auth writes the session cookies, redirects and handshake bodies itself; this door passes them on untouched";
+
 const AUTH_DOOR = publicRoute({
   reason:
     "the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal",
@@ -151,13 +155,13 @@ export const authRest = defineRestRouter(AuthDoorApi)
 
   .get("/api/auth/logout", "endBrowserSessionAndRedirect")
   .withAccess(AUTH_DOOR)
-  .withRawResponse({ produces: AUTH_ANSWER })
-  .handle(async ({ app, request }) => endSession({ app, request }))
+  .withResponse("forwarded", { produces: AUTH_ANSWER, because: BETTER_AUTH_FORWARDS })
+  .handle(async ({ app, request, response }) => response.pass(await endSession({ app, request })))
 
   .post("/api/auth/logout", "endBrowserSession")
   .withAccess(AUTH_DOOR)
-  .withRawResponse({ produces: JSON_MEDIA_TYPE })
-  .handle(async ({ app, request }) => endSession({ app, request }))
+  .withResponse("forwarded", { produces: JSON_MEDIA_TYPE, because: BETTER_AUTH_FORWARDS })
+  .handle(async ({ app, request, response }) => response.pass(await endSession({ app, request })))
 
   /**
    * An any-method route so OPTIONS, HEAD and CORS preflight reach Better Auth,
@@ -166,9 +170,11 @@ export const authRest = defineRestRouter(AuthDoorApi)
    */
   .get("/api/auth/*", "betterAuthHandshake")
   .withAccess(AUTH_DOOR)
-  .withRawResponse({ produces: AUTH_ANSWER })
+  .withResponse("forwarded", { produces: AUTH_ANSWER, because: BETTER_AUTH_FORWARDS })
   .anyMethod()
-  .handle(async ({ app, request }) => betterAuthHandshake({ app, request }))
+  .handle(async ({ app, request, response }) =>
+    response.pass(await betterAuthHandshake({ app, request })),
+  )
   .build();
 
 /**
@@ -227,7 +233,7 @@ async function betterAuthHandshake({
 }: {
   app: AuthDoorApi;
   request: Request;
-}): Promise<RestRawResult> {
+}): Promise<Response> {
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
 

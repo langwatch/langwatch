@@ -2,6 +2,7 @@ import { AUTHZ_GRANTS_EVENT_TYPES } from "@langwatch/authz-contract";
 import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
 
 import type { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
+import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -13,13 +14,12 @@ import {
 } from "./authz-grant.commands.ts";
 import { AUTHZ_GRANT_AGGREGATE_TYPE, type AuthzGrantsEvent } from "./authz-grant.events.ts";
 import { AuthzGrantProjection } from "./authz-grant.projection.ts";
-import type { GrantProjectionWriteStore } from "./authz-grant.projection.ts";
 import { EventingAuthzAuditAdapter } from "./authz-grant.subscriber.ts";
 
 export const AUTHZ_GRANT_PIPELINE_NAME = "authz_grant" as const;
 
 export interface EventingAuthzAdapterOptions {
-  authzGrantsWriteStore: GrantProjectionWriteStore;
+  authzGrantsWriteStore: AuthzGrantProjectionRepository;
   authzAuditTrailStore: AuthzAuditTrailStore;
 }
 

@@ -20,7 +20,12 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
-import { ScimApi } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimApi,
+  scimTokenCreateRestInputSchema,
+  scimTokenIdParamsSchema,
+  scimTokenRestSummarySchema,
+} from "@langwatch/enterprise-scim-contract";
 import { z } from "zod";
 
 /**
@@ -34,27 +39,6 @@ export const scimTokenRestActor = defineRestMiddleware(
   z.object({ actorId: z.string() }),
 );
 
-const tokenSummarySchema = z.object({
-  id: z.string(),
-  description: z.string().nullable(),
-  /** D08: which single sign-on connection this token reaches. An id, never a
-   *  secret — and the most important thing about a token, so it is listed. */
-  connectionId: z.string().nullable(),
-  createdAt: z.date(),
-  lastUsedAt: z.date().nullable(),
-});
-
-const idParamsSchema = z.object({ scimTokenId: z.string().min(1) });
-
-const createTokenSchema = z.object({
-  description: z.string().trim().min(1).max(255).optional(),
-  /** D08: the connection this token is for, and the whole of its write
-   *  authority. Optional on the wire and required by the application, so a
-   *  provisioning tool that has not been updated gets the named
-   *  `scim_connection_required` refusal rather than a schema error. */
-  connectionId: z.string().trim().min(1).optional(),
-});
-
 export const scimTokenRest = defineRestRouter(ScimApi)
   .withNamespace("scim-tokens")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -62,7 +46,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
 
   .get("/", "listScimTokens")
   .withPermission("organization:manage")
-  .withOutput(z.object({ tokens: z.array(tokenSummarySchema) }))
+  .withOutput(z.object({ tokens: z.array(scimTokenRestSummarySchema) }))
   .withDocs({
     tags: ["SCIM Tokens"],
     description:
@@ -73,7 +57,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
   }))
 
   .post("/", "createScimToken")
-  .withInput(createTokenSchema)
+  .withInput(scimTokenCreateRestInputSchema)
   .withPermission("organization:manage")
   .withOutput(
     z.object({
@@ -120,7 +104,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
   })
 
   .delete("/:scimTokenId", "revokeScimToken")
-  .withParams(idParamsSchema)
+  .withParams(scimTokenIdParamsSchema)
   .withPermission("organization:manage")
   .withOutput(z.object({ success: z.literal(true) }))
   .withDocs({

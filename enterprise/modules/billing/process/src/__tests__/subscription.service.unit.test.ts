@@ -527,6 +527,20 @@ describe("BillingSubscriptionService", () => {
         ).rejects.toMatchObject({ code: "organization_not_found" });
       });
     });
+
+    describe("when the caller has no address of their own", () => {
+      it("refuses by name and tells sales nothing", async () => {
+        await expect(
+          service.notifyProspective({
+            organizationId: "org_123",
+            plan: PlanTypes.LAUNCH,
+            actorEmail: null,
+          }),
+        ).rejects.toMatchObject({ code: "billing_customer_email_required" });
+        expect(organizationRepository.findName).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("createSubscriptionWithInvites()", () => {

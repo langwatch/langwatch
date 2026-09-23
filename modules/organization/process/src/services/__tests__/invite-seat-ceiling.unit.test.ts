@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { resolveInviteTeamMemberships } from "../../rules/invite-memberships.rules.ts";
 import { InviteService } from "../invite.service.ts";
 
 const ORGANIZATION_ID = "organization-1";
@@ -72,7 +73,7 @@ describe("given an invitation for a Lite Member seat", () => {
     /** @scenario "An invitation cannot carry team access above the invited seat" */
     it("corrects its team access to Viewer at acceptance", () => {
       expect(
-        InviteService.resolveInviteTeamMemberships({
+        resolveInviteTeamMemberships({
           role: "EXTERNAL",
           teamIds: "",
           teamAssignments: [

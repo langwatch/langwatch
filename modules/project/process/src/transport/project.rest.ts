@@ -27,6 +27,7 @@ import {
   projectRestCredentialSchema,
   projectRestPaginationQuerySchema,
   projectRestParamsSchema,
+  projectRestRegenerateApiKeyInputSchema,
   projectRestPageSchema,
   projectRestSchema,
   projectRestUpdateSchema,
@@ -306,6 +307,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
 
   .post("/:projectId/regenerate-api-key", "regenerateProjectApiKey")
   .withParams(projectRestParamsSchema)
+  .withInput(projectRestRegenerateApiKeyInputSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
   .withDocs({

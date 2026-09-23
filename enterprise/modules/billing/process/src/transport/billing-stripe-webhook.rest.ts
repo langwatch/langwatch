@@ -14,13 +14,12 @@ import {
 import {
   billingStripeWebhookReceiptSchema,
   billingStripeWebhookHeadersSchema,
+  type HandleEventResult,
 } from "@langwatch/enterprise-billing-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import type Stripe from "stripe";
-
-import type { HandleEventResult } from "../services/billing-stripe-webhook.service.ts";
 
 const logger = createLogger("langwatch:billing:stripe-webhook");
 

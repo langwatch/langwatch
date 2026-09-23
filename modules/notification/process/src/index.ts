@@ -41,5 +41,5 @@ export {
  * mapping: EmailProviderService below is what `resolveDefaultFrom` wraps.
  */
 export { EmailDeliveryAdapter } from "./services/email-delivery.service.ts";
-export { RedisTenantBroadcastRepository as RedisTenantBroadcastAdapter } from "./repositories/redis/redis.tenant-broadcast.repository.ts";
+export { RedisTenantBroadcastChannel as RedisTenantBroadcastAdapter } from "./channels/redis/redis.tenant-broadcast.channel.ts";
 export { EmailProviderService } from "./services/email-provider.service.ts";

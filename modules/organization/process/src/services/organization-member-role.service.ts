@@ -1,9 +1,9 @@
-import { HandledError } from "@langwatch/handled-error";
 /**
  * Changing what a member may do: enabling and disabling a seat, and the cascading role update
  * across the organization and its teams.
  */
 import {
+  TeamRoleUpdateRejectedError,
   RoleBindingScopeType,
   type OrganizationUserRole,
   type TeamUserRole,
@@ -65,19 +65,6 @@ async function collectCustomRolePermissions({
   }
 
   return allPermissions.length > 0 ? allPermissions : undefined;
-}
-
-/**
- * A team-role update the caller could not have meant: it names a different
- * member, or a team outside the organization whose seats are being changed.
- */
-class TeamRoleUpdateRejectedError extends HandledError {
-  declare readonly code: "validation_error";
-
-  constructor(message: string, meta: Readonly<Record<string, unknown>>) {
-    super("validation_error", message, { httpStatus: 400, fault: "customer", meta });
-    this.name = "TeamRoleUpdateRejectedError";
-  }
 }
 
 type OrganizationMemberRoleDependencies = {

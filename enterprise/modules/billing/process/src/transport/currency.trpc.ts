@@ -7,11 +7,10 @@ import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import {
   currencyTrpc,
   currencyRequestHeadersSchema,
+  type CurrencyRequest,
   type DetectedCurrency,
 } from "@langwatch/enterprise-billing-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
-
-import type { CurrencyRequest } from "../services/currency.service.ts";
 
 /** The currency question this surface asks of the application. */
 export interface BillingCurrencyApi {

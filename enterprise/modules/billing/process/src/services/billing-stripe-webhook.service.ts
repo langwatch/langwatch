@@ -1,4 +1,7 @@
-import { type StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import {
+  type HandleEventResult,
+  type StripePriceMap,
+} from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
@@ -34,10 +37,6 @@ export interface LicensePurchaseHandler {
     privateKey: string;
   }): Promise<void>;
 }
-
-export type HandleEventResult =
-  | { status: "ok" }
-  | { status: "error"; httpStatus: 400 | 500; message: string };
 
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;

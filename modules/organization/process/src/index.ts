@@ -36,7 +36,6 @@ export type {
   OrganizationMemberWithUser,
   UpdateMemberRoleResult,
 } from "./repositories/organization-membership.repository.ts";
-export type { PostgresOrganizationAdapterOptions } from "./services/postgres-organization.service.ts";
 export type {
   PersonalWorkspaceDiagnostics,
   PersonalWorkspaceIdentity,

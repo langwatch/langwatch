@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   TENANT_BROADCAST_EVENT_TYPES,
   TenantBroadcastPublisher,
-} from "../../../channels/tenant-broadcast.channel.ts";
-import { RedisTenantBroadcastRepository } from "../redis.tenant-broadcast.repository.ts";
+} from "../../tenant-broadcast.channel.ts";
+import { RedisTenantBroadcastChannel } from "../redis.tenant-broadcast.channel.ts";
 
 /**
  * Spec: modules/notification/specs/tenant-broadcast-twin.feature.
@@ -28,7 +28,7 @@ class RefusingPublisher extends TenantBroadcastPublisher {
 const FROZEN_NOW = 1_756_000_000_000;
 
 function adapterOver(publisher: TenantBroadcastPublisher, logger?: unknown) {
-  return RedisTenantBroadcastRepository.createWithClock({
+  return RedisTenantBroadcastChannel.createWithClock({
     publisher,
     now: () => FROZEN_NOW,
     ...(logger ? { logger: logger as never } : {}),

@@ -38,7 +38,9 @@ describe("the /api/auth REST family", () => {
 
     it("writes its own body on every route, since the answers are Better Auth's", () => {
       for (const route of declaration.routes) {
-        expect([route.operation, route.rawResponse !== undefined]).toEqual([route.operation, true]);
+        const writesOwnBody = route.rawResponse !== undefined || route.response !== undefined;
+
+        expect([route.operation, writesOwnBody]).toEqual([route.operation, true]);
       }
     });
 

@@ -16,6 +16,7 @@ import { ScimApp } from "./app/scim.app.ts";
 import type { ScimSyncLifecycle } from "./app/scim.members.ts";
 import { scimEventing } from "./eventing/scim.pipeline.ts";
 import { scimRepositories } from "./repositories/scim-repositories.registry.ts";
+import { SCIM_WEBHOOK_SIGNATURE_HEADER } from "./rules/scim-webhook-signature.rules.ts";
 import {
   ScimSyncLifecycleService,
   type ScimSyncLifecycleAdapterDeps,
@@ -25,7 +26,7 @@ import { scimProtocolRest, scimRestCredential } from "./transport/scim-protocol.
 import { scimReconciliationTrpcTransport } from "./transport/scim-reconciliation.trpc.ts";
 import { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
 import { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
-import { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
+import { scimWebhookDelivery, scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 
 export type { ScimBespokeMembers } from "./app/scim.app.ts";
 
@@ -53,6 +54,10 @@ export const scimServer = defineServerModule("scim")
 
       return { connectionId: credential.connectionId };
     }),
+    bindRestMiddleware(scimWebhookDelivery, (context) => ({
+      signature: context.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER) ?? null,
+      authorization: context.req.header("authorization") ?? null,
+    })),
   ])
   .withEventing(scimEventing);
 

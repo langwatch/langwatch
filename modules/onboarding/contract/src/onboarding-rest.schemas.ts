@@ -5,6 +5,9 @@ export const guidedPathRestParamsSchema = z.object({
   path: z.string().min(1).describe("The onboarding path: llmops, coding, gateway or governance."),
 });
 
+/** Completing a path takes no body; an absent one is read as this. */
+export const guidedPathCompleteRestInputSchema = z.object({});
+
 /** The resolved credential the door reads: an organization, and its user when one is bound. */
 export const onboardingRestCredentialSchema = z.object({
   organizationId: z.string(),

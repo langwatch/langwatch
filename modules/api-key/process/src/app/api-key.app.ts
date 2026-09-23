@@ -149,6 +149,9 @@ export class ApiKeyApp implements ApiKeyApi {
   async update(input: UpdateApiKeyInput) {
     return this.#service.update(input);
   }
+  async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
+    return this.#service.updateAsCaller(input);
+  }
   async findVerifiedToken(input: { token: string }): Promise<ApiKeyVerification | null> {
     return this.#service.findVerifiedToken(input);
   }
@@ -176,6 +179,9 @@ export class ApiKeyApp implements ApiKeyApi {
   }
   async listAll(input: { organizationId: string }) {
     return this.#service.listAll(input);
+  }
+  async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {
+    return this.#service.listForCaller(input);
   }
   async revoke(input: RevokeApiKeyInput) {
     return this.#service.revoke(input);

@@ -121,7 +121,6 @@ export {
 } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export type { BillingSubscription } from "./repositories/subscription.repository.ts";
-export type { CurrencyRequest } from "./services/currency.service.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";
 export type {
   BillingNextStepResolver,
@@ -151,7 +150,6 @@ export type {
 // The Stripe webhook and the Customer.io lifecycle signals, moved off
 // `platform/app/src/server/app-layer/billing/`.
 export type {
-  HandleEventResult,
   LicensePurchaseHandler,
   WebhookService,
 } from "./services/billing-stripe-webhook.service.ts";

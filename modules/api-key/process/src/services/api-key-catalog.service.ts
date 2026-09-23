@@ -1,7 +1,9 @@
 import {
   ApiKeyNotFoundError,
+  ApiKeyPermissionDeniedError,
   type ApiKey,
   type ApiKeyBinding,
+  type ApiKeyCredentialCheck,
   type ApiKeyDetail,
   type ApiKeyName,
   type ApiKeyProject,
@@ -156,6 +158,22 @@ export class ApiKeyCatalogService {
     const rows = await this.repository.listForOrganization({ organizationId });
 
     return (await this.bindings.attach(rows)).map(publicApiKey);
+  }
+
+  async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {
+    const { organizationId, userId } = input;
+    if (userId) return this.list({ userId, organizationId });
+
+    const canManage = await this.options.authz.hasApiKeyPermission({
+      apiKeyId: input.apiKeyId,
+      userId,
+      organizationId,
+      scope: { type: "org", id: organizationId },
+      permission: "organization:manage",
+    });
+    if (!canManage) throw new ApiKeyPermissionDeniedError("organization:manage");
+
+    return this.listAll({ organizationId });
   }
 
   async findIngestionKey(input: {

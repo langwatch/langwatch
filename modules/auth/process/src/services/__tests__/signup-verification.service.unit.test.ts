@@ -221,3 +221,28 @@ describe("given a sign-up address to confirm", () => {
     });
   });
 });
+
+describe("given a sign-up asking for a new account's link", () => {
+  describe("when the address already has an account", () => {
+    it("refuses by name and mails nothing", async () => {
+      const harness = makeService({ registered: true });
+
+      await expect(
+        harness.service.requestNewAccountVerification({ email: "sam@acme.com" }),
+      ).rejects.toMatchObject({ code: "email_already_registered" });
+      expect(harness.sent).toEqual([]);
+    });
+  });
+
+  describe("when the address has no account", () => {
+    it("mails the confirmation link", async () => {
+      const harness = makeService();
+
+      await harness.service.requestNewAccountVerification({ email: "sam@acme.com" });
+
+      expect(harness.sent).toEqual([
+        { email: "sam@acme.com", verificationUrl: "https://app.test/auth/signup?verify=token-1" },
+      ]);
+    });
+  });
+});

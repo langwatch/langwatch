@@ -19,7 +19,6 @@ import {
   type InviteDisplayStatus,
 } from "../rules/invite-display-status.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
-import { resolveInviteTeamMemberships } from "../rules/invite-memberships.rules.ts";
 import { InviteAcceptanceService } from "./invite-acceptance.service.ts";
 import { InviteCreationService } from "./invite-creation.service.ts";
 import { InviteLifecycleService } from "./invite-lifecycle.service.ts";
@@ -89,12 +88,6 @@ export class InviteService {
     const domain = trimmed.slice(at + 1);
 
     return `${local[0]}•••@${domain}`;
-  }
-
-  static resolveInviteTeamMemberships(
-    input: Parameters<typeof resolveInviteTeamMemberships>[0],
-  ): ReturnType<typeof resolveInviteTeamMemberships> {
-    return resolveInviteTeamMemberships(input);
   }
 
   private get invites(): OrganizationInviteRepository {

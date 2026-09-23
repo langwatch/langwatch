@@ -6,9 +6,6 @@
 import {
   ApiKeyAdminRequiredError,
   ApiKeyApi,
-  ApiKeyNotFoundError,
-  ApiKeyNotOwnedError,
-  ApiKeyPermissionDeniedError,
   apiKeyRestCreateSchema,
   apiKeyRestDetailSchema,
   apiKeyRestListSchema,
@@ -217,7 +214,7 @@ export const apiKeyRest: Readonly<{
   // The route policy is organization:view for the caller's OWN keys. The
   // org-wide listing a service credential receives is a different disclosure
   // (every key in the organization), so that branch additionally requires
-  // organization:manage in the handler.
+  // organization:manage, which the application checks.
   .get("/", "listApiKeys")
   .withPermission("organization:view")
   .withOutput(apiKeyRestListSchema)
@@ -233,17 +230,7 @@ export const apiKeyRest: Readonly<{
   })
   .withMiddleware(apiKeyRestCredential)
   .handle(async ({ app, scope }, caller) => {
-    if (!caller.userId) {
-      const canManage = await app.credentialCanManageOrganization(
-        credentialCheck(caller, scope.id),
-      );
-
-      if (!canManage) throw new ApiKeyPermissionDeniedError("organization:manage");
-    }
-
-    const rows = caller.userId
-      ? await app.list({ userId: caller.userId, organizationId: scope.id })
-      : await app.listAll({ organizationId: scope.id });
+    const rows = await app.listForCaller(credentialCheck(caller, scope.id));
 
     return {
       data: rows.map((key) => ({
@@ -396,27 +383,17 @@ export const apiKeyRest: Readonly<{
   .handle(async ({ app, input, scope }, caller) => {
     const isAdmin = await callerIsAdmin({ app, caller, organizationId: scope.id });
 
-    try {
-      await app.update({
-        id: input.apiKeyId,
-        callerUserId: caller.userId,
-        callerIsAdmin: isAdmin,
-        organizationId: scope.id,
-        name: input.name,
-        description: input.description,
-        permissionMode: input.permissionMode,
-        permissions: input.permissions,
-        bindings: input.bindings,
-      });
-    } catch (error) {
-      // Editing somebody else's key answers exactly as fetching it does: the id
-      // names nothing this caller can reach. A 403 here would confirm it names
-      // a real key.
-      if (error instanceof ApiKeyNotOwnedError) {
-        throw new ApiKeyNotFoundError(input.apiKeyId, { reasons: [error] });
-      }
-      throw error;
-    }
+    await app.updateAsCaller({
+      id: input.apiKeyId,
+      callerUserId: caller.userId,
+      callerIsAdmin: isAdmin,
+      organizationId: scope.id,
+      name: input.name,
+      description: input.description,
+      permissionMode: input.permissionMode,
+      permissions: input.permissions,
+      bindings: input.bindings,
+    });
 
     // Read back through the same path GET serves, so the two can never describe
     // the key differently. The route already demanded organization:manage, so

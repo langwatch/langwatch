@@ -4,10 +4,10 @@
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import type { HandleEventResult } from "@langwatch/enterprise-billing-contract";
 import type Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { HandleEventResult } from "../../services/billing-stripe-webhook.service.ts";
 import {
   billingStripeWebhookRest,
   type BillingStripeWebhookApi,

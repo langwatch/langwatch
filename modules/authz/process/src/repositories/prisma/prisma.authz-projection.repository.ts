@@ -3,11 +3,11 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate } from "@langwatch/time";
 
+import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import {
   type GrantProjectionWrite,
-  GrantProjectionWriteStore,
-} from "../../eventing/authz-grant.projection.ts";
-import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration.ts";
+  AuthzGrantProjectionRepository,
+} from "../authz-grant-projection.repository.ts";
 import { AuthzGrantMapper } from "./prisma.authz-grant.mapper.ts";
 
 const logger = createLogger("langwatch:authz:projection-compat");
@@ -88,7 +88,7 @@ export type AuthzProjectionDatabase = Pick<
   "grant" | "role" | "roleBinding" | "customRole" | "shareLink" | "$transaction" | "$executeRaw"
 >;
 
-export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
+export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionRepository {
   static create(database: AuthzProjectionDatabase): PrismaAuthzProjectionRepository {
     return new PrismaAuthzProjectionRepository(database as unknown as ProjectionDatabase);
   }

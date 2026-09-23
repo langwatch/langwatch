@@ -4,8 +4,12 @@
  * @see specs/auth/signup-does-not-strand-an-account.feature
  */
 import { bindTrpcFact, callerAddressFact, createTrpcRuntime } from "@langwatch/api/trpc";
-import { type FrontDoorRateLimitedError, type AuthApi } from "@langwatch/auth-contract";
-import type { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
+import {
+  type FrontDoorRateLimitedError,
+  type AuthApi,
+  NoAddressToConfirmError,
+} from "@langwatch/auth-contract";
+import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +20,8 @@ const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
 const route = vi.fn<AuthApi["route"]>();
 const addressIsRegistered = vi.fn<AuthApi["addressIsRegistered"]>();
 const requestSignUpVerification = vi.fn<AuthApi["requestSignUpVerification"]>();
+const requestNewAccountVerification = vi.fn<AuthApi["requestNewAccountVerification"]>();
+const sendMyAddressConfirmation = vi.fn<AuthApi["sendMyAddressConfirmation"]>();
 const completeSignUpVerification = vi.fn<AuthApi["completeSignUpVerification"]>();
 const readInviteLanding = vi.fn<AuthApi["readInviteLanding"]>();
 const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
@@ -31,6 +37,8 @@ const door: AuthApi = {
   route,
   addressIsRegistered,
   requestSignUpVerification,
+  requestNewAccountVerification,
+  sendMyAddressConfirmation,
   completeSignUpVerification,
   readInviteLanding,
   requestFreshInvite,
@@ -174,7 +182,7 @@ describe("the signed-out front door", () => {
 
   describe("when a sign-up address already has an account", () => {
     it("says so rather than mailing a link, so nobody is stranded half-created", async () => {
-      addressIsRegistered.mockResolvedValue(true);
+      requestNewAccountVerification.mockRejectedValueOnce(new EmailAlreadyRegisteredError());
 
       const refusal = await visitor
         .requestSignUpVerification({ email: "ana@acme.com" })
@@ -183,16 +191,15 @@ describe("the signed-out front door", () => {
       expect((refusal as { cause?: EmailAlreadyRegisteredError }).cause?.code).toBe(
         "email_already_registered",
       );
-      expect(requestSignUpVerification).not.toHaveBeenCalled();
     });
 
-    it("mails the link for an address that has none", async () => {
-      addressIsRegistered.mockResolvedValue(false);
+    it("asks for a new account's link for the address the visitor typed", async () => {
+      requestNewAccountVerification.mockResolvedValue(undefined);
 
       await expect(visitor.requestSignUpVerification({ email: "ana@acme.com" })).resolves.toEqual({
         sent: true,
       });
-      expect(requestSignUpVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
+      expect(requestNewAccountVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
     });
   });
 
@@ -222,27 +229,25 @@ describe("the signed-out front door", () => {
   });
 
   describe("when a signed-in person asks for their own confirmation link", () => {
-    const signedIn = () =>
-      router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+    it("hands over the caller and the address the session named, never one the caller typed", async () => {
+      const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
 
-    it("mails the address the session named, keyed on the caller rather than their address", async () => {
-      await expect(signedIn().sendMyAddressConfirmation({})).resolves.toEqual({ sent: true });
+      await expect(signedIn.sendMyAddressConfirmation({})).resolves.toEqual({ sent: true });
 
-      expect(isWithinBudget).toHaveBeenCalledWith({
-        key: "frontDoor.sendMyAddressConfirmation:user_ana",
-        windowSeconds: 3600,
-        max: 10,
+      expect(sendMyAddressConfirmation).toHaveBeenCalledWith({
+        actorId: "user_ana",
+        email: "ana@acme.com",
       });
-      expect(requestSignUpVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
     });
 
-    it("refuses an account the process resolved no address for", async () => {
+    it("hands over an account the process resolved no address for as having none", async () => {
       const caller = router.createCaller({ actor: { id: "user_ana" }, email: null });
+      sendMyAddressConfirmation.mockRejectedValueOnce(new NoAddressToConfirmError());
 
       await expect(caller.sendMyAddressConfirmation({})).rejects.toThrow(
         "This account has no email address to confirm.",
       );
-      expect(requestSignUpVerification).not.toHaveBeenCalled();
+      expect(sendMyAddressConfirmation).toHaveBeenCalledWith({ actorId: "user_ana", email: null });
     });
   });
 

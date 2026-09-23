@@ -2,6 +2,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 import {
+  SignedInAddressRequiredError,
   InviteAlreadyAcceptedError,
   InviteExpiredError,
   InviteNotFoundError,
@@ -297,23 +298,6 @@ export class OrganizationInvitationDoorService {
         },
       });
     }
-  }
-}
-
-/**
- * The session carries no address, so there is nothing for an invitation to be
- * matched against. Named rather than degraded: signing in again with the
- * invited account is the one thing that fixes it.
- */
-class SignedInAddressRequiredError extends HandledError {
-  declare readonly code: "unauthorized";
-
-  constructor() {
-    super("unauthorized", "You must be signed in to accept the invite", {
-      httpStatus: 401,
-      fault: "customer",
-    });
-    this.name = "SignedInAddressRequiredError";
   }
 }
 

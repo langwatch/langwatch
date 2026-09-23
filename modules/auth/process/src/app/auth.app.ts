@@ -10,6 +10,8 @@ import {
   authServerConfig,
   AuthUnavailableError,
   AuthValidateRateLimitedError,
+  FrontDoorRateLimitedError,
+  NoAddressToConfirmError,
   type AuthApi as AuthApiContract,
   type AuthServerConfig,
   type BrowserSession,
@@ -621,6 +623,30 @@ export class AuthApp implements AuthApiContract {
 
   async requestSignUpVerification(input: Readonly<{ email: string }>): Promise<void> {
     return this.requireSignUp().requestVerification(input);
+  }
+
+  async requestNewAccountVerification(input: Readonly<{ email: string }>): Promise<void> {
+    return this.requireSignUp().requestNewAccountVerification(input);
+  }
+
+  /** Metered on the caller rather than the address, like the token check's own probe. */
+  async sendMyAddressConfirmation(
+    input: Readonly<{ actorId: string; email: string | null }>,
+  ): Promise<void> {
+    if (!input.email) throw new NoAddressToConfirmError();
+
+    const budget = await this.isWithinBudget({
+      key: `frontDoor.sendMyAddressConfirmation:${input.actorId}`,
+      windowSeconds: 60 * 60,
+      max: 10,
+    });
+    if (!budget.allowed) {
+      throw new FrontDoorRateLimitedError("Too many attempts. Please try again later.", {
+        retryAfterSeconds: budget.retryAfterSeconds,
+      });
+    }
+
+    await this.requestSignUpVerification({ email: input.email });
   }
 
   async completeSignUpVerification(
