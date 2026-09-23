@@ -166,6 +166,13 @@ images:
 # Core settings for the main LangWatch application service
 ## @section LangWatch app
 app:
+  ## @param app.migrations.preRoll [default: true] Apply this release's migrations in a
+  ## pre-upgrade Job on the new image, before any Deployment rolls (ADR-155). Fail-closed.
+  ## Off means the containers migrate on boot, as before.
+  ## @param app.migrations.preRollTimeoutSeconds [default: 2100] activeDeadlineSeconds for that Job.
+  migrations:
+    preRoll: true
+    preRollTimeoutSeconds: 2100
   # Telemetry identity for the app pods. Becomes the OTel resource
   # `service.name` and the `service` field on stdout log lines, which log
   # shipping promotes to the Loki `service_name` label.

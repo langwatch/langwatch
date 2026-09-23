@@ -205,6 +205,7 @@ The non-negotiables, all lint-enforced:
 | Any process/module/transport/worker/backend-test work | `backend` |
 | Any screen, drawer, browser half, kit, component test | `frontend` |
 | Which component, theming, UI pattern docs | `design-system` (and `chakra-ui-*` for raw Chakra v3 work) |
+| Any migration: schema.prisma, a goose file, a projection table | `postgres-migration` / `clickhouse-migration` |
 | Citing or deciding any shape | `architecture-guide` → `dev/docs/ARCHITECTURE.md` |
 | A lint message that is wrong, or a new house rule | `lint-rule` |
 | Transactional email | `mail-template` |
@@ -479,6 +480,13 @@ as handled.
 
 Read `dev/docs/best_practices/clickhouse-queries.md` before writing or
 modifying any ClickHouse query.
+
+Before writing or changing any migration read the `postgres-migration` or
+`clickhouse-migration` skill: a migration is applied to the live database
+before the new image rolls, so it must leave the previous image working and
+survive a rollback (ADR-155). Adding a column means nullable or `DEFAULT`;
+removing one waits a full release behind the code that stopped using it and
+carries `-- contract: retired in <release>`; renaming is never in place.
 
 | Rule | Why / how |
 |---|---|

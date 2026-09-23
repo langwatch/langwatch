@@ -220,6 +220,9 @@ backend for you:
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032
         boundary (see the migration Job template header).
+      • GitOps: the pre-roll migration Job (app.migrations.preRoll) is a
+        pre-upgrade hook, which ArgoCD/Flux map to PreSync and run on the
+        first sync too; both runners are idempotent, so it is a no-op there.
 
   • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
     Then configure these on the bucket and deployment, or uploads and
