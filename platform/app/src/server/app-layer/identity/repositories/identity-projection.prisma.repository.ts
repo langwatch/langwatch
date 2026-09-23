@@ -111,12 +111,13 @@ export class PrismaIdentityProjectionRepository
     const userId = context.aggregateId;
     const { state } = projection;
 
+    const parked = new Set<string>();
     for (const fact of Object.values(state.identifiers)) {
-      await this.writeIdentifier(fact);
+      if (await this.writeIdentifier(fact)) parked.add(fact.identifierId);
     }
 
     await this.releaseAddressLocks({ userId, state });
-    await this.projectAccounts({ userId, state });
+    await this.projectAccounts({ userId, state, parked });
 
     // Cursor last: it is the commit marker. A crash before this line leaves
     // rows a re-applied event overwrites idempotently; a crash after it is
@@ -169,12 +170,16 @@ export class PrismaIdentityProjectionRepository
    *
    * A provider SUBJECT is arbitrated, by the partial unique index on
    * `(providerId, providerAccountId)` over the live states (migration
-   * 20260824120004). That collision should be unreachable — every subject
-   * comes from an `Account` row, and `Account` is unique on the same pair —
-   * so reaching it means an invariant broke upstream, and the fold's job is
-   * to say so without dying.
+   * 20260824120004). A subject read from an `Account` row cannot collide,
+   * because `Account` is unique on the same pair. A DERIVED subject has no
+   * row behind it: the backfill unfolds a broker subject such as
+   * `github|730866` into the native one, and another user may already hold
+   * that native subject by signing in with it directly. The fold's job is to
+   * say so without dying.
+   *
+   * True when the identifier was parked rather than written.
    */
-  private async writeIdentifier(fact: IdentifierFact): Promise<void> {
+  private async writeIdentifier(fact: IdentifierFact): Promise<boolean> {
     const { id, ...columns } = factToRow(fact);
     try {
       await this.prisma.identifier.upsert({
@@ -182,8 +187,10 @@ export class PrismaIdentityProjectionRepository
         create: { id, ...columns },
         update: columns,
       });
+      return false;
     } catch (error) {
       if (!(await this.parkedOnSubjectCollision({ fact, error }))) throw error;
+      return true;
     }
   }
 
@@ -213,10 +220,11 @@ export class PrismaIdentityProjectionRepository
    *     pass ever revisits them. A latched user linking a new enterprise
    *     account whose subject collides therefore ends up with the identifier
    *     permanently absent from the projection, the cursor committed, and
-   *     nothing scheduled that would notice. Their `Account` bridge row is
-   *     still written — `projectAccounts` reads the fold STATE, not the rows
-   *     this method wrote — so what actually covers them is the legacy
-   *     fallback ADR-116 exists to retire. This WARN is the only signal.
+   *     nothing scheduled that would notice. No `Account` row is projected
+   *     for the parked identifier either: the subject's row belongs to the
+   *     incumbent, and writing a second one collides on `Account`'s own
+   *     unique pair on every retry, so the user's queue never moves again.
+   *     This WARN is the only signal.
    *
    * (An unlatched user cannot reach here at all: their ceremonies state no
    * facts, so nothing of theirs is ever folded.)
@@ -305,15 +313,22 @@ export class PrismaIdentityProjectionRepository
    * re-asserts values that already agree — it costs a write and changes
    * nothing. It earns its place on replay, and when a detach has to remove
    * a row the stock adapter did not.
+   *
+   * A parked identifier projects to no row: its subject's row is the
+   * incumbent's (see `parkedOnSubjectCollision`).
    */
   private async projectAccounts({
     userId,
     state,
+    parked,
   }: {
     userId: string;
     state: IdentityFoldState;
+    parked: ReadonlySet<string>;
   }): Promise<void> {
-    const linked = linkedIdentifiers(state);
+    const linked = linkedIdentifiers(state).filter(
+      (fact) => !parked.has(fact.identifierId),
+    );
     if (linked.length === 0) return;
     await this.reportWhenUserIsMissing({ userId, linked });
     await this.removeTombstonedAccounts(linked);

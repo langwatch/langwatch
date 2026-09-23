@@ -455,6 +455,20 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the Account row that identifier projected to is gone
     And no row is created for a tombstone
 
+  # A backfill can derive a native subject from a broker subject after another
+  # user has already signed in natively with it. The fold parks that
+  # identifier. It must also leave the subject's Account row alone: projecting
+  # one collides with the holder's row on every attempt, and the user's queue
+  # never moves again.
+  @integration
+  Scenario: An identifier parked on another user's subject projects to no Account row
+    Given "alex" holds a live identifier and Account row for a provider subject
+    And "sam" states a live identifier for the same subject
+    When the identity fold stores "sam"'s projection
+    Then the store completes and "sam"'s cursor moves
+    And "alex"'s Account row is unchanged
+    And no Account row is created for "sam"'s identifier
+
   @integration
   Scenario: The fold reports a user it cannot find, and projects anyway
     Given the log carries "sam"'s linkage but no User row carries "sam"
