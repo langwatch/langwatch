@@ -1,4 +1,8 @@
-import type { EventSubscriberContext, StateProjectionStore } from "@langwatch/eventing";
+import {
+  createTenantId,
+  type EventSubscriberContext,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 /**
  * Freshness signal for a permission card; real projection + subscriber catch
  * the bug where a skipped card event left buttons stuck after the turn ended.
@@ -29,11 +33,11 @@ const noopStore: StateProjectionStore<LangyConversationStateData> = {
   tryLoad: async () => null,
 };
 
-const waitEnded = {
+const waitEnded: LangyConversationProcessingEvent = {
   id: "evt_wait_ended",
   aggregateId: CONVERSATION,
   aggregateType: "langy_conversation",
-  tenantId: PROJECT,
+  tenantId: createTenantId(PROJECT),
   createdAt: 1_752_600_000_000,
   occurredAt: 1_752_600_000_000,
   type: LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED,
@@ -49,7 +53,7 @@ const waitEnded = {
     decision: "allow_once",
     source: "terminal",
   },
-} as unknown as LangyConversationProcessingEvent;
+};
 
 /**
  * Where the projection's cursor stands after one event, the way the pipeline

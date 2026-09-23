@@ -30,29 +30,32 @@ import type { LangyRepositories } from "../repositories/langy-repositories.regis
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
 import { LangyService } from "../services/langy.service.ts";
 
-const COMMAND_NAMES = [
-  "createConversation",
-  "forkConversation",
-  "recordMessage",
-  "importMessage",
-  "acceptAgentTurn",
-  "initiateToolCall",
-  "succeedToolCall",
-  "failToolCall",
-  "updatePlan",
-  "failAgentResponse",
-  "recordAgentResponse",
-  "archiveConversation",
-  "updateConversationMetadata",
-  "recordTurnHandoff",
-  "consumeTurnHandoff",
-  "generateConversationTitle",
-] as const;
-
 function commands(): LangyConversationCommands {
-  return Object.fromEntries(
-    COMMAND_NAMES.map((name) => [name, vi.fn().mockResolvedValue(undefined)]),
-  ) as unknown as LangyConversationCommands;
+  const sent = async () => undefined;
+  return {
+    createConversation: vi.fn(sent),
+    forkConversation: vi.fn(sent),
+    recordMessage: vi.fn(sent),
+    importMessage: vi.fn(sent),
+    acceptAgentTurn: vi.fn(sent),
+    initiateToolCall: vi.fn(sent),
+    succeedToolCall: vi.fn(sent),
+    failToolCall: vi.fn(sent),
+    updatePlan: vi.fn(sent),
+    failAgentResponse: vi.fn(sent),
+    recordAgentResponse: vi.fn(sent),
+    archiveConversation: vi.fn(sent),
+    updateConversationMetadata: vi.fn(sent),
+    recordTurnHandoff: vi.fn(sent),
+    consumeTurnHandoff: vi.fn(sent),
+    generateConversationTitle: vi.fn(sent),
+    requestLocalControl: vi.fn(sent),
+    connectLocalWorkspace: vi.fn(sent),
+    disconnectLocalWorkspace: vi.fn(sent),
+    changeLocalPolicy: vi.fn(sent),
+    startUserWait: vi.fn(sent),
+    endUserWait: vi.fn(sent),
+  };
 }
 
 function composition(turns: LangyTurnTechnicalMembers) {

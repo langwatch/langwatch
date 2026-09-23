@@ -1,5 +1,8 @@
-import type { EventSubscriberContext } from "@langwatch/eventing";
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
+import { createTenantId, type EventSubscriberContext } from "@langwatch/eventing";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_EVENT_VERSIONS,
+} from "@langwatch/langy-contract";
 import { createLangyTurnAdmissionLifecycleSubscriber } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,18 +13,20 @@ const context: EventSubscriberContext = {
   aggregateId: "ignored-conversation",
 };
 
-function event(type: string, data: Record<string, unknown>): LangyConversationProcessingEvent {
+type EventBody<E = LangyConversationProcessingEvent> = E extends LangyConversationProcessingEvent
+  ? Pick<E, "type" | "version" | "data">
+  : never;
+
+function event(body: EventBody): LangyConversationProcessingEvent {
   return {
-    id: `event-${type}`,
+    id: `event-${body.type}`,
     aggregateId: "conversation-1",
     aggregateType: "langy_conversation",
-    tenantId: "project-1",
+    tenantId: createTenantId("project-1"),
     createdAt: 1_000,
     occurredAt: 1_000,
-    type,
-    version: "1",
-    data: { conversationId: "conversation-1", ...data },
-  } as unknown as LangyConversationProcessingEvent;
+    ...body,
+  };
 }
 
 function makeDeps() {
@@ -39,9 +44,10 @@ describe("Langy turn admission lifecycle subscriber", () => {
     const subscriber = createLangyTurnAdmissionLifecycleSubscriber(deps);
 
     await subscriber.handle(
-      event(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED, {
-        turnId: "turn-1",
-        questionParts: [],
+      event({
+        type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+        data: { conversationId: "conversation-1", turnId: "turn-1", questionParts: [] },
       }),
       context,
     );
@@ -59,9 +65,17 @@ describe("Langy turn admission lifecycle subscriber", () => {
     const subscriber = createLangyTurnAdmissionLifecycleSubscriber(deps);
 
     await subscriber.handle(
-      event(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED, {
-        turnId: "turn-old",
-        parts: [],
+      event({
+        type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+        data: {
+          conversationId: "conversation-1",
+          turnId: "turn-old",
+          messageId: "message-1",
+          role: "assistant",
+          parts: [],
+          outcome: "completed",
+        },
       }),
       context,
     );
@@ -77,7 +91,14 @@ describe("Langy turn admission lifecycle subscriber", () => {
     const deps = makeDeps();
     const subscriber = createLangyTurnAdmissionLifecycleSubscriber(deps);
 
-    await subscriber.handle(event(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, {}), context);
+    await subscriber.handle(
+      event({
+        type: LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED,
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED,
+        data: { conversationId: "conversation-1" },
+      }),
+      context,
+    );
 
     expect(deps.admissions.release).toHaveBeenCalledWith({
       projectId: "project-1",
