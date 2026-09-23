@@ -275,8 +275,9 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    `*-browser`, or another kit.
 3. **A kit fetches nothing.** No project-scoped queries, no `browser-trpc`.
    Presentational components, pure hooks, shared stores; consumers wire the
-   data (the model-selector ruling: the kit takes `options/value/onChange`,
-   each consumer runs its own query).
+   data. A browser derives a client only from its own contract, so a consumer
+   that needs another module's data renders what that owner lends (rule 7) —
+   the model selector is lent by model-provider (Alex, 2026-09-23).
 4. **A kit is a package, not a subpath** — a subpath is invisible to the
    dependency graph, so it cannot break a cycle or be budgeted. A package
    makes every cross-module browser edge a visible, lintable manifest line.
