@@ -116,9 +116,11 @@ describe("analytics timeseries metric validation", () => {
 
       /** @scenario "An unknown metric is refused as a validation error naming its series" */
       it("refuses a pipeline series on the same enumeration", () => {
-        expect(handledCodeOf(() => translateMetric("not_a_real_metric", "sum", 0))).toBe(
-          "validation_error",
-        );
+        expect(
+          handledCodeOf(() =>
+            translateMetric({ metric: "not_a_real_metric", aggregation: "sum", index: 0 }),
+          ),
+        ).toBe("validation_error");
       });
     });
   });
@@ -165,7 +167,13 @@ describe("analytics timeseries metric validation", () => {
     describe("when the alias is built", () => {
       /** @scenario "Every part of a metric alias is reduced to letters, digits and underscores" */
       it("reduces every part to letters, digits and underscores", () => {
-        const alias = buildMetricAlias(0, INJECTION, "sum", "key-with-dashes'", "sub key)");
+        const alias = buildMetricAlias({
+          index: 0,
+          metric: INJECTION,
+          aggregation: "sum",
+          key: "key-with-dashes'",
+          subkey: "sub key)",
+        });
 
         expect(alias).toMatch(/^[a-zA-Z0-9_]+$/);
         for (const metacharacter of ["(", ")", ",", "'", '"', "-", " ", "."]) {

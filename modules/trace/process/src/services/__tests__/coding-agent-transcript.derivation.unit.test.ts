@@ -10,6 +10,21 @@ import type { SpanDetail } from "@langwatch/trace-contract";
  */
 import { describe, expect, it } from "vitest";
 
+function spanDetail(fields: Partial<SpanDetail>): SpanDetail {
+  return {
+    spanId: "span",
+    parentSpanId: null,
+    name: "span",
+    type: "span",
+    startTimeMs: 0,
+    endTimeMs: 0,
+    durationMs: 0,
+    status: "ok",
+    events: [],
+    ...fields,
+  };
+}
+
 function toolSpan({
   name,
   atMs,
@@ -23,7 +38,7 @@ function toolSpan({
   failed?: boolean;
   spanId?: string;
 }): SpanDetail {
-  return {
+  return spanDetail({
     spanId,
     name: "claude_code.tool",
     startTimeMs: atMs,
@@ -32,11 +47,11 @@ function toolSpan({
     params: { tool_name: name, ...(agentId ? { agent_id: agentId } : {}) },
     input: "{}",
     output: "ok",
-  } as unknown as SpanDetail;
+  });
 }
 
 function modelSpan({ atMs, cost = 0.5 }: { atMs: number; cost?: number }): SpanDetail {
-  return {
+  return spanDetail({
     spanId: `llm-${atMs}`,
     name: "claude_code.llm_request",
     startTimeMs: atMs,
@@ -44,7 +59,7 @@ function modelSpan({ atMs, cost = 0.5 }: { atMs: number; cost?: number }): SpanD
     status: "ok",
     metrics: { promptTokens: 100, completionTokens: 20, cost },
     params: {},
-  } as unknown as SpanDetail;
+  });
 }
 
 function log(attributes: Record<string, unknown>, timestampMs: number): TranscriptLogRecord {
@@ -99,7 +114,7 @@ describe("buildCodingAgentTranscript", () => {
     });
 
     it("carries the cache split, not just the total", () => {
-      const span = {
+      const span = spanDetail({
         spanId: "llm-1",
         name: "claude_code.llm_request",
         startTimeMs: 1_000,
@@ -112,7 +127,7 @@ describe("buildCodingAgentTranscript", () => {
           cache_read_tokens: "14000000",
           cache_creation_tokens: "284000",
         },
-      } as unknown as SpanDetail;
+      });
 
       const transcript = buildCodingAgentTranscript({
         spans: [span],
@@ -242,14 +257,14 @@ describe("buildCodingAgentTranscript", () => {
     // message history at all — the reason this derivation orders by timestamp
     // rather than parsing a vendor's conversation format.
     it("reads its tools out of the span names", () => {
-      const span = {
+      const span = spanDetail({
         spanId: "s-1",
         name: "opencode.tool.bash",
         startTimeMs: 1_000,
         endTimeMs: 1_200,
         status: "ok",
         params: {},
-      } as unknown as SpanDetail;
+      });
 
       const transcript = buildCodingAgentTranscript({
         spans: [span],
@@ -313,14 +328,14 @@ describe("buildCodingAgentTranscript", () => {
     it("keeps the tool: the declaration is the evidence, not the span name", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "t1",
             name: "mcp.tools.call",
             startTimeMs: 1_000,
             endTimeMs: 1_200,
             status: "ok",
             params: { "tool.name": "search_docs" },
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -337,22 +352,22 @@ describe("buildCodingAgentTranscript", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
           toolSpan({ name: "Bash", atMs: 1_000 }),
-          {
+          spanDetail({
             spanId: "exec",
             name: "claude_code.tool.execution",
             startTimeMs: 1_010,
             endTimeMs: 1_090,
             status: "ok",
             params: {},
-          } as unknown as SpanDetail,
-          {
+          }),
+          spanDetail({
             spanId: "blocked",
             name: "claude_code.tool.blocked_on_user",
             startTimeMs: 1_001,
             endTimeMs: 1_005,
             status: "ok",
             params: {},
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -397,11 +412,11 @@ describe("buildCodingAgentTranscript", () => {
     it("returns an empty transcript rather than guessing at one", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "s",
             name: "openai.chat",
             startTimeMs: 1,
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -431,7 +446,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
     ]);
 
     const spans = [
-      {
+      spanDetail({
         spanId: "llm-1",
         name: "llm_call",
         startTimeMs: 1_000,
@@ -443,7 +458,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
           type: "chat_messages",
           value: [{ role: "assistant", content: "pong" }],
         }),
-      } as unknown as SpanDetail,
+      }),
     ];
     const logs = [
       log(
@@ -517,7 +532,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
       // The log read is capped, so a long session can have log replies for
       // some turns and not others. Suppression is per call: a turn whose
       // api_response never arrived must keep its span-derived text.
-      const laterTurnSpan = {
+      const laterTurnSpan = spanDetail({
         spanId: "llm-2",
         name: "llm_call",
         startTimeMs: 60_000,
@@ -529,7 +544,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
           type: "chat_messages",
           value: [{ role: "assistant", content: "second answer" }],
         }),
-      } as unknown as SpanDetail;
+      });
 
       const transcript = buildCodingAgentTranscript({
         spans: [...spans, laterTurnSpan],
@@ -545,7 +560,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
     it("derives a model call with the turn's token usage", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "turn-1",
             name: "session_task.turn",
             startTimeMs: 1_000,
@@ -556,7 +571,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
               "codex.turn.token_usage.non_cached_input_tokens": "2913",
               "gen_ai.usage.cache_read.input_tokens": "9984",
             },
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -575,7 +590,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
     it("counts ai.streamText once and takes the reply from the span output", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "st-1",
             name: "ai.streamText",
             startTimeMs: 1_000,
@@ -584,8 +599,8 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
             metrics: { promptTokens: 2_300, completionTokens: 12 },
             params: { "gen_ai.request.model": "xiaomi/mimo-v2.5" },
             output: JSON.stringify({ type: "text", value: "pong" }),
-          } as unknown as SpanDetail,
-          {
+          }),
+          spanDetail({
             spanId: "st-1-inner",
             name: "ai.streamText.doStream",
             startTimeMs: 1_010,
@@ -593,7 +608,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
             status: "ok",
             metrics: { promptTokens: 2_300, completionTokens: 12 },
             params: {},
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -609,7 +624,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
     it("recognizes the model-named chat span as a model call", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "chat-1",
             name: "chat gpt-5-mini",
             startTimeMs: 1_000,
@@ -617,7 +632,7 @@ describe("buildCodingAgentTranscript for non-claude agents", () => {
             status: "ok",
             metrics: { promptTokens: 900, completionTokens: 5 },
             params: { "gen_ai.request.model": "gpt-5-mini" },
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -719,7 +734,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
     it("renders the call once, on the span, filled with the log's content", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "span-exec-1",
             name: "exec_command",
             startTimeMs: 2_000,
@@ -728,7 +743,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
             params: { tool_name: "exec_command", call_id: "exec-1" },
             input: null,
             output: null,
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [
           codexToolResultLog({
@@ -756,7 +771,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
     it("derives one model call per response span with its token counts", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "hr-1",
             name: "handle_responses",
             startTimeMs: 1_000,
@@ -768,15 +783,15 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
               "gen_ai.usage.cache_read.input_tokens": "12032",
               "gen_ai.usage.cache_write.input_tokens": "256",
             },
-          } as unknown as SpanDetail,
-          {
+          }),
+          spanDetail({
             spanId: "hr-idle",
             name: "handle_responses",
             startTimeMs: 2_000,
             endTimeMs: 2_100,
             status: "ok",
             params: { from: "output_item_done" },
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -793,15 +808,15 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
     it("does NOT double-count response spans when the turn rollup exists", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             spanId: "turn-1",
             name: "session_task.turn",
             startTimeMs: 900,
             endTimeMs: 2_600,
             status: "ok",
             params: { "codex.turn.token_usage.total_tokens": "12902" },
-          } as unknown as SpanDetail,
-          {
+          }),
+          spanDetail({
             spanId: "hr-1",
             name: "handle_responses",
             startTimeMs: 1_000,
@@ -811,7 +826,7 @@ describe("buildCodingAgentTranscript for codex 0.146 sessions", () => {
               "gen_ai.usage.input_tokens": "13005",
               "gen_ai.usage.output_tokens": "10",
             },
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [],
       });
@@ -834,15 +849,15 @@ describe("buildCodingAgentTranscript session system context", () => {
     it("pins one collapsed system context entry above the first prompt", () => {
       const transcript = buildCodingAgentTranscript({
         spans: [
-          {
+          spanDetail({
             ...modelSpan({ atMs: 2_000 }),
             input: chatInput,
-          } as unknown as SpanDetail,
-          {
+          }),
+          spanDetail({
             ...modelSpan({ atMs: 5_000 }),
             spanId: "llm-5000",
             input: chatInput,
-          } as unknown as SpanDetail,
+          }),
         ],
         logs: [
           log(
@@ -887,7 +902,7 @@ describe("buildCodingAgentTranscript injected session context", () => {
         },
       ]);
       const transcript = buildCodingAgentTranscript({
-        spans: [{ ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail],
+        spans: [spanDetail({ ...modelSpan({ atMs: 2_000 }), input })],
         logs: [],
       });
 
@@ -914,7 +929,7 @@ describe("buildCodingAgentTranscript injected session context", () => {
         ],
       });
       const transcript = buildCodingAgentTranscript({
-        spans: [{ ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail],
+        spans: [spanDetail({ ...modelSpan({ atMs: 2_000 }), input })],
         logs: [],
       });
 
@@ -932,7 +947,7 @@ describe("buildCodingAgentTranscript injected session context", () => {
     it("emits no session context entry", () => {
       const input = JSON.stringify([{ role: "user", content: "just a question" }]);
       const transcript = buildCodingAgentTranscript({
-        spans: [{ ...modelSpan({ atMs: 2_000 }), input } as unknown as SpanDetail],
+        spans: [spanDetail({ ...modelSpan({ atMs: 2_000 }), input })],
         logs: [],
       });
       expect(transcript.entries.some((e) => e.kind === "system_prompt")).toBe(false);
@@ -956,7 +971,7 @@ function recoveredCodexTurn({
   output: string;
   spanId?: string;
 }): SpanDetail {
-  return {
+  return spanDetail({
     spanId,
     name: "codex.turn.response",
     startTimeMs: atMs,
@@ -965,11 +980,11 @@ function recoveredCodexTurn({
     params: { "gen_ai.request.model": "gpt-5-mini" },
     input: JSON.stringify({ type: "chat_messages", value: messages }),
     output,
-  } as unknown as SpanDetail;
+  });
 }
 
 function codexTokenSpan({ atMs }: { atMs: number }): SpanDetail {
-  return {
+  return spanDetail({
     spanId: `codex-turn-${atMs}`,
     name: "session_task.turn",
     startTimeMs: atMs,
@@ -977,7 +992,7 @@ function codexTokenSpan({ atMs }: { atMs: number }): SpanDetail {
     status: "ok",
     metrics: { promptTokens: 58000, completionTokens: 200, cost: 0.16 },
     params: {},
-  } as unknown as SpanDetail;
+  });
 }
 
 describe("given a codex trace whose conversation was recovered", () => {
@@ -1198,7 +1213,7 @@ describe("given a codex trace whose recovered conversation and tool spans descri
           ],
           output: "It printed papaya",
         }),
-        {
+        spanDetail({
           spanId: "span-exec-1",
           name: "exec_command",
           startTimeMs: 1_100,
@@ -1207,7 +1222,7 @@ describe("given a codex trace whose recovered conversation and tool spans descri
           params: { tool_name: "exec", call_id: callId },
           input: null,
           output: null,
-        } as unknown as SpanDetail,
+        }),
       ],
       logs: [
         log(

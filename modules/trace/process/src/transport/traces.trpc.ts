@@ -698,19 +698,19 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     });
 
     return rows.map((row) =>
-      gateTraceLogVisibility(
+      gateTraceLogVisibility({
         row,
         protections,
-        protections.visibilityCutoffMs ?? null,
-        {
+        visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
+        codingAgents: {
           logContentKeys: (eventName) =>
             app.codingAgentLogContentKeys(eventName).map((entry) => ({
               key: entry.key,
               category: entry.category,
             })),
         },
-        traceDerivedAttrPrefixes,
-      ),
+        derivedAttrPrefixes: traceDerivedAttrPrefixes,
+      }),
     );
   })
 

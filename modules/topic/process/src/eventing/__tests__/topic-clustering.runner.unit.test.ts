@@ -1,5 +1,5 @@
 import { nowInstant } from "@langwatch/time";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   clusterTopicsForProject,
@@ -117,13 +117,18 @@ describe("clusterTopicsForProject", () => {
     // present) must go through.
     const freshTopics = [{ id: "topic-1", parentId: null, createdAt: nowInstant() }];
 
-    it("skips a NEW run as recently clustered", async () => {
-      const mockClickHouseQuery = vi.fn();
-      const deps = fakeRunnerDeps({
+    let mockClickHouseQuery: ReturnType<typeof vi.fn>;
+    let deps: ReturnType<typeof fakeRunnerDeps>;
+
+    beforeEach(() => {
+      mockClickHouseQuery = vi.fn();
+      deps = fakeRunnerDeps({
         resolveClickHouseClient: vi.fn().mockResolvedValue({ query: mockClickHouseQuery }),
       });
       deps.repository.findTopicIndexRows.mockResolvedValue(freshTopics);
+    });
 
+    it("skips a NEW run as recently clustered", async () => {
       // Counts: topics exist but < 1200 assigned, so still batch mode.
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
@@ -136,12 +141,6 @@ describe("clusterTopicsForProject", () => {
     });
 
     it("lets a continuation page through instead of ending the walk", async () => {
-      const mockClickHouseQuery = vi.fn();
-      const deps = fakeRunnerDeps({
-        resolveClickHouseClient: vi.fn().mockResolvedValue({ query: mockClickHouseQuery }),
-      });
-      deps.repository.findTopicIndexRows.mockResolvedValue(freshTopics);
-
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
@@ -277,7 +276,13 @@ describe("fetchTracesFromClickHouse de-duplication", () => {
       }),
     };
 
-    const res = await fetchTracesFromClickHouse(mockCh, "proj-1", false, [], []);
+    const res = await fetchTracesFromClickHouse({
+      clickhouse: mockCh,
+      projectId: "proj-1",
+      isIncrementalProcessing: false,
+      topicIds: [],
+      subtopicIds: [],
+    });
 
     expect(res.returnedCount).toBe(2); // t-0 counted once + t-1
     expect(res.traces).toHaveLength(2);

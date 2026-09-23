@@ -59,13 +59,13 @@ export type SupportedClickHouseFilterDefinition = ClickHouseFilterDefinition & {
  * Each builder takes filter values and returns SQL + params for parameterized queries.
  * The paramId is used to create unique parameter names when multiple filters are combined.
  */
-export type FilterConditionBuilder = (
-  values: string[],
-  paramId: string,
-  key?: string,
-  subkey?: string,
-  options?: FilterConditionOptions,
-) => FilterConditionResult;
+export type FilterConditionBuilder = (input: {
+  values: string[];
+  paramId: string;
+  key?: string;
+  subkey?: string;
+  options?: FilterConditionOptions;
+}) => FilterConditionResult;
 
 /**
  * Cross-cutting options threaded to every condition builder.

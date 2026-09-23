@@ -17,7 +17,7 @@ export const topicProjectInputSchema = z
   })
   .strict();
 
-export const topicNamesInputSchema = topicProjectInputSchema.extend({
+export const topicNamesInputSchema = topicProjectInputSchema.safeExtend({
   ids: z.array(z.string()),
 });
 

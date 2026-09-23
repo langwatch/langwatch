@@ -27,12 +27,22 @@ class SilentLwqlKeyMapErrorSink extends LwqlKeyMapErrorSink {
 }
 
 export class LwqlKeyMapService {
-  private constructor(
-    private readonly repository: LwqlKeyMapRepository,
-    private readonly sourceDatabase: string,
-    private readonly connection: LangWatchQLConnection | null,
-    private readonly errors: LwqlKeyMapErrorSink,
-  ) {}
+  private readonly repository: LwqlKeyMapRepository;
+  private readonly sourceDatabase: string;
+  private readonly connection: LangWatchQLConnection | null;
+  private readonly errors: LwqlKeyMapErrorSink;
+
+  private constructor(deps: {
+    repository: LwqlKeyMapRepository;
+    sourceDatabase: string;
+    connection: LangWatchQLConnection | null;
+    errors: LwqlKeyMapErrorSink;
+  }) {
+    this.repository = deps.repository;
+    this.sourceDatabase = deps.sourceDatabase;
+    this.connection = deps.connection;
+    this.errors = deps.errors;
+  }
 
   /**
    * `sourceDatabase` is the ClickHouse database the approved views read,
@@ -46,12 +56,12 @@ export class LwqlKeyMapService {
     connection: LangWatchQLConnection | null;
     errors?: LwqlKeyMapErrorSink;
   }): LwqlKeyMapService {
-    return new LwqlKeyMapService(
-      options.repository,
-      options.sourceDatabase,
-      options.connection,
-      options.errors ?? new SilentLwqlKeyMapErrorSink(),
-    );
+    return new LwqlKeyMapService({
+      repository: options.repository,
+      sourceDatabase: options.sourceDatabase,
+      connection: options.connection,
+      errors: options.errors ?? new SilentLwqlKeyMapErrorSink(),
+    });
   }
 
   /**

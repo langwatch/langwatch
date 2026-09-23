@@ -77,12 +77,12 @@ export class StoredObjectUploadService {
 
   static assertByteFacts(value: StoredObjectRecord, byteLength: number): void {
     if (value.byteLength !== byteLength) {
-      throw new StoredObjectIntegrityConflictError(
-        value.tenantId,
-        value.id,
-        value.byteLength,
-        byteLength,
-      );
+      throw new StoredObjectIntegrityConflictError({
+        projectId: value.tenantId,
+        objectId: value.id,
+        expectedByteLength: value.byteLength,
+        actualByteLength: byteLength,
+      });
     }
   }
 

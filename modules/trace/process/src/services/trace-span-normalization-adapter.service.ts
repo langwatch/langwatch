@@ -30,7 +30,7 @@ export class TraceSpanNormalizationAdapter implements TraceSpanNormalization {
     span: OtlpSpan,
     resource: OtlpResource | null,
     instrumentationScope: OtlpInstrumentationScope | null,
-  ) {
+  ): NormalizedSpan {
     return this.service.normalizeSpanReceived(tenantId, span, resource, instrumentationScope);
   }
 

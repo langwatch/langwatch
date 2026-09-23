@@ -157,13 +157,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
 
     try {
       const client = await this.options.resolveClient(tenantId);
-      const record = this.toClickHouseRecord(
+      const record = this.toClickHouseRecord({
         data,
         tenantId,
         projectionId,
-        TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+        version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
         retentionDays,
-      );
+      });
 
       await client.insert({
         table: TABLE_NAME,
@@ -200,13 +200,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           traceId: data.traceId,
           occurredAtMs: data.occurredAt,
         });
-        return this.toClickHouseRecord(
+        return this.toClickHouseRecord({
           data,
-          tid,
+          tenantId: tid,
           projectionId,
-          TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-          rd,
-        );
+          version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
+          retentionDays: rd,
+        });
       });
 
       await client.insert({
@@ -534,13 +534,19 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     };
   }
 
-  private toClickHouseRecord(
-    data: TraceSummaryData,
-    tenantId: string,
-    projectionId: string,
-    version: string,
+  private toClickHouseRecord({
+    data,
+    tenantId,
+    projectionId,
+    version,
     retentionDays = this.options.defaultRetentionDays,
-  ): ClickHouseSummaryWriteRecord {
+  }: {
+    data: TraceSummaryData;
+    tenantId: string;
+    projectionId: string;
+    version: string;
+    retentionDays?: number;
+  }): ClickHouseSummaryWriteRecord {
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,

@@ -97,7 +97,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
     }
   });
 
-  describe("getAll", () => {
+  describe("when getAll runs", () => {
     /** @scenario First-visit projects auto-seed and show All Traces plus 4 seed views */
     it("seeds views on first access for a project", async () => {
       const result = await service().getAll({ projectId });
@@ -122,7 +122,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
     });
   });
 
-  describe("createView", () => {
+  describe("when createView runs", () => {
     /** @scenario create adds a new view at the end */
     it("adds a view whose order comes after every existing one", async () => {
       const before = await service().getAll({ projectId });
@@ -138,7 +138,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
     });
   });
 
-  describe("delete", () => {
+  describe("when delete runs", () => {
     /** @scenario delete removes a view */
     it("removes the view from the database", async () => {
       const created = await service().createView({
@@ -153,7 +153,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
     });
   });
 
-  describe("rename", () => {
+  describe("when rename runs", () => {
     /** @scenario rename updates the view name */
     it("updates the view name in the database", async () => {
       const created = await service().createView({
@@ -173,7 +173,7 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
     });
   });
 
-  describe("reorder", () => {
+  describe("when reorder runs", () => {
     /** @scenario reorder updates the order of all views */
     it("updates the order field for each view and getAll reflects it", async () => {
       const viewA = await service().createView({

@@ -408,48 +408,63 @@ function hiddenCategoryAttributeRules(
  * Recursively strip hidden chat turns from attribute values: drop messages by
  * role, strip tool_calls, apply to JSON-encoded conversations. Input not mutated.
  */
-function stripHiddenChatTurnsFromArray(
-  node: unknown[],
-  roles: ReadonlySet<string>,
-  stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacy,
-): unknown[] {
+function stripHiddenChatTurnsFromArray({
+  node,
+  roles,
+  stripToolCalls,
+  contentPrivacy,
+}: {
+  node: unknown[];
+  roles: ReadonlySet<string>;
+  stripToolCalls: boolean;
+  contentPrivacy: TraceContentPrivacy;
+}): unknown[] {
   const out: unknown[] = [];
   for (const item of node) {
     const role = item && typeof item === "object" ? (item as { role?: unknown }).role : undefined;
     if (typeof role === "string" && roles.has(role)) continue;
-    out.push(stripHiddenChatTurnsDeep(item, roles, stripToolCalls, contentPrivacy));
+    out.push(stripHiddenChatTurnsDeep({ node: item, roles, stripToolCalls, contentPrivacy }));
   }
 
   return out;
 }
 
-function stripHiddenChatTurnsFromObject(
-  node: object,
-  roles: ReadonlySet<string>,
-  stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacy,
-): Record<string, unknown> {
+function stripHiddenChatTurnsFromObject({
+  node,
+  roles,
+  stripToolCalls,
+  contentPrivacy,
+}: {
+  node: object;
+  roles: ReadonlySet<string>;
+  stripToolCalls: boolean;
+  contentPrivacy: TraceContentPrivacy;
+}): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(node)) {
     if (stripToolCalls && key === "tool_calls") continue;
-    out[key] = stripHiddenChatTurnsDeep(value, roles, stripToolCalls, contentPrivacy);
+    out[key] = stripHiddenChatTurnsDeep({ node: value, roles, stripToolCalls, contentPrivacy });
   }
 
   return out;
 }
 
-function stripHiddenChatTurnsDeep(
-  node: unknown,
-  roles: ReadonlySet<string>,
-  stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacy,
-): unknown {
+function stripHiddenChatTurnsDeep({
+  node,
+  roles,
+  stripToolCalls,
+  contentPrivacy,
+}: {
+  node: unknown;
+  roles: ReadonlySet<string>;
+  stripToolCalls: boolean;
+  contentPrivacy: TraceContentPrivacy;
+}): unknown {
   if (Array.isArray(node)) {
-    return stripHiddenChatTurnsFromArray(node, roles, stripToolCalls, contentPrivacy);
+    return stripHiddenChatTurnsFromArray({ node, roles, stripToolCalls, contentPrivacy });
   }
   if (node && typeof node === "object") {
-    return stripHiddenChatTurnsFromObject(node, roles, stripToolCalls, contentPrivacy);
+    return stripHiddenChatTurnsFromObject({ node, roles, stripToolCalls, contentPrivacy });
   }
   if (typeof node === "string") {
     const result = contentPrivacy.stripRolesFromChatArrayJson(node, roles, stripToolCalls);
@@ -499,12 +514,17 @@ function dropRedactedMediaRefs<T extends RedactableV2Dto>(
  * keys when those categories are hidden: replace the matched attribute values (header
  * attributes, span params, span-event attributes) with the placeholder naming who can see them.
  */
-function redactHiddenAttributes<T extends RedactableV2Dto>(
-  redacted: T & V2RedactionFlags,
-  dto: T,
-  protections: V2Protections,
-  contentPrivacy: TraceContentPrivacy,
-): void {
+function redactHiddenAttributes<T extends RedactableV2Dto>({
+  redacted,
+  dto,
+  protections,
+  contentPrivacy,
+}: {
+  redacted: T & V2RedactionFlags;
+  dto: T;
+  protections: V2Protections;
+  contentPrivacy: TraceContentPrivacy;
+}): void {
   const hidden = [
     ...(protections.hiddenAttributes ?? []),
     ...hiddenCategoryAttributeRules(protections, contentPrivacy),
@@ -534,29 +554,34 @@ function redactHiddenAttributes<T extends RedactableV2Dto>(
  * input/output-category keys, untouched by the attribute rules), so an expanded attribute could
  * reveal them. Strips those turns from params and attributes too.
  */
-function stripHiddenTurnsFromCarriers<T extends RedactableV2Dto>(
-  redacted: T & V2RedactionFlags,
-  roles: ReadonlySet<string>,
-  stripToolCalls: boolean,
-  contentPrivacy: TraceContentPrivacy,
-): void {
+function stripHiddenTurnsFromCarriers<T extends RedactableV2Dto>({
+  redacted,
+  roles,
+  stripToolCalls,
+  contentPrivacy,
+}: {
+  redacted: T & V2RedactionFlags;
+  roles: ReadonlySet<string>;
+  stripToolCalls: boolean;
+  contentPrivacy: TraceContentPrivacy;
+}): void {
   if (roles.size === 0 && !stripToolCalls) return;
 
   if (redacted.params) {
-    redacted.params = stripHiddenChatTurnsDeep(
-      redacted.params,
+    redacted.params = stripHiddenChatTurnsDeep({
+      node: redacted.params,
       roles,
       stripToolCalls,
       contentPrivacy,
-    ) as T["params"];
+    }) as T["params"];
   }
   if (redacted.attributes) {
-    redacted.attributes = stripHiddenChatTurnsDeep(
-      redacted.attributes,
+    redacted.attributes = stripHiddenChatTurnsDeep({
+      node: redacted.attributes,
       roles,
       stripToolCalls,
       contentPrivacy,
-    ) as T["attributes"];
+    }) as T["attributes"];
   }
 }
 
@@ -592,8 +617,8 @@ export function redactV2Content<T extends RedactableV2Dto>(
   };
 
   dropRedactedMediaRefs(redacted, { inputRedacted, outputRedacted });
-  redactHiddenAttributes(redacted, dto, protections, contentPrivacy);
-  stripHiddenTurnsFromCarriers(redacted, roles, stripToolCalls, contentPrivacy);
+  redactHiddenAttributes({ redacted, dto, protections, contentPrivacy });
+  stripHiddenTurnsFromCarriers({ redacted, roles, stripToolCalls, contentPrivacy });
 
   return redacted;
 }
@@ -825,12 +850,17 @@ function visibleToLabel(
  * Enforce captured-content visibility per event key (not per record): gating
  * matches span endpoints. Metadata (event name, cost) passes through untouched.
  */
-export function redactTraceLogContent(
-  row: TraceLogRecordDto,
-  protections: LogVisibility,
-  codingAgents: Pick<CodingAgentApi, "logContentKeys">,
-  derivedAttrPrefixes: TraceDerivedAttrPrefixes,
-): TraceLogRecordDto {
+export function redactTraceLogContent({
+  row,
+  protections,
+  codingAgents,
+  derivedAttrPrefixes,
+}: {
+  row: TraceLogRecordDto;
+  protections: LogVisibility;
+  codingAgents: Pick<CodingAgentApi, "logContentKeys">;
+  derivedAttrPrefixes: TraceDerivedAttrPrefixes;
+}): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
 
   const contentKeys = codingAgents.logContentKeys(eventName);
@@ -879,23 +909,31 @@ export function redactTraceLogContent(
  * Apply both visibility gates: plan teaser window and viewer permission. Pre-cutoff
  * records are gated as if no captured content were visible.
  */
-export function gateTraceLogVisibility(
-  row: TraceLogRecordDto,
+export function gateTraceLogVisibility({
+  row,
+  protections,
+  visibilityCutoffMs,
+  codingAgents,
+  derivedAttrPrefixes,
+}: {
+  row: TraceLogRecordDto;
   protections: {
     canSeeCapturedInput?: boolean | null;
     canSeeCapturedOutput?: boolean | null;
     capturedInputVisibleTo?: string | null;
     capturedOutputVisibleTo?: string | null;
-  },
-  visibilityCutoffMs: number | null,
-  codingAgents: Pick<CodingAgentApi, "logContentKeys">,
-  derivedAttrPrefixes: TraceDerivedAttrPrefixes,
-): TraceLogRecordDto {
+  };
+  visibilityCutoffMs: number | null;
+  codingAgents: Pick<CodingAgentApi, "logContentKeys">;
+  derivedAttrPrefixes: TraceDerivedAttrPrefixes;
+}): TraceLogRecordDto {
   const isBeforeCutoff = visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;
-  return redactTraceLogContent(
+  return redactTraceLogContent({
     row,
-    isBeforeCutoff ? { canSeeCapturedInput: false, canSeeCapturedOutput: false } : protections,
+    protections: isBeforeCutoff
+      ? { canSeeCapturedInput: false, canSeeCapturedOutput: false }
+      : protections,
     codingAgents,
     derivedAttrPrefixes,
-  );
+  });
 }

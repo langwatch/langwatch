@@ -146,12 +146,12 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
 
   async findTopDocuments(input: AnalyticsLegacyReadInput): Promise<AnalyticsTopDocumentsResult> {
     const client = await this.clientFor(input.projectId);
-    const built = buildTopDocumentsQuery(
-      input.projectId,
-      new Date(input.startDate),
-      new Date(input.endDate),
-      input.filters,
-    );
+    const built = buildTopDocumentsQuery({
+      projectId: input.projectId,
+      startDate: new Date(input.startDate),
+      endDate: new Date(input.endDate),
+      filters: input.filters,
+    });
     const parts = built.sql.split(";");
     const [topDocsSql, totalSql] = parts;
     const isTwoStatements =
@@ -209,12 +209,12 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
 
   async findFeedbackEvents(input: AnalyticsLegacyReadInput): Promise<AnalyticsFeedbacksResult> {
     const client = await this.clientFor(input.projectId);
-    const built = buildFeedbacksQuery(
-      input.projectId,
-      new Date(input.startDate),
-      new Date(input.endDate),
-      input.filters,
-    );
+    const built = buildFeedbacksQuery({
+      projectId: input.projectId,
+      startDate: new Date(input.startDate),
+      endDate: new Date(input.endDate),
+      filters: input.filters,
+    });
     try {
       const result = await client.query({
         query: built.sql,

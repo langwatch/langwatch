@@ -26,7 +26,7 @@ describe("given the committed Prisma manifest", () => {
     ).toEqual(freshParse());
   });
 
-  describe("its sanity floor", () => {
+  describe("given its sanity floor", () => {
     const modelByName = new Map(LWQL_PRISMA_MANIFEST.models.map((model) => [model.name, model]));
 
     it("carries at least 100 models", () => {

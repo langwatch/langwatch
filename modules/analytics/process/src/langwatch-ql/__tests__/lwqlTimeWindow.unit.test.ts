@@ -87,7 +87,9 @@ describe("given an instant to hand the database", () => {
     });
 
     it("refuses an invalid date rather than spelling it as text", () => {
-      expect(() => formatLangWatchQLDateTimeParameter(new Date("nonsense"))).toThrow();
+      expect(() => formatLangWatchQLDateTimeParameter(new Date("nonsense"))).toThrow(
+        /invalid date/,
+      );
     });
   });
 });

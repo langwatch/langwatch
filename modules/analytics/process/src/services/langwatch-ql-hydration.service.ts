@@ -39,12 +39,22 @@ export interface LangWatchQLStatementRunner {
 }
 
 export class LangWatchQLHydrationService {
-  private constructor(
-    private readonly reads: LangWatchQLHydrationReadService,
-    private readonly compute: LangWatchQLHydrationComputeService,
-    private readonly runner: LangWatchQLStatementRunner,
-    private readonly limits: LangWatchQLHydrationLimits,
-  ) {}
+  private readonly reads: LangWatchQLHydrationReadService;
+  private readonly compute: LangWatchQLHydrationComputeService;
+  private readonly runner: LangWatchQLStatementRunner;
+  private readonly limits: LangWatchQLHydrationLimits;
+
+  private constructor(deps: {
+    reads: LangWatchQLHydrationReadService;
+    compute: LangWatchQLHydrationComputeService;
+    runner: LangWatchQLStatementRunner;
+    limits: LangWatchQLHydrationLimits;
+  }) {
+    this.reads = deps.reads;
+    this.compute = deps.compute;
+    this.runner = deps.runner;
+    this.limits = deps.limits;
+  }
 
   static create({
     reads,
@@ -57,7 +67,7 @@ export class LangWatchQLHydrationService {
     runner: LangWatchQLStatementRunner;
     limits?: LangWatchQLHydrationLimits;
   }): LangWatchQLHydrationService {
-    return new LangWatchQLHydrationService(reads, compute, runner, limits);
+    return new LangWatchQLHydrationService({ reads, compute, runner, limits });
   }
 
   /**

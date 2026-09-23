@@ -62,12 +62,17 @@ const flushGeminiTurn = (turn: GeminiTurn, role: string, messages: unknown[]): v
   turn.toolCalls = [];
 };
 
-const foldGeminiPart = (
-  part: unknown,
-  turn: GeminiTurn,
-  role: string,
-  messages: unknown[],
-): void => {
+const foldGeminiPart = ({
+  part,
+  turn,
+  role,
+  messages,
+}: {
+  part: unknown;
+  turn: GeminiTurn;
+  role: string;
+  messages: unknown[];
+}): void => {
   if (!isRecord(part)) return;
 
   if (typeof part.text === "string") {
@@ -108,7 +113,7 @@ export const convertGeminiContent = ({
   const messages: unknown[] = [];
   const turn: GeminiTurn = { texts: [], toolCalls: [] };
   for (const part of parts) {
-    foldGeminiPart(part, turn, role, messages);
+    foldGeminiPart({ part, turn, role, messages });
   }
   flushGeminiTurn(turn, role, messages);
 

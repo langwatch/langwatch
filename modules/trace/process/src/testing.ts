@@ -2,6 +2,7 @@ import {
   TraceNotFoundError,
   type TraceByIdInput,
   type TraceDerivedEventsInput,
+  type TraceQueryClassification,
 } from "@langwatch/trace-contract";
 
 import { type TraceEventDerivation, type TraceQueryClassifier } from "./app/trace.members.ts";
@@ -34,7 +35,7 @@ export class EmptyTraceSummaryReaderRepository extends TraceSummaryReaderReposit
 }
 
 export class EmptyTraceQueryClassification implements TraceQueryClassifier {
-  classify() {
+  classify(): TraceQueryClassification {
     return { evaluations: false, events: false, spans: false };
   }
 }

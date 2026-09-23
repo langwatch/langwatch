@@ -8,12 +8,12 @@ import * as TraceLegacySummaryMappingService from "../../rules/trace-legacy-summ
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function mapTraceSummaryToTrace(summary: TraceSummaryData, spans: Span[], projectId: string) {
-  return TraceLegacySummaryMappingService.mapTraceSummaryToTrace(
+  return TraceLegacySummaryMappingService.mapTraceSummaryToTrace({
     summary,
     spans,
     projectId,
     traceCanonicalisation,
-  );
+  });
 }
 
 function makeSpan(overrides: Partial<Span> = {}): Span {

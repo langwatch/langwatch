@@ -121,7 +121,7 @@ export class EvaluationAnalyticsRollupMapProjection
     // Per-event parallelism — rollup rows are independent of each other
     // and of sibling evaluations on the same trace (the rollup is dim-keyed,
     // not eval-keyed).
-    groupKeyFn: (event: { id: string }) => `evalRollup:${event.id}`,
+    groupKeyFn: (event: { id: string }): string => `evalRollup:${event.id}`,
     // Eval terminal events are re-reported by design (deterministic ids,
     // SDK retries); without this, every duplicate append double-counts the
     // bucket. See the class doc.

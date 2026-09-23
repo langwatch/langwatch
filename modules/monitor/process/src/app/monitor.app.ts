@@ -37,6 +37,8 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
   type MonitorUsageCount,
+  type EnabledGuardrailMonitor,
+  type MonitorSummary,
 } from "@langwatch/monitor-contract";
 import { nowInstant } from "@langwatch/time";
 import { ZodError } from "zod";
@@ -345,19 +347,21 @@ export class MonitorApp implements MonitorApi {
     return this.#monitors.replicate(input);
   }
 
-  getEnabledOnMessageMonitors(projectId: string) {
+  getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> {
     return this.#catalogue.getEnabledOnMessageMonitors(projectId);
   }
 
-  listEnabledGuardrailMonitors(input: MonitorEnabledGuardrailInput) {
+  listEnabledGuardrailMonitors(
+    input: MonitorEnabledGuardrailInput,
+  ): Promise<EnabledGuardrailMonitor[]> {
     return this.#monitors.listEnabledGuardrailMonitors(input);
   }
 
-  getAllByIds(input: { monitorIds: string[]; projectId: string }) {
+  getAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
     return this.#monitors.getAllByIds(input);
   }
 
-  deleteForExperiment(input: { projectId: string; experimentId: string }) {
+  deleteForExperiment(input: { projectId: string; experimentId: string }): Promise<void> {
     return this.#monitors.deleteForExperiment(input);
   }
 

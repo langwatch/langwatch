@@ -244,7 +244,7 @@ export class EvaluationRunClickHouseWriteRepository {
       IsGuardrail: data.isGuardrail ? 1 : 0,
       Status: data.status,
       Score: data.score,
-      Passed: data.passed === null ? null : data.passed ? 1 : 0,
+      Passed: data.passed === null ? null : Number(data.passed),
       Label: data.label,
       Details: details.value,
       Inputs: inputs.value,

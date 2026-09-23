@@ -14,7 +14,7 @@ import {
   NormalizedStatusCode,
   type SpanReceivedEvent,
 } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
@@ -105,21 +105,27 @@ function makeChResolver(
  */
 describe("given an event_log row stored under tenantA with a known EventPayload", () => {
   describe("when getFromEventLog is called with matching (TenantId, AggregateType, AggregateId, EventId) and field", () => {
-    it("issues a CH SELECT with TenantId as the FIRST predicate and returns the correct field value", async () => {
+    let sqlCaptures: string[];
+    let blobStore: TraceBlobStoreService;
+
+    beforeEach(() => {
       const eventPayload = JSON.stringify({
         span: {
           attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
         },
       });
-      const { client, sqlCaptures } = makeMockChClient({
+      const mock = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
+      sqlCaptures = mock.sqlCaptures;
 
-      const blobStore = TraceBlobStoreService.create({
+      blobStore = TraceBlobStoreService.create({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        resolveClickHouseClient: makeChResolver(client) as never,
+        resolveClickHouseClient: makeChResolver(mock.client) as never,
       });
+    });
 
+    it("issues a CH SELECT with TenantId as the FIRST predicate and returns the correct field value", async () => {
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
         field: FIELD,
@@ -143,20 +149,6 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
     });
 
     it("SQL contains 'TenantId' as the first predicate (substring assertion)", async () => {
-      const eventPayload = JSON.stringify({
-        span: {
-          attributes: [{ key: FIELD, value: { stringValue: FULL_VALUE } }],
-        },
-      });
-      const { client, sqlCaptures } = makeMockChClient({
-        rows: [{ EventPayload: eventPayload }],
-      });
-
-      const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
-        resolveClickHouseClient: makeChResolver(client) as never,
-      });
-
       await blobStore.getFromEventLog({
         eventId: EVENT_ID,
         field: FIELD,

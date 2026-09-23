@@ -324,12 +324,17 @@ export function extractContexts(spanAttributes: NormalizedAttributes): RAGChunk[
  * Extracts error information from span status, preferring the OTel exception
  * event's structured attributes over the span-level statusMessage.
  */
-export function extractError(
-  statusCode: NormalizedStatusCode | null,
-  statusMessage: string | null,
-  spanAttributes: NormalizedAttributes,
-  events: readonly { name: string; attributes: NormalizedAttributes }[],
-): ErrorCapture | null {
+export function extractError({
+  statusCode,
+  statusMessage,
+  spanAttributes,
+  events,
+}: {
+  statusCode: NormalizedStatusCode | null;
+  statusMessage: string | null;
+  spanAttributes: NormalizedAttributes;
+  events: readonly { name: string; attributes: NormalizedAttributes }[];
+}): ErrorCapture | null {
   if (statusCode !== NormalizedStatusCode.ERROR) {
     return null;
   }

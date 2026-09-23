@@ -163,12 +163,22 @@ export class UploadFailedError extends StoredObjectHandledError {
 export class StoredObjectIntegrityConflictError extends StoredObjectHandledError {
   readonly name = "StoredObjectIntegrityConflictError";
 
-  constructor(
-    readonly projectId: StoredObjectProjectId,
-    readonly objectId: StoredObjectId,
-    readonly expectedByteLength: number,
-    readonly actualByteLength: number,
-  ) {
+  readonly projectId: StoredObjectProjectId;
+  readonly objectId: StoredObjectId;
+  readonly expectedByteLength: number;
+  readonly actualByteLength: number;
+
+  constructor({
+    projectId,
+    objectId,
+    expectedByteLength,
+    actualByteLength,
+  }: {
+    projectId: StoredObjectProjectId;
+    objectId: StoredObjectId;
+    expectedByteLength: number;
+    actualByteLength: number;
+  }) {
     super(
       "stored_object_integrity_conflict",
       "Existing content has conflicting verified byte facts.",
@@ -181,6 +191,10 @@ export class StoredObjectIntegrityConflictError extends StoredObjectHandledError
         },
       },
     );
+    this.projectId = projectId;
+    this.objectId = objectId;
+    this.expectedByteLength = expectedByteLength;
+    this.actualByteLength = actualByteLength;
   }
 }
 

@@ -290,12 +290,17 @@ const refusalAnswer = (refusal: HandledError): OtlpAnswer =>
   jsonAnswer(traceDoorRefusalBody(refusal), traceDoorRefusalStatus(refusal));
 
 /** The whole of one `POST /api/otel/v1/traces` request, inside its server span. */
-async function handleTracesRequest(
-  request: Request,
-  span: Span,
-  rawBytes: Uint8Array,
-  ports: TraceOtlpIngestApi,
-): Promise<OtlpAnswer> {
+async function handleTracesRequest({
+  request,
+  span,
+  rawBytes,
+  ports,
+}: {
+  request: Request;
+  span: Span;
+  rawBytes: Uint8Array;
+  ports: TraceOtlpIngestApi;
+}): Promise<OtlpAnswer> {
   // Auth runs before decompression, but the raw-body middleware has already
   // buffered the wire body — the declared body cap is what keeps a 401 cheap.
   const authenticated = await authenticate(request, ports.otlpCredential, loggerTraces);
@@ -366,12 +371,17 @@ async function handleTracesRequest(
 }
 
 /** The whole of one `POST /api/otel/v1/logs` request, inside its server span. */
-async function handleLogsRequest(
-  request: Request,
-  span: Span,
-  rawBytes: Uint8Array,
-  ports: TraceOtlpIngestApi,
-): Promise<OtlpAnswer> {
+async function handleLogsRequest({
+  request,
+  span,
+  rawBytes,
+  ports,
+}: {
+  request: Request;
+  span: Span;
+  rawBytes: Uint8Array;
+  ports: TraceOtlpIngestApi;
+}): Promise<OtlpAnswer> {
   const authenticated = await authenticate(request, ports.otlpCredential, loggerLogs);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
@@ -441,12 +451,17 @@ async function handleLogsRequest(
 }
 
 /** The whole of one `POST /api/otel/v1/metrics` request, inside its server span. */
-async function handleMetricsRequest(
-  request: Request,
-  span: Span,
-  rawBytes: Uint8Array,
-  ports: TraceOtlpIngestApi,
-): Promise<OtlpAnswer> {
+async function handleMetricsRequest({
+  request,
+  span,
+  rawBytes,
+  ports,
+}: {
+  request: Request;
+  span: Span;
+  rawBytes: Uint8Array;
+  ports: TraceOtlpIngestApi;
+}): Promise<OtlpAnswer> {
   const authenticated = await authenticate(request, ports.otlpCredential, loggerMetrics);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
@@ -541,13 +556,13 @@ async function handleOtlpPathAlias({
       return tracer.withActiveSpan(
         "TracesV1.handleTracesRequest",
         { kind: SpanKind.SERVER },
-        (span) => handleTracesRequest(corrected, span, raw, app),
+        (span) => handleTracesRequest({ request: corrected, span, rawBytes: raw, ports: app }),
       );
     }
     case "/api/otel/v1/logs": {
       const tracer = getLangWatchTracer("langwatch.otel.logs");
       return tracer.withActiveSpan("[POST] /api/otel/v1/logs", { kind: SpanKind.SERVER }, (span) =>
-        handleLogsRequest(corrected, span, raw, app),
+        handleLogsRequest({ request: corrected, span, rawBytes: raw, ports: app }),
       );
     }
     case "/api/otel/v1/metrics": {
@@ -555,7 +570,7 @@ async function handleOtlpPathAlias({
       return tracer.withActiveSpan(
         "[POST] /api/otel/v1/metrics",
         { kind: SpanKind.SERVER },
-        (span) => handleMetricsRequest(corrected, span, raw, app),
+        (span) => handleMetricsRequest({ request: corrected, span, rawBytes: raw, ports: app }),
       );
     }
     default:
@@ -579,7 +594,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
       await getLangWatchTracer("langwatch.otel.traces").withActiveSpan(
         "TracesV1.handleTracesRequest",
         { kind: SpanKind.SERVER },
-        (span) => handleTracesRequest(request, span, raw, app),
+        (span) => handleTracesRequest({ request, span, rawBytes: raw, ports: app }),
       ),
     ),
   )
@@ -595,7 +610,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
       await getLangWatchTracer("langwatch.otel.logs").withActiveSpan(
         "[POST] /api/otel/v1/logs",
         { kind: SpanKind.SERVER },
-        (span) => handleLogsRequest(request, span, raw, app),
+        (span) => handleLogsRequest({ request, span, rawBytes: raw, ports: app }),
       ),
     ),
   )
@@ -611,7 +626,7 @@ export const otlpIngestRest = defineRestRouter(TraceApi)
       await getLangWatchTracer("langwatch.otel.metrics").withActiveSpan(
         "[POST] /api/otel/v1/metrics",
         { kind: SpanKind.SERVER },
-        (span) => handleMetricsRequest(request, span, raw, app),
+        (span) => handleMetricsRequest({ request, span, rawBytes: raw, ports: app }),
       ),
     ),
   )

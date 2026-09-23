@@ -124,18 +124,17 @@ function clientFor(
       queries.push(input.query);
       const queriedTraceId = input.query_params?.traceId;
       const traceId = typeof queriedTraceId === "string" ? queriedTraceId : "trace";
-      const rows = input.query.includes("Attributes['gen_ai.conversation.id']")
-        ? thread
+      let rows: unknown[] = [span(traceId)];
+      if (input.query.includes("Attributes['gen_ai.conversation.id']")) {
+        rows = thread
           ? [
               { TraceId: "later", OccurredAtMs: 20 },
               { TraceId: "first", OccurredAtMs: 10 },
             ]
-          : []
-        : input.query.includes("FROM trace_summaries")
-          ? missing
-            ? []
-            : [summary(traceId)]
-          : [span(traceId)];
+          : [];
+      } else if (input.query.includes("FROM trace_summaries")) {
+        rows = missing ? [] : [summary(traceId)];
+      }
       return { json: async <T>() => rows as T[] };
     },
   } satisfies TraceClickHouseClient;

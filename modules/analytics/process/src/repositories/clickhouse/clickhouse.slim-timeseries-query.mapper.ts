@@ -217,20 +217,26 @@ function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filter
 
   for (const [field, rawValue] of Object.entries(filters)) {
     if (!hasFilterValues(rawValue)) continue;
-    appendSlimFilterClause(field, rawValue, clauses, params, next);
+    appendSlimFilterClause({ field, rawValue, clauses, params, next });
   }
 
   const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
   return { whereClause, params };
 }
 
-function appendSlimFilterClause(
-  field: string,
-  rawValue: AnalyticsFilterValue,
-  clauses: string[],
-  params: Record<string, unknown>,
-  next: (prefix: string) => string,
-): void {
+function appendSlimFilterClause({
+  field,
+  rawValue,
+  clauses,
+  params,
+  next,
+}: {
+  field: string;
+  rawValue: AnalyticsFilterValue;
+  clauses: string[];
+  params: Record<string, unknown>;
+  next: (prefix: string) => string;
+}): void {
   switch (field) {
     case "topics.topics": {
       const p = next("topic");
@@ -317,7 +323,13 @@ function appendSlimFilterClause(
       break;
     }
     case "metadata.value": {
-      appendMetadataValueFilterClauses(`${ta}.Attributes`, rawValue, clauses, params, next);
+      appendMetadataValueFilterClauses({
+        attributes: `${ta}.Attributes`,
+        rawValue,
+        clauses,
+        params,
+        next,
+      });
       break;
     }
     default:
@@ -362,7 +374,13 @@ export function buildSlimTimeseriesQuery(
         `Slim builder cannot serve metric "${s.metric}". The router should have routed this to trace_summaries.`,
       );
     }
-    const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
+    const alias = buildMetricAlias({
+      index: i,
+      metric: s.metric,
+      aggregation: s.aggregation,
+      key: s.key,
+      subkey: s.subkey,
+    });
     const expr = slimAggExpression(s.aggregation, slimColumnFor(s.metric));
     selectExprs.push(`${expr} AS ${alias}`);
   }

@@ -1,6 +1,6 @@
 import type { IntentContext } from "@langwatch/eventing";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createTopicClusteringRunHandler,
@@ -355,25 +355,24 @@ describe("createTopicClusteringRunHandler", () => {
      * run_failed ever written.
      */
     describe("when recording the failure itself fails", () => {
-      it("does not rethrow, so the outbox cannot retire the message without a recorded outcome", async () => {
-        const commands = makeCommands();
+      let commands: ReturnType<typeof makeCommands>;
+      let runClusteringPage = vi.fn().mockRejectedValue(new Error("langevals unavailable"));
+      let run: ReturnType<typeof createTopicClusteringRunHandler>;
+
+      beforeEach(() => {
+        commands = makeCommands();
         commands.recordClusteringRunFailed.mockRejectedValue(new Error("clickhouse append failed"));
-        const runClusteringPage = vi.fn().mockRejectedValue(new Error("langevals unavailable"));
-        const run = createTopicClusteringRunHandler(
+        runClusteringPage = vi.fn().mockRejectedValue(new Error("langevals unavailable"));
+        run = createTopicClusteringRunHandler(
           makeDeps({ runClusteringPage, commands, clock: () => 999 }),
         );
+      });
 
+      it("does not rethrow, so the outbox cannot retire the message without a recorded outcome", async () => {
         await expect(run(makePayload(), makeContext({ attempt: 3 }))).resolves.toBeUndefined();
       });
 
       it("does not retry the page that already exhausted every attempt", async () => {
-        const commands = makeCommands();
-        commands.recordClusteringRunFailed.mockRejectedValue(new Error("clickhouse append failed"));
-        const runClusteringPage = vi.fn().mockRejectedValue(new Error("langevals unavailable"));
-        const run = createTopicClusteringRunHandler(
-          makeDeps({ runClusteringPage, commands, clock: () => 999 }),
-        );
-
         await run(makePayload(), makeContext({ attempt: 3 }));
 
         expect(runClusteringPage).toHaveBeenCalledTimes(1);

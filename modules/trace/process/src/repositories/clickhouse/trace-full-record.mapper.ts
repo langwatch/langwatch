@@ -96,29 +96,34 @@ export class TraceFullRecordMapper {
   }
 
   private static extractInput(attributes: NormalizedAttributes) {
-    return TraceFullRecordMapper.extractContent(
+    return TraceFullRecordMapper.extractContent({
       attributes,
-      "input",
-      "gen_ai.input.messages",
-      "gen_ai.tool.call.arguments",
-    );
+      direction: "input",
+      messagesKey: "gen_ai.input.messages",
+      toolKey: "gen_ai.tool.call.arguments",
+    });
   }
 
   private static extractOutput(attributes: NormalizedAttributes) {
-    return TraceFullRecordMapper.extractContent(
+    return TraceFullRecordMapper.extractContent({
       attributes,
-      "output",
-      "gen_ai.output.messages",
-      "gen_ai.tool.call.result",
-    );
+      direction: "output",
+      messagesKey: "gen_ai.output.messages",
+      toolKey: "gen_ai.tool.call.result",
+    });
   }
 
-  private static extractContent(
-    attributes: NormalizedAttributes,
-    direction: "input" | "output",
-    messagesKey: string,
-    toolKey: string,
-  ): { type: string; value: TraceRecordValue } | null {
+  private static extractContent({
+    attributes,
+    direction,
+    messagesKey,
+    toolKey,
+  }: {
+    attributes: NormalizedAttributes;
+    direction: "input" | "output";
+    messagesKey: string;
+    toolKey: string;
+  }): { type: string; value: TraceRecordValue } | null {
     const messages = TraceFullRecordMapper.valueAsRecordValue(attributes[messagesKey]);
     if (messages !== void 0) return TraceFullRecordMapper.content("chat_messages", messages);
     const key = `langwatch.${direction}`;

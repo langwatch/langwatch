@@ -72,14 +72,26 @@ describe("storeResults", () => {
     describe("when storing in batch mode", () => {
       it("leaves the existing topic model in place", async () => {
         const deps = fakeRunnerDeps();
-        await storeResults(deps, "proj-1", undefined, false);
+        await storeResults({
+          deps,
+          projectId: "proj-1",
+          clusteringResult: undefined,
+          isIncremental: false,
+        });
 
         expect(deps.commands.recordTopics).not.toHaveBeenCalled();
       });
 
       it("returns null so the caller can report a skip", async () => {
         const deps = fakeRunnerDeps();
-        await expect(storeResults(deps, "proj-1", undefined, false)).resolves.toBeNull();
+        await expect(
+          storeResults({
+            deps,
+            projectId: "proj-1",
+            clusteringResult: undefined,
+            isIncremental: false,
+          }),
+        ).resolves.toBeNull();
       });
     });
   });
@@ -90,12 +102,12 @@ describe("storeResults", () => {
         // An empty replacement would leave the project with no topics at
         // all, which is strictly worse than keeping the previous model.
         const deps = fakeRunnerDeps();
-        await storeResults(
+        await storeResults({
           deps,
-          "proj-1",
-          { topics: [], subtopics: [], traces: [], cost: undefined } as never,
-          false,
-        );
+          projectId: "proj-1",
+          clusteringResult: { topics: [], subtopics: [], traces: [], cost: undefined } as never,
+          isIncremental: false,
+        });
 
         expect(deps.commands.recordTopics).not.toHaveBeenCalled();
       });
@@ -106,10 +118,10 @@ describe("storeResults", () => {
     describe("when storing in batch mode", () => {
       it("replaces the topic model as before", async () => {
         const deps = fakeRunnerDeps();
-        await storeResults(
+        await storeResults({
           deps,
-          "proj-1",
-          {
+          projectId: "proj-1",
+          clusteringResult: {
             topics: [
               {
                 id: "topic_a",
@@ -122,8 +134,8 @@ describe("storeResults", () => {
             traces: [],
             cost: undefined,
           } as never,
-          false,
-        );
+          isIncremental: false,
+        });
 
         expect(deps.commands.recordTopics).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -149,10 +161,10 @@ describe("storeResults", () => {
           order.push("recorded");
         });
 
-        await storeResults(
+        await storeResults({
           deps,
-          "proj-1",
-          {
+          projectId: "proj-1",
+          clusteringResult: {
             topics: [
               {
                 id: "topic_a",
@@ -165,8 +177,8 @@ describe("storeResults", () => {
             traces: [],
             cost: undefined,
           } as never,
-          false,
-        );
+          isIncremental: false,
+        });
 
         expect(deps.migration.seedProjectTopicModel).toHaveBeenCalledWith("proj-1");
         expect(order).toEqual(["seeded", "recorded"]);

@@ -79,12 +79,17 @@ function isBareDataUri(value: string): boolean {
 }
 
 /** A string is a bare data URI leaf, or an envelope whose JSON may hold parts. */
-function collectFromString(
-  value: string,
-  depth: number,
-  path: PathSeg[],
-  sites: CandidateSite[],
-): void {
+function collectFromString({
+  value,
+  depth,
+  path,
+  sites,
+}: {
+  value: string;
+  depth: number;
+  path: PathSeg[];
+  sites: CandidateSite[];
+}): void {
   if (isBareDataUri(value)) {
     sites.push({ path, node: value, kind: "bareDataUri" });
 
@@ -108,19 +113,24 @@ function collectFromString(
     return;
   }
 
-  collectCandidates(parsed, depth + 1, [...path, { json: true }], sites);
+  collectCandidates({ value: parsed, depth: depth + 1, path: [...path, { json: true }], sites });
 }
 
 /**
  * Part-first: a media part is a leaf — the rewritten reference has nothing left to extract
  * inside it, so the walk never descends into parts.
  */
-function collectFromObject(
-  value: object,
-  depth: number,
-  path: PathSeg[],
-  sites: CandidateSite[],
-): void {
+function collectFromObject({
+  value,
+  depth,
+  path,
+  sites,
+}: {
+  value: object;
+  depth: number;
+  path: PathSeg[];
+  sites: CandidateSite[];
+}): void {
   if (TraceValueMediaExtractionService.isExtractableMediaPart(value)) {
     sites.push({ path, node: value, kind: "part" });
 
@@ -129,36 +139,46 @@ function collectFromObject(
 
   const obj = value as Record<string, unknown>;
   for (const key of Object.keys(obj)) {
-    collectCandidates(obj[key], depth + 1, [...path, { key }], sites);
+    collectCandidates({ value: obj[key], depth: depth + 1, path: [...path, { key }], sites });
   }
 }
 
-function collectCandidates(
-  value: unknown,
-  depth: number,
-  path: PathSeg[],
-  sites: CandidateSite[],
-): void {
+function collectCandidates({
+  value,
+  depth,
+  path,
+  sites,
+}: {
+  value: unknown;
+  depth: number;
+  path: PathSeg[];
+  sites: CandidateSite[];
+}): void {
   if (value == null || depth > MAX_MEDIA_WALK_DEPTH) {
     return;
   }
 
   if (typeof value === "string") {
-    collectFromString(value, depth, path, sites);
+    collectFromString({ value, depth, path, sites });
 
     return;
   }
 
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
-      collectCandidates(value[i], depth + 1, [...path, { index: i }], sites);
+      collectCandidates({
+        value: value[i],
+        depth: depth + 1,
+        path: [...path, { index: i }],
+        sites,
+      });
     }
 
     return;
   }
 
   if (typeof value === "object") {
-    collectFromObject(value, depth, path, sites);
+    collectFromObject({ value, depth, path, sites });
   }
 }
 
@@ -231,12 +251,17 @@ async function processSite(
   return { ...site, replacement: part };
 }
 
-async function storeCandidates(
-  sites: CandidateSite[],
-  params: WalkParams,
-  budget: ExtractionBudget,
-  refs: ExtractedRef[],
-): Promise<StoredSite[]> {
+async function storeCandidates({
+  sites,
+  params,
+  budget,
+  refs,
+}: {
+  sites: CandidateSite[];
+  params: WalkParams;
+  budget: ExtractionBudget;
+  refs: ExtractedRef[];
+}): Promise<StoredSite[]> {
   let takeable = sites;
   if (sites.length > budget.remainingParts) {
     budget.droppedByCap += sites.length - budget.remainingParts;
@@ -424,18 +449,18 @@ export class TraceValueMediaExtractionService {
     refs: ExtractedRef[];
   }> {
     const sites: CandidateSite[] = [];
-    collectCandidates(value, 0, [], sites);
+    collectCandidates({ value, depth: 0, path: [], sites });
     if (sites.length === 0) {
       return { value, refs: [] };
     }
 
     const refs: ExtractedRef[] = [];
-    const stored = await storeCandidates(
+    const stored = await storeCandidates({
       sites,
-      { projectId, purpose, ownerKind, ownerId, service },
-      budget ?? TraceValueMediaExtractionService.createExtractionBudget(),
+      params: { projectId, purpose, ownerKind, ownerId, service },
+      budget: budget ?? TraceValueMediaExtractionService.createExtractionBudget(),
       refs,
-    );
+    });
     if (stored.length === 0) {
       return { value, refs };
     }

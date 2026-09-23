@@ -59,8 +59,11 @@ beforeEach(() => {
 
 describe("given a project receiving its first real trace", () => {
   describe("when the same event is handled twice", () => {
-    it("records the integration milestone once", async () => {
+    let writes: unknown;
+
+    beforeEach(async () => {
       const store = makeProjectStore({ firstMessage: false, integrated: false });
+      writes = store.writes;
       const handler = ProjectMetadataSync.createProjectMetadataHandler({
         projects: store.projects as never,
         recordProductEvent,
@@ -68,7 +71,9 @@ describe("given a project receiving its first real trace", () => {
 
       await handler(event, createContext(foldState));
       await handler(event, createContext(foldState));
+    });
 
+    it("records the integration milestone once", async () => {
       expect(recordProductEvent).toHaveBeenCalledTimes(1);
       expect(recordProductEvent).toHaveBeenCalledWith({
         userId: "user-1",
@@ -79,16 +84,7 @@ describe("given a project receiving its first real trace", () => {
     });
 
     it("writes the metadata once, because the second delivery finds it set", async () => {
-      const store = makeProjectStore({ firstMessage: false, integrated: false });
-      const handler = ProjectMetadataSync.createProjectMetadataHandler({
-        projects: store.projects as never,
-        recordProductEvent,
-      });
-
-      await handler(event, createContext(foldState));
-      await handler(event, createContext(foldState));
-
-      expect(store.writes).toEqual([{ firstMessage: true, integrated: true, language: "python" }]);
+      expect(writes).toEqual([{ firstMessage: true, integrated: true, language: "python" }]);
     });
   });
 

@@ -115,21 +115,26 @@ export class DashboardApp implements DashboardApi {
   #workbenchCaller: WorkbenchCaller;
   readonly #publicBaseUrl: string | undefined;
 
-  private constructor(
+  private constructor({
+    services,
+    peers,
+    workbench,
+    publicBaseUrl,
+  }: Readonly<{
     services: Readonly<{
       dashboards: DashboardService;
       charts: SavedWorkbenchChartService;
       savedViews: SavedViewService;
       widgets: DashboardWidgetService;
-    }>,
+    }>;
     peers: Readonly<{
       analytics: AnalyticsApiContract;
       automation: AutomationApiContract;
       projects: ProjectApiContract;
-    }>,
-    workbench: Readonly<{ access: WorkbenchAccess; caller: WorkbenchCaller }>,
-    publicBaseUrl: string | undefined,
-  ) {
+    }>;
+    workbench: Readonly<{ access: WorkbenchAccess; caller: WorkbenchCaller }>;
+    publicBaseUrl: string | undefined;
+  }>) {
     this.#dashboards = services.dashboards;
     this.#charts = services.charts;
     this.#savedViews = services.savedViews;
@@ -147,8 +152,8 @@ export class DashboardApp implements DashboardApi {
     const workbenchAccess = new AnalyticsWorkbenchAccess(analytics);
     const workbenchCaller = new AnalyticsWorkbenchCaller(analytics);
 
-    return new DashboardApp(
-      {
+    return new DashboardApp({
+      services: {
         dashboards: DashboardService.create({
           repository: setup.repositories.dashboards,
           workbenchAccess,
@@ -161,14 +166,14 @@ export class DashboardApp implements DashboardApi {
         savedViews: SavedViewService.create({ repository: setup.repositories.savedViews }),
         widgets: DashboardWidgetService.create(setup.repositories.dashboardWidgets),
       },
-      {
+      peers: {
         analytics,
         automation: setup.dependencies.automation,
         projects: setup.dependencies.projects,
       },
-      { access: workbenchAccess, caller: workbenchCaller },
-      setup.members.publicBaseUrl,
-    );
+      workbench: { access: workbenchAccess, caller: workbenchCaller },
+      publicBaseUrl: setup.members.publicBaseUrl,
+    });
   }
 
   // -- dashboards ------------------------------------------------------------

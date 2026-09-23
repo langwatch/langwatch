@@ -16,21 +16,24 @@ import {
 } from "@langwatch/topic-contract";
 import { z } from "zod";
 
-export const TopicClusteringRequestedEventSchema = EventSchema.extend({
+export const TopicClusteringRequestedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.REQUESTED),
   version: z.literal(TOPIC_CLUSTERING_EVENT_VERSIONS.REQUESTED),
   data: topicClusteringRequestedEventDataSchema,
 });
 export type TopicClusteringRequestedEvent = z.infer<typeof TopicClusteringRequestedEventSchema>;
 
-export const TopicClusteringRunStartedEventSchema = EventSchema.extend({
+export const TopicClusteringRunStartedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.RUN_STARTED),
   version: z.literal(TOPIC_CLUSTERING_EVENT_VERSIONS.RUN_STARTED),
   data: topicClusteringRunStartedEventDataSchema,
 });
 export type TopicClusteringRunStartedEvent = z.infer<typeof TopicClusteringRunStartedEventSchema>;
 
-export const TopicClusteringRunCompletedEventSchema = EventSchema.extend({
+export const TopicClusteringRunCompletedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.RUN_COMPLETED),
   version: z.literal(TOPIC_CLUSTERING_EVENT_VERSIONS.RUN_COMPLETED),
   data: topicClusteringRunCompletedEventDataSchema,
@@ -39,14 +42,16 @@ export type TopicClusteringRunCompletedEvent = z.infer<
   typeof TopicClusteringRunCompletedEventSchema
 >;
 
-export const TopicClusteringRunFailedEventSchema = EventSchema.extend({
+export const TopicClusteringRunFailedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.RUN_FAILED),
   version: z.literal(TOPIC_CLUSTERING_EVENT_VERSIONS.RUN_FAILED),
   data: topicClusteringRunFailedEventDataSchema,
 });
 export type TopicClusteringRunFailedEvent = z.infer<typeof TopicClusteringRunFailedEventSchema>;
 
-export const TopicClusteringTopicsRecordedEventSchema = EventSchema.extend({
+export const TopicClusteringTopicsRecordedEventSchema = z.object({
+  ...EventSchema.shape,
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.TOPICS_RECORDED),
   version: z.literal(TOPIC_CLUSTERING_EVENT_VERSIONS.TOPICS_RECORDED),
   data: topicClusteringTopicsRecordedEventDataSchema,

@@ -139,7 +139,7 @@ describe("GET /api/v1/traces/facets", () => {
     });
   });
 
-  describe("route order against :traceId", () => {
+  describe("given the route order against :traceId", () => {
     it("reads facets rather than treating the literal segment as a trace id", async () => {
       const { send, readDiscover } = mount();
 

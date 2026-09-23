@@ -10,6 +10,8 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   type EvaluationApi,
   reportEvaluationCommandDataSchema,
+  type EvaluationRunData,
+  type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
 import type {
   InstantEvalApi,
@@ -104,6 +106,9 @@ import {
   type ResolvedInstantEvalRun,
   type TraceDateField,
   type TraceUsageCount,
+  type EvaluationTraceEvent,
+  type EvaluationTraceSpan,
+  type TracesForProjectResult,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -718,7 +723,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     return this.#exportDownload.download(input);
   }
 
-  resolveIngestWaitTimeout(input: TraceIngestWaitInput) {
+  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number> {
     return this.#dependencies.traces.tree.resolveIngestWaitTimeout(input);
   }
 
@@ -796,15 +801,21 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
   }
 
-  getEvaluationSpans(input: traceContractModule.EvaluationTraceReadInput) {
+  getEvaluationSpans(
+    input: traceContractModule.EvaluationTraceReadInput,
+  ): Promise<EvaluationTraceSpan[]> {
     return this.#dependencies.traces.tree.getEvaluationSpans(input);
   }
 
-  getEvaluationEvents(input: traceContractModule.EvaluationTraceReadInput) {
+  getEvaluationEvents(
+    input: traceContractModule.EvaluationTraceReadInput,
+  ): Promise<EvaluationTraceEvent[]> {
     return this.#dependencies.traces.tree.getEvaluationEvents(input);
   }
 
-  async listTraces(input: Parameters<TraceContentReadService["listTraces"]>[0]) {
+  async listTraces(
+    input: Parameters<TraceContentReadService["listTraces"]>[0],
+  ): Promise<TracesForProjectResult> {
     const pageSize =
       input.query.pageSize === undefined
         ? undefined
@@ -818,10 +829,14 @@ export class TraceApp implements TraceApi, CollectorApp {
       },
     });
   }
-  findTrace(input: Parameters<TraceContentReadService["findTrace"]>[0]) {
+  findTrace(
+    input: Parameters<TraceContentReadService["findTrace"]>[0],
+  ): Promise<Trace | undefined> {
     return this.#contentReader.findTrace(input);
   }
-  async readTracesWithSpans(input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0]) {
+  async readTracesWithSpans(
+    input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0],
+  ): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
     return this.#contentReader.readTracesWithSpans(input);
@@ -829,30 +844,36 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   async readTracesWithSpansPreview(
     input: Parameters<TraceContentReadService["readTracesWithSpansPreview"]>[0],
-  ) {
+  ): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
     return this.#contentReader.readTracesWithSpansPreview(input);
   }
   readOrderedSpansForTrace(
     input: Parameters<TraceContentReadService["readOrderedSpansForTrace"]>[0],
-  ) {
+  ): Promise<Span[]> {
     return this.#contentReader.readOrderedSpansForTrace(input);
   }
-  readThreadTraces(input: Parameters<TraceContentReadService["readThreadTraces"]>[0]) {
+  readThreadTraces(
+    input: Parameters<TraceContentReadService["readThreadTraces"]>[0],
+  ): Promise<Trace[]> {
     return this.#contentReader.readThreadTraces(input);
   }
-  async readThreadsTraces(input: Parameters<TraceContentReadService["readThreadsTraces"]>[0]) {
+  async readThreadsTraces(
+    input: Parameters<TraceContentReadService["readThreadsTraces"]>[0],
+  ): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
 
     return this.#contentReader.readThreadsTraces(input);
   }
-  async readSampleTraces(input: Parameters<TraceContentReadService["readSampleTraces"]>[0]) {
+  async readSampleTraces(
+    input: Parameters<TraceContentReadService["readSampleTraces"]>[0],
+  ): Promise<Trace[]> {
     const pageSize = await this.#readBounds.clampPageSize(input.query.projectId, input.pageSize);
 
     return this.#contentReader.readSampleTraces({ ...input, pageSize });
   }
-  readForViewer(input: Parameters<TraceViewerService["readForViewer"]>[0]) {
+  readForViewer(input: Parameters<TraceViewerService["readForViewer"]>[0]): Promise<Trace[]> {
     if (!this.#dependencies.viewer) throw new Error("Trace viewer service is unavailable");
     return this.#dependencies.viewer.readForViewer(input);
   }
@@ -1659,9 +1680,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** The evaluation runs recorded against one trace. */
-  readEvaluationRuns(
-    input: Parameters<EvaluationApi["findRunsByTraceId"]>[0],
-  ): ReturnType<EvaluationApi["findRunsByTraceId"]> {
+  readEvaluationRuns(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {
     return this.#dependencies.evaluations.findRunsByTraceId(input);
   }
 

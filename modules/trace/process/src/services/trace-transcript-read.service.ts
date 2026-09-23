@@ -88,8 +88,8 @@ async function loadTraceLogsWithProtections({
   const visibilityCutoffMs = await ports.getVisibilityCutoffMs(projectId);
   const rows = await app.readTraceLogRecords({ projectId, traceId, occurredAtMs });
   return rows.map((row) =>
-    gateTraceLogVisibility(
-      {
+    gateTraceLogVisibility({
+      row: {
         spanId: row.spanId,
         timeUnixMs: row.timeUnixMs,
         body: row.body,
@@ -100,15 +100,15 @@ async function loadTraceLogsWithProtections({
       },
       protections,
       visibilityCutoffMs,
-      {
+      codingAgents: {
         logContentKeys: (eventName) =>
           app.codingAgentLogContentKeys(eventName).map((entry) => ({
             key: entry.key,
             category: entry.category,
           })),
       },
-      ports.derivedAttrPrefixes,
-    ),
+      derivedAttrPrefixes: ports.derivedAttrPrefixes,
+    }),
   );
 }
 

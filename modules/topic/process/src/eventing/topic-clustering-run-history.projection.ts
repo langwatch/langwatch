@@ -162,7 +162,10 @@ export class TopicClusteringRunHistoryFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    TopicClusteringRunHistoryData,
+    "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  > {
     return {
       ProjectId: "",
       Runs: [],

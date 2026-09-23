@@ -15,12 +15,12 @@ import {
 } from "../app/stored-object.members.ts";
 import type { StoredObjectStorageRuntimeAdapter } from "./stored-object-storage-runtime.service.ts";
 
-export class StoredObjectStoragePortAdapter extends StoredObjectStorage {
+export class StoredObjectStorageService extends StoredObjectStorage {
   static create(input: {
     runtime: StoredObjectStorageRuntimeAdapter;
     aws: AwsClientProcessRuntime;
-  }): StoredObjectStoragePortAdapter {
-    return new StoredObjectStoragePortAdapter(input.runtime, input.aws);
+  }): StoredObjectStorageService {
+    return new StoredObjectStorageService(input.runtime, input.aws);
   }
 
   private constructor(

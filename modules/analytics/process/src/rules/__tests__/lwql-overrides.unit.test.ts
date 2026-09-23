@@ -30,7 +30,7 @@ function overrideFor<T>(overrides: Record<string, T | undefined>, name: string):
 }
 
 describe("Dataset overrides", () => {
-  describe("column gates", () => {
+  describe("given the column gates", () => {
     it("experiment_run_items.Predicted is gated output", () => {
       const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_run_items");
       expect(override.columnGates?.Predicted).toEqual(["output"]);
@@ -122,7 +122,7 @@ describe("Dataset overrides", () => {
     });
   });
 
-  describe("dedup configuration", () => {
+  describe("given the dedup configuration", () => {
     // metric_time_rollups, simulation_run_metrics_rollup and
     // gateway_budget_scope_totals are AggregatingMergeTree sources whose
     // AggregateFunction-state columns the derived builder cannot merge
@@ -149,7 +149,7 @@ describe("Dataset overrides", () => {
     });
   });
 
-  describe("manifest consistency", () => {
+  describe("given the manifest", () => {
     it("all overridden tables exist in the manifest", () => {
       const manifestTableNames = new Set(columnsManifest.tables.map((t) => t.name));
       for (const table of Object.keys(ALL_OVERRIDES)) {

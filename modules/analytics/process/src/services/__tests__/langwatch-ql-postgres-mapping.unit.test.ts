@@ -293,7 +293,7 @@ describe("given postgresApprovedViewStatement", () => {
 
   const SIMPLE_COLUMNS = [{ exposed: "TenantId", source: "projectId" }];
 
-  describe("the DO-block atomic upgrade path", () => {
+  describe("given the DO-block atomic upgrade path", () => {
     it("emits one statement: CREATE OR REPLACE first, DROP+CREATE only on the reorder SQLSTATEs", () => {
       const statement = postgresMapping.approvedViewStatement({
         schema: SCHEMA,

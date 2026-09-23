@@ -62,7 +62,7 @@ export const monitorSchema = z
   .strict();
 export type Monitor = z.infer<typeof monitorSchema>;
 
-export const monitorWithEvaluatorSchema = monitorSchema.extend({
+export const monitorWithEvaluatorSchema = monitorSchema.safeExtend({
   evaluator: evaluatorSchema.nullable(),
 });
 export type MonitorWithEvaluator = z.infer<typeof monitorWithEvaluatorSchema>;

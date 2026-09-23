@@ -38,8 +38,8 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
     this.mapSpanType(ctx, mastraType, isEvalModelStep);
     const modelName = this.extractModelInfo(ctx, modelStepBody);
-    this.extractIO(ctx, mastraType, isEvalModelStep, modelStepBody);
-    this.setDisplayName(ctx, mastraType, modelName, isEvalModelStep, modelStepBody);
+    this.extractIO({ ctx, mastraType, isEvalModelStep, modelStepBody });
+    this.setDisplayName({ ctx, mastraType, modelName, isEvalModelStep, modelStepBody });
     this.extractThreadId(ctx);
     this.mapTokenNames(ctx);
   }
@@ -211,12 +211,17 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
   }
 
   /** Map Mastra-specific I/O attributes to canonical langwatch.input/output. */
-  private extractIO(
-    ctx: ExtractorContext,
-    mastraType: unknown,
-    isEvalModelStep: boolean,
-    modelStepBody: Record<string, unknown> | null,
-  ): void {
+  private extractIO({
+    ctx,
+    mastraType,
+    isEvalModelStep,
+    modelStepBody,
+  }: {
+    ctx: ExtractorContext;
+    mastraType: unknown;
+    isEvalModelStep: boolean;
+    modelStepBody: Record<string, unknown> | null;
+  }): void {
     const { attrs } = ctx.bag;
 
     if (mastraType === "agent_run") {
@@ -241,13 +246,19 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
   }
 
   /** Set contextual display names based on span type and model. */
-  private setDisplayName(
-    ctx: ExtractorContext,
-    mastraType: unknown,
-    modelName: string | null,
-    isEvalModelStep: boolean,
-    modelStepBody: Record<string, unknown> | null,
-  ): void {
+  private setDisplayName({
+    ctx,
+    mastraType,
+    modelName,
+    isEvalModelStep,
+    modelStepBody,
+  }: {
+    ctx: ExtractorContext;
+    mastraType: unknown;
+    modelName: string | null;
+    isEvalModelStep: boolean;
+    modelStepBody: Record<string, unknown> | null;
+  }): void {
     const displayName = mastraValuesService.deriveDisplayName({
       mastraType,
       modelName,

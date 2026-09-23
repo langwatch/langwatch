@@ -3,6 +3,7 @@ import type {
   DiscreteFacetResult,
   TraceListRepositoryPage,
   TraceListRepository,
+  BatchedFacetResult,
 } from "@langwatch/trace-contract";
 
 export class MemoryNullTraceListRepository implements TraceListRepository {
@@ -44,7 +45,7 @@ export class MemoryNullTraceListRepository implements TraceListRepository {
     return { values: [], distinctCount: 0 };
   }
 
-  async findBatchedFacets() {
+  async findBatchedFacets(): Promise<BatchedFacetResult> {
     return { categoricals: {}, ranges: {} };
   }
 

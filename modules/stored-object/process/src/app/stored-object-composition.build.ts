@@ -29,7 +29,7 @@ import {
 } from "../services/stored-object-destination-policy.service.ts";
 import { StoredObjectStorageRegistryAdapter } from "../services/stored-object-storage-registry.service.ts";
 import { StoredObjectStorageRuntimeAdapter } from "../services/stored-object-storage-runtime.service.ts";
-import { StoredObjectStoragePortAdapter } from "../services/stored-object-storage.service.ts";
+import { StoredObjectStorageService } from "../services/stored-object-storage.service.ts";
 import { StoredObjectsService, deriveStoredObjectId } from "../services/stored-objects.service.ts";
 import type { StoredObjectInfrastructure } from "./stored-object.app.ts";
 import {
@@ -123,12 +123,22 @@ type StoredObjectS3RouteTable = Readonly<
  * IS RE-READ ON EVERY RESOLUTION, deliberately.
  */
 class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
-  constructor(
-    private readonly projectOrganizations: PrismaStoredObjectProjectOrganizationRepository,
-    private readonly storage: StoredObjectServerConfig,
-    private readonly routes: StoredObjectS3RouteTable,
-    private readonly deploymentSecrets: StoredObjectS3DeploymentSecrets,
-  ) {}
+  private readonly projectOrganizations: PrismaStoredObjectProjectOrganizationRepository;
+  private readonly storage: StoredObjectServerConfig;
+  private readonly routes: StoredObjectS3RouteTable;
+  private readonly deploymentSecrets: StoredObjectS3DeploymentSecrets;
+
+  constructor(deps: {
+    projectOrganizations: PrismaStoredObjectProjectOrganizationRepository;
+    storage: StoredObjectServerConfig;
+    routes: StoredObjectS3RouteTable;
+    deploymentSecrets: StoredObjectS3DeploymentSecrets;
+  }) {
+    this.projectOrganizations = deps.projectOrganizations;
+    this.storage = deps.storage;
+    this.routes = deps.routes;
+    this.deploymentSecrets = deps.deploymentSecrets;
+  }
 
   /**
    * The route's values first, then the deployment's, FIELD BY FIELD — a
@@ -300,12 +310,12 @@ export function buildStoredObjectInfrastructure(input: {
   };
   const azureAccountKey = members.secrets.find("AZURE_BLOB_ACCOUNT_KEY");
 
-  const targets = new StoredObjectS3Targets(
-    PrismaStoredObjectProjectOrganizationRepository.create(members.prisma),
+  const targets = new StoredObjectS3Targets({
+    projectOrganizations: PrismaStoredObjectProjectOrganizationRepository.create(members.prisma),
     storage,
     routes,
-    deploymentS3Secrets,
-  );
+    deploymentSecrets: deploymentS3Secrets,
+  });
   const destinations = StoredObjectDestinationPolicyAdapter.create({
     selection: {
       // The `azure` selection has a driver behind it, so a write to an Azure
@@ -380,7 +390,7 @@ export function buildStoredObjectInfrastructure(input: {
   });
 
   return {
-    storage: StoredObjectStoragePortAdapter.create({ runtime: storageRuntime, aws }),
+    storage: StoredObjectStorageService.create({ runtime: storageRuntime, aws }),
     delivery: new UnavailableStoredObjectDelivery(),
     uploadTokens: new UnavailableStoredObjectUploadTokens(),
     idDeriver: { fromDigest: deriveStoredObjectId },

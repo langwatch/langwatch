@@ -114,12 +114,12 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
     name: normalizedSpan.name,
     input: extractInput(normalizedSpan.spanAttributes),
     output: extractOutput(normalizedSpan.spanAttributes),
-    error: extractError(
-      normalizedSpan.statusCode,
-      normalizedSpan.statusMessage,
-      normalizedSpan.spanAttributes,
-      normalizedSpan.events,
-    ),
+    error: extractError({
+      statusCode: normalizedSpan.statusCode,
+      statusMessage: normalizedSpan.statusMessage,
+      spanAttributes: normalizedSpan.spanAttributes,
+      events: normalizedSpan.events,
+    }),
     timestamps,
     metrics: extractMetrics(normalizedSpan.spanAttributes),
     params: unflattenDotNotation(normalizedSpan.spanAttributes),

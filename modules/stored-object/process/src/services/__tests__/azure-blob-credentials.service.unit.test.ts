@@ -88,11 +88,8 @@ describe("resolveAzureCredentials", () => {
 
         expect(credentials.mode).toBe(mode);
         expect(credentials.accountName).toBe("lwacct");
-        if (mode === "sharedKey") {
-          expect((credentials as { accountKey: string }).accountKey).toBe("key-value");
-        } else {
-          expect("accountKey" in credentials).toBe(false);
-        }
+        const accountKey = "accountKey" in credentials ? credentials.accountKey : "absent";
+        expect(accountKey).toBe(mode === "sharedKey" ? "key-value" : "absent");
       },
     );
 

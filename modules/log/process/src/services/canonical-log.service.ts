@@ -495,6 +495,20 @@ export class CanonicalLogAdapter implements LogPreparer {
     return null;
   }
 
+  private static effectiveTimestamp({
+    timeUnixNano,
+    observedTimeUnixNano,
+    acceptedAt,
+  }: {
+    timeUnixNano: string;
+    observedTimeUnixNano: string;
+    acceptedAt: number;
+  }): string {
+    if (timeUnixNano !== "0") return timeUnixNano;
+    if (observedTimeUnixNano !== "0") return observedTimeUnixNano;
+    return String(BigInt(acceptedAt) * 1_000_000n);
+  }
+
   private static buildRecord(args: {
     tenantId: string;
     organizationId: string;
@@ -535,14 +549,11 @@ export class CanonicalLogAdapter implements LogPreparer {
       log.observedTimeUnixNano,
       "observedTimeUnixNano",
     );
-    let effectiveTimestamp: string;
-    if (timeUnixNano !== "0") {
-      effectiveTimestamp = timeUnixNano;
-    } else if (observedTimeUnixNano !== "0") {
-      effectiveTimestamp = observedTimeUnixNano;
-    } else {
-      effectiveTimestamp = String(BigInt(args.acceptedAt) * 1_000_000n);
-    }
+    const effectiveTimestamp = CanonicalLogAdapter.effectiveTimestamp({
+      timeUnixNano,
+      observedTimeUnixNano,
+      acceptedAt: args.acceptedAt,
+    });
     const flags = CanonicalLogAdapter.uint32Number(log.flags, "flags");
     const severityNumber = Number(
       CanonicalLogAdapter.integerDecimal(log.severityNumber ?? 0, "severityNumber", 255n),
@@ -677,18 +688,30 @@ export class CanonicalLogAdapter implements LogPreparer {
       }
       if (Array.isArray(current)) return current.map(normalize);
       if (CanonicalLogAdapter.isSerializableRecord(current)) {
-        if (seen.has(current)) throw new Error("Cannot canonicalize cyclic OTLP data");
-        seen.add(current);
-        const result: UnknownRecord = {};
-        for (const key of Object.keys(current).toSorted()) {
-          result[key] = normalize(current[key]);
-        }
-        seen.delete(current);
-        return result;
+        return CanonicalLogAdapter.normalizeRecord({ current, normalize, seen });
       }
       return current;
     };
     return JSON.stringify(normalize(value));
+  }
+
+  private static normalizeRecord({
+    current,
+    normalize,
+    seen,
+  }: {
+    current: UnknownRecord;
+    normalize: (value: unknown) => unknown;
+    seen: WeakSet<object>;
+  }): UnknownRecord {
+    if (seen.has(current)) throw new Error("Cannot canonicalize cyclic OTLP data");
+    seen.add(current);
+    const result: UnknownRecord = {};
+    for (const key of Object.keys(current).toSorted()) {
+      result[key] = normalize(current[key]);
+    }
+    seen.delete(current);
+    return result;
   }
 
   private static sha256(value: string): string {

@@ -32,7 +32,12 @@ describe("storeResults", () => {
       // storeResults accidentally re-grew one, it could only come through a
       // new dependency — the absence is the assertion.
       const deps = fakeRunnerDeps();
-      await storeResults(deps, "project_regression", sampleClusteringResult, false);
+      await storeResults({
+        deps,
+        projectId: "project_regression",
+        clusteringResult: sampleClusteringResult,
+        isIncremental: false,
+      });
 
       expect(deps.traceAssignments.assignTopic).toHaveBeenCalledTimes(2);
       expect(deps.traceAssignments.assignTopic).toHaveBeenCalledWith(

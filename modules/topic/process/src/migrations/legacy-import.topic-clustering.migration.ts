@@ -41,12 +41,22 @@ export interface TopicClusteringBackfillSummary {
  * SCHEDULE seeds run on worker start, safe to re-run on their own idempotency.
  */
 export class LegacyImportTopicClusteringMigration {
-  private constructor(
-    private readonly repository: TopicClusteringRepository,
-    private readonly redis: Redis | Cluster | null,
-    private readonly commands: TopicClusteringCommands,
-    private readonly schedulePageSize?: number,
-  ) {}
+  private readonly repository: TopicClusteringRepository;
+  private readonly redis: Redis | Cluster | null;
+  private readonly commands: TopicClusteringCommands;
+  private readonly schedulePageSize?: number;
+
+  private constructor(deps: {
+    repository: TopicClusteringRepository;
+    redis: Redis | Cluster | null;
+    commands: TopicClusteringCommands;
+    schedulePageSize?: number;
+  }) {
+    this.repository = deps.repository;
+    this.redis = deps.redis;
+    this.commands = deps.commands;
+    this.schedulePageSize = deps.schedulePageSize;
+  }
 
   static create(options: {
     repository: TopicClusteringRepository;
@@ -56,12 +66,12 @@ export class LegacyImportTopicClusteringMigration {
     /** Test override for the schedule walk's page size. */
     schedulePageSize?: number;
   }): LegacyImportTopicClusteringMigration {
-    return new LegacyImportTopicClusteringMigration(
-      options.repository,
-      options.redis,
-      options.commands,
-      options.schedulePageSize,
-    );
+    return new LegacyImportTopicClusteringMigration({
+      repository: options.repository,
+      redis: options.redis,
+      commands: options.commands,
+      schedulePageSize: options.schedulePageSize,
+    });
   }
 
   /**

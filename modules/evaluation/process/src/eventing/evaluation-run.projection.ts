@@ -71,7 +71,10 @@ export class EvaluationRunFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    EvaluationRunData,
+    "createdAt" | "updatedAt" | "LastEventOccurredAt"
+  > {
     return {
       evaluationId: "",
       evaluatorId: "",

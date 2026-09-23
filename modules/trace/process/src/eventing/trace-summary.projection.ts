@@ -168,7 +168,7 @@ export class TraceSummaryFoldProjection
     return new TraceSummaryFoldProjection(deps);
   }
 
-  protected initState() {
+  protected initState(): Omit<TraceSummaryData, "createdAt" | "updatedAt" | "LastEventOccurredAt"> {
     return {
       traceId: "",
       spanCount: 0,

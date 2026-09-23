@@ -72,7 +72,7 @@ describe("checkedInteger", () => {
 
   describe("given something that is not an integer at all", () => {
     it("refuses a fractional number rather than truncating it", () => {
-      expect(() => uint64(1.5)).toThrow();
+      expect(() => uint64(1.5)).toThrow(/not a safely represented integer/);
     });
 
     it("refuses a number past the safe-integer boundary, which has already lost digits", () => {

@@ -120,14 +120,14 @@ export class ClickHouseTraceQueryFieldsRepository {
     if (def.kind !== "categorical") {
       throw new Error(`facet '${key}' is not a categorical facet`);
     }
-    return this.translators.crossTableCategorical(
-      def.table,
-      ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
-      def.expression,
+    return this.translators.crossTableCategorical({
+      table: def.table,
+      timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+      expression: def.expression,
       read,
       needs,
-      def.key,
-    );
+      name: def.key,
+    });
   }
 
   crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
@@ -135,14 +135,14 @@ export class ClickHouseTraceQueryFieldsRepository {
     if (def.kind !== "range") {
       throw new Error(`facet '${key}' is not a range facet`);
     }
-    return this.translators.crossTableRange(
-      def.table,
-      ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
-      def.expression,
+    return this.translators.crossTableRange({
+      table: def.table,
+      timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+      expression: def.expression,
       read,
       needs,
-      def.key,
-    );
+      name: def.key,
+    });
   }
 }
 

@@ -160,20 +160,26 @@ function buildEvalSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["fi
 
   for (const [field, rawValue] of Object.entries(filters)) {
     if (!hasFilterValues(rawValue)) continue;
-    appendEvalSlimFilterClause(field, rawValue, clauses, params, next);
+    appendEvalSlimFilterClause({ field, rawValue, clauses, params, next });
   }
 
   const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
   return { whereClause, params };
 }
 
-function appendEvalSlimFilterClause(
-  field: string,
-  rawValue: AnalyticsFilterValue,
-  clauses: string[],
-  params: Record<string, unknown>,
-  next: (prefix: string) => string,
-): void {
+function appendEvalSlimFilterClause({
+  field,
+  rawValue,
+  clauses,
+  params,
+  next,
+}: {
+  field: string;
+  rawValue: AnalyticsFilterValue;
+  clauses: string[];
+  params: Record<string, unknown>;
+  next: (prefix: string) => string;
+}): void {
   switch (field) {
     case "metadata.key": {
       const keys = collectStringValues(rawValue);
@@ -187,7 +193,13 @@ function appendEvalSlimFilterClause(
       break;
     }
     case "metadata.value": {
-      appendMetadataValueFilterClauses(`${ea}.Attributes`, rawValue, clauses, params, next);
+      appendMetadataValueFilterClauses({
+        attributes: `${ea}.Attributes`,
+        rawValue,
+        clauses,
+        params,
+        next,
+      });
       break;
     }
     default:
@@ -242,7 +254,13 @@ export function buildEvalSlimTimeseriesQuery(
         `Eval slim builder cannot filter by evaluator key "${String(s.key)}" — evaluation_analytics has no EvaluatorId column. The router should have routed this to evaluation_runs.`,
       );
     }
-    const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
+    const alias = buildMetricAlias({
+      index: i,
+      metric: s.metric,
+      aggregation: s.aggregation,
+      key: s.key,
+      subkey: s.subkey,
+    });
     const expr = evalSlimAggExpression(s.aggregation, evalSlimColumnFor(s.metric));
     selectExprs.push(`${expr} AS ${alias}`);
   }

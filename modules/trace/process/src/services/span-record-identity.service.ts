@@ -69,20 +69,25 @@ export class SpanRecordIdentityService {
       OtlpTraceRequestService.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
     );
 
-    return this.generateDeterministicSpanRecordIdFromData(
-      String(event.tenantId),
+    return this.generateDeterministicSpanRecordIdFromData({
+      tenantId: String(event.tenantId),
       traceId,
       spanId,
       startTimeUnixMs,
-    );
+    });
   }
 
-  generateDeterministicSpanRecordIdFromData(
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-    startTimeUnixMs: number,
-  ): string {
+  generateDeterministicSpanRecordIdFromData({
+    tenantId,
+    traceId,
+    spanId,
+    startTimeUnixMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    startTimeUnixMs: number;
+  }): string {
     EventUtils.validateTenantId({ tenantId }, "generateDeterministicSpanRecordIdFromData");
 
     return this.makeDeterministicKsuid({

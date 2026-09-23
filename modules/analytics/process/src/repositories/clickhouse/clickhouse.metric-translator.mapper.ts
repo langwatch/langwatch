@@ -223,12 +223,17 @@ function getConditionalAggregation(aggregation: AggregationTypes): string {
 /**
  * Translate a simple numeric aggregation (avg, sum, min, max)
  */
-function translateSimpleAggregation(
-  columnExpr: string,
-  aggregation: AggregationTypes,
-  alias: string,
-  percentileMode: PercentileMode = "exact",
-): string {
+function translateSimpleAggregation({
+  columnExpr,
+  aggregation,
+  alias,
+  percentileMode = "exact",
+}: {
+  columnExpr: string;
+  aggregation: AggregationTypes;
+  alias: string;
+  percentileMode?: PercentileMode;
+}): string {
   switch (aggregation) {
     case "avg":
       return `avg(${columnExpr}) AS ${alias}`;
@@ -259,12 +264,17 @@ function translateSimpleAggregation(
  * Uses ClickHouse array functions (arraySum, arrayAvg, etc.)
  * to aggregate values extracted from arrays.
  */
-function translateArrayAggregation(
-  arrayExpr: string,
-  aggregation: AggregationTypes,
-  alias: string,
-  percentileMode: PercentileMode = "exact",
-): string {
+function translateArrayAggregation({
+  arrayExpr,
+  aggregation,
+  alias,
+  percentileMode = "exact",
+}: {
+  arrayExpr: string;
+  aggregation: AggregationTypes;
+  alias: string;
+  percentileMode?: PercentileMode;
+}): string {
   switch (aggregation) {
     case "avg":
       // Flatten arrays across rows and compute average
@@ -300,13 +310,19 @@ function sanitizeAliasPart(value: string): string {
 /**
  * Build alias for a metric aggregation.
  */
-export function buildMetricAlias(
-  index: number,
-  metric: string,
-  aggregation: AggregationTypes,
-  key?: string,
-  subkey?: string,
-): string {
+export function buildMetricAlias({
+  index,
+  metric,
+  aggregation,
+  key,
+  subkey,
+}: {
+  index: number;
+  metric: string;
+  aggregation: AggregationTypes;
+  key?: string;
+  subkey?: string;
+}): string {
   const parts = [index.toString(), sanitizeAliasPart(metric), aggregation];
   if (key) parts.push(sanitizeAliasPart(key));
   if (subkey) parts.push(sanitizeAliasPart(subkey));
@@ -316,49 +332,68 @@ export function buildMetricAlias(
 /**
  * Translate a metric definition to ClickHouse SQL.
  */
-export function translateMetric(
-  metric: string,
-  aggregation: AggregationTypes,
-  index: number,
-  key?: string,
-  subkey?: string,
-): MetricTranslation {
+export function translateMetric({
+  metric,
+  aggregation,
+  index,
+  key,
+  subkey,
+}: {
+  metric: string;
+  aggregation: AggregationTypes;
+  index: number;
+  key?: string;
+  subkey?: string;
+}): MetricTranslation {
   if (!isKnownMetricKey(metric)) {
     throw unknownMetricError(index);
   }
 
-  const alias = buildMetricAlias(index, metric, aggregation, key, subkey);
+  const alias = buildMetricAlias({ index, metric, aggregation, key, subkey });
   const requiredJoins: CHTable[] = [];
 
   // Handle specific metric categories
   const isMetadataMetric = metric.startsWith("metadata.") && isMetadataMetricKey(metric);
   if (isMetadataMetric) {
-    return translateMetadataMetric(metric, aggregation, alias, requiredJoins);
+    return translateMetadataMetric({ metric, aggregation, alias, requiredJoins });
   }
 
   const isPerformanceMetric = metric.startsWith("performance.") && isPerformanceMetricKey(metric);
   if (isPerformanceMetric) {
-    return translatePerformanceMetric(metric, aggregation, alias, requiredJoins);
+    return translatePerformanceMetric({ metric, aggregation, alias, requiredJoins });
   }
 
   const isEvaluationMetric = metric.startsWith("evaluations.") && isEvaluationMetricKey(metric);
   if (isEvaluationMetric) {
-    return translateEvaluationMetric(metric, aggregation, alias, requiredJoins, key);
+    return translateEvaluationMetric({
+      metric,
+      aggregation,
+      alias,
+      requiredJoins,
+      evaluatorId: key,
+    });
   }
 
   const isEventMetric = metric.startsWith("events.") && isEventMetricKey(metric);
   if (isEventMetric) {
-    return translateEventMetric(metric, aggregation, alias, requiredJoins, key, subkey);
+    return translateEventMetric({
+      metric,
+      aggregation,
+      alias,
+      requiredJoins,
+      eventType: key,
+      metricKey: subkey,
+    });
   }
 
   const isSentimentMetric = metric.startsWith("sentiment.") && isSentimentMetricKey(metric);
   if (isSentimentMetric) {
-    return translateSentimentMetric(metric, aggregation, alias, requiredJoins);
+    return translateSentimentMetric({ metric, aggregation, alias, requiredJoins });
   }
 
   const isThreadsMetric = metric.startsWith("threads.") && isThreadsMetricKey(metric);
   if (isThreadsMetric) {
-    return translateThreadsMetric(metric, aggregation, alias, requiredJoins);
+    return translateThreadsMetric({ metric, aggregation, alias, requiredJoins });
   }
 
   const mapped = translateMappedMetric({ aggregation, alias, metric, requiredJoins });
@@ -388,7 +423,7 @@ function translateMappedMetric({
   }
 
   return {
-    selectExpression: translateSimpleAggregation(column, aggregation, alias),
+    selectExpression: translateSimpleAggregation({ columnExpr: column, aggregation, alias }),
     alias,
     requiredJoins,
     params: {},
@@ -398,18 +433,27 @@ function translateMappedMetric({
 /**
  * Translate metadata metrics (trace_id, user_id, thread_id, span_type)
  */
-function translateMetadataMetric(
-  metric: MetadataMetricKey,
-  aggregation: AggregationTypes,
-  alias: string,
-  requiredJoins: CHTable[],
-): MetricTranslation {
+function translateMetadataMetric({
+  metric,
+  aggregation,
+  alias,
+  requiredJoins,
+}: {
+  metric: MetadataMetricKey;
+  aggregation: AggregationTypes;
+  alias: string;
+  requiredJoins: CHTable[];
+}): MetricTranslation {
   const ts = tableAliases.trace_summaries;
 
   switch (metric) {
     case "metadata.trace_id":
       return {
-        selectExpression: translateSimpleAggregation(`${ts}.TraceId`, aggregation, alias),
+        selectExpression: translateSimpleAggregation({
+          columnExpr: `${ts}.TraceId`,
+          aggregation,
+          alias,
+        }),
         alias,
         requiredJoins,
         params: {},
@@ -426,11 +470,11 @@ function translateMetadataMetric(
         };
       }
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.Attributes['langwatch.user_id']`,
+        selectExpression: translateSimpleAggregation({
+          columnExpr: `${ts}.Attributes['langwatch.user_id']`,
           aggregation,
           alias,
-        ),
+        }),
         alias,
         requiredJoins,
         params: {},
@@ -447,11 +491,11 @@ function translateMetadataMetric(
         };
       }
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.Attributes['gen_ai.conversation.id']`,
+        selectExpression: translateSimpleAggregation({
+          columnExpr: `${ts}.Attributes['gen_ai.conversation.id']`,
           aggregation,
           alias,
-        ),
+        }),
         alias,
         requiredJoins,
         params: {},
@@ -467,7 +511,11 @@ function translateMetadataMetric(
         requiredJoins.push("stored_spans");
       }
       return {
-        selectExpression: translateSimpleAggregation(`${ts}.TraceId`, aggregation, alias),
+        selectExpression: translateSimpleAggregation({
+          columnExpr: `${ts}.TraceId`,
+          aggregation,
+          alias,
+        }),
         alias,
         requiredJoins,
         params: {},
@@ -478,16 +526,21 @@ function translateMetadataMetric(
 /**
  * Translate performance metrics
  */
-function translatePerformanceMetric(
-  metric: PerformanceMetricKey,
-  aggregation: AggregationTypes,
-  alias: string,
-  requiredJoins: CHTable[],
-): MetricTranslation {
+function translatePerformanceMetric({
+  metric,
+  aggregation,
+  alias,
+  requiredJoins,
+}: {
+  metric: PerformanceMetricKey;
+  aggregation: AggregationTypes;
+  alias: string;
+  requiredJoins: CHTable[];
+}): MetricTranslation {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
   const perfAgg = (col: string): string =>
-    translateSimpleAggregation(col, aggregation, alias, "tdigest");
+    translateSimpleAggregation({ columnExpr: col, aggregation, alias, percentileMode: "tdigest" });
 
   switch (metric) {
     case "performance.completion_time":
@@ -653,13 +706,19 @@ function translatePerformanceMetric(
 /**
  * Translate evaluation metrics
  */
-function translateEvaluationMetric(
-  metric: EvaluationMetricKey,
-  aggregation: AggregationTypes,
-  alias: string,
-  requiredJoins: CHTable[],
-  evaluatorId?: string,
-): MetricTranslation {
+function translateEvaluationMetric({
+  metric,
+  aggregation,
+  alias,
+  requiredJoins,
+  evaluatorId,
+}: {
+  metric: EvaluationMetricKey;
+  aggregation: AggregationTypes;
+  alias: string;
+  requiredJoins: CHTable[];
+  evaluatorId?: string;
+}): MetricTranslation {
   requiredJoins.push("evaluation_runs");
   const es = tableAliases.evaluation_runs;
 
@@ -721,14 +780,21 @@ function translateEvaluationMetric(
 /**
  * Translate event metrics (event_type, event_score, event_details)
  */
-function translateEventMetric(
-  metric: EventMetricKey,
-  aggregation: AggregationTypes,
-  alias: string,
-  requiredJoins: CHTable[],
-  eventType?: string,
-  metricKey?: string,
-): MetricTranslation {
+function translateEventMetric({
+  metric,
+  aggregation,
+  alias,
+  requiredJoins,
+  eventType,
+  metricKey,
+}: {
+  metric: EventMetricKey;
+  aggregation: AggregationTypes;
+  alias: string;
+  requiredJoins: CHTable[];
+  eventType?: string;
+  metricKey?: string;
+}): MetricTranslation {
   requiredJoins.push("stored_spans");
   const ss = tableAliases.stored_spans;
 
@@ -787,7 +853,7 @@ function translateEventMetric(
       }
 
       // Apply aggregation to the extracted scores array
-      const aggExpr = translateArrayAggregation(scoreExtraction, aggregation, alias);
+      const aggExpr = translateArrayAggregation({ arrayExpr: scoreExtraction, aggregation, alias });
       return {
         selectExpression: aggExpr,
         alias,
@@ -809,12 +875,17 @@ function translateEventMetric(
 /**
  * Translate sentiment metrics.
  */
-function translateSentimentMetric(
-  metric: SentimentMetricKey,
-  aggregation: AggregationTypes,
-  alias: string,
-  requiredJoins: CHTable[],
-): MetricTranslation {
+function translateSentimentMetric({
+  metric,
+  aggregation,
+  alias,
+  requiredJoins,
+}: {
+  metric: SentimentMetricKey;
+  aggregation: AggregationTypes;
+  alias: string;
+  requiredJoins: CHTable[];
+}): MetricTranslation {
   const ss = tableAliases.stored_spans;
 
   switch (metric) {
@@ -852,7 +923,7 @@ function translateSentimentMetric(
           )
         )`;
 
-      const aggExpr = translateArrayAggregation(voteExtraction, aggregation, alias);
+      const aggExpr = translateArrayAggregation({ arrayExpr: voteExtraction, aggregation, alias });
       return {
         selectExpression: aggExpr,
         alias,
@@ -866,12 +937,16 @@ function translateSentimentMetric(
 /**
  * Translate threads metrics (average_duration_per_thread)
  */
-function translateThreadsMetric(
-  metric: ThreadsMetricKey,
-  aggregation: AggregationTypes,
-  alias: string,
-  requiredJoins: CHTable[],
-): MetricTranslation {
+function translateThreadsMetric({
+  metric,
+  alias,
+  requiredJoins,
+}: {
+  metric: ThreadsMetricKey;
+  aggregation: AggregationTypes;
+  alias: string;
+  requiredJoins: CHTable[];
+}): MetricTranslation {
   const ts = tableAliases.trace_summaries;
 
   switch (metric) {
@@ -898,21 +973,29 @@ function translateThreadsMetric(
 /**
  * Translate a pipeline aggregation (per-user, per-thread metrics)
  */
-export function translatePipelineAggregation(
-  metric: string,
-  aggregation: AggregationTypes,
-  pipelineField: string,
-  pipelineAggregation: PipelineAggregationTypes,
-  index: number,
-  key?: string,
-  subkey?: string,
-): MetricTranslation {
+export function translatePipelineAggregation({
+  metric,
+  aggregation,
+  pipelineField,
+  pipelineAggregation,
+  index,
+  key,
+  subkey,
+}: {
+  metric: string;
+  aggregation: AggregationTypes;
+  pipelineField: string;
+  pipelineAggregation: PipelineAggregationTypes;
+  index: number;
+  key?: string;
+  subkey?: string;
+}): MetricTranslation {
   if (!isKnownMetricKey(metric)) {
     throw unknownMetricError(index);
   }
 
   const ts = tableAliases.trace_summaries;
-  const alias = buildMetricAlias(index, metric, aggregation, key, subkey);
+  const alias = buildMetricAlias({ index, metric, aggregation, key, subkey });
 
   // Get the pipeline field expression
   // ES terms aggregation excludes null/missing values, so we just use the column directly
@@ -936,7 +1019,7 @@ export function translatePipelineAggregation(
   }
 
   // Get the inner metric translation
-  const innerMetric = translateMetric(metric, aggregation, index, key, subkey);
+  const innerMetric = translateMetric({ metric, aggregation, index, key, subkey });
 
   // Special handling for threads.average_duration_per_thread with pipeline
   // This requires a 3-level aggregation:

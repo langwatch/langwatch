@@ -174,7 +174,9 @@ export const clusterTopicsForProject = async (
   // createdAt is "now"; re-evaluating the gate on page 2 would read them as
   // "recently clustered" and stop the walk, silently truncating any backlog
   // larger than one page. The run was approved on page 1; later pages are the same run.
-  const daysFrequency = assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
+  let daysFrequency = 2;
+  if (assignedTracesCount < 100) daysFrequency = 7;
+  else if (assignedTracesCount < 500) daysFrequency = 3;
   const cadenceHorizon = nowInstant().subtract({
     milliseconds: daysFrequency * 24 * 60 * 60 * 1000,
   });
@@ -205,14 +207,14 @@ export const clusterTopicsForProject = async (
     "Starting trace search for topic clustering",
   );
 
-  const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse(
+  const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse({
     clickhouse,
     projectId,
     isIncrementalProcessing,
     topicIds,
     subtopicIds,
     searchAfter,
-  );
+  });
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
@@ -251,8 +253,8 @@ export const clusterTopicsForProject = async (
   }
 
   const summary = isIncrementalProcessing
-    ? await incrementalClustering(deps, projectId, traces, runContext)
-    : await batchClusterTraces(deps, projectId, traces, runContext);
+    ? await incrementalClustering({ deps, projectId, traces, runContext })
+    : await batchClusterTraces({ deps, projectId, traces, runContext });
 
   logger.info({ projectId }, "done! project");
 
@@ -349,14 +351,21 @@ export async function fetchCountsFromClickHouse({
   };
 }
 
-export async function fetchTracesFromClickHouse(
-  clickhouse: TopicClusteringClickHouse,
-  projectId: string,
-  isIncrementalProcessing: boolean,
-  topicIds: string[],
-  subtopicIds: string[],
-  searchAfter?: [number, string],
-): Promise<TraceSearchResult> {
+export async function fetchTracesFromClickHouse({
+  clickhouse,
+  projectId,
+  isIncrementalProcessing,
+  topicIds,
+  subtopicIds,
+  searchAfter,
+}: {
+  clickhouse: TopicClusteringClickHouse;
+  projectId: string;
+  isIncrementalProcessing: boolean;
+  topicIds: string[];
+  subtopicIds: string[];
+  searchAfter?: [number, string];
+}): Promise<TraceSearchResult> {
   // Narrow FETCH window (49d, hot-tier only): bounds how far cursor-paging
   // reads the heavy ComputedInput column, keeping it off S3 cold storage.
   const fetchWindowStartMs = nowInstant().epochMilliseconds - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
@@ -451,7 +460,9 @@ export async function fetchTracesFromClickHouse(
     const aTs = parseInt(a.OccurredAtMs, 10);
     const bTs = parseInt(b.OccurredAtMs, 10);
     if (aTs !== bTs) return bTs - aTs; // OccurredAt DESC
-    return a.TraceId < b.TraceId ? -1 : a.TraceId > b.TraceId ? 1 : 0; // TraceId ASC
+    if (a.TraceId < b.TraceId) return -1; // TraceId ASC
+    if (a.TraceId > b.TraceId) return 1;
+    return 0;
   });
 
   // Defensive de-dup by TraceId in JS, not SQL: the per-key SQL dedup
@@ -488,6 +499,17 @@ export async function fetchTracesFromClickHouse(
   return { traces, lastSort, returnedCount: rows.length };
 }
 
+/** The `input` a JSON-encoded value wraps, or the value itself when it wraps none. */
+function unwrapInnerInput(value: string): string {
+  try {
+    const inner = JSON.parse(value);
+    if (typeof inner?.input === "string" && inner.input.length > 0) return inner.input;
+  } catch {
+    // value is already a string
+  }
+  return value;
+}
+
 /** Extract text from a ComputedInput JSON string (mirrors getExtractedInput logic) */
 function extractInputFromComputed(computedInput: string | null): string {
   if (!computedInput) return "<empty>";
@@ -496,18 +518,7 @@ function extractInputFromComputed(computedInput: string | null): string {
     const parsed = JSON.parse(computedInput);
     // ComputedInput is typically the already-extracted input value as JSON
     if (typeof parsed === "string") return parsed || "<empty>";
-    if (typeof parsed?.value === "string") {
-      let value = parsed.value;
-      try {
-        const inner = JSON.parse(value);
-        if (typeof inner?.input === "string" && inner.input.length > 0) {
-          value = inner.input;
-        }
-      } catch {
-        // value is already a string
-      }
-      return value || "<empty>";
-    }
+    if (typeof parsed?.value === "string") return unwrapInnerInput(parsed.value) || "<empty>";
     if (typeof parsed?.input === "string") return parsed.input || "<empty>";
     return typeof parsed === "object" ? JSON.stringify(parsed) : String(parsed) || "<empty>";
   } catch {
@@ -551,12 +562,17 @@ const getProjectTopicClusteringModelProvider = async (
   return { model: topicClusteringModel, modelProvider };
 };
 
-export const batchClusterTraces = async (
-  deps: TopicClusteringRunnerDeps,
-  projectId: string,
-  traces: TopicClusteringTrace[],
-  runContext?: ClusteringRunContext,
-): Promise<ClusteringStoreSummary | null> => {
+export const batchClusterTraces = async ({
+  deps,
+  projectId,
+  traces,
+  runContext,
+}: {
+  deps: TopicClusteringRunnerDeps;
+  projectId: string;
+  traces: TopicClusteringTrace[];
+  runContext?: ClusteringRunContext;
+}): Promise<ClusteringStoreSummary | null> => {
   logger.info({ tracesLength: traces.length, projectId }, "batch clustering topics");
 
   const topicModel = await getProjectTopicClusteringModelProvider(deps, projectId);
@@ -582,15 +598,20 @@ export const batchClusterTraces = async (
     traces,
   });
 
-  return storeResults(deps, projectId, clusteringResult, false, runContext);
+  return storeResults({ deps, projectId, clusteringResult, isIncremental: false, runContext });
 };
 
-export const incrementalClustering = async (
-  deps: TopicClusteringRunnerDeps,
-  projectId: string,
-  traces: TopicClusteringTrace[],
-  runContext?: ClusteringRunContext,
-): Promise<ClusteringStoreSummary | null> => {
+export const incrementalClustering = async ({
+  deps,
+  projectId,
+  traces,
+  runContext,
+}: {
+  deps: TopicClusteringRunnerDeps;
+  projectId: string;
+  traces: TopicClusteringTrace[];
+  runContext?: ClusteringRunContext;
+}): Promise<ClusteringStoreSummary | null> => {
   logger.info({ tracesLength: traces.length, projectId }, "incremental topic clustering");
 
   const topics: TopicClusteringTopic[] = (await deps.repository.findModelTopics(projectId)).map(
@@ -637,16 +658,74 @@ export const incrementalClustering = async (
     subtopics,
   });
 
-  return storeResults(deps, projectId, clusteringResult, true, runContext);
+  return storeResults({ deps, projectId, clusteringResult, isIncremental: true, runContext });
 };
 
-export const storeResults = async (
-  deps: TopicClusteringRunnerDeps,
-  projectId: string,
-  clusteringResult: TopicClusteringResponse | undefined,
-  isIncremental: boolean,
-  runContext?: ClusteringRunContext,
-): Promise<ClusteringStoreSummary | null> => {
+const recordClusteredTopics = async ({
+  deps,
+  projectId,
+  clusteringResult,
+  isIncremental,
+  runContext,
+}: {
+  deps: TopicClusteringRunnerDeps;
+  projectId: string;
+  clusteringResult: TopicClusteringResponse;
+  isIncremental: boolean;
+  runContext?: ClusteringRunContext;
+}): Promise<void> => {
+  const { topics, subtopics } = clusteringResult;
+  const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
+  // No clustering topics_recorded may be appended before the project's
+  // pre-ownership history is on the stream: per-aggregate log order then
+  // guarantees the seed folds first, so this event can never reconcile
+  // the table down to just its own delta. Idempotent (`seed:v1`) and a
+  // no-op once the projection owns the model.
+  await deps.migration.seedProjectTopicModel(projectId);
+  await deps.commands.recordTopics({
+    tenantId: projectId,
+    occurredAt: nowInstant().epochMilliseconds,
+    mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
+    source: "clustering",
+    dedupeKey: runContext
+      ? `run:${runContext.runId}:page-${runContext.page}`
+      : `adhoc:${nowInstant().epochMilliseconds}`,
+    topics: [
+      ...topics.map((topic) => ({
+        id: topic.id,
+        name: topic.name,
+        parentId: null,
+        embeddingsModel: embeddingsModel.model,
+        centroid: topic.centroid,
+        p95Distance: topic.p95_distance,
+        automaticallyGenerated: true,
+      })),
+      ...subtopics.map((subtopic) => ({
+        id: subtopic.id,
+        name: subtopic.name,
+        parentId: subtopic.parent_id,
+        embeddingsModel: embeddingsModel.model,
+        centroid: subtopic.centroid,
+        p95Distance: subtopic.p95_distance,
+        automaticallyGenerated: true,
+      })),
+    ],
+  });
+};
+
+export const storeResults = async ({
+  deps,
+  projectId,
+  clusteringResult,
+  isIncremental,
+  runContext,
+}: {
+  deps: TopicClusteringRunnerDeps;
+  projectId: string;
+  clusteringResult: TopicClusteringResponse | undefined;
+  isIncremental: boolean;
+  runContext?: ClusteringRunContext;
+}): Promise<ClusteringStoreSummary | null> => {
   // No result is a skip, not an empty run: return null (not deleting the model if endpoint unset).
   if (!clusteringResult) {
     logger.warn(
@@ -671,42 +750,7 @@ export const storeResults = async (
   // Batch mode replaces the model only when there's a new one (not leaving project empty).
   // Everything else merges; projection applies asynchronously (eventually consistent).
   if (topics.length > 0 || subtopics.length > 0) {
-    const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
-    // No clustering topics_recorded may be appended before the project's
-    // pre-ownership history is on the stream: per-aggregate log order then
-    // guarantees the seed folds first, so this event can never reconcile
-    // the table down to just its own delta. Idempotent (`seed:v1`) and a
-    // no-op once the projection owns the model.
-    await deps.migration.seedProjectTopicModel(projectId);
-    await deps.commands.recordTopics({
-      tenantId: projectId,
-      occurredAt: nowInstant().epochMilliseconds,
-      mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
-      source: "clustering",
-      dedupeKey: runContext
-        ? `run:${runContext.runId}:page-${runContext.page}`
-        : `adhoc:${nowInstant().epochMilliseconds}`,
-      topics: [
-        ...topics.map((topic) => ({
-          id: topic.id,
-          name: topic.name,
-          parentId: null,
-          embeddingsModel: embeddingsModel.model,
-          centroid: topic.centroid,
-          p95Distance: topic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-        ...subtopics.map((subtopic) => ({
-          id: subtopic.id,
-          name: subtopic.name,
-          parentId: subtopic.parent_id,
-          embeddingsModel: embeddingsModel.model,
-          centroid: subtopic.centroid,
-          p95Distance: subtopic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-      ],
-    });
+    await recordClusteredTopics({ deps, projectId, clusteringResult, isIncremental, runContext });
   }
 
   // Emit TopicAssignedEvents via command queue

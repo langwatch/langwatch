@@ -220,7 +220,7 @@ export function composeTraceAppDependencies(
       logRecords,
       canonicalisation: options.canonicalisation,
       editOverlay,
-      changeTraceName: options.commands.changeTraceName,
+      changeTraceName: (data) => options.commands.changeTraceName(data),
     },
     spanIngest: TraceProcessingSpanIngestAdapter.create(options.commands),
     // The receiver the two ingestion doors share. ONE dedup claim and ONE

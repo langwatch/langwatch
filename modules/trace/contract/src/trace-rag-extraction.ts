@@ -176,19 +176,21 @@ export const convertFromUnixNano = (timeUnixNano: unknown): number => {
   return Math.round(unixNano / 1000000);
 };
 
-export const setNestedProperty = (obj: Record<string, any>, path: string, value: any): void => {
-  const unflattened = safeUnflatten({ [path]: value }) as Record<string, any>;
+export const setNestedProperty = (
+  obj: Record<string, unknown>,
+  path: string,
+  value: unknown,
+): void => {
+  const unflattened = safeUnflatten({ [path]: value });
 
-  // Merge the unflattened object into the target object
-  const keys = Object.keys(unflattened);
-  for (const key of keys) {
-    if (!(key in obj)) {
-      obj[key] = unflattened[key];
-      // Deep merge if both are objects
-    } else if (typeof obj[key] === "object" && typeof unflattened[key] === "object") {
-      obj[key] = { ...obj[key], ...unflattened[key] };
+  // Merge the unflattened object into the target object, deep when both sides are objects
+  for (const key of Object.keys(unflattened)) {
+    const existing = obj[key];
+    const incoming = unflattened[key];
+    if (key in obj && typeof existing === "object" && typeof incoming === "object") {
+      obj[key] = { ...existing, ...incoming };
     } else {
-      obj[key] = unflattened[key];
+      obj[key] = incoming;
     }
   }
 };

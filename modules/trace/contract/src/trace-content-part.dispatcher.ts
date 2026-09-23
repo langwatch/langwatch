@@ -66,12 +66,17 @@ function inputAudioPart<R>(
 }
 
 /** A `file` part carrying its payload inline, under `mediaType` + `data`/`url`. */
-function inlineFilePart<R>(
-  o: Record<string, unknown>,
-  part: unknown,
-  visitor: AsyncContentPartVisitor<R>,
-  payload: Readonly<{ mimeType: string; data: string | undefined; url: string | undefined }>,
-): R | Promise<R> | undefined {
+function inlineFilePart<R>({
+  o,
+  part,
+  visitor,
+  payload,
+}: {
+  o: Record<string, unknown>;
+  part: unknown;
+  visitor: AsyncContentPartVisitor<R>;
+  payload: Readonly<{ mimeType: string; data: string | undefined; url: string | undefined }>;
+}): R | Promise<R> | undefined {
   const { mimeType, data, url } = payload;
   if (mimeType.startsWith("audio/")) {
     if (!visitor.inputAudio) return visitor.unknown?.(part);
@@ -119,7 +124,12 @@ function filePart<R>(
     const data = asString(o.data);
     const url = asString(o.url);
     if (data || url) {
-      return inlineFilePart(o, part, visitor, { mimeType: o.mediaType.toLowerCase(), data, url });
+      return inlineFilePart({
+        o,
+        part,
+        visitor,
+        payload: { mimeType: o.mediaType.toLowerCase(), data, url },
+      });
     }
   }
 

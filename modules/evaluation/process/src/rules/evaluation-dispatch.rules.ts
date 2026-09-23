@@ -67,7 +67,7 @@ const autoparseContexts = (contexts: unknown): string[] | undefined => {
 
 export const getEvaluatorDataForParams = (
   checkType: string,
-  params: Record<string, any>,
+  params: Record<string, unknown>,
 ): EvaluationDispatchData => {
   const declaresOwnInputs =
     checkType.startsWith("custom/") || checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX);

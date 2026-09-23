@@ -34,6 +34,11 @@ import {
   type LangWatchQLValidationInput,
   type QueryReference,
   type AnalyticsApi as AnalyticsApiContract,
+  type AnalyticsEvaluationReadInput,
+  type AnalyticsEvaluationRollupAppendBatchInput,
+  type AnalyticsEvaluationRollupAppendInput,
+  type AnalyticsEvaluationRow,
+  type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
@@ -174,9 +179,9 @@ const isPresent = (value: string | undefined): value is string => Boolean(value)
 
 const langWatchQlConnection = (values: readonly string[]): LangWatchQLConnection => {
   const [url, username, password, database, tenantSetting] = values;
-  if (!url || !username || !password || !database || !tenantSetting) {
-    throw new Error("LangWatchQL connection is incomplete");
-  }
+  const incomplete = !url || !username || !password || !database || !tenantSetting;
+  if (incomplete) throw new Error("LangWatchQL connection is incomplete");
+
   return { url, username, password, database, tenantSetting };
 };
 
@@ -557,32 +562,26 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     });
   }
 
-  upsertEvaluationAnalytics(
-    input: Parameters<AnalyticsService["upsertEvaluationAnalytics"]>[0],
-  ): Promise<void> {
+  upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void> {
     return this.#dependencies.analytics.upsertEvaluationAnalytics(input);
   }
 
-  upsertEvaluationAnalyticsBatch(
-    input: Parameters<AnalyticsService["upsertEvaluationAnalyticsBatch"]>[0],
-  ): Promise<void> {
+  upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void> {
     return this.#dependencies.analytics.upsertEvaluationAnalyticsBatch(input);
   }
 
   findEvaluationAnalytics(
-    input: Parameters<AnalyticsService["findEvaluationAnalytics"]>[0],
-  ): ReturnType<AnalyticsService["findEvaluationAnalytics"]> {
+    input: AnalyticsEvaluationReadInput,
+  ): Promise<{ row: AnalyticsEvaluationRow; appliedEventIds: string[] } | null> {
     return this.#dependencies.analytics.findEvaluationAnalytics(input);
   }
 
-  appendEvaluationAnalyticsRollup(
-    input: Parameters<AnalyticsService["appendEvaluationAnalyticsRollup"]>[0],
-  ): Promise<void> {
+  appendEvaluationAnalyticsRollup(input: AnalyticsEvaluationRollupAppendInput): Promise<void> {
     return this.#dependencies.analytics.appendEvaluationAnalyticsRollup(input);
   }
 
   appendEvaluationAnalyticsRollupBatch(
-    input: Parameters<AnalyticsService["appendEvaluationAnalyticsRollupBatch"]>[0],
+    input: AnalyticsEvaluationRollupAppendBatchInput,
   ): Promise<void> {
     return this.#dependencies.analytics.appendEvaluationAnalyticsRollupBatch(input);
   }

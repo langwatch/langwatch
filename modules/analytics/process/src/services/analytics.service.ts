@@ -88,16 +88,23 @@ export class AnalyticsService extends AnalyticsServiceContract {
     evaluationRepository: AnalyticsEvaluationRepository;
     tripwire?: AnalyticsTripwire;
   }): AnalyticsService {
-    return new AnalyticsService(options.repository, options.evaluationRepository, options.tripwire);
+    return new AnalyticsService(options);
   }
 
-  private constructor(
-    private readonly repository: AnalyticsRepository,
-    private readonly evaluationRepository: AnalyticsEvaluationRepository,
-    private readonly tripwire?: AnalyticsTripwire,
-    private readonly cache = new Map<string, CacheEntry>(),
-  ) {
+  private readonly repository: AnalyticsRepository;
+  private readonly evaluationRepository: AnalyticsEvaluationRepository;
+  private readonly tripwire?: AnalyticsTripwire;
+  private readonly cache = new Map<string, CacheEntry>();
+
+  private constructor(deps: {
+    repository: AnalyticsRepository;
+    evaluationRepository: AnalyticsEvaluationRepository;
+    tripwire?: AnalyticsTripwire;
+  }) {
     super();
+    this.repository = deps.repository;
+    this.evaluationRepository = deps.evaluationRepository;
+    this.tripwire = deps.tripwire;
   }
 
   private readonly tracer = trace.getTracer("langwatch.analytics.service");

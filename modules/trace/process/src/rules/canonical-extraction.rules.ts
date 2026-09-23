@@ -25,12 +25,17 @@ type ExtractMessagesConfig = {
 };
 
 /** Whether one attribute key carried the messages this extraction wanted. */
-const extractMessagesFromAttr = (
-  ctx: ExtractorContext,
-  key: string,
-  ruleId: string,
-  config: ExtractMessagesConfig,
-): boolean => {
+const extractMessagesFromAttr = ({
+  ctx,
+  key,
+  ruleId,
+  config,
+}: {
+  ctx: ExtractorContext;
+  key: string;
+  ruleId: string;
+  config: ExtractMessagesConfig;
+}): boolean => {
   const raw = ctx.bag.attrs.take(key);
   if (raw === void 0) return false;
 
@@ -60,12 +65,17 @@ const extractMessagesFromAttr = (
 };
 
 /** Whether one event source carried the messages this extraction wanted. */
-const extractMessagesFromEvents = (
-  ctx: ExtractorContext,
-  source: Extract<MessageSource, { type: "event" }>,
-  ruleId: string,
-  config: ExtractMessagesConfig,
-): boolean => {
+const extractMessagesFromEvents = ({
+  ctx,
+  source,
+  ruleId,
+  config,
+}: {
+  ctx: ExtractorContext;
+  source: Extract<MessageSource, { type: "event" }>;
+  ruleId: string;
+  config: ExtractMessagesConfig;
+}): boolean => {
   const messages: unknown[] = [];
   for (const ev of ctx.bag.events.takeAll(source.name)) {
     const extracted = source.extractor(ev);
@@ -81,12 +91,17 @@ const extractMessagesFromEvents = (
   return true;
 };
 
-const extractMessages = (
-  ctx: ExtractorContext,
-  sources: MessageSource[],
-  ruleId: string,
-  config: ExtractMessagesConfig,
-): boolean => {
+const extractMessages = ({
+  ctx,
+  sources,
+  ruleId,
+  config,
+}: {
+  ctx: ExtractorContext;
+  sources: MessageSource[];
+  ruleId: string;
+  config: ExtractMessagesConfig;
+}): boolean => {
   const alreadyPresent = ctx.bag.attrs.has(config.attrKey) || ctx.out[config.attrKey] !== void 0;
   if (alreadyPresent) {
     return false;
@@ -94,13 +109,13 @@ const extractMessages = (
 
   for (const source of sources) {
     if (source.type === "event") {
-      if (extractMessagesFromEvents(ctx, source, ruleId, config)) return true;
+      if (extractMessagesFromEvents({ ctx, source, ruleId, config })) return true;
 
       continue;
     }
 
     for (const key of source.keys) {
-      if (extractMessagesFromAttr(ctx, key, ruleId, config)) return true;
+      if (extractMessagesFromAttr({ ctx, key, ruleId, config })) return true;
     }
   }
 
@@ -112,10 +127,15 @@ export const extractInputMessages = (
   sources: MessageSource[],
   ruleId: string,
 ): boolean =>
-  extractMessages(ctx, sources, ruleId, {
-    attrKey: ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-    defaultRole: "user",
-    extractSystemInstructions: true,
+  extractMessages({
+    ctx,
+    sources,
+    ruleId,
+    config: {
+      attrKey: ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+      defaultRole: "user",
+      extractSystemInstructions: true,
+    },
   });
 
 export const extractOutputMessages = (
@@ -123,10 +143,15 @@ export const extractOutputMessages = (
   sources: MessageSource[],
   ruleId: string,
 ): boolean =>
-  extractMessages(ctx, sources, ruleId, {
-    attrKey: ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-    defaultRole: "assistant",
-    extractSystemInstructions: false,
+  extractMessages({
+    ctx,
+    sources,
+    ruleId,
+    config: {
+      attrKey: ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+      defaultRole: "assistant",
+      extractSystemInstructions: false,
+    },
   });
 
 export const extractModelToBoth = ({

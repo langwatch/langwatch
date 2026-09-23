@@ -103,7 +103,10 @@ export class EvaluationAnalyticsFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    EvaluationAnalyticsData,
+    "createdAt" | "updatedAt" | "LastEventOccurredAt"
+  > {
     return {
       evaluationId: "",
       evaluatorId: "",

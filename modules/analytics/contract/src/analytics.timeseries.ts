@@ -170,18 +170,20 @@ export type AnalyticsTimeseriesRow = z.infer<typeof analyticsTimeseriesRowSchema
 
 export type AnalyticsMetricSource = "trace" | "evaluation";
 
+const TRACE_METRIC_PREFIXES = [
+  "metadata.",
+  "performance.",
+  "events.",
+  "sentiment.",
+  "threads.",
+  "topics.",
+  "traces.",
+] as const;
+
 export function getMetricSource(metric: string): AnalyticsMetricSource | undefined {
-  return metric.startsWith("evaluations.")
-    ? "evaluation"
-    : metric.startsWith("metadata.") ||
-        metric.startsWith("performance.") ||
-        metric.startsWith("events.") ||
-        metric.startsWith("sentiment.") ||
-        metric.startsWith("threads.") ||
-        metric.startsWith("topics.") ||
-        metric.startsWith("traces.")
-      ? "trace"
-      : void 0;
+  if (metric.startsWith("evaluations.")) return "evaluation";
+
+  return TRACE_METRIC_PREFIXES.some((prefix) => metric.startsWith(prefix)) ? "trace" : void 0;
 }
 
 export function buildSeriesName(series: AnalyticsSeries, index: number): string {

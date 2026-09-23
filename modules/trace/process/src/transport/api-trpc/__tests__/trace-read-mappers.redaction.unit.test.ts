@@ -70,7 +70,12 @@ function redactTraceLogContent(
   row: TraceLogRecordDto,
   protections: LogProtections,
 ): TraceLogRecordDto {
-  return redactTraceLogContentWithService(row, protections, codingAgents, DERIVED_ATTR_PREFIXES);
+  return redactTraceLogContentWithService({
+    row,
+    protections,
+    codingAgents,
+    derivedAttrPrefixes: DERIVED_ATTR_PREFIXES,
+  });
 }
 
 function gateTraceLogVisibility(
@@ -78,13 +83,13 @@ function gateTraceLogVisibility(
   protections: LogProtections,
   visibilityCutoffMs: number | null,
 ): TraceLogRecordDto {
-  return gateTraceLogVisibilityWithService(
+  return gateTraceLogVisibilityWithService({
     row,
     protections,
     visibilityCutoffMs,
     codingAgents,
-    DERIVED_ATTR_PREFIXES,
-  );
+    derivedAttrPrefixes: DERIVED_ATTR_PREFIXES,
+  });
 }
 
 /** A full per-category visibility map, all visible unless overridden. */

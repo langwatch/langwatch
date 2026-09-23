@@ -1,4 +1,5 @@
 import { getFacetValueState, validateAst } from "../../../trace-query-analysis.ts";
+import type { FacetState } from "../../../trace-query-metadata.ts";
 import {
   addSameFieldOrValue,
   addToOrGroupAtLocation,
@@ -6,7 +7,7 @@ import {
   removeFacetValueFromQuery,
   toggleFacetInQuery,
 } from "../../../trace-query-mutations.ts";
-import { isEmptyAST, parse, serialize } from "../../../trace-query-parser.ts";
+import { isEmptyAST, type LiqeQuery, parse, serialize } from "../../../trace-query-parser.ts";
 import {
   type SetFilterPayload,
   setFilterPayloadSchema,
@@ -22,7 +23,7 @@ import { ExplorerTransformError, type ExplorerTransform } from "./types.ts";
 function canonicalQuery(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
-  let ast: ReturnType<typeof parse>;
+  let ast: LiqeQuery;
   try {
     ast = parse(trimmed);
   } catch (error) {
@@ -140,7 +141,7 @@ function facetStateIn({
   queryText: string;
   field: string;
   value: string;
-}): ReturnType<typeof getFacetValueState> {
+}): FacetState {
   const trimmed = queryText.trim();
   if (!trimmed) return "neutral";
   try {

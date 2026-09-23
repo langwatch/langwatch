@@ -25,12 +25,12 @@ export interface FilterTranslation {
  * optional SQL fragment that handlers reading `stored_spans` inject into
  * their subquery WHERE, pruning the scan to the dashboard's date range.
  */
-type FilterHandler = (
-  values: string[],
-  key?: string,
-  subkey?: string,
-  spanTimePredicate?: string,
-) => FilterTranslation;
+type FilterHandler = (input: {
+  values: string[];
+  key?: string;
+  subkey?: string;
+  spanTimePredicate?: string;
+}) => FilterTranslation;
 
 /**
  * Parameter counter for generating unique parameter names
@@ -58,56 +58,63 @@ function genParamName(prefix: string): string {
 // accepts a filter the translator then silently ignores.
 const filterHandlers: Record<FilterField, FilterHandler | null> = {
   // Topic Filters
-  "topics.topics": (values) => translateTopicFilter(values),
-  "topics.subtopics": (values) => translateSubtopicFilter(values),
+  "topics.topics": ({ values }) => translateTopicFilter(values),
+  "topics.subtopics": ({ values }) => translateSubtopicFilter(values),
 
   // Metadata Filters
-  "metadata.user_id": (values) => translateMetadataFilter("langwatch.user_id", values),
-  "metadata.thread_id": (values) => translateMetadataFilter("gen_ai.conversation.id", values),
-  "metadata.customer_id": (values) => translateMetadataFilter("langwatch.customer_id", values),
-  "metadata.labels": (values) => translateLabelsFilter(values),
-  "metadata.key": (values) => translateMetadataKeyFilter(values),
-  "metadata.value": (values, key) => translateMetadataValueFilter(values, key),
-  "metadata.prompt_ids": (values) => translatePromptIdsFilter(values),
+  "metadata.user_id": ({ values }) => translateMetadataFilter("langwatch.user_id", values),
+  "metadata.thread_id": ({ values }) => translateMetadataFilter("gen_ai.conversation.id", values),
+  "metadata.customer_id": ({ values }) => translateMetadataFilter("langwatch.customer_id", values),
+  "metadata.labels": ({ values }) => translateLabelsFilter(values),
+  "metadata.key": ({ values }) => translateMetadataKeyFilter(values),
+  "metadata.value": ({ values, key }) => translateMetadataValueFilter(values, key),
+  "metadata.prompt_ids": ({ values }) => translatePromptIdsFilter(values),
 
   // Trace Filters
-  "traces.origin": (values) => translateOriginFilter(values),
-  "traces.error": (values) => translateErrorFilter(values),
-  "traces.name": (values) => translateTraceNameFilter(values),
+  "traces.origin": ({ values }) => translateOriginFilter(values),
+  "traces.error": ({ values }) => translateErrorFilter(values),
+  "traces.name": ({ values }) => translateTraceNameFilter(values),
 
   // Span Filters
-  "spans.type": (values, _key, _subkey, spanTime) => translateSpanTypeFilter(values, spanTime),
-  "spans.model": (values, _key, _subkey, spanTime) => translateSpanModelFilter(values, spanTime),
+  "spans.type": ({ values, spanTimePredicate: spanTime }) =>
+    translateSpanTypeFilter(values, spanTime),
+  "spans.model": ({ values, spanTimePredicate: spanTime }) =>
+    translateSpanModelFilter(values, spanTime),
 
   // Evaluation Filters
-  "evaluations.evaluator_id": (values) => translateEvaluatorIdFilter(values),
-  "evaluations.evaluator_id.guardrails_only": (values) => translateEvaluatorIdFilter(values),
-  "evaluations.evaluator_id.has_passed": (values) =>
+  "evaluations.evaluator_id": ({ values }) => translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.guardrails_only": ({ values }) => translateEvaluatorIdFilter(values),
+  "evaluations.evaluator_id.has_passed": ({ values }) =>
     translateEvaluatorIdFilter(values, "AND Passed IS NOT NULL"),
-  "evaluations.evaluator_id.has_score": (values) =>
+  "evaluations.evaluator_id.has_score": ({ values }) =>
     translateEvaluatorIdFilter(values, "AND Score IS NOT NULL"),
-  "evaluations.evaluator_id.has_label": (values) =>
+  "evaluations.evaluator_id.has_label": ({ values }) =>
     translateEvaluatorIdFilter(
       values,
       "AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('succeeded', 'failed')",
     ),
-  "evaluations.passed": (values, key) => translateEvaluationPassedFilter(values, key),
-  "evaluations.score": (values, key) => translateEvaluationScoreFilter(values, key),
-  "evaluations.label": (values, key) => translateEvaluationLabelFilter(values, key),
-  "evaluations.state": (values, key) => translateEvaluationStateFilter(values, key),
+  "evaluations.passed": ({ values, key }) => translateEvaluationPassedFilter(values, key),
+  "evaluations.score": ({ values, key }) => translateEvaluationScoreFilter(values, key),
+  "evaluations.label": ({ values, key }) => translateEvaluationLabelFilter(values, key),
+  "evaluations.state": ({ values, key }) => translateEvaluationStateFilter(values, key),
 
   // Event Filters
-  "events.event_type": (values, _key, _subkey, spanTime) =>
+  "events.event_type": ({ values, spanTimePredicate: spanTime }) =>
     translateEventTypeFilter(values, spanTime),
-  "events.metrics.key": (values, key, _subkey, spanTime) =>
+  "events.metrics.key": ({ values, key, spanTimePredicate: spanTime }) =>
     translateEventMetricKeyFilter(values, key, spanTime),
-  "events.metrics.value": (values, key, subkey, spanTime) =>
-    translateEventMetricValueFilter(values, key, subkey, spanTime),
-  "events.event_details.key": (values, key, _subkey, spanTime) =>
+  "events.metrics.value": ({ values, key, subkey, spanTimePredicate: spanTime }) =>
+    translateEventMetricValueFilter({
+      values,
+      eventType: key,
+      metricKey: subkey,
+      spanTimePredicate: spanTime,
+    }),
+  "events.event_details.key": ({ values, key, spanTimePredicate: spanTime }) =>
     translateEventDetailKeyFilter(values, key, spanTime),
 
   // Annotation Filters
-  "annotations.hasAnnotation": (values) => translateAnnotationFilter(values),
+  "annotations.hasAnnotation": ({ values }) => translateAnnotationFilter(values),
 };
 
 /**
@@ -136,7 +143,7 @@ export function translateFilter(
   }
 
   const handler = filterHandlers[field];
-  return handler ? handler(values, key, subkey, spanTimePredicate) : noOpFilter;
+  return handler ? handler({ values, key, subkey, spanTimePredicate }) : noOpFilter;
 }
 
 /**
@@ -582,12 +589,17 @@ function translateEventMetricKeyFilter(
  * arrayExists to correlate Events.Name with Events.Attributes at the same
  * index, preventing a type match at one index from pairing with a value at another.
  */
-function translateEventMetricValueFilter(
-  values: string[],
-  eventType?: string,
-  metricKey?: string,
+function translateEventMetricValueFilter({
+  values,
+  eventType,
+  metricKey,
   spanTimePredicate = "",
-): FilterTranslation {
+}: {
+  values: string[];
+  eventType?: string;
+  metricKey?: string;
+  spanTimePredicate?: string;
+}): FilterTranslation {
   const ts = tableAliases.trace_summaries;
 
   if (!metricKey) {

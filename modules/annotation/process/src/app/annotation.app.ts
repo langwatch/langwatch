@@ -33,6 +33,19 @@ import {
   type AnnotationReviewCreateInput,
   type AnnotationSuggestionSource,
   type AnnotationUsageCount,
+  type AnnotationOptimizedQueues,
+  type AnnotationQueueDetail,
+  type AnnotationQueueItem,
+  type AnnotationQueueItemWithTrace,
+  type AnnotationQueueListEntry,
+  type AnnotationQueueListedItem,
+  type AnnotationQueuePendingCount,
+  type AnnotationQueueRecord,
+  type AnnotationScore,
+  type AnnotationScoreName,
+  type AnnotationWithFullUser,
+  type AnnotationWithUserSummary,
+  type ProjectionAnnotation,
 } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -134,59 +147,59 @@ export class AnnotationApp implements AnnotationApi {
     return new AnnotationApp(repositories, dependencies);
   }
 
-  create(input: CreateAnnotationInput) {
+  create(input: CreateAnnotationInput): Promise<Annotation> {
     return this.#annotations.create(input);
   }
 
-  createUnattributed(input: CreateUnattributedAnnotationInput) {
+  createUnattributed(input: CreateUnattributedAnnotationInput): Promise<Annotation> {
     return this.#annotations.createUnattributed(input);
   }
 
-  update(input: UpdateAnnotationInput) {
+  update(input: UpdateAnnotationInput): Promise<Annotation> {
     return this.#annotations.update(input);
   }
 
-  delete(input: DeleteAnnotationInput) {
+  delete(input: DeleteAnnotationInput): Promise<Annotation> {
     return this.#annotations.delete(input);
   }
 
-  getById(input: AnnotationByIdInput) {
+  getById(input: AnnotationByIdInput): Promise<Annotation> {
     return this.#annotations.getById(input);
   }
 
-  list(input: ListAnnotationsInput) {
+  list(input: ListAnnotationsInput): Promise<Annotation[]> {
     return this.#annotations.list(input);
   }
 
-  listForProjection(input: ListProjectionAnnotationsInput) {
+  listForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
     return this.#annotations.listForProjection(input);
   }
 
-  listScoreNames(input: ListAnnotationScoreNamesInput) {
+  listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
     return this.#scores.listScoreNames(input);
   }
 
-  upsertScore(input: UpsertAnnotationScoreInput) {
+  upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore> {
     return this.#scores.upsertScore(input);
   }
 
-  listScores(input: ListAnnotationScoresInput) {
+  listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
     return this.#scores.listScores(input);
   }
 
-  getScore(input: AnnotationScoreByIdInput) {
+  getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
     return this.#scores.getScore(input);
   }
 
-  toggleScore(input: ToggleAnnotationScoreInput) {
+  toggleScore(input: ToggleAnnotationScoreInput): Promise<AnnotationScore> {
     return this.#scores.toggleScore(input);
   }
 
-  deleteScore(input: AnnotationScoreByIdInput) {
+  deleteScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
     return this.#scores.deleteScore(input);
   }
 
-  async configure(input: AnnotationQueueConfiguration) {
+  async configure(input: AnnotationQueueConfiguration): Promise<AnnotationQueueRecord> {
     const organizationId = await this.#projects.getOrganizationId(input.projectId);
     const userIds = [...new Set(input.userIds)];
     const scoreTypeIds = [...new Set(input.scoreTypeIds)];
@@ -200,45 +213,53 @@ export class AnnotationApp implements AnnotationApi {
 
     return this.#queues.configure(input);
   }
-  listQueues(input: AnnotationQueueScope & Readonly<{ reachableOnly?: boolean; userId?: string }>) {
+  listQueues(
+    input: AnnotationQueueScope & Readonly<{ reachableOnly?: boolean; userId?: string }>,
+  ): Promise<AnnotationQueueListEntry[]> {
     return this.#queues.listQueues(input);
   }
 
-  async getQueue(input: AnnotationQueueScope & Readonly<{ slug?: string; queueId?: string }>) {
+  async getQueue(
+    input: AnnotationQueueScope & Readonly<{ slug?: string; queueId?: string }>,
+  ): Promise<AnnotationQueueDetail> {
     const { members, ...scope } = await this.#getOrganizationScope(input);
     const queue = await this.#queues.getQueue({ ...input, ...scope });
 
     return this.#withMemberSummaries(queue, members);
   }
 
-  async listQueueItems(input: AnnotationQueueScope) {
+  async listQueueItems(input: AnnotationQueueScope): Promise<readonly AnnotationQueueListedItem[]> {
     const { members, ...scope } = await this.#getOrganizationScope(input);
     const items = await this.#queues.listQueueItems({ ...input, ...scope });
 
     return items.map((item) => this.#withQueueItemMemberSummaries(item, members));
   }
 
-  countPendingItems(input: AnnotationQueueCaller) {
+  countPendingItems(input: AnnotationQueueCaller): Promise<number> {
     return this.#queues.countPendingItems(input);
   }
 
-  countAssignedItems(input: AnnotationQueueCaller) {
+  countAssignedItems(input: AnnotationQueueCaller): Promise<number> {
     return this.#queues.countAssignedItems(input);
   }
 
-  async listMemberQueuePendingCounts(input: AnnotationQueueCaller) {
+  async listMemberQueuePendingCounts(
+    input: AnnotationQueueCaller,
+  ): Promise<AnnotationQueuePendingCount[]> {
     return [...(await this.#queues.listMemberQueuePendingCounts(input))];
   }
 
   async deleteQueueItems(
     input: AnnotationQueueCaller & Readonly<{ queueItemIds: readonly string[] }>,
-  ) {
+  ): Promise<number> {
     const { members: _members, ...scope } = await this.#getOrganizationScope(input);
 
     return this.#queues.deleteQueueItems({ ...input, ...scope });
   }
 
-  async markQueueItemDone(input: AnnotationQueueCaller & Readonly<{ queueItemId: string }>) {
+  async markQueueItemDone(
+    input: AnnotationQueueCaller & Readonly<{ queueItemId: string }>,
+  ): Promise<AnnotationQueueItem> {
     const { members: _members, ...scope } = await this.#getOrganizationScope(input);
 
     return this.#queues.markQueueItemDone({ ...input, ...scope });
@@ -312,7 +333,9 @@ export class AnnotationApp implements AnnotationApi {
     return this.#usage.countUsage(input);
   }
 
-  async queueTraces(input: QueueAnnotationTracesInput) {
+  async queueTraces(
+    input: QueueAnnotationTracesInput,
+  ): Promise<Readonly<{ created: number; skipped: number }>> {
     const annotators = input.annotators.map((reference) => {
       const result = annotatorReferenceSchema.safeParse(reference);
 
@@ -357,7 +380,7 @@ export class AnnotationApp implements AnnotationApi {
     return { created: traceIds.length, skipped: input.traceIds.length - traceIds.length };
   }
 
-  async listWithFullUsers(input: ListAnnotationsInput) {
+  async listWithFullUsers(input: ListAnnotationsInput): Promise<AnnotationWithFullUser[]> {
     const annotations = await this.list(input);
     const profiles = await this.#profilesFor(annotations);
 
@@ -367,7 +390,7 @@ export class AnnotationApp implements AnnotationApi {
     }));
   }
 
-  async listWithUserSummaries(input: ListAnnotationsInput) {
+  async listWithUserSummaries(input: ListAnnotationsInput): Promise<AnnotationWithUserSummary[]> {
     const annotations = await this.listWithFullUsers(input);
 
     return annotations.map(({ user, ...annotation }) =>
@@ -392,7 +415,7 @@ export class AnnotationApp implements AnnotationApi {
     return new Map(profiles.map((profile) => [profile.id, profile]));
   }
 
-  async createReview(input: AnnotationReviewCreateInput) {
+  async createReview(input: AnnotationReviewCreateInput): Promise<Annotation> {
     await this.#syncTraceSuggestion(input);
 
     const created = await this.create({
@@ -414,7 +437,7 @@ export class AnnotationApp implements AnnotationApi {
     return created;
   }
 
-  async updateReview(input: AnnotationReviewUpdateInput) {
+  async updateReview(input: AnnotationReviewUpdateInput): Promise<Annotation> {
     const existing = await this.getById({
       id: input.id,
       projectId: input.projectId,
@@ -445,7 +468,7 @@ export class AnnotationApp implements AnnotationApi {
     });
   }
 
-  async deleteReview(input: AnnotationReviewDeleteInput) {
+  async deleteReview(input: AnnotationReviewDeleteInput): Promise<Annotation> {
     const deleted = await this.delete({
       id: input.annotationId,
       projectId: input.projectId,
@@ -513,7 +536,9 @@ export class AnnotationApp implements AnnotationApi {
       );
     }
   }
-  async listReviewQueueItems(input: AnnotationQueueCaller) {
+  async listReviewQueueItems(
+    input: AnnotationQueueCaller,
+  ): Promise<AnnotationQueueItemWithTrace[]> {
     const queueItems = await this.listQueueItems(input);
     const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
 
@@ -528,7 +553,9 @@ export class AnnotationApp implements AnnotationApi {
     return queueItems.map((item) => ({ ...item, trace: traceMap.get(item.traceId) ?? null }));
   }
 
-  async listOptimizedQueues(input: AnnotationReviewOptimizedQueuesInput) {
+  async listOptimizedQueues(
+    input: AnnotationReviewOptimizedQueuesInput,
+  ): Promise<AnnotationOptimizedQueues> {
     const { members, ...scope } = await this.#getOrganizationScope(input);
 
     // The tier-effective take: the paged read clamps to the plan's page size,

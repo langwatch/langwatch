@@ -11,7 +11,7 @@ import {
   StoredObjectStorageRuntimeAdapter,
   StoredObjectProjectDestinationResolver,
 } from "../stored-object-storage-runtime.service.ts";
-import { StoredObjectStoragePortAdapter } from "../stored-object-storage.service.ts";
+import { StoredObjectStorageService } from "../stored-object-storage.service.ts";
 
 class NoProxy {
   tryResolveForHost() {
@@ -64,11 +64,11 @@ class RecordingDriver extends MemoryDriver {
   }
 }
 
-describe("StoredObjectStoragePortAdapter", () => {
+describe("StoredObjectStorageService", () => {
   describe("when the checkup probes a project's destination", () => {
     it("writes an object under the project and removes it again", async () => {
       const driver = new RecordingDriver();
-      const adapter = StoredObjectStoragePortAdapter.create({
+      const adapter = StoredObjectStorageService.create({
         runtime: StoredObjectStorageRuntimeAdapter.create({
           destination: new Destination(),
           s3ForProject: () => driver,
@@ -96,7 +96,7 @@ describe("StoredObjectStoragePortAdapter", () => {
       s3ForProject: () => driver,
       fileForProject: () => driver,
     });
-    const adapter = StoredObjectStoragePortAdapter.create({
+    const adapter = StoredObjectStorageService.create({
       runtime,
       aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
     });
@@ -125,7 +125,7 @@ describe("StoredObjectStoragePortAdapter", () => {
       s3ForProject: () => new MemoryDriver(),
       fileForProject: () => new MemoryDriver(),
     });
-    const adapter = StoredObjectStoragePortAdapter.create({
+    const adapter = StoredObjectStorageService.create({
       runtime,
       aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
     });
@@ -151,7 +151,7 @@ describe("StoredObjectStoragePortAdapter", () => {
       s3ForProject: () => new MemoryDriver(),
       fileForProject: () => new MemoryDriver(),
     });
-    const adapter = StoredObjectStoragePortAdapter.create({
+    const adapter = StoredObjectStorageService.create({
       runtime,
       aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
     });
@@ -170,7 +170,7 @@ describe("StoredObjectStoragePortAdapter", () => {
       s3ForProject: () => new MemoryDriver(),
       fileForProject: () => new MemoryDriver(),
     });
-    const adapter = StoredObjectStoragePortAdapter.create({
+    const adapter = StoredObjectStorageService.create({
       runtime,
       aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
     });
@@ -199,7 +199,7 @@ describe("StoredObjectStoragePortAdapter", () => {
         s3ForProject: () => driver,
         fileForProject: () => driver,
       });
-      const adapter = StoredObjectStoragePortAdapter.create({
+      const adapter = StoredObjectStorageService.create({
         runtime,
         aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
       });
@@ -219,7 +219,7 @@ describe("StoredObjectStoragePortAdapter", () => {
         s3ForProject: () => driver,
         fileForProject: () => driver,
       });
-      const adapter = StoredObjectStoragePortAdapter.create({
+      const adapter = StoredObjectStorageService.create({
         runtime,
         aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
       });

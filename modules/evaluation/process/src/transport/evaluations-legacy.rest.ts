@@ -490,7 +490,7 @@ async function evaluateDataset({
   let data: EvaluationDispatchData;
 
   try {
-    data = getEvaluatorDataForParams(checkType, params.data as Record<string, any>);
+    data = getEvaluatorDataForParams(checkType, params.data as Record<string, unknown>);
 
     if (!evaluator.requiredFields.every((field: string) => field in data.data)) {
       return answer(
@@ -650,7 +650,7 @@ async function handleEvaluatorCall({
       checkType,
       (isLegacyPairwiseDispatch
         ? translateLegacyPairwisePayload(params.data as Record<string, unknown>)
-        : params.data) as Record<string, any>,
+        : params.data) as Record<string, unknown>,
     );
   } catch (error) {
     logInvalid({ error, projectId, message: "invalid evaluation data received" });
@@ -773,7 +773,7 @@ async function mergeEvaluatorSettings({
   const evaluatorSettingSchema = checkType.startsWith("custom/")
     ? undefined
     : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
-  const stored = ((saved.settings ?? monitor?.parameters) as any) ?? {};
+  const stored = saved.settings ?? monitor?.parameters ?? {};
 
   try {
     // NB: `select_best_compare`'s settings schema is non-strict, so a legacy

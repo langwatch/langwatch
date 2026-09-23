@@ -11,7 +11,12 @@ import { buildMetricAlias } from "../clickhouse/clickhouse.metric-translator.map
 import { parseTimeseriesRows } from "../clickhouse/clickhouse.timeseries-row-parser.mapper.ts";
 
 const alias = (series: AnalyticsSeries, index: number) =>
-  buildMetricAlias(index, series.metric, series.aggregation, series.key);
+  buildMetricAlias({
+    index,
+    metric: series.metric,
+    aggregation: series.aggregation,
+    key: series.key,
+  });
 
 const passRateSeries: AnalyticsSeries = {
   metric: "evaluations.evaluation_pass_rate",

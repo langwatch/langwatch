@@ -921,12 +921,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           const wantsFullIo = options.resolveBlobs === true;
 
           if ((wantsSpans || wantsFullIo) && traces.length > 0) {
-            const enriched = await this.enrichTracesWithSpans(
+            const enriched = await this.enrichTracesWithSpans({
               traces,
-              input.projectId,
+              projectId: input.projectId,
               protections,
-              wantsFullIo,
-            );
+              resolveBlobs: wantsFullIo,
+            });
 
             // A summary caller keeps the recomputed trace-level IO but not the
             // spans it never asked for — the payload shape stays exactly as it
@@ -1816,7 +1816,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);
-          const trace = mapTraceSummaryToTrace(summary, [], projectId, this.traceCanonicalisation);
+          const trace = mapTraceSummaryToTrace({
+            summary,
+            spans: [],
+            projectId,
+            traceCanonicalisation: this.traceCanonicalisation,
+          });
           return TraceReadRedactionService.applyTraceProtections(trace, protections);
         });
 
@@ -2462,7 +2467,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       : null;
 
     const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
-    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId, this.traceCanonicalisation);
+    let trace = mapTraceSummaryToTrace({
+      summary,
+      spans: mappedSpans,
+      projectId,
+      traceCanonicalisation: this.traceCanonicalisation,
+    });
 
     // When blobs were resolved, patch trace.input / trace.output with
     // the recomputed full values (overwriting the preview from trace_summaries).
@@ -2481,12 +2491,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * Enrich traces (which have empty spans) with actual span data from ClickHouse.
    * @internal
    */
-  private async enrichTracesWithSpans(
-    traces: Trace[],
-    projectId: string,
-    protections: Protections,
+  private async enrichTracesWithSpans({
+    traces,
+    projectId,
+    protections,
     resolveBlobs = false,
-  ): Promise<Trace[]> {
+  }: {
+    traces: Trace[];
+    projectId: string;
+    protections: Protections;
+    resolveBlobs?: boolean;
+  }): Promise<Trace[]> {
     const traceIds = traces.map((t) => t.trace_id);
     // The traces already carry their own timestamps, so derive the partition
     // window for free: this bounds the trace_summaries summary read to the

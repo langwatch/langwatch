@@ -144,13 +144,13 @@ function matchField(
       return true;
     }
 
-    return matchSimpleArray(traceData, field, filterValue);
+    return matchSimpleArray({ traceData, field, filterValues: filterValue });
   }
 
   let actionable = false;
 
   for (const [key, subValue] of Object.entries(filterValue)) {
-    const result = matchKeyedTraceField(traceData, field, key, subValue);
+    const result = matchKeyedTraceField({ traceData, field, key, subValue });
     if (result === "matched") {
       return true;
     }
@@ -160,17 +160,24 @@ function matchField(
   return !actionable;
 }
 
-function matchKeyedTraceField(
-  traceData: PreconditionTraceData,
-  field: FilterField,
-  key: string,
-  subValue: string[] | Record<string, string[]>,
-): "matched" | "unmatched" | "empty" {
+function matchKeyedTraceField({
+  traceData,
+  field,
+  key,
+  subValue,
+}: {
+  traceData: PreconditionTraceData;
+  field: FilterField;
+  key: string;
+  subValue: string[] | Record<string, string[]>;
+}): "matched" | "unmatched" | "empty" {
   if (Array.isArray(subValue)) {
     if (subValue.length === 0) {
       return "empty";
     }
-    return matchSimpleArray(traceData, field, subValue, key) ? "matched" : "unmatched";
+    return matchSimpleArray({ traceData, field, filterValues: subValue, key })
+      ? "matched"
+      : "unmatched";
   }
 
   if (typeof subValue !== "object" || subValue === null) {
@@ -185,7 +192,7 @@ function matchKeyedTraceField(
     if (!Array.isArray(values) || values.length === 0) {
       continue;
     }
-    if (matchSimpleArray(traceData, field, values, key, subkey)) {
+    if (matchSimpleArray({ traceData, field, filterValues: values, key, subkey })) {
       return "matched";
     }
   }
@@ -197,13 +204,19 @@ function matchKeyedTraceField(
  * Resolves a field value using the precondition matcher registry and
  * checks if any of the filter values match.
  */
-function matchSimpleArray(
-  traceData: PreconditionTraceData,
-  field: FilterField,
-  filterValues: string[],
-  key?: string,
-  subkey?: string,
-): boolean {
+function matchSimpleArray({
+  traceData,
+  field,
+  filterValues,
+  key,
+  subkey,
+}: {
+  traceData: PreconditionTraceData;
+  field: FilterField;
+  filterValues: string[];
+  key?: string;
+  subkey?: string;
+}): boolean {
   const matcher: PreconditionFieldMatcher | null | undefined = PRECONDITION_FIELD_MATCHERS[field];
 
   // Key-selector fields (metadata.key) and unavailable fields

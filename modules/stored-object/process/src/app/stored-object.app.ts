@@ -28,6 +28,7 @@ import type {
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
   StoredObjectStorageDestination,
+  StoredObjectStorageUsage,
 } from "@langwatch/stored-object-contract";
 
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
@@ -207,7 +208,10 @@ export class StoredObjectApp implements StoredObjectApi {
     return this.#storage.getById(input);
   }
 
-  getStorageUsageByProject(input: { projectId: string; purpose?: string }) {
+  getStorageUsageByProject(input: {
+    projectId: string;
+    purpose?: string;
+  }): Promise<StoredObjectStorageUsage> {
     return this.#storage.getStorageUsageByProject(input);
   }
 

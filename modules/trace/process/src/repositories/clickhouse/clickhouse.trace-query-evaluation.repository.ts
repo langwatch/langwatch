@@ -69,7 +69,12 @@ export class ClickhouseTraceQueryEvaluationRepository {
     }
 
     const state: WalkState = { nodeCount: 0, unsupportedFields: [] };
-    const result = ClickhouseTraceQueryEvaluationRepository.evaluateNode(ast, false, trace, state);
+    const result = ClickhouseTraceQueryEvaluationRepository.evaluateNode({
+      node: ast,
+      negated: false,
+      trace,
+      state,
+    });
 
     // A field that can never evaluate positively at dispatch (span-scoped
     // fields, size, scenario dimensions) compiles to valid SQL and passes the
@@ -105,12 +110,17 @@ export class ClickhouseTraceQueryEvaluationRepository {
     return needs;
   }
 
-  private static evaluateNode(
-    node: LiqeQuery,
-    negated: boolean,
-    trace: InMemoryTrace,
-    state: WalkState,
-  ): boolean | Unsupported {
+  private static evaluateNode({
+    node,
+    negated,
+    trace,
+    state,
+  }: {
+    node: LiqeQuery;
+    negated: boolean;
+    trace: InMemoryTrace;
+    state: WalkState;
+  }): boolean | Unsupported {
     state.nodeCount++;
     if (state.nodeCount > MAX_FILTER_NODE_COUNT) {
       return UNSUPPORTED;
@@ -134,22 +144,22 @@ export class ClickhouseTraceQueryEvaluationRepository {
         const logExpr = node as LogicalExpressionToken;
         // Negation threads down unchanged and the operator stays as-is — the
         // exact shape `translateNode` compiles, so both sides always agree.
-        const left = ClickhouseTraceQueryEvaluationRepository.evaluateNode(
-          logExpr.left,
+        const left = ClickhouseTraceQueryEvaluationRepository.evaluateNode({
+          node: logExpr.left,
           negated,
           trace,
           state,
-        );
+        });
         if (left === UNSUPPORTED) {
           return UNSUPPORTED;
         }
 
-        const right = ClickhouseTraceQueryEvaluationRepository.evaluateNode(
-          logExpr.right,
+        const right = ClickhouseTraceQueryEvaluationRepository.evaluateNode({
+          node: logExpr.right,
           negated,
           trace,
           state,
-        );
+        });
         if (right === UNSUPPORTED) {
           return UNSUPPORTED;
         }
@@ -161,23 +171,23 @@ export class ClickhouseTraceQueryEvaluationRepository {
         const unary = node as UnaryOperatorToken;
         const isNeg = unary.operator === "NOT" || unary.operator === "-";
 
-        return ClickhouseTraceQueryEvaluationRepository.evaluateNode(
-          unary.operand,
-          negated !== isNeg,
+        return ClickhouseTraceQueryEvaluationRepository.evaluateNode({
+          node: unary.operand,
+          negated: negated !== isNeg,
           trace,
           state,
-        );
+        });
       }
 
       case "ParenthesizedExpression": {
         const paren = node as ParenthesizedExpressionToken;
 
-        return ClickhouseTraceQueryEvaluationRepository.evaluateNode(
-          paren.expression,
+        return ClickhouseTraceQueryEvaluationRepository.evaluateNode({
+          node: paren.expression,
           negated,
           trace,
           state,
-        );
+        });
       }
 
       default:
@@ -198,12 +208,12 @@ export class ClickhouseTraceQueryEvaluationRepository {
 
     // Attribute prefixes — mirror `translateTag`'s routing order exactly.
     if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) {
-      return ClickhouseTraceQueryEvaluationRepository.evaluateTraceAttribute(
-        fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length),
+      return ClickhouseTraceQueryEvaluationRepository.evaluateTraceAttribute({
+        key: fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length),
         tag,
         negated,
         trace,
-      );
+      });
     }
 
     if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
@@ -213,30 +223,30 @@ export class ClickhouseTraceQueryEvaluationRepository {
     }
 
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
-      return ClickhouseTraceQueryEvaluationRepository.evaluateEventAttribute(
-        fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length),
+      return ClickhouseTraceQueryEvaluationRepository.evaluateEventAttribute({
+        key: fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length),
         tag,
         negated,
         trace,
-      );
+      });
     }
 
     if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
-      return ClickhouseTraceQueryEvaluationRepository.evaluateTraceAttribute(
-        fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length),
+      return ClickhouseTraceQueryEvaluationRepository.evaluateTraceAttribute({
+        key: fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length),
         tag,
         negated,
         trace,
-      );
+      });
     }
 
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
-      return ClickhouseTraceQueryEvaluationRepository.evaluateEventAttribute(
-        fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length),
+      return ClickhouseTraceQueryEvaluationRepository.evaluateEventAttribute({
+        key: fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length),
         tag,
         negated,
         trace,
-      );
+      });
     }
 
     // `.get()` — own keys only, so `constructor` / `toString` / `__proto__` are
@@ -301,12 +311,17 @@ export class ClickhouseTraceQueryEvaluationRepository {
     return column.toLowerCase().includes(lowerValue);
   }
 
-  private static evaluateTraceAttribute(
-    key: string,
-    tag: TagToken,
-    negated: boolean,
-    trace: InMemoryTrace,
-  ): boolean | Unsupported {
+  private static evaluateTraceAttribute({
+    key,
+    tag,
+    negated,
+    trace,
+  }: {
+    key: string;
+    tag: TagToken;
+    negated: boolean;
+    trace: InMemoryTrace;
+  }): boolean | Unsupported {
     // Empty key throws on the SQL side (422) — fail closed.
     if (!key) {
       return UNSUPPORTED;
@@ -319,12 +334,17 @@ export class ClickhouseTraceQueryEvaluationRepository {
     return negated ? !matched : matched;
   }
 
-  private static evaluateEventAttribute(
-    key: string,
-    tag: TagToken,
-    negated: boolean,
-    trace: InMemoryTrace,
-  ): boolean | Unsupported {
+  private static evaluateEventAttribute({
+    key,
+    tag,
+    negated,
+    trace,
+  }: {
+    key: string;
+    tag: TagToken;
+    negated: boolean;
+    trace: InMemoryTrace;
+  }): boolean | Unsupported {
     if (!key) {
       return UNSUPPORTED;
     }

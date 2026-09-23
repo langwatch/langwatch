@@ -41,7 +41,7 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   ObjectExpr: (e) => e.toJSON(),
   ClassExpr: (id, _1, args, _2) => {
     let argIndex = 0;
-    const processedArgs = args.toJSON().map((arg: any) => {
+    const processedArgs = args.toJSON().map((arg: unknown) => {
       if (Array.isArray(arg)) {
         // Named argument
         return arg;
@@ -80,7 +80,7 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   ArgValue: (arg) => arg.toJSON(),
 });
 
-export const isPythonRepr = (input: string) => /^[A-Z][A-Za-z0-9_]*\(/.test(input);
+export const isPythonRepr = (input: string): boolean => /^[A-Z][A-Za-z0-9_]*\(/.test(input);
 
 /** A one-key `{ arg0: … }` wrapper is the grammar's positional argument; unwrap it. */
 const unwrapSingleArg = (value: unknown): unknown => {

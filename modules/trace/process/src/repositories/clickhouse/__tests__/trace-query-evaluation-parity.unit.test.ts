@@ -677,15 +677,13 @@ describe("FieldDef SQL/read parity", () => {
         const value = def.read!(emptyTrace);
         // No default (bare column: CH yields '' or NULL, and the read agrees),
         // an array-valued read, or a field that can't be read at dispatch.
-        if (
+        const hasNoInventedDefault =
           value === UNSUPPORTED ||
           value === null ||
           value === "" ||
           Array.isArray(value) ||
-          typeof value === "number"
-        ) {
-          return;
-        }
+          typeof value === "number";
+        if (hasNoInventedDefault) return;
         // A read that invents a value for an unset trace is only honest if the
         // SQL invents the same one — otherwise the two halves disagree on
         // exactly the rows nobody stamped.

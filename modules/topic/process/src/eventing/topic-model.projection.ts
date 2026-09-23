@@ -63,7 +63,7 @@ export class TopicModelFoldProjection
     this.store = deps.store;
   }
 
-  protected initState() {
+  protected initState(): Omit<TopicModelData, "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"> {
     return {
       ProjectId: "",
       Topics: [],

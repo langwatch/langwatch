@@ -58,12 +58,12 @@ export class SpanNormalizationPipelineService {
           "SpanNormalizationPipelineService.normalizeSpanReceived",
         );
 
-        const normalizedSpan = this.decodeOtlpSpan(
+        const normalizedSpan = this.decodeOtlpSpan({
           tenantId,
           otlpSpan,
           otlpResource,
           otlpInstrumentationScope,
-        );
+        });
 
         span.setAttributes({
           "span.record_id": normalizedSpan.id,
@@ -88,12 +88,17 @@ export class SpanNormalizationPipelineService {
     );
   }
 
-  private decodeOtlpSpan(
-    tenantId: string,
-    otlpSpan: OtlpSpan,
-    otlpResource: OtlpResource | null,
-    otlpInstrumentationScope: OtlpInstrumentationScope | null,
-  ): NormalizedSpan {
+  private decodeOtlpSpan({
+    tenantId,
+    otlpSpan,
+    otlpResource,
+    otlpInstrumentationScope,
+  }: {
+    tenantId: string;
+    otlpSpan: OtlpSpan;
+    otlpResource: OtlpResource | null;
+    otlpInstrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan {
     // decode span data
     const { traceId, spanId } = OtlpTraceRequestService.normalizeOtlpSpanIds(otlpSpan);
     const startTimeUnixNano = OtlpTraceRequestService.normalizeOtlpUnixNano(
@@ -110,12 +115,12 @@ export class SpanNormalizationPipelineService {
     );
 
     return {
-      id: spanRecordIdentityService.generateDeterministicSpanRecordIdFromData(
+      id: spanRecordIdentityService.generateDeterministicSpanRecordIdFromData({
         tenantId,
         traceId,
         spanId,
         startTimeUnixMs,
-      ),
+      }),
       tenantId,
       traceId,
       spanId,

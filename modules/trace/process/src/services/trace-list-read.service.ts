@@ -91,20 +91,39 @@ export class TraceListService {
   }): TraceListService {
     const topicNaming = TraceTopicNamingService.create({ topicService });
 
-    return new TraceListService(
+    return new TraceListService({
       repository,
       evaluations,
-      TraceDiscoverService.create({ repository, topicNaming }),
-      TraceFacetValuesService.create({ repository, topicNaming }),
-    );
+      discover: TraceDiscoverService.create({ repository, topicNaming }),
+      facetValues: TraceFacetValuesService.create({ repository, topicNaming }),
+    });
   }
 
-  private constructor(
-    private readonly repository: TraceListRead,
-    private readonly evaluations: EvaluationApi,
-    private readonly discover: TraceDiscoverService,
-    private readonly facetValues: TraceFacetValuesService,
-  ) {}
+  private readonly repository: TraceListRead;
+
+  private readonly evaluations: EvaluationApi;
+
+  private readonly discover: TraceDiscoverService;
+
+  private readonly facetValues: TraceFacetValuesService;
+
+  private constructor(deps: {
+    repository: TraceListRead;
+
+    evaluations: EvaluationApi;
+
+    discover: TraceDiscoverService;
+
+    facetValues: TraceFacetValuesService;
+  }) {
+    this.repository = deps.repository;
+
+    this.evaluations = deps.evaluations;
+
+    this.discover = deps.discover;
+
+    this.facetValues = deps.facetValues;
+  }
 
   /** The cached facet discovery for the sidebar. */
   getDiscover(params: DiscoverParams): Promise<DiscoverResult> {

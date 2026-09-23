@@ -85,7 +85,7 @@ describe("createCustomerIoTraceSyncHandler()", () => {
     vi.useRealTimers();
   });
 
-  describe("customerIoTraceSyncJobId", () => {
+  describe("when deriving the customerIoTraceSyncJobId", () => {
     /** @scenario "Trace sync subscriber uses project-scoped job ID for debouncing" */
     it("returns cio-trace-sync-{projectId}", () => {
       expect(customerIoTraceSyncJobId("project-42")).toBe("cio-trace-sync-project-42");

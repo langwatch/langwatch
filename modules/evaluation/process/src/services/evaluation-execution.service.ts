@@ -336,14 +336,14 @@ export class EvaluationExecutionService {
       });
     }
 
-    return this.runCustomEvaluation(
+    return this.runCustomEvaluation({
       projectId,
       evaluatorType,
       data,
       trace,
       workflowId,
       parentCausalityDepth,
-    );
+    });
   }
 
   /**
@@ -381,14 +381,21 @@ export class EvaluationExecutionService {
     });
   }
 
-  private async runCustomEvaluation(
-    projectId: string,
-    evaluatorType: string,
-    data: Record<string, unknown>,
-    trace?: Trace,
-    workflowId?: string | null,
-    parentCausalityDepth?: number,
-  ): Promise<SingleEvaluationResult> {
+  private async runCustomEvaluation({
+    projectId,
+    evaluatorType,
+    data,
+    trace,
+    workflowId,
+    parentCausalityDepth,
+  }: {
+    projectId: string;
+    evaluatorType: string;
+    data: Record<string, unknown>;
+    trace?: Trace;
+    workflowId?: string | null;
+    parentCausalityDepth?: number;
+  }): Promise<SingleEvaluationResult> {
     const resolvedWorkflowId = workflowId ?? evaluatorType.split("/")[1];
 
     if (!resolvedWorkflowId) {

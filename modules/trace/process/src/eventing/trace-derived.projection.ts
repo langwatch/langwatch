@@ -338,7 +338,10 @@ export class TraceAnalyticsFoldProjection
     return new TraceAnalyticsFoldProjection(deps);
   }
 
-  protected initState() {
+  protected initState(): Omit<
+    TraceAnalyticsData,
+    "createdAt" | "updatedAt" | "LastEventOccurredAt"
+  > {
     return {
       traceId: "",
       spanCount: 0,

@@ -148,7 +148,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
 
     this.stripReservedAttributes(span, resource);
     if (!command.data.spoolRef) {
-      this.capAttributes(span, resource, tenantId, traceId, spanId);
+      this.capAttributes({ span, resource, tenantId, traceId, spanId });
     }
 
     const piiRedactionLevel = commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
@@ -249,13 +249,19 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     };
   }
 
-  private capAttributes(
-    span: OtlpSpan,
-    resource: OtlpResource | null,
-    tenantId: string,
-    traceId: string,
-    spanId: string,
-  ): void {
+  private capAttributes({
+    span,
+    resource,
+    tenantId,
+    traceId,
+    spanId,
+  }: {
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+  }): void {
     const cappedAttributeCount = traceAttributeCapService.capOversizedAttributes(span, resource);
     if (cappedAttributeCount === 0) {
       return;

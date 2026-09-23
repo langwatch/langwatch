@@ -28,7 +28,7 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions[field];
       expect(builder).not.toBeNull();
 
-      const result = builder!(["v1", "v2"], "f0");
+      const result = builder!({ values: ["v1", "v2"], paramId: "f0" });
 
       expect(result.sql).toBe(`${column} IN ({f0_values:Array(String)})`);
       expect(result.params).toEqual({ f0_values: ["v1", "v2"] });
@@ -44,7 +44,7 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions[field];
       expect(builder).not.toBeNull();
 
-      const result = builder!(["a", "b"], "f0");
+      const result = builder!({ values: ["a", "b"], paramId: "f0" });
 
       expect(result.sql).toContain("hasAny(");
       expect(result.sql).not.toContain('"a"');
@@ -57,7 +57,7 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions["spans.model"];
       expect(builder).not.toBeNull();
 
-      const result = builder!(["a", "b"], "f0");
+      const result = builder!({ values: ["a", "b"], paramId: "f0" });
 
       expect(result.sql).toBe("hasAny(ts.Models, {f0_values:Array(String)})");
       expect(result.params).toEqual({ f0_values: ["a", "b"] });
@@ -68,7 +68,7 @@ describe("clickHouseFilterConditions", () => {
     /** @scenario 'A metadata key filter checks the canonical, legacy, and bare attribute names' */
     it("when a single key is filtered, it checks all three historical key formats", () => {
       const builder = clickHouseFilterConditions["metadata.key"];
-      const result = builder!(["nested·key"], "f0");
+      const result = builder!({ values: ["nested·key"], paramId: "f0" });
 
       expect(result.params).toEqual({
         f0_k0_canonical: "metadata.nested.key",
@@ -82,7 +82,7 @@ describe("clickHouseFilterConditions", () => {
 
     it("when several keys are filtered, it OR's each key's three-format check together", () => {
       const builder = clickHouseFilterConditions["metadata.key"];
-      const result = builder!(["canary", "environment"], "f0");
+      const result = builder!({ values: ["canary", "environment"], paramId: "f0" });
 
       expect(result.sql).toContain(" OR ");
       expect(result.params).toHaveProperty("f0_k0_canonical", "metadata.canary");
@@ -91,7 +91,7 @@ describe("clickHouseFilterConditions", () => {
 
     it("when no keys are selected, it returns the no-match guard", () => {
       const builder = clickHouseFilterConditions["metadata.key"];
-      const result = builder!([], "f0");
+      const result = builder!({ values: [], paramId: "f0" });
 
       expect(result.sql).toBe("1=0");
       expect(result.params).toEqual({});
@@ -102,7 +102,7 @@ describe("clickHouseFilterConditions", () => {
     /** @scenario 'A metadata value filter requires its key' */
     it("when the key is missing, it returns the no-match guard rather than an unresolvable column", () => {
       const builder = clickHouseFilterConditions["metadata.value"];
-      const result = builder!(["true"], "f0");
+      const result = builder!({ values: ["true"], paramId: "f0" });
 
       expect(result.sql).toBe("1=0");
       expect(result.params).toEqual({});
@@ -110,7 +110,7 @@ describe("clickHouseFilterConditions", () => {
 
     it("when the key is present, it checks all three historical key formats for the value", () => {
       const builder = clickHouseFilterConditions["metadata.value"];
-      const result = builder!(["val"], "f0", "nested·key");
+      const result = builder!({ values: ["val"], paramId: "f0", key: "nested·key" });
 
       expect(result.params).toEqual({
         f0_canonical: "metadata.nested.key",
@@ -138,7 +138,7 @@ describe("clickHouseFilterConditions", () => {
       ["annotations.hasAnnotation", [], "1=0"],
     ] as const)("when %s selects %j, it emits %s", (field, values, expectedSql) => {
       const builder = clickHouseFilterConditions[field];
-      const result = builder!([...values], "f0");
+      const result = builder!({ values: [...values], paramId: "f0" });
 
       expect(result.sql).toBe(expectedSql);
       expect(result.params).toEqual({});
@@ -153,20 +153,20 @@ describe("clickHouseFilterConditions", () => {
     it("maps empty/NULL origins to 'application' via ifNull, matching the dropdown", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       expect(builder).not.toBeNull();
-      const result = builder!(["application"], "f0");
+      const result = builder!({ values: ["application"], paramId: "f0" });
       expect(result.sql).toBe(expectedSql);
       expect(result.params).toEqual({ f0_values: ["application"] });
     });
 
     it("passes non-application values through directly", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
-      const result = builder!(["evaluation"], "f0");
+      const result = builder!({ values: ["evaluation"], paramId: "f0" });
       expect(result.sql).toBe(expectedSql);
     });
 
     it("returns 1=0 when no values selected", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
-      const result = builder!([], "f0");
+      const result = builder!({ values: [], paramId: "f0" });
       expect(result.sql).toBe("1=0");
     });
   });
@@ -184,7 +184,7 @@ describe("clickHouseFilterConditions", () => {
       (field) => {
         const builder = clickHouseFilterConditions[field];
         expect(builder).not.toBeNull();
-        const result = builder!(["eval-1"], "f0");
+        const result = builder!({ values: ["eval-1"], paramId: "f0" });
 
         expect(result.sql).toContain("EXISTS (");
         const whereClause = result.sql.slice(result.sql.indexOf("WHERE"));
@@ -205,7 +205,7 @@ describe("clickHouseFilterConditions", () => {
       "when %s runs with a key, TenantId is checked before the NULL-safe TraceId correlation",
       (field, values, key) => {
         const builder = clickHouseFilterConditions[field];
-        const result = builder!([...values], "f0", key);
+        const result = builder!({ values: [...values], paramId: "f0", key });
 
         const whereClause = result.sql.slice(result.sql.indexOf("WHERE"));
         const tenantIndex = whereClause.indexOf("es.TenantId = ts.TenantId");
@@ -217,13 +217,13 @@ describe("clickHouseFilterConditions", () => {
 
     it("when evaluations.passed has no key, it returns the no-match guard", () => {
       const builder = clickHouseFilterConditions["evaluations.passed"];
-      const result = builder!(["true"], "f0");
+      const result = builder!({ values: ["true"], paramId: "f0" });
       expect(result.sql).toBe("1=0");
     });
 
     it("when evaluations.passed selects true/false, it coerces them to 1/0 for the ClickHouse column", () => {
       const builder = clickHouseFilterConditions["evaluations.passed"];
-      const result = builder!(["true", "false"], "f0", "eval-1");
+      const result = builder!({ values: ["true", "false"], paramId: "f0", key: "eval-1" });
       expect(result.params.f0_values).toEqual([1, 0]);
     });
   });
@@ -239,7 +239,9 @@ describe("clickHouseFilterConditions", () => {
       "when evaluations.score is given %j with key=%s, it returns the no-match guard",
       (field, values, key) => {
         const builder = clickHouseFilterConditions[field];
-        const result = key ? builder!([...values], "f0", key) : builder!([...values], "f0");
+        const result = key
+          ? builder!({ values: [...values], paramId: "f0", key })
+          : builder!({ values: [...values], paramId: "f0" });
         expect(result.sql).toBe("1=0");
         expect(result.params).toEqual({});
       },
@@ -247,7 +249,7 @@ describe("clickHouseFilterConditions", () => {
 
     it("when evaluations.score is given a valid ascending range, it emits a bounded comparison", () => {
       const builder = clickHouseFilterConditions["evaluations.score"];
-      const result = builder!(["0.5", "0.9"], "f0", "eval-1");
+      const result = builder!({ values: ["0.5", "0.9"], paramId: "f0", key: "eval-1" });
       expect(result.sql).toContain("es.Score >= {f0_min:Float64}");
       expect(result.sql).toContain("es.Score <= {f0_max:Float64}");
       expect(result.params.f0_min).toBe(0.5);
@@ -256,13 +258,23 @@ describe("clickHouseFilterConditions", () => {
 
     it("when events.metrics.value is given an invalid range, it returns the no-match guard", () => {
       const builder = clickHouseFilterConditions["events.metrics.value"];
-      const result = builder!(["100", "0"], "f0", "purchase", "amount");
+      const result = builder!({
+        values: ["100", "0"],
+        paramId: "f0",
+        key: "purchase",
+        subkey: "amount",
+      });
       expect(result.sql).toBe("1=0");
     });
 
     it("when events.metrics.value is given a valid range, it emits a bounded comparison", () => {
       const builder = clickHouseFilterConditions["events.metrics.value"];
-      const result = builder!(["0", "100"], "f0", "purchase", "amount");
+      const result = builder!({
+        values: ["0", "100"],
+        paramId: "f0",
+        key: "purchase",
+        subkey: "amount",
+      });
       expect(result.sql).toContain(
         "toFloat64OrNull(sp.SpanAttributes[{f0_attrkey:String}]) >= {f0_min:Float64}",
       );
@@ -275,7 +287,7 @@ describe("clickHouseFilterConditions", () => {
     it("when topics.topics is filtered with a hostile value, the SQL text is unchanged by its contents", () => {
       const hostileValue = 'it\'s a "test"; DROP TABLE trace_summaries;--';
       const builder = clickHouseFilterConditions["topics.topics"];
-      const result = builder!([hostileValue], "f0");
+      const result = builder!({ values: [hostileValue], paramId: "f0" });
 
       expect(result.sql).not.toContain(hostileValue);
       expect(result.params).toEqual({ f0_values: [hostileValue] });
@@ -284,7 +296,7 @@ describe("clickHouseFilterConditions", () => {
     it("when evaluations.state is filtered with a hostile value, the SQL text is unchanged by its contents", () => {
       const hostileValue = "'; DROP TABLE evaluation_runs;--";
       const builder = clickHouseFilterConditions["evaluations.state"];
-      const result = builder!([hostileValue], "f0", "eval-1");
+      const result = builder!({ values: [hostileValue], paramId: "f0", key: "eval-1" });
 
       expect(result.sql).not.toContain(hostileValue);
       expect(result.params).toEqual({ f0_key: "eval-1", f0_values: [hostileValue] });

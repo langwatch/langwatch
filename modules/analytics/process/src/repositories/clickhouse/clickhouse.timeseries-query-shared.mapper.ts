@@ -153,13 +153,19 @@ export function isEvalMetricKey(metric: string): metric is EvalMetricKey {
   return (EVAL_METRIC_KEYS as readonly string[]).includes(metric);
 }
 
-export function appendMetadataValueFilterClauses(
-  attributes: string,
-  rawValue: AnalyticsFilterValue,
-  clauses: string[],
-  params: Record<string, unknown>,
-  next: (prefix: string) => string,
-): void {
+export function appendMetadataValueFilterClauses({
+  attributes,
+  rawValue,
+  clauses,
+  params,
+  next,
+}: {
+  attributes: string;
+  rawValue: AnalyticsFilterValue;
+  clauses: string[];
+  params: Record<string, unknown>;
+  next: (prefix: string) => string;
+}): void {
   if (typeof rawValue !== "object" || Array.isArray(rawValue)) return;
 
   for (const [metaKey, vals] of Object.entries(rawValue)) {

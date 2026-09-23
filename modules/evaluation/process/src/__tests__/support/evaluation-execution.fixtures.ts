@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type EvaluationExecutionResult,
   type EvaluationRunData,
@@ -14,7 +15,6 @@ import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { monitorWithEvaluatorSchema } from "@langwatch/monitor-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EvaluationTraceEvent,
   EvaluationTraceSpan,
@@ -53,24 +53,22 @@ export function buildExecuteCommand(
 export function buildMonitor(overrides: Record<string, unknown> = {}): MonitorWithEvaluator {
   const { evaluator: evaluatorOverride, ...monitorOverrides } = overrides;
   const evaluator =
-    evaluatorOverride === undefined
-      ? null
-      : evaluatorOverride !== null && typeof evaluatorOverride === "object"
-        ? {
-            id: "evaluator-test",
-            projectId: "project-evaluation-test",
-            name: "Test evaluator",
-            slug: "test-evaluator",
-            type: "evaluator",
-            config: {},
-            workflowId: null,
-            copiedFromEvaluatorId: null,
-            archivedAt: null,
-            createdAt: new Date(0),
-            updatedAt: new Date(0),
-            ...evaluatorOverride,
-          }
-        : evaluatorOverride;
+    evaluatorOverride !== null && typeof evaluatorOverride === "object"
+      ? {
+          id: "evaluator-test",
+          projectId: "project-evaluation-test",
+          name: "Test evaluator",
+          slug: "test-evaluator",
+          type: "evaluator",
+          config: {},
+          workflowId: null,
+          copiedFromEvaluatorId: null,
+          archivedAt: null,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+          ...evaluatorOverride,
+        }
+      : (evaluatorOverride ?? null);
 
   return monitorWithEvaluatorSchema.parse({
     id: "monitor-test",
