@@ -448,6 +448,7 @@ assert_render_job_complete() {
 }
 
 # @scenario "A single-replica deployment provisions LangWatchQL unchanged"
+# @scenario "On a single node, sql mode is permitted and provisions the access model"
 test_lwql() {
   sep; info "Suite: LangWatchQL access model (app self-provisioned)"
 
@@ -607,6 +608,75 @@ $provision_out"
     fail "lwql_postgres bridge failed to read through the named collection — lwql_ro is likely absent or its password diverged from the collection's reader key:
 $bridge_out"
   fi
+
+  # ── AC9: `sql` mode is PERMITTED on a single node (issue #8258) ──────────────
+  # DoD (tasks#889): prove sql mode provisions on one node — the counterpart to
+  # test_lwql_replicas proving it is refused on a multi-host cluster. The chart
+  # default is rendered mode; flip THIS single-replica release to sql mode via
+  # app env and prove the AC9 cluster guard permits it (system.clusters shows no
+  # multi-host own-cluster here, so the guard returns rather than fail-closing).
+  #
+  # The rendered users_xml access model stays mounted, so sql-mode DDL for the
+  # user/profile/policies cannot create a second, SQL-store copy of a
+  # users_xml-owned entity: it yields to the read-only config store (tolerated
+  # 495 ACCESS_STORAGE_READONLY). That yield is exactly the non-vacuity signal
+  # that the sql-mode DDL path really ran, on a node the guard did NOT refuse —
+  # so this asserts the yield, not a "storage != users_xml" row, which is
+  # unreachable while rendered delivery owns the name.
+  info "AC9: enabling sql mode on the single-replica release"
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
+    --set app.extraEnvs[0].value=sql \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (app LWQL_ACCESS_MODEL_MODE=sql)"
+
+  # The env really applied, and the app booted Ready in sql mode — the guard
+  # permitted it rather than fail-closing the boot.
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  assert_eq "app deployment carries LWQL_ACCESS_MODEL_MODE=sql" \
+    "$(kc get deploy "${RELEASE}-app" -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LWQL_ACCESS_MODEL_MODE")].value}')" \
+    "sql"
+  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
+    -o jsonpath='{.items[0].metadata.name}')
+
+  # Re-run the same converge the boot ran, capturing its output. On a single node
+  # the guard returns (own-cluster host count <= 1), so the run must NOT log the
+  # refusal, and it must show the config-store yield — proof the sql-mode DDL
+  # path executed against a permitted node.
+  local sql_provision_out
+  if sql_provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1); then
+    pass "sql-mode lwql:provision succeeds on a single node"
+  else
+    fail "sql-mode lwql:provision failed on a single node:
+$sql_provision_out"
+  fi
+  if printf '%s' "$sql_provision_out" | grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError'; then
+    fail "AC9 guard refused sql mode on a SINGLE node — it must only refuse on a multi-host cluster:
+$sql_provision_out"
+  else
+    pass "AC9 guard permits sql mode on a single node (no refusal)"
+  fi
+  if printf '%s' "$sql_provision_out" | grep -qiE 'defined in the ClickHouse config store|read-only'; then
+    pass "sql-mode DDL ran and yielded to the mounted users_xml access model (non-vacuous)"
+  else
+    fail "sql-mode converge showed no config-store yield — the sql DDL path may not have run:
+$sql_provision_out"
+  fi
+
+  # The access model still stands under sql mode: the tenant-filtered query
+  # through the Service still succeeds (the mounted model is untouched).
+  svc_out=$(kc exec "$app_pod" -- curl -s -m 10 \
+    -H "X-ClickHouse-User: langwatch_lwql" \
+    -H "X-ClickHouse-Key: $lwql_pw" \
+    "http://${RELEASE}-clickhouse:8123/" \
+    --data-binary "SELECT count() FROM langwatch.lwql_api_key_tenant_map" 2>/dev/null | tr -d ' \r\n')
+  assert_eq "tenant-filtered query still succeeds under sql mode" "$svc_out" "0"
+  # Left in sql mode on purpose: the next suite (test_workers) helm-upgrades this
+  # same release with values-e2e.yaml and no extraEnvs, which drops the env, and
+  # sql mode only yielded here (ClickHouse state is identical to rendered mode),
+  # so nothing downstream depends on reverting it.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -622,6 +692,7 @@ $bridge_out"
 # ─────────────────────────────────────────────────────────────────────────────
 # @scenario "Every replica of a three-replica deployment carries the whole access set"
 # @scenario "A pod added by scaling up carries the access set with no application action"
+# @scenario "On a multi-host cluster, sql mode is refused and provisions nothing"
 test_lwql_replicas() {
   sep; info "Suite: LangWatchQL access model across replicas (3, then scaled to 4)"
 
@@ -711,6 +782,55 @@ test_lwql_replicas() {
     "$(ch_query "$new_pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
   assert_eq "scaled-up pod $new_pod authenticates the restricted identity" \
     "$(kc exec "$new_pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
+
+  # ── AC9: `sql` mode is REFUSED on a multi-host cluster (issue #8258) ─────────
+  # The counterpart to the single-node case in test_lwql. This release is a
+  # 3-host ReplicatedMergeTree cluster: system.clusters carries an is_local=1
+  # cluster with three distinct hosts, and the chart-managed server writes no
+  # `replicated` user directory (its access store stays local). So sql mode must
+  # fail-closed — DDL would reach only the one host behind the Service. The
+  # refusal is inside the non-fatal boot boundary: the app stays Ready and logs
+  # the refusal (host count + replicated-directory count, never statement text),
+  # and NO SQL-store copy of the restricted user appears on any replica.
+  info "AC9: enabling sql mode on the 3-host cluster"
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
+    --set app.replicaCount=1 \
+    --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
+    --set app.extraEnvs[0].value=sql \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (app LWQL_ACCESS_MODEL_MODE=sql, 3-host cluster)"
+
+  # (a) The app boots Ready despite the refusal — a fail-closed access model, not
+  # a crashlooping deployment.
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
+    -o jsonpath='{.items[0].metadata.name}')
+  pass "app pod Ready under sql mode on a multi-host cluster (refusal is non-fatal)"
+
+  # (b) The refusal is logged, by name and/or its stable message, with its two
+  # counts. Re-run the same converge the boot ran and capture it: the guard logs
+  # the refusal before throwing, and selfProvisionAll swallows the throw (so the
+  # task still exits 0; `|| true` guards either way).
+  local refuse_out
+  refuse_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1) || true
+  if printf '%s' "$refuse_out" | grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError'; then
+    pass "AC9 guard refuses sql mode on a multi-host cluster"
+  else
+    fail "expected the AC9 sql-mode cluster refusal in the app log, found none:
+$refuse_out"
+  fi
+
+  # (c) No SQL-store copy of the restricted user on any replica: the guard aborts
+  # before any access-model DDL, so only the rendered users_xml copy exists. The
+  # helm upgrade above reconciled the StatefulSet back to three replicas, so
+  # re-enumerate the current pods.
+  pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
+  for p in $pods; do
+    assert_eq "[$p] no SQL-store copy of langwatch_lwql (guard blocked sql-mode DDL)" \
+      "$(ch_query "$p" "SELECT count() FROM system.users WHERE name='langwatch_lwql' AND storage != 'users_xml'")" "0"
+  done
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

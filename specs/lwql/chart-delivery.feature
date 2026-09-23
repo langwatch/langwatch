@@ -60,3 +60,25 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
     Given the chart is rendered with the clickhouse-external overlay
     Then the application deployment sets LWQL_ACCESS_MODEL_MODE to sql
     And it acknowledges single-node scope with LWQL_ACCESS_MODEL_SQL_SINGLE_NODE
+
+  # ── AC9: sql mode is fail-closed on clusters, permitted on one node ─────────
+  # The chart never selects sql mode for chart-managed ClickHouse, but an
+  # operator can, so both branches of the AC9 cluster guard are exercised live
+  # against a chart-managed deployment. See ADR-141 and
+  # platform/app/src/server/analytics/lwql/provisioning/sqlModeClusterGuard.ts.
+
+  @e2e
+  Scenario: On a single node, sql mode is permitted and provisions the access model
+    Given the single-replica chart-managed release is upgraded to LWQL_ACCESS_MODEL_MODE=sql
+    When the application pod boots in sql mode
+    Then the AC9 cluster guard permits provisioning and logs no refusal
+    And the sql-mode DDL path runs and yields to the mounted users_xml access model
+    And a tenant-filtered query through the ClusterIP Service still succeeds
+
+  @e2e
+  Scenario: On a multi-host cluster, sql mode is refused and provisions nothing
+    Given a three-host chart-managed ClickHouse cluster with no replicated access storage
+    When the release is upgraded to LWQL_ACCESS_MODEL_MODE=sql without acknowledging single-node scope
+    Then the application pod stays Ready because the refusal is non-fatal
+    And the app logs the AC9 refusal with its host and replicated-directory counts
+    And no SQL-store copy of the restricted user appears on any replica
