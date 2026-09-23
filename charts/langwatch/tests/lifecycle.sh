@@ -62,10 +62,8 @@ VALUES_ALLOWLIST=(
   "ingress.host"
 )
 
-# ── Subchart aliases for the parent-extraVolumes check (invariant 4) ─────────
-# The dependency aliases from Chart.yaml. redis/postgresql are parent-managed
-# StatefulSets (not subcharts), so their extraVolumes are the parent's own.
-SUBCHARTS=(clickhouse gateway langyagent prometheus)
+# SUBCHARTS (the names that invariant 4 treats as subcharts) is derived from
+# Chart.yaml below, after the PyYAML guard — see the derivation there.
 
 failures=0
 
@@ -91,6 +89,24 @@ if ! python3 -c 'import yaml' >/dev/null 2>&1; then
     echo "SETUP ERROR: python3 with PyYAML is required" >&2
     exit 2
   }
+fi
+
+# ── Subchart names for the parent-extraVolumes check (invariant 4) ───────────
+# Read straight from Chart.yaml dependencies (the alias when set, else the name)
+# so a newly added subchart is covered without editing this script. redis and
+# postgresql are parent-managed StatefulSets, not subcharts, so their
+# extraVolumes are the parent's own and are excluded by construction.
+mapfile -t SUBCHARTS < <(python3 - <<'PYEOF'
+import yaml
+with open("Chart.yaml") as fh:
+    chart = yaml.safe_load(fh) or {}
+for dep in chart.get("dependencies", []) or []:
+    print(dep.get("alias") or dep["name"])
+PYEOF
+)
+if [ "${#SUBCHARTS[@]}" -eq 0 ]; then
+  echo "SETUP ERROR: no dependencies found in Chart.yaml" >&2
+  exit 2
 fi
 
 WORKDIR="$(mktemp -d)"
@@ -218,32 +234,41 @@ def resolve_dep(idx, kind, name, job_phases, job_weight):
 
 
 def check_hook_deps(kind_wanted):
-    """kind_wanted: 'ServiceAccount' or 'Secret'."""
-    docs = load_docs([sys.argv[2], sys.argv[3]])
-    idx = index(docs)
-    jobs = {}
-    for d in docs:
-        if d["kind"] == "Job" and is_hook(d):
-            jobs[(d["metadata"]["name"], frozenset(phases_of(d)), weight_of(d))] = d
+    """kind_wanted: 'ServiceAccount' or 'Secret'.
+
+    Each render (install, upgrade) is indexed and resolved on its OWN, never
+    unioned: a dependency that is a hook in one render but main-phase or absent
+    in the other is a real defect in that render, and merging the two would let
+    the good render mask the bad one. The FAIL line carries the render it fired
+    in, since the same Job can pass in one and fail in the other.
+    """
+    renders = [("install", sys.argv[2]), ("upgrade", sys.argv[3])]
     bad = 0
     checked = 0
-    for (jname, jphases, jweight), job in sorted(jobs.items()):
-        if kind_wanted == "ServiceAccount":
-            san = sa_of(job)
-            needs = [] if not san or san == "default" else [san]
-        else:
-            needs = sorted(secret_names(job))
-        for name in needs:
-            checked += 1
-            status = resolve_dep(idx, kind_wanted, name, set(jphases), jweight)
-            phase = ",".join(sorted(jphases))
-            if status != "ok":
-                print("FAIL [hook-dep]: job=%s phase=%s needs=%s/%s found=%s"
-                      % (jname, phase, kind_wanted, name, status))
-                bad += 1
+    for render_name, path in renders:
+        docs = load_docs([path])
+        idx = index(docs)
+        jobs = {}
+        for d in docs:
+            if d["kind"] == "Job" and is_hook(d):
+                jobs[(d["metadata"]["name"], frozenset(phases_of(d)), weight_of(d))] = d
+        for (jname, jphases, jweight), job in sorted(jobs.items()):
+            if kind_wanted == "ServiceAccount":
+                san = sa_of(job)
+                needs = [] if not san or san == "default" else [san]
+            else:
+                needs = sorted(secret_names(job))
+            for name in needs:
+                checked += 1
+                status = resolve_dep(idx, kind_wanted, name, set(jphases), jweight)
+                phase = ",".join(sorted(jphases))
+                if status != "ok":
+                    print("FAIL [hook-dep]: render=%s job=%s phase=%s needs=%s/%s found=%s"
+                          % (render_name, jname, phase, kind_wanted, name, status))
+                    bad += 1
     if bad:
         return 1
-    print("ok   [hook-%s] %d hook-Job %s dependencies are lower-weight hooks covering every phase"
+    print("ok   [hook-%s] %d hook-Job %s dependencies (across install and upgrade) are lower-weight hooks covering every phase"
           % (kind_wanted.lower(), checked, kind_wanted))
     return 0
 
@@ -289,6 +314,16 @@ def declared(values, path):
     return True
 
 
+def allowed(dotted, allow):
+    """An allowlist entry exempts its exact path AND every path below it, so
+    `gateway.ingress` also covers `gateway.ingress.host` — anything under a
+    subchart-owned or notes-only subtree, not just the one dotted spelling."""
+    for entry in allow:
+        if dotted == entry or dotted.startswith(entry + "."):
+            return True
+    return False
+
+
 def check_values():
     allow = set(sys.argv[2:])
     with open("values.yaml") as fh:
@@ -302,7 +337,7 @@ def check_values():
                 for m in REF.finditer(line):
                     path = m.group(1).lstrip(".").split(".")
                     dotted = ".".join(path)
-                    if dotted in allow:
+                    if allowed(dotted, allow):
                         continue
                     if not declared(values, path):
                         print("FAIL [undeclared-value]: %s:%d references .Values.%s (not in values.yaml)"
