@@ -35,12 +35,14 @@ function makeConversationRepo(
   overrides?: Partial<LangyConversationRepository>,
 ): LangyConversationRepository {
   return {
+    countUsage: vi.fn().mockResolvedValue({ turns: 0, activeUsers: 0 }),
     tryFindVisibleById: vi.fn().mockResolvedValue(null),
     findOwnership: vi.fn().mockResolvedValue("missing"),
     findAllForUser: vi.fn().mockResolvedValue([]),
     findActiveOwnedIds: vi.fn().mockResolvedValue([]),
     tryFindPendingHandoff: vi.fn().mockResolvedValue(null),
     tryFindRunToken: vi.fn().mockResolvedValue(null),
+    hasAdmittedTurn: vi.fn().mockResolvedValue(false),
     turnExists: vi.fn().mockResolvedValue(false),
     ...overrides,
   };

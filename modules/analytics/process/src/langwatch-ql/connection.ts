@@ -4,7 +4,7 @@
  * one-way -- executor.ts and provisioning/ reach down to this leaf, never the reverse.
  * @see ./executor.ts — builds the client from this connection
  * @see ./provisioning/selfProvisioning.ts — the deploy path that converges it
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { createLogger } from "@langwatch/observability";

@@ -1,11 +1,12 @@
 /**
  * Orders catalog policy, validation, reserved-window resolution, restricted execution, then
- * advisory diagnostics -- defence in depth, since the database row policy is the real isolation
- * boundary. Server and result ceilings throw or truncate on overflow; neither is caller-set.
+ * advisory diagnostics; the database row policy is the real isolation boundary. Nothing is cut:
+ * a bare statement gets the default `LIMIT`, and an oversized result is `lwql_result_too_large`.
  */
 
 import {
   LangWatchQLParameterMissingError,
+  LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   type LangWatchQLBudgetOverflowMode,
@@ -21,6 +22,7 @@ import type {
   LangWatchQLExecutor,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
+import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
@@ -148,6 +150,18 @@ export interface LangWatchQLExecuteInput {
   readonly onBudgetOverflow?: LangWatchQLBudgetOverflowMode;
   /** Whether this caller may call an eval function. Absent means no. */
   readonly isInstantEvalsEnabled?: boolean;
+}
+
+/**
+ * One execution over a SET of projects: their secrets become the tenant-capability set the row
+ * policy resolves, so the query reads the union of their rows. Empty is a valid scope that reads
+ * zero rows.
+ */
+export interface LangWatchQLProjectSetExecuteInput extends Omit<
+  LangWatchQLExecuteInput,
+  "project"
+> {
+  readonly projects: readonly LangWatchQLCaller[];
 }
 
 /**
@@ -329,10 +343,15 @@ export class LangWatchQLService {
 
   /**
    * Validates a submitted statement against this caller's permissions, then
-   * executes it as the restricted identity.
+   * executes it as the restricted identity, over the one project it is bound to.
    */
-  async execute({
-    project,
+  execute({ project, ...input }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+    return this.executeForProjects({ ...input, projects: [project] });
+  }
+
+  /** The same, over every project in the set — an API key's readable projects. */
+  async executeForProjects({
+    projects,
     protections,
     sql,
     parameters,
@@ -340,9 +359,10 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     isInstantEvalsEnabled,
-  }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  }: LangWatchQLProjectSetExecuteInput): Promise<LangWatchQLQueryResult> {
+    const projectIds = projects.map((project) => project.id);
     const validation = this.validate({
-      projectId: project.id,
+      projectId: projectIds.join(",") || "(none)",
       protections,
       sql,
       ...(parameters ? { parameters } : {}),
@@ -365,7 +385,7 @@ export class LangWatchQLService {
     const { executor } = this.deps;
     if (!executor) {
       logger.error(
-        { projectId: project.id },
+        { projectIds },
         "LangWatchQL query refused: no restricted identity is provisioned",
       );
 
@@ -374,7 +394,7 @@ export class LangWatchQLService {
 
     return this.executeValidated({
       executor,
-      project,
+      projects,
       sql,
       validation,
       granularity,
@@ -385,15 +405,26 @@ export class LangWatchQLService {
    * Runs a statement that passed every gate as the restricted identity, and
    * shapes what came back with the facts those gates recorded.
    */
+  /** @throws {LangWatchQLResultTooLargeError} when the rows' JSON exceeds `maxResultBytes`. */
+  private assertResultWithinByteCeiling(rows: readonly Record<string, unknown>[]): void {
+    let bytes = 0;
+    for (const row of rows) {
+      bytes += JSON.stringify(row)?.length ?? 0;
+      if (bytes > this.limits.maxResultBytes) {
+        throw new LangWatchQLResultTooLargeError(this.limits.maxResultBytes);
+      }
+    }
+  }
+
   private async executeValidated({
     executor,
-    project,
+    projects,
     sql,
     validation,
     granularity,
   }: {
     readonly executor: LangWatchQLExecutor;
-    readonly project: LangWatchQLCaller;
+    readonly projects: readonly LangWatchQLCaller[];
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
@@ -411,18 +442,30 @@ export class LangWatchQLService {
     };
 
     const execution = await executor.execute({
-      sql,
+      // The submitted statement with one edit and no other: a default `LIMIT` when the caller
+      // named none, so an unbounded query is capped rather than streamed.
+      sql: validation.appendRowLimit
+        ? appendDefaultRowLimit({
+            sql,
+            maxRows: this.limits.maxRows,
+            ...(validation.appendRowLimitBeforeOffset
+              ? { beforeOffset: validation.appendRowLimitBeforeOffset }
+              : {}),
+          })
+        : sql,
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half — it predates the
       // granularity merge, so passing it drops `period_granularity_seconds`
       // from every statement that declares one.
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
-      tenantCapability: lwqlCapability.tenantCapability({
-        secret: project.lwqlKey,
+      tenantCapability: lwqlCapability.tenantCapabilitySet({
+        secrets: projects.map((project) => project.lwqlKey),
       }),
-      limits: this.limits,
     });
+    // Refused rather than cut: a body that looks whole but is missing its tail is the worse
+    // failure for an analytics caller. The row count is already bounded by the LIMIT above.
+    this.assertResultWithinByteCeiling(execution.rows);
 
     // The facts the walk recorded, plus what actually came back. Both halves
     // are needed and neither is re-derived: a rule about the query's shape
@@ -433,20 +476,16 @@ export class LangWatchQLService {
       views: this.views,
       columns: execution.columns,
       rows: execution.rows,
-      truncated: execution.truncated,
-      limits: this.limits,
-      rowsReturned: execution.statistics.rowsReturned,
       now: this.now(),
     });
 
     logger.info(
       {
-        projectId: project.id,
+        projectIds: projects.map((project) => project.id),
         tables: validation.tables,
         rowsReturned: execution.statistics.rowsReturned,
         rowsRead: execution.statistics.rowsRead,
         elapsedMs: execution.statistics.elapsedMs,
-        truncated: execution.truncated,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
@@ -458,7 +497,6 @@ export class LangWatchQLService {
       columns: execution.columns,
       rows: execution.rows,
       statistics: execution.statistics,
-      truncated: execution.truncated,
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,

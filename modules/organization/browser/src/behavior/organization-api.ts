@@ -6,10 +6,14 @@
 
 import { createModuleApi, type ModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { Plan } from "@langwatch/entitlement-contract";
+import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import type {
   EnrichedAuditLog,
+  JoinRequestAutomaticJoins,
+  JoinRequestMine,
   JoinRequestPending,
   OrganizationInvite,
+  OrganizationMemberProvenance,
   OrganizationUser,
   User,
 } from "@langwatch/organization-contract";
@@ -285,6 +289,14 @@ export type OrganizationApiMap = {
       query: {
         input: { organizationId: string; includeDeactivated?: boolean };
         output: OrganizationWithMembersAndTheirTeams;
+      };
+    };
+
+    /** Why each member is here, keyed by user id; asked apart so failing costs only the chips. */
+    getMemberProvenance: {
+      query: {
+        input: { organizationId: string };
+        output: Record<string, OrganizationMemberProvenance>;
       };
     };
 
@@ -712,6 +724,22 @@ export type OrganizationApiMap = {
   };
 
   joinRequests: {
+    /** The post-login offer: the lookup minus the domains this person dismissed. */
+    offer: { query: { input: void; output: JoinLookupDecision } };
+    /** Everything this person is waiting on. */
+    mine: { query: { input: void; output: JoinRequestMine } };
+    dismissOffer: {
+      mutation: { input: Record<string, never>; output: { success: true } };
+    };
+    request: {
+      mutation: {
+        input: { organizationId: string };
+        output: { joinRequestId: string; state: "PENDING" | "APPROVED" };
+      };
+    };
+    automaticJoins: {
+      query: { input: { organizationId: string }; output: JoinRequestAutomaticJoins };
+    };
     /**
      * Three settings, not a boolean: `off` refuses, `request` queues for an
      * administrator, `auto` lets them in. The domains travel with it, since

@@ -8,6 +8,7 @@ import type {
   StoredObjectDirectUploadTarget,
   StoredObjectHead,
   StoredObjectOwnerResolver,
+  StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
@@ -76,6 +77,16 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
       throw new Error("provider unavailable");
     }
     this.deleted = true;
+  }
+
+  probes = 0;
+
+  async resolveDestination(): Promise<StoredObjectStorageDestination> {
+    return { kind: "s3", bucket: "langwatch-test" };
+  }
+
+  async probe(): Promise<void> {
+    this.probes += 1;
   }
 }
 

@@ -12,6 +12,14 @@ import type { GatewayGuardrailBundleEntry } from "./gateway-guardrail.ts";
 export const gatewayConfig = Config.define((c) => ({
   /** How long after a request an outcome may still arrive. */
   spendSettlementGraceMs: c.env("LW_SPEND_SETTLEMENT_GRACE_MS", z.string().optional()),
+  /** Where this control plane reaches the gateway's own surface. */
+  internalUrl: c.env("LW_GATEWAY_INTERNAL_URL", z.string().optional()),
+  /** Where the gateway is told to reach this control plane; the public base URL otherwise. */
+  controlPlaneUrl: c.env("GATEWAY_CONTROL_PLANE_URL", z.string().optional()),
+  /** Where apps reach the gateway, when no internal address is set. Legacy name, still honoured. */
+  baseUrl: c.env("LW_GATEWAY_BASE_URL", z.string().optional()),
+  /** Where apps outside the deployment reach the gateway. */
+  publicUrl: c.env("LW_GATEWAY_PUBLIC_URL", z.string().optional()),
 }));
 
 export type GatewayServerConfig = ConfigOf<typeof gatewayConfig>;
@@ -82,6 +90,14 @@ export function assertGatewaySecretsAllOrNone(source: Readonly<Record<string, un
     missing,
   );
 }
+
+/** Where this deployment reaches the gateway, and where the gateway should reach back. */
+export type GatewayDeploymentAddresses = Readonly<{
+  baseUrl: string | undefined;
+  /** What an app outside the deployment is told to point at. */
+  publicUrl: string | undefined;
+  expectedControlPlaneUrl: string | undefined;
+}>;
 
 /** The browser only learns where the gateway answers, never a secret. */
 export const gatewayWebConfigSchema = z.strictObject({

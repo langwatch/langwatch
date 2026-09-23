@@ -27,7 +27,8 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
     isLangWatchQLAvailable: () => true,
     describeLangWatchQLSchema: async () => ({
       database: "analytics",
-      datasets: [],
+      functions: [],
+      views: [],
       appFunctions: [],
     }),
     validateLangWatchQL: (_input: LangWatchQLValidationInput) => ({
@@ -39,7 +40,6 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
         columns: [],
         rows: [],
         statistics: { elapsedMs: 0, rowsRead: 0, bytesRead: 0 },
-        truncated: false,
         diagnostics: [],
         followsTimeWindow: false,
         followsGranularity: false,

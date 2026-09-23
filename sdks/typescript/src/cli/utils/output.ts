@@ -1,10 +1,11 @@
+import { Option, type Command } from "commander";
 /**
  * The one place a command SAYS its successful result — the output contract:
  * `await printResult(data, { ...commandOptions, table: renderHumanTable })`.
  * Legacy flags normalise onto it via `resolveOutputOptions` — no breaking change.
  */
 import type * as yaml from "js-yaml";
-import { Option, type Command } from "commander";
+
 import { setOutputFormat } from "./outputScope";
 import { parsePositiveIntOrNull } from "./positiveInt";
 
@@ -534,7 +535,7 @@ export const assertFormatIsSupported = async (
   // Auto-detected agent mode: keep the human table, but never let a caller
   // believe it is parsing structured output.
   process.stderr.write(
-    `note: \`${name}\` does not emit structured output yet — the table below is not machine-readable.\n`,
+    `note: \`${name}\` does not emit structured output yet. The table below is not machine-readable.\n`,
   );
   return { ...resolved, format: "table" };
 };
@@ -704,9 +705,25 @@ function applyJqLength(
 ): unknown {
   const path = pipeIndex === -1 ? "." : trimmed.slice(0, pipeIndex).trim();
   const operator = pipeIndex === -1 ? "length" : trimmed.slice(pipeIndex + 1).trim();
-  if (operator !== "length" || path.length === 0) {
+  if (path.length === 0) {
     throw new Error(
-      `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported.` +
+      `Invalid --jq expression "${expression}": nothing before the pipe.` + USE_THE_SHELL,
+    );
+  }
+
+  // `a | b` where b is a path is just b applied to what a produced, which is
+  // how `.data[] | .slug` is written. An iterating left side produced a list,
+  // and jq applies the right side to each of its elements.
+  if (operator.startsWith(".")) {
+    const left = applyJq(path, data);
+    return path.includes("[]") && Array.isArray(left)
+      ? left.map((item) => applyJq(operator, item))
+      : applyJq(operator, left);
+  }
+
+  if (operator !== "length") {
+    throw new Error(
+      `Invalid --jq expression "${expression}": after a pipe this supports a path (".slug") or "length".` +
         USE_THE_SHELL,
     );
   }

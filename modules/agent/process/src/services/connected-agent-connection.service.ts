@@ -5,8 +5,6 @@ import {
   PRESENCE_REFRESH_MS,
   PROTOCOL_VERSION,
   type PlatformFrame,
-  type SdkFrame,
-  sdkFrameSchema,
   type InstanceNudge,
   instanceNudgeSchema,
   type AgentConnection,
@@ -15,9 +13,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 
+import { readSdkFrame, UNREADABLE_RESULT_MESSAGE } from "../rules/connected-agent-frame.rules.ts";
 import { instanceChannel, pendingKey } from "../rules/connected-agent-keys.rules.ts";
 import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
-import { AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
+import type { AgentSessionService, SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:gateway");
 
@@ -116,8 +115,8 @@ export class ConnectedAgentConnectionService {
     resolved: ResolvedConnectCredential,
     raw: string,
   ): Promise<void> {
-    const parsed = findSdkFrame(raw);
-    if (parsed?.type !== "register") {
+    const read = readSdkFrame(raw);
+    if (read.kind !== "frame" || read.frame.type !== "register") {
       this.#refuse(
         ws,
         new AgentRegisterRefusedError({
@@ -127,7 +126,7 @@ export class ConnectedAgentConnectionService {
       );
       return;
     }
-    const frame = parsed;
+    const frame = read.frame;
 
     let info: SessionInfo;
     let registered: PlatformFrame;
@@ -261,8 +260,13 @@ export class ConnectedAgentConnectionService {
   }
 
   async #onFrame(session: Session, raw: string): Promise<void> {
-    const frame = findSdkFrame(raw);
-    if (!frame) return;
+    const read = readSdkFrame(raw);
+    if (read.kind === "dropped") return;
+    if (read.kind === "unreadable_result") {
+      await this.#failUnreadableResult(session, read);
+      return;
+    }
+    const { frame } = read;
     switch (frame.type) {
       case "ack":
         await this.#core.ack(session.info, frame.callId);
@@ -279,6 +283,28 @@ export class ConnectedAgentConnectionService {
         // with a fresh socket to change what it serves.
         return;
     }
+  }
+
+  /**
+   * The instance has answered and will not answer again, so the call it holds
+   * fails now rather than at its deadline. A call it does not hold is dropped.
+   */
+  async #failUnreadableResult(
+    session: Session,
+    { callId, issue }: { callId: string; issue: string },
+  ): Promise<void> {
+    if (!session.activeCallIds.has(callId)) return;
+    session.activeCallIds.delete(callId);
+    logger.warn(
+      { instanceId: session.info.instanceId, callId, issue },
+      "result frame fails the schema, failing the call",
+    );
+    await this.#core.result(session.info, {
+      type: "result",
+      protocol: PROTOCOL_VERSION,
+      callId,
+      error: { code: "agent_call_failed", message: `${UNREADABLE_RESULT_MESSAGE}: ${issue}` },
+    });
   }
 
   /** Presence refresh on the SDK's pongs, and the ping that asks for them. */
@@ -347,14 +373,5 @@ export class ConnectedAgentConnectionService {
       session.socket.close(SERVICE_RESTART_CLOSE_CODE, "service restart");
       await this.#onClose(session);
     }
-  }
-}
-
-function findSdkFrame(raw: string): SdkFrame | null {
-  try {
-    const parsed = sdkFrameSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
   }
 }

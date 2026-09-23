@@ -4,6 +4,7 @@ import { PrismaBatchEvaluationRepository } from "./prisma.batch-evaluation.repos
 import { PrismaDatasetContentRepository } from "./prisma.dataset-content.repository.ts";
 import { PrismaDatasetRecordContentRepository } from "./prisma.dataset-record-content.repository.ts";
 import { PrismaDatasetRecordRepository } from "./prisma.dataset-record.repository.ts";
+import { PrismaDatasetUsageRepository } from "./prisma.dataset-usage.repository.ts";
 import { PrismaDatasetRepository } from "./prisma.dataset.repository.ts";
 
 export const PostgresDatasetRepositories = prismaRepositories({
@@ -12,4 +13,5 @@ export const PostgresDatasetRepositories = prismaRepositories({
   content: PrismaDatasetContentRepository,
   recordContent: PrismaDatasetRecordContentRepository,
   batchEvaluations: PrismaBatchEvaluationRepository,
+  usage: PrismaDatasetUsageRepository,
 });

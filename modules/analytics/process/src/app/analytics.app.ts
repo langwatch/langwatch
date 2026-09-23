@@ -20,6 +20,7 @@ import {
   type AnalyticsTopDocumentsResult,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
+  type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLRunCaller,
@@ -28,11 +29,13 @@ import {
   type LangWatchQLJudgementCall,
   type LangWatchQLSchema,
   type LangWatchQLService,
+  type LangWatchQLStatementRequest,
   type LangWatchQLTextHydrationInput,
   type LangWatchQLValidationInput,
   type QueryReference,
   type AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -50,22 +53,23 @@ import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
 import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
 import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
+import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
+import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import { lwqlHydrationKeyCap } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
+import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
 import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import {
-  keyPermitted,
   resolveApiKeyProtections as resolveApiKeyProtectionsRule,
   resolveProjectProtections as resolveProjectProtectionsRule,
   resolveWorkbenchProtections,
   resolveWorkbenchRunCaller,
 } from "../rules/workbench-protections.rules.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../services/langwatch-ql-executor.service.ts";
 import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
@@ -74,6 +78,10 @@ import {
   type LangWatchQLTraceSource,
 } from "../services/langwatch-ql-hydration-read.service.ts";
 import { LangWatchQLHydrationService } from "../services/langwatch-ql-hydration.service.ts";
+import {
+  LangWatchQLQueryScopeService,
+  type LangWatchQLQueryScope,
+} from "../services/langwatch-ql-query-scope.service.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /**
@@ -125,6 +133,8 @@ export interface AnalyticsAppDependencies {
   lwqlBounds: LangWatchQLBoundsService;
   /** The peer every app-function value is read and rendered through. */
   traces: TraceApi;
+  /** Where the server would keep the app functions, for the checkup's provisioning probe. */
+  appFunctionStore: LangWatchQLAppFunctionStoreRepository;
 }
 
 export type AnalyticsInfrastructure = Readonly<{
@@ -231,11 +241,13 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
     projectId,
     threadKeys,
     protections,
+    maxTraces,
   }: Parameters<LangWatchQLTraceSource["readThreadTraces"]>[0]): Promise<readonly Trace[]> {
     return this.traces.readThreadsTraces({
       projectId,
       threadIds: [...threadKeys],
       protections,
+      maxTraces,
     });
   }
 }
@@ -307,6 +319,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
           rateLimiter: setup.members.rateLimiter,
         }),
         traces: setup.dependencies.traces,
+        appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
       },
       setup.members.publicBaseUrl,
     );
@@ -316,9 +329,11 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   #publicBaseUrl: string | undefined;
   #playgroundAccess: CustomChartPlaygroundAccessService;
   #hydration: LangWatchQLHydrationService;
+  #queryScope: LangWatchQLQueryScopeService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
+    this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
     this.#hydration = LangWatchQLHydrationService.create({
@@ -381,6 +396,11 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     return this.#dependencies.langWatchQL.available;
   }
 
+  /** Whether every replica would see the app functions; empty where the server did not say. */
+  async findAppFunctionsProvisionable(): Promise<boolean[]> {
+    return (await this.#dependencies.appFunctionStore.findProbe()).map(canProvisionAppFunctions);
+  }
+
   /** The database this deployment's LangWatchQL views live in. */
   langWatchQLDatabase(): string {
     return this.#dependencies.langWatchQL.database;
@@ -401,11 +421,95 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
    * it — `/schema` refuses such a key — while the filter half is answered in
    * full either way. See ADR-154.
    */
-  async describeQueryReference(
+  describeQueryReference(
     input: Readonly<{
       projectId: string;
       protections: LangWatchQLProtections;
       canRunLangWatchQL: boolean;
+    }>,
+  ): Promise<QueryReference> {
+    return this.#queryReference({
+      protections: input.protections,
+      canRunLangWatchQL: input.canRunLangWatchQL,
+      schema: () =>
+        this.describeLangWatchQLSchema({
+          projectId: input.projectId,
+          protections: input.protections,
+        }),
+    });
+  }
+
+  /**
+   * One statement over every project this key may read, counted against each of their
+   * windows first. An empty scope still runs, and reads zero rows.
+   */
+  async runLangWatchQLForKey(
+    input: Readonly<{ reach: LangWatchQLKeyReach } & LangWatchQLStatementRequest>,
+  ): Promise<LangWatchQLQueryResult> {
+    const { reach, sql, parameters, timeWindow, granularitySeconds } = input;
+    const { projects, protections } = await this.#queryScope.resolve({ reach });
+    for (const project of projects) {
+      await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
+    }
+
+    return this.#dependencies.langWatchQL.executeForProjects({
+      projects,
+      protections,
+      sql,
+      ...(parameters ? { parameters } : {}),
+      ...(timeWindow ? { timeWindow } : {}),
+      ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+      isInstantEvalsEnabled:
+        statementMightCallEvalFunction(sql) && (await this.#isInstantEvalsEnabledFor({ projects })),
+    });
+  }
+
+  /** The catalogue as this key sees it: gated to the strictest of its readable projects. */
+  async describeLangWatchQLSchemaForKey(
+    input: Readonly<{ reach: LangWatchQLKeyReach }>,
+  ): Promise<LangWatchQLSchema> {
+    return this.#schemaFor(await this.#queryScope.resolve(input));
+  }
+
+  /**
+   * Both query languages, the SQL half open when the key clears `analytics:view` where it
+   * resolved AND reads at least one project; saying so points any other key at the filter.
+   */
+  async describeQueryReferenceForKey(
+    input: Readonly<{ reach: LangWatchQLKeyReach }>,
+  ): Promise<QueryReference> {
+    const scope = await this.#queryScope.resolve(input);
+    const holdsQueryPermission = await this.#queryScope.holdsQueryPermission(input);
+
+    return this.#queryReference({
+      protections: scope.protections,
+      canRunLangWatchQL: holdsQueryPermission && scope.projects.length > 0,
+      schema: () => this.#schemaFor(scope),
+    });
+  }
+
+  async #schemaFor(scope: LangWatchQLQueryScope): Promise<LangWatchQLSchema> {
+    return this.#dependencies.langWatchQL.describeSchema({
+      protections: scope.protections,
+      isInstantEvalsEnabled: await this.#isInstantEvalsEnabledFor(scope),
+    });
+  }
+
+  /** A judged column is charged to one project, so the gate opens only for a scope of one. */
+  async #isInstantEvalsEnabledFor(
+    scope: Pick<LangWatchQLQueryScope, "projects">,
+  ): Promise<boolean> {
+    const [sole, ...others] = scope.projects;
+    if (!sole || others.length > 0) return false;
+
+    return this.#isInstantEvalsEnabled(sole.id);
+  }
+
+  async #queryReference(
+    input: Readonly<{
+      protections: LangWatchQLProtections;
+      canRunLangWatchQL: boolean;
+      schema: () => Promise<LangWatchQLSchema>;
     }>,
   ): Promise<QueryReference> {
     const database = this.langWatchQLDatabase();
@@ -415,11 +519,8 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
       lwqlEnabled: input.canRunLangWatchQL,
       database,
       schema: input.canRunLangWatchQL
-        ? await this.describeLangWatchQLSchema({
-            projectId: input.projectId,
-            protections: input.protections,
-          })
-        : { database, datasets: [], appFunctions: [] },
+        ? await input.schema()
+        : { database, functions: [], views: [], appFunctions: [] },
       limits: {
         maxStatementLength: MAX_LWQL_LENGTH,
         maxRowsReturned: DEFAULT_LWQL_RESULT_LIMITS.maxRows,
@@ -427,21 +528,6 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
         maxExecutionTimeSeconds: DEFAULT_LWQL_RESOURCE_LIMITS.maxExecutionTimeSeconds,
       },
       traceFilterExamples: TRACE_FILTER_EXAMPLES,
-    });
-  }
-
-  /**
-   * Whether this credential reaches LangWatchQL at all — the one caller fact
-   * the reference document depends on, asked of the KEY rather than enforced,
-   * because a key entitled only to traces still reads the filter half.
-   */
-  canApiKeyRunLangWatchQL(
-    input: Readonly<{ credential: RestCredentialPrincipal }>,
-  ): Promise<boolean> {
-    return keyPermitted({
-      authz: this.#dependencies.authz,
-      credential: input.credential,
-      permission: "analytics:view",
     });
   }
 

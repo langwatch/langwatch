@@ -180,14 +180,16 @@ function DatasetEntry({
             <Badge size="xs" variant="surface" fontSize="10px">
               {dataset.freshness}
             </Badge>
-            <Badge
-              size="xs"
-              variant="surface"
-              fontSize="10px"
-              title="Bound this column with a range to keep the scan narrow"
-            >
-              time: {dataset.timeColumn}
-            </Badge>
+            {dataset.timeColumn !== null && (
+              <Badge
+                size="xs"
+                variant="surface"
+                fontSize="10px"
+                title="Bound this column with a range to keep the scan narrow"
+              >
+                time: {dataset.timeColumn}
+              </Badge>
+            )}
           </HStack>
           {dataset.joinKeys.length > 0 && (
             <Text fontSize="10.5px" color="fg.subtle">

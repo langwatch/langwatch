@@ -91,7 +91,14 @@ export function UiNavigationHost({
   const { host, failure } = useNavigationHostReading(commandBar);
 
   if (failure.departing) return <LoadingScreen />;
-  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
+  if (failure.copy) {
+    return (
+      <UiPageFailure
+        copy={failure.copy}
+        retry={{ onRetry: () => window.location.reload(), testId: "retry-workspace" }}
+      />
+    );
+  }
 
   return (
     <NavigationHostProvider value={host}>
@@ -121,7 +128,7 @@ function useNavigationHostReading(commandBar: boolean) {
 
   const failure = useUiShellFailure({
     error: organizations.error,
-    fallbackTitle: "Couldn't load your workspace",
+    fallbackTitle: "We couldn't open your workspace",
   });
 
   const read: NavigationGraphRead = useMemo(() => organizations.data ?? [], [organizations.data]);

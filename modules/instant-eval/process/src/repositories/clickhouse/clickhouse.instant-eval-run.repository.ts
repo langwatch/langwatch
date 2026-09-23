@@ -1,4 +1,5 @@
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { z } from "zod";
 
 import type { InstantEvalClickHouseResolver } from "../../app/instant-eval.members.ts";
 import type {
@@ -15,6 +16,8 @@ import {
   toRow,
   toWriteRecord,
 } from "./clickhouse.instant-eval-run.mapper.ts";
+
+const usageRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));
 
 export class ClickHouseInstantEvalRunRepository implements InstantEvalRunRepository {
   private constructor(
@@ -129,6 +132,55 @@ export class ClickHouseInstantEvalRunRepository implements InstantEvalRunReposit
     if (row?.status !== "QUEUED") return;
     const at = this.now();
     await this.write({ ...row, status: "FAILED", error: code, updatedAt: at, finishedAt: at });
+  }
+
+  /** Per project, so each read routes to the tenant's server; FINAL, as the report always read it. */
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<{ runs: number; firstRunAt?: number }> {
+    const window =
+      since === undefined ? "" : "AND CreatedAt >= fromUnixTimestamp64Milli({since:Int64})";
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const client = await this.resolveClient(tenantId);
+        const read = async (query: string) => {
+          const result = await client.query({
+            query,
+            query_params: since === undefined ? { tenantId } : { tenantId, since },
+            format: "JSONEachRow",
+          });
+          return usageRowsSchema.parse(await result.json())[0];
+        };
+        const [counted, earliest] = await Promise.all([
+          read(`
+            SELECT toString(count()) AS Total, '0' AS FirstMs
+            FROM ${INSTANT_EVAL_RUNS_TABLE} FINAL
+            WHERE TenantId = {tenantId:String}
+              ${window}`),
+          read(`
+            SELECT toString(count()) AS Total,
+                   toString(toUnixTimestamp64Milli(min(CreatedAt))) AS FirstMs
+            FROM ${INSTANT_EVAL_RUNS_TABLE}
+            WHERE TenantId = {tenantId:String}`),
+        ]);
+        return {
+          runs: Number.parseInt(counted?.Total ?? "0", 10),
+          first:
+            Number.parseInt(earliest?.Total ?? "0", 10) === 0
+              ? []
+              : [Number(earliest?.FirstMs ?? "0")],
+        };
+      }),
+    );
+    const firsts = perProject.flatMap((project) => project.first);
+    return {
+      runs: perProject.reduce((sum, project) => sum + project.runs, 0),
+      ...(firsts.length === 0 ? {} : { firstRunAt: Math.min(...firsts) }),
+    };
   }
 
   async write(row: InstantEvalRunRow): Promise<void> {

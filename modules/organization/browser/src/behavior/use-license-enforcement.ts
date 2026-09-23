@@ -6,6 +6,7 @@
 
 // The upgrade modal is a shared zustand singleton: opening it here and
 // mounting it elsewhere is one modal, not a copy.
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import { useCallback } from "react";
 
@@ -23,6 +24,7 @@ type LimitType = "members" | "membersLite";
 export function useLicenseEnforcement(limitType: LimitType) {
   const { organization } = useOrganizationTeamProject();
   const openUpgradeModal = useUpgradeModalStore((state) => state.open);
+  const analytics = useUiAnalytics();
 
   const checkResult = api.licenseEnforcement.checkLimit.useQuery(
     { organizationId: organization?.id ?? "", limitType },
@@ -43,6 +45,17 @@ export function useLicenseEnforcement(limitType: LimitType) {
         return onAllowed();
       }
       openUpgradeModal(limitType, checkResult.data.current, checkResult.data.max);
+      analytics.track({
+        boundary: "organization",
+        action: "shown",
+        name: "upgrade_modal",
+        attributes: {
+          mode: "limit",
+          limitType,
+          current: checkResult.data.current,
+          max: checkResult.data.max,
+        },
+      });
       // Fire-and-forget: notify backend that a UI pre-check blocked the user
       if (organization?.id) {
         reportBlocked.mutate({
@@ -52,7 +65,7 @@ export function useLicenseEnforcement(limitType: LimitType) {
       }
       return undefined;
     },
-    [checkResult.data, openUpgradeModal, limitType, organization?.id, reportBlocked],
+    [analytics, checkResult.data, openUpgradeModal, limitType, organization?.id, reportBlocked],
   );
 
   return {

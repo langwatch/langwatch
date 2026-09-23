@@ -9,6 +9,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ResourceOwnership } from "@langwatch/kernel";
@@ -42,6 +43,7 @@ export function createScenarioRestTestApp(
     scenarioTabs?: Partial<ScenarioTabRegistry>;
     broadcast?: Partial<ScenarioBroadcast>;
     traces?: Partial<TraceApi>;
+    billing?: Partial<BillingApi>;
   } = {},
 ) {
   const simulations = createApiFixture<SimulationService>(
@@ -71,6 +73,7 @@ export function createScenarioRestTestApp(
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
+      billing: createApiFixture<BillingApi>(options.billing ?? {}, "Billing API"),
     },
     members: {
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
@@ -83,6 +86,7 @@ export function createScenarioRestTestApp(
       runConfigurations: createApiFixture<RunConfigurationsService>(),
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
+      idempotency: { claim: async () => true },
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: createApiFixture<ResourceOwnership>(),

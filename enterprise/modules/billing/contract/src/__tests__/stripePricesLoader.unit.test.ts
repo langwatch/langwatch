@@ -46,6 +46,9 @@ describe("stripeCatalog", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
       const resolved = resolveStripePriceMap(parsed, "test");
 
+      // A name the catalog does not map in this mode resolves to nothing,
+      // which is the point of the optional list; every mapped one still has
+      // to come back exactly as the file wrote it.
       for (const key of STRIPE_PRICE_NAMES) {
         expect(resolved[key]).toBe(parsed.mapping[key]?.test);
       }

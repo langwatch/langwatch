@@ -91,6 +91,11 @@ export interface AnalyticsApi {
   ): Promise<void>;
   isLangWatchQLAvailable(): boolean;
   /**
+   * Whether the LangWatchQL app functions can be created so every replica sees
+   * them. Empty where ClickHouse did not answer the settings the probe reads.
+   */
+  findAppFunctionsProvisionable(): Promise<boolean[]>;
+  /**
    * The database this deployment's LangWatchQL views live in, which a module
    * writing a statement against them has to name.
    */
@@ -154,12 +159,6 @@ export interface AnalyticsApi {
     projectId: string;
     credential: RestCredentialPrincipal;
   }): Promise<LangWatchQLProtections>;
-  /**
-   * Whether this credential reaches LangWatchQL at all — the one caller fact
-   * the reference document depends on. Asked of the key rather than enforced,
-   * because a key entitled only to traces still reads the filter half.
-   */
-  canApiKeyRunLangWatchQL(input: { credential: RestCredentialPrincipal }): Promise<boolean>;
   /**
    * What the PROJECT itself may see, with nobody asking — the protections a
    * job judging that project's own rows runs under, where there is neither a

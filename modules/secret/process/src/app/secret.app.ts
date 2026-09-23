@@ -4,6 +4,10 @@ import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import {
   RESERVED_PROJECT_SECRET_NAMES,
   SecretApi,
+  type RevealedSecret,
+  type RevealOnceInput,
+  type StashedReveal,
+  type StashRevealInput,
   type CreateSecretInput,
   type DeleteSecretInput,
   type GetSecretInput,
@@ -15,6 +19,7 @@ import {
 } from "@langwatch/secret-contract";
 
 import type { SecretRepositories } from "../repositories/secret.repositories.ts";
+import { OneTimeRevealService } from "../services/one-time-reveal.service.ts";
 import { SecretService } from "../services/secret.service.ts";
 
 /**
@@ -35,9 +40,11 @@ export class SecretApp implements SecretApiContract {
   static readonly reads = reads("encryption");
 
   #secrets: SecretService;
+  #reveals: OneTimeRevealService;
 
-  private constructor(secrets: SecretService) {
+  private constructor(secrets: SecretService, reveals: OneTimeRevealService) {
     this.#secrets = secrets;
+    this.#reveals = reveals;
   }
 
   static create(setup: SecretSetup): SecretApp {
@@ -47,7 +54,21 @@ export class SecretApp implements SecretApiContract {
         encryption: setup.members.encryption,
         reservedNames: RESERVED_PROJECT_SECRET_NAMES,
       }),
+      OneTimeRevealService.create({
+        store: setup.repositories.reveals,
+        encryption: setup.members.encryption,
+      }),
     );
+  }
+
+  /** Parks a secret for a single later read, and answers the id that reads it. */
+  stashReveal(input: StashRevealInput): Promise<StashedReveal> {
+    return this.#reveals.stash(input);
+  }
+
+  /** Serves a stashed secret and forgets it. Every later read is refused. */
+  revealOnce(input: RevealOnceInput): Promise<RevealedSecret> {
+    return this.#reveals.reveal(input);
   }
 
   /** The project's secrets, metadata only. */

@@ -1,7 +1,7 @@
 /**
  * LangWatchQL analytics SQL — the shape of the schema catalog.
  * @see ./lwql-views.ts — the catalog itself
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
@@ -55,7 +55,62 @@ export interface LangWatchQLViewColumn {
    * SQL over the source table producing this column. Defaults to the single
    * entry in {@link sourceColumns} when the column is passed through unchanged.
    */
-  readonly expression?: (source: (column: string) => string) => string;
+  readonly expression?: (
+    source: (column: string) => string,
+    joined?: (column: string) => string,
+  ) => string;
+  /**
+   * Columns of the view's {@link LangWatchQLViewJoin} table this column reads —
+   * the joined-side analogue of {@link sourceColumns}. The grant on them is
+   * driven by {@link LangWatchQLViewJoin.sourceColumns}, not by this list.
+   */
+  readonly joinedSourceColumns?: readonly string[];
+  /**
+   * Set when this column reads an aggregate-function state finalised with a merge combinator under
+   * the view's `GROUP BY`.
+   */
+  readonly aggregate?: boolean;
+}
+
+/**
+ * A second physical table a view joins, so one view renders from two sources.
+ * The tenant boundary covers both: the joined table is a source table too, so a
+ * row policy is created on it. Only a ClickHouse-resident view may declare one.
+ */
+export interface LangWatchQLViewJoin {
+  /** The joined table, in the same source database as the primary. */
+  readonly table: string;
+  /** Alias the view body gives the joined table, used in {@link on}. */
+  readonly alias: string;
+  /**
+   * The `ON` predicate, as SQL over the primary alias and {@link alias}.
+   * Assembled as text: reference only those two aliases and validated
+   * identifiers, never a caller-supplied value.
+   */
+  readonly on: string;
+  /** Join kind. `INNER` when absent. */
+  readonly kind?: "INNER" | "LEFT";
+  /**
+   * Columns of {@link table} the view reads, granted on that table. Must
+   * include every column {@link on} and the joined expressions read.
+   */
+  readonly sourceColumns: readonly string[];
+  /**
+   * Columns referenced only by {@link on}, split by table so each is granted
+   * where it lives. `ON` reaches both tables and a bare name exists on both, so
+   * the sides are named rather than parsed out of the SQL.
+   */
+  readonly onSourceColumns?: {
+    /** Columns of the primary {@link LangWatchQLViewDefinition.sourceTable}. */
+    readonly primary?: readonly string[];
+    /** Columns of the joined {@link table}. */
+    readonly joined?: readonly string[];
+  };
+  /**
+   * The joined table's column holding the owning project, when it is not the
+   * default `TenantId`, so its row policy filters the column it carries.
+   */
+  readonly tenantColumn?: string;
 }
 
 /** What identifies one row of a view, and how the source's versions collapse to it. */
@@ -93,6 +148,23 @@ export interface LangWatchQLPostgresMapping {
    * Column of {@link baseRelation} holding the owning project.
    */
   readonly tenantSourceColumn: string;
+  /**
+   * The join chain from {@link baseRelation} to the relation carrying the owning project, one hop
+   * per entry.
+   */
+  readonly tenantPath?: readonly {
+    /** Relation joined (application table name, e.g. "Team"). */
+    readonly relation: string;
+    /** Alias this hop's relation gets in the view body. */
+    readonly alias: string;
+    /** The equijoin: `<previous alias>.<from> = <alias>.<to>`. */
+    readonly on: { readonly from: string; readonly to: string };
+  }[];
+  /**
+   * A visibility rule the application's own repository enforces in code, rendered into the approved
+   * view's WHERE clause because the reader role sees only that view.
+   */
+  readonly rowFilter?: string;
 }
 
 /**
@@ -130,11 +202,32 @@ export interface LangWatchQLViewDefinition {
   /**
    * The column a caller should filter to prune partitions.
    */
-  readonly timeColumn: string;
+  readonly timeColumn?: string;
   /** How far behind the write path this view can be, for the schema endpoint. */
   readonly freshness: string;
   readonly dedup: LangWatchQLViewDedup;
   readonly columns: readonly LangWatchQLViewColumn[];
+  /**
+   * The source table's column holding the owning project, when it is not the
+   * default `TenantId`, so the row-policy generator filters the real column.
+   */
+  readonly tenantColumn?: string;
+  /**
+   * A second physical table this view joins. Present, its table is
+   * tenant-policed alongside {@link sourceTable} and granted separately.
+   */
+  readonly join?: LangWatchQLViewJoin;
+  /**
+   * A pre-filter applied in the view body, as SQL over the source aliases —
+   * needed where a physical table multiplexes record kinds and the view exposes
+   * one of them. Assembled as text: only source aliases and validated literals.
+   */
+  readonly where?: string;
+  /**
+   * Columns {@link where} references, granted on {@link sourceTable}. Listed
+   * explicitly rather than parsed out of the predicate SQL.
+   */
+  readonly whereSourceColumns?: readonly string[];
 }
 
 /**
@@ -188,16 +281,27 @@ export class LangWatchQLCatalogShapesService {
     return view.grainColumns ?? view.dedup.keyColumns;
   }
 
+  /** The physical source column an exposed grain/key column reads. */
+  physicalColumn(view: LangWatchQLViewDefinition, exposedName: string): string {
+    const column = view.columns.find((candidate) => candidate.name === exposedName);
+    const source = column?.sourceColumns[0];
+
+    return source && source.length > 0 ? source : exposedName;
+  }
+
   /**
    * SQL producing a column from the source table.
    */
   columnExpression({
     column,
     source,
+    joined,
     isAggregated = false,
   }: {
     readonly column: LangWatchQLViewColumn;
     readonly source: (name: string) => string;
+    /** Qualifies a joined-table column; present only for a view with a join. */
+    readonly joined?: (name: string) => string;
     readonly isAggregated?: boolean;
   }): string {
     if (column.expression) {
@@ -212,7 +316,7 @@ export class LangWatchQLCatalogShapesService {
         );
       }
 
-      return column.expression(source);
+      return column.expression(source, joined);
     }
 
     if (column.sourceColumns.length !== 1) {
@@ -257,8 +361,13 @@ export class LangWatchQLCatalogShapesService {
     return [
       ...new Set([
         ...view.columns.flatMap((column) => column.sourceColumns),
-        ...view.dedup.keyColumns,
+        ...view.dedup.keyColumns.map((key) => this.physicalColumn(view, key)),
         ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+        // A column read only to filter (`where`) or to match the join (`on`, its
+        // primary side) is a source column the view reads just as a projected one
+        // is, and must be granted or the restricted read is denied on it.
+        ...(view.whereSourceColumns ?? []),
+        ...(view.join?.onSourceColumns?.primary ?? []),
       ]),
     ].toSorted();
   }

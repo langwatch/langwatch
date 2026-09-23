@@ -9,9 +9,9 @@ import { HandledError } from "@langwatch/handled-error";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { Hono } from "hono";
 import type { Context, ErrorHandler, Next } from "hono";
+import { generateSpecs } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -23,10 +23,10 @@ import {
   type IdempotencyReceiptCreateInput,
   type IdempotencyReceiptPersistence,
   type IdempotencyReceiptRecord,
-  type IdempotencyReceiptUpdateInput,
   type IdempotencyResponseCipher,
 } from "../idempotency.ts";
 import { bodyLimit, validator as zValidator } from "../request.ts";
+import { readFencedReceiptWrite } from "./support/fenced-receipt-write.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The request validator, end to end through a real Hono app.
@@ -570,26 +570,6 @@ class FakeReceiptStore implements IdempotencyReceiptPersistence {
     findUnique: async (input: { where: { scopeId_key: { scopeId: string; key: string } } }) =>
       this.rows.get(`${input.where.scopeId_key.scopeId}:${input.where.scopeId_key.key}`) ?? null,
 
-    updateMany: async (input: {
-      where: { id: string; claimId?: string; responseStatus?: null };
-      data: IdempotencyReceiptUpdateInput;
-    }) => {
-      const row = this.byId(input.where.id);
-      if (!row) return { count: 0 };
-
-      if (input.where.claimId !== undefined && row.claimId !== input.where.claimId) {
-        return { count: 0 };
-      }
-
-      if (input.where.responseStatus === null && row.responseStatus !== null) {
-        return { count: 0 };
-      }
-
-      Object.assign(row, input.data);
-
-      return { count: 1 };
-    },
-
     deleteMany: async (input: { where: { id: string; claimId?: string } }) => {
       const found = [...this.rows.entries()].find(([, row]) => row.id === input.where.id);
       if (!found) return { count: 0 };
@@ -606,7 +586,18 @@ class FakeReceiptStore implements IdempotencyReceiptPersistence {
     },
   };
 
-  private byId(id: string) {
+  readonly $executeRaw = async (sql: TemplateStringsArray, ...values: unknown[]) => {
+    const write = readFencedReceiptWrite(sql, values);
+    const row = this.byId(write.id);
+    if (!row || row.claimId !== write.claimId) return 0;
+    if (write.pendingOnly && row.responseStatus !== null) return 0;
+
+    Object.assign(row, write.data);
+
+    return 1;
+  };
+
+  private byId(id: unknown) {
     return [...this.rows.values()].find((row) => row.id === id);
   }
 

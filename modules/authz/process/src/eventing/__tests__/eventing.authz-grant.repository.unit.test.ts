@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzReadRepository } from "../../repositories/authz-read.repository.ts";
 import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
-import { RoutedAuthzReadRepository } from "../../repositories/routed/routed.authz-read.repository.ts";
+import { EventingAuthzReadRepository } from "../../repositories/eventing/eventing.authz-read.repository.ts";
 import type { EventingAuthzLedgerAdapter } from "../authz-grant.store.ts";
 
 const ORG_ID = "org_ledger";
@@ -18,11 +18,39 @@ function prismaError(code: string): Error {
   return Object.assign(new Error("conflict"), { code });
 }
 
+/** A live grant row as Postgres hands it back. */
+function storedGrant(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "rb_1",
+    organizationId: ORG_ID,
+    principalType: "USER",
+    principalId: "user_sam",
+    roleKey: "member",
+    legacyRole: "MEMBER",
+    source: "grants-service",
+    scopeType: "TEAM",
+    scopeId: "team_support",
+    token: null,
+    permission: null,
+    resourceKind: null,
+    projectId: null,
+    createdByUserId: null,
+    expiresAt: null,
+    maxViews: null,
+    occurredAt: new Date(0),
+    ...overrides,
+  };
+}
+
 function harness(writerOverrides: Partial<EventingAuthzLedgerAdapter> = {}) {
   const db = {
     roleBinding: {
-      findFirst: vi.fn().mockResolvedValue({ id: "rb_1" }),
-      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockRejectedValue(new Error("legacy runtime read")),
+      findMany: vi.fn().mockRejectedValue(new Error("legacy runtime read")),
+    },
+    grant: {
+      findFirst: vi.fn().mockResolvedValue(storedGrant()),
+      findMany: vi.fn().mockResolvedValue([storedGrant()]),
     },
   };
   const writer = {
@@ -36,11 +64,7 @@ function harness(writerOverrides: Partial<EventingAuthzLedgerAdapter> = {}) {
   return {
     db,
     writer,
-    repository: EventingAuthzGrantRepository.create({
-      database: db as never,
-      writer,
-      selectHead: async () => true,
-    }),
+    repository: EventingAuthzGrantRepository.create({ database: db as never, writer }),
   };
 }
 
@@ -77,6 +101,29 @@ describe("given a create that collides with an identical binding", () => {
         code: "role_binding_already_exists",
       });
     });
+  });
+});
+
+describe("given a grant id that is not a role binding", () => {
+  it("does not expose a resource grant through the binding port", async () => {
+    const { db, repository } = harness();
+    db.grant.findFirst.mockResolvedValueOnce(
+      storedGrant({
+        id: "share_1",
+        principalType: "ANYONE",
+        principalId: null,
+        roleKey: null,
+        legacyRole: null,
+        scopeType: "RESOURCE",
+        scopeId: "trace_1",
+        token: "token_1",
+        permission: "traces:view",
+        resourceKind: "TRACE",
+        projectId: "project_1",
+      }),
+    );
+
+    await expect(repository.findBinding({ bindingId: "share_1" })).resolves.toBe(null);
   });
 });
 
@@ -122,7 +169,7 @@ describe("given a delete for a binding that is not there", () => {
   describe("when the pre-read finds nothing", () => {
     it("answers the writer's missing binding rather than a silent no-op", async () => {
       const { db, repository } = harness();
-      db.roleBinding.findFirst.mockResolvedValueOnce(null);
+      db.grant.findFirst.mockResolvedValueOnce(null);
 
       await expect(
         repository.deleteBinding({
@@ -139,7 +186,7 @@ describe("given a replace whose broad grant has already gone", () => {
   describe("when the existence pre-read finds nothing", () => {
     it("answers the writer's missing binding and never revokes or attaches anything", async () => {
       const { db, repository, writer } = harness();
-      db.roleBinding.findFirst.mockResolvedValueOnce(null);
+      db.grant.findFirst.mockResolvedValueOnce(null);
 
       await expect(
         repository.replaceBinding({
@@ -208,19 +255,16 @@ const OFFBOARD_ORG_ID = "organization_offboard_1";
 const OFFBOARD_USER_ID = "user_offboard_1";
 
 function buildRepository({
-  bindingIds,
   grantIds,
   survivingGrantRows = 0,
-  survivingBindingRows = 0,
 }: {
-  bindingIds: string[];
   grantIds: string[];
   /** Grant-head rows still present INSIDE the transaction - the shape of a
    *  revocation that never actually landed. */
   survivingGrantRows?: number;
-  survivingBindingRows?: number;
 }) {
   const tx = {
+    roleBinding: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     groupMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     teamUser: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     organizationUser: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
@@ -228,39 +272,30 @@ function buildRepository({
       findUnique: vi.fn().mockResolvedValue({ email: "gone@example.com" }),
     },
     organizationInvite: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    grant: { count: vi.fn().mockResolvedValue(survivingGrantRows) },
-    roleBinding: { count: vi.fn().mockResolvedValue(survivingBindingRows) },
+    grant: {
+      findMany: vi.fn().mockResolvedValue(grantIds.map((id) => ({ id }))),
+      count: vi.fn().mockResolvedValue(survivingGrantRows),
+    },
   };
-  const roleBindingFindMany = vi.fn().mockResolvedValue(bindingIds.map((id) => ({ id })));
-  const grantFindMany = vi.fn().mockResolvedValue(grantIds.map((id) => ({ id })));
   const prisma = {
-    roleBinding: { findMany: roleBindingFindMany },
-    grant: { findMany: grantFindMany },
+    roleBinding: { findMany: vi.fn().mockRejectedValue(new Error("legacy runtime read")) },
     $transaction: vi.fn(async (run: (t: typeof tx) => unknown) => run(tx)),
   } as never;
   const offboardMember = vi.fn().mockResolvedValue(undefined);
   const writer = { offboardMember } as unknown as EventingAuthzLedgerAdapter;
   return {
-    repository: EventingAuthzGrantRepository.create({
-      database: prisma,
-      writer,
-      selectHead: async () => true,
-    }),
+    repository: EventingAuthzGrantRepository.create({ database: prisma, writer }),
     offboardMember,
-    grantFindMany,
+    grantFindMany: tx.grant.findMany,
     tx,
   };
 }
 
 describe("given a member being offboarded", () => {
-  describe("when the user holds facts on both heads", () => {
+  describe("when the user holds live grants", () => {
     /** @scenario "Offboarding a user removes every grant, with proof" */
-    it("revokes the union of compat rows and grant-head rows, once each", async () => {
+    it("revokes every live grant head, including grants without a compat row", async () => {
       const { repository, offboardMember, grantFindMany } = buildRepository({
-        bindingIds: ["shared-1", "compat-only-2"],
-        // "shared-1" is the same fact seen through the other head; the
-        // lite-member row exists ONLY as a grant, which is exactly the
-        // class a compat-only enumeration used to leave resolving.
         grantIds: ["shared-1", "lite-member-3"],
       });
 
@@ -276,6 +311,7 @@ describe("given a member being offboarded", () => {
           organizationId: OFFBOARD_ORG_ID,
           principalType: "USER",
           principalId: OFFBOARD_USER_ID,
+          revokedAt: null,
         },
         select: { id: true },
       });
@@ -283,18 +319,30 @@ describe("given a member being offboarded", () => {
         expect.objectContaining({
           organizationId: OFFBOARD_ORG_ID,
           userId: OFFBOARD_USER_ID,
-          revokedGrantIds: ["shared-1", "compat-only-2", "lite-member-3"],
+          revokedGrantIds: ["shared-1", "lite-member-3"],
         }),
       );
+    });
+
+    it("drops the departing user's compatibility rows inside the transaction", async () => {
+      const { repository, tx } = buildRepository({ grantIds: [] });
+
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async () => undefined,
+      });
+
+      expect(tx.roleBinding.deleteMany).toHaveBeenCalledWith({
+        where: { organizationId: OFFBOARD_ORG_ID, userId: OFFBOARD_USER_ID },
+      });
     });
   });
 
   describe("when the proof runs", () => {
-    it("reads through the head the organization is served from", async () => {
-      const { repository } = buildRepository({
-        bindingIds: [],
-        grantIds: [],
-      });
+    it("proves against the grants projection after offboarding", async () => {
+      const { repository } = buildRepository({ grantIds: [] });
       const seen: AuthzReadRepository[] = [];
 
       await repository.offboardUser({
@@ -307,58 +355,34 @@ describe("given a member being offboarded", () => {
       });
 
       expect(seen).toHaveLength(1);
-      expect(seen[0]).toBeInstanceOf(RoutedAuthzReadRepository);
+      expect(seen[0]).toBeInstanceOf(EventingAuthzReadRepository);
     });
   });
 
   describe("when grant rows keyed to the user survive the revocation", () => {
     it("fails the offboarding even though the membership-gated proof passes", async () => {
       const { repository } = buildRepository({
-        bindingIds: [],
         grantIds: ["survivor-1"],
         survivingGrantRows: 1,
       });
-      // The collector-shaped proof is VACUOUS here by construction: both
-      // heads' user reads gate on the organization membership this very
+      // The collector-shaped proof is VACUOUS here by construction: the
+      // user reads gate on the organization membership this very
       // transaction deleted, so it resolves nothing whether or not the
-      // revocations landed. A prove stub that swears everything is fine is
-      // exactly what the direct row assertion must not be fooled by.
+      // revocations landed.
       const prove = vi.fn(async () => undefined);
-
-      const attempt = repository.offboardUser({
-        userId: OFFBOARD_USER_ID,
-        organizationId: OFFBOARD_ORG_ID,
-        actor: ACTOR,
-        prove,
-      });
-
-      await expect(attempt).rejects.toMatchObject({
-        code: "offboard_incomplete",
-      });
-    });
-
-    it("fails on surviving compat rows the same way", async () => {
-      const { repository } = buildRepository({
-        bindingIds: ["rb-stuck"],
-        grantIds: [],
-        survivingBindingRows: 1,
-      });
 
       await expect(
         repository.offboardUser({
           userId: OFFBOARD_USER_ID,
           organizationId: OFFBOARD_ORG_ID,
           actor: ACTOR,
-          prove: async () => undefined,
+          prove,
         }),
       ).rejects.toMatchObject({ code: "offboard_incomplete" });
     });
 
     it("scopes the direct assertion to the user's principal in this organization", async () => {
-      const { repository, tx } = buildRepository({
-        bindingIds: [],
-        grantIds: [],
-      });
+      const { repository, tx } = buildRepository({ grantIds: [] });
 
       await repository.offboardUser({
         userId: OFFBOARD_USER_ID,
@@ -369,8 +393,7 @@ describe("given a member being offboarded", () => {
 
       // `revokedAt: null` is the postcondition, not decoration: a revoke
       // MARKS its row, so without the fence this counts the very rows the
-      // revocation just ended and every departing member who held a grant
-      // fails their own offboarding.
+      // revocation just ended.
       expect(tx.grant.count).toHaveBeenCalledWith({
         where: {
           organizationId: OFFBOARD_ORG_ID,
@@ -378,9 +401,6 @@ describe("given a member being offboarded", () => {
           principalId: OFFBOARD_USER_ID,
           revokedAt: null,
         },
-      });
-      expect(tx.roleBinding.count).toHaveBeenCalledWith({
-        where: { organizationId: OFFBOARD_ORG_ID, userId: OFFBOARD_USER_ID },
       });
     });
   });

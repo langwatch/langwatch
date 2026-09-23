@@ -122,10 +122,13 @@ function createReads({
       ssoConnectionReads: () => ({
         findForOrganization,
         getProvider,
+        getOrganization: () => Promise.reject(new Error("reconciliation never asks")),
       }),
       scimSyncReads: () => ({
         findForOrganization: async () => syncs,
         findByConnection: async () => null,
+        listForOperator: async () => ({ syncs: [], total: 0 }),
+        findForOperator: async () => [],
       }),
     },
     grants: { findDirectoryCausedChanges: vi.fn(async () => changes) },
@@ -269,6 +272,7 @@ describe("the organization's directory sync panel", () => {
         retiredAtMs: T0 + 6_000,
         userId: "user_sam",
         occurredAtMs: T0 + 6_000,
+        redrivenAtMs: null,
       };
       service = ScimReconciliationService.create(
         createReads({

@@ -48,24 +48,37 @@ const PASSWORD_ACCOUNT: AccountSignInMethods = {
 
 function build({
   byDomain = null,
+  legacyByDomain = null,
+  projectedByDomain = byDomain,
   active = [],
+  legacyActive = [],
+  projectedActive = active,
   policy = POLICY,
   breakGlassAllowed = true,
   account = PASSWORD_ACCOUNT,
 }: {
   byDomain?: RoutableConnection | null;
+  legacyByDomain?: RoutableConnection | null;
+  projectedByDomain?: RoutableConnection | null;
   active?: readonly RoutableConnection[];
+  legacyActive?: readonly RoutableConnection[];
+  projectedActive?: readonly RoutableConnection[];
   policy?: SignInMethodPolicy;
   breakGlassAllowed?: boolean;
   /** What the address's account holds; null for an address nobody holds. */
   account?: AccountSignInMethods | null;
 } = {}) {
   const records: SignInRoutingRecord[] = [];
-  const findConnectionsForDomain = vi.fn().mockResolvedValue(byDomain === null ? [] : [byDomain]);
-  const findActiveConnections = vi.fn().mockResolvedValue(active);
+  const findConnectionsForDomain = vi
+    .fn()
+    .mockResolvedValue(projectedByDomain === null ? [] : [projectedByDomain]);
+  const findActiveConnections = vi.fn().mockResolvedValue(projectedActive);
+  const findLegacyConnectionForDomain = vi.fn().mockResolvedValue(legacyByDomain);
+  const findLegacyActiveConnections = vi.fn().mockResolvedValue(legacyActive);
   const findAccountMethods = vi.fn().mockResolvedValue(account);
   const service = SignInRouterService.create({
     domains: { findConnectionsForDomain, findActiveConnections },
+    legacy: { findLegacyConnectionForDomain, findLegacyActiveConnections },
     policy: { resolvePolicy: async () => policy },
     breakGlass: { allow: async () => breakGlassAllowed },
     accounts: { findAccountMethods },
@@ -76,12 +89,15 @@ function build({
     records,
     findConnectionsForDomain,
     findActiveConnections,
+    findLegacyConnectionForDomain,
+    findLegacyActiveConnections,
     findAccountMethods,
   };
 }
 
 describe("SignInRouterService", () => {
   describe("when an address is submitted", () => {
+    /** @scenario "A live connection decides the domains it proved" */
     it("asks the domain port about the normalized domain only", async () => {
       const { service, findConnectionsForDomain, findActiveConnections } = build({
         byDomain: ACME,
@@ -140,6 +156,90 @@ describe("SignInRouterService", () => {
       expect(findActiveConnections).toHaveBeenCalledTimes(1);
       expect(findConnectionsForDomain).not.toHaveBeenCalled();
       expect(decision.reasonCode).toBe("sole_active_connection");
+    });
+  });
+
+  describe("when the projected connection does not decide the domain", () => {
+    it("falls back to the legacy domain lookup for unfinished connections", async () => {
+      const unfinished: RoutableConnection = {
+        ...ACME,
+        state: "INACTIVE",
+      };
+      const { service, findLegacyConnectionForDomain } = build({
+        projectedByDomain: unfinished,
+        legacyByDomain: ACME,
+      });
+
+      const decision = await service.route({ identifier: "sam@acme.com" });
+
+      expect(decision.reasonCode).toBe("domain_routed");
+      expect(findLegacyConnectionForDomain).toHaveBeenCalledWith({
+        domain: "acme.com",
+      });
+    });
+
+    /** @scenario "A domain no connection answers for is still decided by the legacy columns" */
+    it("uses the legacy domain when no connection is projected", async () => {
+      const { service, findLegacyConnectionForDomain } = build({
+        projectedByDomain: null,
+        legacyByDomain: ACME,
+      });
+
+      const decision = await service.route({ identifier: "sam@acme.com" });
+
+      expect(decision.reasonCode).toBe("domain_routed");
+      expect(findLegacyConnectionForDomain).toHaveBeenCalledWith({
+        domain: "acme.com",
+      });
+    });
+  });
+
+  describe("when no address has been asked for yet", () => {
+    it("uses the legacy list only when the projected list is empty", async () => {
+      const { service } = build({ active: [], legacyActive: [ACME] });
+
+      const decision = await service.route({ identifier: null });
+
+      expect(decision.reasonCode).toBe("sole_active_connection");
+      expect(decision.connectionId).toBe("conn_acme");
+    });
+
+    it("uses the projected list as the selected replacement", async () => {
+      const legacy: RoutableConnection = {
+        ...ACME,
+        connectionId: "legacy",
+      };
+      const projected: RoutableConnection = {
+        ...ACME,
+        connectionId: "replacement",
+      };
+      const { service } = build({
+        active: [projected],
+        legacyActive: [legacy],
+      });
+
+      const decision = await service.route({ identifier: null });
+
+      expect(decision.connectionId).toBe("replacement");
+    });
+
+    it("does not implicitly roll back a suspended projected connection", async () => {
+      const suspended: RoutableConnection = {
+        ...ACME,
+        state: "SUSPENDED",
+      };
+      const legacy: RoutableConnection = {
+        ...ACME,
+        connectionId: "legacy",
+      };
+      const { service } = build({
+        active: [suspended],
+        legacyActive: [legacy],
+      });
+
+      const decision = await service.route({ identifier: null });
+
+      expect(decision.connectionId).toBe("conn_acme");
     });
   });
 

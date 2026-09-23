@@ -1,15 +1,17 @@
-/**
- * Error output: prose for humans, JSON for machines.
- * Both paths scrub messages through `redactSecrets` first; meta/reasons/kind are not scrubbed.
- */
-import chalk from "chalk";
 import {
   handledErrorFromThrown,
   toCliErrorDocument,
   type CliHandledError,
 } from "@langwatch/langy-contract/cards/handled-error";
+/**
+ * Error output: prose for humans, JSON for machines.
+ * Both paths scrub messages through `redactSecrets` first; meta/reasons/kind are not scrubbed.
+ */
+import chalk from "chalk";
+
 import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
+import { loginPermissionsHint } from "./loginScopeHint";
 import { currentOutputScope, getOutputFormat, resolveOutputFormat } from "./outputScope";
 
 /**
@@ -97,13 +99,25 @@ const detailLines = (domain: CliHandledError): string[] => {
 };
 
 /**
+ * The fallback advice, plus what only this machine knows: the permissions the
+ * login here was minted with. Applied to both renderings, so a person and an
+ * agent are told the same thing about why a 403 happened.
+ */
+const withCliAdvice = (domain: CliHandledError): CliHandledError => {
+  const enriched = withFallbackSuggestions(domain);
+  const hint = loginPermissionsHint(enriched.code);
+  if (!hint) return enriched;
+  return { ...enriched, suggestions: [...(enriched.suggestions ?? []), hint] };
+};
+
+/**
  * Human rendering: Error sentence, Details, Suggestions (platform or fallback), Docs.
  * Infrastructure failures print sentence only (no invented precision).
  */
 export const renderErrorForHumans = (domain: CliHandledError): string => {
   if (!domain.isHandled) return domain.message;
 
-  const enriched = withFallbackSuggestions(domain);
+  const enriched = withCliAdvice(domain);
   const lines = [`Error: ${enriched.message}`, ...detailLines(enriched)];
 
   if (enriched.suggestions?.length) {
@@ -122,7 +136,7 @@ export const renderErrorForHumans = (domain: CliHandledError): string => {
  */
 export const renderErrorAsJson = (domain: CliHandledError): string =>
   JSON.stringify(
-    toCliErrorDocument(withFallbackSuggestions(domain)),
+    toCliErrorDocument(withCliAdvice(domain)),
     null,
     // Agent mode's contract is compact single-line JSON (utils/output.ts);
     // the pretty two-space form is for `-o json`, where a person may read it.

@@ -16,10 +16,12 @@ import {
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
 } from "../migrations/legacy-import.authz-grant.migration.ts";
-import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import type { AuthzDatabase, AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzGrantWriteDatabase } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
+import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
+import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
 import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository.ts";
 import {
@@ -30,19 +32,20 @@ import {
   type AuthzCutoverDatabase,
   PrismaAuthzCutoverRepository,
 } from "../repositories/prisma/prisma.authz-cutover.repository.ts";
+import {
+  type AuthzMembershipStampDatabase,
+  PrismaAuthzMembershipStampRepository,
+} from "../repositories/prisma/prisma.authz-membership-stamp.repository.ts";
 import type { AuthzMigrationDatabase } from "../repositories/prisma/prisma.authz-migration.repository.ts";
 import { PrismaAuthzMigrationRepository } from "../repositories/prisma/prisma.authz-migration.repository.ts";
 import {
   type AuthzProjectionDatabase,
   PrismaAuthzProjectionRepository,
 } from "../repositories/prisma/prisma.authz-projection.repository.ts";
-import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
 import type { PostgresAuthzDatabase } from "../repositories/prisma/prisma.authz.database.ts";
 import type { AuthzEpochRedis } from "../repositories/redis/redis.authz-epoch.repository.ts";
 import { RedisAuthzEpochRepository } from "../repositories/redis/redis.authz-epoch.repository.ts";
-import { RoutedAuthzListingRepository } from "../repositories/routed/routed.authz-listing.repository.ts";
-import { RoutedAuthzReadRepository } from "../repositories/routed/routed.authz-read.repository.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { ObservabilityAuthzCutoverAdapter } from "../services/authz-cutover-telemetry.service.ts";
 import type {
@@ -65,6 +68,7 @@ type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzCutoverDatabase &
   AuthzAuditDatabase &
   AuthzBindingDatabase &
+  AuthzMembershipStampDatabase &
   AuthzProjectionDatabase;
 
 export type PostgresAuthzAdapterOptions = {
@@ -178,15 +182,11 @@ export class PostgresAuthzAdapter {
 
   /**
    * The engine's own reader over a Postgres client, for a host that needs to
-   * see what the engine sees (the share ledger's cut-over check does). The
-   * repository stays private; this is the one door to it.
+   * see what the engine sees. Every decision reads the grants projection, so
+   * this is that head; the repository stays private behind this one door.
    */
-  static createReader({
-    database,
-  }: {
-    database: PostgresAuthzDatabase;
-  }): PrismaAuthzReadRepository {
-    return PrismaAuthzReadRepository.create(database as unknown as AuthzDatabase);
+  static createReader({ database }: { database: PostgresAuthzDatabase }): AuthzReadRepository {
+    return EventingAuthzReadRepository.create(database as unknown as AuthzDatabase);
   }
 
   private constructor(private readonly options: PostgresAuthzAdapterOptions) {}
@@ -205,7 +205,9 @@ export class PostgresAuthzAdapter {
         counter: metrics.engineGateReadFailureCounter(),
       }),
     });
-    const selectHead = (organizationId: string) => cutover.isOn({ organizationId });
+    // Migration completion still answers compatibility writes and legacy
+    // API-key adoption; every decision and listing reads the grants head.
+    const isOnEngine = (organizationId: string) => cutover.isOn({ organizationId });
 
     const revocation = PrismaAuthzRevocationRepository.create({
       database,
@@ -216,9 +218,9 @@ export class PostgresAuthzAdapter {
     const ledgerOptions: EventingAuthzLedgerAdapterOptions = {
       database,
       dispatcher: this.options.dispatcher,
-      cutover,
       epoch,
       revocation,
+      membershipStamps: PrismaAuthzMembershipStampRepository.create({ database }),
     };
     if (this.options.now) ledgerOptions.now = this.options.now;
     if (this.options.newCommandId) {
@@ -226,26 +228,16 @@ export class PostgresAuthzAdapter {
     }
     if (this.options.ledgerPoll) ledgerOptions.poll = this.options.ledgerPoll;
     const ledger = EventingAuthzLedgerAdapter.create(ledgerOptions);
-    const grantRepository = EventingAuthzGrantRepository.create({
-      database,
-      writer: ledger,
-      selectHead,
-    });
+    const grantRepository = EventingAuthzGrantRepository.create({ database, writer: ledger });
     const bindingRepository =
       this.options.repositories?.bindings ?? PrismaAuthzBindingRepository.create({ database });
 
     const authzOptions: AuthzServiceOptions = {
-      repository: RoutedAuthzReadRepository.create({
-        database,
-        selectHead,
-      }),
-      listing: RoutedAuthzListingRepository.create({
-        database,
-        selectHead,
-      }),
+      repository: EventingAuthzReadRepository.create(database),
+      listing: EventingAuthzListingRepository.create(database),
       bindings: bindingRepository,
       epoch,
-      isOnEngine: selectHead,
+      isOnEngine,
       findEngineCutoverAt: async (organizationId) => {
         const finalizedAt = await cutover.findFinalizedAt({ organizationId });
 

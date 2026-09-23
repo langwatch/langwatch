@@ -1,10 +1,10 @@
 import { parseVirtualKeyConfig } from "@langwatch/gateway-contract";
 import type { GatewayRealtimeSession as GatewayRealtimeSessionRow } from "@langwatch/gateway-contract";
-import type {
-  GatewayRealtimeSession,
-  GatewayRealtimeSessionStatus,
+import {
+  type GatewayRealtimeSession,
+  type GatewayRealtimeSessionStatus,
   Prisma,
-  PrismaClient,
+  type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -17,8 +17,15 @@ import {
 /** The client slice realtime sessions are booked and settled through. */
 export type GatewayRealtimeSessionDatabase = Pick<
   PrismaClient,
-  "gatewayRealtimeSession" | "virtualKey" | "$transaction"
+  "gatewayRealtimeSession" | "virtualKey" | "$transaction" | "$executeRaw"
 >;
+
+/**
+ * A write moving a session out of OPEN states its status condition against the
+ * table: through `updateMany` it sits in a subquery, and a statement parked on
+ * the row lock re-checks only the id, so it could regress a CLOSED row.
+ */
+type SessionStatusWriter = Pick<Prisma.TransactionClient, "$executeRaw">;
 
 /** Private Prisma owner for the record of brokered realtime voice sessions. */
 export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessionRepository {
@@ -62,13 +69,11 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
         // would otherwise sit OPEN forever and ratchet the key down one slot
         // at a time, which is the failure an OpenAI socket makes likely: it
         // never signals that it closed.
-        await tx.gatewayRealtimeSession.updateMany({
-          where: {
-            virtualKeyId: session.virtualKeyId,
-            status: "OPEN",
-            mintedAt: { lt: toDate(staleBefore) },
-          },
-          data: { status: "EXPIRED", closedAt: new Date(), closeReason },
+        await expireOpenSessions(tx, {
+          virtualKeyId: session.virtualKeyId,
+          closedAt: new Date(),
+          staleBefore,
+          closeReason,
         });
         const open = await tx.gatewayRealtimeSession.count({
           where: { virtualKeyId: session.virtualKeyId, status: "OPEN" },
@@ -112,12 +117,18 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     status: GatewayRealtimeSessionStatus;
     closeReason: string;
   }): Promise<boolean> {
-    const updated = await this.database.gatewayRealtimeSession.updateMany({
-      where: { id: sessionId, projectId, status: "OPEN" },
-      data: { status, closedAt: new Date(), closeReason },
-    });
+    const updated = await this.database.$executeRaw`
+      UPDATE "GatewayRealtimeSession"
+         SET "status" = ${status}::"GatewayRealtimeSessionStatus",
+             "closedAt" = now(),
+             "closeReason" = ${closeReason},
+             "updatedAt" = now()
+       WHERE "id" = ${sessionId}
+         AND "projectId" = ${projectId}
+         AND "status" = 'OPEN'
+    `;
 
-    return updated.count > 0;
+    return updated > 0;
   }
 
   async findByVendorConversationId({
@@ -231,19 +242,20 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     closeReason: string;
     vendorCostRaw?: unknown;
   }): Promise<number> {
-    const { count } = await this.database.gatewayRealtimeSession.updateMany({
-      where: { id: sessionId, projectId, status: { in: ["OPEN", "EXPIRED"] } },
-      data: {
-        status: "CLOSED",
-        closedAt: toDate(closedAt),
-        closeReason,
-        ...(vendorCostRaw === undefined
-          ? {}
-          : { vendorCostRaw: vendorCostRaw as Prisma.InputJsonValue }),
-      },
-    });
+    // A report carrying no cost payload keeps the one the row already holds.
+    const costPayload = vendorCostRaw === undefined ? null : JSON.stringify(vendorCostRaw);
 
-    return count;
+    return this.database.$executeRaw`
+      UPDATE "GatewayRealtimeSession"
+         SET "status" = 'CLOSED',
+             "closedAt" = ${toDate(closedAt)},
+             "closeReason" = ${closeReason},
+             "vendorCostRaw" = COALESCE(${costPayload}::jsonb, "vendorCostRaw"),
+             "updatedAt" = now()
+       WHERE "id" = ${sessionId}
+         AND "projectId" = ${projectId}
+         AND "status" IN ('OPEN', 'EXPIRED')
+    `;
   }
 
   async expireStale({
@@ -257,17 +269,38 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     staleBefore: Instant;
     closeReason: string;
   }): Promise<number> {
-    const { count } = await this.database.gatewayRealtimeSession.updateMany({
-      where: {
-        ...(virtualKeyId ? { virtualKeyId } : {}),
-        status: "OPEN",
-        mintedAt: { lt: toDate(staleBefore) },
-      },
-      data: { status: "EXPIRED", closedAt: toDate(now), closeReason },
+    return expireOpenSessions(this.database, {
+      virtualKeyId,
+      closedAt: toDate(now),
+      staleBefore,
+      closeReason,
     });
-
-    return count;
   }
+}
+
+/** OPEN sessions minted before `staleBefore` become EXPIRED; one key's, or the fleet's. */
+function expireOpenSessions(
+  database: SessionStatusWriter,
+  {
+    virtualKeyId,
+    closedAt,
+    staleBefore,
+    closeReason,
+  }: { virtualKeyId?: string; closedAt: Date; staleBefore: Instant; closeReason: string },
+): Promise<number> {
+  const keyFilter = virtualKeyId ? Prisma.sql`AND "virtualKeyId" = ${virtualKeyId}` : Prisma.empty;
+
+  return database.$executeRaw`
+    -- @tenancy: a fleet sweep over open sessions; the mint path narrows it to one key under the cap's advisory lock
+    UPDATE "GatewayRealtimeSession"
+       SET "status" = 'EXPIRED',
+           "closedAt" = ${closedAt},
+           "closeReason" = ${closeReason},
+           "updatedAt" = now()
+     WHERE "status" = 'OPEN'
+       AND "mintedAt" < ${toDate(staleBefore)}
+       ${keyFilter}
+  `;
 }
 
 /** The one place a stored session's Dates become instants. */

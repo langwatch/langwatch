@@ -29,6 +29,7 @@ import {
   type DatasetRecord,
   type DatasetRecordMutationResult,
   type DatasetRecordPage,
+  type DatasetUsageCount,
   type DatasetWithRecords,
   type DeleteDatasetRecordsInput,
   type FinalizeUploadInput,
@@ -135,6 +136,7 @@ export class DatasetApp implements DatasetApi {
   #datasets: DatasetService;
   #normalization: DatasetNormalizationService | null;
   #batchEvaluations: DatasetRepositories["batchEvaluations"];
+  #usage: DatasetRepositories["usage"];
   #experiments: ExperimentApi;
   #permissions: AuthzApi;
   readonly #publicBaseUrl: string | undefined;
@@ -191,6 +193,7 @@ export class DatasetApp implements DatasetApi {
     });
 
     this.#batchEvaluations = repositories.batchEvaluations;
+    this.#usage = repositories.usage;
     this.#experiments = dependencies.experiments;
     this.#permissions = dependencies.permissions;
     this.#publicBaseUrl = members.publicBaseUrl;
@@ -478,6 +481,10 @@ export class DatasetApp implements DatasetApi {
    * The platform's own address for one dataset resource. A deployment that
    * serves this family but named no public origin refuses by name.
    */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount> {
+    return this.#usage.countUsage(input);
+  }
+
   platformUrl(input: { projectSlug: string; path: string }): string {
     if (this.#publicBaseUrl === undefined) {
       throw new Error(

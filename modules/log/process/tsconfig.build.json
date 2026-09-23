@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../../data-privacy/contract/tsconfig.build.json"
     },
     {

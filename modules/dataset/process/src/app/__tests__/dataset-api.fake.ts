@@ -7,6 +7,7 @@ const unused = async () => {
 export function completeDatasetApi(overrides: Partial<DatasetApi> = {}): DatasetApi {
   return {
     upsertDataset: unused,
+    countUsage: unused,
     validateDatasetName: unused,
     findNextAvailableName: unused,
     listDatasets: unused,

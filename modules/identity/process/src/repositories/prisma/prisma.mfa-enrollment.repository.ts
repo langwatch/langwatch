@@ -37,7 +37,7 @@ export class PrismaMfaEnrollmentRepository implements MfaEnrollmentRepository {
       where: { id: userId },
       select: {
         orgMemberships: {
-          where: { organization: { mfaRequired: true } },
+          where: { disabledAt: null, organization: { mfaRequired: true } },
           select: { organization: { select: { slug: true } } },
         },
       },

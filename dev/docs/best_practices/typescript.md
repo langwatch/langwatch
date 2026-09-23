@@ -1,9 +1,14 @@
 # TypeScript
 
-`pnpm typecheck` is **one** `tsc -b` against the root `tsconfig.json`, a
+`pnpm typecheck` is `tsc -b` against the root `tsconfig.json`, a
 solution whose `references` name every workspace member's check root and
-nothing else. One compiler process walks that graph once and checks each
-project exactly once. The recursive form it replaced (`pnpm -r typecheck`, one
+nothing else, preceded by the api and ui closures as their own `tsc -b`
+processes. Three processes rather than one is for memory: `tsc -b` keeps every
+file it parses until it exits, so each process frees its cache before the next
+starts, and all three run under `GOMEMLIMIT=2GiB` with one checker per
+project — 3.1 GB peak instead of 5.9 at the same wall time (ADR-100's
+2026-09-23 amendment). Later runs find shared projects up to date, so each
+project is still checked once. The recursive form it replaced (`pnpm -r typecheck`, one
 `tsc -b` per package, serialised) made a package near the root of the graph
 have its up-to-date check re-run by most of the other 194, and reported
 `TS6305` errors that were only an artefact of checking a package before a
@@ -155,7 +160,7 @@ packages (it would demand the `.js`-specifier scheme this repo deliberately
 abandoned). The evidence is in
 `dev/docs/plans/typescript-tidy-projects.md` §10.
 
-pnpm catalogs are the analogous single source for a dependency's *version*,
+pnpm catalogs are the analogous single source for a dependency's _version_,
 not its project references. `pnpm-workspace.yaml`'s `catalog:` block holds the
 version for every shared dependency whose declared range already agreed
 everywhere it was used, or whose differing spellings already resolved to one

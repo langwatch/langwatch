@@ -49,6 +49,7 @@ beforeEach(() => {
   service = SsoConnectionService.create(
     SsoConnectionGuardsService.create({
       connections,
+      registrationSlots: connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding(),
       platformOperators: new StubPlatformOperators(),
@@ -334,5 +335,52 @@ describe("given a grandfathered connection an organization is moving off", () =>
 
       expect(facts).toEqual([]);
     });
+  });
+});
+
+describe("given a grandfathered connection an organization is still running", () => {
+  beforeEach(() => seedLegacy());
+
+  /** @scenario "A legacy connection may have exactly one explicit direct replacement" */
+  it("refuses the ordinary lower-level registration bypass beside legacy", async () => {
+    await expect(
+      service.registerConnection({
+        ...command("local_ssoc_unlinked000000000000000"),
+        type: "oidc",
+        idp: {
+          issuer: "https://acme.okta.com",
+          providerId: "acme-okta",
+          clientIdRef: "cred_1",
+          secretRef: "cred_2",
+          certRefs: [],
+        },
+        arrivalPolicy: "refuse",
+      }),
+    ).rejects.toMatchObject({ code: "sso_connection_already_registered" });
+
+    expect(
+      await connections.tryFindConnection({ connectionId: "local_ssoc_unlinked000000000000000" }),
+    ).toBeNull();
+  });
+
+  it("serializes concurrent replacement attempts before either event is appended", async () => {
+    const attempts = await Promise.allSettled([
+      registerReplacement("local_ssoc_candidate_a000000000000"),
+      registerReplacement("local_ssoc_candidate_b000000000000"),
+    ]);
+
+    expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.filter((attempt) => attempt.status === "rejected")).toHaveLength(1);
+  });
+
+  it("reuses the direct slot after the prior draft is discarded", async () => {
+    await registerReplacement();
+    await service.discardConnection(command(REPLACEMENT));
+
+    await registerReplacement("local_ssoc_replacement_retry000000");
+
+    expect(
+      await connections.tryFindConnection({ connectionId: "local_ssoc_replacement_retry000000" }),
+    ).toMatchObject({ migrationPhase: "SETUP", replacesConnectionId: LEGACY });
   });
 });

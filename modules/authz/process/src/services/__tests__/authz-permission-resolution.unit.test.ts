@@ -1,9 +1,5 @@
 // Permission decisions service-level resolution; engine walk in contract package.
-import type {
-  AuthzPermission,
-  CollectedBinding,
-  LegacyTeamMembership,
-} from "@langwatch/authz-contract";
+import type { AuthzPermission, CollectedBinding } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { StubAuthzBindingRepository } from "../../repositories/__tests__/support/authz-binding.stub.ts";
@@ -25,7 +21,6 @@ type World = {
   membership?: OrganizationRole | null;
   bindings?: CollectedBinding[];
   groupBindings?: CollectedBinding[];
-  legacyTeams?: LegacyTeamMembership[];
   customRoles?: { id: string; permissions: unknown }[];
   projectKnown?: boolean;
   demoProjectId?: string;
@@ -39,7 +34,6 @@ function authzFor({
   membership = "MEMBER",
   bindings = [],
   groupBindings = [],
-  legacyTeams = [],
   customRoles = [],
   projectKnown = true,
   demoProjectId,
@@ -50,7 +44,6 @@ function authzFor({
       .mockResolvedValue(membership ? { role: membership, disabled: false } : null),
     findUserBindings: vi.fn().mockResolvedValue(bindings),
     findGroupBindings: vi.fn().mockResolvedValue(groupBindings),
-    findLegacyTeamMemberships: vi.fn().mockResolvedValue(legacyTeams),
     findCustomRolePermissions: vi.fn().mockResolvedValue(customRoles),
     findProjectLineage: vi
       .fn()
@@ -66,23 +59,16 @@ function authzFor({
   });
 }
 
-const teamBinding = (
-  role: CollectedBinding["role"],
-  customRoleId: string | null = null,
-): CollectedBinding => ({ role, customRoleId, scopeType: "TEAM", scopeId: TEAM });
-
-const orgBinding = (role: CollectedBinding["role"]): CollectedBinding => ({
-  role,
-  customRoleId: null,
-  scopeType: "ORGANIZATION",
-  scopeId: ORG,
+const teamBinding = (roleKey: CollectedBinding["roleKey"]): CollectedBinding => ({
+  roleKey,
+  scopeType: "TEAM",
+  scopeId: TEAM,
 });
 
-const legacyTeam = (role: LegacyTeamMembership["role"]): LegacyTeamMembership => ({
-  teamId: TEAM,
-  role,
-  customRoleId: null,
-  isPersonal: false,
+const orgBinding = (roleKey: CollectedBinding["roleKey"]): CollectedBinding => ({
+  roleKey,
+  scopeType: "ORGANIZATION",
+  scopeId: ORG,
 });
 
 const onProject = (authz: AuthzService, permission: AuthzPermission, id = PROJECT) =>
@@ -99,7 +85,7 @@ describe("given a project-scoped permission check", () => {
     /** @scenario "An unresolvable scope id is denied like any other" */
     it("denies and reports no organization role, revealing nothing about the id", async () => {
       const decision = await onProject(
-        authzFor({ projectKnown: false, bindings: [teamBinding("ADMIN")] }),
+        authzFor({ projectKnown: false, bindings: [teamBinding("admin")] }),
         "workflows:view",
       );
 
@@ -113,7 +99,7 @@ describe("given a project-scoped permission check", () => {
     /** @scenario "Non-members are denied access" */
     it("denies despite a binding naming them, and reports no role", async () => {
       const decision = await onProject(
-        authzFor({ membership: null, bindings: [teamBinding("ADMIN")] }),
+        authzFor({ membership: null, bindings: [teamBinding("admin")] }),
         "workflows:view",
       );
 
@@ -137,7 +123,7 @@ describe("given a project-scoped permission check", () => {
     /** @scenario "A group binding authorizes exactly like a direct one" */
     it("grants — a group binding is a binding", async () => {
       const decision = await onProject(
-        authzFor({ groupBindings: [{ ...teamBinding("MEMBER"), viaGroupId: "group-1" }] }),
+        authzFor({ groupBindings: [{ ...teamBinding("member"), viaGroupId: "group-1" }] }),
         "workflows:view",
       );
 
@@ -149,7 +135,7 @@ describe("given a project-scoped permission check", () => {
     /** @scenario "A built-in role binding grants its bag" */
     it("grants what that role's bag carries", async () => {
       const decision = await onProject(
-        authzFor({ bindings: [teamBinding("ADMIN")] }),
+        authzFor({ bindings: [teamBinding("admin")] }),
         "workflows:view",
       );
 
@@ -160,7 +146,7 @@ describe("given a project-scoped permission check", () => {
 
   describe("when the caller holds a custom role", () => {
     const customRoleWorld = (permissions: string[]): World => ({
-      bindings: [teamBinding("CUSTOM", "custom-1")],
+      bindings: [teamBinding("custom:custom-1")],
       customRoles: [{ id: "custom-1", permissions }],
     });
 
@@ -190,27 +176,30 @@ describe("given a project-scoped permission check", () => {
 
   describe("when the team role decides the outcome", () => {
     const cases: {
-      role: CollectedBinding["role"];
+      roleKey: CollectedBinding["roleKey"];
       permission: AuthzPermission;
       permitted: boolean;
     }[] = [
-      { role: "ADMIN", permission: "analytics:view", permitted: true },
-      { role: "ADMIN", permission: "datasets:manage", permitted: true },
-      { role: "ADMIN", permission: "team:manage", permitted: true },
-      { role: "MEMBER", permission: "analytics:view", permitted: true },
-      { role: "MEMBER", permission: "datasets:manage", permitted: true },
-      { role: "MEMBER", permission: "team:manage", permitted: false },
-      { role: "VIEWER", permission: "analytics:view", permitted: true },
-      { role: "VIEWER", permission: "datasets:manage", permitted: false },
-      { role: "VIEWER", permission: "team:manage", permitted: false },
+      { roleKey: "admin", permission: "analytics:view", permitted: true },
+      { roleKey: "admin", permission: "datasets:manage", permitted: true },
+      { roleKey: "admin", permission: "team:manage", permitted: true },
+      { roleKey: "member", permission: "analytics:view", permitted: true },
+      { roleKey: "member", permission: "datasets:manage", permitted: true },
+      { roleKey: "member", permission: "team:manage", permitted: false },
+      { roleKey: "viewer", permission: "analytics:view", permitted: true },
+      { roleKey: "viewer", permission: "datasets:manage", permitted: false },
+      { roleKey: "viewer", permission: "team:manage", permitted: false },
     ];
 
     /** @scenario "A team role decides the outcome at project scope" */
     /** @scenario "Team role permissions are unaffected by org role awareness" */
     it.each(cases)(
-      "answers $permitted for a $role asking $permission",
-      async ({ role, permission, permitted }) => {
-        const decision = await onProject(authzFor({ bindings: [teamBinding(role)] }), permission);
+      "answers $permitted for a $roleKey asking $permission",
+      async ({ roleKey, permission, permitted }) => {
+        const decision = await onProject(
+          authzFor({ bindings: [teamBinding(roleKey)] }),
+          permission,
+        );
 
         expect(decision.permitted).toBe(permitted);
         expect(decision.organizationRole).toBe("MEMBER");
@@ -225,7 +214,7 @@ describe("given a project-scoped permission check", () => {
       "reports %s alongside the verdict",
       async (role) => {
         const decision = await onProject(
-          authzFor({ membership: role, bindings: [teamBinding("MEMBER")] }),
+          authzFor({ membership: role, bindings: [teamBinding("member")] }),
           "analytics:view",
         );
 
@@ -309,7 +298,7 @@ describe("given an organization-scoped permission check", () => {
 
   describe("when a lite member carries a stray organization-scoped admin binding", () => {
     const liteWithAdminBinding = (): AuthzService =>
-      authzFor({ membership: "EXTERNAL", bindings: [orgBinding("ADMIN")] });
+      authzFor({ membership: "EXTERNAL", bindings: [orgBinding("admin")] });
 
     /** @scenario "A lite member is never promoted by an organization-scoped binding" */
     it("still reaches the member floor", async () => {
@@ -333,7 +322,7 @@ describe("given an organization-scoped permission check", () => {
     /** @scenario "An organization admin holds the organization and its governance surfaces" */
     it("manages the organization", async () => {
       const decision = await onOrganization(
-        authzFor({ membership: "ADMIN", bindings: [orgBinding("ADMIN")] }),
+        authzFor({ membership: "ADMIN", bindings: [orgBinding("admin")] }),
         "organization:manage",
       );
 
@@ -346,7 +335,7 @@ describe("given an organization-scoped permission check", () => {
     /** @scenario "Org admin can manage any team regardless of team membership" */
     it("still administers any team in the organization", async () => {
       const decision = await onTeam(
-        authzFor({ membership: "ADMIN", bindings: [orgBinding("ADMIN")] }),
+        authzFor({ membership: "ADMIN", bindings: [orgBinding("admin")] }),
         "team:manage",
       );
 
@@ -358,95 +347,8 @@ describe("given an organization-scoped permission check", () => {
     /** @scenario "A team administrator gains no organization permission" */
     it("gains no organization permission from it", async () => {
       const decision = await onOrganization(
-        authzFor({ bindings: [teamBinding("ADMIN")], legacyTeams: [legacyTeam("ADMIN")] }),
+        authzFor({ bindings: [teamBinding("admin")] }),
         "organization:manage",
-      );
-
-      expect(decision.permitted).toBe(false);
-    });
-  });
-});
-
-describe("given a caller whose access predates the RoleBinding migration", () => {
-  describe("when they are an organization admin with a legacy admin team row", () => {
-    const legacyAdmin = (): AuthzService =>
-      authzFor({ membership: "ADMIN", legacyTeams: [legacyTeam("ADMIN")] });
-
-    /** @scenario "An organization admin from before role bindings keeps their gateway and audit access" */
-    it.each([
-      "gatewayLogs:view",
-      "gatewayBudgets:view",
-      "gatewayCacheRules:create",
-      "auditLog:view",
-    ] as AuthzPermission[])("keeps %s through the legacy team fallback", async (permission) => {
-      const decision = await onOrganization(legacyAdmin(), permission);
-
-      expect(decision.permitted).toBe(true);
-    });
-
-    /** @scenario "An organization admin from before role bindings keeps their gateway and audit access" */
-    it("does not gain organization management from a team-scoped row", async () => {
-      const decision = await onOrganization(legacyAdmin(), "organization:manage");
-
-      expect(decision.permitted).toBe(false);
-    });
-
-    /** @scenario "An organization admin from before role bindings keeps their gateway and audit access" */
-    it("is refused the same permissions once the legacy row is gone", async () => {
-      const decision = await onOrganization(authzFor({ membership: "ADMIN" }), "gatewayLogs:view");
-
-      expect(decision.permitted).toBe(false);
-    });
-  });
-
-  describe("when their legacy team row is a member row", () => {
-    const legacyMember = (): AuthzService => authzFor({ legacyTeams: [legacyTeam("MEMBER")] });
-
-    /** @scenario "A legacy member team row keeps read access and no delete" */
-    it.each(["gatewayLogs:view", "auditLog:view"] as AuthzPermission[])(
-      "keeps %s",
-      async (permission) => {
-        await expect(onOrganization(legacyMember(), permission)).resolves.toMatchObject({
-          permitted: true,
-        });
-      },
-    );
-
-    /** @scenario "A legacy member team row keeps read access and no delete" */
-    it("cannot delete a gateway budget", async () => {
-      const decision = await onOrganization(legacyMember(), "gatewayBudgets:delete");
-
-      expect(decision.permitted).toBe(false);
-    });
-  });
-
-  describe("when their legacy team row is a viewer row", () => {
-    const legacyViewer = (): AuthzService => authzFor({ legacyTeams: [legacyTeam("VIEWER")] });
-
-    /** @scenario "A legacy viewer team row keeps the audit log readable" */
-    it("keeps the audit log readable", async () => {
-      await expect(onOrganization(legacyViewer(), "auditLog:view")).resolves.toMatchObject({
-        permitted: true,
-      });
-    });
-
-    /** @scenario "A legacy member team row keeps read access and no delete" */
-    it("cannot delete a gateway budget", async () => {
-      const decision = await onOrganization(legacyViewer(), "gatewayBudgets:delete");
-
-      expect(decision.permitted).toBe(false);
-    });
-  });
-
-  describe("when a chain binding already exists at project scope", () => {
-    /** @scenario "A binding on the scope chain retires the legacy fallback" */
-    it("decides on the binding and ignores the legacy row", async () => {
-      const decision = await onProject(
-        authzFor({
-          bindings: [teamBinding("VIEWER")],
-          legacyTeams: [legacyTeam("ADMIN")],
-        }),
-        "datasets:manage",
       );
 
       expect(decision.permitted).toBe(false);
@@ -456,7 +358,7 @@ describe("given a caller whose access predates the RoleBinding migration", () =>
 
 describe("given a lite member", () => {
   const liteMember = (world: World = {}): AuthzService =>
-    authzFor({ membership: "EXTERNAL", bindings: [teamBinding("VIEWER")], ...world });
+    authzFor({ membership: "EXTERNAL", bindings: [teamBinding("viewer")], ...world });
 
   describe("when they request a mutating permission", () => {
     /** @scenario "A lite member is refused every mutating permission" */
@@ -510,7 +412,7 @@ describe("given a lite member", () => {
   describe("when a non-empty custom role overrides the cap", () => {
     const withCustomRole = (permissions: string[]): AuthzService =>
       liteMember({
-        bindings: [teamBinding("CUSTOM", "custom-1")],
+        bindings: [teamBinding("custom:custom-1")],
         customRoles: [{ id: "custom-1", permissions }],
       });
 

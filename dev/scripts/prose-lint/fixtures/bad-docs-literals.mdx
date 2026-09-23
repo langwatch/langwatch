@@ -1,0 +1,17 @@
+---
+title: Instant Evals
+description: Ask one question of every trace in your project and read the matches back.
+---
+
+# Instant Evals
+
+## Where does the judged text come from?
+
+Instant Evals are behind the `release_instant_evals_enabled` feature flag; ask LangWatch to turn it on for your project. It matters because the AI gateway records the tokens each run sends, and the langwatch dashboard shows the total. We dogfood every run in this PR before shipping it, so the numbers on the page come from our own project rather than from a customer's, which is also why the examples use our internal trace names throughout the guide, and why the token counts you see here differ from the ones a fresh project would show after its first week of traffic once the rows have all been judged and the judgements written back to the results table where the CLI reads them from.
+
+Pairs with: [the CLI reference](/features/instant-evals/cli).
+
+<CardGroup cols={2}>
+  <Card title="CLI reference" href="/features/instant-evals/cli">Every subcommand and flag.</Card>
+  <Card title="Target shorthand" icon="code" href="/features/instant-evals/shorthand">What a target expands into.</Card>
+</CardGroup>

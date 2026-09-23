@@ -123,13 +123,19 @@ Feature: BetterAuth config (unmounted)
     When an OAuth callback returns a profile with email "b@example.com"
     Then the signin is rejected with a DIFFERENT_EMAIL_NOT_ALLOWED error
 
-  Scenario: New user with matching SSO domain joins the SSO org
-    Given an organization with ssoDomain "acme.com" exists
-    And no user exists with email "new@acme.com"
-    When a new user signs in via a matching SSO provider with email "new@acme.com"
-    Then a new user is created
-    And the user is added to the organization as a MEMBER
-    And an Account row is created for the OAuth account
+  Scenario: Authenticated user on a proved admitting SSO connection joins its organization
+    Given an already-created user with email "ana@acme.com"
+    And an authenticated account callback resolves to an active SSO connection that proved "acme.com" and admits arrivals
+    When the connection arrival is accepted
+    Then the user is added to the connection's organization as a MEMBER
+    And the user receives the MEMBER organization grant
+
+  Scenario: A signed SAML callback creates the federated identity rows
+    Given no user, account, or session exists for "ana@acme.com"
+    And an active SAML connection has proved "acme.com"
+    When a valid assertion signed by that connection's configured identity authenticates "ana@acme.com"
+    Then exactly one user, one account, and one session are created
+    And the account belongs to that user and names that SAML connection as its provider
 
   Scenario: Existing user with correct SSO provider auto-links
     Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
@@ -141,12 +147,50 @@ Feature: BetterAuth config (unmounted)
   # `pendingSsoSetup` is the flag this sets; it is reconciled once against
   # identifier data and dropped at bake end. Under the auth screens the same
   # situation is a routing decision the screen explains instead (ADR-117 §6).
-  Scenario: Existing user with wrong SSO provider gets pending flag
-    Given an organization with ssoDomain "acme.com" and ssoProvider "okta" exists
+  #
+  # Scoped to the BROKER now that native social buttons mount beside it. An
+  # existing member arriving through the broker on a connection the
+  # organization has since stopped pinning is mid-migration, and locking them
+  # out is the failure this soft flag exists to avoid.
+  Scenario: Existing user with wrong brokered SSO provider gets pending flag
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
+    And a user exists with email "existing@acme.com" and pendingSsoSetup=false
+    When that user signs in through the broker on a different connection
+    Then signin succeeds
+    And pendingSsoSetup is set to true
+
+  # A native provider is a button the deployment mounts itself, beside the
+  # broker. No existing way in runs through one, so refusing it locks nobody
+  # out - and admitting it would hand an organization that enforces single
+  # sign-on a second door it never agreed to. The refusal carries the code
+  # the error page already renders as "use your organization's sign-in".
+  Scenario: A native social sign-in at an SSO-enforced domain is refused
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
+    And a user exists with email "existing@acme.com" and pendingSsoSetup=false
+    When that user signs in via Google
+    Then the signin is rejected with an SSO_PROVIDER_NOT_ALLOWED error
+    And pendingSsoSetup is left alone
+
+  # A provider is linked ONCE: better-auth writes the Account row the first
+  # time and only updates it on every sign-in after. So the refusal has to sit
+  # on both paths, or it closes the door to new links while every link the old
+  # soft block already wrote keeps letting its holder in.
+  Scenario: A native social sign-in on an already-linked account is refused too
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
+    And a user exists with email "existing@acme.com" whose Google account is already linked
+    When that user signs in via Google again
+    Then the signin is rejected with an SSO_PROVIDER_NOT_ALLOWED error
+
+  # The refusal is about a provider the organization did NOT choose. One it did
+  # choose is its own front door, whatever kind of provider it happens to be -
+  # so an organization pinned to Google signs in with Google, and refusing
+  # native providers ahead of that match would lock it out of its own setting.
+  Scenario: An organization pinned to Google still signs in with Google
+    Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
     And a user exists with email "existing@acme.com" and pendingSsoSetup=false
     When that user signs in via Google
     Then signin succeeds
-    And pendingSsoSetup is set to true
+    And pendingSsoSetup is left alone
 
   # ============================================================================
   # RETIRED at D06 — the legacy impersonation pair, and the plugin allow-list

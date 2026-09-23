@@ -17,6 +17,19 @@ export class OpsCapabilityUnavailableError extends HandledError {
   }
 }
 
+/** The checkup over REST is for self-hosted installs; LangWatch Cloud answers that it has none. */
+export class CheckupNotSelfHostedError extends HandledError {
+  declare readonly code: "checkup_not_self_hosted";
+
+  constructor() {
+    super("checkup_not_self_hosted", "The checkup is for self-hosted installs", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "CheckupNotSelfHostedError";
+  }
+}
+
 export class ReplayAlreadyRunningError extends HandledError {
   declare readonly code: "replay_already_running";
 

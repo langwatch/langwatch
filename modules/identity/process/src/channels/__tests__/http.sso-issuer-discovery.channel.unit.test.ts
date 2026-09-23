@@ -151,3 +151,97 @@ describe("the memory twin", () => {
     expect(discovery.asked).toEqual([ISSUER, "https://nobody.test"]);
   });
 });
+
+describe("given an issuer origin an operator vouched for", () => {
+  const VOUCHED = "https://idp.corp.internal";
+  const refuseEverything: SsrfUrlValidator = async () => {
+    throw new Error("resolves to a private address");
+  };
+
+  function vouchedChannel(options: {
+    validateVouched: SsrfUrlValidator;
+    answer: (url: string) => Promise<DiscoveryResponse>;
+  }): { channel: HttpsSsoIssuerDiscoveryChannel; asked: string[] } {
+    const asked: string[] = [];
+    const fetchValidated: FencedDiscoveryFetch = async (validated, init) => {
+      asked.push(validated.originalUrl);
+      const next = await options.answer(validated.originalUrl);
+      if (next.status === 302 && init.revalidate) {
+        const hop = await init.revalidate("https://169.254.169.254/latest/meta-data");
+        asked.push(hop.originalUrl);
+      }
+
+      return next;
+    };
+
+    return {
+      channel: HttpsSsoIssuerDiscoveryChannel.create({
+        policy: POLICY,
+        dialableInternalOrigins: () => [VOUCHED],
+        validate: refuseEverything,
+        validateVouched: options.validateVouched,
+        fetchValidated,
+      }),
+      asked,
+    };
+  }
+
+  it("reads its document although it answers on a private address", async () => {
+    const { channel, asked } = vouchedChannel({
+      validateVouched: async (url) => ({ ...admitted(url), resolvedIp: "10.0.0.7" }),
+      answer: async () => respond(200, DISCOVERY_DOCUMENT),
+    });
+
+    await expect(channel.discover({ issuer: `${VOUCHED}/realms/acme` })).resolves.toEqual({
+      reachable: true,
+    });
+    expect(asked).toEqual([`${VOUCHED}/realms/acme/.well-known/openid-configuration`]);
+  });
+
+  it("judges a redirect out of the vouched origin by the fence again", async () => {
+    const { channel } = vouchedChannel({
+      validateVouched: async (url) => ({ ...admitted(url), resolvedIp: "10.0.0.7" }),
+      answer: async () => respond(302, null),
+    });
+
+    await expect(channel.discover({ issuer: VOUCHED })).resolves.toMatchObject({
+      reachable: false,
+    });
+  });
+
+  it("still refuses a vouched name that resolves to nothing", async () => {
+    const { channel, asked } = vouchedChannel({
+      validateVouched: async (url) => {
+        const parsed = new URL(url);
+        return {
+          type: "unresolved",
+          reason: "no-records",
+          originalUrl: url,
+          hostname: parsed.hostname,
+          port: 443,
+          protocol: parsed.protocol,
+          path: parsed.pathname,
+        };
+      },
+      answer: async () => respond(200, DISCOVERY_DOCUMENT),
+    });
+
+    await expect(channel.discover({ issuer: VOUCHED })).resolves.toEqual({
+      reachable: false,
+      reason: "unresolvable",
+    });
+    expect(asked).toEqual([]);
+  });
+
+  it("leaves every other origin behind the fence", async () => {
+    const { channel, asked } = vouchedChannel({
+      validateVouched: async (url) => admitted(url),
+      answer: async () => respond(200, DISCOVERY_DOCUMENT),
+    });
+
+    await expect(channel.discover({ issuer: ISSUER })).resolves.toMatchObject({
+      reachable: false,
+    });
+    expect(asked).toEqual([]);
+  });
+});

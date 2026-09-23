@@ -119,6 +119,9 @@
       "path": "../../enterprise/modules/saas/contract/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/saas/process/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/scim/contract/tsconfig.build.json"
     },
     {
@@ -336,6 +339,12 @@
     },
     {
       "path": "../../modules/workflow/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/api-fixture/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/test-harness/tsconfig.build.json"
     },
     {
       "path": "../../packages/vitest-config/tsconfig.build.json"

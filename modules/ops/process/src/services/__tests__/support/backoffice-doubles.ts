@@ -25,6 +25,30 @@ export const backofficeOperator: UserProfile = {
 };
 
 export class AuthStub implements BrowserSessionApi {
+  findDialableIdentityProviderOrigins(): never {
+    throw new Error("unused");
+  }
+  countUsage(): never {
+    throw new Error("unused");
+  }
+  issuesOwnPasswords(): boolean {
+    return false;
+  }
+  offersTwoStepVerification(): never {
+    throw new Error("unused");
+  }
+  getSignedInWith(): never {
+    throw new Error("unused");
+  }
+  getSignInSecuritySettings(): never {
+    throw new Error("unused");
+  }
+  saveSignInSecuritySettings(): never {
+    throw new Error("unused");
+  }
+  releaseHeldAccount(): never {
+    throw new Error("unused");
+  }
   /** Auth's cutover half, which nothing here exercises. */
   async retireLegacySsoAccess(): Promise<{ retired: number; remaining: number }> {
     return { retired: 0, remaining: 0 };

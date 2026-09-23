@@ -32,6 +32,13 @@ export abstract class SsoConnectionReadRepository {
  */
 export abstract class SsoBreakGlassBindingRepository {
   abstract hasLiveBinding(args: { organizationId: string }): Promise<boolean>;
+  /** Holds a live binding for one activation; false when there is none to hold. */
+  abstract reserveActivationRecovery(args: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean>;
 }
 
 /**

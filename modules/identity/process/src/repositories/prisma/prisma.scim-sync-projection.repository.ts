@@ -125,6 +125,51 @@ export class PrismaScimSyncProjectionRepository
     return rows.map((row) => PrismaScimSyncProjectionRepository.rowToScimSync(row));
   }
 
+  /** Searched on ids rather than prose: that is what a support case carries. */
+  async findPageForOperator({
+    page,
+    pageSize,
+    search,
+  }: {
+    page: number;
+    pageSize: number;
+    search?: string | undefined;
+  }): Promise<{ syncs: ScimSyncState[]; total: number }> {
+    const term = search?.trim();
+    const where: Prisma.ScimSyncStateWhereInput = term
+      ? {
+          OR: [
+            { id: { contains: term, mode: "insensitive" } },
+            { connectionId: { contains: term, mode: "insensitive" } },
+            { organizationId: { contains: term, mode: "insensitive" } },
+            { state: { equals: term.toUpperCase() } },
+          ],
+        }
+      : {};
+    const [rows, total] = await Promise.all([
+      this.prisma.scimSyncState.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip: page * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.scimSyncState.count({ where }),
+    ]);
+    return {
+      syncs: rows.map((row) => PrismaScimSyncProjectionRepository.rowToScimSync(row)),
+      total,
+    };
+  }
+
+  async findByConnectionForOperator({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<ScimSyncState[]> {
+    const row = await this.prisma.scimSyncState.findUnique({ where: { id: connectionId } });
+    return row ? [PrismaScimSyncProjectionRepository.rowToScimSync(row)] : [];
+  }
+
   /**
    * One stored row back into the reducer's state. Exported because the failure
    * surface and the guards' read need the same translation, and two copies of

@@ -4,6 +4,8 @@ import {
   parseOnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import {
+  joinRequestApiDomainJoinSchema,
+  type JoinRequestJoining,
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
@@ -11,6 +13,7 @@ import {
   type UpdateOrganizationSettingsInput,
   type PersonalFeatures,
   type PersonalWorkspace,
+  type OrganizationUsageCount,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 
@@ -30,6 +33,69 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
 
   static create(database: PrismaClient): PrismaOrganizationRepository {
     return new PrismaOrganizationRepository(database);
+  }
+
+  async findAllIds(): Promise<string[]> {
+    const rows = await this.database.organization.findMany({ select: { id: true } });
+    return rows.map((row) => row.id);
+  }
+
+  async countUsage({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<OrganizationUsageCount> {
+    const scope = { organizationId: { in: [...organizationIds] } };
+    const [members, organizations, firstTwo] = await Promise.all([
+      this.database.organizationUser.count({ where: scope }),
+      this.database.organization.findMany({
+        where: { id: { in: [...organizationIds] } },
+        select: { ssoProvider: true },
+      }),
+      this.database.organizationUser.findMany({
+        where: scope,
+        orderBy: { createdAt: "asc" },
+        take: 2,
+        select: { createdAt: true },
+      }),
+    ]);
+    const second = firstTwo[1];
+    return {
+      members,
+      ssoProviders: organizations.flatMap((row) => (row.ssoProvider ? [row.ssoProvider] : [])),
+      ...(second ? { secondMemberJoinedAt: second.createdAt.getTime() } : {}),
+    };
+  }
+
+  async getJoinSetting({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<JoinRequestJoining> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { domainJoin: true, joinDomains: true },
+    });
+    if (!row) throw new OrganizationNotFoundError();
+
+    const domainJoin = joinRequestApiDomainJoinSchema.safeParse(row.domainJoin);
+    return {
+      domainJoin: domainJoin.success ? domainJoin.data : "request",
+      joinDomains: row.joinDomains,
+    };
+  }
+
+  async saveJoinSetting({
+    organizationId,
+    setting,
+  }: {
+    organizationId: string;
+    setting: JoinRequestJoining;
+  }): Promise<void> {
+    await this.database.organization.update({
+      where: { id: organizationId },
+      data: { domainJoin: setting.domainJoin, joinDomains: setting.joinDomains },
+    });
   }
 
   async getGuidedOnboarding({
@@ -163,11 +229,18 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     organizationId: string;
     billingCustomerId: string;
   }): Promise<boolean> {
-    const result = await this.database.organization.updateMany({
-      where: { id: input.organizationId, stripeCustomerId: null },
-      data: { stripeCustomerId: input.billingCustomerId },
-    });
-    return result.count > 0;
+    // The condition sits on the table, not in `updateMany`'s subquery: a write
+    // parked on the row lock re-checks it against the committed row, so only
+    // one of two checkouts started together is told it won.
+    const updated = await this.database.$executeRaw`
+      -- @tenancy: an organization is addressed by its own primary key.
+      UPDATE "Organization"
+         SET "stripeCustomerId" = ${input.billingCustomerId},
+             "updatedAt" = now()
+       WHERE "id" = ${input.organizationId}
+         AND "stripeCustomerId" IS NULL
+    `;
+    return updated > 0;
   }
 
   tryFindPersonalWorkspace(input: {

@@ -1,6 +1,6 @@
 /**
  * Isolation proof, part 2: PG-resident data reached via engine tables stays row-policed.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @vitest-environment node
  */
 
@@ -119,7 +119,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * it would assert the two layers together and prove neither. The engine
      * table has only the policy, which is the layer this case is about.
      */
-    /** @scenario "Every PostgreSQL-resident dataset in the catalog is tenant-scoped" */
+    /** @scenario "Every PostgreSQL-resident view in the catalog is tenant-scoped" */
     it("scopes every PostgreSQL-resident dataset to the caller's tenant", async () => {
       expect(
         POSTGRES_VIEWS.length,
@@ -162,6 +162,46 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
           serialised.includes("excluded-"),
           `${view.name}: an excluded column's data reached the LangWatchQL schema`,
         ).toBe(false);
+      }
+    });
+  });
+
+  describe("when a caller queries an organization-scoped view", () => {
+    /** Walks Organization -> Team -> Project; two organizations make the negative case real. */
+    /** @scenario "An organization-scoped view never shows another organization's rows" */
+    it("returns only the caller's own organization's virtual keys", async () => {
+      const read = (client: ClickHouseClient) =>
+        selectRows<{ TenantId: string; VirtualKeyId: string; Name: string }>(
+          client,
+          `SELECT TenantId, VirtualKeyId, Name FROM ${database}.virtual_keys ORDER BY VirtualKeyId`,
+        );
+      const tenantB = await harness.restrictedClient({ keyHash: harness.tenantB.keyHash });
+
+      const rowsA = await read(tenantA);
+      const rowsB = await read(tenantB);
+
+      expect(rowsA.map((row) => [row.TenantId, row.Name])).toEqual([
+        [harness.tenantA.tenantId, `VK ${harness.tenantA.tenantId}`],
+      ]);
+      expect(rowsB.map((row) => [row.TenantId, row.Name])).toEqual([
+        [harness.tenantB.tenantId, `VK ${harness.tenantB.tenantId}`],
+      ]);
+    });
+  });
+
+  describe("when a caller asks for traffic by topic name", () => {
+    it("lists only the caller's own project's topics", async () => {
+      const rows = await selectRows<{ TopicId: string; TopicName: string }>(
+        tenantA,
+        `SELECT TopicId, TopicName FROM ${database}.topics ORDER BY TopicId`,
+      );
+
+      expect(rows.map((row) => row.TopicId)).toEqual([
+        `${harness.tenantA.tenantId}-topic-1`,
+        `${harness.tenantA.tenantId}-topic-2`,
+      ]);
+      for (const row of rows) {
+        expect(row.TopicName.startsWith(`Topic ${harness.tenantA.tenantId}`)).toBe(true);
       }
     });
   });
@@ -704,5 +744,98 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         "the key map was not restored, later tests would still see the duplicate",
       ).toBe(control.tenantA);
     });
+  });
+
+  describe("when a project has a private conversation and a shared one", () => {
+    /** The generic seed's conversation is the shared one; only the private one is seeded here. */
+    const sharedConversationId = () => `${harness.tenantA.tenantId}-conversationId`;
+    const privateConversationId = () => `${harness.tenantA.tenantId}-private-conversation`;
+    const LANGY_VIEWS = [
+      "langy_conversation_projections",
+      "langy_conversation_turn_projections",
+      "langy_message_projections",
+      "langy_turn_requests",
+      "langy_active_turns",
+    ];
+
+    const privateSeedStatements = (): string[] => {
+      const tenantId = harness.tenantA.tenantId;
+      const conversationId = privateConversationId();
+      const userId = `${tenantId}-user-b`;
+      const turnId = `${tenantId}-private-turn-1`;
+      const requestId = `${tenantId}-private-req-1`;
+      return [
+        `INSERT INTO "LangyConversationProjection" (` +
+          `id, "projectId", "conversationId", "userId", "titleSource", "status", ` +
+          `"isShared", "messageCount", "createdAt", "updatedAt", "occurredAt", ` +
+          `"acceptedAt", "lastEventId", "projectionVersion") VALUES (` +
+          `'${tenantId}-private-conv', '${tenantId}', '${conversationId}', '${userId}', ` +
+          `'user', 'active', false, 0, 1700000000000, 1700000000000, 1700000000000, ` +
+          `1700000000000, 'evt-private-1', '1')`,
+        `INSERT INTO "LangyConversationTurnProjection" (` +
+          `id, "projectId", "conversationId", "turnId", "status", "questionParts", ` +
+          `"answerParts", "toolCalls", "createdAt", "updatedAt", "occurredAt", ` +
+          `"acceptedAt", "lastEventId", "projectionVersion") VALUES (` +
+          `'${tenantId}-private-turn', '${tenantId}', '${conversationId}', '${turnId}', ` +
+          `'completed', '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, 1700000000000, ` +
+          `1700000000000, 1700000000000, 1700000000000, 'evt-private-turn-1', '1')`,
+        `INSERT INTO "LangyMessageProjection" (` +
+          `id, "projectId", "conversationId", "messageId", "role", "parts", ` +
+          `"sourceEventId", "occurredAt", "acceptedAt", "createdAt", "updatedAt") VALUES (` +
+          `'${tenantId}-private-msg', '${tenantId}', '${conversationId}', ` +
+          `'${tenantId}-private-msg-1', 'user', '[]'::jsonb, 'evt-private-msg-1', ` +
+          `1700000000000, 1700000000000, 1700000000000, 1700000000000)`,
+        `INSERT INTO "LangyTurnRequest" (` +
+          `id, "projectId", "userId", "requestId", "conversationId", "turnId", ` +
+          `"status", "leaseOwner", "leaseExpiresAt") VALUES (` +
+          `'${tenantId}-private-req', '${tenantId}', '${userId}', '${requestId}', ` +
+          `'${conversationId}', '${turnId}', 'completed', 'worker-1', now())`,
+        `INSERT INTO "LangyActiveTurn" (` +
+          `id, "projectId", "conversationId", "turnId", "requestId", "userId", ` +
+          `"status", "leaseOwner", "leaseExpiresAt") VALUES (` +
+          `'${tenantId}-private-active', '${tenantId}', '${conversationId}', '${turnId}', ` +
+          `'${requestId}', '${userId}', 'active', 'worker-1', now() + interval '1 hour')`,
+      ];
+    };
+
+    const deletePrivateSeed = async (): Promise<void> => {
+      for (const table of [
+        "LangyActiveTurn",
+        "LangyTurnRequest",
+        "LangyMessageProjection",
+        "LangyConversationTurnProjection",
+        "LangyConversationProjection",
+      ]) {
+        await postgres.asAdmin(
+          `DELETE FROM "${table}" WHERE "conversationId" = '${privateConversationId()}'`,
+        );
+      }
+    };
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("shows the shared conversation and hides the private one, across all five Langy views", async () => {
+      for (const sql of privateSeedStatements()) {
+        const result = await postgres.asAdmin(sql);
+        expect(result.exitCode, `seeding failed: ${sql}\n${result.stderr}`).toBe(0);
+      }
+
+      try {
+        for (const view of LANGY_VIEWS) {
+          const serialised = JSON.stringify(
+            await selectRows(tenantA, `SELECT * FROM ${database}.${view}`),
+          );
+          expect(
+            serialised.includes(privateConversationId()),
+            `${view}: the private conversation's data reached the caller`,
+          ).toBe(false);
+          expect(
+            serialised.includes(sharedConversationId()),
+            `${view}: the shared conversation never reached the caller`,
+          ).toBe(true);
+        }
+      } finally {
+        await deletePrivateSeed();
+      }
+    }, 60_000);
   });
 });

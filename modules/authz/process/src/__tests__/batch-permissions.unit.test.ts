@@ -10,9 +10,8 @@ const ORG = "org-1";
 
 const key = { type: "apiKey", id: "key-1" } as const;
 
-const binding = (role: CollectedBinding["role"], projectId: string): CollectedBinding => ({
-  role,
-  customRoleId: null,
+const binding = (roleKey: CollectedBinding["roleKey"], projectId: string): CollectedBinding => ({
+  roleKey,
   scopeType: "PROJECT",
   scopeId: projectId,
   viaGroupId: null,
@@ -39,7 +38,7 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
       makeReader({
         findApiKeyBindings: vi
           .fn()
-          .mockResolvedValue([binding("ADMIN", "proj-0"), binding("VIEWER", "proj-1")]),
+          .mockResolvedValue([binding("admin", "proj-0"), binding("viewer", "proj-1")]),
       });
 
     /** @scenario "A large organization's rollup is decided from one grant snapshot" */
@@ -111,9 +110,9 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
     const reader = () =>
       makeReader({
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
-        findApiKeyBindings: vi.fn().mockResolvedValue([binding("ADMIN", "proj-0")]),
+        findApiKeyBindings: vi.fn().mockResolvedValue([binding("admin", "proj-0")]),
         findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
-        findUserBindings: vi.fn().mockResolvedValue([binding("VIEWER", "proj-0")]),
+        findUserBindings: vi.fn().mockResolvedValue([binding("viewer", "proj-0")]),
       });
 
     it("caps every batched decision at the owner's grants", async () => {

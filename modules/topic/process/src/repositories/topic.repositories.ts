@@ -1,3 +1,5 @@
+import type { ProcessStore } from "@langwatch/eventing";
+
 import type { TopicClusteringRepository } from "./topic-clustering.repository.ts";
 import type { TopicRepository } from "./topic.repository.ts";
 
@@ -9,4 +11,6 @@ import type { TopicRepository } from "./topic.repository.ts";
 export interface TopicRepositories {
   readonly topics: TopicRepository;
   readonly clustering: TopicClusteringRepository;
+  /** The clustering wake's process-manager row, which the status panel reads. */
+  readonly processStore: ProcessStore;
 }

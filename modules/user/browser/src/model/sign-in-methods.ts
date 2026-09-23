@@ -52,6 +52,30 @@ export function isCredentialAccount(account: {
 }
 
 /**
+ * Which password offer the account's Security page makes, or none (ADR-027).
+ * Wherever the deployment issues its own a password is offered, even behind an
+ * enterprise provider; under Auth0 only an account with a database identity has one.
+ */
+export function passwordOfferFor({
+  authProvider,
+  emailPasswordEnabled,
+  holdsCredentialAccount,
+  hasPasswordAnswer,
+}: {
+  authProvider: string | undefined;
+  emailPasswordEnabled: boolean;
+  holdsCredentialAccount: boolean;
+  hasPasswordAnswer: boolean | undefined;
+}): { held: boolean } | null {
+  // Assumed held until the answer arrives: flickering "Set a password" at
+  // somebody who has one reads as their password having been lost.
+  if (authProvider === "email" || emailPasswordEnabled) return { held: hasPasswordAnswer ?? true };
+  if (authProvider === "auth0" && holdsCredentialAccount) return { held: true };
+
+  return null;
+}
+
+/**
  * Whether a password can be changed at all on this deployment. Email and
  * Auth0 modes keep the credential reachable; every other mode (OIDC, an
  * enterprise connection) holds it elsewhere — offering to change it would lie.

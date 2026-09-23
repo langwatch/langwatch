@@ -99,6 +99,16 @@ export type ExperimentWorkflowCopyInput = Readonly<{
   copiedFromWorkflowId?: string;
 }>;
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many experiments were made, since `since` where one is given, and when the
+ * first was. Times are epoch milliseconds.
+ */
+export interface ExperimentUsageCount {
+  readonly experiments: number;
+  readonly firstExperimentAt?: number;
+}
+
 // Callable API of the composed Experiment application. Four workbench writes
 // stay App-only because they reshape input to take the caller as a separate
 // argument (ADR-133).
@@ -258,6 +268,11 @@ export interface ExperimentApi {
   watchUpdates(
     input: Readonly<{ projectId: string; signal?: AbortSignal | undefined }>,
   ): AsyncIterable<ExperimentUpdateFrame>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<ExperimentUsageCount>;
 }
 
 export const ExperimentApi = moduleApi<ExperimentApi>()("experiment");

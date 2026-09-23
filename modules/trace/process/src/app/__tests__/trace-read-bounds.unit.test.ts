@@ -51,7 +51,10 @@ function harness(tier: "free" | "paid" | "enterprise") {
   const app = TraceApp.create({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
-      existence: { findExistingTraceIds: async ({ traceIds }) => [...traceIds] },
+      existence: {
+        findExistingTraceIds: async ({ traceIds }) => [...traceIds],
+        countUsage: async () => ({ traces: 0, spans: 0 }),
+      },
       read: read as TraceLegacyRead,
       spans: {} as TracesSpanReader,
       summary,

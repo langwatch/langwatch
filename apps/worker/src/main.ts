@@ -49,6 +49,7 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
     .withMember("queue", () => void 0)
     .withMember("content", () => void 0)
     .withMember("gatewayInternalProtocol", () => ({}))
+    .withMember("connectJudge", () => null)
     .withMember("monitor", () => void 0)
     // The worker hosts no topic-clustering caller of its own, so the claim is
     // answered by something that refuses loudly rather than by `undefined`.

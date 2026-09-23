@@ -2,6 +2,8 @@ import type { ApiKey, ApiKeyRevocationCause, ApiKeyScope } from "@langwatch/api-
 import type { Instant } from "@langwatch/time";
 
 export type StoredApiKey = ApiKey & { hashedSecret: string };
+/** A key as its own row holds it: its grants are authz's, joined by the service. */
+export type ApiKeyRow = Omit<StoredApiKey, "roleBindings">;
 export type ApiKeyCreateRecord = {
   name: string;
   description: string | null;
@@ -37,34 +39,36 @@ export type ApiKeyUpdateRecord = {
 
 /** Private persistence boundary for the API-key aggregate. */
 export abstract class ApiKeyRepository {
-  abstract create(input: ApiKeyCreateRecord): Promise<StoredApiKey>;
-  abstract activate(input: { id: string }): Promise<StoredApiKey>;
-  abstract findByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null>;
-  abstract findById(input: { id: string }): Promise<StoredApiKey | null>;
+  abstract create(input: ApiKeyCreateRecord): Promise<ApiKeyRow>;
+  abstract activate(input: { id: string }): Promise<ApiKeyRow>;
+  abstract findByLookupId(input: { lookupId: string }): Promise<ApiKeyRow | null>;
+  abstract findById(input: { id: string }): Promise<ApiKeyRow | null>;
   abstract findByIdInOrganization(input: {
     id: string;
     organizationId: string;
-  }): Promise<StoredApiKey | null>;
-  abstract listForUser(input: { organizationId: string; userId: string }): Promise<StoredApiKey[]>;
-  abstract listForOrganization(input: { organizationId: string }): Promise<StoredApiKey[]>;
-  abstract update(input: ApiKeyUpdateRecord): Promise<StoredApiKey>;
+  }): Promise<ApiKeyRow | null>;
+  abstract listForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]>;
+  abstract listForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]>;
+  abstract update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow>;
   /**
    * Marks a key revoked, keeping the FIRST cause ever recorded: the fence
    * on `revokedAt` stops a `"cap"` retirement from overwriting a `"user"`
    * revoke that already landed.
    */
-  abstract revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<StoredApiKey>;
+  abstract revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<ApiKeyRow>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
+  /** The newest live ingest key of this source among keys the caller named. */
   abstract findIngestKey(input: {
     organizationId: string;
-    projectId: string;
+    apiKeyIds: readonly string[];
     sourceType: string;
-  }): Promise<StoredApiKey | null>;
-  abstract findIngestKeysForProject(input: {
+  }): Promise<ApiKeyRow | null>;
+  /** The live ingest keys among keys the caller named, newest first. */
+  abstract findIngestKeys(input: {
     organizationId: string;
-    projectId: string;
-  }): Promise<StoredApiKey[]>;
+    apiKeyIds: readonly string[];
+  }): Promise<ApiKeyRow[]>;
   /**
    * Revokes every unrevoked key of one reserved name past expiry.
    * Cross-tenant by design (a fleet-wide sweep, not a request); the name is

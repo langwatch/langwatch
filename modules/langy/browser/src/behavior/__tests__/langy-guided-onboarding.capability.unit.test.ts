@@ -98,6 +98,26 @@ describe("given a caller waiting for the panel's scope", () => {
     });
   });
 
+  describe("when a kickoff is owed and the persisted scope already names this page", () => {
+    /** @scenario a kickoff owed right away waits for Langy to announce the page's scope */
+    it("waits for this page load's announcement, then keeps the kickoff through a repeat", () => {
+      useLangyStore.setState({ activeConversationScope: scope, scopeAnnounced: false });
+      langyGuidedOnboarding.dock();
+
+      langyGuidedOnboarding.onScopeAnnounced(() =>
+        langyGuidedOnboarding.queueKickoff({ brief: "set up the gateway" }),
+      );
+      expect(useLangyStore.getState().isOpen).toBe(true);
+      expect(useLangyStore.getState().pendingKickoff).toBeNull();
+
+      useLangyStore.getState().resetForScope(scope);
+      expect(useLangyStore.getState().pendingKickoff?.brief).toBe("set up the gateway");
+
+      useLangyStore.getState().resetForProject(scope.projectId);
+      expect(useLangyStore.getState().pendingKickoff?.brief).toBe("set up the gateway");
+    });
+  });
+
   describe("when the caller releases before any announcement", () => {
     it("hears nothing afterwards", () => {
       const announced = vi.fn();

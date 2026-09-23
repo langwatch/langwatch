@@ -42,6 +42,25 @@ describe("OutboxDispatcherService", () => {
     beforeEach(commitStartedTurn);
 
     describe("when the dispatcher runs", () => {
+      it("tells the handler when its lease lapses", async () => {
+        const handler = vi.fn().mockResolvedValue(undefined);
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          leaseDurationMs: 45_000,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const { message } = handler.mock.calls[0]![0] as {
+          message: DispatchableMessage;
+        };
+        // Anchored at the drain's own clock, which is where the store anchored
+        // the lease, so a handler can bound paid work by the same instant the
+        // store will hand the message to someone else at.
+        expect(message.leaseExpiresAt).toBe(T0 + 1 + 45_000);
+      });
+
       it("invokes the handler with the message identity and payload", async () => {
         const handler = vi.fn().mockResolvedValue(undefined);
         const dispatcher = new OutboxDispatcherService({

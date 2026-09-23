@@ -6,7 +6,16 @@ import { notificationServer } from "../../notification.server.ts";
 import { createNotificationTestApp } from "./notification.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role }).withModules([withMemoryRepositories(notificationServer)]);
+  return createApp({ role })
+    .withModules([withMemoryRepositories(notificationServer)])
+    .withConfig({
+      notification: {
+        defaultFrom: undefined,
+        provider: undefined,
+        ses: { enabled: undefined, region: undefined, endpoint: undefined },
+        smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+      },
+    });
 }
 
 const record = {

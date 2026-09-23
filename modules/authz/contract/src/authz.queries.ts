@@ -358,6 +358,15 @@ export const authzListScopeBindingsInputSchema = z
   .strict();
 export type AuthzListScopeBindingsInput = z.infer<typeof authzListScopeBindingsInputSchema>;
 
+/** The bindings of keys the caller already loaded from this organization. */
+export const authzListApiKeyBindingsInputSchema = z
+  .object({
+    organizationId: z.string(),
+    apiKeyIds: z.array(z.string()).readonly(),
+  })
+  .strict();
+export type AuthzListApiKeyBindingsInput = z.infer<typeof authzListApiKeyBindingsInputSchema>;
+
 export const authzListGroupBindingsInputSchema = z
   .object({ organizationId: z.string(), groupId: z.string() })
   .strict();

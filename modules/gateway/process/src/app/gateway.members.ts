@@ -1,5 +1,6 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
+  type GatewayConnectUpstream,
   type SpendUsage,
   type VirtualKeyWithScopes,
   type ModelProvider,
@@ -332,8 +333,11 @@ export interface GatewayClickHouse {
  * catalog. A port because each reads something outside the service.
  */
 export interface GatewayConfigAssembly {
-  /** The `ETag` for one key's bundle. */
-  versionToken(virtualKey: VirtualKeyWithScopes): Promise<string>;
+  /** The `ETag` for one key's bundle, moved by a hosted provider slot as much as by the key. */
+  versionToken(
+    virtualKey: VirtualKeyWithScopes,
+    connectUpstream?: GatewayConnectUpstream,
+  ): Promise<string>;
 
   /** The alias map the gateway receives, reserved tiers filled in. */
   withTierFallthrough(input: {

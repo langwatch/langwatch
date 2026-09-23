@@ -17,7 +17,7 @@ export const ProjectApi = moduleApi<ProjectApi>()("project");
 class ProjectApp implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = {};
-  static create(): ProjectApp {
+  static create(_setup?: Readonly<{ config: undefined }>): ProjectApp {
     return new ProjectApp();
   }
   getById(id: string): string {

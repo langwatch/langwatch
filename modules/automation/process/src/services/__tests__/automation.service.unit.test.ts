@@ -170,6 +170,9 @@ class Triggers extends TriggerRepository {
     traceId: string;
     projectId: string;
   }[] = [];
+  countUsage(): Promise<{ triggers: number }> {
+    return Promise.resolve({ triggers: 0 });
+  }
   findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
     this.findActiveCalls++;
     return Promise.resolve(this.rowsByProject.get(projectId) ?? []);

@@ -10,15 +10,18 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
-import { PrismaGatewayAdapter } from "../../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import type { GatewayModelProviderCredentials } from "../../app/gateway.members.ts";
+import { PrismaGatewayAdapter } from "../../app/prisma.gateway.composition.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import { VirtualKeyService } from "../../services/virtual-key.service.ts";
 import { PostgresVirtualKeyAdapter } from "../../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+
 import { GatewayConfigAssemblyAdapter } from "../../app/gateway-config-assembly.composition.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { GatewayScopeResolutionService } from "../../services/gateway-scope-resolution.service.ts";
@@ -26,6 +29,10 @@ import {
   mountGatewayInternalRest,
   signedGatewayRequest,
 } from "./support/gateway-internal-rest.harness.ts";
+
+const noPlatformProviders = createApiFixture<ModelProviderApi>({
+  platformProviderChain: () => Promise.resolve([]),
+});
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
@@ -97,12 +104,16 @@ function buildApp(): void {
   const materialiser = GatewayConfigMaterialiserService.create({
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+      platformProviders: noPlatformProviders,
     }),
     projects: projects,
     chRepo: null,
     budgetDecisions: gateway,
     credentials,
-    assembly: GatewayConfigAssemblyAdapter.create({ prisma }),
+    assembly: GatewayConfigAssemblyAdapter.create({
+      prisma,
+      platformProviders: noPlatformProviders,
+    }),
   });
   const store = PrismaGatewayInternalStoreRepository.create({ database: prisma });
   virtualKeys = createVirtualKeyServiceForTest(prisma, projects);

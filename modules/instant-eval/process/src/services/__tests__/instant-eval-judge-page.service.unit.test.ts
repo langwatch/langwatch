@@ -21,6 +21,10 @@ import type {
 } from "../../channels/instant-eval-judge.channel.ts";
 import type { InstantEvalJudgmentRecord } from "../../repositories/instant-eval-judgments.repository.ts";
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
+import {
+  INSTANT_EVAL_CANCEL_POLL_MS,
+  INSTANT_EVAL_PAGE_SETTLE_MS,
+} from "../../rules/instant-eval-page-stop.rules.ts";
 import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import type {
   InstantEvalKeyPage,
@@ -460,6 +464,55 @@ describe("given a page cancelled while it was judging", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+});
+
+describe("given a page intent leased for a while", () => {
+  /** A lease that leaves the page this many milliseconds to judge in. */
+  const leasedFor = (ms: number) =>
+    AT.epochMilliseconds + INSTANT_EVAL_PAGE_SETTLE_MS + INSTANT_EVAL_CANCEL_POLL_MS + ms;
+  const untilStopped = (signal: AbortSignal | undefined) =>
+    new Promise<InstantEvalJudgement>((_resolve, reject) => {
+      signal?.addEventListener("abort", () => reject(new DOMException("stopped", "AbortError")));
+    });
+  const threeRows = {
+    keyPage: { keys: [rowKey("t1"), rowKey("t2"), rowKey("t3")], hasMore: true },
+    rows: [
+      { TraceId: "t1", annoyed: "one" },
+      { TraceId: "t2", annoyed: "two" },
+      { TraceId: "t3", annoyed: "three" },
+    ],
+    concurrency: 1,
+  };
+
+  describe("when the lease runs down while the page is judging", () => {
+    /** @scenario "A page judges under a deadline inside its lease" */
+    it("stops before the lease lapses and reports where to resume", async () => {
+      const { service, judgments } = await judging({
+        ...threeRows,
+        answer: async ({ index, signal }) => (index === 0 ? judged(0.9) : untilStopped(signal)),
+      });
+
+      const outcome = await service.judgePage({ ...INPUT, deadlineAt: leasedFor(50) });
+
+      expect(judgments.written[0]).toMatchObject([{ TraceId: "t1", Status: "judged" }]);
+      expect(outcome).toMatchObject({ rows: 1, cursor: "t1", hasNextPage: true });
+    });
+  });
+
+  describe("when the deadline lands before any row answered", () => {
+    /** @scenario "A page judges under a deadline inside its lease" */
+    it("writes nothing and keeps the cursor where the page started", async () => {
+      const { service, judgments } = await judging({
+        ...threeRows,
+        answer: async ({ signal }) => untilStopped(signal),
+      });
+
+      const outcome = await service.judgePage({ ...INPUT, deadlineAt: leasedFor(50) });
+
+      expect(judgments.written.flat()).toEqual([]);
+      expect(outcome).toMatchObject({ rows: 0, cursor: null, hasNextPage: true });
     });
   });
 });

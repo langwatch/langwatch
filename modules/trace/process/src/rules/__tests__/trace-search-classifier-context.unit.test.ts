@@ -13,7 +13,7 @@ describe("given the classifier's input", () => {
       const context = buildRouteContext({
         sentence: "annoyed users",
         explicitQuery: "status:error",
-        activeQuery: "model:gpt-4o",
+        activeQuery: "model:gpt-5-mini",
         lensId: "conversations",
         timeRange: RANGE,
         known: { evaluators: ["ragas/faithfulness"], events: ["thumbs_up_down"] },
@@ -22,7 +22,7 @@ describe("given the classifier's input", () => {
       expect(context).toContain("Typed sentence: annoyed users");
       expect(context).toContain("Lens: conversations. Time window: 24 hours.");
       expect(context).toContain("Typed alongside it as filters: status:error");
-      expect(context).toContain("Search applied before this one: model:gpt-4o");
+      expect(context).toContain("Search applied before this one: model:gpt-5-mini");
       expect(context).toContain("status, model, service");
       expect(context).toContain("ragas/faithfulness");
       expect(context).toContain("thumbs_up_down");

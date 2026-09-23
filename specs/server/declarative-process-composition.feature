@@ -88,6 +88,12 @@ Feature: Composing a process declaratively
     And the senders registration answers with reach the module
 
   @unit
+  Scenario: A module hosts several pipelines
+    Given a module that calls withEventing once for each of three pipelines
+    When the process boots with an eventing runtime on its pool
+    Then the three register in the order declared, each connected to its own senders
+
+  @unit
   Scenario: A role that runs no event sourcing ignores the declaration
     Given a module that declares a pipeline with defineEventingModule
     When the process boots with no eventing runtime on its pool

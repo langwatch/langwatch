@@ -72,3 +72,40 @@ export class SessionIsCurrentError extends HandledError {
     this.name = "SessionIsCurrentError";
   }
 }
+
+/**
+ * This address is locked out after repeated failures (GAC-09). The message
+ * names neither whether the address has an account nor which half of the
+ * credentials was right: either makes the screen an oracle.
+ */
+export class SignInLockedOutError extends HandledError {
+  declare readonly code: "identity_sign_in_locked_out";
+
+  constructor(detail: string) {
+    super("identity_sign_in_locked_out", "identity_sign_in_locked_out", {
+      httpStatus: 429,
+      fault: "customer",
+      retryable: true,
+      reasons: [new Error(detail)],
+    });
+    this.name = "SignInLockedOutError";
+  }
+}
+
+/**
+ * A session-window save named a ceiling shorter than the idle timeout beside
+ * it (GAC-10). Refused rather than accepted: a session that ends at the
+ * ceiling before it could ever go idle makes the idle timeout unreachable.
+ */
+export class SessionMaxLifetimeTooShortError extends HandledError {
+  declare readonly code: "identity_session_max_lifetime_too_short";
+
+  constructor(detail: string) {
+    super("identity_session_max_lifetime_too_short", "identity_session_max_lifetime_too_short", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SessionMaxLifetimeTooShortError";
+  }
+}

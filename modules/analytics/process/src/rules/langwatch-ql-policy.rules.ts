@@ -1,6 +1,6 @@
 /**
  * LangWatchQL analytics SQL — what a caller is allowed to name.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 /**
@@ -63,6 +63,11 @@ export interface LangWatchQLPolicy {
   readonly defaultDatabase?: string;
   /** Defaults to {@link DEFAULT_LWQL_LIMITS}. */
   readonly limits?: LangWatchQLLimits;
+  /**
+   * The columns of each view in `allowedTables`, keyed and qualified the same way. Optional:
+   * it only sharpens a `GATED_COLUMN` refusal into one naming the view's usable columns.
+   */
+  readonly viewColumns?: Readonly<Record<string, readonly string[]>>;
 }
 
 /** The policy in the form the walk compares against: lowercased and set-shaped. */
@@ -74,6 +79,10 @@ export interface ResolvedLangWatchQLPolicy {
   readonly reservedDatabases: ReadonlySet<string>;
   readonly defaultDatabase: string;
   readonly limits: LangWatchQLLimits;
+  /** `allowedTables` as written, sorted and deduplicated, for a refusal to list. */
+  readonly availableViews: readonly string[];
+  /** `viewColumns`, keyed by the qualified table name. */
+  readonly viewColumns: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -94,4 +103,11 @@ export function qualifyTableName({
   if (explicit) return `${explicit}.${trimmed}`;
   if (trimmed.includes(".")) return trimmed;
   return defaultDatabase ? `${defaultDatabase}.${trimmed}` : trimmed;
+}
+
+/** The sorted, deduplicated form a refusal lists names in. */
+export function sortedUnique(names: readonly string[]): string[] {
+  return [...new Set(names.map((name) => name.trim()))].toSorted((left, right) =>
+    left.localeCompare(right),
+  );
 }

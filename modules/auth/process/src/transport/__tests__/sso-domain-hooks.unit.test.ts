@@ -79,7 +79,9 @@ function accountRepo({
   user?: { id: string; email: string; deactivatedAt: Date | null };
 }): BetterAuthHooksRepository {
   return {
-    tryFindUserForHooks: vi.fn().mockResolvedValue({ ...user, pendingSsoSetup: false }),
+    tryFindUserForHooks: vi
+      .fn()
+      .mockResolvedValue({ ...user, pendingSsoSetup: false, signupConfirmationPending: false }),
     tryFindOrganizationBySsoDomain: vi.fn().mockResolvedValue(organization),
     countAccountsForUser: vi.fn().mockResolvedValue(accountCount),
     flagPendingSsoSetup: vi.fn().mockResolvedValue(undefined),

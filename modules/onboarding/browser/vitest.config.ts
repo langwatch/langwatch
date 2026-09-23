@@ -2,6 +2,9 @@ import { defineModuleVitestConfig } from "@langwatch/vitest-config";
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
+  // Several files mock the same modules (the api map, the experiment registration, the screens)
+  // with different shapes; a shared registry lets one file's mock leak into the next.
+  isolate: true,
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],

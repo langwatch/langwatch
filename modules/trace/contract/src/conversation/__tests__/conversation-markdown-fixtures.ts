@@ -12,7 +12,7 @@ export function makeTurn(opts: {
       traceId: opts.traceId ?? "t1",
       timestamp: opts.timestamp ?? 1_700_000_000_000,
       durationMs: 1000,
-      models: ["gpt-4o"],
+      models: ["gpt-5-mini"],
       totalCost: 0.01,
       totalTokens: 100,
       input: null,

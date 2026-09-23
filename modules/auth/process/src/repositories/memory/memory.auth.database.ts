@@ -7,7 +7,14 @@ import type { BrowserSessionRecord, StoredBrowserSession } from "../auth-session
  * test mints to exercise revocation carry none, and a devices list that reads
  * them absent answers exactly what a session minted before the columns does.
  */
-export type MemoryStoredSession = StoredBrowserSession & Partial<Omit<BrowserSessionRecord, "id">>;
+export type MemoryStoredSession = Omit<
+  StoredBrowserSession,
+  "createdAt" | "lastSeenAt" | "updatedAt"
+> &
+  Partial<Omit<BrowserSessionRecord, "id">> & {
+    /** The idle-window stamp (GAC-10), absent on a session never under one. */
+    lastSeenAt?: Instant;
+  };
 
 /** One confirmation token, exactly as the row holds it. */
 export type StoredVerificationToken = {

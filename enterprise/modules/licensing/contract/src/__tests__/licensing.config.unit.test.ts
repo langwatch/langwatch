@@ -24,4 +24,46 @@ describe("licensing server configuration", () => {
       expect(read({}).publicKey).toBeUndefined();
     });
   });
+
+  describe("the connect endpoints", () => {
+    describe("given an https endpoint", () => {
+      it("accepts it", () => {
+        expect(
+          read({ LANGWATCH_CONNECT_GATEWAY_ENDPOINT: "https://gateway.langwatch.ai" })
+            .connectGatewayEndpoint,
+        ).toBe("https://gateway.langwatch.ai");
+      });
+    });
+
+    describe("given a plain http endpoint on a public host", () => {
+      it("refuses it naming the variable", () => {
+        expect(() =>
+          read({ LANGWATCH_CONNECT_GATEWAY_ENDPOINT: "http://gateway.example.com" }),
+        ).toThrow(/LANGWATCH_CONNECT_GATEWAY_ENDPOINT must use https/);
+      });
+    });
+
+    describe("given a plain http endpoint on a loopback host", () => {
+      it("accepts localhost and 127.0.0.1 with a port", () => {
+        expect(
+          read({ LANGWATCH_CONNECT_LICENSE_ENDPOINT: "http://localhost:5643" })
+            .connectLicenseEndpoint,
+        ).toBe("http://localhost:5643");
+        expect(
+          read({ LANGWATCH_CONNECT_LICENSE_ENDPOINT: "http://127.0.0.1:5643" })
+            .connectLicenseEndpoint,
+        ).toBe("http://127.0.0.1:5643");
+      });
+    });
+
+    describe("given no value", () => {
+      it("falls back to the hosted endpoints", () => {
+        expect(read({}).connectGatewayEndpoint).toBe("https://gateway.langwatch.ai");
+        expect(read({}).connectLicenseEndpoint).toBe("https://connect.langwatch.ai");
+        expect(read({ LANGWATCH_CONNECT_GATEWAY_ENDPOINT: "" }).connectGatewayEndpoint).toBe(
+          "https://gateway.langwatch.ai",
+        );
+      });
+    });
+  });
 });

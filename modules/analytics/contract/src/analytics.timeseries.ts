@@ -47,6 +47,7 @@ export const analyticsTimeseriesInputSchema = z
     filters: z.record(z.string(), analyticsFilterValueSchema).default({}),
     traceIds: z.array(z.string()).optional(),
     negateFilters: z.boolean().optional(),
+    excludeOrigins: z.array(z.string()).optional(),
     series: z.array(analyticsSeriesSchema),
     groupBy: z.string().min(1).optional(),
     groupByKey: z.string().optional(),

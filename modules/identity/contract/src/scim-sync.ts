@@ -46,6 +46,7 @@ export const SCIM_APPLY_FAILED_EVENT_TYPE = "lw.identity.scim_apply_failed" as c
 export const SCIM_APPLY_RECOVERED_EVENT_TYPE = "lw.identity.scim_apply_recovered" as const;
 export const SCIM_APPLY_RETIRED_EVENT_TYPE = "lw.identity.scim_apply_retired" as const;
 export const SCIM_TOKEN_REVOKED_EVENT_TYPE = "lw.identity.scim_token_revoked" as const;
+export const SCIM_APPLY_REDRIVEN_EVENT_TYPE = "lw.identity.scim_apply_redriven" as const;
 
 export const SCIM_SYNC_EVENT_TYPES = [
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
@@ -55,6 +56,7 @@ export const SCIM_SYNC_EVENT_TYPES = [
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
 ] as const;
 export type ScimSyncEventType = (typeof SCIM_SYNC_EVENT_TYPES)[number];
 
@@ -121,6 +123,22 @@ export const scimApplyRetiredPayloadSchema = z.object({
   userId: z.string().min(1).nullable(),
 });
 
+/**
+ * The operator surface's one write (ADR-122): a retired apply sent through
+ * again. Names WHICH dead letter by its retirement time; the operator rides
+ * on the fact because a re-drive crosses a tenant boundary.
+ */
+export const scimApplyRedrivenPayloadSchema = z.object({
+  ...syncIdentity,
+  op: scimApplyOpSchema,
+  errorCode: z.string().min(1),
+  userId: z.string().min(1).nullable(),
+  /** Business time of the retirement this re-drive answers. */
+  retiredAtMs: z.number().int().nonnegative(),
+  /** The platform operator who sent it through again. */
+  actor: identityActorSchema,
+});
+
 export const scimTokenRevokedPayloadSchema = z.object({
   ...syncIdentity,
   tokenId: z.string().min(1).nullable(),
@@ -158,6 +176,10 @@ export const scimSyncFactInputSchema = z.discriminatedUnion("type", [
     data: scimApplyRetiredPayloadSchema,
   }),
   z.object({
+    type: z.literal(SCIM_APPLY_REDRIVEN_EVENT_TYPE),
+    data: scimApplyRedrivenPayloadSchema,
+  }),
+  z.object({
     type: z.literal(SCIM_TOKEN_REVOKED_EVENT_TYPE),
     data: scimTokenRevokedPayloadSchema,
   }),
@@ -183,6 +205,8 @@ export interface ScimSyncFailure {
   /** The person it was about, when it was about one. */
   userId: string | null;
   occurredAtMs: number;
+  /** Set once an operator re-drove the retired apply (ADR-122); a re-drive states it once. */
+  redrivenAtMs: number | null;
 }
 
 /** One connection's directory sync as the projection knows it. */
@@ -207,6 +231,23 @@ export interface ScimSyncState {
  */
 export function scimSyncIdFor({ connectionId }: { connectionId: string }): string {
   return connectionId;
+}
+
+/**
+ * The dead letter a re-drive names, when it may still be re-driven: retired at
+ * that time and not re-driven yet. The guard and the operator surface ask the
+ * same question, so one predicate answers both.
+ */
+export function pickRetiredLetter({
+  state,
+  retiredAtMs,
+}: {
+  state: ScimSyncState;
+  retiredAtMs: number;
+}): ScimSyncFailure | undefined {
+  return state.deadLetters.find(
+    (failure) => failure.retiredAtMs === retiredAtMs && failure.redrivenAtMs === null,
+  );
 }
 
 export function emptyScimSync({ scimSyncId }: { scimSyncId: string }): ScimSyncState {
@@ -235,7 +276,13 @@ export function reduceScimSync({
   fact: ScimSyncFact;
 }): ScimSyncState {
   const touched = { ...state, updatedAtMs: fact.occurredAt };
-  if (state.state === "REVOKED") return touched;
+  // REVOKED absorbs everything the DIRECTORY does: a push arriving after a
+  // revocation comes from a token that should already have stopped verifying.
+  // Issuing a new token is not something the directory does - it is the exact
+  // advice we give when one leaks, and absorbing it made that advice a trap.
+  if (state.state === "REVOKED" && fact.type !== SCIM_TOKEN_ISSUED_EVENT_TYPE) {
+    return touched;
+  }
 
   switch (fact.type) {
     case SCIM_TOKEN_ISSUED_EVENT_TYPE:
@@ -271,6 +318,7 @@ export function reduceScimSync({
           errorCode: fact.data.errorCode,
           attempts: sameFailure(state.lastFailure, fact.data) ? state.lastFailure.attempts + 1 : 1,
           retiredAtMs: null,
+          redrivenAtMs: null,
           userId: fact.data.userId,
           occurredAtMs: fact.occurredAt,
         },
@@ -285,6 +333,7 @@ export function reduceScimSync({
         retiredAtMs: fact.occurredAt,
         userId: fact.data.userId,
         occurredAtMs: fact.occurredAt,
+        redrivenAtMs: null,
       };
       // Stays in ERROR: a retired apply is a state the directory asked for
       // and did not get, so the connection is not healthy just because we
@@ -294,6 +343,19 @@ export function reduceScimSync({
         state: "ERROR",
         lastFailure: retired,
         deadLetters: [...state.deadLetters, retired],
+      };
+    }
+    case SCIM_APPLY_REDRIVEN_EVENT_TYPE: {
+      // Stamps the ONE dead letter named and leaves the sync where it is: a
+      // re-drive is a request, and what the apply then does states its own fact.
+      const stamp = (failure: ScimSyncFailure): ScimSyncFailure =>
+        failure.retiredAtMs === fact.data.retiredAtMs && failure.redrivenAtMs === null
+          ? { ...failure, redrivenAtMs: fact.occurredAt }
+          : failure;
+      return {
+        ...touched,
+        lastFailure: state.lastFailure ? stamp(state.lastFailure) : null,
+        deadLetters: state.deadLetters.map(stamp),
       };
     }
     case SCIM_TOKEN_REVOKED_EVENT_TYPE:

@@ -67,7 +67,8 @@ site: rename to `get*`/`find*` where it looks something up, or to a derivation
 verb where it computes.
 
 **`try*` is never a verb.** It names how a method behaves on failure rather than
-what it answers, and `langwatch/no-try-prefix` says so.
+what it answers, and `langwatch/banned-verb-prefix` says so (it absorbed
+`no-try-prefix` on 2026-09-23, with the `require*` ban beside it).
 
 ## Consequences
 
@@ -84,6 +85,13 @@ what it answers, and `langwatch/no-try-prefix` says so.
 
 - `packages/oxlint-rules/src/rules/fallible-result-naming.rule.mjs` — the
   derivation and repository vocabularies
-- `packages/oxlint-rules/src/rules/no-try-prefix.rule.mjs` — the `try*` ban
+- `packages/oxlint-rules/src/rules/banned-verb-prefix.rule.mjs` — the `try*` and `require*` bans
 - `.claude/skills/architecture-guide/references/server.md` — the table a lane reads
 - CLAUDE.md — the row that points here
+
+## Amended 2026-09-23
+
+An assertion — a method that returns nothing and throws when its condition does
+not hold — is named `assert<Condition>`. It answers no value, so it is neither a `get*`
+nor a `find*`. `require*` stays banned: it was the old spelling of exactly this shape,
+and `assert*` replaces it rather than joining it.

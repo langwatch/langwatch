@@ -9,16 +9,22 @@ import {
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import {
+  signedInWithFor,
   signInMethodLabelFor,
   signInProvedSecondFactor,
   type IdentityEmailService,
+  type SignedInWith,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { AuthSessionCacheRepository } from "../repositories/auth-session-cache.repository.ts";
-import type { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
+import type {
+  AuthSessionRepository,
+  StoredBrowserSession,
+} from "../repositories/auth-session.repository.ts";
+import type { SessionBoundService } from "./session-bound.service.ts";
 
 const CACHE_PREFIX = "better-auth:";
 const logger = createLogger("langwatch:auth:session-lifecycle");
@@ -36,6 +42,9 @@ export interface BrowserSessionDeps {
    * to the stored user's own address, per the chain below. */
   identityEmails: IdentityEmailService | undefined;
   users: UserApi;
+  /** The organization's browser-session window (GAC-10), asked here because
+   *  this is where a session becomes an identity and the row is already read. */
+  sessionBound: SessionBoundService;
   now(): Instant;
 }
 
@@ -46,6 +55,10 @@ export class BrowserSessionService {
   }
 
   private constructor(private readonly deps: BrowserSessionDeps) {}
+
+  countSignedInUsers(input: { at: number }): Promise<number> {
+    return this.deps.sessions.countSignedInUsers(input);
+  }
 
   async tryResolveBrowserSession(input: {
     verified: VerifiedBrowserSession | null;
@@ -59,6 +72,8 @@ export class BrowserSessionService {
     if (!stored) {
       return null;
     }
+
+    if (await this.pastItsWindow({ stored })) return null;
 
     const user = await this.deps.users.findById({ id: verified.user.id });
     const session = browserSessionSchema.parse({
@@ -77,15 +92,27 @@ export class BrowserSessionService {
       sessionId: verified.session.id,
     });
 
+    return this.asImpersonated({ stored, session });
+  }
+
+  /**
+   * The same session seen as whoever is being browsed AS, or unchanged when
+   * nobody is. An expired impersonation and a retired target both give the
+   * signed-in session back: the back office renders as who is actually there.
+   */
+  private async asImpersonated({
+    stored,
+    session,
+  }: {
+    stored: StoredBrowserSession;
+    session: BrowserSession;
+  }): Promise<BrowserSession> {
     const impersonation = browserSessionImpersonationSchema.safeParse(stored.impersonating);
     if (!impersonation.success) return session;
     const impersonationExpired =
       Temporal.Instant.compare(fromDate(impersonation.data.expires), this.deps.now()) <= 0;
     if (impersonationExpired) return session;
 
-    // The person being browsed as, read through the ONE directory this process
-    // resolves anybody through: a retired account stops the impersonation here
-    // rather than rendering the back office as somebody who is gone.
     const impersonatedUser = await this.deps.users.findById({ id: impersonation.data.id });
     if (!impersonatedUser || impersonatedUser.deactivatedAt !== null) {
       return session;
@@ -111,6 +138,65 @@ export class BrowserSessionService {
         },
       },
     });
+  }
+
+  /**
+   * Whether this session is past its organization's window, destroying it if
+   * so: a session honoured in one place and refused in another has not
+   * ended. A destroy that fails still refuses the caller.
+   */
+  private async pastItsWindow({ stored }: { stored: StoredBrowserSession }): Promise<boolean> {
+    const verdict = await this.deps.sessionBound.enforce({
+      session: {
+        id: stored.id,
+        userId: stored.userId,
+        createdAt: stored.createdAt,
+        lastSeenAt: stored.lastSeenAt,
+        updatedAt: stored.updatedAt,
+      },
+    });
+    if (verdict.withinBound) return false;
+
+    try {
+      await this.revokeBrowserSession({ sessionId: stored.id });
+    } catch (error) {
+      logger.warn(
+        { error, sessionId: stored.id, reason: verdict.reason },
+        "could not end a session past its organization's window; it is refused to the caller regardless",
+      );
+    }
+
+    return true;
+  }
+
+  /**
+   * Ends every session these people hold that is already past its window, each
+   * judged by `enforce`, so a member of two organizations meets the strictest
+   * bound. specs/identity/org-session-lifetime.feature
+   */
+  async endSessionsPastWindow({ userIds }: { userIds: readonly string[] }): Promise<number> {
+    let ended = 0;
+    for (const userId of userIds) {
+      for (const stored of await this.deps.sessions.findStoredForUser({ userId })) {
+        if (await this.pastItsWindow({ stored })) ended += 1;
+      }
+    }
+
+    return ended;
+  }
+
+  /** How one of this person's own sessions signed in; `unknown` for any other. */
+  async getSignedInWith({
+    userId,
+    sessionId,
+  }: {
+    userId: string;
+    sessionId: string;
+  }): Promise<SignedInWith> {
+    const records = await this.deps.sessions.findForUser({ userId });
+    const session = records.find((record) => record.id === sessionId);
+
+    return signedInWithFor({ amr: session?.amr });
   }
 
   /**

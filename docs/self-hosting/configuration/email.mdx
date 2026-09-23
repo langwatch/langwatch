@@ -5,7 +5,45 @@ description: "Configure the gateway LangWatch sends alerts, invitations and pass
 
 LangWatch sends alert notifications, scheduled reports, team invitations, usage warnings and password reset links. All of it goes through one gateway, which you choose with `EMAIL_PROVIDER`.
 
-Until a gateway is configured, those messages are not sent, and the places that would offer to send one hide the option: an invitation can be shared as a link but not emailed, and an alert configured for email delivers nothing.
+Until a gateway is configured, those messages are not sent, and the places that would offer to send one hide the option: an invitation can be shared as a link but not emailed, and an alert configured for email cannot deliver.
+
+## Sign-in, invitations and recovery
+
+Configure email before inviting people or enabling SSO. The same gateway sends
+sign-up verification, invitation and password-reset messages. It also carries
+identity notifications such as join requests and recovery-access warnings.
+
+| Journey | What the recipient does |
+| --- | --- |
+| Create an account | Open the verification email and confirm the address before completing registration. |
+| Join an organization | Open the invitation, sign in with the invited account and select **Let me in**. |
+| Reset a password | Open **Forgot password**, request a link and choose a new password. The link expires after one hour. |
+| Recover access during an SSO outage | Use the local recovery route for the administrator named during SSO setup. Email delivery does not override the organization's sign-in policy. |
+
+An invitation link can be shared directly if email is unavailable. Revoking or
+reissuing an invitation makes its previous link unusable. Ask the organization
+administrator for a new invitation if the page says it is no longer available.
+
+Password-reset requests show the same confirmation for known and unknown
+addresses. A confirmation therefore does not prove a message was sent. A
+successful reset revokes the account's previous sessions. See
+[SSO configuration](/self-hosting/configuration/sso) for when local password
+sign-in and reset are available.
+
+## Check delivery before rollout
+
+1. Set `EMAIL_PROVIDER`, the provider credentials and `EMAIL_DEFAULT_FROM`.
+2. Set `BASE_HOST` to the public HTTPS address of your installation. Reset and
+   invitation links must open the same installation your users sign in to.
+3. Apply the configuration to the app and worker deployments, then restart
+   them so they read the new settings.
+4. Send an invitation to a test account from **Settings > Directory > People**.
+   Check delivery and open the link.
+5. For an account allowed to use local passwords, request a password reset
+   and complete it. Do this before depending on email for SSO recovery.
+
+See [Members and teams](/platform/members-and-teams) for invitation controls
+and [SSO setup](/platform/sso) for choosing a recovery administrator.
 
 ## Choosing a Gateway
 
@@ -16,7 +54,7 @@ Until a gateway is configured, those messages are not sent, and the places that 
 | SendGrid | `sendgrid`       | You have a SendGrid account                                                                                                                                                                            |
 | Resend   | `resend`         | You have a Resend account                                                                                                                                                                              |
 
-SMTP is the one to reach for when nothing else fits. Any gateway that speaks it works.
+Use SMTP when your provider or internal relay gives you an SMTP endpoint.
 
 <Note>
   `EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails. Leave it
@@ -157,9 +195,15 @@ workers:
 
 The `smtp` gateway ignores these variables deliberately, because a relay is normally an internal host reached directly. Point it at the relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
 
+## Identity notifications and retries
+
+Join-request, automatic-join and SSO domain-proof notifications are queued for delivery. A temporary mail-provider failure is retried for the affected recipient; it does not undo the action that triggered the notification or resend to recipients whose delivery has already been recorded.
+
+For Resend, retries reuse a delivery key. Resend [keeps these keys for 24 hours](https://resend.com/changelog/idempotency-keys). SMTP retries keep the same message identifier, but SMTP, SES and SendGrid do not guarantee duplicate suppression if a worker stops after the provider accepts a message and before delivery is recorded. Replaying an older notification can also send another copy after the provider's retention window.
+
 ## Troubleshooting
 
-The chart refuses to render when `app.email.provider` names a gateway nothing configures, so a missing setting stops `helm install` rather than surfacing at the first alert. It also refuses a credential that names a Secret without naming a key inside it, which otherwise installs cleanly and resolves to nothing.
+The chart refuses to render when `app.email.provider` names an unconfigured gateway, so a missing setting stops `helm install` rather than surfacing at the first alert. It also refuses a credential that names a Secret without naming a key inside it, which otherwise installs cleanly and fails to resolve a value.
 
 Settings can instead arrive through `extraEnvs` or `extraEnvFrom`, which the chart cannot see inside and therefore accepts. Supply them to both `app` and `workers`: each Deployment reads only its own extra environment, and both send mail.
 

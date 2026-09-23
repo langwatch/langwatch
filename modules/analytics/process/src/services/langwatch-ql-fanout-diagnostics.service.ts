@@ -75,7 +75,7 @@ function fanoutForPair({
       continue;
     }
 
-    const key = `${multiplied.datasetName}<-${multiplier.datasetName}`;
+    const key = `${multiplied.viewName}<-${multiplier.viewName}`;
     if (seen.has(key)) {
       continue;
     }
@@ -122,20 +122,20 @@ function fanoutDiagnostic({
   return {
     code: "POSSIBLE_FANOUT",
     message:
-      `The join repeats each row of ${multiplied.datasetName} once per matching row of ` +
-      `${multiplier.datasetName}, because it does not match ${multiplier.datasetName} on ` +
+      `The join repeats each row of ${multiplied.viewName} once per matching row of ` +
+      `${multiplier.viewName}, because it does not match ${multiplier.viewName} on ` +
       `${unmatched.join(", ")}. ` +
       (isRowCollapsing
-        ? `Any aggregate over a ${multiplied.datasetName} measure therefore counts that measure ` +
-          `once per matching row. Aggregate ${multiplied.datasetName} to its own grain first, ` +
+        ? `Any aggregate over a ${multiplied.viewName} measure therefore counts that measure ` +
+          `once per matching row. Aggregate ${multiplied.viewName} to its own grain first, ` +
           `then join.`
-        : `Its rows are therefore repeated in the result. Aggregate ${multiplier.datasetName} to ` +
-          `${multiplied.datasetName}'s grain first, then join.`),
+        : `Its rows are therefore repeated in the result. Aggregate ${multiplier.viewName} to ` +
+          `${multiplied.viewName}'s grain first, then join.`),
     meta: {
-      /** The dataset whose rows are repeated. */
-      dataset: multiplied.datasetName,
-      /** The dataset each of those rows is repeated for. */
-      multipliedBy: multiplier.datasetName,
+      /** The view whose rows are repeated. */
+      view: multiplied.viewName,
+      /** The view each of those rows is repeated for. */
+      multipliedByView: multiplier.viewName,
       /**
        * The repeated dataset's measures: the columns where the repetition
        * changes the number rather than only the row count.

@@ -153,6 +153,15 @@ export type NavigationApiMap = {
       query: { input: Record<string, never>; output: { pendingSsoSetup?: boolean } };
     };
   };
+  identity: {
+    /** Whether a reader with no organization is back from testing an SSO connection. */
+    myTestArrival: {
+      query: {
+        input: Record<string, never>;
+        output: { testing: true; organizationName: string } | { testing: false };
+      };
+    };
+  };
 
   /**
    * THE FIVE LISTS QUICK SEARCH READS, and the reason the command bar is not a feature of its

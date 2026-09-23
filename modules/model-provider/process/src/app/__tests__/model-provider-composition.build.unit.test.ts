@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Tests that ModelProviderApp.create builds collaborators from declared members and config,
  * not from hand-composed infrastructure. Regression: before regaining build step, calls
@@ -9,11 +10,11 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import { ModelProviderApp } from "../model-provider.app.ts";
+import { createModelProviderTestDataPrivacy } from "./model-provider.fixture.ts";
 
 function testProject(id: string) {
   return projectWithTeamSchema.parse({
@@ -102,27 +103,28 @@ function fakeRedis(): RedisConnection {
  * Builds the app exactly the way boot does: through `create`, not test-only
  * `createForTesting`.
  */
-function createRealModelProviderApp(): ModelProviderApp {
+function createRealModelProviderApp(): Promise<ModelProviderApp> {
   return ModelProviderApp.create({
     repositories: MemoryModelProviderRepositories.create(),
     dependencies: {
       projects: createFullModelProviderTestProjects(),
       organizations: createFullModelProviderTestOrganizations(),
       permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+      dataPrivacy: createModelProviderTestDataPrivacy(),
     },
     members: {
       redis: fakeRedis(),
+      nlpServiceUrl: undefined,
     },
     config: {
       blockLocalHttpCalls: true,
       allowedProxyHosts: [],
-      nlpServiceUrl: undefined,
       defaultModel: undefined,
     },
     resources: new ResourceScope(),
     secrets: SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(
       "model-provider",
-      [],
+      Object.values(ModelProviderApp.secrets),
     ),
   });
 }
@@ -130,7 +132,7 @@ function createRealModelProviderApp(): ModelProviderApp {
 describe("ModelProviderApp.create", () => {
   describe("given only the process's own redis and secrets members", () => {
     it("answers the default-models feature catalogue instead of crashing on undefined defaultFeatures", async () => {
-      const app = createRealModelProviderApp();
+      const app = await createRealModelProviderApp();
 
       await expect(
         app.getDefaultSnapshotUnattributed({ projectId: "project-1" }),
@@ -138,13 +140,13 @@ describe("ModelProviderApp.create", () => {
     });
 
     it("answers the provider list instead of crashing on undefined systemProviders", async () => {
-      const app = createRealModelProviderApp();
+      const app = await createRealModelProviderApp();
 
       await expect(app.listForProject({ projectId: "project-1" })).resolves.toEqual([]);
     });
 
     it("recognizes a known provider instead of crashing on undefined exists", async () => {
-      const app = createRealModelProviderApp();
+      const app = await createRealModelProviderApp();
 
       await expect(
         app.upsertUnattributed({

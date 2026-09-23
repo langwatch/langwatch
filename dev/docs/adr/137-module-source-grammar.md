@@ -2,18 +2,16 @@
 
 **Date:** 2026-09-09
 
-**Status:** Proposed
+**Status:** Proposed. Amended 2026-09-23: the class rules are one rule, and the
+boundary rules the deleted package-and-layer ADR recorded live here (see the last section).
 
 **Behavioural contract:**
 [Filenames](../../../specs/tooling/lint-feature-source-filename.feature),
 [layout](../../../specs/tooling/lint-feature-source-layout.feature),
 [subjects](../../../specs/tooling/lint-feature-source-subject.feature),
-[module classes](../../../specs/tooling/lint-feature-module-classes.feature),
-[service classes](../../../specs/tooling/lint-service-classes.feature),
-[service quality](../../../specs/tooling/lint-service-quality.feature),
-[layer classes](../../../specs/tooling/lint-layer-class.feature),
+[module classes](../../../specs/tooling/lint-module-classes.feature),
+[pass-through classes](../../../specs/tooling/lint-pass-through-class.feature),
 [namespace classes](../../../specs/tooling/lint-namespace-class.feature),
-[the ast-grep delegation rule](../../../specs/tooling/lint-naming-shapes.feature),
 [schemas in the contract](../../../specs/tooling/lint-schema-outside-contract.feature),
 [HandledError in the contract](../../../specs/tooling/lint-handled-error-outside-contract.feature),
 [strict feature layout](../../../packages/architecture-enforcer/specs/strict-feature-layout.feature),
@@ -55,22 +53,19 @@ one neighbour reads is a hop too.
 | `langwatch/feature-source-filename` | plugin | `<subject>.<artifact>.ts`, lower kebab case, artifact from the canonical list. |
 | `langwatch/feature-source-layout` | plugin | Six ids covering where a file may live in layout v0, contract filenames, server artifacts in contract source, a process manager written as a service, and rules-module purity. |
 | `langwatch/feature-source-subject` | plugin | A module may not claim a subject the catalogue gives to another module. |
-| `langwatch/feature-module-classes` | plugin | A port module exports an abstract `*Port`; a runtime module exports a concrete class with a `static create`; neither keeps behaviour in a standalone export. |
-| `langwatch/service-classes` | plugin | A service module defines exactly one `*Service` class, constructed through `static create`, with no exported standalone function. |
-| `langwatch/service-quality` | plugin | No duplicate class member or object key; a class with `static create` has a private constructor. Enabled nowhere today. |
-| `langwatch/layer-class` | plugin | A class whose public methods almost all forward under the same name to the same collaborator is a hop, not a layer. |
+| `langwatch/module-classes` | plugin | A service, app, migration or repository module exports its concrete class, built through `static create` behind a private constructor; a declared interface file exports the interface; no behaviour in a standalone export. Replaces `feature-module-classes`, `service-classes` and `service-quality` (2026-09-23). |
+| `langwatch/pass-through-class` | plugin | A class whose public methods almost all forward under the same name to the same collaborator is a hop, not a layer. Was `layer-class`. |
 | `langwatch/namespace-class` | plugin | A class with only static members is a module wearing a class. |
-| `langwatch/schema-outside-contract` | plugin | A Zod schema authored (not merely composed from an import) as a top-level const in `server/src/transport/**` belongs in the module's contract package. |
-| `langwatch/handled-error-outside-contract` | plugin | A class extending `HandledError` declared anywhere under a module's `server/src` belongs in `contract/src/<m>.errors.ts`. |
+| `langwatch/schema-outside-contract` | plugin | A Zod schema authored (not merely composed from an import) as a top-level const in `process/src/transport/**` belongs in the module's contract package. |
+| `langwatch/handled-error-outside-contract` | plugin | A class extending `HandledError` declared anywhere under a module's `process/src` belongs in `contract/src/<m>.errors.ts`. |
 | `feature-layout` | architecture-enforcer | A server file outside the folder-and-kind grammar, or a root exporting a private repository, store or projection. |
-| `feature-app-contract` | architecture-enforcer | A module's contract is exactly one `*.api.ts` interface of callable operations named `<Feature>Api`. |
-| `feature-setup-infrastructure` | architecture-enforcer | An App factory's `FeatureSetup` declares concrete technical records, never a peer API or service capability. |
-| `feature-shape` | architecture-enforcer | A module carrying a legacy pre-ADR-133 shape fragment, against a shrink-only baseline. |
+| `feature-shape` | architecture-enforcer | A module carrying a legacy pre-ADR-133 shape fragment. |
 | `source-folder-shape` | architecture-enforcer | Folder and fragment budgets: at most 12 files in a source folder, no sub-20-line fragment only one neighbour reads. |
-| `legacy-feature-fragments` | architecture-enforcer | The remaining legacy composition, adapter, page-shell and transport fragments may only shrink. |
 | `unused-module-export` | architecture-enforcer | A name a module's `server` package exports that no file in the repository imports, the package index included. |
-| `infrastructure-member-unused` | architecture-enforcer | A member of a `<Feature>Infrastructure` interface no app, service or repository in the owning package reaches. |
 | `memory-twin-drift` | architecture-enforcer | A repository whose Prisma implementation and memory twin declare different method sets, in either direction. |
+
+`feature-app-contract` and `feature-setup-infrastructure` were retired on
+2026-09-23: they enforced the module `*App` shape ARCHITECTURE.md §15 deletes.
 
 The per-file half is the plugin, because it needs the file's classified role
 and layout version. The per-module half is architecture-enforcer, because it needs
@@ -132,3 +127,44 @@ ratchet holds the line and the count only goes down.
 `service-quality` is registered and enabled nowhere, and its duplicate-member
 half duplicates the available built-in `no-dupe-class-members`. ADR-135 records
 both facts as follow-ups.
+
+## Amendment, 2026-09-23: the boundary rules
+
+The package-and-layer-boundaries ADR (numbered 136 until its deletion on
+2026-09-18) recorded these rules and was retired in favour of
+`dev/docs/ARCHITECTURE.md`, which is the authority on the shape. The rules that
+enforce that shape are recorded here. `legacy-feature-fragments` and
+`infrastructure-member-unused` were deleted, and `feature-shape` no longer
+reads a baseline.
+
+| Rule | Layer | Meaning |
+| --- | --- | --- |
+| `langwatch/package-boundaries` | plugin | The dependency direction: apps to process or browser to contract, one module reaches another only through its contract, a browser package is closed, a kit is a leaf that fetches nothing, and a package is imported only through its `exports`. One message id per shape. |
+| `langwatch/module-layers` | plugin | Inside a module, a repository, channel, transport or service names only what its layer may: a channel takes its client, a transport names no repository, service or channel (it calls the `app` it receives), a service names no repository backend and no channel implementation. Replaces `service-dependencies`, `transport-imports-a-repository`, `repository-takes-only-its-store` and `channel-takes-only-its-client`. |
+| `langwatch/web-imports-server-shaped-value` | plugin | A browser module may not value-import a package whose declarations are the server's. |
+| `langwatch/service-does-not-open-a-channel` | plugin | A file under `services/` may not construct the event bus or a queue processor (`EventSourcing`, `mapCommands` and the other eventing runtime constructors; helpers, errors and types are free), Redis pub/sub, an HTTP client, an AWS client, a mail sender or Slack; the conduit is a channel and the service takes its interface. |
+| `langwatch/rest-route` | plugin | A REST declaration imports its schemas from its own contract, declares input and output, keeps path parameters semantic, and answers by returning or throwing, never by building a response. Replaces the six `rest-*` rules. |
+| `langwatch/no-port-vocabulary` | plugin | No `*Port` name and no `ports/` path: state is a repository, an exchange is a channel, behaviour is a service. |
+| `langwatch/legacy-monolith-path` | plugin | No `~/*`, `@app/*` or `platform/` specifier; nothing maps them any more. |
+| `langwatch/no-alias-reexport` | plugin | A name is re-exported under its own name, not an alias. |
+| `langwatch/unresolved-relative-import` | plugin | A relative import or re-export resolves to a file that exists. Was `dangling-barrel-export`. |
+| `langwatch/jsx-from-hook` | plugin | A hook returns state and callbacks, not JSX. |
+| `langwatch/signature-mirror` | plugin | A boundary signature does not mirror another type through `Parameters`/`ReturnType`; the nested-cast half is `stand-in-cast`. Was the `boundary-signature-mirrors` policy. |
+| `langwatch/enterprise-license-header` | plugin | Every `enterprise/` source file carries its licence header. Was the `enterprise-source-license` policy. |
+| `application-boundaries` | architecture-enforcer | One application may not import another's source. |
+| `cycles` | architecture-enforcer | No circular manifest dependency among workspace packages. |
+| `manifests` | architecture-enforcer | Every manifest declares an explicit `exports` map, no private or accidental entry point, no cross-application dependency. |
+| `declarations` | architecture-enforcer | A package's public `.d.ts` does not leak Prisma, application source or private repository types. |
+| `composed-exports` | architecture-enforcer | A process package does not export a factory no application entrypoint constructs. |
+| `declaration-project-references` | architecture-enforcer | Declaration-project references do not cycle, dangle, or drift from the manifest. |
+| `contract-build-config` | architecture-enforcer | A contract package's declaration build is configured, and src-only. |
+| `langwatch/transport-declares` | plugin | A transport handler reaches no raw request or response context and goes through `@langwatch/api`, validating output. Was the `api-transport-boundaries` and `api-transport-framework` policies. |
+| `service-projection-boundaries` | architecture-enforcer | A service does not depend on a collaborator exposing projection-store writes. |
+| `langwatch/eventing-role-purity` | plugin | A projection, subscriber or process manager stays inside its role: no I/O, no awaiting, no fabricated durable events. Was the `eventing-roles` policy. |
+| `architecture-records` | architecture-enforcer | Every non-application ownership root owns a boundary ADR with the required sections and at least one spec. |
+| `feature-configuration` | architecture-enforcer | Two applications do not each bind the same environment variable through their own config schema. |
+| `browser-node-leak` | architecture-enforcer | A browser-reachable package's value-import graph does not reach a Node builtin. |
+| `browser-package-closure` | architecture-enforcer | Nothing but `apps/ui` imports a module's browser package or declares it as a dependency. |
+| `browser-package-exports` | architecture-enforcer | A browser package exports `./declaration` and nothing else. |
+| `browser-kit-exports` | architecture-enforcer | A kit exports through its single `.` entry, never a subpath. |
+| `browser-kit-dependencies` | architecture-enforcer | A kit depends only on contracts, the design system and `browser-host`. |

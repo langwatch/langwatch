@@ -3,7 +3,14 @@
  * Test license fixtures - pre-generated static constants.
  * License generation logic stays in lw-saas only.
  */
-import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import {
+  type LicenseData,
+  type LicensingServerConfig,
+  CONNECT_DEFAULT_GATEWAY_ENDPOINT,
+  CONNECT_DEFAULT_LICENSE_ENDPOINT,
+} from "@langwatch/enterprise-licensing-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import { planQuantities } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -11,6 +18,15 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { LicensingApp, type LicensingInfrastructure } from "./app/licensing.app.ts";
 import { type LicenseStorage, type StoredLicense } from "./app/licensing.members.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
+
+/** Connect off, so no suite composing this app can make an outbound call. */
+export const TEST_LICENSING_CONFIG: LicensingServerConfig = {
+  publicKey: TEST_PUBLIC_KEY,
+  connectDisabled: true,
+  connectGatewayEndpoint: CONNECT_DEFAULT_GATEWAY_ENDPOINT,
+  connectLicenseEndpoint: CONNECT_DEFAULT_LICENSE_ENDPOINT,
+  connectInstanceId: void 0,
+};
 
 /**
  * Base license data template - PRO plan, for tests. The numbers are pinned
@@ -162,9 +178,9 @@ export function createTestLicensingApp(
   }),
   reportError: LicensingInfrastructure["reportError"] = () => {},
   notifyLimitReached: LicensingInfrastructure["notifyLimitReached"] = async () => {},
-): LicensingApp {
+): Promise<LicensingApp> {
   return LicensingApp.create({
-    dependencies: {},
+    dependencies: { gateway: createApiFixture<GatewayApi>() },
     members: {
       infrastructure: {
         repository: new TestLicenseStorage(),
@@ -177,8 +193,9 @@ export function createTestLicensingApp(
         reportError,
       },
       isSaas: false,
+      serviceVersion: "test",
     },
-    config: { publicKey: TEST_PUBLIC_KEY },
+    config: TEST_LICENSING_CONFIG,
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });

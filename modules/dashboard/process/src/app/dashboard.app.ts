@@ -31,6 +31,7 @@ import {
   type SavedViewPeriod,
   type SavedWorkbenchChart,
   type SavedWorkbenchChartDefinitionUpdate,
+  type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
@@ -173,6 +174,10 @@ export class DashboardApp implements DashboardApi {
   // -- dashboards ------------------------------------------------------------
 
   /** The project's dashboards, each with the number of cards its grid renders. */
+  countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCount> {
+    return this.#dashboards.countUsage(input);
+  }
+
   getAll(input: {
     projectId: string;
     graphCountScope: DashboardGraphCountScope;

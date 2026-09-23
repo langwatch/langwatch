@@ -5,8 +5,7 @@
 **Status:** Accepted
 
 **Behavioural contract:**
-[Secret sources](../../../packages/secrets/specs/secret-sources.feature),
-[the lint rule](../../../specs/tooling/lint-secrets-through-source.feature)
+[Secret sources](../../../packages/secrets/specs/secret-sources.feature)
 
 **Related:** [ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md)
@@ -167,10 +166,9 @@ implementation and one imagined one is worse than a port with two real ones.
 
 ### Guards
 
-- `langwatch/secrets-through-source` (error): a `process.env.<SECRET_KEY>` read
-  outside `packages/secrets/**`, an application config module, a process boot
-  file or a test. One baselined site, the database seeder, which derives the
-  API key pepper before any runtime boots.
+- ~~`langwatch/secrets-through-source`~~ — deleted 2026-09-23: it read an
+  empty key set and never fired. `node/no-process-env` and
+  `langwatch/environment-boundaries` keep module code off the environment.
 - A test asserting `.env` has exactly three credential writers under
   `dev/scripts`, and that each writes only the keys the registry marks for it.
 - `haven env` masks every classified key unless `--reveal`, pinned by a Go test

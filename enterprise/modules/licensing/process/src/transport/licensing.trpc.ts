@@ -28,6 +28,14 @@ export const licenseTrpcTransport = defineTrpcRouter(LicensingApi, licenseTrpc)
     planInfo: await app.uploadLicense(input),
   }))
 
+  // The code is the credential for one call to LangWatch and is never stored.
+  .procedure("activate")
+  .withPermission("organization:manage")
+  .handle(async ({ app, input }) => ({
+    success: true as const,
+    planInfo: await app.activateLicenseWithCode(input),
+  }))
+
   .procedure("remove")
   .withPermission("organization:manage")
   .handle(async ({ app, input }) => {
@@ -36,10 +44,4 @@ export const licenseTrpcTransport = defineTrpcRouter(LicensingApi, licenseTrpc)
     return { success: true as const, removed: result.removed };
   })
 
-  // `organization:manage`, because only an organization's own admins may mint a
-  // key against it. What a minted key CONTAINS, and the refusal of a term
-  // already elapsed, are the application's, so a second door cannot differ.
-  .procedure("generate")
-  .withPermission("organization:manage")
-  .handle(({ app, input }) => ({ licenseKey: app.mintLicenseKey(input) }))
   .build();

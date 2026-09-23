@@ -6,8 +6,6 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 
-import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.ts";
-import { PrismaGatewayAdapter } from "./prisma.gateway.composition.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { GatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
@@ -21,7 +19,10 @@ import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/p
 import { PrismaVirtualKeyAuthorizationRepository } from "../repositories/prisma/prisma.virtual-key-authorization.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+import {
+  GatewayScopeResolutionService,
+  type GatewayPlatformProviders,
+} from "../services/gateway-scope-resolution.service.ts";
 import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import { GatewayUsageService } from "../services/gateway-usage.service.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
@@ -41,6 +42,8 @@ import type {
   GatewayPermissionScope,
   GatewayScopePermissions,
 } from "./gateway.members.ts";
+import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.ts";
+import { PrismaGatewayAdapter } from "./prisma.gateway.composition.ts";
 
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
@@ -135,7 +138,7 @@ class GatewayAuthzScopePermissions implements GatewayScopePermissions {
   }
 }
 
-/** The four other features the gateway control plane reaches, one by one. */
+/** The other features the gateway control plane reaches, one by one. */
 export type GatewayControlPlanePeers = Readonly<{
   /** The permission service every other surface on this process authorizes with. */
   authz: AuthzApi;
@@ -145,6 +148,8 @@ export type GatewayControlPlanePeers = Readonly<{
   evaluators: EvaluatorApi;
   /** The monitors a guardrail attachment names. */
   monitors: MonitorApi;
+  /** The deployment's own providers, which a license's managed key dispatches on. */
+  platformProviders: GatewayPlatformProviders;
 }>;
 
 export type GatewayControlPlaneOptions = Readonly<{
@@ -192,6 +197,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
 
   const scopeResolution = GatewayScopeResolutionService.create({
     repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+    platformProviders: peers.platformProviders,
   });
   const changes = PrismaGatewayChangeEventsRepository.create(prisma);
   const virtualKeys = VirtualKeyService.create({
@@ -335,6 +341,11 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
       virtualKeyAuthorization.assertActorCanManageAllScopes(
         { permissions, actor: gatewayVirtualKeyActor(actor) },
         [...scopes],
+      ),
+    assertCanCreateScopes: ({ actor, scopes, callerProjectId }) =>
+      virtualKeyAuthorization.assertActorCanCreateScopes(
+        { permissions, actor: gatewayVirtualKeyActor(actor) },
+        { scopes: [...scopes], callerProjectId },
       ),
     assertCanOperateOnAnyScope: ({ actor, scopes, permission }) =>
       virtualKeyAuthorization.assertActorCanOperateOnAnyScope(

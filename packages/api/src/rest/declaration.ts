@@ -154,7 +154,13 @@ export type RestDeprecation = Readonly<{
  */
 export type RestDoorCredential = Extract<
   Credential,
-  "project" | "organization" | "scimToken" | "internalSecret" | "instance-admin" | "browser"
+  | "project"
+  | "organization"
+  | "apiKey"
+  | "scimToken"
+  | "internalSecret"
+  | "instance-admin"
+  | "browser"
 >;
 
 /**
@@ -165,6 +171,7 @@ export type RestDoorCredential = Extract<
 export const DOOR_SCOPE_TIER = {
   project: "project",
   organization: "organization",
+  apiKey: "organization",
   scimToken: "organization",
   browser: null,
   internalSecret: null,

@@ -1,12 +1,17 @@
 /** Input schemas for the `user.*` tRPC surface. Secrets never stored here. */
 import { z } from "zod";
 
+import { userProfileNameSchema } from "./user.ts";
+
 /**
  * The procedures that take no arguments still declare a parser, because tRPC
  * appends the input middleware where `.input()` is called and the process's
  * policy is applied after it.
  */
 export const userApiEmptyInputSchema = z.object({});
+
+/** A blank name is refused here, not trimmed down to nothing and stored. */
+export const userApiUpdateNameInputSchema = z.object({ name: userProfileNameSchema });
 
 export const userApiRegisterInputSchema = z.object({
   // Optional: the front door does not ask. Onboarding does, in a place

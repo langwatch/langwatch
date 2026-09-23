@@ -136,6 +136,8 @@ export type LangyApiMap = {
   dataset: { getAll: QL; getById: Q };
   prompts: { getAllPromptsForProject: QL; getByIdOrHandle: Q };
   experiments: { getAllByProjectId: QL; getExperimentBySlug: Q };
+  /** The one-time reveal the secret snippet card spends; a mutation, since reading destroys it. */
+  secrets: { revealOnce: M };
 };
 
 /** What each procedure in the map takes. */

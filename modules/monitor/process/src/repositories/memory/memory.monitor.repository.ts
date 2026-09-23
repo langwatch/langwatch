@@ -21,6 +21,7 @@ import {
   type MonitorToggleInput,
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
+  type MonitorUsageCount,
 } from "@langwatch/monitor-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -36,6 +37,21 @@ export class MemoryMonitorRepository implements MonitorRepository {
 
   static create(): MemoryMonitorRepository {
     return new MemoryMonitorRepository();
+  }
+
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<MonitorUsageCount> {
+    const rows = this.#rows.filter((row) => projectIds.includes(row.projectId));
+    const made = rows.map((row) => row.createdAt.getTime());
+    return {
+      monitors: made.filter((at) => since === undefined || at >= since).length,
+      ...(made.length === 0 ? {} : { firstMonitorAt: Math.min(...made) }),
+    };
   }
 
   /** Seeds a row the way a fixture or a contract test needs it to already exist. */

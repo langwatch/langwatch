@@ -33,7 +33,8 @@ export function buildLangyProcessEventView(
     outcome:
       event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED ? event.data.outcome : null,
     titleTouched:
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED &&
+      (event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED ||
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED) &&
       typeof event.data.title === "string",
   };
 }
@@ -139,6 +140,13 @@ export const handleMetadataUpdated: LangyHandler = (state, payload) => {
   return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.USER } };
 };
 
+/** A title chosen at creation (a fork, the guided kickoff) is as sticky as a rename. */
+export const handleConversationStarted: LangyHandler = (state, payload) => {
+  const view = langyProcessEventViewSchema.parse(payload);
+  if (!view.titleTouched) return { state };
+  return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.USER } };
+};
+
 export const handleTitleGenerated: LangyHandler = (state) => {
   if (state.titleSource === LANGY_TITLE_SOURCE.USER) return { state };
   return { state: { ...state, titleSource: LANGY_TITLE_SOURCE.AUTO } };
@@ -199,7 +207,7 @@ export function langyConversationProcess(
       .on(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED, handleTitleGenerated)
       .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING, handleHandoffPending)
       .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED, handleHandoffConsumed)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED, handleNoDecision)
+      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED, handleConversationStarted)
       .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED, handleNoDecision)
       .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED, handleNoDecision)
       .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED, handleNoDecision)

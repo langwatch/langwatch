@@ -1,9 +1,10 @@
 /**
- * The real PostHog channel: one client, shared across every call this
- * process makes. `key`/`host` are plain config, not a secret — the browser
- * ships the same project key. @see specs/features/onboarding/guided-onboarding-variant.feature
+ * The real PostHog channel: one client, built on the first send from ops'
+ * product-analytics target, never at construction. No target, no client and
+ * no send. @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import { createLogger } from "@langwatch/observability";
+import type { ProductAnalyticsTarget } from "@langwatch/ops-contract";
 import { PostHog } from "posthog-node";
 
 import type { PostHogEventInput, PostHogEventsChannel } from "../posthog-events.channel.ts";
@@ -11,28 +12,37 @@ import type { PostHogEventInput, PostHogEventsChannel } from "../posthog-events.
 const logger = createLogger("langwatch:onboarding:posthog");
 
 export interface HttpPostHogEventsOptions {
-  readonly key: string;
-  readonly host?: string;
+  readonly targets: () => ProductAnalyticsTarget[];
 }
 
 export class HttpPostHogEventsChannel implements PostHogEventsChannel {
-  private constructor(private readonly client: PostHog) {}
+  #clients: PostHog[] | undefined;
+
+  private constructor(private readonly targets: () => ProductAnalyticsTarget[]) {}
 
   static create(options: HttpPostHogEventsOptions): HttpPostHogEventsChannel {
-    return new HttpPostHogEventsChannel(
-      new PostHog(options.key, options.host ? { host: options.host } : {}),
-    );
+    return new HttpPostHogEventsChannel(options.targets);
   }
 
   track({ userId, event, properties }: PostHogEventInput): void {
     try {
-      this.client.capture({ distinctId: userId, event, properties });
+      for (const client of this.clients()) {
+        client.capture({ distinctId: userId, event, properties });
+      }
     } catch (error) {
       logger.warn({ error, event }, "guided onboarding event did not reach PostHog");
     }
   }
 
   async close(): Promise<void> {
-    await this.client.shutdown();
+    await Promise.all((this.#clients ?? []).map((client) => client.shutdown()));
+  }
+
+  private clients(): PostHog[] {
+    this.#clients ??= this.targets().map(
+      (target) => new PostHog(target.key, target.host ? { host: target.host } : {}),
+    );
+
+    return this.#clients;
   }
 }

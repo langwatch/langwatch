@@ -36,6 +36,7 @@ import {
   type MonitorToggleInput,
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
+  type MonitorUsageCount,
 } from "@langwatch/monitor-contract";
 import { nowInstant } from "@langwatch/time";
 import { ZodError } from "zod";
@@ -102,6 +103,7 @@ export class MonitorApp implements MonitorApi {
   static readonly reads = ["monitor"] as const;
 
   #monitors: MonitorService;
+  #usage: MonitorRepositories["monitors"];
   #catalogue: MonitorCatalogService;
   #permissions: AuthzApi;
   #performance: MonitorPerformance;
@@ -120,6 +122,7 @@ export class MonitorApp implements MonitorApi {
       generateId: members.generateId,
     });
     this.#catalogue = MonitorCatalogService.create({ repository: repositories.monitors });
+    this.#usage = repositories.monitors;
     this.#permissions = dependencies.permissions;
     this.#performance = members.performance;
     this.#replication = members.replication;
@@ -405,6 +408,10 @@ export class MonitorApp implements MonitorApi {
    * The platform's own address for one monitor resource. A deployment that
    * serves this family but named no public origin refuses by name.
    */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<MonitorUsageCount> {
+    return this.#usage.countUsage(input);
+  }
+
   platformUrl(input: { projectSlug: string; path: string }): string {
     if (this.#publicBaseUrl === undefined) {
       throw new Error(

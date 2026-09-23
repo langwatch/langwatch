@@ -21,6 +21,9 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
@@ -48,6 +51,9 @@
       "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/gateway/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -69,6 +75,9 @@
       "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/ops/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
@@ -88,6 +97,9 @@
     },
     {
       "path": "../../../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/vitest-config/tsconfig.build.json"

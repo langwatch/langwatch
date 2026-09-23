@@ -1,3 +1,5 @@
+import type { TraceUsageCount } from "@langwatch/trace-contract";
+
 import { TraceExistenceRepository } from "../read/trace-existence.repository.ts";
 import type { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 
@@ -23,5 +25,21 @@ export class MemoryTraceExistenceRepository extends TraceExistenceRepository {
     traceIds: readonly string[];
   }): Promise<string[]> {
     return this.#store.findTraceIds({ tenantId: input.projectId, traceIds: input.traceIds });
+  }
+
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<TraceUsageCount> {
+    const spans = this.#store
+      .findByTenants({ tenantIds: projectIds })
+      .filter((span) => since === undefined || span.startTimeUnixMs >= since);
+    return {
+      traces: new Set(spans.map((span) => `${span.tenantId}/${span.traceId}`)).size,
+      spans: spans.length,
+    };
   }
 }

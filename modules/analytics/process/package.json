@@ -28,7 +28,10 @@
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "generate:lwql-columns-manifest": "node --experimental-transform-types scripts/generate-lwql-columns-manifest.ts",
+    "generate:lwql-prisma-manifest": "node --experimental-transform-types scripts/generate-lwql-prisma-manifest.ts",
+    "generate:query-reference-fixture": "node --experimental-transform-types scripts/generate-query-reference-fixture.ts"
   },
   "dependencies": {
     "@clickhouse/client": "catalog:",

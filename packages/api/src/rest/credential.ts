@@ -229,9 +229,24 @@ export type RestResolvedScimCredential = Readonly<{
   connectionId: string | null;
 }>;
 
+/**
+ * What the key door resolved (#8085): a legacy project key IS its project; any other key reaches
+ * its organization, and names the project it resolved to when the request selected one.
+ */
+export type RestKeyCredentialPrincipal =
+  | Readonly<{ kind: "project"; projectId: string }>
+  | Readonly<{
+      kind: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+      resolvedProject?: Readonly<{ id: string; teamId: string }>;
+    }>;
+
 const projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
 const organizationCredentials = new WeakMap<Request, RestResolvedOrganizationCredential>();
 const scimCredentials = new WeakMap<Request, RestResolvedScimCredential>();
+const keyCredentials = new WeakMap<Request, RestKeyCredentialPrincipal>();
 const browserCallers = new WeakMap<Request, RestBrowserCaller>();
 
 /** The project door states what it resolved, once per request. */
@@ -256,6 +271,14 @@ export function recordScimCredential(
   credential: RestResolvedScimCredential,
 ): void {
   scimCredentials.set(request, credential);
+}
+
+/** The key door states what it resolved, once per request. */
+export function recordKeyCredential(
+  request: Request,
+  credential: RestKeyCredentialPrincipal,
+): void {
+  keyCredentials.set(request, credential);
 }
 
 /** The byte door states who it verified, once per request. */
@@ -288,6 +311,19 @@ export function organizationCredentialOfRequest(
   if (!credential) {
     throw new Error(
       "A module bound a fact from the organization credential, and this request's door resolved none",
+    );
+  }
+
+  return credential;
+}
+
+/** The same, for the key door. */
+export function keyCredentialOfRequest(request: Request): RestKeyCredentialPrincipal {
+  const credential = keyCredentials.get(request);
+
+  if (!credential) {
+    throw new Error(
+      "A module bound a fact from the key credential, and this request's door resolved none",
     );
   }
 

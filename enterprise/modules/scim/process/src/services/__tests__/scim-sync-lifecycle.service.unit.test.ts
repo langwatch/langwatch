@@ -62,6 +62,7 @@ function statingGuards(): ScimSyncLifecycleGuards {
     recordScimUserPush: async (data) => fact(data),
     recordScimGroupMapping: async (data) => fact(data),
     recordScimApplyFailure: async (data) => fact(data),
+    redriveScimApply: async (data) => fact(data),
     revokeScimSync: async (data) => fact(data),
   };
 }
@@ -73,6 +74,7 @@ function quietGuards(): ScimSyncLifecycleGuards {
     recordScimUserPush: async () => [],
     recordScimGroupMapping: async () => [],
     recordScimApplyFailure: async () => [],
+    redriveScimApply: async () => [],
     revokeScimSync: async () => [],
   };
 }

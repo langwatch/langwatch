@@ -27,16 +27,6 @@ export const roleBindingRestSchema = z.object({
 });
 export type RoleBindingRest = z.infer<typeof roleBindingRestSchema>;
 
-export const roleBindingRestCreatedSchema = roleBindingRestSchema.extend({
-  /**
-   * Present (true) only when this is the user's first explicit binding and
-   * their access so far derived from legacy team membership, which this
-   * write switches off. Informative, never blocking.
-   */
-  hasLegacyAccessNotice: z.boolean().optional(),
-});
-export type RoleBindingRestCreated = z.infer<typeof roleBindingRestCreatedSchema>;
-
 export const roleBindingRestListQuerySchema = z.object({
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),

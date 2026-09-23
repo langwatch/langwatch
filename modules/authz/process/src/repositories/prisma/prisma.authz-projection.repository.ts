@@ -300,7 +300,7 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
   private statementFor(write: GrantProjectionWrite): Promise<unknown> {
     switch (write.kind) {
       case "grant.upsert":
-        return this.upsertGrant(write.row);
+        return this.upsertGrant(write.row, write.membershipStamp, write.membershipBootstrap);
 
       case "grant.setRole":
         return this.prisma.grant.updateMany({
@@ -355,15 +355,27 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
     }
   }
 
-  // Guarded upsert with trailing WHERE; redelivered attach must not un-revoke.
-  private upsertGrant(row: GrantRow): Promise<number> {
+  /**
+   * Guarded upsert with trailing WHERE; redelivered attach must not un-revoke.
+   * The leading WHERE is the membership fence: a USER grant only enters while
+   * the lifetime it was stamped against is still the live one.
+   */
+  private upsertGrant(
+    row: GrantRow,
+    membershipStamp: string | undefined,
+    membershipBootstrap: boolean | undefined,
+  ): Promise<number> {
+    const stamp = membershipStamp ?? null;
+    const bootstrapScopeIsAllowed =
+      row.scopeType === "TEAM" ||
+      (row.scopeType === "ORGANIZATION" && row.scopeId === row.organizationId);
     return this.prisma.$executeRaw`
       INSERT INTO "Grant" (
         "id", "organizationId", "principalType", "principalId", "roleKey",
         "legacyRole", "source", "scopeType", "scopeId", "token", "permission",
         "resourceKind", "projectId", "createdByUserId", "expiresAt",
         "maxViews", "occurredAt", "updatedAt"
-      ) VALUES (
+      ) SELECT
         ${row.id}, ${row.organizationId},
         ${row.principalType}::"GrantPrincipalType", ${row.principalId},
         ${row.roleKey}, ${row.legacyRole}, ${row.source},
@@ -371,6 +383,25 @@ export class PrismaAuthzProjectionRepository extends GrantProjectionWriteStore {
         ${row.permission}, ${row.resourceKind}, ${row.projectId},
         ${row.createdByUserId}, ${row.expiresAt ? toDate(row.expiresAt) : null}, ${row.maxViews},
         ${toDate(row.occurredAt)}, NOW()
+      WHERE (
+        ${stamp}::text IS NULL
+        OR ${row.principalType}::text <> 'USER'
+        OR EXISTS (
+          SELECT 1
+          FROM "OrganizationUser"
+          WHERE "organizationId" = ${row.organizationId}
+            AND "userId" = ${row.principalId}
+            AND "membershipStamp" = ${stamp}::text
+          FOR UPDATE
+        )
+        OR (
+          ${membershipBootstrap ?? false}::boolean
+          AND ${row.roleKey === "admin"}::boolean
+          AND ${bootstrapScopeIsAllowed}::boolean
+          AND NOT EXISTS (
+            SELECT 1 FROM "Organization" WHERE "id" = ${row.organizationId}
+          )
+        )
       )
       ON CONFLICT ("id") DO UPDATE SET
         "organizationId"  = EXCLUDED."organizationId",

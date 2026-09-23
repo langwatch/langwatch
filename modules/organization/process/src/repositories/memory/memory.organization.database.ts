@@ -1,4 +1,5 @@
 import type {
+  JoinRequestJoining,
   OrganizationIntent,
   OrganizationUserRole,
   PersonalFeatures,
@@ -22,6 +23,9 @@ export interface MemoryOrganizationRow {
   /** Every sign-up answer the organization carries, guided onboarding among
    *  them. Shapeless here for the reason it is shapeless in Postgres. */
   signupData?: Record<string, unknown> | null;
+  /** How colleagues on a matching domain get in; absent reads as asking. */
+  domainJoin?: JoinRequestJoining["domainJoin"];
+  joinDomains?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -132,6 +136,8 @@ export interface MemoryGroupRow {
  */
 export class MemoryOrganizationDatabase {
   readonly organizations = new Map<string, MemoryOrganizationRow>();
+  /** Organizations marked as a self-hosted licence customer. */
+  readonly selfHostedCustomers = new Set<string>();
   readonly teams = new Map<string, MemoryTeamRow>();
   readonly organizationUsers: MemoryOrganizationUserRow[] = [];
   readonly projects = new Map<string, MemoryProjectRow>();

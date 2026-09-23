@@ -8,14 +8,6 @@ import {
   type ReplayStatus,
 } from "@langwatch/ops-contract";
 
-import type { UsageStatsOrganization, UsageStatsProjectCounts } from "../../app/ops.app.ts";
-
-/** One organization's ClickHouse-backed counts, keyed by organization id. */
-export interface MemoryUsageStatsClickHouseCounts {
-  traceCount: number;
-  scenarioRunCount: number;
-}
-
 /** One event as the in-memory event log keeps it, with the columns the explorer reads by. */
 export interface MemoryEventRow {
   eventId: string;
@@ -77,12 +69,6 @@ export class MemoryOpsStore {
   /** The operator trails, newest act last. */
   readonly processAudit: ProcessAuditEntryView[] = [];
   readonly schedulerAudit: SchedulerAuditEntryView[] = [];
-  /** Organizations the usage-stats worker reports on. */
-  readonly usageStatsOrganizations: UsageStatsOrganization[] = [];
-  /** Per-organization project counts, keyed by organization id. */
-  readonly usageStatsProjectCounts = new Map<string, UsageStatsProjectCounts>();
-  /** Per-organization ClickHouse counts, keyed by organization id. */
-  readonly usageStatsClickHouseCounts = new Map<string, MemoryUsageStatsClickHouseCounts>();
   replayStatus: ReplayStatus = { ...IDLE_STATUS };
   replayLockHolder: string | null = null;
   replayCancelled = false;

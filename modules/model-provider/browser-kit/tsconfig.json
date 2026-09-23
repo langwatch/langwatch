@@ -6,6 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "jsx": "react-jsx",
     "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
   },

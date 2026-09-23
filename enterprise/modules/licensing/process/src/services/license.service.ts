@@ -21,6 +21,7 @@ import type {
   LicenseUsage,
   LicenseStorage,
 } from "../app/licensing.members.ts";
+import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicenseRetentionConfiguration = {
@@ -56,6 +57,8 @@ export type LicenseServiceOptions = {
   retention?: LicenseRetention;
   logger?: LicenseLogger;
   configuration?: LicenseServiceConfiguration;
+  /** `LANGWATCH_LICENSE_KEY`, which licensing alone claims; absent where none is set. */
+  instanceLicenseKey?: string | undefined;
 };
 
 type LicenseResourceCounts = {
@@ -81,11 +84,14 @@ export class LicenseService extends LicensingServiceContract {
    * the same service directly over the licence read alone.
    */
   private readonly plans: LicensePlanSourceService;
+  private platformSsoGate: Promise<boolean> | undefined;
+  private readonly instanceLicenseKey: string | undefined;
 
   private constructor(options: LicenseServiceOptions) {
     super();
     this.repository = options.repository;
     this.cryptography = options.cryptography;
+    this.instanceLicenseKey = options.instanceLicenseKey;
     this.plans = LicensePlanSourceService.create({
       licenses: options.repository,
       cryptography: options.cryptography,
@@ -100,12 +106,10 @@ export class LicenseService extends LicensingServiceContract {
     return new LicenseService(options);
   }
 
-  async inspectPlatformAccess(input: {
-    instanceLicenseKey?: string | undefined;
-  }): Promise<PlatformLicenseAccess> {
+  async inspectPlatformAccess(): Promise<PlatformLicenseAccess> {
     const inspections: PlatformLicenseInspection[] = [];
-    if (input.instanceLicenseKey) {
-      const inspection = this.inspectPlatformLicense(input.instanceLicenseKey, {
+    if (this.instanceLicenseKey) {
+      const inspection = this.inspectPlatformLicense(this.instanceLicenseKey, {
         source: "instance",
       });
       inspections.push(inspection);
@@ -127,6 +131,30 @@ export class LicenseService extends LicensingServiceContract {
     }
 
     return { allowed: false, inspections };
+  }
+
+  /**
+   * Whether a signed license anywhere on this deployment permits platform single
+   * sign-on. Decided once per process; a failed scan is not remembered (ADR-027).
+   */
+  async isPlatformSsoLicensed({ isSaas }: { isSaas: boolean }): Promise<boolean> {
+    if (isSaas) return true;
+    this.platformSsoGate ??= this.inspectPlatformAccess().then(
+      (access) => access.allowed,
+      (error: unknown) => {
+        this.platformSsoGate = undefined;
+        throw error;
+      },
+    );
+    try {
+      return await this.platformSsoGate;
+    } catch (error) {
+      this.logger.error(
+        { error },
+        "the platform single sign-on license scan failed; denying for now",
+      );
+      return false;
+    }
   }
 
   async getActivePlan(organizationId: string): Promise<PlanInfo> {
@@ -189,6 +217,7 @@ export class LicenseService extends LicensingServiceContract {
         planName: validation.licenseData.plan.name,
         expiresAt: validation.licenseData.expiresAt,
         organizationName: validation.licenseData.organizationName,
+        connected: connectServicesNamedBy(validation.licenseData.connectServices).length > 0,
         ...(await this.getResourceCounts(organizationId, validation.licenseData.plan)),
       };
     }

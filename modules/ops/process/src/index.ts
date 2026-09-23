@@ -43,12 +43,7 @@ export {
   type StorageStatsInstance,
 } from "./services/storage-stats-collection.service.ts";
 export type { QueuePayloadDecoder } from "./app/ops.app.ts";
-export type {
-  UsageStatsErrorReporter,
-  UsageStatsTelemetryClient,
-  UsageStatsWorkerDatabase,
-} from "./app/ops.app.ts";
-export type { OpsWorker, OpsWorkerHandle, UsageStatsWorkerConfig } from "./app/ops.app.ts";
+export type { OpsWorker, OpsWorkerHandle } from "./app/ops.app.ts";
 
 /** The operations explorers and the replay runner, moved off the application. */
 export type {

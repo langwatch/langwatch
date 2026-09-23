@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Pins which of the two things Save does: one piece of state — which chart
  * is open — decides overwrite vs duplicate. Only the tRPC client is faked.
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { act, renderHook } from "@testing-library/react";

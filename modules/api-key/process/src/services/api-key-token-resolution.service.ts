@@ -16,6 +16,7 @@ import type { ProjectIdentity } from "@langwatch/project-contract";
 import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 function publicApiKey(row: StoredApiKey): ApiKey {
@@ -57,10 +58,14 @@ export class ApiKeyTokenResolutionService {
     return new ApiKeyTokenResolutionService(options.repository, options);
   }
 
+  private readonly bindings: ApiKeyBindingsService;
+
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
-  ) {}
+  ) {
+    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+  }
 
   async findVerifiedToken({
     token,
@@ -98,9 +103,10 @@ export class ApiKeyTokenResolutionService {
         .catch(() => void 0);
     }
 
-    this.options.legacyGrants.mint(publicApiKey(row));
+    const key = publicApiKey(await this.bindings.attachOne(row));
+    this.options.legacyGrants.mint(key);
 
-    return { ...publicApiKey(row), tokenType: "apiKey" };
+    return { ...key, tokenType: "apiKey" };
   }
 
   async findResolvedToken(input: {

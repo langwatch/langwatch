@@ -45,6 +45,7 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "better-auth": "catalog:",

@@ -36,6 +36,21 @@ describe("public application configuration projection", () => {
     expect(config).not.toHaveProperty("RESEND_API_KEY");
   });
 
+  it("hands the browser HIDE_DEV_INDICATOR only when it is switched on", () => {
+    const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
+
+    expect(resolvePublicAppConfig({ ...base, HIDE_DEV_INDICATOR: "1" })).toMatchObject({
+      hideDevIndicator: true,
+    });
+    expect(resolvePublicAppConfig({ ...base, HIDE_DEV_INDICATOR: "true" })).toMatchObject({
+      hideDevIndicator: true,
+    });
+    expect(resolvePublicAppConfig({ ...base, HIDE_DEV_INDICATOR: "false" })).not.toHaveProperty(
+      "hideDevIndicator",
+    );
+    expect(resolvePublicAppConfig(base)).not.toHaveProperty("hideDevIndicator");
+  });
+
   it("retains the gateway public-url, legacy-url, and deployment-default precedence", () => {
     expect(
       resolveGatewayBaseUrl({

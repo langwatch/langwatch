@@ -177,6 +177,20 @@ function makeQueryInput(
  *  own mapping (id -> name remap, ProjectedAnnotation shape) is exercised
  *  against canned rows instead of a real join. */
 class FakeAnnotationService implements AnnotationApi {
+  countUsage(): Promise<{
+    annotations: number;
+    annotationQueues: number;
+    annotationQueueItems: number;
+    annotationScores: number;
+  }> {
+    return Promise.resolve({
+      annotations: 0,
+      annotationQueues: 0,
+      annotationQueueItems: 0,
+      annotationScores: 0,
+    });
+  }
+
   createUnattributed(): never {
     throw new Error("Not used by projection search tests: createUnattributed.");
   }

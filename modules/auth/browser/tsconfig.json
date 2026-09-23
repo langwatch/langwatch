@@ -58,6 +58,9 @@
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
+      "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {

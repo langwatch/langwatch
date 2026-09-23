@@ -5,11 +5,13 @@
 
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type {
+  licenseRegistryTrpc,
   opsDashboardTrpc,
   opsEventLogTrpc,
   opsPlatformTrpc,
   opsProcessTrpc,
   opsQueueTrpc,
+  selfHostedInstancesTrpc,
 } from "@langwatch/ops-contract";
 import type { promptTrpc } from "@langwatch/prompt-contract";
 import type { TimeInput } from "@langwatch/time";
@@ -158,6 +160,8 @@ export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsPlatformTrpc> &
   ContractApiMap<typeof opsProcessTrpc> &
   ContractApiMap<typeof opsQueueTrpc> &
+  ContractApiMap<typeof licenseRegistryTrpc> &
+  ContractApiMap<typeof selfHostedInstancesTrpc> &
   ContractApiMap<typeof promptTrpc> &
   BorrowedProcedures;
 

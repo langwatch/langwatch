@@ -2,11 +2,12 @@ import {
   BILLING_REPORT_COMMAND_TYPES,
   reportUsageForMonthCommandDataSchema,
   type ReportUsageForMonthCommandData,
+  type UsageBillingContract,
 } from "@langwatch/enterprise-billing-contract";
 import type { Command, CommandHandler, Event } from "@langwatch/eventing";
 import { defineCommandSchema } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { BillingCheckpointRepository } from "../repositories/billing-checkpoint.repository.ts";
 import type { BillingOrganizationCache } from "../repositories/organization/billing-organization-cache.repository.ts";
@@ -16,9 +17,10 @@ import {
   instantEvalMeterUnitsToUsd,
   INSTANT_EVAL_USD_EVENT_NAME,
 } from "../rules/instant-eval-meter.rules.ts";
-import type {
+import { meterEventTimestampSeconds } from "../rules/meter-event-timestamp.rules.ts";
+import {
   BillableEventsQueryService,
-  BillableEventsTotalResult,
+  type BillableEventsTotalResult,
 } from "../services/billable-events-query.service.ts";
 import type { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import type { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
@@ -36,6 +38,12 @@ export const BILLABLE_EVENTS_EVENT_NAME = "langwatch_billable_events";
  */
 interface BillingMeter {
   readonly eventName: string;
+  /** The most this month may report for a capped contract, or null for no cap. */
+  readonly ceiling: (args: {
+    organizationId: string;
+    billingMonth: string;
+    contract: UsageBillingContract;
+  }) => Promise<number | null>;
   /** The month's running total in the meter's own integer unit. */
   readonly queryTotal: (args: {
     organizationId: string;
@@ -76,6 +84,15 @@ export interface ReportUsageForMonthCommandDeps {
   organizationCache: BillingOrganizationCache;
   /** Where an unexpected failure in this handler is reported. */
   errorReporter: BillingErrorReporter;
+  /**
+   * The most hosted usage a connected customer's month may report, or null.
+   * The gateway's 60 second budget refresh lets the ledger run past the
+   * commit, and the credit grant covers the commit exactly (ADR-156 §7).
+   */
+  connectedUsageCeiling: (input: {
+    organizationId: string;
+    billingMonth: string;
+  }) => Promise<number | null>;
 }
 
 const SCHEMA = defineCommandSchema(
@@ -103,6 +120,61 @@ function billableEventsIdentifier({
   return `${organizationId}:${billingMonth}:from:${lastReportedTotal}:to:${targetTotal}`;
 }
 
+/** When the billing month ended, in epoch milliseconds. */
+function billingMonthEndMs(billingMonth: string): number {
+  const [, end] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+
+  return Temporal.Instant.from(`${end.replace(" ", "T")}Z`).epochMilliseconds;
+}
+
+/**
+ * A Cloud customer is invoiced monthly, so its events stay at the time of
+ * reporting rather than behind a closed period. A connected customer is
+ * invoiced quarterly (ADR-156 §7), so the month is open and dated there.
+ */
+function meterTimestampFor({
+  contract,
+  billingMonth,
+  nowMs,
+}: {
+  contract: UsageBillingContract;
+  billingMonth: string;
+  nowMs: number;
+}): number {
+  return meterEventTimestampSeconds({
+    periodEndMs: contract === "connected" ? billingMonthEndMs(billingMonth) : nowMs,
+    nowMs,
+  });
+}
+
+/**
+ * The total the month reports, never above what the contract agreed. A total
+ * past the ceiling is the gateway's 60 second refresh letting spend overshoot
+ * the budget; the ledger keeps the real figure, the invoice the agreed one.
+ */
+function totalWithinContractCeiling({
+  measured,
+  ceiling,
+  organizationId,
+  billingMonth,
+  meter,
+}: {
+  measured: number;
+  ceiling: number | null;
+  organizationId: string;
+  billingMonth: string;
+  meter: BillingMeter;
+}): number {
+  if (ceiling === null || measured <= ceiling) return measured;
+
+  logger.info(
+    { organizationId, billingMonth, meter: meter.eventName, measured, ceiling },
+    "hosted usage ran past the contract ceiling; reporting the ceiling",
+  );
+
+  return ceiling;
+}
+
 /**
  * Reports usage to Stripe via two-phase checkpoints and self-dispatch convergence.
  * Handles all errors internally; framework sees every job as successful.
@@ -123,12 +195,15 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     this.meters = [
       {
         eventName: BILLABLE_EVENTS_EVENT_NAME,
+        ceiling: async () => null,
         queryTotal: (args) => deps.queryBillableEventsTotal(args),
         toValue: (delta) => delta,
         identifier: billableEventsIdentifier,
       },
       {
         eventName: INSTANT_EVAL_USD_EVENT_NAME,
+        ceiling: ({ contract, ...args }) =>
+          contract === "connected" ? deps.connectedUsageCeiling(args) : Promise.resolve(null),
         queryTotal: (args) => deps.queryInstantEvalSpendTotal(args),
         toValue: instantEvalMeterUnitsToUsd,
         identifier: instantEvalMeterIdentifier,
@@ -206,6 +281,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
             organizationId,
             billingMonth,
             stripeCustomerId: org.stripeCustomerId,
+            contract: org.contract,
           })) || shouldSelfDispatch;
       }
     } catch (error) {
@@ -245,6 +321,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
+    contract: UsageBillingContract;
   }): Promise<boolean> {
     try {
       return await this.reportForBillingMonth(input);
@@ -279,11 +356,13 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     organizationId,
     billingMonth,
     stripeCustomerId,
+    contract,
   }: {
     meter: BillingMeter;
     organizationId: string;
     billingMonth: string;
     stripeCustomerId: string;
+    contract: UsageBillingContract;
   }): Promise<boolean> {
     const checkpoint = await this.deps.billingCheckpoints.findCheckpoint({
       organizationId,
@@ -326,7 +405,13 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         return false;
       }
 
-      const currentTotal = totalResult.total;
+      const currentTotal = totalWithinContractCeiling({
+        measured: totalResult.total,
+        ceiling: await meter.ceiling({ organizationId, billingMonth, contract }),
+        organizationId,
+        billingMonth,
+        meter,
+      });
 
       if (currentTotal <= lastReportedTotal) {
         logger.debug(
@@ -387,7 +472,11 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
           {
             eventName: meter.eventName,
             identifier,
-            timestamp: Math.floor(nowInstant().epochMilliseconds / 1000),
+            timestamp: meterTimestampFor({
+              contract,
+              billingMonth,
+              nowMs: nowInstant().epochMilliseconds,
+            }),
             value: meter.toValue(delta),
           },
         ],

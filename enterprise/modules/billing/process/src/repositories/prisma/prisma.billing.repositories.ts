@@ -8,6 +8,7 @@ import { PrismaBillingCheckpointRepository } from "./prisma.billing-checkpoint.r
 import { PrismaBillingReportOrganizationRepository } from "./prisma.billing-report-organization.repository.ts";
 import { PrismaBillingWebhookOrganizationRepository } from "./prisma.billing-webhook-organization.repository.ts";
 import { PrismaBillingWebhookBillingSubscription } from "./prisma.billing-webhook-subscription.repository.ts";
+import { PrismaConnectedBillingRepository } from "./prisma.connected-billing.repository.ts";
 import { PrismaDuplicateSubscriptionsReportRepository } from "./prisma.duplicate-subscriptions-report.repository.ts";
 import { PrismaNurturingProfileRepository } from "./prisma.nurturing-profile.repository.ts";
 import { PrismaOrganizationPricingRepository } from "./prisma.organization-pricing.repository.ts";
@@ -29,6 +30,7 @@ export class PostgresBillingRepositories {
 
     return {
       checkpoints: PrismaBillingCheckpointRepository.create(prisma),
+      connectedBilling: PrismaConnectedBillingRepository.create(prisma),
       duplicateSubscriptionsReports: PrismaDuplicateSubscriptionsReportRepository.create({
         database: prisma,
       }),

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * `GatewayApp.findSpendEventsPage`: ledger read, filter/cursor passthrough,
@@ -6,6 +7,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -94,15 +96,21 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       monitors: peer("monitors"),
       organizations: peer("organizations"),
       featureFlags: peer("featureFlags"),
+      modelProviders: peer("modelProviders"),
     },
     members: {
       prisma: fakePrisma(),
       clickhouse: fakeClickHouse(),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
+      encryption: createApiFixture<Encryption>(),
     },
     config: {
       spendSettlementGraceMs: void 0,
+      internalUrl: void 0,
+      controlPlaneUrl: void 0,
+      baseUrl: undefined,
+      publicUrl: undefined,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

@@ -46,7 +46,7 @@ export function isWithinRolloutPercentage({
   subject: string | undefined;
   percentage: number;
 }): boolean {
-  if (subject === undefined) return false;
+  if (!subject || !flagKey) return false;
   if (percentage <= 0) return false;
   if (percentage >= 100) return true;
 

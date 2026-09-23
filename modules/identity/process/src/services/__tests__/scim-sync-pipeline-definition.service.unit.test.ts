@@ -19,7 +19,12 @@ const T0 = 1_690_000_000_000;
 
 function guardsOver(state: ScimSyncState | null) {
   return ScimSyncGuardsService.create({
-    syncs: { tryFindSync: async () => state, findForOrganization: async () => [] },
+    syncs: {
+      tryFindSync: async () => state,
+      findForOrganization: async () => [],
+      findPageForOperator: async () => ({ syncs: [], total: 0 }),
+      findByConnectionForOperator: async () => [],
+    },
   });
 }
 

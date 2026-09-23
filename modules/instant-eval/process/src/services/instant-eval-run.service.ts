@@ -5,6 +5,7 @@
  */
 
 import type { LangWatchQLRunCaller } from "@langwatch/analytics-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   type InstantEvalActor,
   type InstantEvalJudgmentStatus,
@@ -14,6 +15,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
+import type { LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 
 import type { InstantEvalJudgmentPage } from "../repositories/instant-eval-judgments.repository.ts";
 import type { InstantEvalRunRow } from "../repositories/instant-eval-run.repository.ts";
@@ -61,9 +63,15 @@ export interface InstantEvalRunPeers {
   /** The database the LangWatchQL views live in. */
   database(): string;
   /**
-   * The trace ids a target's filter selects, through the explorer's own
-   * compiler, capped at the run's row limit. Absent where none is wired, and
-   * a filtered target is refused rather than judged unfiltered.
+   * A target's filter compiled against the LangWatchQL trace view, so the
+   * statement carries it and can be rerun. Absent where none is wired, and the
+   * filter is then resolved into a selection.
+   */
+  compileFilter?(input: { filter: string }): LangWatchQLTraceFilter;
+  /**
+   * The trace ids a target's filter selects through the explorer's compiler,
+   * capped at the row limit: what a field outside the trace row is judged by.
+   * Absent where none is wired, and such a filter is refused, never ignored.
    */
   selectTraceIds?(input: {
     projectId: string;
@@ -353,35 +361,88 @@ export class InstantEvalRunService {
     input: InstantEvalRunInput;
     rowLimit: number;
   }): Promise<InstantEvalStatement> {
-    const selection = await this.#selectionFor({ projectId, input, rowLimit });
+    const base = { input, database: this.peers.database(), now: this.now() };
+    const filter = this.#shorthandFilterOf(input);
+    if (filter === undefined) return instantEvalStatementFor(base);
+    const peers = this.peers;
+    if (!peers.compileFilter) {
+      return instantEvalStatementFor({
+        ...base,
+        selection: await this.#selectionFor({ projectId, input, filter, rowLimit }),
+      });
+    }
 
-    return instantEvalStatementFor({
-      input,
-      database: this.peers.database(),
-      now: this.now(),
-      ...(selection ? { selection } : {}),
+    const compiled = this.#compileFilter({
+      compile: (input) => peers.compileFilter?.(input) ?? { kind: "empty" },
+      filter,
     });
+    switch (compiled.kind) {
+      case "empty":
+        return instantEvalStatementFor(base);
+      case "compiled":
+        return instantEvalStatementFor({
+          ...base,
+          filter: { sql: compiled.sql, parameters: compiled.parameters },
+        });
+      case "refused":
+        throw new InstantEvalQueryInvalidError({ reason: compiled.reason, fields: ["filter"] });
+      case "unsupported":
+        // The explorer's own compiler answers what the trace view cannot.
+        if (!this.peers.selectTraceIds) {
+          throw new InstantEvalQueryInvalidError({
+            reason: `A shorthand filter cannot ask for "${compiled.field}". It can ask for ${compiled.supportedFields.join(", ")} and for trace.attribute.<key>. Everything else the trace explorer filters on lives outside the trace row, so ask it with a statement instead.`,
+            fields: ["filter"],
+          });
+        }
+        return instantEvalStatementFor({
+          ...base,
+          selection: await this.#selectionFor({ projectId, input, filter, rowLimit }),
+        });
+    }
   }
 
-  /**
-   * The trace ids a target's filter selects, resolved rather than compiled: the
-   * filter language is the explorer's. Refused where no resolver is wired.
-   */
+  /** The shorthand's filter, when the request is a shorthand that names one. */
+  #shorthandFilterOf(input: InstantEvalRunInput): string | undefined {
+    if (typeof input.sql === "string" && input.sql.trim() !== "") return undefined;
+    const filter = input.shorthand?.filter?.trim();
+    return filter === undefined || filter === "" ? undefined : filter;
+  }
+
+  /** The dialect's answer, with syntax it cannot read refused as the shorthand's own. */
+  #compileFilter({
+    compile,
+    filter,
+  }: {
+    compile: NonNullable<InstantEvalRunPeers["compileFilter"]>;
+    filter: string;
+  }): LangWatchQLTraceFilter {
+    try {
+      return compile({ filter });
+    } catch (error) {
+      if (error instanceof HandledError && error.code === "filter_parse_error") {
+        throw new InstantEvalQueryInvalidError({
+          reason: `That filter could not be read: ${error.message}`,
+          fields: ["filter"],
+        });
+      }
+      throw error;
+    }
+  }
+
+  /** The trace ids a target's filter selects, resolved by the explorer's own compiler. */
   async #selectionFor({
     projectId,
     input,
+    filter,
     rowLimit,
   }: {
     projectId: string;
     input: InstantEvalRunInput;
+    filter: string;
     rowLimit: number;
-  }): Promise<readonly string[] | undefined> {
-    if (typeof input.sql === "string" && input.sql.trim() !== "") return undefined;
+  }): Promise<readonly string[]> {
     const shorthand = input.shorthand;
-    const filter = shorthand?.filter?.trim();
-    if (shorthand === undefined || filter === undefined || filter === "") return undefined;
-
-    if (!this.peers.selectTraceIds) {
+    if (!this.peers.selectTraceIds || shorthand === undefined) {
       throw new InstantEvalQueryInvalidError({
         reason:
           "This deployment cannot resolve a target's filter, so the rows it names cannot be judged. Send a statement with the selection written into its WHERE clause instead.",

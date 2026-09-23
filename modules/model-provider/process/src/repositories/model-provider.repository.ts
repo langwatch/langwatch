@@ -1,4 +1,8 @@
-import type { ModelDefaultScope, ModelProvider } from "@langwatch/model-provider-contract";
+import type {
+  ModelDefaultScope,
+  ModelProvider,
+  ModelProviderUsageCount,
+} from "@langwatch/model-provider-contract";
 
 /** The provider row as it is stored: the contract's own shape, whole. */
 export type ModelProviderRecord = ModelProvider;
@@ -25,4 +29,6 @@ export interface ModelProviderRepository {
   hasStoredCredentials(id: string): Promise<boolean>;
   /** Whether a write failed because another row already holds the handle. */
   isRoutingHandleConflict(error: unknown): boolean;
+  /** The usage report's read; one organization per query, as the tenancy guard admits. */
+  countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount>;
 }

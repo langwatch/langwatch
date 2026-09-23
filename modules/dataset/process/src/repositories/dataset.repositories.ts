@@ -2,6 +2,7 @@ import type { BatchEvaluationRepository } from "./batch-evaluation.repository.ts
 import type { DatasetContentRepository } from "./dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "./dataset-record-content.repository.ts";
 import type { DatasetRecordRepository } from "./dataset-record.repository.ts";
+import type { DatasetUsageRepository } from "./dataset-usage.repository.ts";
 import type { DatasetRepository } from "./dataset.repository.ts";
 
 export interface DatasetRepositories {
@@ -15,4 +16,6 @@ export interface DatasetRepositories {
   readonly recordContent: DatasetRecordContentRepository;
   /** The batch-evaluation rows an experiment's runs are summarised by. */
   readonly batchEvaluations: BatchEvaluationRepository;
+  /** The usage report's counts over the three tables above. */
+  readonly usage: DatasetUsageRepository;
 }

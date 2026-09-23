@@ -305,6 +305,10 @@
     "./format-milliseconds": {
       "types": "./dist/format-milliseconds.d.ts",
       "default": "./src/format-milliseconds.ts"
+    },
+    "./settings-card": {
+      "types": "./dist/components/settings-card.d.ts",
+      "default": "./src/components/settings-card.tsx"
     }
   },
   "scripts": {

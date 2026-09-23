@@ -54,9 +54,9 @@ export class InstantEvalRunContextService {
   }
 
   /**
-   * A run with no row, or a project with no query identity, is a run no step
-   * can carry out — one refusal for both, because the step's caller can act on
-   * neither and a job must not report a missing identity as a missing run.
+   * A run with no row is missing; a run on a deployment that provisions no
+   * query identity is a configuration gap, and answers `instant_eval_not_enabled`
+   * so the reader is not sent after a row that is there (ADR-137).
    */
   async load({
     projectId,

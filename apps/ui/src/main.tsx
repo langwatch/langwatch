@@ -50,6 +50,7 @@ import type { FallbackProps } from "react-error-boundary";
 import { useLocation } from "react-router";
 
 import { uiDesignSystem } from "./design-system";
+import { installedUiDeclarations } from "./shell/ui-declarations";
 import { uiRouteTable } from "./shell/ui-route-table";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 
@@ -144,6 +145,7 @@ class BrowserUiShell extends UiShell {
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
+            declarations: installedUiDeclarations,
             // The posthog module SINGLETON, the same one `PostHogProvider` is
             // handed: inert until the inner providers initialise it, and
             // initialised well before a screen emits.

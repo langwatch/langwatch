@@ -14,8 +14,8 @@ describe("queryWithoutFacet", () => {
     /** @scenario "The facet's own terms are dropped and the rest kept" */
     it("drops that field's terms and keeps the rest", () => {
       expect(
-        queryWithoutFacet({ queryText: "status:error AND model:gpt-4o", facetKey: "status" }),
-      ).toBe("model:gpt-4o");
+        queryWithoutFacet({ queryText: "status:error AND model:gpt-5-mini", facetKey: "status" }),
+      ).toBe("model:gpt-5-mini");
     });
 
     it("drops the field's dotted sub-fields with it", () => {
@@ -71,7 +71,7 @@ describe("queryNamesFacet", () => {
     expect(queryNamesFacet({ queryText: "evaluator.verdict:pass", facetKey: "evaluator" })).toBe(
       true,
     );
-    expect(queryNamesFacet({ queryText: "model:gpt-4o refund", facetKey: "status" })).toBe(false);
+    expect(queryNamesFacet({ queryText: "model:gpt-5-mini refund", facetKey: "status" })).toBe(false);
     expect(queryNamesFacet({ queryText: "", facetKey: "status" })).toBe(false);
   });
 });

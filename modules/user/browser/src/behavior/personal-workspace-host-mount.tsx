@@ -226,10 +226,11 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
         {
           isSaas: deployment.isSaaS,
           appBaseUrl: deployment.appBaseUrl,
-          // No capability carries these two yet — see the handoff for the
+          // No capability carries these three yet — see the handoff for the
           // widening this host is waiting on.
           passkeysEnabled: false,
           authProvider: void 0,
+          emailPasswordEnabled: false,
         },
         organization,
         project,

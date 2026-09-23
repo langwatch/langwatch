@@ -71,6 +71,7 @@ import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "../rules/better-auth-sso-adapter.rules.ts";
+import { configuredAuthProvider } from "../rules/configured-auth-provider.rules.ts";
 import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 import { SsoHistoryActivityService } from "../services/sso-history-activity.service.ts";
@@ -129,7 +130,6 @@ async function resolveConfiguration(
   secrets: SsoSetup["secrets"],
 ): Promise<SsoConfiguration> {
   const [
-    instanceLicenseKey,
     googleClientSecret,
     githubClientSecret,
     gitlabClientSecret,
@@ -140,7 +140,6 @@ async function resolveConfiguration(
     oneLoginClientSecret,
     oidcClientSecret,
   ] = await Promise.all([
-    secrets.into(ssoSecrets.instanceLicenseKey, (value) => value),
     secrets.into(ssoSecrets.googleClientSecret, (value) => value),
     secrets.into(ssoSecrets.githubClientSecret, (value) => value),
     secrets.into(ssoSecrets.gitlabClientSecret, (value) => value),
@@ -152,11 +151,18 @@ async function resolveConfiguration(
     secrets.into(ssoSecrets.oidcClientSecret, (value) => value),
   ]);
 
+  const { provider, deprecatedNameUsed } = configuredAuthProvider(config);
+  if (deprecatedNameUsed) {
+    members.logger.warn(
+      { module: "sso" },
+      "NEXTAUTH_PROVIDER is deprecated - set AUTH_PROVIDER instead. The configured value still applies.",
+    );
+  }
+
   return {
     isSaas: members.isSaas,
-    provider: config.provider,
+    provider,
     baseUrl: members.publicBaseUrl ?? "http://localhost",
-    instanceLicenseKey,
     googleClientId: config.googleClientId,
     googleClientSecret,
     githubClientId: config.githubClientId,
@@ -260,10 +266,7 @@ export class SsoApp implements SsoApiContract {
         isHosted,
         licensedAtStartup: () => gate.platformAllowed(),
       }),
-      licenseProof: InstanceLicenseProof.create({
-        licensing: dependencies.licensing,
-        instanceLicenseKey: configuration.instanceLicenseKey,
-      }),
+      licenseProof: InstanceLicenseProof.create({ licensing: dependencies.licensing }),
       // Hosted self-serve (tier 3) is not offered: nothing stages the claim
       // queue it waits on. When it ships this reads the organization's
       // `self_serve_sso` opt-in - handoff §10.

@@ -10,6 +10,7 @@ import type {
   SsoAuthenticationActivityApi,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
+import { nowInstant } from "@langwatch/time";
 import { memoryAdapter } from "better-auth/adapters/memory";
 
 import { createSecondaryStorage } from "../../app/auth-composition.build.ts";
@@ -17,6 +18,9 @@ import {
   createBetterAuthTransport,
   type BetterAuthDeploymentConfiguration,
 } from "../../channels/http/http.better-auth.channel.ts";
+import { CredentialSessionGuard } from "../../channels/http/http.credential-session-guard.channel.ts";
+import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
+import { CredentialSignInPolicyService } from "../../services/credential-sign-in-policy.service.ts";
 
 export function deployment(
   overrides: Partial<BetterAuthDeploymentConfiguration> = {},
@@ -87,6 +91,18 @@ export function betterAuthTransportFor(
     }),
     /** Nothing registered: a test that needs an origin trusted says so. */
     ssoIssuers: { issuersForRequest: async () => [] },
+    /** No routing directory, so no organization connection governs a
+     *  credential sign-in; a test that needs one supplies its own guard. */
+    /** No organization has set a threshold, so nothing is ever locked out. */
+    signInLockout: signInSecurityFixture({ now: nowInstant }).lockout,
+    addressRoutesToConnection: async () => false,
+    credentialGuard: CredentialSessionGuard.create(
+      CredentialSignInPolicyService.create({
+        routing: null,
+        connections: { getOrganization: async () => ({ organizationId: "org-absent" }) },
+        recovery: { findGrants: async () => [] },
+      }),
+    ),
     sendResetPassword: async () => undefined,
     redis: null,
     secondaryStorage: createSecondaryStorage(null),

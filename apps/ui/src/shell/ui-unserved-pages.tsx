@@ -28,7 +28,6 @@ const unservedPage = async () => ({ default: UiUnservedPage });
  */
 export const uiUnservedPageLoaders: UiPageLoaderRegistry = {
   "layouts/project-langy": unservedLayout,
-  "pages/settings/authentication": unservedPage,
   "pages/[project]/automations/activity": unservedPage,
   "pages/[project]/evaluations/[id]/edit/choose": unservedPage,
   "pages/[project]/analytics/custom/index": unservedPage,

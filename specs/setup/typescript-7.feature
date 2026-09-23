@@ -46,7 +46,16 @@ Feature: TypeScript 7 is the compiler
     # Two of them publish bundled declarations through tsup's `dts: true`; the
     # third is the architecture linter, a synchronous CLI over the whole tree
     # that uses a program, a printer and a scanner 7 does not expose. Held
-    # deliberately, not by omission.
+    # deliberately, not by omission — and held as a library only: they
+    # typecheck with 7, as the next scenario requires.
+
+  @unit
+  Scenario: A package held on 6 still typechecks with 7
+    Given a package that declares TypeScript 6 for its build or its runtime
+    When its typecheck script runs
+    Then the workspace's TypeScript 7 compiler checks it, not the package's own
+    # Its references reach build projects the root solution builds too; two
+    # compilers over one build info each mark the other's output stale.
 
   @unit
   Scenario: The superseded preview compiler is gone

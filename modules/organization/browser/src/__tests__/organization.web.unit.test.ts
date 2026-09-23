@@ -40,6 +40,14 @@ describe("given a browser that installs organization", () => {
       expect(loaded).toHaveProperty("default");
     });
 
+    /** Main presents it inside the settings chrome, so organization declares it. */
+    it("answers with the Authentication settings component", async () => {
+      const screen = organizationWeb.installation.screens["pages/settings/authentication"];
+      const loaded = await screen?.load?.();
+
+      expect(loaded).toHaveProperty("default");
+    });
+
     it("answers with the Groups component", async () => {
       const screen = organizationWeb.installation.screens["pages/settings/groups"];
       const loaded = await screen?.load?.();

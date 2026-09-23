@@ -6,7 +6,10 @@ export const auditLogJsonValueSchema = z.json();
 export type AuditLogJsonValue = z.infer<typeof auditLogJsonValueSchema>;
 
 export const auditLogEntrySchema = z.object({
-  userId: z.string().min(1),
+  /** Whoever did it, when the log knows. Absent on a row about an actor
+   *  nobody has identified — a lock taken against an address with no account
+   *  is precisely the row an attack shows up in, and it still gets appended. */
+  userId: z.string().min(1).optional(),
   organizationId: z.string().min(1).optional(),
   projectId: z.string().min(1).optional(),
   action: z.string().min(1),

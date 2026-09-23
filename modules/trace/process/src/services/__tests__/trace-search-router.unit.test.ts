@@ -26,11 +26,11 @@ describe("given a text with only field:value terms", () => {
       const classifier = answering("langy");
       const d = deps({ classifier });
 
-      const result = await router(d).route(input({ text: "status:error AND model:gpt-4o" }));
+      const result = await router(d).route(input({ text: "status:error AND model:gpt-5-mini" }));
 
       expect(result).toEqual({
         kind: "filter",
-        query: "status:error AND model:gpt-4o",
+        query: "status:error AND model:gpt-5-mini",
         decidedBy: "fallback",
       });
       expect(classifier.classify).not.toHaveBeenCalled();

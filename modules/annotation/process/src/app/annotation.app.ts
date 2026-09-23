@@ -32,6 +32,7 @@ import {
   type AnnotationReviewQueueItem,
   type AnnotationReviewCreateInput,
   type AnnotationSuggestionSource,
+  type AnnotationUsageCount,
 } from "@langwatch/annotation-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -69,6 +70,7 @@ type AnnotationSetup = Readonly<{
     /** The tier-effective bounds the queue reads clamp their take to. */
     entitlement: EntitlementApi;
   }>;
+  config: undefined;
 }>;
 const logger = createLogger("langwatch:annotation:app");
 const annotatorReferenceSchema = z.string().transform((reference, context) => {
@@ -99,6 +101,7 @@ export class AnnotationApp implements AnnotationApi {
   #annotations: AnnotationService;
   #scores: AnnotationScoreService;
   #queues: AnnotationQueueService;
+  #usage: AnnotationRepositories["usage"];
   #projects: ProjectApi;
   #organizations: OrganizationApi;
   #users: UserApi;
@@ -118,6 +121,7 @@ export class AnnotationApp implements AnnotationApi {
       items: repositories.queueItems,
     });
 
+    this.#usage = repositories.usage;
     this.#projects = dependencies.projects;
     this.#organizations = dependencies.organizations;
     this.#users = dependencies.users;
@@ -299,6 +303,13 @@ export class AnnotationApp implements AnnotationApi {
 
       throw error;
     }
+  }
+
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AnnotationUsageCount> {
+    return this.#usage.countUsage(input);
   }
 
   async queueTraces(input: QueueAnnotationTracesInput) {

@@ -1,7 +1,7 @@
 /**
  * LangWatchQL analytics SQL — which functions a LangWatchQL query may call.
  * @see ./validate.ts — the walk that applies this
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 /**
@@ -372,21 +372,43 @@ function isListed(lookup: NameLookup, name: string): boolean {
   return lookup[name] === true;
 }
 
+/** Every allowed function name in its canonical spelling: the one source both lists below read. */
+const FUNCTION_NAME_SOURCES: readonly string[] = [
+  ...OPERATORS,
+  ...AGGREGATE_FUNCTIONS,
+  ...WINDOW_FUNCTIONS,
+  ...DATE_TIME_FUNCTIONS,
+  ...ARITHMETIC_FUNCTIONS,
+  ...STRING_FUNCTIONS,
+  ...CONDITIONAL_FUNCTIONS,
+  ...COLLECTION_FUNCTIONS,
+  ...JSON_FUNCTIONS,
+  ...CONVERSION_FUNCTIONS,
+];
+
 /** Every name a LangWatchQL query may call, lowercased. */
 const ALLOWED_FUNCTION_NAMES: NameLookup = nameLookup(
-  [
-    ...OPERATORS,
-    ...AGGREGATE_FUNCTIONS,
-    ...WINDOW_FUNCTIONS,
-    ...DATE_TIME_FUNCTIONS,
-    ...ARITHMETIC_FUNCTIONS,
-    ...STRING_FUNCTIONS,
-    ...CONDITIONAL_FUNCTIONS,
-    ...COLLECTION_FUNCTIONS,
-    ...JSON_FUNCTIONS,
-    ...CONVERSION_FUNCTIONS,
-  ].map((name) => name.toLowerCase()),
+  FUNCTION_NAME_SOURCES.map((name) => name.toLowerCase()),
 );
+
+/**
+ * The allowlist as the schema and a `FUNCTION_NOT_ALLOWED` refusal publish it: deduplicated and
+ * sorted case-insensitively, first spelling wins. Combinator forms (`countIf`) are admitted by
+ * `aggregateBaseOf` and deliberately not enumerated.
+ */
+export const LWQL_ALLOWED_FUNCTION_NAMES: readonly string[] = canonicalFunctionNames();
+
+function canonicalFunctionNames(): string[] {
+  const seenLowercased = new Set<string>();
+  const canonicalNames: string[] = [];
+  for (const name of FUNCTION_NAME_SOURCES) {
+    const lowercased = name.toLowerCase();
+    if (seenLowercased.has(lowercased)) continue;
+    seenLowercased.add(lowercased);
+    canonicalNames.push(name);
+  }
+  return canonicalNames.toSorted((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
 
 /** The aggregates a combinator suffix may be appended to, lowercased. */
 const AGGREGATE_BASE_NAMES: NameLookup = nameLookup(

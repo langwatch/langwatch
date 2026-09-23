@@ -1,3 +1,5 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
@@ -5,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import { LicensingApp } from "../../app/licensing.app.ts";
 import type { OrganizationLicenseReads } from "../../app/licensing.members.ts";
 import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
-import { TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "../../testing.ts";
-import { createUnavailableLicensingInfrastructure } from "../licensing-infrastructure.service.ts";
+import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../testing.ts";
+import { LicensingInfrastructureService } from "../licensing-infrastructure.service.ts";
 
 const LICENSED_ORGANIZATION_ID = "org_paid";
 
@@ -26,24 +28,23 @@ function licenceRows(): {
 }
 
 function composeWithoutMutation() {
-  return createUnavailableLicensingInfrastructure({
+  return LicensingInfrastructureService.create({ processName: "the worker" }).withoutMutation({
     licenses: licenceRows().licenses,
-    processName: "the worker",
   });
 }
 
 describe("licensing infrastructure composed without licence mutation", () => {
   /** @scenario "A process that composes no licence mutation still scans the licence rows" */
   it("accepts a key activated on an organization when no instance key is set", async () => {
-    const app = LicensingApp.create({
-      dependencies: {},
-      members: { infrastructure: composeWithoutMutation(), isSaas: false },
-      config: { publicKey: TEST_PUBLIC_KEY },
+    const app = await LicensingApp.create({
+      dependencies: { gateway: createApiFixture<GatewayApi>() },
+      members: { infrastructure: composeWithoutMutation(), isSaas: false, serviceVersion: "test" },
+      config: TEST_LICENSING_CONFIG,
       resources: new ResourceScope(),
       secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
     });
 
-    await expect(app.inspectPlatformAccess({})).resolves.toMatchObject({
+    await expect(app.inspectPlatformAccess()).resolves.toMatchObject({
       allowed: true,
       inspections: [
         { source: "organization", organizationId: LICENSED_ORGANIZATION_ID, valid: true },

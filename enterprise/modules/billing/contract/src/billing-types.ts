@@ -126,6 +126,18 @@ export type LicensePurchaseNotificationPayload = {
   currency: string;
 };
 
+/** A lead signal from a self-hosted install, for the self-hosted Slack channel. */
+export type SelfHostedSignalNotificationPayload = {
+  headline: string;
+  instanceId: string;
+  organizationName?: string | null;
+  leadingDomain?: string | null;
+  version?: string | null;
+  users?: number | null;
+  traces28d?: number | null;
+  instanceUrl: string;
+};
+
 export type SignupNotificationPayload = {
   userName?: string | null;
   userEmail?: string | null;

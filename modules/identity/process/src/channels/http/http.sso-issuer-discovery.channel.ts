@@ -47,6 +47,13 @@ class DiscoveryDowngradedError extends Error {
   }
 }
 
+/** A vouched origin whose name answered nothing: vouching is not evidence of an address. */
+class VouchedOriginUnresolvableError extends Error {
+  constructor() {
+    super("a vouched issuer origin did not resolve");
+  }
+}
+
 /**
  * The SAME guarded fetch the file proof makes, for the same reason: the
  * issuer is a string an administrator typed, so `http://169.254.169.254/…`
@@ -55,13 +62,18 @@ class DiscoveryDowngradedError extends Error {
 export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel {
   private constructor(
     private readonly validate: SsrfUrlValidator,
+    private readonly validateVouched: SsrfUrlValidator,
+    private readonly dialableInternalOrigins: () => readonly string[],
     private readonly fetchValidated: FencedDiscoveryFetch,
     private readonly tls: EgressTlsPolicy,
   ) {}
 
   static create(options: {
     policy: SsoDomainProofEgressPolicy;
+    /** Origins an operator named in advance, which may answer privately. */
+    dialableInternalOrigins?: () => readonly string[];
     validate?: SsrfUrlValidator;
+    validateVouched?: SsrfUrlValidator;
     fetchValidated?: FencedDiscoveryFetch;
   }): HttpsSsoIssuerDiscoveryChannel {
     return new HttpsSsoIssuerDiscoveryChannel(
@@ -70,16 +82,26 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
           blockLocal: options.policy.blockLocal,
           allowedHosts: [...options.policy.allowedHosts],
         }),
+      options.validateVouched ?? createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] }),
+      options.dialableInternalOrigins ?? (() => []),
       options.fetchValidated ?? fetchValidatedDestination,
       { rejectUnauthorized: options.policy.verifyTls },
     );
   }
 
-  /** Every hop, the first included: https, then the deployment's fence. */
+  /**
+   * Every hop, the first included: https, then the deployment's fence. A
+   * vouched origin skips the private-address refusal for that hop only, so
+   * vouching never travels with a redirect.
+   */
   private readonly judge: SsrfUrlValidator = async (url) => {
     if (!url.toLowerCase().startsWith("https://")) throw new DiscoveryDowngradedError();
+    if (!this.dialableInternalOrigins().includes(new URL(url).origin)) return this.validate(url);
 
-    return this.validate(url);
+    const vouched = await this.validateVouched(url);
+    if (vouched.type === "unresolved") throw new VouchedOriginUnresolvableError();
+
+    return vouched;
   };
 
   async discover({ issuer }: { issuer: string }): Promise<SsoIssuerDiscovery> {
@@ -122,6 +144,7 @@ export class HttpsSsoIssuerDiscoveryChannel implements SsoIssuerDiscoveryChannel
  */
 function reasonFor({ error, aborted }: { error: unknown; aborted: boolean }): string {
   if (error instanceof DiscoveryDowngradedError) return "not_https";
+  if (error instanceof VouchedOriginUnresolvableError) return "unresolvable";
   if (error instanceof RedirectRefusedError) return "redirect_refused";
   if (aborted) return "timeout";
   const code =

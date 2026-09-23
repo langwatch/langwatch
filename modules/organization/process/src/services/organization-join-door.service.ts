@@ -5,6 +5,8 @@
  */
 
 import type {
+  JoinRequestAdmitted,
+  JoinRequestAutomaticJoins,
   JoinRequestFiled,
   JoinRequestJoining,
   JoinRequestJoiningChanged,
@@ -44,6 +46,52 @@ export class OrganizationJoinDoorService {
       userId: input.userId,
       verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
     });
+  }
+
+  /** The post-login offer: the same answer, minus the domains they dismissed. */
+  async offer(input: Readonly<{ userId: string }>): Promise<unknown> {
+    return this.deps.joinRequests.offerForSignedInUser({
+      userId: input.userId,
+      verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+    });
+  }
+
+  /** "No thanks", remembered for the caller's own verified domain. */
+  async dismissOffer(input: Readonly<{ userId: string }>): Promise<void> {
+    await this.deps.joinRequests.dismissOffer({
+      userId: input.userId,
+      verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+    });
+  }
+
+  /** Walk in where the organization asked for that; a null organization is the ordinary case. */
+  async admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
+    return this.deps.joinRequests.joinAutomaticallyIfAdmitted({
+      userId: input.userId,
+      verifiedEmail: await this.deps.directory.findVerifiedEmail(input),
+    });
+  }
+
+  /** Who walked in on the domain setting lately, named for the members area. */
+  async listAutomaticJoins(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<JoinRequestAutomaticJoins> {
+    const joins = await this.deps.joinRequests.automaticJoinsForOrganization(input);
+    const names = await this.deps.directory.listUserNames({
+      userIds: joins.map((join) => join.userId),
+    });
+    const nameById = new Map(names.map((person) => [person.id, person.name] as const));
+
+    return joins.map((join) => ({
+      joinRequestId: join.joinRequestId,
+      userId: join.userId,
+      name: nameById.get(join.userId) ?? UNNAMED_COLLEAGUE,
+      domain: join.domain,
+      joinedAt:
+        join.resolvedAtMs === null
+          ? null
+          : toDate(Temporal.Instant.fromEpochMilliseconds(join.resolvedAtMs)),
+    }));
   }
 
   /** Everything this person is waiting on. */
@@ -106,14 +154,23 @@ export class OrganizationJoinDoorService {
     return this.deps.joinRequests.readJoining(input);
   }
 
-  setJoining(
+  /** Audited by the ledger against the administrator who saved it. */
+  async setJoining(
     input: Readonly<{
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
-    return this.deps.joinRequests.setJoining(input);
+    const change = await this.deps.joinRequests.setJoining(input);
+
+    return {
+      previous: change.previous,
+      next: change.next,
+      previousDomains: [...change.previousDomains],
+      nextDomains: [...change.nextDomains],
+    };
   }
 }
 

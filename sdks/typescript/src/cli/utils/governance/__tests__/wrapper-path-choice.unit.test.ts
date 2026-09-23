@@ -73,6 +73,21 @@ describe("parseToolModeFlag", () => {
       expect(out.args).toEqual(["--print", "x"]);
       expect(out.override).toBe("ingestion");
     });
+
+    it("still drops a value that is no mode, so it never reaches the tool", () => {
+      const out = parseToolModeFlag(["--tool-mode", "bogus", "-p", "hi"], {});
+      expect(out.args).toEqual(["-p", "hi"]);
+      expect(out.override).toBeUndefined();
+    });
+  });
+
+  describe("given --tool-mode with an option right after it", () => {
+    /** @scenario "A --tool-mode with no value does not swallow the option after it" */
+    it("reads the option as a missing value and forwards it", () => {
+      const out = parseToolModeFlag(["--tool-mode", "--print", "x"], {});
+      expect(out.args).toEqual(["--print", "x"]);
+      expect(out.override).toBeUndefined();
+    });
   });
 
   describe("given LANGWATCH_TOOL_MODE env and no flag", () => {

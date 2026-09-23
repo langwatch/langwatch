@@ -21,6 +21,7 @@ import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prism
 import { PrismaIdentityReservationRepository } from "../repositories/prisma/prisma.identity-reservations.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "../repositories/prisma/prisma.identity-secret-carry.repository.ts";
 import { PrismaJoinRequestAudienceRepository } from "../repositories/prisma/prisma.join-request-audience.repository.ts";
+import { PrismaJoinRequestProjectionRepository } from "../repositories/prisma/prisma.join-request-projection.repository.ts";
 import { PrismaScimSyncProjectionRepository } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "../repositories/prisma/prisma.sso-connection-projection.repository.ts";
 import { AdminEmailPlatformOperatorsRepository } from "../repositories/prisma/prisma.sso-platform-operators.repository.ts";
@@ -33,6 +34,7 @@ import {
   IdentityLedgerWriterAdapter,
   type IdentityStagedSender,
 } from "../services/identity-ledger.service.ts";
+import { JoinRequestLedgerWriterAdapter } from "../services/join-request-ledger.service.ts";
 import {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
@@ -102,13 +104,14 @@ const JOIN_REQUEST_COMMAND_NAMES = [
 ] as const;
 
 /**
- * The five an Enterprise directory's push states.
+ * The five an Enterprise directory's push states, and the operator's re-drive.
  */
 const SCIM_SYNC_COMMAND_NAMES = [
   "issueScimToken",
   "recordScimUserPush",
   "recordScimGroupMapping",
   "recordScimApplyFailure",
+  "redriveScimApply",
   "revokeScimSync",
 ] as const;
 
@@ -323,6 +326,10 @@ export function buildIdentityInfrastructure(input: {
         prisma,
         reservations: PrismaIdentityReservationRepository.create(prisma),
       }),
+      eventing: identityEventing,
+    }),
+    joinRequestLedger: JoinRequestLedgerWriterAdapter.create({
+      projectionStore: PrismaJoinRequestProjectionRepository.create(prisma),
       eventing: identityEventing,
     }),
     secrets: PrismaIdentitySecretCarryRepository.create(prisma),

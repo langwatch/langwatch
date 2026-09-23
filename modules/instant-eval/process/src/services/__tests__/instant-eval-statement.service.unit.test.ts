@@ -103,7 +103,6 @@ class ProbeOnlyRunner implements InstantEvalStatementRunner {
       columns: this.columns,
       rows: [],
       statistics: { elapsedMs: 1, rowsRead: 0, bytesRead: 0, rowsReturned: 0 },
-      truncated: false,
       diagnostics: [],
       followsTimeWindow: true,
       followsGranularity: true,

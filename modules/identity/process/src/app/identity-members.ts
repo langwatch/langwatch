@@ -3,6 +3,7 @@ import type { ScimSyncReadRepository } from "../repositories/scim-sync.repositor
 import type { SsoConnectionHistoryRepository } from "../repositories/sso-connection-history.repository.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
+import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 /**
@@ -36,6 +37,8 @@ export type IdentityInfrastructure = Readonly<{
    * process from its own Prisma client and its own `reservations` row.
    */
   ledger: IdentityLedger;
+  /** The join-request ledger's append-and-converge surface, over the same `eventing`. */
+  joinRequestLedger: JoinRequestLedger;
   /** The three backfill reads the D01 secret-carry pass writes through. */
   secrets: IdentitySecretCarryRepository;
   /** Who a join-request notification reaches. Read only when `mail` is present. */

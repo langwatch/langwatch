@@ -1,5 +1,7 @@
+import { nowInstant } from "@langwatch/time";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
+
 import {
   BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_LEASE_SET_TTL_SECONDS,
@@ -11,7 +13,6 @@ import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua.ts";
 import { CachedLuaScript } from "./cachedLuaScript.ts";
 import { resolveDispatchAllowListRedisKey } from "./dispatch-scope.ts";
 import { gqJobsDispatchedOverrideTotal } from "./metrics.ts";
-import { nowInstant } from "@langwatch/time";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -1592,50 +1593,129 @@ const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
 
-const REGISTER_PREFLIGHT_TARGETS_LUA = `
+/**
+ * A group's failure state as one token: its error timestamp and whether it is blocked.
+ * Stored at registration and compared at inspection, which separates this preflight's own
+ * damage from an earlier release's wedge (specs/event-sourcing/migration-preflight-barrier).
+ */
+const PREFLIGHT_GROUP_STATE_LUA = `
+local function gqPreflightGroupState(keyPrefix, blockedKey, groupId)
+  local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
+  local stamp = ""
+  if redis.call("EXISTS", errorKey) == 1 then
+    stamp = redis.call("HGET", errorKey, "timestamp") or "present"
+  end
+  return stamp .. "|" .. redis.call("SISMEMBER", blockedKey, groupId)
+end
+`;
+
+const REGISTER_PREFLIGHT_TARGETS_LUA =
+  PREFLIGHT_GROUP_STATE_LUA +
+  `
 local targetKey = KEYS[1]
 local candidatesKey = KEYS[2]
 local signalKey = KEYS[3]
-local ttlSec = tonumber(ARGV[1])
-for index = 2, #ARGV do
+local blockedKey = KEYS[4]
+local baselineKey = KEYS[5]
+local keyPrefix = ARGV[1]
+local ttlSec = tonumber(ARGV[2])
+for index = 3, #ARGV do
   local groupId = ARGV[index]
   redis.call("SADD", targetKey, groupId)
   -- Registration puts a target ahead of the dispatch loop's wall-clock
   -- rotation scores. This also re-activates a target when an older worker
   -- stages it without knowing the preflight protocol.
-  redis.call("ZADD", candidatesKey, index - 1, groupId)
+  redis.call("ZADD", candidatesKey, index - 2, groupId)
+  -- HSETNX: only the first registration may say what was already wedged here.
+  redis.call("HSETNX", baselineKey, groupId, gqPreflightGroupState(keyPrefix, blockedKey, groupId))
 end
 redis.call("EXPIRE", targetKey, ttlSec)
 redis.call("EXPIRE", candidatesKey, ttlSec)
+redis.call("EXPIRE", baselineKey, ttlSec)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
-return #ARGV - 1
+return #ARGV - 2
 `;
-const registerPreflightTargetsScript = new CachedLuaScript(
-  REGISTER_PREFLIGHT_TARGETS_LUA,
-);
+const registerPreflightTargetsScript = new CachedLuaScript(REGISTER_PREFLIGHT_TARGETS_LUA);
 
-const INSPECT_PREFLIGHT_TARGETS_LUA = `
+const INSPECT_PREFLIGHT_TARGETS_LUA =
+  PREFLIGHT_GROUP_STATE_LUA +
+  `
 local targetKey = KEYS[1]
 local blockedKey = KEYS[2]
+local baselineKey = KEYS[3]
 local keyPrefix = ARGV[1]
+local maxIds = tonumber(ARGV[2])
 local groups = redis.call("SMEMBERS", targetKey)
 local pending = 0
 local active = 0
 local failed = 0
 local blocked = 0
+local held = 0
+local pendingGroups = 0
+local failedIds = {}
+local blockedIds = {}
+local pendingIds = {}
+local heldIds = {}
+local function gqNameGroup(ids, groupId)
+  if #ids < maxIds then ids[#ids + 1] = groupId end
+end
 for _, groupId in ipairs(groups) do
   local groupPrefix = keyPrefix .. "group:" .. groupId
-  pending = pending + redis.call("ZCARD", groupPrefix .. ":jobs")
-  active = active + redis.call("EXISTS", groupPrefix .. ":active")
-  failed = failed + redis.call("EXISTS", groupPrefix .. ":error")
-  blocked = blocked + redis.call("SISMEMBER", blockedKey, groupId)
+  -- A target registered outside the preflight protocol has no baseline, and
+  -- reads as unwedged: an unexplained failure refuses rather than settles.
+  local baseStamp, baseBlocked = string.match(redis.call("HGET", baselineKey, groupId) or "|0", "^(.*)|([01])$")
+  if not baseBlocked then baseStamp, baseBlocked = "", "0" end
+  local stamp, isBlocked = string.match(gqPreflightGroupState(keyPrefix, blockedKey, groupId), "^(.*)|([01])$")
+  if baseBlocked == "1" then
+    -- Already blocked when the preflight adopted it: its jobs cannot dispatch
+    -- and never will, so counting them would only hang the barrier out.
+    held = held + 1
+    gqNameGroup(heldIds, groupId)
+  else
+    local groupPending = redis.call("ZCARD", groupPrefix .. ":jobs")
+    local groupActive = redis.call("EXISTS", groupPrefix .. ":active")
+    pending = pending + groupPending
+    active = active + groupActive
+    if groupPending > 0 or groupActive == 1 then
+      pendingGroups = pendingGroups + 1
+      gqNameGroup(pendingIds, groupId)
+    end
+    if isBlocked == "1" then
+      blocked = blocked + 1
+      gqNameGroup(blockedIds, groupId)
+    end
+  end
+  if stamp ~= "" and stamp ~= baseStamp then
+    failed = failed + 1
+    gqNameGroup(failedIds, groupId)
+  end
 end
-return {pending, active, failed, blocked, #groups}
+return {pending, active, failed, blocked, #groups, held, pendingGroups, failedIds, blockedIds, pendingIds, heldIds}
 `;
-const inspectPreflightTargetsScript = new CachedLuaScript(
-  INSPECT_PREFLIGHT_TARGETS_LUA,
-);
+const inspectPreflightTargetsScript = new CachedLuaScript(INSPECT_PREFLIGHT_TARGETS_LUA);
+
+/** How many group ids a single refusal names before it says "and N more". */
+export const PREFLIGHT_NAMED_GROUP_LIMIT = 20;
+
+/**
+ * What the barrier sees across a preflight's target groups. `heldFromBefore`
+ * groups were already blocked when the preflight adopted them and are excluded
+ * from `pending`/`active`; the id lists are what an operator acts on.
+ */
+export type PreflightTargetsState = {
+  pending: number;
+  active: number;
+  failed: number;
+  blocked: number;
+  groups: number;
+  heldFromBefore: number;
+  pendingGroups: number;
+  failedGroupIds: string[];
+  blockedGroupIds: string[];
+  pendingGroupIds: string[];
+  heldFromBeforeGroupIds: string[];
+};
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
@@ -2342,26 +2422,34 @@ export class GroupStagingScripts {
     return this.redis.zcard(`${this.keyPrefix}ready`);
   }
 
-  async inspectPreflightTargets(targetKey: string): Promise<{
-    pending: number;
-    active: number;
-    failed: number;
-    blocked: number;
-    groups: number;
-  }> {
-    const result = (await inspectPreflightTargetsScript.run(
+  async inspectPreflightTargets(targetKey: string): Promise<PreflightTargetsState> {
+    const result: unknown = await inspectPreflightTargetsScript.run(
       this.redis,
-      2,
+      3,
       targetKey,
       `${this.keyPrefix}blocked`,
+      `${targetKey}:baseline`,
       this.keyPrefix,
-    )) as number[];
+      String(PREFLIGHT_NAMED_GROUP_LIMIT),
+    );
+    const row = Array.isArray(result) ? result : [];
+    const count = (index: number): number => Number(row[index] ?? 0);
+    const names = (index: number): string[] => {
+      const value: unknown = row[index];
+      return Array.isArray(value) ? value.map(String) : [];
+    };
     return {
-      pending: Number(result[0] ?? 0),
-      active: Number(result[1] ?? 0),
-      failed: Number(result[2] ?? 0),
-      blocked: Number(result[3] ?? 0),
-      groups: Number(result[4] ?? 0),
+      pending: count(0),
+      active: count(1),
+      failed: count(2),
+      blocked: count(3),
+      groups: count(4),
+      heldFromBefore: count(5),
+      pendingGroups: count(6),
+      failedGroupIds: names(7),
+      blockedGroupIds: names(8),
+      pendingGroupIds: names(9),
+      heldFromBeforeGroupIds: names(10),
     };
   }
 
@@ -2375,10 +2463,13 @@ export class GroupStagingScripts {
     if (groupIds.length === 0) return;
     await registerPreflightTargetsScript.run(
       this.redis,
-      3,
+      5,
       targetKey,
       `${targetKey}:candidates`,
       this.getSignalKey(),
+      `${this.keyPrefix}blocked`,
+      `${targetKey}:baseline`,
+      this.keyPrefix,
       "3600",
       ...groupIds,
     );

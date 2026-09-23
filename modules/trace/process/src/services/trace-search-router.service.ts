@@ -166,9 +166,6 @@ export class TraceSearchRouterService {
       known,
       available: { isLangyAvailable: input.isLangyAvailable ?? true, isInstantEvalAvailable },
     };
-    if (input.forceKind) {
-      return this.applyClassified({ context, classified: input.forceKind, decidedBy: "caller" });
-    }
     const classified = await this.classify(context);
     if (classified) {
       return this.applyClassified({ context, classified, decidedBy: "classifier" });

@@ -22,6 +22,7 @@ const {
   mockToasterCreate,
   mockListForUserData,
   mockListForMemberData,
+  mockProvenance,
 } = vi.hoisted(() => ({
   mockUpdateMemberRole: vi.fn(),
   mockApplyMemberBindings: vi.fn(),
@@ -45,6 +46,7 @@ const {
   mockListForMemberData: {
     current: [] as unknown[],
   },
+  mockProvenance: { current: {} as Record<string, unknown> },
 }));
 
 vi.mock("../../../behavior/organization-api.ts", () => ({
@@ -84,6 +86,9 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
     organization: {
       updateMemberRole: {
         useMutation: () => ({ mutateAsync: mockUpdateMemberRole }),
+      },
+      getMemberProvenance: {
+        useQuery: () => ({ data: mockProvenance.current, isError: false }),
       },
     },
   },
@@ -237,6 +242,7 @@ describe("<MemberDetailDialog/>", () => {
     vi.clearAllMocks();
     mockListForUserData.current = [];
     mockListForMemberData.current = [];
+    mockProvenance.current = {};
     mockUpdateMemberRole.mockResolvedValue({
       success: true,
       teamsLeftWithoutAdmin: [],
@@ -257,6 +263,25 @@ describe("<MemberDetailDialog/>", () => {
     it("does not show the self-guard message", () => {
       renderDialog();
       expect(screen.queryByText(/cannot change your own organization role/i)).toBeNull();
+    });
+  });
+
+  describe("given the member was invited and accepted", () => {
+    it("says somebody here invited them", () => {
+      mockProvenance.current = { "user-1": { source: "invited" } };
+      renderDialog();
+      expect(screen.getByTestId("provenance-explanation")).toHaveTextContent(
+        "Somebody here invited them, and they accepted.",
+      );
+    });
+  });
+
+  describe("given nothing on record explains the member", () => {
+    it("says so rather than inventing a reason", () => {
+      renderDialog();
+      expect(screen.getByTestId("provenance-explanation")).toHaveTextContent(
+        "Nothing on record says how they got here.",
+      );
     });
   });
 

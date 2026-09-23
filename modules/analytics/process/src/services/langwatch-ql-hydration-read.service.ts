@@ -26,6 +26,12 @@ export const LWQL_HYDRATION_READ_CHUNK = {
   threadKeys: 10,
 } as const;
 
+/**
+ * The traces one thread may bring back. The thread read's own default ceiling is
+ * sized for one page of a list, so a chunk of conversations asks for its own.
+ */
+export const LWQL_TRACES_PER_THREAD_CEILING = 1_000;
+
 /** What hydration needs from the Trace peer, and nothing more. */
 export interface LangWatchQLTraceSource {
   /** Traces named by id, with their spans. Order is not promised. */
@@ -43,6 +49,8 @@ export interface LangWatchQLTraceSource {
     projectId: string;
     threadKeys: readonly string[];
     protections: LangWatchQLProtections;
+    /** The most traces the read may answer with, sized by the threads asked for. */
+    maxTraces: number;
   }): Promise<readonly Trace[]>;
 }
 
@@ -164,7 +172,12 @@ export class LangWatchQLHydrationReadService {
               budget,
               signal: stop,
               read: (chunk) =>
-                this.traces.readThreadTraces({ projectId, threadKeys: chunk, protections }),
+                this.traces.readThreadTraces({
+                  projectId,
+                  threadKeys: chunk,
+                  protections,
+                  maxTraces: chunk.length * LWQL_TRACES_PER_THREAD_CEILING,
+                }),
             }),
           ),
         ),

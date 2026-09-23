@@ -104,6 +104,7 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     getRunIdsForSet: async () => ({ runIds: [], reachedCap: false }),
     getDistinctExternalSetIds: async () => new Set(),
     countRunsForExport: async () => 0,
+    countUsage: async () => 0,
     findRunsForExport: async () => ({ runs: [], hasMore: false }),
     queueRun: async () => {},
     startRun: async () => {},

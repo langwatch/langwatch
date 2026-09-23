@@ -1,3 +1,5 @@
+import { readdir } from "node:fs/promises";
+
 export interface PrismaMigrationRequest {
   databaseUrl: string;
   schemaPath: URL;
@@ -40,5 +42,24 @@ export class PrismaMigrationService {
       schemaPath: this.schemaPath,
       migrationsPath: this.migrationsPath,
     });
+  }
+}
+
+/**
+ * The migration folder names this release ships, sorted: what the database's
+ * ledger is compared against. Empty where the folder is not on this install.
+ */
+export async function listPrismaMigrationNames({
+  migrationsPath = new URL("../prisma/migrations/", import.meta.url),
+}: { migrationsPath?: URL } = {}): Promise<string[]> {
+  try {
+    const entries = await readdir(migrationsPath, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .toSorted();
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    throw error;
   }
 }

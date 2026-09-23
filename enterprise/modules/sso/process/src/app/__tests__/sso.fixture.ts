@@ -28,7 +28,8 @@ export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";
 
 export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConfig {
   return {
-    provider: "auth0",
+    authProvider: "auth0",
+    legacyProvider: undefined,
     googleClientId: undefined,
     githubClientId: undefined,
     gitlabClientId: undefined,

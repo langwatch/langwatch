@@ -6,6 +6,7 @@
 
 import { Box, Text } from "@chakra-ui/react";
 import { usePeriodSelector } from "@langwatch/analytics-browser-kit";
+import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useMemo } from "react";
 
@@ -13,7 +14,6 @@ import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-wi
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useFrameDiagnostic } from "../../behavior/use-frame-diagnostic.ts";
 import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
-import type { ChartFrameDashboardContext } from "../../model/dashboard-widget/bridge-protocol.ts";
 import { declaredParamDefaults } from "../../model/dashboard-widget/params-snapshot.ts";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";

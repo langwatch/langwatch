@@ -19,4 +19,6 @@ export interface AnalyticsTimeseriesBuilderInput {
   readonly groupByKey?: string;
   readonly timeScale?: number | "full";
   readonly timeZone?: string;
+  /** Trace origins left out of the count, ANDed after the user's filters. */
+  readonly excludeOrigins?: string[];
 }

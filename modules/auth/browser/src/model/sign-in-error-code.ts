@@ -11,6 +11,7 @@ export const normalizeSignInErrorCode = (error: string | null | undefined): stri
   if (
     error === "account_already_linked_to_different_user" ||
     error === "account_not_linked" ||
+    error === "account not linked" ||
     error === "OAuthAccountNotLinked"
   ) {
     return "OAuthAccountNotLinked";

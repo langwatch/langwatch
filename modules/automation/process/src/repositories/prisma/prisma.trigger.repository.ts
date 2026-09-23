@@ -4,6 +4,7 @@ import {
   type Trigger,
   type TriggerSummary,
   type UpdateTriggerCommand,
+  type AutomationUsageCount,
 } from "@langwatch/automation-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -50,6 +51,26 @@ export class PrismaTriggerRepository extends TriggerRepository {
   }
   static create(database: TriggerDatabase, clock: AutomationClock): PrismaTriggerRepository {
     return new PrismaTriggerRepository(database, clock);
+  }
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AutomationUsageCount> {
+    const scope = { projectId: { in: [...projectIds] } };
+    const [triggers, first] = await Promise.all([
+      this.database.trigger.count({
+        where: since === undefined ? scope : { ...scope, createdAt: { gte: new Date(since) } },
+      }),
+      this.database.trigger.findFirst({
+        where: scope,
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    return { triggers, ...(first ? { firstTriggerAt: first.createdAt.getTime() } : {}) };
   }
   async findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
     const rows = await this.database.trigger.findMany({

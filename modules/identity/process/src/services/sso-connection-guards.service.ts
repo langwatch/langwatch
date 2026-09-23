@@ -10,6 +10,10 @@ import {
   type WithdrawDomainCommandData,
   CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
+  domainClaimRetryAfterSeconds,
+  isClaimableSsoDomain,
+  SsoDomainClaimThrottledError,
+  SsoDomainNotEligibleError,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   type CompleteTeardownCommandData,
   CONNECTION_ACTIVATED_EVENT_TYPE,
@@ -79,6 +83,7 @@ import {
 } from "@langwatch/identity-contract";
 
 import { grandfatheredConnectionFacts } from "../rules/sso-connection-grandfather-facts.rules.ts";
+import { activationRecoveryReservationId } from "../rules/sso-connection-id.rules.ts";
 import {
   SsoConnectionGuardChecksService,
   type SsoConnectionGuardsDeps,
@@ -102,11 +107,38 @@ export class SsoConnectionGuardsService {
     const existing = await this.checks.tryFindConnection({
       connectionId: data.connectionId,
     });
-    // The grandfather migration's whole idempotency rests on this line: a
-    // second pass registers the same connection id and states nothing.
+    // A retry of the same self-served registration states nothing; an id held
+    // by anything else is refused rather than moved.
     if (existing) {
-      return [];
+      if (
+        existing.organizationId === data.organizationId &&
+        existing.source === "self-serve" &&
+        existing.replacesConnectionId === null
+      ) {
+        return [];
+      }
+      throw new SsoConnectionAlreadyRegisteredError(
+        `connection ${data.connectionId} is already registered`,
+      );
     }
+    // The legacy history is the grandfather migration's to state, never an ordinary registration's.
+    if (data.source !== "self-serve") {
+      throw new SsoConnectionInvalidTransitionError(
+        "ordinary registration may only create a self-serve connection",
+      );
+    }
+    await this.checks.refuseCompetingConnection({
+      organizationId: data.organizationId,
+      connectionId: data.connectionId,
+      kind: "direct",
+    });
+    await this.checks.claimRegistrationSlot({
+      organizationId: data.organizationId,
+      connectionId: data.connectionId,
+      commandId: data.commandId,
+      kind: "direct",
+      replacesConnectionId: null,
+    });
 
     return [
       {
@@ -131,12 +163,35 @@ export class SsoConnectionGuardsService {
   async grandfatherConnection(
     data: GrandfatherConnectionCommandData,
   ): Promise<SsoConnectionFactInput[]> {
+    // Only the migration itself may state a legacy history: a user-attributed
+    // import would be an organization writing its own verified domains.
+    if (
+      data.source !== "legacy-grandfathered" ||
+      data.actor.type !== "system" ||
+      data.actor.id !== null
+    ) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: legacy import requires the system migration actor`,
+      );
+    }
     const existing = await this.checks.tryFindConnection({
       connectionId: data.connectionId,
     });
     if (existing) {
       return [];
     }
+    await this.checks.refuseCompetingConnection({
+      organizationId: data.organizationId,
+      connectionId: data.connectionId,
+      kind: "legacy",
+    });
+    await this.checks.claimRegistrationSlot({
+      organizationId: data.organizationId,
+      connectionId: data.connectionId,
+      commandId: data.commandId,
+      kind: "legacy",
+      replacesConnectionId: null,
+    });
 
     return grandfatheredConnectionFacts(data);
   }
@@ -150,6 +205,20 @@ export class SsoConnectionGuardsService {
       state.verifiedDomains.includes(domain)
     ) {
       return [];
+    }
+    // Checked after the retry short-circuit, so a repeated claim never spends
+    // the budget its first attempt already paid for.
+    if (!isClaimableSsoDomain(domain)) {
+      throw new SsoDomainNotEligibleError(
+        `connection ${data.connectionId}: ${domain} is not a domain an organization can hold alone`,
+      );
+    }
+    const retryAfterSeconds = domainClaimRetryAfterSeconds({
+      claims: state.domainClaims,
+      nowMs: data.occurredAtMs,
+    });
+    if (retryAfterSeconds > 0) {
+      throw new SsoDomainClaimThrottledError(retryAfterSeconds);
     }
 
     return [
@@ -579,9 +648,12 @@ export class SsoConnectionGuardsService {
    */
   async activateConnection(data: ActivateConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, ACTIVATE_CONNECTION_COMMAND_TYPE);
-    if (state.verifiedDomains.length === 0) {
+    const hasOwnershipProof = state.verifiedDomains.some(
+      (domain) => qualifySsoDomainOwnership({ state, domain }).status === "QUALIFIED",
+    );
+    if (!hasOwnershipProof) {
       throw new SsoConnectionActivationBlockedError(
-        `connection ${data.connectionId}: no verified domain`,
+        `connection ${data.connectionId}: no qualified domain ownership proof`,
       );
     }
 
@@ -595,8 +667,19 @@ export class SsoConnectionGuardsService {
       );
     }
 
-    const bound = await this.checks.hasLiveBinding({
+    const reservationCommandId = activationRecoveryReservationId({
       organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      actorType: data.actor.type,
+      actorId: data.actor.id,
+      connectionUpdatedAtMs: state.updatedAtMs,
+      transition: "activate",
+    });
+    const bound = await this.checks.reserveActivationRecovery({
+      organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      commandId: reservationCommandId,
+      nowMs: data.occurredAtMs,
     });
     if (!bound) {
       throw new SsoConnectionActivationBlockedError(
@@ -609,6 +692,7 @@ export class SsoConnectionGuardsService {
         type: CONNECTION_ACTIVATED_EVENT_TYPE,
         data: {
           connectionId: data.connectionId,
+          activationReservationCommandId: reservationCommandId,
           testLoginAccountId: data.testLoginAccountId,
           actor: data.actor,
           source: data.source,
@@ -637,13 +721,34 @@ export class SsoConnectionGuardsService {
   }
 
   async resumeConnection(data: ResumeConnectionCommandData): Promise<SsoConnectionFactInput[]> {
-    await this.checks.require(data, RESUME_CONNECTION_COMMAND_TYPE);
+    const state = await this.checks.require(data, RESUME_CONNECTION_COMMAND_TYPE);
+    // Resuming routes sign-ins again, so it needs the same way back in activation did.
+    const reservationCommandId = activationRecoveryReservationId({
+      organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      actorType: data.actor.type,
+      actorId: data.actor.id,
+      connectionUpdatedAtMs: state.updatedAtMs,
+      transition: "resume",
+    });
+    const bound = await this.checks.reserveActivationRecovery({
+      organizationId: state.organizationId,
+      connectionId: data.connectionId,
+      commandId: reservationCommandId,
+      nowMs: data.occurredAtMs,
+    });
+    if (!bound) {
+      throw new SsoConnectionActivationBlockedError(
+        `connection ${data.connectionId}: no live break-glass binding for organization ${state.organizationId}`,
+      );
+    }
 
     return [
       {
         type: CONNECTION_RESUMED_EVENT_TYPE,
         data: {
           connectionId: data.connectionId,
+          activationReservationCommandId: reservationCommandId,
           actor: data.actor,
           source: data.source,
         },
@@ -756,7 +861,6 @@ export class SsoConnectionGuardsService {
       );
     }
 
-    await this.refuseCompetingReplacement(data);
     const predecessor = await this.checks.tryFindConnection({
       connectionId: data.replacesConnectionId,
     });
@@ -769,6 +873,19 @@ export class SsoConnectionGuardsService {
         `connection ${data.replacesConnectionId} is not an active grandfathered connection for organization ${data.organizationId}`,
       );
     }
+    await this.checks.refuseCompetingConnection({
+      organizationId: data.organizationId,
+      connectionId: data.connectionId,
+      kind: "direct",
+      allowedConnectionId: data.replacesConnectionId,
+    });
+    await this.checks.claimRegistrationSlot({
+      organizationId: data.organizationId,
+      connectionId: data.connectionId,
+      commandId: data.commandId,
+      kind: "direct",
+      replacesConnectionId: data.replacesConnectionId,
+    });
 
     return [
       {
@@ -872,29 +989,6 @@ export class SsoConnectionGuardsService {
         },
       },
     ];
-  }
-
-  /** One replacement at a time: a second one would leave two connections
-   *  claiming the same predecessor, and nothing to say which pair is the
-   *  migration. A terminal one is not standing and does not count. */
-  private async refuseCompetingReplacement(data: {
-    organizationId: string;
-    replacesConnectionId: string;
-  }): Promise<void> {
-    const held = await this.checks.findForOrganization({
-      organizationId: data.organizationId,
-    });
-    const standing = held.find(
-      (connection) =>
-        connection.replacesConnectionId === data.replacesConnectionId &&
-        connection.state !== "DISCARDED" &&
-        connection.state !== "TORN_DOWN",
-    );
-    if (standing) {
-      throw new SsoConnectionAlreadyRegisteredError(
-        `connection ${standing.connectionId} already replaces ${data.replacesConnectionId}`,
-      );
-    }
   }
 
   /** A migration verb on a connection that replaces nothing is a mistake,

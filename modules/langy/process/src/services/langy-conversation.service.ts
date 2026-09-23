@@ -14,6 +14,7 @@ import type { LangyTurnOrderReader } from "./langy-turn-order.service.ts";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository.ts";
 
+import type { LangyUsageCount } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { LangyConversationLifecycleService } from "./langy-conversation-lifecycle.service.ts";
@@ -122,6 +123,10 @@ export class LangyConversationService {
     input: Parameters<LangyConversationReadService["getAll"]>[0],
   ): ReturnType<LangyConversationReadService["getAll"]> {
     return this.reads.getAll(input);
+  }
+
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
+    return this.repository.countUsage(input);
   }
 
   getPage(

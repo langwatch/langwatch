@@ -1,13 +1,15 @@
 /**
- * How an organization has set joining, and the three refusals a change passes first — in the
- * order that costs the customer least to fix: the licence, then the identity provider that
- * already admits people, then the domain nobody has proved.
+ * How an organization has set joining, and the four refusals a change passes first — in the
+ * order that costs the customer least to fix: the organization's plan, the deployment's
+ * licence, the identity provider that already admits people, the domain nobody has proved.
  */
 import {
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
+  JoinPolicyNotLicensedError,
   normalizeDomain,
   type DomainJoinSetting,
+  type JoinSettingChange,
 } from "@langwatch/identity-contract";
 
 import type { JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
@@ -27,21 +29,35 @@ export class JoinDomainSettingService {
   ) {}
 
   /**
-   * Turn automatic joining on, off, or back to asking. Three refusals, in the order that costs the
-   * customer least to fix: the licence, then the identity provider that already admits people, then
-   * the domain nobody has proved.
+   * Turn automatic joining on, off, or back to asking. The plan is asked only of a change that
+   * opens the door wider; closing it is free on every plan, and clearing the last domain is
+   * closing it.
    */
   async setJoining({
     organizationId,
     domainJoin,
     domains,
+    actorUserId,
   }: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
-  }): Promise<{ previous: DomainJoinSetting; next: DomainJoinSetting }> {
+    actorUserId: string;
+  }): Promise<JoinSettingChange> {
     const current = await this.deps.settings.read({ organizationId });
     const normalized = domains.map(normalizeDomain).filter(Boolean);
+
+    if (
+      this.opensTheDoorWider({
+        from: { domainJoin: current.domainJoin, domains: current.joinDomains },
+        to: { domainJoin, domains: normalized },
+      }) &&
+      !(await this.deps.joinPolicyEntitled({ organizationId }))
+    ) {
+      throw new JoinPolicyNotLicensedError(
+        `organization ${organizationId} asked to set joining to ${domainJoin} on a plan that does not carry the control`,
+      );
+    }
 
     if (domainJoin === "auto") {
       if (!(await this.deps.autoJoinLicensed())) {
@@ -61,16 +77,22 @@ export class JoinDomainSettingService {
       }
     }
 
-    await this.deps.settings.write({
-      organizationId,
-      domainJoin,
-      // Turning automatic joining off clears the domains it named: a setting
-      // flipped back on later must name them again, deliberately, rather than
-      // inherit a list from a decision somebody made months ago.
-      joinDomains: domainJoin === "auto" ? normalized : [],
-    });
+    // Turning automatic joining off clears the domains it named: a setting
+    // flipped back on later must name them again, deliberately.
+    const nextDomains = domainJoin === "auto" ? normalized : [];
+    await this.deps.settings.write({ organizationId, domainJoin, joinDomains: nextDomains });
 
-    return { previous: current.domainJoin, next: domainJoin };
+    const change: JoinSettingChange = {
+      previous: current.domainJoin,
+      next: domainJoin,
+      previousDomains: current.joinDomains,
+      nextDomains,
+    };
+    // Awaited: a setting that decides who may walk in unapproved is the change
+    // a customer comes to the audit page for, so the row lands before "saved".
+    await this.deps.audit.joiningChanged({ organizationId, actorUserId, change });
+
+    return change;
   }
 
   /** How this organization has set joining, for the settings card. */
@@ -80,5 +102,22 @@ export class JoinDomainSettingService {
     organizationId: string;
   }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }> {
     return this.deps.settings.read({ organizationId });
+  }
+
+  /**
+   * Whether a save lets more people in than the setting already did — asked of the CHANGE:
+   * "off" narrows, re-saving changes nothing, another domain on an open door widens it.
+   */
+  private opensTheDoorWider({
+    from,
+    to,
+  }: {
+    from: { domainJoin: DomainJoinSetting; domains: readonly string[] };
+    to: { domainJoin: DomainJoinSetting; domains: readonly string[] };
+  }): boolean {
+    if (to.domainJoin === "off") return false;
+    if (to.domainJoin !== from.domainJoin) return true;
+    const already = new Set(from.domains);
+    return to.domains.some((domain) => !already.has(domain));
   }
 }

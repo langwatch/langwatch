@@ -2,11 +2,14 @@
 
 **Date:** 2026-09-09
 
-**Status:** Proposed
+**Status:** Proposed. Amended 2026-09-23: the ast-grep rows are plugin rules or
+gone, and the test rules the plugin already held have rows (see the last section).
 
 **Behavioural contract:**
-[The ast-grep test shapes](../../../specs/tooling/lint-test-shapes.feature),
-[architecture test quality](../../../packages/architecture-enforcer/specs/feature-package-boundaries.feature)
+[the assertion-coverage built-in](../../../specs/tooling/lint-test-shapes.feature),
+[tautological assertions](../../../specs/tooling/lint-no-tautological-assertion.feature),
+[form watch in a child](../../../specs/tooling/lint-no-form-watch-in-child.feature),
+[test descriptions](../../../specs/tooling/lint-test-description-is-an-action.feature)
 
 **Related:** [ADR-135: the toolchain](./135-lint-and-format-toolchain.md),
 [the testing philosophy](../TESTING_PHILOSOPHY.md)
@@ -36,10 +39,17 @@ before the user has done anything wrong.
 
 | Rule | Layer | Meaning |
 | --- | --- | --- |
-| `no-tautological-assertion` | ast-grep | Comparing an expression to itself, or a literal to the same literal, tests the assertion library. |
-| `no-form-watch-in-child` | ast-grep | A child component holding `form` as a prop uses `useWatch`, never `form.watch()`. |
-| `no-form-disable-on-isvalid` | ast-grep | Disable a submit button while the request is in flight, not on form validity. |
-| `test-quality` | architecture-enforcer | Tests with no real assertion, duplicated bodies, a mocked subject, or an empty snapshot, across the workspace. |
+| `langwatch/no-tautological-assertion` | plugin | `expect(x).toBe(x)` and its kin compare a value with itself and cannot fail. |
+| `langwatch/no-form-watch-in-child` | plugin | A component holding `form` as a prop uses `useWatch`, never `form.watch()`. |
+| `langwatch/test-description-is-an-action` | plugin | Nested `describe` blocks read `given <precondition>` then `when <action>`. |
+| `langwatch/shared-setup-is-a-hook` | plugin | Setup repeated across sibling tests belongs in a hook. |
+| `langwatch/unit-test-does-not-render` | plugin | A test that renders a component is an integration test, not a unit test. |
+| `langwatch/banned-test-model-names` | plugin | A test names `gpt-5-mini`, not a retired or overpriced model. Fixable. |
+| `langwatch/no-logger-spy` | plugin | No `vi.spyOn` on a real logger; assert through `createTestLogger()`. |
+| `langwatch/no-prototype-stub` | plugin | No test double built by `Object.create(Class.prototype)`. |
+| `vitest/valid-expect` | oxlint built-in | `expect` takes at most two arguments; the second labels which iteration failed. |
+| `vitest/valid-title` | oxlint built-in | A test title is a string and does not start with "should". |
+| `vitest/require-mock-type-parameters` | oxlint built-in | Off (amendment below). |
 
 `no-test-without-assertion` and `no-empty-test` were ast-grep rules that
 duplicated `vitest/expect-expect`, a built-in already enabled at oxlint's own
@@ -96,3 +106,15 @@ Test names are checked by a rule, so a rename is a lint fix rather than a
 review round. The cost is that a legitimately awkward name now needs an
 inline suppression, and a suppression in a test file is a fair prompt to ask
 what the test is really about.
+
+## Amendment, 2026-09-23: the plugin holds the test rules
+
+ast-grep was removed. `no-tautological-assertion` and `no-form-watch-in-child`
+are plugin rules now; `no-form-disable-on-isvalid` was deleted without a port.
+The `test-quality` policy left the architecture-enforcer registry (its
+`--review-test-quality` report remains).
+
+`vitest/valid-title` is now configured with `mustNotMatch` refusing a leading
+"should" on `it` and `test`, and the plugin-config guard pins that setting.
+Whether the pinned build fires on every such title was not re-measured. `langwatch/test-description-is-an-action` still owns
+the nested-`describe` check.

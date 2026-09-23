@@ -19,6 +19,16 @@ Feature: Process outbox lease hardening
     And the delivery is reported as fenced, not as dispatched
     And a fenced outcome is counted for the process
 
+  @integration @fencing
+  Scenario: Two acknowledgements of one lease: the second is refused
+    Given a dispatcher leased a message
+    When its delivery is acknowledged as dispatched and as failed at the same moment
+    Then the message row carries the first acknowledgement
+    And the second is reported as not applied
+    # The second waits on the first's row lock and re-reads the lease and the
+    # status as the first left them, rather than deciding on the row as it
+    # read it before the wait.
+
   @integration @lease-budget
   Scenario: A batch running out of lease releases its tail instead of dispatching past it
     Given a leased batch whose earlier deliveries consume nearly the whole lease

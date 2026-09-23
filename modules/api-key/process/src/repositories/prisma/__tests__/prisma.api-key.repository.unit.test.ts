@@ -119,7 +119,7 @@ describe("PrismaApiKeyRepository", () => {
 
       await repository.findIngestKey({
         organizationId: "org-1",
-        projectId: "project-1",
+        apiKeyIds: ["key-1"],
         sourceType: "claude_code",
       });
 
@@ -131,35 +131,34 @@ describe("PrismaApiKeyRepository", () => {
 });
 
 describe("when a key is revoked", () => {
-  /** The revoke's two calls: the fenced write, then the read-back. */
+  /** The revoke's two calls: the fenced SQL write, then the read-back. */
   function revokingRepository(row: { revokedAt: Date | null; revocationCause: string | null }) {
-    const updateMany = vi.fn(
-      async (update: { where: { revokedAt: null }; data: Record<string, unknown> }) => {
-        if (row.revokedAt) return { count: 0 };
-        row.revokedAt = update.data.revokedAt as Date;
-        row.revocationCause = update.data.revocationCause as string;
-        return { count: 1 };
-      },
-    );
+    const $executeRaw = vi.fn(async (sql: TemplateStringsArray, ...values: unknown[]) => {
+      if (row.revokedAt && sql.join("?").includes('"revokedAt" IS NULL')) return 0;
+      row.revokedAt = new Date();
+      row.revocationCause = String(values[0]);
+      return 1;
+    });
     const findUniqueOrThrow = vi.fn(async () => row);
     const database = {
-      apiKey: { updateMany, findUniqueOrThrow },
+      apiKey: { findUniqueOrThrow },
+      $executeRaw,
     } as unknown as PrismaApiKeyDatabase;
-    return { repository: PrismaApiKeyRepository.create({ prisma: database }), updateMany, row };
+    return { repository: PrismaApiKeyRepository.create({ prisma: database }), $executeRaw, row };
   }
 
   /** @scenario "A revoke from the API keys page records a person as its cause" */
   it("records the cause the caller named, fenced on the row still being live", async () => {
-    const { repository, updateMany, row } = revokingRepository({
+    const { repository, $executeRaw, row } = revokingRepository({
       revokedAt: null,
       revocationCause: null,
     });
 
     await repository.revoke({ id: "key-1", cause: "user" });
 
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "key-1", revokedAt: null } }),
-    );
+    const [sql, ...values] = $executeRaw.mock.calls[0] ?? [];
+    expect(sql?.join("?")).toContain('"revokedAt" IS NULL');
+    expect(values).toEqual(["user", "key-1"]);
     expect(row.revocationCause).toBe("user");
   });
 

@@ -8,6 +8,7 @@ import {
   useUiDeployment,
   useUiScope,
   type UiFeedback,
+  type UiRoute,
 } from "@langwatch/browser-host/capabilities";
 import { useMemo, type ReactNode } from "react";
 
@@ -15,6 +16,7 @@ import {
   ScimHostApi,
   ScimHostProvider,
   type ScimFailureNotice,
+  type ScimRouteReading,
   type ScimSuccessNotice,
 } from "../model/scim-host.ts";
 
@@ -23,6 +25,7 @@ class CapabilityScimHost extends ScimHostApi {
     private readonly orgId: string | undefined,
     private readonly appBaseUrl: string,
     private readonly feedback: UiFeedback,
+    private readonly uiRoute: UiRoute,
   ) {
     super();
   }
@@ -43,6 +46,14 @@ class CapabilityScimHost extends ScimHostApi {
   failed(failure: ScimFailureNotice): void {
     this.feedback.failed(failure);
   }
+
+  route(): ScimRouteReading {
+    return { query: this.uiRoute.reading().query };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.uiRoute.setQuery(next, { replace: true });
+  }
 }
 
 /**
@@ -51,13 +62,13 @@ class CapabilityScimHost extends ScimHostApi {
  * is what `mounts.load` resolves.
  */
 export default function ScimHostMount({ children }: { children?: ReactNode }) {
-  const { feedback } = useUiCapabilities();
+  const { feedback, route } = useUiCapabilities();
   const { organizationId } = useUiScope().activeScope();
   const { appBaseUrl } = useUiDeployment();
 
   const host = useMemo(
-    () => new CapabilityScimHost(organizationId ?? void 0, appBaseUrl, feedback),
-    [organizationId, appBaseUrl, feedback],
+    () => new CapabilityScimHost(organizationId ?? void 0, appBaseUrl, feedback, route),
+    [organizationId, appBaseUrl, feedback, route],
   );
 
   return <ScimHostProvider value={host}>{children}</ScimHostProvider>;

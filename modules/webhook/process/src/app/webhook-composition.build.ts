@@ -1,10 +1,7 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { PrismaProcessStore } from "@langwatch/eventing/server";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { WebhookDispatchUnavailableError } from "@langwatch/webhook-contract";
 
 import { WebhookAccessService } from "../services/webhook-access.service.ts";
-import type { WebhookHealthDeps } from "../services/webhook-health.service.ts";
 import type { WebhookTestDispatch } from "./webhook.app.ts";
 
 /**
@@ -16,21 +13,18 @@ function unavailableDispatch(): WebhookTestDispatch {
 }
 
 /**
- * What this process hands `WebhookApp` at boot: the shared process store,
- * entitlement check, and the test-fire dispatch this process refuses by name.
+ * What this process hands `WebhookApp` at boot: the entitlement check, and
+ * the test-fire dispatch this process refuses by name.
  */
 export function buildWebhookComposition(input: {
-  prisma: ProcessMembers["prisma"];
   entitlement: Pick<EntitlementApi, "getActivePlan">;
 }): {
-  processStore: WebhookHealthDeps["processStore"];
   assertEndpointsEntitled(organizationId: string): Promise<void>;
   dispatch: WebhookTestDispatch;
 } {
   const access = WebhookAccessService.create(input.entitlement);
 
   return {
-    processStore: PrismaProcessStore.create({ database: input.prisma }),
     assertEndpointsEntitled: (organizationId) => access.assertEndpointsAvailable(organizationId),
     dispatch: unavailableDispatch(),
   };

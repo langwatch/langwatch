@@ -4,6 +4,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -15,12 +16,13 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
 /**
- * Packages on TypeScript 6: sdks/typescript, mcp/typescript (tsup `dts`),
- * architecture-enforcer (programmatic API, sync CLI).
+ * Packages on TypeScript 6 as a library: sdks/typescript, mcp/typescript,
+ * packages/ksuid (tsup and publish builds), architecture-enforcer (parser).
  */
 const HELD_ON_SIX = new Set([
   "sdks/typescript",
   "mcp/typescript",
+  "packages/ksuid",
   "packages/architecture-enforcer",
 ]);
 
@@ -59,6 +61,12 @@ function trackedFiles(): string[] {
 
 const TRACKED = trackedFiles();
 
+function installedCompilerVersion(manifest: string): string {
+  const fromPackage = createRequire(resolve(REPO_ROOT, manifest));
+  const compiler = fromPackage.resolve("typescript/package.json");
+  return JSON.parse(readFileSync(compiler, "utf8")).version;
+}
+
 describe("given TypeScript 7 is the compiler", () => {
   describe("when source reaches for the compiler API", () => {
     /** @scenario "The compiler API is only reached through its unstable export" */
@@ -81,11 +89,13 @@ describe("given TypeScript 7 is the compiler", () => {
 
     /** @scenario "Every workspace package builds against one compiler major" */
     it("declares TypeScript 7 everywhere except the packages held on 6", () => {
+      // Manifests name a pnpm catalog, not a range, so the major is read from
+      // the compiler each package actually resolves.
       const declared = new Map<string, string>();
       for (const manifest of manifests) {
         const json = JSON.parse(readFileSync(resolve(REPO_ROOT, manifest), "utf8"));
-        const version = json.devDependencies?.typescript ?? json.dependencies?.typescript;
-        if (version) declared.set(manifest, version);
+        if (!(json.devDependencies?.typescript ?? json.dependencies?.typescript)) continue;
+        declared.set(manifest, installedCompilerVersion(manifest));
       }
 
       // A package this test cannot see is a package it cannot enforce, so the
@@ -102,10 +112,25 @@ describe("given TypeScript 7 is the compiler", () => {
 
       const wrong = [...declared].filter(([manifest, version]) => {
         const held = [...HELD_ON_SIX].some((pkg) => manifest.startsWith(`${pkg}/`));
-        return held ? !version.startsWith("^6.") : !version.startsWith("^7.");
+        return held ? !version.startsWith("6.") : !version.startsWith("7.");
       });
 
       expect(wrong).toEqual([]);
+    });
+
+    /** @scenario "A package held on 6 still typechecks with 7" */
+    it("runs every held package's typecheck through the workspace compiler", () => {
+      const scripts = manifests
+        .filter((manifest) => [...HELD_ON_SIX].some((held) => manifest === `${held}/package.json`))
+        .map((manifest) => {
+          const json = JSON.parse(readFileSync(resolve(REPO_ROOT, manifest), "utf8"));
+          return [manifest, json.scripts?.typecheck] as const;
+        })
+        .filter(([, script]) => script !== undefined);
+
+      expect(scripts.length).toBeGreaterThan(0);
+      const local = scripts.filter(([, script]) => !script.startsWith("pnpm -w exec tsc "));
+      expect(local).toEqual([]);
     });
 
     /** @scenario "The superseded preview compiler is gone" */

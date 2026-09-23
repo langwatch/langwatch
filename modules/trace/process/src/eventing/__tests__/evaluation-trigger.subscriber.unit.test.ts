@@ -16,12 +16,16 @@ import {
   type TraceEvaluationLoopBlockReason,
   type TraceEvaluationMonitor,
 } from "../../app/trace.members.ts";
+import { TraceDeferredOriginEventingAdapter } from "../../services/eventing.deferred-origin.service.ts";
+import { TraceAttributeAccumulationService } from "../../services/trace-attribute-accumulation.service.ts";
+import { TraceOriginService } from "../../services/trace-origin.service.ts";
 import {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
   detectFoldedCausalityLoop,
 } from "../evaluation-trigger.subscriber.ts";
 import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
+import { createInitState, createTestSpan } from "./trace-summary-test.fixtures.ts";
 
 /**
  * Spec: modules/trace/specs/evaluation-trigger.feature
@@ -884,5 +888,51 @@ describe("evaluationTrigger relevance check", () => {
         false,
       );
     });
+  });
+});
+
+describe("createEvaluationTriggerSubscriber — the folded depth, as the projection folds it", () => {
+  /** The trace's attributes after one span, through the real accumulation and origin services. */
+  function foldedAfter(spanAttributes: Record<string, string | number>): Record<string, string> {
+    return TraceAttributeAccumulationService.create(
+      TraceOriginService.create(),
+    ).accumulateAttributes({
+      state: createInitState(),
+      span: createTestSpan({ spanAttributes }),
+      outputSource: "span",
+      inputIsFallback: false,
+      outputIsFallback: false,
+      inputMediaRefs: null,
+      outputMediaRefs: null,
+    });
+  }
+
+  it("carries the depth from the span through accumulation into the guard", async () => {
+    const attributes = foldedAfter({
+      "langwatch.origin": "evaluation",
+      "langwatch.reserved.causality_depth": 1,
+    });
+    const { built, dispatch } = subscriber({});
+
+    await run(built, originResolvedEvent(), foldState({ attributes }));
+
+    expect(dispatch.sent).toEqual([]);
+  });
+
+  /** A span another library started inside an evaluator run carries a depth and no origin. */
+  it("guards a trace whose spans carry a depth but no origin", async () => {
+    const attributes = foldedAfter({ "langwatch.reserved.causality_depth": 1 });
+    expect(attributes["langwatch.origin"]).toBeUndefined();
+    expect(
+      TraceDeferredOriginEventingAdapter.needsOriginResolution({
+        event: spanEvent({ attributes: [] }),
+        foldState: foldState({ attributes }),
+      }),
+    ).toBe(true);
+    const { built, dispatch } = subscriber({});
+
+    await run(built, originResolvedEvent(), foldState({ attributes }));
+
+    expect(dispatch.sent).toEqual([]);
   });
 });

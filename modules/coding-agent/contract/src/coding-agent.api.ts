@@ -54,6 +54,16 @@ export type CodingAgentPullRequestUsageRead = Readonly<{
   contributingProjectCount: number;
 }>;
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * sessions started, since `since` where one is given, and when the first
+ * session started. A session folded twice counts once. Epoch milliseconds.
+ */
+export interface CodingAgentUsageCount {
+  readonly sessions: number;
+  readonly firstSessionAt?: number;
+}
+
 export interface CodingAgentApi {
   logContentKeys(eventName: string): readonly LogContentKey[];
   contentAttrKeys(eventName: string): readonly string[];
@@ -122,6 +132,11 @@ export interface CodingAgentApi {
     by: { readonly id: string },
   ): Promise<CodingAgentPersonalPullRequestUsage & { connection: CodingAgentGithubConnection }>;
   githubConnection(organizationId: string | undefined): Promise<CodingAgentGithubConnection>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount>;
 }
 
 export const CodingAgentApi = moduleApi<CodingAgentApi>()("coding-agent");

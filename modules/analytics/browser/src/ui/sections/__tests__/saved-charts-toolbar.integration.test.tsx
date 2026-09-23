@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Save and Open, driving the real component against real Chakra menus:
  * Save with a chart open must write back, not quietly leave two.
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

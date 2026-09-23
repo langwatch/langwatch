@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
@@ -75,6 +76,11 @@ const GLOBAL_MODELS = [
   // global support inbox read from the admin backoffice; `linkedProjectId` is
   // informational only, so there is no tenancy column to constrain on.
   "BugReport",
+  // The sign-in attempt lock is keyed by a normalized identifier hash and
+  // consulted before any user or tenant is known, like IdentifierReservation.
+  "SignInAttemptLock",
+  // One row per installation: which instance this is, with no tenant at all.
+  "InstanceIdentity",
 ] as const;
 
 /**
@@ -94,6 +100,15 @@ const RELATIONAL_PARENT_SCOPED = [
   // Annotation-queue join tables, written through the parent queue.
   "AnnotationQueueMembers",
   "AnnotationQueueScores",
+  // Keyed by the SSO connection it re-proves; read only through it.
+  "SsoConnectionReproofCursor",
+  // Connected-billing ledger rows, owned by their ConnectedBillingAccount.
+  "ConnectedCreditGrant",
+  "ConnectedInvoice",
+  "ConnectedSeatChange",
+  "ConnectedStatement",
+  // A self-hosted instance's reports, reached through the instance row.
+  "SelfHostedInstanceReport",
 ] as const;
 
 /**
@@ -447,6 +462,7 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
           (c.organizationId && Array.isArray(c.organizationId.in)) ||
           hasIdOrInPredicate(c) ||
           typeof c.hashedSecret === "string" ||
+          typeof c.licenseTokenHash === "string" ||
           // Rotation grace-window lookup: previousHashedSecret is a
           // uniquely-keyed secret column too, so a where-clause that
           // names it is bounded.

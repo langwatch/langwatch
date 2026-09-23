@@ -39,6 +39,7 @@ import type {
   ProposeLinkCommandData,
   VerifyIdentifierCommandData,
 } from "./facts.ts";
+import type { DomainJoinSetting, JoinLookupDecision, JoinOffer } from "./join-matching.ts";
 import type {
   ApproveJoinCommandData,
   ExpireJoinCommandData,
@@ -46,7 +47,7 @@ import type {
   RequestJoinCommandData,
   WithdrawJoinCommandData,
 } from "./join-request-commands.ts";
-import type { JoinRequestFactInput } from "./join-request.ts";
+import type { JoinRequestAggregateState, JoinRequestFactInput } from "./join-request.ts";
 import type { MatchableEmail } from "./matchable-emails.ts";
 import type {
   ConfirmMfaCommandData,
@@ -63,6 +64,7 @@ import type {
   RecordScimApplyFailureCommandData,
   RecordScimGroupMappingCommandData,
   RecordScimUserPushCommandData,
+  RedriveScimApplyCommandData,
   RevokeScimSyncCommandData,
 } from "./scim-sync-commands.ts";
 import type { ScimSyncFactInput, ScimSyncState } from "./scim-sync.ts";
@@ -244,6 +246,10 @@ export interface SsoConnectionReadsApi {
     organizationId: string;
     connectionId: string;
   }): Promise<SsoConnectionProviderReading>;
+  /** Which organization governs a connection. Asked by the peer that holds
+   *  only the connection the sign-in router chose. Throws when no connection
+   *  answers to that id. */
+  getOrganization(args: { connectionId: string }): Promise<{ organizationId: string }>;
 }
 
 /** One connection, named the way the rows a peer owns were stamped. */
@@ -265,6 +271,15 @@ export interface ScimSyncReadsApi {
     organizationId: string;
     connectionId: string;
   }): Promise<ScimSyncState | null>;
+  /** The platform operator's cross-customer page (ADR-122), newest first;
+   *  searched on the sync, connection or organization id, or the state. */
+  listForOperator(args: {
+    page: number;
+    pageSize: number;
+    search?: string | undefined;
+  }): Promise<{ syncs: ScimSyncState[]; total: number }>;
+  /** One connection's sync across every organization, for the operator. */
+  findForOperator(args: { connectionId: string }): Promise<ScimSyncState[]>;
 }
 
 /**
@@ -552,6 +567,83 @@ export interface SsoArrivalApi {
   admit(args: { user: SsoArrivingUser; connectionId: string; domain: string }): Promise<void>;
 }
 
+/** A member a matching domain admitted, and whether the policy did it with nobody approving. */
+export interface IdentityDomainAdmission {
+  userId: string;
+  domain: string;
+  automatic: boolean;
+}
+
+/** Which of an organization's members joined by domain (D12), for the members list. */
+export interface JoinAdmissionsApi {
+  findForMembers(args: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<IdentityDomainAdmission[]>;
+}
+
+/** Both values and both domain lists of a saved joining setting, for its audit row. */
+export interface JoinSettingChange {
+  previous: DomainJoinSetting;
+  next: DomainJoinSetting;
+  previousDomains: readonly string[];
+  nextDomains: readonly string[];
+}
+
+/**
+ * The join-request ledger (D12, ADR-117): the lookup, the offer, the ask, the
+ * admins' answers and the setting behind them. Organization serves the door.
+ */
+export interface JoinRequestsApi {
+  lookup(args: { userId: string; verifiedEmail: string | null }): Promise<JoinLookupDecision>;
+  offerForSignedInUser(args: {
+    userId: string;
+    verifiedEmail: string | null;
+  }): Promise<JoinLookupDecision>;
+  dismissOffer(args: { userId: string; verifiedEmail: string | null }): Promise<void>;
+  joinAutomaticallyIfAdmitted(args: {
+    userId: string;
+    verifiedEmail: string | null;
+  }): Promise<{ organization: JoinOffer | null }>;
+  request(args: {
+    userId: string;
+    verifiedEmail: string | null;
+    organizationId: string;
+  }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }>;
+  withdraw(args: { joinRequestId: string; userId: string }): Promise<void>;
+  approve(args: {
+    joinRequestId: string;
+    organizationId: string;
+    adminUserId: string;
+  }): Promise<void>;
+  reject(args: {
+    joinRequestId: string;
+    organizationId: string;
+    adminUserId: string;
+  }): Promise<void>;
+  resolveByInvitation(args: {
+    userId: string;
+    organizationId: string;
+    inviteId: string;
+  }): Promise<void>;
+  withdrawOnInvitationAccepted(args: { userId: string; organizationId: string }): Promise<void>;
+  /** Audited against `actorUserId`, the administrator who saved it. */
+  setJoining(args: {
+    organizationId: string;
+    domainJoin: DomainJoinSetting;
+    domains: readonly string[];
+    actorUserId: string;
+  }): Promise<JoinSettingChange>;
+  readJoining(args: {
+    organizationId: string;
+  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
+  pendingForOrganization(args: { organizationId: string }): Promise<JoinRequestAggregateState[]>;
+  automaticJoinsForOrganization(args: {
+    organizationId: string;
+  }): Promise<JoinRequestAggregateState[]>;
+  pendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]>;
+}
+
 /**
  * Where a person who belongs to no organization stands: not testing anything,
  * for almost everybody — and the connection an administrator's mandatory test
@@ -567,6 +659,7 @@ export interface ScimSyncGuardsApi {
   recordScimUserPush(data: RecordScimUserPushCommandData): Promise<ScimSyncFactInput[]>;
   recordScimGroupMapping(data: RecordScimGroupMappingCommandData): Promise<ScimSyncFactInput[]>;
   recordScimApplyFailure(data: RecordScimApplyFailureCommandData): Promise<ScimSyncFactInput[]>;
+  redriveScimApply(data: RedriveScimApplyCommandData): Promise<ScimSyncFactInput[]>;
   revokeScimSync(data: RevokeScimSyncCommandData): Promise<ScimSyncFactInput[]>;
 }
 
@@ -623,6 +716,8 @@ export interface IdentityApi {
   ssoAssertion(): SsoAssertionApi;
   ssoArrival(): SsoArrivalApi;
   ssoTestArrival(): SsoTestArrivalApi;
+  joinAdmissions(): JoinAdmissionsApi;
+  joinRequests(): JoinRequestsApi;
   ssoActivity(): SsoAuthenticationActivityApi;
   ssoMigrationCallbacks(): SsoMigrationCallbackApi;
   ssoBreakGlass(): SsoBreakGlassApi;

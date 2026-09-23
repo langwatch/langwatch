@@ -56,6 +56,8 @@ function makeService(failure: LedgerFailure) {
   const grantCalls: Record<string, unknown>[] = [];
   const dependencies = {
     authz: {
+      listApiKeyBindings: async ({ apiKeyIds }: { apiKeyIds: string[] }) =>
+        existing.roleBindings.map((binding) => ({ ...binding, apiKeyId: apiKeyIds[0] })),
       hasPermission: async () => true,
       can: async () => true,
       listUserBindings: async () => [],

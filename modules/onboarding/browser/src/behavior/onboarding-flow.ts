@@ -23,11 +23,24 @@ export function getOnboardingFlowConfig({
   isSaaS,
   intent,
   intentForkEnabled,
+  guided,
 }: {
   isSaaS: boolean;
   intent: OrganizationIntent | undefined;
   intentForkEnabled: boolean;
+  /** The guided variant: organization and tailor cards, then Langy takes over, on any install. */
+  guided: boolean;
 }): OnboardingFlowConfig {
+  if (guided) {
+    return buildConfig("guided", [
+      OnboardingScreenIndex.ORGANIZATION,
+      OnboardingScreenIndex.BASIC_INFO,
+      OnboardingScreenIndex.HELLO,
+      OnboardingScreenIndex.VALUE,
+      OnboardingScreenIndex.PROVIDER,
+    ]);
+  }
+
   if (!intentForkEnabled) {
     return isSaaS
       ? buildConfig("full", [

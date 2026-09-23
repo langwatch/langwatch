@@ -71,6 +71,12 @@
     },
     {
       "path": "../secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

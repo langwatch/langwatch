@@ -66,7 +66,7 @@ describe("MemoryAgentRepository", () => {
     input.config.versions.v1.name = "changed nested input";
     created.name = "changed output";
     created.createdAt.setTime(0);
-    created.config.name = "changed output";
+    Object.assign(created.config, { name: "changed output" });
 
     const saved = await first.getById(input);
     expect(saved).toMatchObject({

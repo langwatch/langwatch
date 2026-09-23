@@ -6,6 +6,7 @@ import {
   SavedWorkbenchChartNotFoundError,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
+  type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
@@ -49,6 +50,18 @@ export class MemoryDashboardRepository implements DashboardRepository {
 
   static create(): MemoryDashboardRepository {
     return new MemoryDashboardRepository();
+  }
+
+  async countUsage({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<DashboardUsageCount> {
+    return {
+      builderCharts: this.#charts.filter(
+        (chart) => chart.kind === "builder" && projectIds.includes(chart.projectId),
+      ).length,
+    };
   }
 
   async findAllDashboards(input: {

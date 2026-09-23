@@ -1,3 +1,5 @@
+export const LOG_PROCESSING_PIPELINE_NAME = "log_processing" as const;
+
 export const CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE = "lw.obs.log.record_received" as const;
 export const CANONICAL_LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST = "2026-07-17" as const;
 

@@ -23,6 +23,12 @@ class RecordingUiAnalytics extends UiAnalytics {
   track(event: UiAnalyticsEvent): void {
     this.tracked.push(event);
   }
+
+  identify(): void {}
+
+  group(): void {}
+
+  reset(): void {}
 }
 
 const SURFACE = {

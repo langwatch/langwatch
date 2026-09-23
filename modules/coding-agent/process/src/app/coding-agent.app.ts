@@ -24,6 +24,7 @@ import {
   type CodingAgentSessionsListInput,
   type CodingAgentSessionCursor,
   type CodingAgentSpanFilterInput,
+  type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
@@ -257,6 +258,14 @@ export class CodingAgentApp implements CodingAgentApi {
   /** The project's "at a glance" totals over a window. */
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {
     return this.#codingAgents.getUsageTotals(input);
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount> {
+    return this.#codingAgents.countUsage(input);
   }
 
   /** The project's recent sessions in a window, newest first. */

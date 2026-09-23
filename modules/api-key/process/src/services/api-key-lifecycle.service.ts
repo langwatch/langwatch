@@ -19,6 +19,7 @@ import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
@@ -47,11 +48,15 @@ export class ApiKeyLifecycleService {
     return new ApiKeyLifecycleService(options.repository, options, grants);
   }
 
+  private readonly bindings: ApiKeyBindingsService;
+
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
     private readonly grants: ApiKeyGrantPolicyService,
-  ) {}
+  ) {
+    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+  }
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
     const parsed = createApiKeyInputSchema.parse(input);
@@ -116,7 +121,9 @@ export class ApiKeyLifecycleService {
 
     return {
       token: generated.token,
-      apiKey: publicApiKey(await this.repository.activate({ id: row.id })),
+      apiKey: publicApiKey(
+        await this.bindings.attachOne(await this.repository.activate({ id: row.id })),
+      ),
     };
   }
 
@@ -182,13 +189,15 @@ export class ApiKeyLifecycleService {
           });
 
     return publicApiKey(
-      await this.repository.update({
-        id: input.id,
-        name: input.name,
-        description: input.description,
-        permissionMode: input.permissionMode,
-        roleBindings: effectiveBindings,
-      }),
+      await this.bindings.attachOne(
+        await this.repository.update({
+          id: input.id,
+          name: input.name,
+          description: input.description,
+          permissionMode: input.permissionMode,
+          roleBindings: effectiveBindings,
+        }),
+      ),
     );
   }
 
@@ -232,7 +241,10 @@ export class ApiKeyLifecycleService {
     }
 
     const cause = input.cause ?? "user";
-    const revoked = publicApiKey(await this.repository.revoke({ id: input.id, cause }));
+    const revoked = publicApiKey({
+      ...(await this.repository.revoke({ id: input.id, cause })),
+      roleBindings: existing.roleBindings,
+    });
 
     if (input.cascadeToChildren ?? true) {
       await this.revokeChildrenOf({
@@ -308,7 +320,7 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyNotFoundError(id);
     }
 
-    return row;
+    return this.bindings.attachOne(row);
   }
 
   private async validateCreateBindings(input: {

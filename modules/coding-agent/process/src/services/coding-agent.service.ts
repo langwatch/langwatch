@@ -17,6 +17,7 @@ import {
   type CodingAgentTraceSessionLookupInput,
   type CodingAgentTracePullRequestInput,
   type CodingAgentTracePullRequestLink,
+  type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
@@ -70,6 +71,10 @@ export interface CodingAgentSessionService {
   getForPersonalProject(
     input: CodingAgentPersonalPullRequestUsageInput,
   ): Promise<CodingAgentPersonalPullRequestUsage>;
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount>;
 }
 
 /** The one public Coding Agent contract, composed from private role-specific collaborators. */
@@ -172,6 +177,13 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
 
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {
     return this.collaborators.sessionReads.getUsageTotals(input);
+  }
+
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount> {
+    return this.collaborators.sessionReads.countUsage(input);
   }
 
   listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]> {

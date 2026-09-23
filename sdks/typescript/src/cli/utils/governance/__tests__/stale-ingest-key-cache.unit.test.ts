@@ -6,6 +6,7 @@
 import * as fs from "node:fs";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { appSettingsTargetFor, installAppEnv } from "../app-settings";
 import * as cliApi from "../cli-api";
 import type { GovernanceConfig } from "../config";
@@ -405,7 +406,7 @@ describe("runUnifiedLoginFlow", () => {
         );
 
         const cfg = baseCfg({
-          control_plane_url: "http://localhost:5580",
+          control_plane_url: "https://langwatch.acme.test",
         });
 
         vi.spyOn(deviceFlow, "startDeviceCode").mockResolvedValue({

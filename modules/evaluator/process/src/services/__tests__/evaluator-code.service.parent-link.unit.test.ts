@@ -89,7 +89,10 @@ describe("EvaluatorCodeService execute", () => {
         projectId: "test-project-id",
         evaluatorId: "evaluator_parent_link_test",
         data: { output: "hello" },
-        parentTrace: { traceId: "0af7651916cd43dd8448eb211c80319c", spanId: "b7ad6b7169203331" },
+        parentTrace: {
+          traceId: "0af7651916cd43dd8448eb211c80319c",
+          parentSpanId: "b7ad6b7169203331",
+        },
       });
 
       expect(doNotTraceOf(sent[0]!)).toBe(false);

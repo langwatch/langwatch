@@ -61,9 +61,17 @@ body {
   margin: 0;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* Declared in a layer on purpose. Chakra emits component styles in `@layer
+   recipes`, and an unlayered rule beats every layer, so an unlayered anchor
+   colour repaints the text of anything rendered `asChild` over an `<a>`: a
+   solid Button used as a link lost its `colorPalette.contrast` and inherited
+   the surrounding text colour instead. In a layer the rule still beats the
+   browser default and loses to the component that styled itself. */
+@layer base {
+	a {
+		color: inherit;
+		text-decoration: none;
+	}
 }
 
 * {

@@ -3,7 +3,8 @@
  * key is separate to avoid spreading credentials across unrelated surfaces.
  */
 
-import { createContext, useContext } from "react";
+import type { UiJoinOfferProps } from "@langwatch/browser-host/declarations";
+import { createContext, useContext, type ComponentType } from "react";
 
 /** One project, as narrowly as these screens read one. */
 export type OnboardingProject = {
@@ -26,6 +27,8 @@ export type OnboardingOrganization = {
   readonly name: string;
   readonly primaryIntent: string | null;
   readonly teams: readonly OnboardingTeam[];
+  /** The stored sign-up answers, where a guided variant and its state live. */
+  readonly signupData?: unknown;
 };
 
 /**
@@ -117,6 +120,12 @@ export type OnboardingFailureNotice = {
   readonly description?: string;
 };
 
+/** A join offer a peer declared (organization's), keyed by the module that declared it. */
+export type OnboardingJoinOffer = {
+  readonly key: string;
+  readonly JoinOffer: ComponentType<UiJoinOfferProps>;
+};
+
 export abstract class OnboardingHostApi {
   /** The organization graph and what this page is about. */
   abstract scope(): OnboardingScope;
@@ -181,6 +190,9 @@ export abstract class OnboardingHostApi {
 
   /** The governance sample-data toggle; see {@link OnboardingGovernanceCapability}. */
   abstract governance(): OnboardingGovernanceCapability;
+
+  /** "Your colleagues are already here", drawn before the create-organization form. */
+  abstract joinOffers(): readonly OnboardingJoinOffer[];
 }
 
 const OnboardingHostContext = createContext<OnboardingHostApi | undefined>(void 0);

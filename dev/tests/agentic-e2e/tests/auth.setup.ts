@@ -94,6 +94,29 @@ setup("authenticate", async ({ page, request }) => {
     );
   }
 
+  // Same reasoning as the nudge above, for the other modal the shell can open
+  // over a reused session. `JoinYourTeamTakeover` offers this account the
+  // organizations already on its verified address's domain — and every account
+  // the front-door suite confirms is `@langwatch.ai`, the same domain as this
+  // one, so by the time the later suites run there is always something to
+  // offer. It is a cover-size modal, so leaving it open does not merely
+  // obstruct clicks: `aria-modal` takes the rest of the page out of the
+  // accessibility tree, and every `getByRole` in every unrelated suite then
+  // fails as "element(s) not found".
+  const dismissJoinOfferResponse = await page.request.post(
+    "/api/trpc/joinRequests.dismissOffer?batch=1",
+    { data: { "0": { json: {} } } },
+  );
+  const dismissJoinOfferData = await dismissJoinOfferResponse
+    .json()
+    .catch(() => null);
+
+  if (!dismissJoinOfferResponse.ok() || dismissJoinOfferData?.["0"]?.error) {
+    throw new Error(
+      `joinRequests.dismissOffer failed: ${JSON.stringify(dismissJoinOfferData).slice(0, 500)}`,
+    );
+  }
+
   // Step 3: Create org + project via API if not already set up.
   // page.request inherits the browser session cookies from the sign-in above,
   // so this call is fully authenticated. This is more reliable than clicking

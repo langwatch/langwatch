@@ -65,6 +65,7 @@
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",

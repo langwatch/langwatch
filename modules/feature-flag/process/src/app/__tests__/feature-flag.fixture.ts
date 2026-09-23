@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { parseProcessConfig } from "@langwatch/config";
 import {
@@ -10,7 +11,7 @@ import {
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 
 import type { FeatureFlagRepositories } from "../../repositories/feature-flag.repositories.ts";
@@ -176,6 +177,7 @@ export function createFeatureFlagTestApp(
     },
     config: input.config ?? resolveTestFeatureFlagServerConfig(),
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     members: {},
   });
 }

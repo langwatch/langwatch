@@ -51,6 +51,9 @@
       "path": "../../../../packages/error-presentation/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -61,6 +64,9 @@
     },
     {
       "path": "../../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/ops/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"

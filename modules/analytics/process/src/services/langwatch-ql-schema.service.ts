@@ -16,6 +16,7 @@ import {
   lwqlAppFunctionSignature,
 } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
 import type { LangWatchQLAppFunctionDefinition } from "../rules/langwatch-ql-app-function-shapes.rules.ts";
+import { LWQL_ALLOWED_FUNCTION_NAMES } from "../rules/langwatch-ql-functions.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLCatalogShapesService,
@@ -37,6 +38,25 @@ const EXAMPLE_LOOKBACK_DAYS = 7;
 
 /** Rows an example query asks for. */
 const EXAMPLE_ROW_LIMIT = 100;
+
+/**
+ * A `timeColumn` whose declared type this matches is temporal or numeric — comparable to
+ * `subtractDays(now(), …)` — and can bound a lookback.
+ */
+export const BOUNDABLE_TIME_COLUMN_TYPE = /Date|Int|Float|Decimal/;
+
+/**
+ * The `WHERE <timeColumn> >= subtractDays(...)` clause for an example query, or
+ * the empty string when the view's time column cannot be bounded that way.
+ */
+function exampleLookbackPredicate({ view }: { view: LangWatchQLViewDefinition }): string {
+  const timeColumnType = view.columns.find((column) => column.name === view.timeColumn)?.type;
+  if (!timeColumnType || !BOUNDABLE_TIME_COLUMN_TYPE.test(timeColumnType)) {
+    return "";
+  }
+
+  return `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`;
+}
 
 export type {
   LangWatchQLSchema,
@@ -68,21 +88,33 @@ export class LangWatchQLSchemaService {
       .filter((column) => column.name !== EXAMPLE_SKIPPED_COLUMN)
       .slice(0, EXAMPLE_COLUMN_COUNT)
       .map((column) => column.name);
+    const lookback = exampleLookbackPredicate({ view });
     if (projection.length === 0) {
       // Every column carries its own gate: the one query still runnable by any
       // caller who can see the dataset is a count. No ORDER BY — an aggregate
       // without GROUP BY has nothing to order.
+      return lookback
+        ? `SELECT count() AS rows\nFROM ${database}.${view.name}\n${lookback}`
+        : `SELECT count() AS rows\nFROM ${database}.${view.name}`;
+    }
+
+    if (!lookback) {
+      // A view with no boundable time column has nothing to compare to a date —
+      // emit the projection and a bare LIMIT rather than `ORDER BY undefined`.
+      const orderBy = view.timeColumn ? `ORDER BY ${view.timeColumn} DESC\n` : "";
+
       return (
-        `SELECT count() AS rows\n` +
+        `SELECT ${projection.join(", ")}\n` +
         `FROM ${database}.${view.name}\n` +
-        `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`
+        `${orderBy}` +
+        `LIMIT ${EXAMPLE_ROW_LIMIT}`
       );
     }
 
     return (
       `SELECT ${projection.join(", ")}\n` +
       `FROM ${database}.${view.name}\n` +
-      `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})\n` +
+      `${lookback}\n` +
       `ORDER BY ${view.timeColumn} DESC\n` +
       `LIMIT ${EXAMPLE_ROW_LIMIT}`
     );
@@ -144,12 +176,13 @@ export class LangWatchQLSchemaService {
 
     return {
       database,
-      datasets: catalogShapes.visibleViews({ protections, views }).map((view) => ({
+      functions: LWQL_ALLOWED_FUNCTION_NAMES,
+      views: catalogShapes.visibleViews({ protections, views }).map((view) => ({
         name: `${database}.${view.name}`,
         description: view.description,
         grain: view.grain,
         joinKeys: view.joinKeys,
-        timeColumn: view.timeColumn,
+        timeColumn: view.timeColumn ?? null,
         freshness: view.freshness,
         columns: view.columns.map((column) => ({
           name: column.name,

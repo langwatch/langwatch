@@ -1,10 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 /**
  * @vitest-environment node
@@ -118,7 +118,10 @@ function harness(
   const app = TraceApp.create({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
-      existence: { findExistingTraceIds: async ({ traceIds }) => [...traceIds] },
+      existence: {
+        findExistingTraceIds: async ({ traceIds }) => [...traceIds],
+        countUsage: async () => ({ traces: 0, spans: 0 }),
+      },
       read: read as TraceLegacyRead,
       spans: spans as TracesSpanReader,
       summary,

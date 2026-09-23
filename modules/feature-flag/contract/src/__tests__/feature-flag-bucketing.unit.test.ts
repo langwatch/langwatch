@@ -78,6 +78,17 @@ describe("isWithinRolloutPercentage", () => {
     });
   });
 
+  describe("given a read with an empty subject or no flag key to salt the bucket", () => {
+    it("matches nothing rather than bucketing every flag the same way", () => {
+      expect(isWithinRolloutPercentage({ flagKey: FLAG, subject: "", percentage: 100 })).toBe(
+        false,
+      );
+      expect(isWithinRolloutPercentage({ flagKey: "", subject: "user_1", percentage: 100 })).toBe(
+        false,
+      );
+    });
+  });
+
   describe("given a target with no bucketing subject", () => {
     // A system target is not a person, so a percentage rule has nobody to
     // bucket. It is refused at every percentage, 100 included, rather than

@@ -12,6 +12,21 @@ const NOT_A_MEMBER_YET = {
     "the caller is asking about organizations they are not in yet, so there is no scope to hold a permission on; the handler answers only for the session's OWN verified addresses and reveals nothing else",
 } as const;
 
+const OWN_OFFER_ONLY = {
+  reason:
+    "the same own-verified-address answer `lookup` gives, minus the domains this caller has dismissed; no other person's organizations are reachable",
+} as const;
+
+const OWN_DISMISSAL_ONLY = {
+  reason:
+    "the caller silencing their own offer, on the domain their own session's verified address holds",
+} as const;
+
+const OWN_DOMAIN_ADMISSION_ONLY = {
+  reason:
+    "admits the caller to an organization that opted into admitting their own verified domain; the handler re-derives the match server-side and admits nothing else",
+} as const;
+
 const OWN_PENDING_REQUESTS = {
   reason: "the caller's own pending requests, keyed by their session id",
 } as const;
@@ -32,6 +47,22 @@ export const joinRequestTrpcTransport = defineTrpcRouter(OrganizationApi, joinRe
   .procedure("lookup")
   .noPermission(NOT_A_MEMBER_YET)
   .handle(({ app, actor }) => app.lookupJoinableOrganizations({ userId: actor.id }))
+
+  .procedure("offer")
+  .noPermission(OWN_OFFER_ONLY)
+  .handle(({ app, actor }) => app.offerJoinableOrganizations({ userId: actor.id }))
+
+  .procedure("dismissOffer")
+  .noPermission(OWN_DISMISSAL_ONLY)
+  .handle(async ({ app, actor }) => {
+    await app.dismissJoinOffer({ userId: actor.id });
+
+    return { success: true as const };
+  })
+
+  .procedure("admitAutomatically")
+  .noPermission(OWN_DOMAIN_ADMISSION_ONLY)
+  .handle(({ app, actor }) => app.admitAutomatically({ userId: actor.id }))
 
   .procedure("mine")
   .noPermission(OWN_PENDING_REQUESTS)
@@ -99,11 +130,20 @@ export const joinRequestTrpcTransport = defineTrpcRouter(OrganizationApi, joinRe
 
   .procedure("setJoining")
   .withPermission("organization:manage")
-  .handle(({ app, input }) =>
+  .handle(({ app, input, actor }) =>
     app.setJoiningPolicy({
       organizationId: input.organizationId,
       domainJoin: input.domainJoin,
       domains: input.domains,
+      actorUserId: actor.id,
     }),
   )
+
+  /**
+   * Who walked in without anybody approving, lately — the in-product half of
+   * telling the admins after the fact.
+   */
+  .procedure("automaticJoins")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.listAutomaticJoins({ organizationId: input.organizationId }))
   .build();

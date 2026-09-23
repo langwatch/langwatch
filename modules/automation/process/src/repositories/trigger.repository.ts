@@ -3,6 +3,7 @@ import type {
   Trigger,
   TriggerSummary,
   UpdateTriggerCommand,
+  AutomationUsageCount,
 } from "@langwatch/automation-contract";
 export type ReportScheduleTarget = {
   id: string;
@@ -11,6 +12,11 @@ export type ReportScheduleTarget = {
 };
 export abstract class TriggerRepository {
   abstract findActiveForProject(projectId: string): Promise<TriggerSummary[]>;
+  /** The usage report's count, deleted included; the caller never passes an empty project list. */
+  abstract countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AutomationUsageCount>;
   abstract findActiveReportTargets(): Promise<ReportScheduleTarget[]>;
   abstract claimSend(input: {
     triggerId: string;

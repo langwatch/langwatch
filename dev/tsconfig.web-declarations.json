@@ -34,18 +34,9 @@
     "resolveJsonModule": true
   },
   "include": [
-    "../modules/agent/browser/src/**/*.ts",
-    "../modules/agent/browser/src/**/*.tsx",
-    "../modules/agent/browser/src/**/*.json",
     "../modules/scenario/browser/src/**/*.ts",
     "../modules/scenario/browser/src/**/*.tsx",
     "../modules/scenario/browser/src/**/*.json",
-    "../modules/coding-agent/browser/src/**/*.ts",
-    "../modules/coding-agent/browser/src/**/*.tsx",
-    "../modules/coding-agent/browser/src/**/*.json",
-    "../modules/annotation/browser/src/**/*.ts",
-    "../modules/annotation/browser/src/**/*.tsx",
-    "../modules/annotation/browser/src/**/*.json",
     "../modules/trace/browser/src/**/*.ts",
     "../modules/trace/browser/src/**/*.tsx",
     "../modules/trace/browser/src/**/*.json",
@@ -55,9 +46,6 @@
     "../modules/project/browser/src/**/*.ts",
     "../modules/project/browser/src/**/*.tsx",
     "../modules/project/browser/src/**/*.json",
-    "../modules/onboarding/browser/src/**/*.ts",
-    "../modules/onboarding/browser/src/**/*.tsx",
-    "../modules/onboarding/browser/src/**/*.json",
     "../modules/prompt/browser/src/**/*.ts",
     "../modules/prompt/browser/src/**/*.tsx",
     "../modules/prompt/browser/src/**/*.json",
@@ -79,14 +67,10 @@
     "../modules/analytics/browser/src/**/*.ts",
     "../modules/analytics/browser/src/**/*.tsx",
     "../modules/analytics/browser/src/**/*.json",
-    "../modules/*/browser-kit/src/**/*.ts",
-    "../modules/*/browser-kit/src/**/*.tsx"
   ],
   "files": [
     "../modules/analytics/browser/src/__tests__/lwql-fixtures.ts",
     "../modules/analytics/browser/src/testing.tsx",
-    "../modules/annotation/browser/src/testing.tsx",
-    "../modules/coding-agent/browser/src/testing.tsx",
     "../packages/browser-trpc/src/workflow-api.ts"
   ],
   "exclude": [

@@ -4,7 +4,7 @@
  * workflow the lifecycle can commit a version against, like the Prisma pair.
  */
 import { nowInstant, toDate } from "@langwatch/time";
-import type { Workflow } from "@langwatch/workflow-contract";
+import type { Workflow, WorkflowUsageCount } from "@langwatch/workflow-contract";
 
 import { WorkflowRowRepository, type WorkflowRowDraft } from "../workflow-row.repository.ts";
 import type { WorkflowMemoryStore } from "./workflow-memory.store.ts";
@@ -16,6 +16,22 @@ export class WorkflowRowMemoryRepository extends WorkflowRowRepository {
 
   private constructor(private readonly store: WorkflowMemoryStore) {
     super();
+  }
+
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<WorkflowUsageCount> {
+    const made = [...this.store.workflows.values()]
+      .filter((workflow) => projectIds.includes(workflow.projectId))
+      .map((workflow) => workflow.createdAt.getTime());
+    return {
+      workflows: made.filter((at) => since === undefined || at >= since).length,
+      ...(made.length === 0 ? {} : { firstWorkflowAt: Math.min(...made) }),
+    };
   }
 
   create(input: WorkflowRowDraft): Promise<void> {

@@ -59,6 +59,10 @@ export const userWeb = defineWebModule("user")
       load: () => import("./ui/sections/personal-workspace/security.screen.tsx"),
     },
   })
+  /** The account-security offer the shell draws after the join offer resolves to nothing. */
+  .withCapabilities({
+    secureAccountNudge: { load: () => import("./ui/sections/secure-account-nudge.tsx") },
+  })
   /** What another module may mount. governance reads the tile icon for its tool cards. */
   .publishSurfaces({
     "surfaces/tile-icon": { load: () => import("./ui/elements/tile-icon.tsx") },

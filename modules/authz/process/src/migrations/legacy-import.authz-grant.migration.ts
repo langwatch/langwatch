@@ -591,33 +591,42 @@ export class AuthzExpectedFactsMapper {
       .slice()
       .toSorted((a, b) => a.id.localeCompare(b.id))
       .map((row) => this.legacyRoleToFact(row));
-    const bindingFacts = inventory.bindingRows
-      .slice()
-      .toSorted((a, b) => a.id.localeCompare(b.id))
-      .flatMap((row) => {
-        const fact = this.bindingToFact({ row });
-        return fact ? [fact] : [];
-      });
+    const bindingFacts = this.stampUserFacts(
+      inventory.bindingRows
+        .slice()
+        .toSorted((a, b) => a.id.localeCompare(b.id))
+        .flatMap((row) => {
+          const fact = this.bindingToFact({ row });
+          return fact ? [fact] : [];
+        }),
+      inventory.members,
+    );
     // One coverage predicate for both suppression rules below: a user is
     // "already bound" identically whether the binding names them or a group
     // they belong to, and the two rules must never disagree about that.
     const covers = AuthzBindingCoverageMapper.create({
       groupMemberships: inventory.groupMemberships,
     });
-    const teamFacts = this.teamMembershipFacts({
-      organizationId,
-      teamRows: inventory.teamRows,
-      bindingRows: inventory.bindingRows,
-      covers,
-    });
-    const organizationFacts = this.organizationLevelFacts({
-      organizationId,
-      members: inventory.members,
-      externalMembers: inventory.externalMembers,
-      bindingRows: inventory.bindingRows,
-      covers,
-      organizationCreatedAtMs: inventory.organizationCreatedAtMs,
-    });
+    const teamFacts = this.stampUserFacts(
+      this.teamMembershipFacts({
+        organizationId,
+        teamRows: inventory.teamRows,
+        bindingRows: inventory.bindingRows,
+        covers,
+      }),
+      inventory.members,
+    );
+    const organizationFacts = this.stampUserFacts(
+      this.organizationLevelFacts({
+        organizationId,
+        members: inventory.members,
+        externalMembers: inventory.externalMembers,
+        bindingRows: inventory.bindingRows,
+        covers,
+        organizationCreatedAtMs: inventory.organizationCreatedAtMs,
+      }),
+      inventory.members,
+    );
     const credentialFacts = inventory.credentials
       .slice()
       .toSorted((a, b) => a.projectId.localeCompare(b.projectId))
@@ -677,6 +686,23 @@ export class AuthzExpectedFactsMapper {
     return Array.isArray(stored)
       ? stored.filter((entry): entry is string => typeof entry === "string" && entry !== "")
       : [];
+  }
+
+  /**
+   * Stamp imported USER facts with the membership lifetime in the inventory.
+   * Disabled seats keep the stamp so replay survives re-enable; a user with
+   * no current membership drops the fact fail-closed.
+   */
+  private static stampUserFacts(
+    facts: GrantFact[],
+    members: OrganizationMemberFact[],
+  ): GrantFact[] {
+    const stamps = new Map(members.map((member) => [member.userId, member.membershipStamp]));
+    return facts.flatMap((fact) => {
+      if (fact.principal.type !== "user" || fact.scope.type === "RESOURCE") return [fact];
+      const membershipStamp = fact.principal.id ? stamps.get(fact.principal.id) : undefined;
+      return membershipStamp === undefined ? [] : [{ ...fact, membershipStamp }];
+    });
   }
 
   /**

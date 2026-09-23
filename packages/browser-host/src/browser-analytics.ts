@@ -6,7 +6,12 @@
 
 import type { PostHog } from "posthog-js";
 
-import { UiAnalytics, type UiAnalyticsEvent } from "./analytics.ts";
+import {
+  UiAnalytics,
+  type UiAnalyticsEvent,
+  type UiAnalyticsGroup,
+  type UiAnalyticsReader,
+} from "./analytics.ts";
 
 /** The envelope version every destination has received since 2025-05-29. */
 const EVENT_VERSION = "2025-05-29";
@@ -28,6 +33,10 @@ type InstrumentedEvent = {
 type AnalyticsDestination = {
   id: string;
   send: (event: InstrumentedEvent) => void;
+  /** Only a destination that keeps people apart implements these. */
+  identify?: (reader: UiAnalyticsReader) => void;
+  group?: (organization: UiAnalyticsGroup) => void;
+  reset?: () => void;
 };
 
 const CONSOLE_DESTINATION: AnalyticsDestination = {
@@ -68,6 +77,14 @@ function postHogDestination(client: PostHog): AnalyticsDestination {
         context: event.context,
       });
     },
+    identify: (reader) => client.identify(reader.id, { email: reader.email ?? undefined }),
+    group: (organization) =>
+      client.group(
+        "organization",
+        organization.id,
+        organization.name ? { name: organization.name } : {},
+      ),
+    reset: () => client.reset(),
   };
 }
 
@@ -102,6 +119,29 @@ class BrowserUiAnalytics extends UiAnalytics {
         destination.send(instrumented);
       } catch {
         console.error(`analytic provider ${destination.id} failed`, instrumented);
+      }
+    }
+  }
+
+  identify(reader: UiAnalyticsReader): void {
+    this.#each("identify", (destination) => destination.identify?.(reader));
+  }
+
+  group(organization: UiAnalyticsGroup): void {
+    this.#each("group", (destination) => destination.group?.(organization));
+  }
+
+  reset(): void {
+    this.#each("reset", (destination) => destination.reset?.());
+  }
+
+  #each(what: string, call: (destination: AnalyticsDestination) => void): void {
+    if (typeof window === "undefined") return;
+    for (const destination of this.destinations) {
+      try {
+        call(destination);
+      } catch {
+        console.error(`analytic provider ${destination.id} failed to ${what}`);
       }
     }
   }

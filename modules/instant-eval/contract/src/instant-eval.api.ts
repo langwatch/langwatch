@@ -77,6 +77,17 @@ export interface InstantEvalRunWindow extends InstantEvalRunReference {
  * every read is a poll of what the pipeline wrote. Creating, estimating,
  * cancelling and sampling arrive with the run service they call.
  */
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * runs and judgements made, since `since` where one is given, and when the
+ * first run was. Epoch milliseconds.
+ */
+export interface InstantEvalUsageCount {
+  readonly runs: number;
+  readonly judgments: number;
+  readonly firstRunAt?: number;
+}
+
 export interface InstantEvalApi {
   /** Whether this project may run Instant Evals at all. */
   isEnabled(input: { projectId: string }): Promise<boolean>;
@@ -171,6 +182,12 @@ export interface InstantEvalApi {
     text: string;
     questions: readonly InstantEvalQuestion[];
   }): Promise<InstantEvalJudgement>;
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<InstantEvalUsageCount>;
 }
 
 export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");

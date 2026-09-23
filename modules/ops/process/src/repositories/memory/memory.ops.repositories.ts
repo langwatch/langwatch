@@ -1,3 +1,5 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
+
 import type { OpsRepositories } from "../ops.repositories.ts";
 import { MemoryBugReportRepository } from "./memory.bug-report.repository.ts";
 import { MemoryOpsStore } from "./memory.ops.store.ts";
@@ -12,6 +14,9 @@ export class MemoryOpsRepositories {
   static create(): OpsRepositories {
     const store = MemoryOpsStore.create();
 
-    return { bugReports: MemoryBugReportRepository.create({ store }) };
+    return {
+      bugReports: MemoryBugReportRepository.create({ store }),
+      processStore: InMemoryProcessStore.createForLocalDevelopment(),
+    };
   }
 }

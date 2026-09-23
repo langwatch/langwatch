@@ -186,6 +186,25 @@ describe("redactAuditArgs", () => {
         expect(redacted.organizationId).toBe("org-1");
       });
 
+      it("replaces a licence key on every action that carries one, and keeps the rest", () => {
+        for (const action of ["license.upload", "licenseRegistry.registerLegacy", undefined]) {
+          const redacted = redactAuditArgs({
+            input: { organizationId: "org-1", licenseKey: "eyJkYXRhIjp7fX0=" },
+            action,
+          }) as Record<string, unknown>;
+
+          expect(JSON.stringify(redacted)).not.toContain("eyJkYXRhIjp7fX0=");
+          expect(redacted.licenseKey).toBe("[redacted]");
+          expect(redacted.organizationId).toBe("org-1");
+        }
+      });
+
+      it("returns input whose licence key is empty as the same object", () => {
+        const input = { organizationId: "org-1", licenseKey: "" };
+
+        expect(redactAuditArgs({ input })).toBe(input);
+      });
+
       /** @scenario "A credential is never persisted to the audit trail" */
       /** @scenario "A secret typed into a scalar field never reaches the audit trail" */
       it.each(["secrets.create", "secrets.update"])("redacts a secret value on %s", (action) => {

@@ -2,20 +2,19 @@ import type { EventSourcing } from "@langwatch/eventing";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { JoinRequestMail } from "../../app/identity.members.ts";
 import type { JoinRequestEvent } from "../../eventing/join-request-state.projection.ts";
-import { PostgresJoinRequestNotificationAdapter } from "../../repositories/prisma/prisma.join-request-notification.repository.ts";
+import type { JoinRequestNotifier } from "../../rules/join-requests-contract.rules.ts";
 import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
 } from "../../services/eventing-join-request-ledger.service.ts";
 import { JoinRequestGuardsService } from "../../services/join-request-guards.service.ts";
+import { JoinRequestLifecycleDispatcherAdapter } from "../../services/join-request-lifecycle-dispatcher.service.ts";
 import {
   JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
 } from "../../services/join-request-pipeline-definition.service.ts";
 import { JoinRequestService } from "../../services/join-request.service.ts";
-import { PrismaJoinRequestLifecycleRepository } from "./prisma.join-request-lifecycle.repository.ts";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
 import { PrismaJoinRequestReadRepository } from "./prisma.join-request.repository.ts";
 
@@ -29,8 +28,8 @@ export type PostgresJoinRequestPipelineOptions = {
    * The runtime this pipeline is registered on.
    */
   eventSourcing: EventSourcing;
-  /** How the reminder and the lapse notice are rendered and sent. */
-  mail: JoinRequestMail;
+  /** Who is told about each recorded fact, and how: the six join-request notices. */
+  notifier: JoinRequestNotifier;
 };
 
 /**
@@ -46,7 +45,7 @@ export class PostgresJoinRequestPipelineAdapter {
   private constructor(private readonly options: PostgresJoinRequestPipelineOptions) {}
 
   build(): JoinRequestPipeline {
-    const { database, eventSourcing, mail } = this.options;
+    const { database, eventSourcing, notifier } = this.options;
     const head = new PrismaJoinRequestProjectionRepository(database);
     const reads = new PrismaJoinRequestReadRepository(database);
     const guards = JoinRequestGuardsService.create({ requests: reads });
@@ -85,11 +84,7 @@ export class PostgresJoinRequestPipelineAdapter {
     return JoinRequestPipelineDefinitionAdapter.create({
       joinRequestProjectionStore: head,
       joinRequestGuards: guards,
-      lifecycle: PrismaJoinRequestLifecycleRepository.create({
-        requests,
-        reads,
-        notifications: PostgresJoinRequestNotificationAdapter.create({ database, mail }).build(),
-      }),
+      lifecycle: JoinRequestLifecycleDispatcherAdapter.create(reads, notifier, () => requests),
     });
   }
 }

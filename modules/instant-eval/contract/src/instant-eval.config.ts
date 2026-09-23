@@ -9,8 +9,16 @@ import { z } from "zod";
  */
 export const instantEvalConfig = Config.define((c) => ({
   /** "jev" or "null"; "null" switches judging off outright. */
-  classifier: c.env("INSTANT_EVAL_CLASSIFIER", z.enum(["jev", "null"]).optional()),
-  classifierBaseUrl: c.env("JEV_BASE_URL", z.string().optional()),
+  classifier: c.env("INSTANT_EVAL_CLASSIFIER", z.enum(["jev", "null", "connect"]).optional()),
+  /** HTTPS only: the judge key travels in a header, so plaintext would send it in the clear. */
+  classifierBaseUrl: c.env(
+    "JEV_BASE_URL",
+    z
+      .string()
+      .url()
+      .refine((value) => value.startsWith("https://"), { message: "JEV_BASE_URL must use https" })
+      .optional(),
+  ),
   classifierModel: c.env("JEV_MODEL", z.string().optional()),
   /** Input tokens per second the whole deployment may send. */
   globalTokensPerSecond: c.env(

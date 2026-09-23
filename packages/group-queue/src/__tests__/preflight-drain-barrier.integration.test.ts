@@ -8,7 +8,7 @@ import { GroupQueueProcessor } from "../groupQueue.ts";
 type TestPayload = { id: string; groupId: string };
 
 const WARNING =
-  "Migration preflight stopped waiting for work that had not drained and is starting anyway; the tenants it covers stay held for a later pass, and these counts are for operator triage";
+  "Migration preflight stopped waiting for work that had not drained and is starting anyway; the tenants it covers stay held for a later pass, and these groups are for operator triage";
 
 /**
  * The barrier runs before this process consumes anything, so on a fleet
@@ -88,7 +88,12 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
       await expect(queue.waitUntilPreflightIdle()).resolves.toBeUndefined();
 
       const call = warnSpy.mock.calls.find(([, message]) => message === WARNING);
-      expect(call?.[0]).toMatchObject({ queueName, pending: 1, groups: 1, timeoutMs: 0 });
+      expect(call?.[0]).toMatchObject({
+        queueName,
+        pending: 1,
+        stillWorking: "held-group",
+        timeoutMs: 0,
+      });
     });
   });
 
@@ -97,9 +102,15 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
     it("still refuses to start", async () => {
       const queue = createQueue();
       await targetGroupWithPendingWork("faulted-group");
-      await redis.set(`${queueName}:gq:group:faulted-group:error`, "1");
+      await redis.hset(
+        `${queueName}:gq:group:faulted-group:error`,
+        "message",
+        "boom",
+        "timestamp",
+        "1",
+      );
 
-      await expect(queue.waitUntilPreflightIdle()).rejects.toThrow(GroupQueueError);
+      await expect(queue.waitUntilPreflightIdle()).rejects.toThrow("failed: faulted-group");
     });
   });
 
@@ -110,6 +121,59 @@ describe("GroupQueueProcessor - preflight drain barrier", () => {
       await redis.sadd(`${queueName}:gq:blocked`, "blocked-group");
 
       await expect(queue.waitUntilPreflightIdle()).rejects.toThrow(GroupQueueError);
+    });
+  });
+
+  describe("given a group that was already blocked when the preflight adopted it", () => {
+    /** @scenario "A group wedged before the preflight does not refuse startup" */
+    it("settles past it and leaves it exactly as wedged", async () => {
+      const processed: string[] = [];
+      const queue = new GroupQueueProcessor<TestPayload>(
+        {
+          name: queueName,
+          process: async (payload) => {
+            processed.push(payload.groupId);
+          },
+          groupKey: (payload) => payload.groupId,
+          identify: (payload) => payload.id,
+        },
+        redis,
+        { dispatchGroupAllowListKey: allowListKey() },
+      );
+      queues.push(queue);
+      await redis.sadd(`${queueName}:gq:blocked`, "wedged");
+      await redis.hset(`${queueName}:gq:group:wedged:error`, "message", "old", "timestamp", "1");
+      await redis.zadd(`${queueName}:gq:group:wedged:jobs`, 1, "stale-job");
+
+      await queue.registerPreflightGroups(() => ["wedged"]);
+      await queue.send({ id: "owned", groupId: "owned" });
+
+      await expect(queue.waitUntilPreflightIdle()).resolves.toBeUndefined();
+      expect(processed).toEqual(["owned"]);
+      expect(await redis.sismember(`${queueName}:gq:blocked`, "wedged")).toBe(1);
+      expect(await redis.zcard(`${queueName}:gq:group:wedged:jobs`)).toBe(1);
+    });
+  });
+
+  describe("given a group the preflight adopted clean", () => {
+    it("refuses, naming it, when the group fails under the preflight", async () => {
+      const queue = createQueue();
+      await queue.registerPreflightGroups(() => ["doomed"]);
+      await redis.hset(`${queueName}:gq:group:doomed:error`, "message", "boom", "timestamp", "99");
+
+      await expect(queue.waitUntilPreflightIdle()).rejects.toThrow("failed: doomed");
+    });
+
+    it("tells a stale error key from a failure under the preflight on the same group", async () => {
+      const queue = createQueue();
+      const errorKey = `${queueName}:gq:group:stale:error`;
+      await redis.hset(errorKey, "message", "old", "timestamp", "1");
+      await queue.registerPreflightGroups(() => ["stale"]);
+
+      await expect(queue.waitUntilPreflightIdle()).resolves.toBeUndefined();
+
+      await redis.hset(errorKey, "message", "new", "timestamp", "2");
+      await expect(queue.waitUntilPreflightIdle()).rejects.toThrow("failed: stale");
     });
   });
 });

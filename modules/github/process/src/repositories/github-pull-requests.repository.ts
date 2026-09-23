@@ -3,6 +3,7 @@
  * mapping/status/usage services. Normalizes repository names to lowercase.
  */
 
+import type { GithubUsageCount } from "@langwatch/github-contract";
 import type { Instant } from "@langwatch/time";
 
 /** A stored pull-request snapshot. Times are instants; `null` means "not yet". */
@@ -97,6 +98,12 @@ export interface UpsertGithubBranchCheckInput {
 }
 
 export abstract class GithubPullRequestsRepository {
+  /** The usage report's count; the caller never passes an empty organization list. */
+  abstract countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<GithubUsageCount>;
+
   /**
    * Idempotent upsert by unique key, ordered by `prUpdatedAt` freshness. Both
    * GitHub webhooks and REST requests can arrive out-of-order and late.
@@ -219,6 +226,9 @@ export abstract class GithubPullRequestsRepository {
 }
 
 export class NullGithubPullRequestsRepository extends GithubPullRequestsRepository {
+  async countUsage(): Promise<GithubUsageCount> {
+    return { pullRequests: 0 };
+  }
   async upsertPullRequests(): Promise<void> {}
   async findAllByBranches(): Promise<GithubPullRequestRow[]> {
     return [];

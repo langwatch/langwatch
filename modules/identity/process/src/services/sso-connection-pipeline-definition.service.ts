@@ -51,10 +51,13 @@ import {
   SelectMigrationRouteCommand,
   BeginMigrationFinalizationCommand,
   FinalizeMigrationCommand,
+  RecordDomainProofAbsentCommand,
+  RecordDomainProofPresentCommand,
   RejectDomainClaimCommand,
   RequestTeardownCommand,
   RequestVerificationCommand,
   ResumeConnectionCommand,
+  SetArrivalPolicyCommand,
   SuspendConnectionCommand,
   VerifyDomainCommand,
 } from "../eventing/sso-connection.intent.ts";
@@ -99,7 +102,15 @@ const CONNECTION_COMMANDS = [
   ["selectMigrationRoute", SelectMigrationRouteCommand],
   ["beginMigrationFinalization", BeginMigrationFinalizationCommand],
   ["finalizeMigration", FinalizeMigrationCommand],
+  ["setArrivalPolicy", SetArrivalPolicyCommand],
+  ["recordDomainProofAbsent", RecordDomainProofAbsentCommand],
+  ["recordDomainProofPresent", RecordDomainProofPresentCommand],
 ] as const;
+
+/** The sender names the pipeline carries, which the ledger's own table must match. */
+export const CONNECTION_COMMAND_NAMES: readonly string[] = CONNECTION_COMMANDS.map(
+  ([name]) => name,
+);
 
 export interface SsoConnectionPipelineDeps {
   connectionProjectionStore: StateProjectionStore<SsoConnectionFoldState>;

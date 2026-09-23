@@ -11,6 +11,7 @@ import {
   getVersionValidator,
   parseLlmConfigVersion,
   parseRuntimeParameters,
+  type PromptUsageCount,
 } from "@langwatch/prompt-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
@@ -50,6 +51,22 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
 
   static create(state: MemoryPromptState): MemoryLlmConfigRepository {
     return new MemoryLlmConfigRepository(state);
+  }
+
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<PromptUsageCount> {
+    const made = [...this.#state.configs.values()]
+      .filter((row) => projectIds.includes(row.projectId))
+      .map((row) => row.createdAt.getTime());
+    return {
+      prompts: made.filter((at) => since === undefined || at >= since).length,
+      ...(made.length === 0 ? {} : { firstPromptAt: Math.min(...made) }),
+    };
   }
 
   async findOrganizationIdForProject(projectId: string): Promise<string> {

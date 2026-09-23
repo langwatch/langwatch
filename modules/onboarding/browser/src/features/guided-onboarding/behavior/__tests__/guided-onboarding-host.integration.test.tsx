@@ -52,6 +52,7 @@ import {
   type OnboardingActor,
   type OnboardingFlagReading,
   type OnboardingGovernanceCapability,
+  type OnboardingJoinOffer,
   type OnboardingLangyCapability,
   type OnboardingRouteReading,
   type OnboardingScope,
@@ -129,6 +130,10 @@ class TestOnboardingHost extends OnboardingHostApi {
   }
   governance(): OnboardingGovernanceCapability {
     return { setSampleChoice: this.governanceSetSampleChoice };
+  }
+
+  joinOffers(): readonly OnboardingJoinOffer[] {
+    return [];
   }
 }
 

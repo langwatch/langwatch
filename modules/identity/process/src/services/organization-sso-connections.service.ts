@@ -49,6 +49,21 @@ export class OrganizationSsoConnectionsService {
 
     return { connectionId, providerId: connection.idpMetadata.providerId };
   }
+
+  /** Which organization governs a connection, for a peer that was handed the
+   *  connection alone and must fence its next read on the tenant. */
+  async getOrganization({
+    connectionId,
+  }: {
+    connectionId: string;
+  }): Promise<{ organizationId: string }> {
+    const connection = await this.connections.tryFindConnection({ connectionId });
+    if (!connection) {
+      throw new SsoConnectionNotFoundError(`Connection ${connectionId} is not registered.`);
+    }
+
+    return { organizationId: connection.organizationId };
+  }
 }
 
 function toOrganizationConnection(state: SsoConnectionState): OrganizationSsoConnection {

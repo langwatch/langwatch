@@ -23,6 +23,7 @@ import {
   type UserTourPreference,
   type CreatedUser,
   type SetFirstUserPasswordResult,
+  type UserUsageCount,
 } from "@langwatch/user-contract";
 
 import type {
@@ -66,6 +67,28 @@ export class PrismaUserRepository
   implements UserRepository
 {
   static readonly create = this.factory((prisma) => new PrismaUserRepository(prisma));
+
+  /**
+   * Folded here, in the module that owns the addresses: only the per-domain
+   * counts leave it. The tenancy guard is not asked for a tenant because the
+   * report describes the whole install.
+   */
+  async countUsage(): Promise<UserUsageCount> {
+    const rows = await this.prisma.user.findMany({
+      where: { email: { not: null } },
+      select: { email: true },
+    });
+    return { emailDomains: domainCounts(rows.map((row) => row.email ?? "")) };
+  }
+
+  /** Install-wide on purpose, like the report: one row at most, and only a yes or no leaves. */
+  async hasAccountOnDomain(domain: string): Promise<boolean> {
+    const row = await this.prisma.user.findFirst({
+      where: { email: { endsWith: `@${domain}`, mode: "insensitive" } },
+      select: { id: true },
+    });
+    return row !== null;
+  }
 
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
     if (userIds.length === 0) return [];
@@ -187,11 +210,15 @@ export class PrismaUserRepository
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
     const [passkeyCount, user] = await Promise.all([
       this.prisma.passkey.count({ where: { userId: id } }),
-      this.prisma.user.findUnique({ where: { id }, select: { passkeyNudgeDismissedAt: true } }),
+      this.prisma.user.findUnique({
+        where: { id },
+        select: { passkeyNudgeDismissedAt: true, twoFactorEnabled: true },
+      }),
     ]);
 
     return userPasskeyNudgeStatusSchema.parse({
       hasPasskey: passkeyCount > 0,
+      twoStepEnabled: user?.twoFactorEnabled ?? false,
       dismissedAt: user?.passkeyNudgeDismissedAt ?? null,
     });
   }
@@ -200,6 +227,22 @@ export class PrismaUserRepository
     await this.prisma.user.update({
       where: { id: input.id },
       data: { passkeyNudgeDismissedAt: toDate(input.dismissedAt) },
+    });
+  }
+
+  async findJoinOfferDismissedDomains(id: string): Promise<string[]> {
+    const row = await this.prisma.user.findUnique({
+      where: { id },
+      select: { joinOfferDismissedDomains: true },
+    });
+
+    return row?.joinOfferDismissedDomains ?? [];
+  }
+
+  async addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: input.id },
+      data: { joinOfferDismissedDomains: { push: input.domain } },
     });
   }
 
@@ -322,4 +365,14 @@ function credentialAccountData(input: {
     providerAccountId: input.userId,
     password: input.password,
   };
+}
+
+/** One count per domain, the part after the `@`, dropping an address with none. */
+function domainCounts(emails: readonly string[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const email of emails) {
+    const domain = email.trim().toLowerCase().split("@")[1];
+    if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
+  }
+  return counts;
 }

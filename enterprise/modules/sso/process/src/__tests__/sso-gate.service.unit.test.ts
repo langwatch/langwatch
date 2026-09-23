@@ -1,9 +1,9 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type LicensingApi,
   type PlatformLicenseAccess,
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SsoGateLogger } from "../app/sso.members.ts";
@@ -55,8 +55,7 @@ const validAccess = (
 
 describe("SsoGateService", () => {
   let licensing: LicensingApi;
-  const inspectPlatformAccess =
-    vi.fn<(input: { instanceLicenseKey?: string | undefined }) => Promise<PlatformLicenseAccess>>();
+  const inspectPlatformAccess = vi.fn<() => Promise<PlatformLicenseAccess>>();
   let logger: FakeLogger;
 
   beforeEach(() => {
@@ -139,20 +138,13 @@ describe("SsoGateService", () => {
   });
 
   /** @scenario "An SSO-only deployment recovers by setting the instance license key" */
-  it("passes the instance license to the shared licensing service", async () => {
+  it("asks licensing, which holds the instance license, and admits what it grants", async () => {
     inspectPlatformAccess.mockResolvedValue(
       validAccess({ source: "instance", organizationId: undefined }),
     );
 
-    expect(
-      await create({
-        ...baseConfiguration(),
-        instanceLicenseKey: "instance-license",
-      }).platformAllowed(),
-    ).toBe(true);
-    expect(inspectPlatformAccess).toHaveBeenCalledWith({
-      instanceLicenseKey: "instance-license",
-    });
+    expect(await create(baseConfiguration()).platformAllowed()).toBe(true);
+    expect(inspectPlatformAccess).toHaveBeenCalledWith();
   });
 
   /** @scenario "Self-hosted with a genuine org license keeps SSO working with zero action" */
@@ -214,7 +206,6 @@ describe("SsoGateService", () => {
     const configuration = {
       ...baseConfiguration(),
       auth0ClientSecret: undefined,
-      instanceLicenseKey: "instance-license",
     };
     expect(await create(configuration).resolveProvider()).toBe("email");
     expect(logger.warn).toHaveBeenCalledWith(

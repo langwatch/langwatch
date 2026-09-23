@@ -117,6 +117,9 @@ export function approvalTitle({
   if (call.tool === "local_write" || call.tool === "local_edit") {
     return `Langy wants to change a file in ${workspaceName}`;
   }
+  if (call.tool === "local_langwatch_env") {
+    return `Langy wants to write a file in ${workspaceName}`;
+  }
   return `Langy wants to read a file in ${workspaceName}`;
 }
 

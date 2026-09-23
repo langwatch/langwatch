@@ -168,6 +168,7 @@
                   "user-events/custom"
                 ]
               },
+              "features/querying-your-data",
               "features/automations",
               "features/embedded-analytics"
             ]
@@ -198,6 +199,17 @@
                 "pages": [
                   "evaluations/online-evaluation/overview",
                   "evaluations/online-evaluation/setup-monitors"
+                ]
+              },
+              {
+                "group": "Instant Evals",
+                "pages": [
+                  "features/instant-evals/overview",
+                  "features/instant-evals/questions",
+                  "features/instant-evals/targets",
+                  "features/instant-evals/results",
+                  "features/instant-evals/limits-and-cost",
+                  "features/instant-evals/cli"
                 ]
               },
               {
@@ -275,11 +287,13 @@
           {
             "group": "Platform",
             "pages": [
+              "platform/command-bar",
               {
                 "group": "Administration",
                 "pages": [
                   "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/sso",
                   "platform/api-keys",
                   "platform/audit-log",
                   "platform/data-privacy",
@@ -287,8 +301,7 @@
                   "platform/secrets",
                   "platform/scim",
                   "platform/scim-groups",
-                  "platform/model-providers",
-                  "platform/command-bar"
+                  "platform/model-providers"
                 ]
               }
             ]
@@ -964,6 +977,9 @@
             "pages": [
               "self-hosting/overview",
               "self-hosting/licensing",
+              "self-hosting/connect",
+              "self-hosting/data-and-telemetry",
+              "self-hosting/usage-report-dictionary",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
@@ -1046,6 +1062,7 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/create-search",
+              "api-reference/traces/discover-what-the-trace-filter-fields-ho",
               "api-reference/traces/post-create-search",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
@@ -1336,6 +1353,20 @@
             ]
           },
           {
+            "group": "Instant Evals",
+            "pages": [
+              "api-reference/instant-evals/overview",
+              "api-reference/instant-evals/estimate-a-run",
+              "api-reference/instant-evals/create-instant-evals",
+              "api-reference/instant-evals/list-instant-evals",
+              "api-reference/instant-evals/get-instant-evals",
+              "api-reference/instant-evals/read-a-run-s-results",
+              "api-reference/instant-evals/sample-a-run",
+              "api-reference/instant-evals/cancel-a-run",
+              "api-reference/instant-evals/running-an-instant-eval"
+            ]
+          },
+          {
             "group": "Run Plans",
             "pages": [
               "api-reference/run-plans/overview",
@@ -1521,8 +1552,10 @@
             "group": "Query",
             "pages": [
               "api-reference/query/overview",
+              "api-reference/query/discover-both-query-languages",
               "api-reference/query/discover-the-queryable-langwatchql-schema",
-              "api-reference/query/run-a-langwatchql-query"
+              "api-reference/query/run-a-langwatchql-query",
+              "api-reference/query/extraction-functions"
             ]
           },
           {
@@ -1932,7 +1965,11 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1789308461",
+      "source": "/features/instant-evals/shorthand",
+      "destination": "/features/instant-evals/targets"
+    },
+    {
+      "source": "/ci/cache/busted/1789807595",
       "destination": "/introduction"
     },
     {

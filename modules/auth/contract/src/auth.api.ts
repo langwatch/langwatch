@@ -1,4 +1,4 @@
-import type { RoutingDecision } from "@langwatch/identity-contract";
+import type { RoutingDecision, SignedInWith } from "@langwatch/identity-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
@@ -7,6 +7,12 @@ import type {
   VerifiedBrowserSession,
 } from "./browser-session.ts";
 import type { InviteLanding, SignUpVerificationResult } from "./front-door.responses.ts";
+import type {
+  ReleaseHeldAccountResult,
+  SaveSignInSecurityInput,
+  SaveSignInSecurityResult,
+  SignInSecuritySettings,
+} from "./sign-in-security.ts";
 
 /**
  * The subject carried by an unexpired CLI access bearer. The device-session
@@ -22,6 +28,14 @@ export type CliAccessSession = Readonly<{
 }>;
 
 /**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * people signed in right now, one person on four devices counted once.
+ */
+export interface AuthUsageCount {
+  readonly signedInUsers: number;
+}
+
+/**
  * Everything the auth module does for a caller: the signed-in browser session,
  * and the signed-out front door that stands before they have one — one
  * interface because it is one module, meeting at the same person.
@@ -32,6 +46,27 @@ export interface AuthApi {
    * this module; a peer asks rather than declaring the variable a second time.
    */
   offersPasskeys(): boolean;
+  /**
+   * Whether this deployment offers two-step verification (`MFA_ENROLLMENT_OPEN`,
+   * owned here). The account-security offer asks rather than redeclaring it.
+   */
+  offersTwoStepVerification(): boolean;
+  /**
+   * How this person signed in on this session, read off the factors it recorded.
+   * `unknown` where the session recorded none or is not theirs: never a guess.
+   */
+  getSignedInWith(input: { userId: string; sessionId: string }): Promise<SignedInWith>;
+  /**
+   * Whether this deployment issues its own passwords beside a federated
+   * provider (D09, `LOCAL_PASSWORDS_ENABLED`). Email mode issues them anyway.
+   */
+  issuesOwnPasswords(): boolean;
+  /**
+   * Identity-provider origins an operator runs on private addresses
+   * (`SSO_TRUSTED_IDP_ORIGINS`, plus the worktree simulator outside production).
+   * One owner, this module: issuer discovery asks rather than redeclaring them.
+   */
+  findDialableIdentityProviderOrigins(): string[];
   /**
    * Whether Better Auth accepts the token. Carries the RAW auth-session id
    * an impersonation starts/stops against; a process with no sign-in door
@@ -123,6 +158,21 @@ export interface AuthApi {
    * them asks rather than reading them (ADR-129).
    */
   findFederatedAccountProviders(input: { userId: string }): Promise<string[]>;
+  /** The organization's two sign-in security rules, all zero when unset. */
+  getSignInSecuritySettings(input: { organizationId: string }): Promise<SignInSecuritySettings>;
+  /**
+   * Saves both rules, asking for the Enterprise plan only when a rule turns on
+   * from fully off, then ends every member session already past the window.
+   */
+  saveSignInSecuritySettings(input: SaveSignInSecurityInput): Promise<SaveSignInSecurityResult>;
+  /** Releases a member the organization holds after a fifth consecutive lock-out. */
+  releaseHeldAccount(input: {
+    organizationId: string;
+    userId: string;
+    actorUserId: string;
+  }): Promise<ReleaseHeldAccountResult>;
+  /** The usage report's figure (ADR-156, section 10), install-wide. */
+  countUsage(input: { at: number }): Promise<AuthUsageCount>;
 }
 
 /** Which accounts a legacy-access question is about: the connection being

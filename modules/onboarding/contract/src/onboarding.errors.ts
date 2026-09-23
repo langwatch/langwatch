@@ -19,3 +19,20 @@ export class GuidedOnboardingPathUnknownError extends HandledError {
     this.name = "GuidedOnboardingPathUnknownError";
   }
 }
+
+/** Guided state is read and written per person; a key bound to nobody cannot act as one. */
+export class OnboardingKeyUserRequiredError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor() {
+    super(
+      "permission_denied",
+      "This API key is not tied to a user, so it cannot read or act on guided onboarding state",
+      {
+        httpStatus: 403,
+        fault: "customer",
+      },
+    );
+    this.name = "OnboardingKeyUserRequiredError";
+  }
+}

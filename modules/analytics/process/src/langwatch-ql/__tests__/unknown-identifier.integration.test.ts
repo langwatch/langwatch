@@ -6,7 +6,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import type { LangWatchQLExecutor } from "../../repositories/langwatch-ql-executor.repository.ts";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   startLangWatchQLClickHouse,
@@ -26,7 +25,6 @@ describe("given SQL that names a column no dataset has", () => {
       await executor.execute({
         sql,
         tenantCapability: harness.tenantA.keyHash,
-        limits: DEFAULT_LWQL_RESULT_LIMITS,
       });
     } catch (error) {
       return error;
@@ -62,7 +60,6 @@ describe("given SQL that names a column no dataset has", () => {
       const result = await executor.execute({
         sql: `SELECT TraceId FROM ${database}.traces LIMIT 1`,
         tenantCapability: harness.tenantA.keyHash,
-        limits: DEFAULT_LWQL_RESULT_LIMITS,
       });
 
       expect(result.columns.map((column) => column.name)).toEqual(["TraceId"]);

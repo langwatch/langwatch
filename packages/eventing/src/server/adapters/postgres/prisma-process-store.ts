@@ -1,3 +1,15 @@
+import { generate } from "@langwatch/ksuid";
+import {
+  Prisma,
+  PrismaClient,
+  type ProcessManagerInstance,
+  type ProcessManagerOutbox,
+} from "@langwatch/prisma-client/generated";
+import { Temporal, toDate } from "@langwatch/time";
+
+import type { JsonValue } from "../../../process-manager/json.ts";
+import type { ProcessRef } from "../../../process-manager/processManager.types.ts";
+import { deriveInboxKey } from "../../../process-manager/stores/inboxKey.ts";
 import type {
   AppendIntentsResult,
   CommitResult,
@@ -11,18 +23,7 @@ import type {
   ProcessCommit,
   ProcessStore,
 } from "../../../process-manager/stores/processStore.types.ts";
-import type { JsonValue } from "../../../process-manager/json.ts";
-import type { ProcessRef } from "../../../process-manager/processManager.types.ts";
-import { deriveInboxKey } from "../../../process-manager/stores/inboxKey.ts";
-import { generate } from "@langwatch/ksuid";
 import type { EventingProcessPersistenceDatabase } from "../../process-persistence.database.ts";
-import {
-  Prisma,
-  PrismaClient,
-  type ProcessManagerInstance,
-  type ProcessManagerOutbox,
-} from "@langwatch/prisma-client/generated";
-import { Temporal, toDate } from "@langwatch/time";
 
 const PROCESS_MANAGER_INSTANCE_KSUID_RESOURCE = "pminstance";
 const PROCESS_MANAGER_INBOX_KSUID_RESOURCE = "pminbox";
@@ -491,21 +492,23 @@ export class PrismaProcessStore implements ProcessStore {
     leaseToken: string;
     now: number;
   }): Promise<{ applied: boolean }> {
-    const result = await this.#prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        status: "dispatched",
-        leasedUntil: null,
-        leaseToken: null,
-        dispatchedAt: asDate(params.now),
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    // One statement with its conditions on the row, so a racing acknowledgement that waited on
+    // the lock re-checks the lease as this one left it (an updateMany reads first, then writes).
+    const now = asDate(params.now);
+    const updated = await this.#prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = 'dispatched',
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "dispatchedAt" = ${now},
+             "updatedAt" = ${now}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async markFailed(params: {
@@ -515,21 +518,21 @@ export class PrismaProcessStore implements ProcessStore {
     nextAttemptAt: number;
     dead: boolean;
   }): Promise<{ applied: boolean }> {
-    const result = await this.#prisma.processManagerOutbox.updateMany({
-      where: {
-        ...params.identity,
-        leaseToken: params.leaseToken,
-        status: "pending",
-      },
-      data: {
-        status: params.dead ? "dead" : "pending",
-        nextAttemptAt: asDate(params.nextAttemptAt),
-        leasedUntil: null,
-        leaseToken: null,
-        updatedAt: asDate(params.now),
-      },
-    });
-    return { applied: result.count === 1 };
+    const status = params.dead ? "dead" : "pending";
+    const updated = await this.#prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "status" = ${status}::"ProcessManagerOutboxStatus",
+             "nextAttemptAt" = ${asDate(params.nextAttemptAt)},
+             "leasedUntil" = NULL,
+             "leaseToken" = NULL,
+             "updatedAt" = ${asDate(params.now)}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
   }
 
   async recordFailedAttempt(params: {

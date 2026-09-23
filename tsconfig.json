@@ -1,8 +1,9 @@
 {
   // The workspace solution: every package's check root, in one project graph.
   //
-  // `pnpm typecheck` is `tsc -b` against this file, so the compiler walks the
-  // reference graph once and checks each project exactly once. The recursive
+  // `pnpm typecheck` ends with `tsc -b` against this file, so the compiler walks
+  // the reference graph once and checks each project exactly once (the api and
+  // ui closures run first as their own processes, for memory -- ADR-100). The recursive
   // form it replaced (`pnpm -r typecheck`, serialised) spawned one `tsc -b` per
   // package, and each of those re-walked its own dependency subtree: a package
   // near the root of the graph had its up-to-date check re-run by most of the
@@ -238,6 +239,9 @@
     },
     {
       "path": "enterprise/modules/saas/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/saas/process/tsconfig.json"
     },
     {
       "path": "enterprise/modules/scim/browser/tsconfig.json"

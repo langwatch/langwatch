@@ -4,6 +4,7 @@
  * computes from its scope graph plus the optional routing policy's ordering.
  */
 import {
+  type GatewayConnectUpstream,
   type ModelProvider,
   type VirtualKeyWithScopes,
   budgetPeriodFloorMs,
@@ -32,6 +33,7 @@ import {
   type GatewayConfigPayload,
   type ProviderExclusionWire,
 } from "../rules/gateway-config-wire.rules.ts";
+import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.service.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
@@ -65,6 +67,8 @@ export class GatewayConfigMaterialiserService {
      * deployment facts as configuration.
      */
     private readonly langyMirrorProjectId: string | undefined,
+    /** The hosted provider a connected install adds; absent where nothing composes one. */
+    private readonly connectUpstream: GatewayConnectUpstreamService | undefined,
   ) {}
 
   static create(input: {
@@ -76,6 +80,7 @@ export class GatewayConfigMaterialiserService {
     assembly: GatewayConfigAssembly;
     /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
     langyMirrorProjectId?: string | undefined;
+    connectUpstream?: GatewayConnectUpstreamService | undefined;
   }): GatewayConfigMaterialiserService {
     return new GatewayConfigMaterialiserService(
       input.scopeResolution,
@@ -85,6 +90,7 @@ export class GatewayConfigMaterialiserService {
       input.credentials,
       input.assembly,
       input.langyMirrorProjectId,
+      input.connectUpstream,
     );
   }
 
@@ -131,7 +137,14 @@ export class GatewayConfigMaterialiserService {
    * drifting apart is what lets a 304 confirm a stale bundle.
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
-    return this.assembly.versionToken(vk);
+    return this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+  }
+
+  /** The organization's hosted provider on a connected install, if licensing wrote one. */
+  private async upstreamOf(organizationId: string): Promise<GatewayConnectUpstream | undefined> {
+    if (!this.connectUpstream) return undefined;
+    const [upstream] = await this.connectUpstream.findForOrganization(organizationId);
+    return upstream;
   }
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
@@ -148,6 +161,14 @@ export class GatewayConfigMaterialiserService {
       config.providersAllowed,
     );
     const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
+    const upstream = await this.upstreamOf(vk.organizationId);
+    const ownSlots = providers.map((mp, index) =>
+      buildProviderSlot(mp, index, this.credentials, this.assembly),
+    );
+    // LangWatch goes last: a customer credential keeps serving the models it serves.
+    const slots = upstream
+      ? [...ownSlots, GatewayConnectUpstreamService.providerSlot(upstream, ownSlots.length)]
+      : ownSlots;
     // The cache-rule bundle, the project's guardrail catalogue and the key's
     // surviving attachments come from the one Gateway service that owns those
     // tables, rather than from a second copy of each query living here.
@@ -181,11 +202,9 @@ export class GatewayConfigMaterialiserService {
               { LANGY_MIRROR_PROJECT_ID: this.langyMirrorProjectId },
             )
           : "skip",
-      providers: providers.map((mp, index) =>
-        buildProviderSlot(mp, index, this.credentials, this.assembly),
-      ),
+      providers: slots,
       fallback: {
-        chain: providers.map((mp) => mp.id),
+        chain: slots.map((slot) => slot.id),
         // routing_mode NONE means the request never leaves the provider
         // that serves the model, so the attempt budget is one. Pinning it
         // here makes no-fallback real for gateways that predate the

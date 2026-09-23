@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type {
+  DirectoryIdentityRow,
   ScimDirectoryOwnership,
   ScimRequestLogEntry,
   ScimRequestRecord,
@@ -259,4 +260,13 @@ export abstract class ScimRepository extends ScimGrantRepository {
   abstract findDirectoryOwnership(input: {
     connectionIds: string[];
   }): Promise<ScimDirectoryOwnership[]>;
+  /**
+   * The `externalId <-> userId` mapping on one connection, newest first: the
+   * operator's detail (ADR-122). Keyed on the connection, never the identifier
+   * alone — the same identifier on two connections is two different people.
+   */
+  abstract findDirectoryIdentities(input: {
+    connectionId: string;
+    limit: number;
+  }): Promise<DirectoryIdentityRow[]>;
 }

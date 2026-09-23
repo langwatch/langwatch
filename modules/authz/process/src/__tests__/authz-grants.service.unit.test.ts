@@ -638,8 +638,7 @@ describe("AuthzGrantsService.offboard", () => {
             makeReader({
               findUserBindings: vi.fn().mockResolvedValue([
                 {
-                  role: "MEMBER",
-                  customRoleId: null,
+                  roleKey: "member",
                   scopeType: "TEAM",
                   scopeId: TEAM,
                   viaGroupId: null,
@@ -674,8 +673,7 @@ describe("AuthzGrantsService.offboard", () => {
           findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
           findApiKeyBindings: vi.fn().mockResolvedValue([
             {
-              role: "ADMIN",
-              customRoleId: null,
+              roleKey: "admin",
               scopeType: "PROJECT",
               scopeId: PROJECT,
               viaGroupId: null,
@@ -715,8 +713,7 @@ const COMPATIBILITY_CALLS: readonly {
         {
           bindingId: "rb-ledger",
           principal: { userId: "alice" },
-          role: "MEMBER",
-          customRoleId: null,
+          roleKey: "member",
           scopeType: "TEAM",
           scopeId: TEAM,
         },

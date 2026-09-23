@@ -252,6 +252,10 @@ export const ShellPageBody = ({
         </Alert.Root>
       )}
 
+      {host.startupNotice()}
+
+      {host.joinOffer({ currentOrganizationId: organization?.id })}
+
       {adminViewingAs && <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />}
 
       {ssoStatus?.pendingSsoSetup && (
@@ -310,30 +314,34 @@ export const ShellPageBody = ({
           </ErrorBoundary>
         </Box>
       ) : (
-        <Alert.Root
-          status="warning"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <Text flex={1}>
-                You are not part of any team in this organization. Ask your administrator to add
-                you, or{" "}
-                <NavigationLink href="/" textDecoration="underline">
-                  go back to your home page
-                </NavigationLink>
-                .
-              </Text>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
+        (host.teamAccessWaiting({
+          organizationName: organization?.name ?? "your organization",
+        }) ?? (
+          <Alert.Root
+            status="warning"
+            width="full"
+            border="1px solid"
+            borderColor="colorPalette.muted"
+            marginX={4}
+            marginTop={3}
+            borderRadius="lg"
+            maxWidth="calc(100% - 22px)"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <HStack width="full" gap={4}>
+                <Text flex={1}>
+                  You are not part of any team in this organization. Ask your administrator to add
+                  you, or{" "}
+                  <NavigationLink href="/" textDecoration="underline">
+                    go back to your home page
+                  </NavigationLink>
+                  .
+                </Text>
+              </HStack>
+            </Alert.Content>
+          </Alert.Root>
+        ))
       )}
     </VStack>
   );

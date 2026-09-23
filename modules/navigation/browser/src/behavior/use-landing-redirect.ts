@@ -6,6 +6,7 @@ import { useNavigationHost } from "../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../model/product-memory.ts";
 import type { ProductId } from "../model/products.ts";
 import { resolveLandingDestination } from "../model/resolve-landing-destination.ts";
+import { resolveOrglessDestination } from "../model/resolve-orgless-destination.ts";
 import { navigationApi } from "./navigation-api.ts";
 import { useLlmOpsProjectSlug } from "./use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "./use-reachable-products.ts";
@@ -60,6 +61,8 @@ interface LandingInput {
    */
   projectHomeSlug: string | null;
   isOrgless: boolean;
+  /** Whether a reader with no organization is an administrator back from an SSO test sign-in. */
+  testArrival: { isPending: boolean; isTestArrival: boolean };
 }
 
 /**
@@ -88,11 +91,16 @@ function productLandingDestination({
   });
 }
 
-/** Fallback destinations: project home on error, /onboarding/welcome for orgless users */
-function fallbackDestination({ resolved, projectSlug, isOrgless }: LandingInput): string | null {
+/** Fallbacks: project home on error; an orgless reader per `resolveOrglessDestination`. */
+function fallbackDestination({
+  resolved,
+  projectSlug,
+  isOrgless,
+  testArrival,
+}: LandingInput): string | null {
   if (resolved.hasError && projectSlug) return `/${projectSlug}`;
-  if (isOrgless) return "/onboarding/welcome";
-  return null;
+  if (!isOrgless) return null;
+  return resolveOrglessDestination(testArrival);
 }
 
 /** Navigates to destination at most once; prevents update-depth loops from lazy-loading routes */
@@ -127,6 +135,16 @@ export function useLandingRedirect(): void {
   });
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const replaceOnce = useReplaceOnce();
+  const isOrgless = belongsToNoOrganization({
+    isWorkspaceResolving: isLoading,
+    organization,
+    organizations,
+  });
+  // Asked only of the people it can be true of: everybody with an organization is past this branch.
+  const testArrival = navigationApi.identity.myTestArrival.useQuery(
+    {},
+    { enabled: isOrgless, staleTime: 60_000, retry: false },
+  );
 
   useEffect(() => {
     replaceOnce(
@@ -144,11 +162,12 @@ export function useLandingRedirect(): void {
             : null,
           projectSlug: project?.slug ?? null,
           projectHomeSlug: llmOpsProjectSlug,
-          isOrgless: belongsToNoOrganization({
-            isWorkspaceResolving: isLoading,
-            organization,
-            organizations,
-          }),
+          isOrgless,
+          testArrival: {
+            // A failed read falls through to the bootstrap screen rather than holding the redirect.
+            isPending: isOrgless && testArrival.isLoading,
+            isTestArrival: testArrival.data?.testing === true,
+          },
         }),
         search: window.location.search,
       }),
@@ -160,6 +179,9 @@ export function useLandingRedirect(): void {
     organization,
     organizations,
     isLoading,
+    isOrgless,
+    testArrival.data,
+    testArrival.isLoading,
     replaceOnce,
     isReachableLoading,
     reachableProducts,

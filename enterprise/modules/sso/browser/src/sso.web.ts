@@ -22,4 +22,8 @@ export const ssoWeb = defineWebModule("sso")
       label: "Identity provider",
       load: () => import("./ui/sections/sso-setup.screen.tsx"),
     },
+  })
+  // How people sign in, drawn on organization's Authentication overview.
+  .withCapabilities({
+    authenticationOverviewCard: { load: () => import("./ui/sections/sso-overview-card.tsx") },
   });

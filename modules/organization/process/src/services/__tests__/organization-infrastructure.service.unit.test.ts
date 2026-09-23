@@ -39,8 +39,22 @@ import { TeamRepository } from "../../repositories/team.repository.ts";
 import { OrganizationService } from "../organization.service.ts";
 
 class StubRepository extends OrganizationRepository {
+  async findAllIds(): Promise<string[]> {
+    return [];
+  }
+
+  async countUsage(): Promise<{ members: number; ssoProviders: string[] }> {
+    return { members: 0, ssoProviders: [] };
+  }
+
   guidedOnboarding: GuidedOnboardingRecord = { state: { paths: [], donePaths: [] }, variant: null };
   storedSettings: StoredOrganizationSettings | null = null;
+
+  async getJoinSetting(): Promise<{ domainJoin: "request"; joinDomains: string[] }> {
+    return { domainJoin: "request", joinDomains: [] };
+  }
+
+  async saveJoinSetting(): Promise<void> {}
 
   async getGuidedOnboarding(): Promise<GuidedOnboardingRecord> {
     return this.guidedOnboarding;

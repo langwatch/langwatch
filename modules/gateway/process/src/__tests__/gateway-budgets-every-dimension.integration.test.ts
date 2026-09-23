@@ -44,9 +44,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
+import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -60,9 +60,16 @@ import { PostgresVirtualKeyAdapter } from "../testing.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+
 import { GatewayConfigAssemblyAdapter } from "../app/gateway-config-assembly.composition.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+
+const noPlatformProviders = createApiFixture<ModelProviderApi>({
+  platformProviderChain: () => Promise.resolve([]),
+});
 /**
  * The tenancy guard names a project on every query. This suite writes the
  * organizations and projects it then reads, so it composes the client without
@@ -148,12 +155,16 @@ const materialiser = (spend: GatewayBudgetClickHouseRepository | null) =>
   GatewayConfigMaterialiserService.create({
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+      platformProviders: noPlatformProviders,
     }),
     projects: new SuiteProjectService(),
     chRepo: spend,
     budgetDecisions: gateway,
     credentials,
-    assembly: GatewayConfigAssemblyAdapter.create({ prisma }),
+    assembly: GatewayConfigAssemblyAdapter.create({
+      prisma,
+      platformProviders: noPlatformProviders,
+    }),
   });
 
 async function bundleFor(keyId: string, spend: GatewayBudgetClickHouseRepository | null = null) {

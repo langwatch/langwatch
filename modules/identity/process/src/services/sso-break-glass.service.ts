@@ -14,10 +14,8 @@ import {
   type SelfServeActor,
 } from "@langwatch/identity-contract";
 
-import type {
-  SsoBreakGlassRepository,
-  SsoBreakGlassWarningChannel,
-} from "../repositories/sso-break-glass.repository.ts";
+import type { SsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
+import type { SsoBreakGlassRepository } from "../repositories/sso-break-glass.repository.ts";
 import type { SsoBreakGlassBindingRepository } from "../repositories/sso-connection.repository.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -328,5 +326,16 @@ export class RequiresLocalDoorAndBinding implements SsoBreakGlassBindingReposito
     if (!(await this.deps.localDoor.hasLiveBinding(args))) return false;
 
     return this.deps.bindings.hasLiveBinding(args);
+  }
+
+  async reserveActivationRecovery(args: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean> {
+    if (!(await this.deps.localDoor.hasLiveBinding(args))) return false;
+
+    return this.deps.bindings.reserveActivationRecovery(args);
   }
 }

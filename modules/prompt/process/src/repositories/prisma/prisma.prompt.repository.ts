@@ -21,6 +21,7 @@ import {
   parseLlmConfigVersion,
   parseRuntimeParameters,
   sortKeysDeep,
+  type PromptUsageCount,
 } from "@langwatch/prompt-contract";
 import { nanoid } from "nanoid";
 
@@ -70,6 +71,27 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   ) {
     super();
     this.versions = versions ?? PrismaLlmConfigVersionsRepository.create({ prisma });
+  }
+
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<PromptUsageCount> {
+    const scope = { projectId: { in: [...projectIds] } };
+    const [prompts, first] = await Promise.all([
+      this.prisma.llmPromptConfig.count({
+        where: since === undefined ? scope : { ...scope, createdAt: { gte: new Date(since) } },
+      }),
+      this.prisma.llmPromptConfig.findFirst({
+        where: scope,
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    return { prompts, ...(first ? { firstPromptAt: first.createdAt.getTime() } : {}) };
   }
 
   async findOrganizationIdForProject(projectId: string): Promise<string> {

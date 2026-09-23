@@ -33,10 +33,12 @@ export interface LangyToolFrame {
   digest?: CliResultDigest;
   /** Validated polymorphic payload for a successful LangWatch CLI call. */
   result?: CliToolResult;
+  /** The call ran in the developer's shared folder (ADR-129), whatever its tool name. */
+  local?: boolean;
 }
 
 /** opencode's shell tools — any of these may be carrying a `langwatch` call. */
-const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute"]);
+const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
 
 /** Keys a shell tool may pass its command under. opencode's bash uses `command`. */
 const COMMAND_KEYS = ["command", "cmd", "script"];

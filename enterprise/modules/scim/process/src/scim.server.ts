@@ -14,10 +14,13 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { ScimApp } from "./app/scim.app.ts";
 import type { ScimSyncLifecycle } from "./app/scim.members.ts";
+import { scimEventing } from "./eventing/scim.pipeline.ts";
+import { scimRepositories } from "./repositories/scim-repositories.registry.ts";
 import {
   ScimSyncLifecycleService,
   type ScimSyncLifecycleAdapterDeps,
 } from "./services/scim-sync-lifecycle.service.ts";
+import { scimOversightTrpcTransport } from "./transport/scim-oversight.trpc.ts";
 import { scimProtocolRest, scimRestCredential } from "./transport/scim-protocol.rest.ts";
 import { scimReconciliationTrpcTransport } from "./transport/scim-reconciliation.trpc.ts";
 import { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
@@ -27,11 +30,13 @@ import { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 export type { ScimBespokeMembers } from "./app/scim.app.ts";
 
 export const scimServer = defineServerModule("scim")
+  .withRepositories(scimRepositories)
   .withApp(ScimApp)
   .withTransports(
     scimTokenRest,
     scimTokenTrpcTransport,
     scimReconciliationTrpcTransport,
+    scimOversightTrpcTransport,
     scimProtocolRest,
     scimWebhookRest,
   )
@@ -48,7 +53,8 @@ export const scimServer = defineServerModule("scim")
 
       return { connectionId: credential.connectionId };
     }),
-  ]);
+  ])
+  .withEventing(scimEventing);
 
 export type { ScimSyncLifecycleAdapterDeps };
 

@@ -25,6 +25,7 @@ export function readNavigationDeployment(): NavigationDeployment {
     return {
       isSaaS: config.deployment === "saas",
       isDevelopment: config.mode === "development",
+      ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
       ...(config.demoProjectSlug ? { demoProjectSlug: config.demoProjectSlug } : {}),
       hasNlpService: config.capabilities.nlp,
       hasLangevals: config.capabilities.langevals,

@@ -1,4 +1,4 @@
-import type { LangyContextChip } from "@langwatch/langy-browser-kit";
+import { type LangyContextChip, useLangyPageContextStore } from "@langwatch/langy-browser-kit";
 import {
   createContext,
   type ReactNode,
@@ -50,7 +50,9 @@ export function LangyProvider({ children }: { children: ReactNode }) {
   const proposalHandlersRef = useRef<ProposalHandlers>({});
   const actionHandlersRef = useRef<LangyUiActionHandlers>({});
   const [experimentSlug, setExperimentSlug] = useState<string | undefined>();
-  const [pageContext, setPageContext] = useState<LangyContextChip[]>([]);
+  const pageContext = useLangyPageContextStore((state) => state.pageContext);
+  const registerPageContext = useLangyPageContextStore((state) => state.register);
+  const clearPageContext = useLangyPageContextStore((state) => state.clear);
 
   const registerHandlers = useCallback(
     (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => {
@@ -71,14 +73,6 @@ export function LangyProvider({ children }: { children: ReactNode }) {
 
   const clearActions = useCallback(() => {
     actionHandlersRef.current = {};
-  }, []);
-
-  const registerPageContext = useCallback((items: LangyContextChip[]) => {
-    setPageContext(items);
-  }, []);
-
-  const clearPageContext = useCallback(() => {
-    setPageContext([]);
   }, []);
 
   const value = useMemo<LangyContextValue>(
@@ -144,26 +138,4 @@ export function useRegisterLangyActions(handlers: LangyUiActionHandlers) {
     registerActions(handlers);
     return () => clearActions();
   }, [handlers, registerActions, clearActions]);
-}
-
-/**
- * Optional hook for pages to declare precise Langy context the route can't express — a
- * selected prompt or dashboard with its human name. Registers on mount, clears on
- * unmount, so the chip follows the page.
- */
-export function useRegisterLangyPageContext(items: LangyContextChip[]) {
-  // Read without `useLangy`: a page also renders where Langy is not mounted (a
-  // test, a surface outside the project layout), and naming its resource for
-  // Langy must not be what breaks it there.
-  const langy = useContext(LangyContext);
-  const registerPageContext = langy?.registerPageContext;
-  const clearPageContext = langy?.clearPageContext;
-  // Serialize so a fresh array literal with the same content doesn't re-run.
-  const key = JSON.stringify(items);
-  useEffect(() => {
-    if (!registerPageContext || !clearPageContext) return;
-    registerPageContext(items);
-    return () => clearPageContext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, registerPageContext, clearPageContext]);
 }

@@ -71,7 +71,7 @@ Feature: Composing the join-request ledger in a background worker
     Given a composed join-request pipeline
     When the expiry wake fires
     Then it appends through the ledger and stages the expireJoin command
-    And it notifies the requester only when something actually expired
+    And the requester is told only once the expiry itself is recorded
 
   @unit
   Scenario: One bouncing admin address does not silence the rest

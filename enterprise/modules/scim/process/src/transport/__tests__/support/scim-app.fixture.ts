@@ -28,6 +28,7 @@ import {
   ScimConnectionsService,
   type ScimConnectionReads,
 } from "../../../services/scim-connections.service.ts";
+import type { ScimOversightService } from "../../../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
 
 export class ScimServiceFake extends ScimService {
@@ -85,6 +86,8 @@ export function scimTestApp(
     connections?: OrganizationSsoConnection[];
     webhookSecret?: string | undefined;
     planType?: string;
+    oversight?: ScimOversightService;
+    operators?: Parameters<typeof ScimApp.createWithService>[0]["operators"];
   } = {},
 ) {
   const scim = options.scim ?? new ScimServiceFake();
@@ -93,6 +96,7 @@ export function scimTestApp(
     ssoConnectionReads: () => ({
       findForOrganization: () => Promise.resolve(offered),
       getProvider: ({ connectionId }) => Promise.resolve({ connectionId, providerId: "oidc" }),
+      getOrganization: () => Promise.reject(new Error("the doors never ask")),
     }),
   };
   const audited: unknown[] = [];
@@ -114,6 +118,8 @@ export function scimTestApp(
         scimSyncReads: () => ({
           findForOrganization: () => Promise.resolve([]),
           findByConnection: () => Promise.resolve(null),
+          listForOperator: () => Promise.resolve({ syncs: [], total: 0 }),
+          findForOperator: () => Promise.resolve([]),
         }),
       },
       grants: { findDirectoryCausedChanges: () => Promise.resolve([]) },
@@ -123,6 +129,8 @@ export function scimTestApp(
     entitlements,
     auditLog,
     webhookSecret: () => ("webhookSecret" in options ? options.webhookSecret : undefined),
+    ...(options.oversight ? { oversight: options.oversight } : {}),
+    ...(options.operators ? { operators: options.operators } : {}),
   });
 
   return { app, scim, audited };

@@ -1,9 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
@@ -87,6 +88,7 @@ export function createRoleTestApp(
     },
     config: void 0,
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
   return { app, roles };

@@ -27,6 +27,7 @@ describe("given the published trace filter examples", () => {
   });
 
   describe("when each is read the way a caller would send it", () => {
+    /** @scenario "Every example is runnable as published" */
     it.each(TRACE_FILTER_EXAMPLES.map((example) => [example.id, example.text] as const))(
       "[%s] parses, passes the save-time check and compiles",
       (_id, text) => {
@@ -40,5 +41,24 @@ describe("given the published trace filter examples", () => {
         expect(compiled?.params.tenantId).toBe(TENANT);
       },
     );
+  });
+
+  describe("when a translated filter is combined with the legacy filter map", () => {
+    /** @scenario "The filter's bound parameters cannot collide with the legacy filter's" */
+    it("never emits a parameter the legacy builder also owns", () => {
+      const legacyOwned = /^(f\d+_|spanWindowStart$|spanWindowEnd$)/;
+      const legacySharedValue = new Set(["tenantId"]);
+      for (const example of TRACE_FILTER_EXAMPLES) {
+        const compiled = traceQueryRepository.translateFilter({
+          queryText: example.text,
+          tenantId: TENANT,
+          timeRange: WINDOW,
+        });
+        for (const name of Object.keys(compiled?.params ?? {})) {
+          if (legacySharedValue.has(name)) continue;
+          expect(legacyOwned.test(name), `${example.id}: ${name}`).toBe(false);
+        }
+      }
+    });
   });
 });

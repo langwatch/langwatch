@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
@@ -22,7 +23,6 @@ import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyApp } from "../app/langy.app.ts";
@@ -264,6 +264,7 @@ function testPresence(): PresenceApi {
     update: () => Promise.resolve(),
     leave: () => Promise.resolve(),
     list: () => Promise.resolve([]),
+    publishProjectEvent: () => Promise.resolve(),
     broadcastCursor: () => Promise.resolve(),
     events: async function* () {},
     cursors: async function* () {},

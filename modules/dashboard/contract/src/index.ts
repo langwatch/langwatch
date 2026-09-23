@@ -5,6 +5,7 @@ export * from "./dashboard.trpc.ts";
 export { DashboardApi } from "./dashboard.api.ts";
 export type {
   DashboardGraphCountScope,
+  DashboardUsageCount,
   SavedWorkbenchChartDefinitionUpdate,
 } from "./dashboard.api.ts";
 export * from "./graph.ts";

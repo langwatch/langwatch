@@ -14,13 +14,14 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 
-function repoAnswering(deactivatedAt: Instant | null) {
+function repoAnswering(deactivatedAt: Instant | null, signupConfirmationPending = false) {
   const tryFindUserForHooks = vi.fn(async () => ({
     id: "user-1",
     email: "user@example.com",
     name: null,
     deactivatedAt,
     pendingSsoSetup: false,
+    signupConfirmationPending,
   }));
   const findFederatedAccountsForUser = vi.fn(async () => [
     { providerId: "auth0", accountId: "waad|acme|sam" },
@@ -83,6 +84,26 @@ describe("beforeSessionCreate", () => {
           }),
         ).resolves.toBeUndefined();
         expect(tryFindUserForHooks).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a password sign-up still awaiting its emailed proof", () => {
+    describe("when its correct password is about to mint a session", () => {
+      /** @scenario "Pending password sign-in cannot mint a session" */
+      it("refuses the session, and lets it through once the latch is cleared", async () => {
+        const pending = repoAnswering(null, true);
+        const confirmed = repoAnswering(null, false);
+        const attempt = (repo: BetterAuthHooksRepository) =>
+          beforeSessionCreate({
+            repo,
+            session: { userId: "user-1" },
+            path: "/sign-in/email",
+            collaborators: CONTINUING,
+          });
+
+        await expect(attempt(pending.repo)).resolves.toBe(false);
+        await expect(attempt(confirmed.repo)).resolves.toBeUndefined();
       });
     });
   });

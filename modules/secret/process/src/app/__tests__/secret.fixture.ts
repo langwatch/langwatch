@@ -1,4 +1,5 @@
 import { ResourceScope } from "@langwatch/kernel";
+import { ScopedSecrets } from "@langwatch/secrets";
 
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
 import type { SecretRepositories } from "../../repositories/secret.repositories.ts";
@@ -32,5 +33,6 @@ export function createSecretTestApp(
     members: { encryption: input.encryption ?? new ReversibleTestSecretEncryption() },
     config: void 0,
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 }

@@ -1,6 +1,7 @@
 // Dataset editor respecting I-READY gate; dataset ID from host route (screen decides readiness).
 
 import { Alert, Box, Button, Spinner, Text } from "@chakra-ui/react";
+import { datasetContextChip, useRegisterLangyPageContext } from "@langwatch/langy-browser-kit";
 import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 
@@ -40,6 +41,10 @@ export default function DatasetEditorScreen() {
     },
   );
 
+  const datasetName = datasetQuery.data?.name;
+  useRegisterLangyPageContext(
+    datasetId && datasetName ? [datasetContextChip({ datasetId, name: datasetName })] : [],
+  );
   const status = datasetQuery.data?.status;
   // `getById` returns null for an archived or deleted dataset rather than
   // throwing: surface that explicitly rather than treating the absent row as

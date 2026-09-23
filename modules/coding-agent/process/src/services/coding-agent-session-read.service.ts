@@ -7,6 +7,7 @@ import {
   codingAgentSessionEventsInputSchema,
   codingAgentSessionLookupInputSchema,
   codingAgentTraceSessionLookupInputSchema,
+  type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
   codingAgentUsageTotalsInputSchema,
@@ -156,6 +157,14 @@ export class CodingAgentSessionReadService {
     });
 
     return this.withMetricTotals(parsed.projectId, rows, parsed);
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount> {
+    return this.dependencies.sessions.countUsage(input);
   }
 
   async getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {

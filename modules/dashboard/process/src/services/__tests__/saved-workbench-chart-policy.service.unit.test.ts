@@ -1,7 +1,7 @@
 /**
  * The save gate for a workbench chart: what a definition has to survive before
  * anything is allowed to store it.
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";

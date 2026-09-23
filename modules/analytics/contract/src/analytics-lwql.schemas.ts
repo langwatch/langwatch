@@ -4,6 +4,7 @@
  * accepted steps ARE the published contract, so both doors read one copy.
  */
 import { defineRestMiddleware } from "@langwatch/api/contract";
+import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
 import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
@@ -30,6 +31,37 @@ export const langWatchQLProtectionsSchema: z.ZodType<LangWatchQLProtections> = z
 export const langWatchQLCallerProtections = defineRestMiddleware(
   "langWatchQLCallerProtections",
   langWatchQLProtectionsSchema,
+);
+
+/**
+ * Who an API key is, as the key door resolved it: a legacy project key IS its own project; any
+ * other key reaches the projects of its organization it holds `analytics:view` on. Annotated with
+ * the framework's type, so the two stop compiling together rather than drifting apart.
+ */
+export type LangWatchQLKeyReach = RestKeyCredentialPrincipal;
+export const langWatchQLKeyReachSchema: z.ZodType<LangWatchQLKeyReach> = z.discriminatedUnion(
+  "kind",
+  [
+    z.object({ kind: z.literal("project"), projectId: z.string().min(1) }).strict(),
+    z
+      .object({
+        kind: z.literal("apiKey"),
+        apiKeyId: z.string().min(1),
+        userId: z.string().min(1).nullable(),
+        organizationId: z.string().min(1),
+        resolvedProject: z
+          .object({ id: z.string().min(1), teamId: z.string().min(1) })
+          .strict()
+          .optional(),
+      })
+      .strict(),
+  ],
+);
+
+/** The key the query door authenticated, resolved by the process rather than the handler. */
+export const langWatchQLKeyReach = defineRestMiddleware(
+  "langWatchQLKeyReach",
+  langWatchQLKeyReachSchema,
 );
 
 /**

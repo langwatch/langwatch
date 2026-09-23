@@ -1,4 +1,5 @@
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   affectedRollupBuckets,
   buildMetricRollups,
@@ -47,6 +48,36 @@ export interface MetricClickHouseClient {
 }
 
 export type MetricClickHouseClientResolver = (tenantId: string) => Promise<MetricClickHouseClient>;
+
+/**
+ * Adapts the process's routed `clickhouse` member to Metric's tenant-resolved
+ * client, so the append/read repositories below keep their own shape.
+ */
+export function createMetricClickHouseResolver(
+  clickhouse: ClickHouseQueryClient,
+): MetricClickHouseClientResolver {
+  return (tenantId) =>
+    Promise.resolve<MetricClickHouseClient>({
+      async insert(params) {
+        await clickhouse.insert({
+          tenantId,
+          table: params.table,
+          rows: params.values as readonly Record<string, unknown>[],
+        });
+        return undefined;
+      },
+      async query(params) {
+        const result = await clickhouse.query<Record<string, unknown>>({
+          tenantId,
+          sql: params.query,
+          ...(params.query_params ? { params: params.query_params } : {}),
+          ...(params.unscoped ? { unscoped: params.unscoped } : {}),
+        });
+        return { json: async <T = unknown>() => result.rows as T[] };
+      },
+    });
+}
+
 const logger = createLogger("langwatch:app-layer:metrics:metric-data-point-repository");
 
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;

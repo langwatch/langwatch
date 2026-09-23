@@ -7,9 +7,9 @@
  * it, and a reviewer checking whether a leaver was removed has no business
  * being handed a control that mints credentials.
  *
- * No Enterprise plan gate, unlike `scimToken.*`: the headline case for reading
- * this is a plan that lapsed, and gating it would withhold the answer to "why
- * did my push stop" on the grounds that the push stopped.
+ * The request log takes no Enterprise plan gate: its headline case is a plan
+ * that lapsed, and gating it would withhold "why did my push stop" on the
+ * grounds that the push stopped. The overview asks the plan, in the app.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { ScimApi, scimReconciliationTrpc } from "@langwatch/enterprise-scim-contract";

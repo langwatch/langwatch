@@ -47,6 +47,8 @@ export const publicAppConfigSchema = z.strictObject({
    * the shell alongside the rest of the deployment's public shape.
    */
   authProvider: z.string().min(1).optional(),
+  /** Keeps the development badge off a development build (demos, screenshots). */
+  hideDevIndicator: z.boolean().optional(),
 });
 
 export type PublicAppConfig = z.infer<typeof publicAppConfigSchema>;

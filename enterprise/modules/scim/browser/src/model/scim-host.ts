@@ -17,6 +17,11 @@ export type ScimFailureNotice = {
   fallbackTitle: string;
 };
 
+/** The query string the screen was opened with. */
+export type ScimRouteReading = {
+  query: Readonly<Record<string, string | undefined>>;
+};
+
 export abstract class ScimHostApi {
   /** The organization the tokens are minted against. */
   abstract organizationId(): string | undefined;
@@ -27,6 +32,11 @@ export abstract class ScimHostApi {
   abstract succeeded(notice: ScimSuccessNotice): void;
 
   abstract failed(failure: ScimFailureNotice): void;
+
+  abstract route(): ScimRouteReading;
+
+  /** Replaces the whole query string; a key left out is a key removed. */
+  abstract setQuery(next: Readonly<Record<string, string | undefined>>): void;
 }
 
 const ScimHostContext = createContext<ScimHostApi | undefined>(void 0);
@@ -46,3 +56,6 @@ export function useScimHost(): ScimHostApi {
 
 /** Seeing the page is `sso:view`; minting a token takes `sso:manage` (ADR-122). */
 export const SCIM_PAGE_PERMISSION = "sso:view";
+
+/** Where the connectors live: the Authentication section's provisioning page. */
+export const CONNECTORS_PAGE = "/settings/authentication/connectors";

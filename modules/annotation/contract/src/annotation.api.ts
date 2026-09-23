@@ -46,6 +46,19 @@ import type {
   UpdateAnnotationInput,
 } from "./annotation.schemas.ts";
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many were made, since `since` where one is given, and when the first
+ * annotation was. Times are epoch milliseconds.
+ */
+export interface AnnotationUsageCount {
+  readonly annotations: number;
+  readonly annotationQueues: number;
+  readonly annotationQueueItems: number;
+  readonly annotationScores: number;
+  readonly firstAnnotationAt?: number;
+}
+
 /** Flat operations peers may call after the annotation app is composed. */
 export interface AnnotationApi {
   create(input: CreateAnnotationInput): Promise<Annotation>;
@@ -92,6 +105,11 @@ export interface AnnotationApi {
   queueTraces(
     input: QueueAnnotationTracesInput,
   ): Promise<Readonly<{ created: number; skipped: number }>>;
+  /** The usage report's figures for these projects. */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AnnotationUsageCount>;
 }
 
 export const AnnotationApi = moduleApi<AnnotationApi>()("annotation");

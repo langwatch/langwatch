@@ -1,8 +1,11 @@
 import { createServer, type Server } from "http";
+
 import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
+
 import { initConfig } from "../config.js";
 import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.js";
 import { deleteAgent, getAgent, updateAgent } from "../langwatch-api-agents.js";
+import QUERY_REFERENCE_FIXTURE from "./fixtures/query-reference.json" with { type: "json" };
 
 // --- Canned responses for every API endpoint ---
 
@@ -68,6 +71,27 @@ const CANNED_TRACE_DETAIL = {
       passed: true,
     },
   ],
+};
+
+const CANNED_QUERY_RESULT = {
+  columns: [
+    { name: "day", type: "DateTime64(3)" },
+    { name: "traces", type: "UInt64" },
+    { name: "messages", type: "Nullable(JSON)" },
+  ],
+  rows: [
+    {
+      day: "2026-09-01 00:00:00.000",
+      traces: 12,
+      messages: '[{"role":"user"}]',
+    },
+    { day: "2026-09-02 00:00:00.000", traces: 7, messages: null },
+  ],
+  statistics: { elapsedMs: 9, rowsRead: 2, bytesRead: 40, rowsReturned: 2 },
+  truncated: false,
+  followsTimeWindow: false,
+  followsGranularity: false,
+  diagnostics: [],
 };
 
 const CANNED_ANALYTICS = {
@@ -483,6 +507,32 @@ function createMockServer(): Server {
       // Store last request for assertions
       const routeKey = `${method} ${url.split("?")[0]}`;
       lastRequests[routeKey] = { method, url, body };
+
+      if (url === "/api/v1/query/reference" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(QUERY_REFERENCE_FIXTURE));
+        return;
+      }
+      if (url === "/api/v1/query" && method === "POST") {
+        const parsed = JSON.parse(body) as { sql?: string };
+        if (parsed.sql === "__many__") {
+          res.writeHead(200);
+          res.end(
+            JSON.stringify({
+              ...CANNED_QUERY_RESULT,
+              rows: Array.from({ length: 120 }, (_, index) => ({
+                day: `2026-09-${String((index % 28) + 1).padStart(2, "0")} 00:00:00.000`,
+                traces: index,
+                messages: null,
+              })),
+            }),
+          );
+          return;
+        }
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_QUERY_RESULT));
+        return;
+      }
 
       // --- Trace endpoints ---
       if (url === "/api/v1/traces/search" && method === "POST") {
@@ -925,12 +975,28 @@ describe("All MCP tools integration", () => {
   describe("discover_schema()", () => {
     describe("when category is filters", () => {
       /** @scenario Agent discovers available filter fields */
-      it("returns filter field documentation", async () => {
+      it("returns the platform's own filter fields", async () => {
         const { formatSchema } = await import("../tools/discover-schema.js");
-        const result = formatSchema("filters");
+        const result = await formatSchema("filters");
 
-        expect(result).toContain("## Available Filter Fields");
-        expect(result).toContain("filters");
+        expect(result).toContain("## Trace Filter Fields");
+        expect(result).toContain("search_traces");
+        expect(result).toContain("trace.attribute.");
+        expect(result).toContain("Trace query syntax");
+        expect(lastRequests["GET /api/v1/query/reference"]).toBeDefined();
+      });
+    });
+
+    describe("when category is lwql", () => {
+      /** @scenario Agent discovers the analytics SQL schema */
+      it("returns the datasets with their time columns and example statements", async () => {
+        const { formatSchema } = await import("../tools/discover-schema.js");
+        const result = await formatSchema("lwql");
+
+        expect(result).toContain("## Analytics SQL");
+        expect(result).toContain("analytics.traces");
+        expect(result).toContain("OccurredAt");
+        expect(result).toContain("```sql");
       });
     });
 
@@ -938,7 +1004,7 @@ describe("All MCP tools integration", () => {
       /** @scenario Agent discovers available metrics with allowed aggregations */
       it("returns metric documentation", async () => {
         const { formatSchema } = await import("../tools/discover-schema.js");
-        const result = formatSchema("metrics");
+        const result = await formatSchema("metrics");
 
         expect(result).toContain("## Available Metrics");
       });
@@ -947,7 +1013,7 @@ describe("All MCP tools integration", () => {
     describe("when category is aggregations", () => {
       it("returns aggregation types", async () => {
         const { formatSchema } = await import("../tools/discover-schema.js");
-        const result = formatSchema("aggregations");
+        const result = await formatSchema("aggregations");
 
         expect(result).toContain("## Available Aggregation Types");
         expect(result).toContain("cardinality");
@@ -960,7 +1026,7 @@ describe("All MCP tools integration", () => {
       /** @scenario Agent discovers available group-by options */
       it("returns group-by options", async () => {
         const { formatSchema } = await import("../tools/discover-schema.js");
-        const result = formatSchema("groups");
+        const result = await formatSchema("groups");
 
         expect(result).toContain("## Available Group-By Options");
       });
@@ -1009,12 +1075,67 @@ describe("All MCP tools integration", () => {
       /** @scenario Agent discovers all schema information at once */
       it("returns all schema categories", async () => {
         const { formatSchema } = await import("../tools/discover-schema.js");
-        const result = formatSchema("all");
+        const result = await formatSchema("all");
 
-        expect(result).toContain("## Available Filter Fields");
+        expect(result).toContain("## Trace Filter Fields");
+        expect(result).toContain("## Analytics SQL");
         expect(result).toContain("## Available Metrics");
         expect(result).toContain("## Available Aggregation Types");
         expect(result).toContain("## Available Group-By Options");
+      });
+    });
+
+    describe("when the reference is fetched", () => {
+      it("sends the credential", async () => {
+        const { formatSchema } = await import("../tools/discover-schema.js");
+        await formatSchema("filters");
+        expect(lastRequests["GET /api/v1/query/reference"]?.method).toBe("GET");
+      });
+    });
+  });
+
+  describe("run_query", () => {
+    describe("when the statement returns rows", () => {
+      /** @scenario Agent runs an analytics SQL statement and reads a table */
+      it("sends the statement unchanged and renders a markdown table", async () => {
+        const { handleRunQuery } = await import("../tools/run-query.js");
+        const sql =
+          "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day";
+        const result = await handleRunQuery({ sql });
+
+        expect(JSON.parse(lastRequests["POST /api/v1/query"]!.body).sql).toBe(sql);
+        expect(result).toContain("| day | traces | messages |");
+        expect(result).toContain("| --- | --- | --- |");
+        expect(result).toContain("2026-09-01 00:00:00.000");
+        expect(result).toContain("Returned 2 rows in 9ms.");
+      });
+
+      it("passes the declared parameters through", async () => {
+        const { handleRunQuery } = await import("../tools/run-query.js");
+        await handleRunQuery({
+          sql: "SELECT {days:UInt32}",
+          parameters: { days: 7 },
+        });
+        expect(JSON.parse(lastRequests["POST /api/v1/query"]!.body).parameters).toEqual({
+          days: 7,
+        });
+      });
+    });
+
+    describe("when the statement returns more rows than the tool prints", () => {
+      /** @scenario A long result is capped and says so */
+      it("prints the cap and reports the real count", async () => {
+        const { handleRunQuery } = await import("../tools/run-query.js");
+        const { RUN_QUERY_ROW_CAP } = await import("../tools/run-query.js");
+        const result = await handleRunQuery({ sql: "__many__" });
+
+        const dataRows = result
+          .split("\n")
+          .filter((line) => line.startsWith("| ") && !line.includes("---"));
+        // One header row plus the cap.
+        expect(dataRows).toHaveLength(RUN_QUERY_ROW_CAP + 1);
+        expect(result).toContain("Returned 120 rows");
+        expect(result).toContain(`Showing the first ${RUN_QUERY_ROW_CAP}`);
       });
     });
   });
@@ -1089,6 +1210,34 @@ describe("All MCP tools integration", () => {
         expect(parsed.filters).toEqual({
           "metadata.user_id": ["user-42"],
         });
+      });
+    });
+
+    describe("when a trace filter string is given", () => {
+      /** @scenario Agent filters a trace search with the trace filter language */
+      it("sends it as the filter, not as the text query", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        await handleSearchTraces({
+          filter: "status:error AND model:gpt-*",
+          query: "refund",
+        });
+
+        const parsed = JSON.parse(lastRequests["POST /api/v1/traces/search"]!.body) as {
+          filter?: string;
+          query?: string;
+        };
+        expect(parsed.filter).toBe("status:error AND model:gpt-*");
+        expect(parsed.query).toBe("refund");
+      });
+
+      it("sends no filter key when none was given", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.js");
+        await handleSearchTraces({ query: "refund" });
+
+        const parsed = JSON.parse(lastRequests["POST /api/v1/traces/search"]!.body) as {
+          filter?: string;
+        };
+        expect(parsed.filter).toBeUndefined();
       });
     });
 

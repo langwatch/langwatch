@@ -616,3 +616,53 @@ describe("the product-switcher top bar", () => {
     });
   });
 });
+
+describe("the development badge", () => {
+  afterEach(() => cleanup());
+
+  describe("when the build is a development build", () => {
+    it("shows the DEV badge", () => {
+      renderShell({ readings: { deployment: { isDevelopment: true } } });
+
+      expect(screen.getByText("DEV")).toBeInTheDocument();
+    });
+  });
+
+  describe("when a development build sets HIDE_DEV_INDICATOR", () => {
+    it("draws the top bar without the DEV badge", () => {
+      renderShell({
+        readings: { deployment: { isDevelopment: true, hideDevIndicator: true } },
+      });
+
+      expect(screen.queryByText("DEV")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("the guided tour's spotlight targets", () => {
+  afterEach(() => cleanup());
+
+  const tourTarget = (id: string) => document.querySelector(`[data-tour="${id}"]`);
+
+  describe("when an LLM Ops page renders", () => {
+    it("marks the page body, the product and project switchers, the sidebar and the Build group", () => {
+      renderShell();
+
+      expect(tourTarget("main-content")).toContainElement(screen.getByTestId("page-body"));
+      expect(tourTarget("product-switcher")).not.toBeNull();
+      expect(tourTarget("project-switcher")).toBe(
+        screen.getByRole("button", { name: "Switch project" }),
+      );
+      expect(tourTarget("sidebar")).not.toBeNull();
+      expect(tourTarget("nav-group-build")).toHaveTextContent("Build");
+    });
+  });
+
+  describe("when a Gateway page renders", () => {
+    it("marks the Virtual Keys entry", () => {
+      renderShell({ readings: { pathname: "/gateway/virtual-keys" } });
+
+      expect(tourTarget("nav-virtual-keys")).toHaveAccessibleName("Virtual Keys");
+    });
+  });
+});

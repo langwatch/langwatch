@@ -1,8 +1,8 @@
+import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
-import type { ChartFrameDashboardContext } from "../model/dashboard-widget/bridge-protocol.ts";
 import { declaredParamDefaults } from "../model/dashboard-widget/params-snapshot.ts";
 import { useDashboardWidgetChartNavigate } from "./use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "./use-dashboard-widget-executor.ts";

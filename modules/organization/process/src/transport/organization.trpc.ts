@@ -151,6 +151,11 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .withPermission("organization:manage")
   .handle(({ app, input, actor }, person) => app.getMemberOrRefuse(input, callerOf(actor, person)))
 
+  /** Bounded by the organization's own membership, never a caller-supplied id list. */
+  .procedure("getMemberProvenance")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getMemberProvenance(input))
+
   /**
    * Lenient, as the invite form has always done: an ungrantable team
    * assignment is dropped and the rest are still created, rather than losing

@@ -36,7 +36,16 @@
       "path": "../../../../modules/entitlement/process/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/gateway/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/instant-eval/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/kernel/tsconfig.build.json"

@@ -1,6 +1,6 @@
 /**
  * LangWatchQL analytics SQL — the default-deny AST validator.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  */
 import type { SqlSourcePosition, LangWatchQLViolationCode } from "@langwatch/analytics-contract";
@@ -16,13 +16,21 @@ import {
   RESERVED_DATABASES,
   type ResolvedLangWatchQLPolicy,
   DEFAULT_LWQL_LIMITS,
+  sortedUnique,
 } from "../rules/langwatch-ql-policy.rules.ts";
-import { positionOf, ROOT_FRAME, walkNode } from "../rules/langwatch-ql-query-walk.rules.ts";
+import {
+  positionOf,
+  reportRowLimitViolations,
+  ROOT_FRAME,
+  rowLimitAppend,
+  walkNode,
+} from "../rules/langwatch-ql-query-walk.rules.ts";
 import type {
   LangWatchQLValidation,
   RejectedLangWatchQL,
   WalkContext,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
+import { DEFAULT_VIOLATION_HINTS } from "../rules/langwatch-ql-violations.rules.ts";
 
 export interface ValidateLangWatchQLInput extends LangWatchQLPolicy {
   /** The SQL exactly as the caller submitted it. Never rewritten. */
@@ -58,6 +66,7 @@ export class LangWatchQLValidationService {
 
     const ctx = this.createWalkContext(this.resolvePolicy(policy));
     walkNode(screened.statement, ROOT_FRAME, ctx);
+    reportRowLimitViolations(ctx);
 
     if (ctx.violations.length > 0) {
       return { ok: false, violations: ctx.violations };
@@ -76,6 +85,7 @@ export class LangWatchQLValidationService {
         hasGroupBy: block.hasGroupBy,
         isAggregated: block.isAggregated,
       })),
+      ...rowLimitAppend(ctx),
     };
   }
 
@@ -93,6 +103,13 @@ export class LangWatchQLValidationService {
       reservedDatabases: new Set(RESERVED_DATABASES),
       defaultDatabase,
       limits: policy.limits ?? DEFAULT_LWQL_LIMITS,
+      availableViews: sortedUnique(policy.allowedTables),
+      viewColumns: new Map(
+        Object.entries(policy.viewColumns ?? {}).map(([table, columns]) => [
+          qualifyTableName({ table, defaultDatabase }),
+          sortedUnique(columns),
+        ]),
+      ),
     };
   }
 
@@ -104,6 +121,7 @@ export class LangWatchQLValidationService {
       parameters: [],
       blocks: [],
       appFunctions: [],
+      topLevelLimits: [],
     };
   }
 
@@ -168,7 +186,15 @@ export class LangWatchQLValidationService {
   }): RejectedLangWatchQL {
     return {
       ok: false,
-      violations: [{ code, clause: "statement", message, ...(at ? { at } : {}) }],
+      violations: [
+        {
+          code,
+          clause: "statement",
+          message,
+          hint: DEFAULT_VIOLATION_HINTS[code],
+          ...(at ? { at } : {}),
+        },
+      ],
     };
   }
 }

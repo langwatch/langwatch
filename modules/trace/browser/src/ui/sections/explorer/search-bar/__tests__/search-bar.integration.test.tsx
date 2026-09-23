@@ -63,6 +63,21 @@ vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+// The cost rule's estimate and start are tRPC mutations; these smoke tests
+// mount no provider, and the rule itself is covered by
+// use-instant-eval-route.integration.test.tsx.
+vi.mock("../use-instant-eval-route.ts", () => ({
+  useInstantEvalRoute: () => ({
+    onInstantEvalRoute: vi.fn(),
+    abandonPendingRun: vi.fn(),
+    confirmation: null,
+    confirmRun: vi.fn(),
+    searchWordsInstead: vi.fn(),
+    isEstimating: false,
+    isStarting: false,
+  }),
+}));
+
 // Enter on a sentence calls `traces.routeSearch`; the hook's own routing is
 // covered by use-submit-search.integration, so the submit is stubbed here
 // rather than mounting a tRPC provider.

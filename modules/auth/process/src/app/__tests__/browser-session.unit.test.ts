@@ -10,6 +10,7 @@ import type {
   BrowserSessionRecord,
   StoredBrowserSession,
 } from "../../repositories/auth-session.repository.ts";
+import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
 import { BrowserSessionService } from "../../services/browser-session.service.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -47,9 +48,13 @@ const LIVE_SESSION: StoredBrowserSession = {
   userId: "user-1",
   sessionToken: "token-1",
   impersonating: null,
+  createdAt: NOW,
+  lastSeenAt: NOW,
+  updatedAt: NOW,
 };
 
 class Sessions implements AuthSessionRepository {
+  countSignedInUsers = vi.fn().mockResolvedValue(0);
   stored: StoredBrowserSession | null = LIVE_SESSION;
   records: readonly BrowserSessionRecord[] = [];
   readonly deletedAll = vi.fn().mockResolvedValue(2);
@@ -62,6 +67,16 @@ class Sessions implements AuthSessionRepository {
 
   async findForUser(): Promise<readonly BrowserSessionRecord[]> {
     return this.records;
+  }
+
+  async findStoredForUser(): Promise<readonly StoredBrowserSession[]> {
+    return this.stored ? [this.stored] : [];
+  }
+
+  readonly touched = vi.fn().mockResolvedValue(undefined);
+
+  async touch(input: { sessionId: string; at: Instant }): Promise<void> {
+    await this.touched(input);
   }
 
   async listTokensForUser(): Promise<string[]> {
@@ -115,6 +130,7 @@ function service(
       cache: options.cache === undefined ? new Cache() : options.cache,
       identityEmails: options.identityEmails ?? new IdentityEmails(),
       users,
+      sessionBound: signInSecurityFixture({ now }).sessionBound,
       now,
     }),
   };
@@ -323,6 +339,25 @@ describe("BrowserSessionService", () => {
       expect(listed.map((entry) => entry.secondFactorProven)).toEqual([false, true, false]);
       expect(listed[1]?.identifierId).toBeNull();
       expect(Object.keys(listed[0] ?? {})).not.toContain("sessionToken");
+    });
+
+    it("says how one of the person's own sessions signed in, and knows nothing of another's", async () => {
+      const sessions = new Sessions();
+      sessions.records = [
+        record({ id: "session-1", amr: ["pwd"] }),
+        record({ id: "session-2", amr: [] }),
+      ];
+      const { service: subject } = service({ sessions });
+
+      await expect(
+        subject.getSignedInWith({ userId: "user-1", sessionId: "session-1" }),
+      ).resolves.toBe("password");
+      await expect(
+        subject.getSignedInWith({ userId: "user-1", sessionId: "session-2" }),
+      ).resolves.toBe("unknown");
+      await expect(
+        subject.getSignedInWith({ userId: "user-1", sessionId: "someone-elses" }),
+      ).resolves.toBe("unknown");
     });
 
     /** @scenario "A person ends one of the browsers they are signed in on" */

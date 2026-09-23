@@ -1,11 +1,11 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { EventSourcing } from "@langwatch/eventing";
+import type { EventSourcing, ProcessStore } from "@langwatch/eventing";
 /**
  * Builds the {@link OpsAppInfrastructure} `apps/api/src/features/ops/ops.composition.ts`
  * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
  * capability with its named refusal, exactly as that composition did.
  */
-import { PrismaProcessStore, PrismaScheduledJobStore } from "@langwatch/eventing/server";
+import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
 import { OpsCapabilityUnavailableError, type OpsServerConfig } from "@langwatch/ops-contract";
@@ -35,8 +35,10 @@ import type {
   OpsAppInfrastructure,
   OpsCapability,
   OpsEventExplorer,
+  OpsLicenseRegistry,
   OpsProcessExplorer,
   OpsReplayRunner,
+  OpsSelfHostedInstances,
   OpsSnapshotRedis,
   OpsSystemMigrationRunner,
 } from "./ops.app.ts";
@@ -53,6 +55,11 @@ export type OpsProcessMembers = Readonly<{
   /** Who reaches the back office — the deployment's own list, named raw
    *  because it is a fact about the installation, not a store. */
   adminEmails: readonly string[];
+  /** The process's own facts the checkup and the usage report name. */
+  isSaas: boolean;
+  serviceVersion: string;
+  publicBaseUrl: string | undefined;
+  processName: string;
 }>;
 
 /** One operator explorer, refused by name on every method. */
@@ -151,6 +158,7 @@ export function buildOpsInfrastructure(input: {
   members: OpsProcessMembers;
   config: OpsServerConfig;
   resources: ResourceOwnership;
+  processStore: ProcessStore;
 }): OpsAppInfrastructure {
   const { members, config, resources } = input;
   const introspection = EventingOpsIntrospectionAdapter.create(() => members.eventing.definitions);
@@ -204,7 +212,7 @@ export function buildOpsInfrastructure(input: {
           introspection,
         }) satisfies OpsEventExplorer,
         managerExplorer: ManagerExplorerService.create({
-          store: PrismaProcessStore.create({ database: members.prisma }),
+          store: input.processStore,
           fleet: ProcessOpsPrismaRepository.create({ prisma: members.prisma }),
           audit: PrismaProcessAuditRepository.create({
             prisma: members.prisma,
@@ -245,6 +253,12 @@ export function buildOpsInfrastructure(input: {
     systemMigrations: unavailableOperatorRuntime<OpsSystemMigrationRunner>(
       "the system migration runner",
     ),
+    // Real when the enterprise licensing module is installed and its
+    // composition overrides this member; refused by name otherwise (§10).
+    licenseRegistry: unavailableOperatorRuntime<OpsLicenseRegistry>("the license registry"),
+    selfHostedInstances: unavailableOperatorRuntime<OpsSelfHostedInstances>(
+      "the self-hosted instance registry",
+    ),
     // The bug-report intake's own flood bound and best-effort alert. This
     // process has neither a dedicated limiter nor a notifier of its own for
     // this endpoint yet, so it allows and answers silently rather than
@@ -253,6 +267,10 @@ export function buildOpsInfrastructure(input: {
     bugReportNotifier: { notify: () => Promise.resolve() },
     explainClients,
     findOpsApiKey: () => config.apiKey ?? null,
+    findProductAnalyticsTargets: () => {
+      const { key, host } = config.productAnalytics;
+      return key ? [{ key, ...(host ? { host } : {}) }] : [];
+    },
     isProduction: members.nodeEnvironment === "production",
   };
 }

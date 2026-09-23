@@ -5,7 +5,11 @@
  */
 import { createHash } from "node:crypto";
 
-import type { VirtualKeyWithScopes, ModelProvider } from "@langwatch/gateway-contract";
+import type {
+  GatewayConnectUpstream,
+  VirtualKeyWithScopes,
+  ModelProvider,
+} from "@langwatch/gateway-contract";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -15,7 +19,10 @@ import {
   type GatewayConfigAssembly,
 } from "../app/gateway.members.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+import {
+  GatewayScopeResolutionService,
+  type GatewayPlatformProviders,
+} from "../services/gateway-scope-resolution.service.ts";
 
 const logger = createLogger("langwatch:gateway:config-assembly");
 
@@ -46,23 +53,33 @@ function buildHostedCatalog(): Record<string, string[]> {
 }
 
 export class GatewayConfigAssemblyAdapter implements GatewayConfigAssembly {
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly scopeResolution: GatewayScopeResolutionService) {}
 
-  static create(input: { prisma: PrismaClient }): GatewayConfigAssemblyAdapter {
-    return new GatewayConfigAssemblyAdapter(input.prisma);
+  static create(input: {
+    prisma: PrismaClient;
+    platformProviders: GatewayPlatformProviders;
+  }): GatewayConfigAssemblyAdapter {
+    return new GatewayConfigAssemblyAdapter(
+      GatewayScopeResolutionService.create({
+        repository: PrismaGatewayScopeResolutionRepository.create({ database: input.prisma }),
+        platformProviders: input.platformProviders,
+      }),
+    );
   }
 
-  async versionToken(virtualKey: VirtualKeyWithScopes): Promise<string> {
-    const providers = await GatewayScopeResolutionService.create({
-      repository: PrismaGatewayScopeResolutionRepository.create({ database: this.prisma }),
-    }).eligibleModelProvidersForVk(virtualKey);
+  async versionToken(
+    virtualKey: VirtualKeyWithScopes,
+    connectUpstream?: GatewayConnectUpstream,
+  ): Promise<string> {
+    const providers = await this.scopeResolution.eligibleModelProvidersForVk(virtualKey);
 
     // Order is part of the answer: `providers[]` is the fallback chain, so two
     // identical sets in a different order are two different bundles. The array
     // comes back in dispatch order, and it is digested as it comes.
     const digest = createHash("sha256")
       .update(
-        JSON.stringify(providers, (_key, value) =>
+        // The hosted slot is synthesized, not a row the resolver sees, so it is digested beside.
+        JSON.stringify(connectUpstream ? [providers, connectUpstream] : providers, (_key, value) =>
           typeof value === "bigint" ? value.toString() : value,
         ),
       )

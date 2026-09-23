@@ -18,8 +18,8 @@ export const userApiIsAdminSchema = z.object({ isAdmin: z.boolean() }).strict();
 /** Whether the caller can sign in with a password at all. */
 export const userApiHasPasswordSchema = z.object({ hasPassword: z.boolean() }).strict();
 
-/** Whether to offer this person a passkey right now (ADR-120). */
-export const userApiPasskeyNudgeSchema = z.object({ offer: z.boolean() }).strict();
+/** The display name the account now carries. */
+export const userApiUpdatedNameSchema = z.object({ name: z.string() }).strict();
 
 /** One sign-in method linked to the account. Never a secret. */
 export const userApiLinkedAccountSchema = z

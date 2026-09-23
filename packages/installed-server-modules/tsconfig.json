@@ -54,6 +54,9 @@
       "path": "../../modules/dataset/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/billing/process/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/governance/process/tsconfig.build.json"
     },
     {
@@ -61,6 +64,9 @@
     },
     {
       "path": "../../enterprise/modules/managed-provider/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/saas/process/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/scim/process/tsconfig.build.json"

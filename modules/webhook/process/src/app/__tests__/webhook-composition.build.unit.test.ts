@@ -1,11 +1,9 @@
 /**
  * The webhook process composition: what `WebhookApp.create` derives from its
- * one declared read (`prisma`) and its one peer dependency (`EntitlementApi`).
+ * one peer dependency (`EntitlementApi`).
  * @vitest-environment node
  */
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { PrismaProcessStore } from "@langwatch/eventing/server";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   WebhookDispatchUnavailableError,
   WebhookEndpointsNotEntitledError,
@@ -35,35 +33,10 @@ class FixedEntitlement implements Pick<EntitlementApi, "getActivePlan"> {
   }
 }
 
-/** The seven members `PrismaProcessStore`'s own shape guard reads off `database`. */
-function fakePrisma(): PrismaClient {
-  const client = {
-    $executeRaw: async () => 0,
-    $queryRaw: async () => [],
-    $transaction: async (fn: unknown) =>
-      typeof fn === "function" ? (fn as (tx: unknown) => unknown)(client) : fn,
-    processManagerInbox: {},
-    processManagerInstance: {},
-    processManagerOutbox: {},
-    processManagerOutboxAttempt: {},
-  };
-  return client as unknown as PrismaClient;
-}
-
 describe("buildWebhookComposition", () => {
-  describe("given the process's one prisma member and its entitlement peer", () => {
-    it("derives the process store from the prisma member", () => {
-      const built = buildWebhookComposition({
-        prisma: fakePrisma(),
-        entitlement: new FixedEntitlement(plan(true)),
-      });
-
-      expect(built.processStore).toBeInstanceOf(PrismaProcessStore);
-    });
-
+  describe("given the process's entitlement peer", () => {
     it("grants when the organization's plan carries webhook endpoints", async () => {
       const built = buildWebhookComposition({
-        prisma: fakePrisma(),
         entitlement: new FixedEntitlement(plan(true)),
       });
 
@@ -72,7 +45,6 @@ describe("buildWebhookComposition", () => {
 
     it("wires the entitlement check through the shared plan gate", async () => {
       const built = buildWebhookComposition({
-        prisma: fakePrisma(),
         entitlement: new FixedEntitlement(plan(false)),
       });
 
@@ -86,7 +58,6 @@ describe("buildWebhookComposition", () => {
     /** @scenario "A test fire from the interactive process refuses by name" */
     it("refuses by name instead of crashing on an unsupplied function", async () => {
       const built = buildWebhookComposition({
-        prisma: fakePrisma(),
         entitlement: new FixedEntitlement(plan(true)),
       });
 

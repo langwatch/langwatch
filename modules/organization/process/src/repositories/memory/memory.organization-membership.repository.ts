@@ -244,6 +244,31 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     };
   }
 
+  async markSelfHostedCustomer(organizationId: string): Promise<void> {
+    if (!this.memory.organizations.has(organizationId)) {
+      throw new Error(`No organization "${organizationId}" to mark as a self-hosted customer`);
+    }
+    this.memory.selfHostedCustomers.add(organizationId);
+  }
+
+  async findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
+    return [...this.memory.selfHostedCustomers].flatMap((organizationId) => {
+      const organization = this.memory.organizations.get(organizationId);
+      return organization ? [{ organizationId, organizationName: organization.name }] : [];
+    });
+  }
+
+  async findRepresentatives(
+    organizationId: string,
+  ): Promise<{ userId: string; organizationName: string }[]> {
+    const organization = this.memory.organizations.get(organizationId);
+    const [oldest] = this.memory.organizationUsers
+      .filter((row) => row.organizationId === organizationId)
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+    if (!organization || !oldest) return [];
+    return [{ userId: oldest.userId, organizationName: organization.name }];
+  }
+
   async deleteProvisionedOrganization(organizationId: string): Promise<void> {
     for (const team of this.teamsOf(organizationId)) this.memory.teams.delete(team.id);
     this.memory.organizationUsers.splice(
@@ -317,6 +342,20 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     });
     if (!row) return null;
     return this.memberWithUser(row);
+  }
+
+  async findMemberUserIds({ organizationId }: { organizationId: string }): Promise<string[]> {
+    return this.memory.organizationUsers
+      .filter((row) => row.organizationId === organizationId)
+      .map((row) => row.userId);
+  }
+
+  /** The memory tier keeps no invitation table, so nobody here arrived on one. */
+  async findInvitedMemberIds(_params: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<string[]> {
+    return [];
   }
 
   async getAllMembers(organizationId: string): Promise<User[]> {

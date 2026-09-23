@@ -8,5 +8,6 @@ export class QuietScimSyncLifecycle implements ScimSyncLifecycle {
   async userPushed(): Promise<void> {}
   async groupMapped(): Promise<void> {}
   async applyFailed(): Promise<void> {}
+  async applyRedriven(): Promise<void> {}
   async revoked(): Promise<void> {}
 }

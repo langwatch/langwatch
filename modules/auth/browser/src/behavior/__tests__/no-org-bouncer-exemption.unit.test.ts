@@ -28,4 +28,10 @@ describe("the no-organization bouncer exemption list", () => {
       expect(noOrgBouncerRoutes).toContain("/governance/cost-centers");
     });
   });
+
+  describe("when a single sign-on test sign-in lands with no organization", () => {
+    it("leaves the tester on the test landing rather than bouncing them to onboarding", () => {
+      expect(noOrgBouncerRoutes).toContain("/auth/sso-test-complete");
+    });
+  });
 });

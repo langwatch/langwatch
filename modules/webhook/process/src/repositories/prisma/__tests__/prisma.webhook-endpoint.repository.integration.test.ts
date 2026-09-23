@@ -24,7 +24,7 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { WebhookEndpointValidationError } from "@langwatch/webhook-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -35,7 +35,11 @@ import {
   WEBHOOK_DISABLED_REASON_AUTO,
   WebhookEndpointConfiguration,
 } from "../../../services/webhook-endpoint-policy.service.ts";
-import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
+import {
+  disableEndpointForFailureStreak,
+  PrismaWebhookEndpointRepository,
+} from "../prisma.webhook-endpoint.repository.ts";
+import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -476,6 +480,35 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
       expect(reEnabled.status).toBe("ACTIVE");
       expect(reEnabled.failingSince).toBeNull();
       expect(reEnabled.disabledReason).toBeNull();
+    });
+
+    /** @scenario Two failing attempts crossing the seventy two hour mark disable the endpoint once */
+    it("tells exactly one of two overlapping attempts that it flipped the endpoint", async () => {
+      const { endpoint } = await create(repository(), {
+        organizationId: orgId,
+        url: "https://example.com/hooks/auto-disable-race",
+        enabledEvents: ["gateway.request.completed"],
+      });
+      const now = new Date();
+      const flip = (tx: Prisma.TransactionClient) =>
+        disableEndpointForFailureStreak({
+          prisma: tx,
+          organizationId: orgId,
+          endpointId: endpoint.id,
+          now,
+        });
+
+      const flips = await raceOnOneRow({
+        prisma,
+        table: "WebhookEndpoint",
+        first: flip,
+        second: flip,
+      });
+
+      expect(flips).toEqual({ first: true, second: false });
+      const health = await repository().health({ organizationId: orgId, endpointId: endpoint.id });
+      expect(health.status).toBe("DISABLED");
+      expect(health.disabledReason).toBe(WEBHOOK_DISABLED_REASON_AUTO);
     });
   });
 });

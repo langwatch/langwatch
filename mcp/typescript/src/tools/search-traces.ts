@@ -10,6 +10,7 @@ import { formatEvaluationLines } from "../utils/format-evaluations.js";
 export async function handleSearchTraces(params: {
   query?: string;
   filters?: Record<string, string[]>;
+  filter?: string;
   startDate?: string;
   endDate?: string;
   pageSize?: number;
@@ -24,6 +25,9 @@ export async function handleSearchTraces(params: {
   const result = await apiSearchTraces({
     query: params.query,
     filters: params.filters,
+    // Forwarded as itself: the filter language and the free-text query are two
+    // different searches, and the server combines them.
+    ...(params.filter ? { filter: params.filter } : {}),
     startDate,
     endDate,
     pageSize: params.pageSize ?? 25,

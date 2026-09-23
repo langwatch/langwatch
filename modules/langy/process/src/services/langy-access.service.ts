@@ -7,17 +7,22 @@ import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-
  */
 export const LANGY_RELEASE_FLAG = "release_langy_enabled" as const;
 
+/** A session user carries an email for domain-targeted rules; an API key's owner carries none. */
+type LangyAccessUser = { id: string; email?: string | null };
+
 function targetForLangyAccess(input: {
-  user: { id: string };
+  user: LangyAccessUser;
   projectId?: string;
   organizationId?: string;
 }): FeatureFlagTarget {
+  const email = input.user.email ? { userEmail: input.user.email } : {};
   if (input.projectId) {
     return {
       kind: "project",
       userId: input.user.id,
       projectId: input.projectId,
       organizationId: input.organizationId,
+      ...email,
     };
   }
 
@@ -26,10 +31,11 @@ function targetForLangyAccess(input: {
       kind: "organization",
       userId: input.user.id,
       organizationId: input.organizationId,
+      ...email,
     };
   }
 
-  return { kind: "user", userId: input.user.id };
+  return { kind: "user", userId: input.user.id, ...email };
 }
 
 /** Decides whether one user may reach Langy in a given scope. */
@@ -45,7 +51,7 @@ export class LangyAccessService {
   }
 
   async hasAccess(input: {
-    user: { id: string };
+    user: LangyAccessUser;
     projectId?: string;
     organizationId?: string;
   }): Promise<boolean> {

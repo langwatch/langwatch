@@ -19,7 +19,8 @@ import { getLangWatchTracer } from "langwatch";
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export interface MetricRequestCollectionDeps {
-  metrics: MetricApi;
+  /** Only the preparation half of `MetricApi`: this collector sends its own batch, itself. */
+  metrics: Pick<MetricApi, "prepareMetricDataPoints">;
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;
   recordMetricCorrelations: (data: RecordMetricCorrelationCommandData[]) => Promise<void>;
 }

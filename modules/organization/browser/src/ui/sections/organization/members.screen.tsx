@@ -19,6 +19,7 @@ import {
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -39,10 +40,19 @@ import {
   useOrganizationHost,
   type OrganizationTeamReading,
 } from "../../../model/organization-host.ts";
+import {
+  emptyPeopleCutText,
+  parsePeopleCut,
+  PEOPLE_CUT_PARAM,
+  type PeopleCut,
+  peopleCutIsEmpty,
+  peopleCutItems,
+  peopleCutShows,
+} from "../../../model/people-cuts.ts";
 import { type OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types.ts";
-import { DomainJoinCard } from "../../../ui/blocks/domain-join-card.tsx";
 import { JoinRequestsTable } from "../../../ui/blocks/join-requests-table.tsx";
 import { CopyInput } from "../../../ui/elements/copy-input.tsx";
+import { ProvenanceChip } from "../../../ui/elements/member-provenance.tsx";
 import { OverflownTextWithTooltip } from "../../../ui/elements/overflown-text.tsx";
 import { RandomColorAvatar } from "../../../ui/elements/random-color-avatar.tsx";
 import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
@@ -101,8 +111,19 @@ function MembersList({
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
 
-  const governanceEnabled = useOrganizationHost().isFeatureEnabled(
-    "release_ui_ai_governance_enabled",
+  const host = useOrganizationHost();
+  const governanceEnabled = host.isFeatureEnabled("release_ui_ai_governance_enabled");
+  const route = host.route();
+  const cut = parsePeopleCut(route.query[PEOPLE_CUT_PARAM]);
+  const selectCut = (next: PeopleCut) =>
+    host.setQuery(
+      { ...route.query, [PEOPLE_CUT_PARAM]: next === "all" ? undefined : next },
+      { replace: true },
+    );
+  // Asked apart from the list: a failed read leaves everybody listed, without chips.
+  const provenance = api.organization.getMemberProvenance.useQuery(
+    { organizationId: organization.id },
+    { enabled: hasOrganizationManagePermission },
   );
   const department = useDepartmentColumn(organization.id, governanceEnabled);
   const showDepartment = department.show && hasOrganizationManagePermission;
@@ -264,6 +285,13 @@ function MembersList({
     hasOrganizationManagePermission && memberId !== user?.id;
 
   const invites = useMemo(() => pendingInvites.data ?? [], [pendingInvites.data]);
+  const openInvites = useMemo(
+    () =>
+      invites.filter(
+        (invite) => invite.displayStatus === "PENDING" || invite.displayStatus === "EXPIRED",
+      ),
+    [invites],
+  );
 
   // One panel, two directions (D12): an invitation is the organization
   // reaching out, a request is somebody reaching in, and an admin answers
@@ -273,6 +301,12 @@ function MembersList({
     organizationId: organization.id,
     canManage: hasOrganizationManagePermission,
   });
+  const counts = {
+    members: organization.members.length,
+    openInvites: openInvites.length,
+    invites: invites.length,
+    requests: joinRequests.requests.length,
+  };
 
   return (
     <>
@@ -297,146 +331,149 @@ function MembersList({
         {hasOrganizationManagePermission && (
           <MemberSeatUsage organizationId={organization.id} activePlan={activePlan} />
         )}
-        <Card.Root width="full" overflow="hidden">
-          {/*
+        <PeopleCutFilter
+          cut={cut}
+          onSelectCut={selectCut}
+          counts={counts}
+          provenanceFailed={provenance.isError}
+        />
+        {peopleCutShows({ cut, list: "members" }) && (
+          <Card.Root width="full" overflow="hidden">
+            {/*
             overflowX="auto" so the row never clips the rightmost ⋮ menu. The
             department picker keeps its full width (do NOT shrink it); the email
             column truncates via OverflownTextWithTooltip so long addresses don't push the row.
           */}
-          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader width="56px" />
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader maxWidth="280px">Email</Table.ColumnHeader>
-                  {hasOrganizationManagePermission && (
-                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
-                  )}
-                  {showDepartment && <Table.ColumnHeader>Department</Table.ColumnHeader>}
-                  <Table.ColumnHeader width="60px"></Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {sortedMembers.map((member) => {
-                  return (
-                    <Table.Row key={member.userId}>
-                      <Table.Cell>
-                        <RandomColorAvatar
-                          size="2xs"
-                          name={member.user.name ?? ""}
-                          image={member.user.image}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <HStack>
-                          <Button
-                            variant="plain"
-                            size="sm"
-                            padding={0}
-                            height="auto"
-                            fontWeight="normal"
-                            color="colorPalette.fg"
-                            colorPalette="blue"
-                            onClick={() => {
-                              setSelectedMember({
-                                userId: member.userId,
-                                role: member.role,
-                                user: {
-                                  name: member.user.name ?? null,
-                                  email: member.user.email ?? null,
-                                },
-                              });
-                            }}
-                          >
-                            {member.user.name}
-                          </Button>
-                          {member.role === "EXTERNAL" && (
-                            <Badge colorPalette="gray" size="sm">
-                              Lite Member
-                            </Badge>
-                          )}
-                          {member.user.deactivatedAt && (
-                            <Badge colorPalette="red" size="sm">
-                              Deactivated
-                            </Badge>
-                          )}
-                          {member.disabledAt && (
-                            <Badge colorPalette="orange" size="sm">
-                              Disabled
-                            </Badge>
-                          )}
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell maxWidth="280px">
-                        <OverflownTextWithTooltip>{member.user.email}</OverflownTextWithTooltip>
-                      </Table.Cell>
-                      {hasOrganizationManagePermission && (
+            <Card.Body paddingY={0} paddingX={0} overflowX="auto">
+              <Table.Root variant="line" size="md" width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader width="56px" />
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader maxWidth="280px">Email</Table.ColumnHeader>
+                    {hasOrganizationManagePermission && (
+                      <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                    )}
+                    {showDepartment && <Table.ColumnHeader>Department</Table.ColumnHeader>}
+                    <Table.ColumnHeader width="60px"></Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {sortedMembers.map((member) => {
+                    return (
+                      <Table.Row key={member.userId}>
                         <Table.Cell>
-                          <MemberAccessDisplay
-                            bindings={bindingsByUser.get(member.userId) ?? []}
-                            isLoading={isBindingsLoading || isBindingsError}
+                          <RandomColorAvatar
+                            size="2xs"
+                            name={member.user.name ?? ""}
+                            image={member.user.image}
                           />
                         </Table.Cell>
-                      )}
-                      {showDepartment && (
                         <Table.Cell>
-                          <DepartmentPicker
-                            organizationId={organization.id}
-                            kind="user"
-                            entityId={member.userId}
-                            value={department.byUser.get(member.userId) ?? null}
-                            departments={department.departments}
-                            onAssigned={department.refetch}
-                          />
+                          <HStack>
+                            <Button
+                              variant="plain"
+                              size="sm"
+                              padding={0}
+                              height="auto"
+                              fontWeight="normal"
+                              color="colorPalette.fg"
+                              colorPalette="blue"
+                              onClick={() => {
+                                setSelectedMember({
+                                  userId: member.userId,
+                                  role: member.role,
+                                  user: {
+                                    name: member.user.name ?? null,
+                                    email: member.user.email ?? null,
+                                  },
+                                });
+                              }}
+                            >
+                              {member.user.name}
+                            </Button>
+                            {member.role === "EXTERNAL" && (
+                              <Badge colorPalette="gray" size="sm">
+                                Lite Member
+                              </Badge>
+                            )}
+                            {member.user.deactivatedAt && (
+                              <Badge colorPalette="red" size="sm">
+                                Deactivated
+                              </Badge>
+                            )}
+                            {member.disabledAt && (
+                              <Badge colorPalette="orange" size="sm">
+                                Disabled
+                              </Badge>
+                            )}
+                            <ProvenanceChip provenance={provenance.data?.[member.userId]} />
+                          </HStack>
                         </Table.Cell>
-                      )}
-                      <Table.Cell>
-                        <Box width="full" height="full" display="flex" justifyContent="end">
-                          <MemberRowActions
-                            member={member}
-                            canDisable={canDisableMember(member.userId)}
-                            canDelete={canDeleteMember(member.userId)}
-                            onEdit={setSelectedMember}
-                            onSetDisabled={setMemberDisabled}
-                            onDelete={deleteMember}
-                          />
-                        </Box>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
+                        <Table.Cell maxWidth="280px">
+                          <OverflownTextWithTooltip>{member.user.email}</OverflownTextWithTooltip>
+                        </Table.Cell>
+                        {hasOrganizationManagePermission && (
+                          <Table.Cell>
+                            <MemberAccessDisplay
+                              bindings={bindingsByUser.get(member.userId) ?? []}
+                              isLoading={isBindingsLoading || isBindingsError}
+                            />
+                          </Table.Cell>
+                        )}
+                        {showDepartment && (
+                          <Table.Cell>
+                            <DepartmentPicker
+                              organizationId={organization.id}
+                              kind="user"
+                              entityId={member.userId}
+                              value={department.byUser.get(member.userId) ?? null}
+                              departments={department.departments}
+                              onAssigned={department.refetch}
+                            />
+                          </Table.Cell>
+                        )}
+                        <Table.Cell>
+                          <Box width="full" height="full" display="flex" justifyContent="end">
+                            <MemberRowActions
+                              member={member}
+                              canDisable={canDisableMember(member.userId)}
+                              canDelete={canDeleteMember(member.userId)}
+                              onEdit={setSelectedMember}
+                              onSetDisabled={setMemberDisabled}
+                              onDelete={deleteMember}
+                            />
+                          </Box>
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+                </Table.Body>
+              </Table.Root>
+            </Card.Body>
+          </Card.Root>
+        )}
 
-        {hasOrganizationManagePermission && (
-          <DomainJoinCard
-            key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
-            domainJoin={joinRequests.joining.domainJoin}
-            joinDomains={joinRequests.joining.joinDomains}
-            saving={joinRequests.savingJoining}
-            onSave={joinRequests.setJoining}
+        {peopleCutShows({ cut, list: "waiting" }) && (
+          <JoinRequestsTable
+            requests={joinRequests.requests}
+            isAdmin={hasOrganizationManagePermission}
+            answeringId={joinRequests.answeringId}
+            onApprove={joinRequests.approve}
+            onReject={joinRequests.reject}
           />
         )}
 
-        <JoinRequestsTable
-          requests={joinRequests.requests}
-          isAdmin={hasOrganizationManagePermission}
-          answeringId={joinRequests.answeringId}
-          onApprove={joinRequests.approve}
-          onReject={joinRequests.reject}
-        />
-
-        <InvitesTable
-          invites={invites}
-          isAdmin={hasOrganizationManagePermission}
-          teams={teams}
-          onViewInviteLink={viewInviteLink}
-          onResendInvite={resendInvite}
-          onRevokeInvite={revokeInvite}
-        />
+        {peopleCutShows({ cut, list: "invited" }) && (
+          <InvitesTable
+            invites={cut === "invited" ? invites : openInvites}
+            isAdmin={hasOrganizationManagePermission}
+            teams={teams}
+            onViewInviteLink={viewInviteLink}
+            onResendInvite={resendInvite}
+            onRevokeInvite={revokeInvite}
+          />
+        )}
       </VStack>
 
       {selectedMember && (
@@ -645,5 +682,46 @@ function MemberAccessDisplay({
         </HStack>
       ))}
     </VStack>
+  );
+}
+
+/** The cut filter, and the one sentence a cut with nobody in it says instead of a table. */
+function PeopleCutFilter({
+  cut,
+  onSelectCut,
+  counts,
+  provenanceFailed,
+}: {
+  cut: PeopleCut;
+  onSelectCut: (next: PeopleCut) => void;
+  counts: { members: number; openInvites: number; invites: number; requests: number };
+  provenanceFailed: boolean;
+}) {
+  const items = peopleCutItems({
+    memberCount: counts.members,
+    openInviteCount: counts.openInvites,
+    requestCount: counts.requests,
+  });
+  return (
+    <>
+      <SegmentedControl
+        size="sm"
+        aria-label="Filter people by how they got here"
+        data-testid="people-cuts"
+        value={cut}
+        onValueChange={({ value }) => onSelectCut(parsePeopleCut(value ?? undefined))}
+        items={items.map((item) => ({ value: item.value, label: `${item.label} ${item.count}` }))}
+      />
+      {provenanceFailed && (
+        <Text fontSize="sm" color="fg.muted">
+          We couldn&apos;t work out how everybody got here just now.
+        </Text>
+      )}
+      {peopleCutIsEmpty({ cut, ...counts }) && (
+        <Text fontSize="sm" color="fg.muted" data-testid="people-cut-empty">
+          {emptyPeopleCutText(cut)}
+        </Text>
+      )}
+    </>
   );
 }

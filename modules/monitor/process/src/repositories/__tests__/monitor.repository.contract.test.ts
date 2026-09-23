@@ -93,6 +93,25 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  describe("when the usage report counts monitors", () => {
+    it("counts the named projects only, and dates the first", async () => {
+      const projectIds = [backend.projectId()];
+      const before = await backend.repository().countUsage({ projectIds });
+      const written = await backend.repository().create(creation());
+      await backend.repository().create(creation());
+
+      const after = await backend.repository().countUsage({ projectIds });
+      const future = await backend.repository().countUsage({
+        projectIds,
+        since: written.createdAt.getTime() + 60_000,
+      });
+
+      expect(after.monitors).toBe(before.monitors + 2);
+      expect(after.firstMonitorAt).toBeLessThanOrEqual(written.createdAt.getTime());
+      expect(future.monitors).toBe(0);
+    });
+  });
+
   describe("when a project holds monitors in several execution modes", () => {
     it("lists only the enabled on-message monitors of that project", async () => {
       const onMessage = await backend.repository().create(creation({ name: "On message" }));

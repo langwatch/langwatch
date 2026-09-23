@@ -68,6 +68,7 @@ describe("the feature map, given the CLI's real command tree", () => {
   });
 
   describe("when the map is compared against the CLI", () => {
+    /** @scenario "The query family is claimed by the feature map" */
     it("covers every non-excluded CLI group with feature-map CLI commands", () => {
       const missing = cliGroups.filter((group) => !mapGroups.has(group));
       expect(

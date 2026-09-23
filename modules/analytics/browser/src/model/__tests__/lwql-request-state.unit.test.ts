@@ -344,7 +344,7 @@ describe("the LangWatchQL request machine", () => {
 
         // An answer the transport delivers anyway is a superseded submission's
         // and changes nothing.
-        calls[1]!.deferred.resolve(lwqlResult({ truncated: true }));
+        calls[1]!.deferred.resolve(lwqlResult({ rows: [] }));
         await settle();
         expect(controller.getState().outcome).toBe(shown);
 
@@ -367,7 +367,7 @@ describe("the LangWatchQL request machine", () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
         controller.runQuery();
-        calls[0]!.deferred.resolve(lwqlResult({ truncated: false }));
+        calls[0]!.deferred.resolve(lwqlResult());
         await settle();
         const shown = controller.getState().outcome;
 

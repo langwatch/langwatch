@@ -214,38 +214,6 @@ Feature: Permission resolution
     And a permission it does not list is denied
 
   # ==========================================================================
-  # The legacy fallbacks that predate role bindings
-  # ==========================================================================
-
-  @regression
-  Scenario: An organization admin from before role bindings keeps their gateway and audit access
-    Given an organization admin whose access is a legacy admin team row with no bindings
-    When they read the gateway logs, budgets, cache rules or the audit log
-    Then the reads are allowed
-    But managing the organization is still refused
-    And the same reads are refused once the legacy row is gone
-
-  @regression
-  Scenario: A legacy member team row keeps read access and no delete
-    Given a caller whose access is a legacy member team row with no bindings
-    When they read the gateway logs or the audit log
-    Then the reads are allowed
-    But deleting a gateway budget is refused
-
-  @regression
-  Scenario: A legacy viewer team row keeps the audit log readable
-    Given a caller whose access is a legacy viewer team row with no bindings
-    When they read the audit log
-    Then the read is allowed
-    But deleting a gateway budget is refused
-
-  @regression
-  Scenario: A binding on the scope chain retires the legacy fallback
-    Given a caller with a viewer binding on the project's team and a legacy admin row
-    When a permission only the admin row would carry is checked
-    Then the check is denied
-
-  # ==========================================================================
   # Carrying the verdict into a request
   # ==========================================================================
 

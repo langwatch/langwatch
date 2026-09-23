@@ -49,9 +49,23 @@ type Fakes = {
 
 function serviceWith(fakes: Fakes = {}) {
   const calls: string[] = [];
+  const row = fakes.row === undefined ? storedKey() : fakes.row;
   const service = ApiKeyTokenResolutionService.create({
+    // The key's grants live on authz's grants head, not on its row.
+    authz: {
+      listApiKeyBindings: async () =>
+        Array.isArray(row?.roleBindings)
+          ? row.roleBindings.map((binding: Record<string, unknown>) => ({
+              ...binding,
+              id: "grant-1",
+              apiKeyId: row.id,
+              role: "VIEWER",
+              customRoleId: null,
+            }))
+          : [],
+    },
     repository: {
-      findByLookupId: async () => (fakes.row === undefined ? storedKey() : fakes.row),
+      findByLookupId: async () => row && { ...row, roleBindings: undefined },
       upgradeHash: async () => {
         calls.push("upgradeHash");
         if (fakes.upgradeFails) throw new Error("write failed");

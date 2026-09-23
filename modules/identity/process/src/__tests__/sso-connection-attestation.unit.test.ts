@@ -91,6 +91,7 @@ beforeEach(() => {
   breakGlass = new StubBreakGlassBindings(true);
   guards = SsoConnectionGuardsService.create({
     connections,
+    registrationSlots: connections,
     breakGlass,
     stranding: new StubStranding([]),
     platformOperators: new StubPlatformOperators([OLIVE.id]),
@@ -174,10 +175,15 @@ describe("operator attestation", () => {
       expect(state.state).toBe("VERIFIED");
       expect(facts[0]!.data).toMatchObject({ actor: OLIVE });
 
-      // The same installation, a second connection in the same organization,
+      // The same installation, a connection in another organization,
       // approved and waiting to be proved. Its administrator still cannot
       // attest it — being self-hosted buys her nothing here.
-      const second = { ...identity, connectionId: "ssoc_2" };
+      const second = {
+        ...identity,
+        tenantId: "org_other",
+        organizationId: "org_other",
+        connectionId: "ssoc_2",
+      };
       await run(
         () =>
           guards.registerConnection({
@@ -368,7 +374,7 @@ describe("operator attestation", () => {
             proofState: "VERIFIED",
             firstAbsentAtMs: null,
             graceEndsAtMs: null,
-            tokenHash: null,
+            tokenHash: "sha256:first-proof",
           },
         ],
       });
@@ -411,8 +417,13 @@ describe("operator attestation", () => {
       await reachApproved();
       await run(() => guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }));
 
-      // A second connection, whose domain the customer proved themselves.
-      const proved = { ...identity, connectionId: "ssoc_2" };
+      // Another organization's connection, whose domain the customer proved.
+      const proved = {
+        ...identity,
+        tenantId: "org_other",
+        organizationId: "org_other",
+        connectionId: "ssoc_2",
+      };
       await run(
         () =>
           guards.registerConnection({
@@ -449,52 +460,11 @@ describe("operator attestation", () => {
         connectionId: "ssoc_2",
       });
 
-      // A third, on a self-hosted installation whose licence proved it.
-      const licensed = { ...identity, connectionId: "ssoc_3" };
-      await run(
-        () =>
-          guards.registerConnection({
-            ...licensed,
-            type: "oidc",
-            idp: IDP,
-            arrivalPolicy: "admit",
-          }),
-        { connectionId: "ssoc_3" },
-      );
-      await run(() => guards.claimDomain({ ...licensed, domain: "gamma.example" }), {
-        connectionId: "ssoc_3",
-      });
-      await run(
-        () =>
-          guards.approveDomainClaim({
-            ...licensed,
-            actor: OLIVE,
-            domain: "gamma.example",
-          }),
-        { connectionId: "ssoc_3" },
-      );
-      await run(
-        () =>
-          guards.requestVerification({
-            ...licensed,
-            domain: "gamma.example",
-            method: "license-token",
-            tokenHash: "sha256:licence",
-          }),
-        { connectionId: "ssoc_3" },
-      );
-      await run(() => guards.verifyDomain({ ...licensed, domain: "gamma.example" }), {
-        connectionId: "ssoc_3",
-      });
-
       const attested = await connections.tryFindConnection({
         connectionId: CONNECTION,
       });
       const published = await connections.tryFindConnection({
         connectionId: "ssoc_2",
-      });
-      const byLicence = await connections.tryFindConnection({
-        connectionId: "ssoc_3",
       });
 
       // Each domain names the method that proved it, and who — so a dispute
@@ -523,18 +493,6 @@ describe("operator attestation", () => {
           // Carried from the ceremony this verification closed: what a
           // re-read will hold the published record against.
           tokenHash: "sha256:proof",
-        },
-      ]);
-      expect(byLicence?.domainVerifications).toEqual([
-        {
-          domain: "gamma.example",
-          method: "license-token",
-          actorId: ANA.id,
-          verifiedAtMs: T0,
-          proofState: "VERIFIED",
-          firstAbsentAtMs: null,
-          graceEndsAtMs: null,
-          tokenHash: null,
         },
       ]);
 

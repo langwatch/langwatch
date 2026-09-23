@@ -12,7 +12,7 @@ import { z } from "zod";
 
 /** Every resource the registry names, in registry order. */
 export const ROLE_PERMISSION_RESOURCES: readonly string[] = [
-  ...new Set(ALL_PERMISSIONS.map((permission) => permissionResource(permission))),
+  ...new Set([...ALL_PERMISSIONS.map((permission) => permissionResource(permission)), "scim"]),
 ];
 
 /** Every action the registry names, sorted. */

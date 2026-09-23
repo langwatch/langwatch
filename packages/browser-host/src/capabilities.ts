@@ -7,6 +7,7 @@
 import { createContext, useContext } from "react";
 
 import type { UiAnalytics } from "./analytics.ts";
+import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UNAVAILABLE_UI_SCOPE, UiScope, useUiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlots } from "./slots.tsx";
@@ -310,6 +311,11 @@ export type UiCapabilities = {
    */
   analytics?: UiAnalytics;
   /**
+   * What installed modules declared through `withCapabilities`. Optional:
+   * absent reads as nothing declared, exactly as `slots` does.
+   */
+  declarations?: UiDeclarations;
+  /**
    * Optional so a hand-built capability set stays valid without one;
    * {@link resolveUiCapabilities} always fills it, production when absent.
    */
@@ -378,6 +384,7 @@ export function resolveUiCapabilities({
 }: UiCapabilityResolution): UiCapabilities {
   return {
     analytics: install.analytics,
+    declarations: install.declarations,
     deployment: install.deployment ?? PRODUCTION_UI_DEPLOYMENT,
     documentTitle: install.documentTitle ?? documentTitle,
     feedback: install.feedback ?? UNAVAILABLE_UI_FEEDBACK,
@@ -410,6 +417,11 @@ export function useOptionalUiCapabilities(): UiCapabilities | undefined {
  */
 export function useUiDeployment(): UiDeployment {
   return useOptionalUiCapabilities()?.deployment ?? PRODUCTION_UI_DEPLOYMENT;
+}
+
+/** What installed modules declared, degrading to none outside a shell. */
+export function useUiDeclarations(): UiDeclarations {
+  return useOptionalUiCapabilities()?.declarations ?? NO_UI_DECLARATIONS;
 }
 
 /**

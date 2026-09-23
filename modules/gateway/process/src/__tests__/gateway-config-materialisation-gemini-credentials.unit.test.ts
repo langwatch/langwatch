@@ -4,13 +4,22 @@
  * materialiser. Covers specs/model-providers/google-agent-platform.feature.
  */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProvider } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
 import { GatewayConfigAssemblyAdapter } from "../app/gateway-config-assembly.composition.ts";
-
-const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
+
+const noPlatformProviders = createApiFixture<ModelProviderApi>({
+  platformProviderChain: () => Promise.resolve([]),
+});
+
+const assembly = GatewayConfigAssemblyAdapter.create({
+  prisma: {} as never,
+  platformProviders: noPlatformProviders,
+});
 
 const geminiRow = (customKeys: Record<string, string>): ModelProvider =>
   ({

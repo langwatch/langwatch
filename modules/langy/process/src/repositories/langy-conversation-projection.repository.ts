@@ -1,3 +1,5 @@
+import type { LangyUsageCount } from "@langwatch/langy-contract";
+
 export interface LangyConversationRow {
   id: string;
   userId: string;
@@ -36,6 +38,12 @@ export interface LangyConversationListCursor {
 
 /** Application-facing reads over the rebuildable operational projection. */
 export abstract class LangyConversationRepository {
+  /** The usage report's counts; the caller never passes an empty project list. */
+  abstract countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<LangyUsageCount>;
+
   abstract tryFindVisibleById(params: {
     id: string;
     projectId: string;
@@ -68,6 +76,17 @@ export abstract class LangyConversationRepository {
     conversationId: string;
   }): Promise<string | null>;
 
+  /**
+   * True when this user has sent a turn on this conversation: a turn receipt
+   * exists for the triple, written at admission time before any event is
+   * folded — the one signal a create is in flight before its projection lands.
+   */
+  abstract hasAdmittedTurn(params: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<boolean>;
+
   /** Checks if a turn projection row exists for the (projectId, conversationId, turnId) triple.
    * Result-ingest rejects forged or mismatched triples before writing (the relay uses HMAC). */
   abstract turnExists(params: {
@@ -78,6 +97,10 @@ export abstract class LangyConversationRepository {
 }
 
 export class NullLangyConversationRepository extends LangyConversationRepository {
+  async countUsage(): Promise<LangyUsageCount> {
+    return { turns: 0, activeUsers: 0 };
+  }
+
   async tryFindVisibleById(): Promise<null> {
     return null;
   }
@@ -100,6 +123,10 @@ export class NullLangyConversationRepository extends LangyConversationRepository
 
   async tryFindRunToken(): Promise<null> {
     return null;
+  }
+
+  async hasAdmittedTurn(): Promise<boolean> {
+    return false;
   }
 
   async turnExists(): Promise<boolean> {

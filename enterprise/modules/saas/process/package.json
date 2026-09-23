@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/enterprise-saas-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangWatch Cloud's own server half: the one place that asserts this deployment is Cloud, and the routes only Cloud answers.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-saas-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "posthog-node": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

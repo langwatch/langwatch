@@ -88,6 +88,12 @@ export const SSO_DOMAIN_CLAIM_AUTHORITIES = ["platform-operator", "dns-proof"] a
 export const ssoDomainClaimAuthoritySchema = z.enum(SSO_DOMAIN_CLAIM_AUTHORITIES);
 export type SsoDomainClaimAuthority = z.infer<typeof ssoDomainClaimAuthoritySchema>;
 
+/** Where one claim stands. `WITHDRAWN` is a tombstone, not a step: the row
+ *  stays so the claim throttle still sees the attempt was made. */
+export const SSO_DOMAIN_CLAIM_STATES = ["WAITING", "APPROVED", "REJECTED", "WITHDRAWN"] as const;
+export const ssoDomainClaimStateSchema = z.enum(SSO_DOMAIN_CLAIM_STATES);
+export type SsoDomainClaimState = z.infer<typeof ssoDomainClaimStateSchema>;
+
 /** Whether a method published something a re-read can go and look for. */
 export function isSsoPublishedProofChannel(method: string): method is SsoPublishedProofChannel {
   return SSO_PUBLISHED_PROOF_CHANNELS.some((channel) => channel === method);
@@ -358,6 +364,9 @@ export const connectionActivatedPayloadSchema = z.object({
    *  only for a grandfathered connection, whose test login is the years of
    *  production sign-ins the strings already served. */
   testLoginAccountId: z.string().min(1).nullable(),
+  /** The break-glass recovery reservation this activation holds, so a retry
+   *  by the same actor reuses it and nobody else can adopt it. */
+  activationReservationCommandId: z.string().min(1).optional(),
   actor: identityActorSchema,
   ...sourced,
 });
@@ -371,6 +380,7 @@ export const connectionSuspendedPayloadSchema = z.object({
 
 export const connectionResumedPayloadSchema = z.object({
   connectionId: z.string().min(1),
+  activationReservationCommandId: z.string().min(1).optional(),
   actor: identityActorSchema,
   ...sourced,
 });
@@ -581,6 +591,27 @@ export interface SsoDomainVerification {
 }
 
 /**
+ * One claim on one domain. `waitedMs` is RECORDED rather than derived, because
+ * a re-claim after a rejection overwrites the row's clock and a queue-latency
+ * measurement a later action can rewrite is not one.
+ */
+export const ssoDomainClaimSchema = z.object({
+  domain: z.string(),
+  state: ssoDomainClaimStateSchema,
+  claimedAtMs: z.number(),
+  claimedByActorId: z.string().nullable(),
+  /** When it was decided; null while it is still waiting. */
+  decidedAtMs: z.number().nullable(),
+  decidedByActorId: z.string().nullable(),
+  /** What authorized the decision; null while it is still waiting. */
+  authority: ssoDomainClaimAuthoritySchema.nullable(),
+  waitedMs: z.number().nullable(),
+  /** The reviewer's words, on a rejection. Read back on a re-claim. */
+  note: z.string().nullable(),
+});
+export type SsoDomainClaim = z.infer<typeof ssoDomainClaimSchema>;
+
+/**
  * One connection as the projection knows it — one row of `SsoConnection`,
  * and the state every guard is evaluated against.
  */
@@ -591,6 +622,9 @@ export interface SsoConnectionState {
   state: SsoConnectionLifecycleState;
   /** Claimed but not yet approved. */
   claimedDomains: string[];
+  /** Every claim this connection has made, in order: where each stands,
+   *  when it was made and how long it waited. */
+  domainClaims: SsoDomainClaim[];
   /** Approved by ops, not yet proved. */
   approvedDomains: string[];
   /** Proved, and the only ones that ever route. */
@@ -668,6 +702,7 @@ export function emptySsoConnection({ connectionId }: { connectionId: string }): 
     type: "oidc",
     state: "DRAFT",
     claimedDomains: [],
+    domainClaims: [],
     approvedDomains: [],
     verifiedDomains: [],
     domainVerifications: [],
@@ -719,6 +754,11 @@ const withoutDomain = (state: SsoConnectionState, domain: string): SsoConnection
     ),
     pendingVerification:
       state.pendingVerification?.domain === domain ? null : state.pendingVerification,
+    // A tombstone, not a deletion: a row the customer could remove is a claim
+    // budget the customer could reset.
+    domainClaims: state.domainClaims.map((claim) =>
+      claim.domain === domain ? { ...claim, state: "WITHDRAWN" as const } : claim,
+    ),
     rejection: state.rejection?.domain === domain ? null : state.rejection,
   };
 
@@ -732,11 +772,57 @@ const stateAfterWithdrawal = (state: SsoConnectionState): SsoConnectionLifecycle
   if (state.verifiedDomains.length > 0) return "VERIFIED";
   if (state.pendingVerification !== null) return "VERIFICATION_PENDING";
   if (state.approvedDomains.length > 0) return "APPROVED";
-  if (state.claimedDomains.length > 0) return "CLAIMED";
-  if (state.rejection !== null) return "REJECTED";
+  if (state.domainClaims.some((claim) => claim.state === "WAITING")) return "CLAIMED";
+  if (state.domainClaims.some((claim) => claim.state === "REJECTED")) return "REJECTED";
 
   return "DRAFT";
 };
+
+/**
+ * Where a fact about ONE domain leaves the lifecycle: never below what the
+ * remaining domains already earned. Without it a connection that proved one
+ * domain and claimed a second dropped to CLAIMED and could not go live.
+ */
+const lifecycleAfterDomainFact = (
+  state: SsoConnectionState,
+  proposed: SsoConnectionLifecycleState,
+): SsoConnectionLifecycleState => {
+  if (LIFECYCLE_BEYOND_VERIFIED.includes(state.state)) return state.state;
+  if (state.verifiedDomains.length > 0) return "VERIFIED";
+  return proposed;
+};
+
+/** One claim row per domain, last claim wins; the earlier attempt stays in the event log. */
+const withClaim = (held: SsoDomainClaim[], claim: SsoDomainClaim): SsoDomainClaim[] => [
+  ...held.filter((entry) => entry.domain !== claim.domain),
+  claim,
+];
+
+/** Decides the claim on a domain, leaving every other row alone. */
+const decideClaim = (
+  held: SsoDomainClaim[],
+  decision: {
+    domain: string;
+    state: Exclude<SsoDomainClaimState, "WAITING">;
+    decidedAtMs: number;
+    decidedByActorId: string | null;
+    authority: SsoDomainClaimAuthority;
+    note: string | null;
+  },
+): SsoDomainClaim[] =>
+  held.map((entry) =>
+    entry.domain === decision.domain
+      ? {
+          ...entry,
+          state: decision.state,
+          decidedAtMs: decision.decidedAtMs,
+          decidedByActorId: decision.decidedByActorId,
+          authority: decision.authority,
+          waitedMs: Math.max(0, decision.decidedAtMs - entry.claimedAtMs),
+          note: decision.note,
+        }
+      : entry,
+  );
 
 const withDomain = (domains: string[], domain: string): string[] =>
   domains.includes(domain) ? domains : [...domains, domain];
@@ -902,22 +988,49 @@ function reduceSsoLifecycleFact({
     case DOMAIN_CLAIMED_EVENT_TYPE:
       return {
         ...touched,
-        state: "CLAIMED",
+        state: lifecycleAfterDomainFact(state, "CLAIMED"),
         claimedDomains: withDomain(state.claimedDomains, fact.data.domain),
+        domainClaims: withClaim(state.domainClaims, {
+          domain: fact.data.domain,
+          state: "WAITING",
+          claimedAtMs: fact.occurredAt,
+          claimedByActorId: fact.data.actor.id,
+          decidedAtMs: null,
+          decidedByActorId: null,
+          authority: null,
+          waitedMs: null,
+          note: null,
+        }),
         rejection: null,
       };
     case DOMAIN_CLAIM_APPROVED_EVENT_TYPE:
       return {
         ...touched,
-        state: "APPROVED",
+        state: lifecycleAfterDomainFact(state, "APPROVED"),
         claimedDomains: without(state.claimedDomains, fact.data.domain),
         approvedDomains: withDomain(state.approvedDomains, fact.data.domain),
+        domainClaims: decideClaim(state.domainClaims, {
+          domain: fact.data.domain,
+          state: "APPROVED",
+          decidedAtMs: fact.occurredAt,
+          decidedByActorId: fact.data.actor.id,
+          authority: fact.data.authority,
+          note: null,
+        }),
       };
     case DOMAIN_CLAIM_REJECTED_EVENT_TYPE:
       return {
         ...touched,
-        state: "REJECTED",
+        state: lifecycleAfterDomainFact(state, "REJECTED"),
         claimedDomains: without(state.claimedDomains, fact.data.domain),
+        domainClaims: decideClaim(state.domainClaims, {
+          domain: fact.data.domain,
+          state: "REJECTED",
+          decidedAtMs: fact.occurredAt,
+          decidedByActorId: fact.data.actor.id,
+          authority: "platform-operator",
+          note: fact.data.note,
+        }),
         rejection: { domain: fact.data.domain, note: fact.data.note },
       };
     case CONNECTION_DISCARDED_EVENT_TYPE:
@@ -933,7 +1046,7 @@ function reduceSsoLifecycleFact({
     case VERIFICATION_REQUESTED_EVENT_TYPE:
       return {
         ...touched,
-        state: "VERIFICATION_PENDING",
+        state: lifecycleAfterDomainFact(state, "VERIFICATION_PENDING"),
         pendingVerification: {
           domain: fact.data.domain,
           method: fact.data.method,
@@ -947,7 +1060,7 @@ function reduceSsoLifecycleFact({
     case DOMAIN_ATTESTED_EVENT_TYPE:
       return {
         ...touched,
-        state: "VERIFIED",
+        state: lifecycleAfterDomainFact(state, "VERIFIED"),
         approvedDomains: without(state.approvedDomains, fact.data.domain),
         verifiedDomains: withDomain(state.verifiedDomains, fact.data.domain),
         domainVerifications: withVerification(state.domainVerifications, {
@@ -969,7 +1082,7 @@ function reduceSsoLifecycleFact({
     case DOMAIN_VERIFIED_EVENT_TYPE:
       return {
         ...touched,
-        state: "VERIFIED",
+        state: lifecycleAfterDomainFact(state, "VERIFIED"),
         approvedDomains: without(state.approvedDomains, fact.data.domain),
         verifiedDomains: withDomain(state.verifiedDomains, fact.data.domain),
         domainVerifications: withVerification(state.domainVerifications, {

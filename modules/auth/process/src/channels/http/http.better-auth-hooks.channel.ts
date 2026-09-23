@@ -539,6 +539,10 @@ export const beforeSessionCreate = async ({
     logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
     return false;
   }
+  if (user?.signupConfirmationPending) {
+    logger.warn({ userId: session.userId }, "Blocked session create: sign-up confirmation pending");
+    return false;
+  }
 
   const authentication = await collaborators.ssoMigration.authorizeAndRecordAuthentication({
     userId: session.userId,

@@ -4,7 +4,12 @@
  */
 
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
-import type { scimReconciliationTrpc, scimTokenTrpc } from "@langwatch/enterprise-scim-contract";
+import type {
+  scimOversightTrpc,
+  scimReconciliationTrpc,
+  scimTokenTrpc,
+} from "@langwatch/enterprise-scim-contract";
+import type { groupTrpc, organizationTrpc } from "@langwatch/organization-contract";
 
 /** One bearer token, as the table renders it: metadata, never the secret. */
 export type ScimTokenRow = {
@@ -15,7 +20,8 @@ export type ScimTokenRow = {
 };
 
 export type ScimApiMap = ContractApiMap<typeof scimTokenTrpc> &
-  ContractApiMap<typeof scimReconciliationTrpc>;
+  ContractApiMap<typeof scimReconciliationTrpc> &
+  ContractApiMap<typeof scimOversightTrpc>;
 
 /** One recorded request, as it arrives in the browser: `occurredAt` is an ISO
  *  string here, whatever the contract declares it as on the server. */
@@ -36,3 +42,17 @@ export type DirectoryChangeRow =
  * React Query cache as the application's `api` proxy.
  */
 export const scimApi = createModuleApi<ScimApiMap>();
+
+/** One connection's sync on the back office's cross-customer list. */
+export type OversightSyncRow =
+  OutputsFromMap<ScimApiMap>["scimOversight"]["getAll"]["syncs"][number];
+
+/**
+ * The two organization reads the directory card states its numbers from:
+ * which groups the directory sent, and who it did not create. Called through
+ * organization's contract, never its browser package.
+ */
+export type DirectoryMembershipApiMap = ContractApiMap<typeof groupTrpc> &
+  ContractApiMap<typeof organizationTrpc>;
+
+export const directoryMembershipApi = createModuleApi<DirectoryMembershipApiMap>();

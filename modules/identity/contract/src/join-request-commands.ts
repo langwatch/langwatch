@@ -70,6 +70,8 @@ export const requestJoinCommandDataSchema = commandDataSchema({
   domain: z.string().min(1),
   matchedVia: joinMatchKindSchema,
   expiresAtMs: z.number().int().nonnegative(),
+  /** False only for a policy approval, which nobody has to act on. */
+  notifyAdmins: z.boolean().default(true),
 });
 export type RequestJoinCommandData = z.infer<typeof requestJoinCommandDataSchema>;
 

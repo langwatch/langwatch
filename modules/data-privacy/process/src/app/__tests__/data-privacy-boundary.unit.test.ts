@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What a rule write answers when it cannot be carried out. Every refusal here
  * is handled: the process maps the status to its door's code and the browser
@@ -6,15 +7,14 @@
 import { AuthzApi, type AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   createDataPrivacyTestProjects,
+  installableDataPrivacy,
   dataPrivacyTestInfrastructure,
   dataPrivacyTestGraph,
   MemoryDataPrivacyDirectory,
@@ -46,7 +46,7 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
   });
 
   const runtime = await createApp({ role: "api" })
-    .withModules([withMemoryRepositories(dataPrivacyServer)])
+    .withModules([installableDataPrivacy()])
     .withMember("dataPrivacy", dataPrivacyTestInfrastructure(directory))
     .provide({
       project: createDataPrivacyTestProjects(),

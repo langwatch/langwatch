@@ -7,6 +7,7 @@ import { MemoryBillingCheckpointRepository } from "./memory.billing-checkpoint.r
 import { MemoryBillingReportOrganizationRepository } from "./memory.billing-report-organization.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "./memory.billing-webhook-organization.repository.ts";
 import { MemoryBillingWebhookBillingSubscription } from "./memory.billing-webhook-subscription.repository.ts";
+import { MemoryConnectedBillingRepository } from "./memory.connected-billing.repository.ts";
 import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate-subscriptions-report.repository.ts";
 import { MemoryNurturingProfileRepository } from "./memory.nurturing-profile.repository.ts";
 import { MemoryOrganizationPricingRepository } from "./memory.organization-pricing.repository.ts";
@@ -27,6 +28,7 @@ export class MemoryBillingRepositories {
 
     return {
       checkpoints: MemoryBillingCheckpointRepository.create(store),
+      connectedBilling: MemoryConnectedBillingRepository.create(store),
       duplicateSubscriptionsReports: MemoryDuplicateSubscriptionsReportRepository.create(store),
       nurturingProfiles: MemoryNurturingProfileRepository.create(store),
       organizations: MemoryBillingOrganizationRepository.create(store),

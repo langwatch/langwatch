@@ -38,4 +38,16 @@ export class ScimSyncReadsService implements ScimSyncReadsApi {
     const syncs = await this.syncs.findForOrganization({ organizationId });
     return syncs.find((sync) => sync.connectionId === connectionId) ?? null;
   }
+
+  listForOperator(input: {
+    page: number;
+    pageSize: number;
+    search?: string | undefined;
+  }): Promise<{ syncs: ScimSyncState[]; total: number }> {
+    return this.syncs.findPageForOperator(input);
+  }
+
+  findForOperator(input: { connectionId: string }): Promise<ScimSyncState[]> {
+    return this.syncs.findByConnectionForOperator(input);
+  }
 }

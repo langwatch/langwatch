@@ -89,6 +89,22 @@ function buildLangyConversationProducerPipeline(input: {
     revoke: refuse("revoke a session key"),
   };
   const titleGenerator: LangyTitleGenerator = refuse("generate a conversation title");
+  const localConnectTurn = {
+    presence: () => ({
+      read: refuse("read a folder's presence"),
+      readOwedConnectTurn: refuse("read an owed connect turn"),
+      settleOwedConnectTurn: refuse("settle an owed connect turn"),
+    }),
+    turns: { start: refuse("start an owed connect turn") },
+  };
+  const guidedOnboarding = {
+    reader: { read: refuse("read a project's guided onboarding") },
+    analytics: {
+      track: () => {
+        throw producerOnly(processName, "track a guided onboarding turn failure");
+      },
+    },
+  };
 
   return EventingLangyConversationAdapter.create({
     langyConversationProjectionStore:
@@ -121,6 +137,8 @@ function buildLangyConversationProducerPipeline(input: {
     worker: UnavailableLangyWorkerAdapter.create(NullLangyWorkerMetricsAdapter.create()),
     titleGenerator,
     sessionKeys,
+    localConnectTurn,
+    guidedOnboarding,
   }).buildProcessing();
 }
 

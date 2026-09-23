@@ -3,17 +3,16 @@ import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 /**
- * Neither is a credential: a payment-link id and a Slack channel address.
- * `productAnalytics` is the same public PostHog project key every other
- * reader in this tree takes as plain config — the browser ships it too.
+ * None is a credential: a payment-link id, a Slack channel address and the
+ * bank details an invoice paid outside the payment provider prints. The
+ * product-analytics target is ops' to declare; billing asks `OpsApi` for it.
  */
 export const billingConfig = Config.define((c) => ({
   licensePaymentLinkId: c.env("STRIPE_LICENSE_PAYMENT_LINK_ID", z.string().optional()),
   slackSubscriptionsChannel: c.env("SLACK_CHANNEL_SUBSCRIPTIONS", z.string().optional()),
-  productAnalytics: {
-    key: c.env("POSTHOG_KEY", z.string().optional()),
-    host: c.env("POSTHOG_HOST", z.string().optional()),
-  },
+  slackSignupsChannel: c.env("SLACK_CHANNEL_SIGNUPS", z.string().optional()),
+  slackSelfHostedChannel: c.env("SLACK_CHANNEL_SELF_HOSTED", z.string().optional()),
+  bankDetails: c.env("LANGWATCH_BILLING_BANK_DETAILS", z.string().optional()),
 }));
 
 export type BillingServerConfig = ConfigOf<typeof billingConfig>;

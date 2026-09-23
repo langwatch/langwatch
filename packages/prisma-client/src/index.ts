@@ -36,6 +36,7 @@ export {
   type PrismaPgPoolConfig,
 } from "./driver-adapter.ts";
 export {
+  listPrismaMigrationNames,
   PrismaMigrationExecutor,
   type PrismaMigrationRequest,
   PrismaMigrationService,
@@ -49,6 +50,11 @@ export {
   isUniqueConstraintError,
   uniqueConstraintTargets,
 } from "./prisma-error-codes.ts";
+export {
+  isSerializationConflict,
+  type SerializationRetryDeps,
+  withSerializationRetry,
+} from "./serializable-retry.ts";
 export {
   reportQueryDuration,
   resetSlowQueryThrottle,

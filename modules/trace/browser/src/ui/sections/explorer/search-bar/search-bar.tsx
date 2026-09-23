@@ -23,11 +23,15 @@ import { editorStyles } from "../../../../behavior/editor-styles.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
+import { useInstantEvalRunStore } from "../../../../behavior/instant-eval-run.store.ts";
 import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
 import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
+import {
+  instantEvalChipMarks,
+  isInstantEvalBusy,
+} from "../../../../model/instant-eval-chip-marks.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
@@ -36,7 +40,9 @@ import {
   ProviderPrimerPopover,
   SMARTER_SEARCH_PRIMER_COPY,
 } from "../ai/provider-primer-popover.tsx";
+import { useInstantEvalRuns } from "../hooks/use-instant-eval-runs.ts";
 import { useTraceFacets } from "../hooks/use-trace-facets.ts";
+import { InstantEvalConfirmDialog } from "../instant-eval-confirm-dialog.tsx";
 import { ActiveSearchEditor } from "./active-search-editor.tsx";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
 import { FloatingAiBar } from "./floating-ai-bar.tsx";
@@ -55,6 +61,7 @@ import { SyntaxHelpDrawerHost } from "./syntax-help-drawer.tsx";
 import { TokenValuePicker, type TokenValuePickerAnchor } from "./token-value-picker.tsx";
 import { useAskLangyFromSearch } from "./use-ask-langy-from-search.ts";
 import type { ValueResolver } from "./use-filter-editor.ts";
+import { useInstantEvalRoute } from "./use-instant-eval-route.ts";
 import { useSubmitSearch } from "./use-submit-search.ts";
 
 const MAX_DYNAMIC_ITEMS = 10;
@@ -65,9 +72,6 @@ const MAX_DYNAMIC_ITEMS = 10;
  * rather than a pointer.
  */
 let smarterSearchPrimerShown = false;
-
-/** Nothing is pending to supersede until the Instant Eval run lands here. */
-const noPendingRunToSupersede = (): void => {};
 
 type RankedValue = { value: string; count: number; label?: string };
 
@@ -267,19 +271,15 @@ export const SearchBar: React.FC = () => {
     smarterSearchPrimerShown = true;
     setSmarterSearchPrimerOpen(true);
   }, []);
-  // The run, its estimate and its cost dialog arrive with modules/instant-eval;
-  // until then a judgement takes the phrase search the router computed for it,
-  // which is what a refusal leaves behind there too.
-  const handleInstantEvalRoute = useCallback(
-    (payload: InstantEvalRoutePayload) => applyQueryText(payload.fallbackQuery),
-    [applyQueryText],
-  );
+  // A judgement goes to the cost rule: reused run, auto-start under the
+  // threshold, the dialog above it, and the phrase search behind every refusal.
+  const instantEval = useInstantEvalRoute();
   const { submitSearch, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
     isSamplePreview,
     onLangy: askLangyFromSearch,
-    onInstantEval: handleInstantEvalRoute,
-    onSupersede: noPendingRunToSupersede,
+    onInstantEval: instantEval.onInstantEvalRoute,
+    onSupersede: instantEval.abandonPendingRun,
     onModelUnavailable: handleModelUnavailable,
   });
   // A text handed over by another part of the page is submitted the way a
@@ -289,15 +289,12 @@ export const SearchBar: React.FC = () => {
   useEffect(() => {
     if (!submitRequest) return;
     clearSubmitRequest();
-    submitSearch(
-      submitRequest.text,
-      submitRequest.forceKind ? { forceKind: submitRequest.forceKind } : undefined,
-    );
+    submitSearch(submitRequest.text);
   }, [submitRequest, clearSubmitRequest, submitSearch]);
   const submitProgress = searchSubmitProgress({
     isRouting,
-    isEstimating: false,
-    isStarting: false,
+    isEstimating: instantEval.isEstimating,
+    isStarting: instantEval.isStarting,
   });
 
   // Reuse the discover payload that already powers the facets sidebar — its
@@ -307,10 +304,30 @@ export const SearchBar: React.FC = () => {
   const { data: facets } = useTraceFacets();
   const valueSourceByField = useMemo(() => categoricalTopValues(facets), [facets]);
 
+  // An `eval` chip wears its run's state on the same overlay the facet labels
+  // use, and the bar sweeps while a run is under way.
+  const { chips: evalChips } = useInstantEvalRuns();
+  const evalRuns = useInstantEvalRunStore((s) => s.runs);
+  const settledEvalRuns = useInstantEvalRunStore((s) => s.settled);
+  const evalChipMarks = useMemo(
+    () => instantEvalChipMarks({ chips: evalChips, runs: evalRuns, settled: settledEvalRuns }),
+    [evalChips, evalRuns, settledEvalRuns],
+  );
+  const instantEvalBusy = isInstantEvalBusy({
+    isEstimating: instantEval.isEstimating,
+    isStarting: instantEval.isStarting,
+    chips: evalChips,
+    runs: evalRuns,
+  });
+
   // Publish the (field → value → label) lookup the chip overlay reads from.
   useEffect(() => {
-    setFilterChipLabels(chipLabelsByField(facets));
-  }, [facets]);
+    const labels = chipLabelsByField(facets);
+    for (const [field, values] of Object.entries(evalChipMarks)) {
+      labels[field] = { ...labels[field], ...values };
+    }
+    setFilterChipLabels(labels);
+  }, [facets, evalChipMarks]);
   const valueResolver = useCallback<ValueResolver>(
     (field, query) => resolveFacetValues({ field, query, valueSourceByField }),
     [valueSourceByField],
@@ -327,6 +344,13 @@ export const SearchBar: React.FC = () => {
       data-spotlight="search-bar"
     >
       <SyntaxHelpDrawerHost />
+      <InstantEvalConfirmDialog
+        confirmation={instantEval.confirmation}
+        isStarting={instantEval.isStarting}
+        onRun={instantEval.confirmRun}
+        onSearchWords={instantEval.searchWordsInstead}
+        onClose={instantEval.searchWordsInstead}
+      />
       <AnimatePresence>
         {langyAskMode && (
           // A crash inside the Langy ask surface must never cost the user
@@ -378,6 +402,7 @@ export const SearchBar: React.FC = () => {
           handleClear={handleClear}
           handleEditorAiShortcut={handleEditorAiShortcut}
           hasContent={hasContent}
+          instantEvalBusy={instantEvalBusy}
           langyRoutesAsk={langyRoutesAsk}
           onOpenLangyAsk={openLangyAsk}
           onStartAiMode={() => setAiMode(true)}
@@ -674,6 +699,7 @@ function StructuredSearchBar({
   handleClear,
   handleEditorAiShortcut,
   hasContent,
+  instantEvalBusy,
   langyRoutesAsk,
   onOpenLangyAsk,
   onStartAiMode,
@@ -709,6 +735,8 @@ function StructuredSearchBar({
   handleClear: (event: React.MouseEvent) => void;
   handleEditorAiShortcut: (currentText: string) => void;
   hasContent: boolean;
+  /** An `eval` chip's run is being estimated, started or judged: the chip sweeps. */
+  instantEvalBusy: boolean;
   langyRoutesAsk: boolean;
   onOpenLangyAsk: () => void;
   onStartAiMode: () => void;
@@ -767,7 +795,13 @@ function StructuredSearchBar({
             </Icon>
           )}
 
-          <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
+          <Box
+            flex={1}
+            minWidth={0}
+            position="relative"
+            css={editorStyles}
+            data-instant-eval-busy={instantEvalBusy ? "" : undefined}
+          >
             {editorMounted ? (
               <ActiveSearchEditor
                 queryText={queryText}

@@ -14,6 +14,15 @@ import type {
   GithubWebhookEnvelope,
 } from "./github.ts";
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many pull requests were opened, since `since` where one is given (epoch
+ * milliseconds, on the day GitHub opened them, not the day we noticed).
+ */
+export interface GithubUsageCount {
+  readonly pullRequests: number;
+}
+
 /** Callable GitHub installation, webhook and pull-request capabilities. */
 export interface GithubApi {
   getAppConfig(): GithubAppConfig;
@@ -91,6 +100,11 @@ export interface GithubApi {
   }): Promise<GithubPullRequest | null>;
   recheckDueBranches(): Promise<number>;
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<GithubUsageCount>;
 }
 
 export const GithubApi = moduleApi<GithubApi>()("github");

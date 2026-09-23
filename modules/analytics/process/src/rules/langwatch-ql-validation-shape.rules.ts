@@ -1,13 +1,14 @@
 import type {
   LangWatchQLAppFunctionCall,
   LangWatchQLClause,
+  SqlSourcePosition,
   LangWatchQLViolation,
   LangWatchQLViolationCode,
 } from "@langwatch/analytics-contract";
 
 /**
  * LangWatchQL analytics SQL — the vocabulary the default-deny walk is written in.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import type { ResolvedLangWatchQLPolicy } from "./langwatch-ql-policy.rules.ts";
@@ -92,6 +93,14 @@ export interface AcceptedLangWatchQL {
    * hydration stage free for every query that existed before app functions.
    */
   readonly appFunctions: readonly LangWatchQLAppFunctionCall[];
+  /**
+   * Whether the service appends the default `LIMIT`: a single top-level `SELECT` naming no
+   * `LIMIT` (an `OFFSET` alone does not bound it). Always `false` for a `UNION`, whose every
+   * branch already names its own `LIMIT` or was refused (`LIMIT_REQUIRED_PER_BRANCH`).
+   */
+  readonly appendRowLimit: boolean;
+  /** Where that statement's `OFFSET` sits, so the default `LIMIT` goes before it. */
+  readonly appendRowLimitBeforeOffset?: SqlSourcePosition;
 }
 
 /** A query that was refused, and every reason found before the walk stopped. */
@@ -119,9 +128,9 @@ export const METADATA_FIELDS: readonly string[] = [
 ];
 
 /**
- * Column-set constructs whose members the walk cannot enumerate. Refused in a projection when
- * the caller has restricted fields, because there is no way to prove the expansion excludes
- * them without the table's columns — which this layer deliberately does not have.
+ * Column-set constructs whose members the walk cannot enumerate, refused wherever they appear
+ * while the caller has restricted fields: nothing proves the expansion excludes one without the
+ * table's columns. The one exemption is the star of a bare `count(*)`, a row count.
  */
 export const UNRESOLVABLE_COLUMN_SETS: readonly string[] = [
   "Asterisk",
@@ -164,6 +173,22 @@ export interface Frame {
    * function. Read by the projection walk and by nothing else.
    */
   readonly isOutermostSelect?: boolean;
+  /**
+   * Set only on the frame a bare `count(*)` walks its `arguments` in, so that one star passes;
+   * never on the call's window definition or parameters, and reset on every nested call.
+   */
+  readonly isBareCountStarArgument?: boolean;
+}
+
+/** What a top-level `SELECT` declared about how many rows it returns. */
+export interface TopLevelLimit {
+  /** Whether it named its own `LIMIT`; an `OFFSET` alone does not bound a row count. */
+  readonly hasLimit: boolean;
+  readonly hasOffset: boolean;
+  /** The `LIMIT` row count when it is a plain non-negative integer literal. */
+  readonly staticRows?: number;
+  readonly at?: SqlSourcePosition;
+  readonly offsetAt?: SqlSourcePosition;
 }
 
 /** Everything the walk accumulates. */
@@ -175,6 +200,8 @@ export interface WalkContext {
   readonly blocks: BlockAccumulator[];
   /** The hydration plan, in projection order. Only admitted calls are here. */
   readonly appFunctions: LangWatchQLAppFunctionCall[];
+  /** One entry per top-level `SELECT`; a subquery's limit bounds a read, not the response. */
+  readonly topLevelLimits: TopLevelLimit[];
 }
 
 export interface NodeArgs {

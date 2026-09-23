@@ -68,6 +68,9 @@ func Run(ctx context.Context, overrides Options) error {
 		// a session outlives the request that minted it, and its per-key cap
 		// has to be counted somewhere every replica sees.
 		app.WithRealtimeSessions(deps.ControlPlane),
+		// Hosted services are implemented once, on the control plane. The
+		// gateway authenticates, applies the budget stop and carries the call.
+		app.WithHostedServices(deps.ControlPlane),
 	}
 	// Appended conditionally on the concrete type: a nil adapter wrapped in
 	// the interface would defeat the app's nil check.

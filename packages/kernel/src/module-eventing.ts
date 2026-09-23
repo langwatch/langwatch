@@ -56,6 +56,44 @@ export interface FeatureEventing<
   connect?(bound: Readonly<{ app: App; commands: Readonly<Record<string, unknown>> }>): void;
 }
 
+/** The pipelines of a module that called `withEventing` more than once. */
+class ModulePipelines implements FeatureEventing {
+  readonly pipeline: string;
+
+  constructor(readonly declarations: readonly FeatureEventing[]) {
+    this.pipeline = declarations.map((declaration) => declaration.pipeline).join(", ");
+  }
+
+  build(setup: FeatureEventingSetup<unknown, unknown, unknown>): PendingPipelines {
+    return new PendingPipelines(this.declarations, setup);
+  }
+}
+
+/** Built one at a time at registration, so each connects before the next builds. */
+class PendingPipelines {
+  constructor(
+    private readonly declarations: readonly FeatureEventing[],
+    private readonly setup: FeatureEventingSetup<unknown, unknown, unknown>,
+  ) {}
+
+  registerEach(register: (definition: unknown) => unknown): void {
+    for (const declaration of this.declarations) {
+      const registration = register(declaration.build(this.setup));
+      declaration.connect?.({ app: this.setup.app, commands: commandsOf(registration) });
+    }
+  }
+}
+
+/** A module's eventing with one more pipeline declared after what it had. */
+export function withAnotherPipeline(
+  current: FeatureEventing | undefined,
+  next: FeatureEventing,
+): FeatureEventing {
+  if (current === void 0) return next;
+  const declared = current instanceof ModulePipelines ? current.declarations : [current];
+  return new ModulePipelines([...declared, next]);
+}
+
 /**
  * As much of an eventing runtime as installing one module's pipeline needs. A
  * process that runs event sourcing puts one on its pool under `eventing`; a
@@ -83,7 +121,16 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
     participation:
       stated === "produce" || stated === "consume" ? stated : participationForRole(role),
     processStore: host.processStore,
-    register: host.register.bind(candidate),
+    register: registerPipelines(host.register.bind(candidate)),
+  };
+}
+
+/** Registers a module's several pipelines one by one, and a single one as it is. */
+function registerPipelines(register: (definition: unknown) => unknown) {
+  return (definition: unknown): unknown => {
+    if (!(definition instanceof PendingPipelines)) return register(definition);
+    definition.registerEach(register);
+    return {};
   };
 }
 

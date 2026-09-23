@@ -6,7 +6,6 @@
 import type {
   AuthzPrincipalRef,
   CollectedBinding,
-  LegacyTeamMembership,
   ShareableResourceKind,
 } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
@@ -76,9 +75,6 @@ export type AuthzDatabase = Readonly<{
   group: FindManyDelegate;
 }>;
 
-/** The already fail-safe, cached migration gate injected by composition. */
-export type AuthzReadHeadSelector = (organizationId: string) => Promise<boolean>;
-
 /**
  * The lineage reads both ports need: resolving a scope reference (read
  * side) and validating a write target's tenancy (write side) ask the same
@@ -132,10 +128,6 @@ export abstract class AuthzReadRepository extends ScopeLineageRepository {
    * carries no ceiling. `null` means the key itself is unknown.
    */
   abstract findApiKeyOwner: (apiKeyId: string) => Promise<{ userId: string | null } | null>;
-  abstract findLegacyTeamMemberships: (args: {
-    userId: string;
-    organizationId: string;
-  }) => Promise<LegacyTeamMembership[]>;
   /**
    * The permission payloads for custom roles the principal's bindings
    * reference, fenced by organization + principal - a role id alone is

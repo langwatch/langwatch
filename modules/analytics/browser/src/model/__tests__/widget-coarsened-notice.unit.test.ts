@@ -2,7 +2,7 @@
  * What a coarsened widget tells the member: since the substitution is
  * otherwise invisible, the notice must name *both* steps (asked-for and
  * used) and cite the ceiling that forced the change, not a bare number.
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { LWQL_GRANULARITY_MAX_BUCKETS } from "@langwatch/analytics-contract";

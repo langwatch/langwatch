@@ -14,6 +14,12 @@ describe("recordAuditLogCommandSchema", () => {
     expect(recordAuditLogCommandSchema.parse(input)).toEqual(input);
   });
 
+  it("appends a row about an actor nobody has identified", () => {
+    const input = { action: "identity.sign_in_locked_out", metadata: { held: false } };
+
+    expect(recordAuditLogCommandSchema.parse(input)).toEqual(input);
+  });
+
   /** @scenario "Non-portable audit metadata is rejected" */
   it("rejects non-portable metadata", () => {
     expect(

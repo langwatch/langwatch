@@ -29,6 +29,7 @@ import {
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,
   type AuthzListBindingsForSynthesisInput,
+  type AuthzListApiKeyBindingsInput,
   type AuthzListGroupBindingsInput,
   type AuthzListManagedBindingsForOrganizationInput,
   type AuthzListManagedBindingsForOrganizationOutput,
@@ -378,6 +379,10 @@ export class AuthzService extends AuthzServiceContract {
 
   async listScopeBindings(args: AuthzListScopeBindingsInput): Promise<AuthzAccessBinding[]> {
     return this.options.listing.findScopeBindings(args);
+  }
+
+  async listApiKeyBindings(args: AuthzListApiKeyBindingsInput): Promise<AuthzAccessBinding[]> {
+    return this.options.listing.findApiKeyBindings(args);
   }
 
   async listGroupBindings(args: AuthzListGroupBindingsInput): Promise<AuthzAccessBinding[]> {

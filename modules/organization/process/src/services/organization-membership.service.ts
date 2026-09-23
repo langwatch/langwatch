@@ -1,4 +1,9 @@
-import { newAuthzBindingId, type AuthzBindingForSynthesis } from "@langwatch/authz-contract";
+import {
+  newAuthzBindingId,
+  type AuthzApi,
+  type AuthzBindingForSynthesis,
+  type GrantsLedgerActor,
+} from "@langwatch/authz-contract";
 import {
   SsoTestArrivalCannotCreateOrganizationError,
   type SsoTestArrivalStanding,
@@ -77,6 +82,9 @@ type TeamMembershipLike = {
  * The membership, provisioning and audit operations, over one repository and
  * four ports.
  */
+/** The grant half of an admission, answered by the authorization peer. */
+export type OrganizationAdmissions = Pick<AuthzApi, "attachBindings" | "completeAdmission">;
+
 export class OrganizationMembershipService {
   static enrichTeamWithRoleBindings<
     T extends {
@@ -137,6 +145,7 @@ export class OrganizationMembershipService {
     sessions: OrganizationSessionRevocation;
     grantCache: OrganizationGrantCache;
     testArrivals: OrganizationTestArrivals;
+    admissions: OrganizationAdmissions;
   }): OrganizationMembershipService {
     return new OrganizationMembershipService(dependencies);
   }
@@ -149,6 +158,7 @@ export class OrganizationMembershipService {
       sessions: OrganizationSessionRevocation;
       grantCache: OrganizationGrantCache;
       testArrivals: OrganizationTestArrivals;
+      admissions: OrganizationAdmissions;
     },
   ) {
     this.roles = OrganizationMemberRoleService.create(dependencies);
@@ -285,6 +295,38 @@ export class OrganizationMembershipService {
     }
 
     return result;
+  }
+
+  /**
+   * The organization a self-hosted licence is issued to, created with its
+   * first team exactly as provisioning creates one, then marked as a customer.
+   */
+  async createSelfHostedCustomer({
+    name,
+  }: {
+    name: string;
+  }): Promise<{ id: string; name: string }> {
+    const { organization } = await this.createForProvisioning({ name });
+    await this.repo.markSelfHostedCustomer(organization.id);
+
+    return organization;
+  }
+
+  /** Marks an existing organization as a self-hosted licence customer. */
+  markSelfHostedCustomer({ organizationId }: { organizationId: string }): Promise<void> {
+    return this.repo.markSelfHostedCustomer(organizationId);
+  }
+
+  findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
+    return this.repo.findSelfHostedCustomers();
+  }
+
+  findRepresentatives({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ userId: string; organizationName: string }[]> {
+    return this.repo.findRepresentatives(organizationId);
   }
 
   /** Every organization on the instance, for the instance-admin surface. */
@@ -444,11 +486,45 @@ export class OrganizationMembershipService {
   /** Makes somebody a MEMBER, minting the grant intent an unfinished
    *  admission is resumed from into the same row, in the ledger's own
    *  scheme because the intent's identity is the ledger's (ADR-129). */
-  async createMembership(params: {
+  async createMembership({
+    organizationId,
+    userId,
+    admittedBy,
+  }: {
     organizationId: string;
     userId: string;
+    admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
   }): Promise<"created" | "already-present"> {
-    return this.repo.createMembership({ ...params, pendingAdmissionId: newAuthzBindingId() });
+    const grantId = newAuthzBindingId();
+    const outcome = await this.repo.createMembership({
+      organizationId,
+      userId,
+      pendingAdmissionId: grantId,
+    });
+    if (outcome !== "created" || !admittedBy) return outcome;
+
+    // A join lands its grant here, audited to whoever admitted it: `join-request`
+    // is deliberately auditable, so an automatic join reads like a clicked one.
+    await this.dependencies.admissions.attachBindings({
+      organizationId,
+      bindings: [
+        {
+          bindingId: grantId,
+          principal: { userId },
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        },
+      ],
+      actor: admittedBy.actor,
+      source: "join-request",
+      onDuplicate: "skip",
+      commandId: admittedBy.commandId,
+      requireProjection: true,
+    });
+    await this.dependencies.admissions.completeAdmission({ organizationId, userId, grantId });
+    return outcome;
   }
 
   /** Refuses when taking this member out would leave the organization with no

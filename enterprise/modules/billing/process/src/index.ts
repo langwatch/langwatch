@@ -2,7 +2,7 @@
  * The three declared transports, and the facts two of them ask the process to
  * resolve. A mount binds a fact; nothing else may.
  */
-export { createBillableEventsMeterProjection } from "./billing.server.ts";
+export { billingServer, createBillableEventsMeterProjection } from "./billing.server.ts";
 export {
   type BillingStripeWebhookApi,
   billingStripeWebhookRest,
@@ -36,6 +36,59 @@ export { billingSubscriptionNotifierChannels } from "./channels/billing-subscrip
 export { UsageLimitEmailChannel } from "./channels/usage-limit-email.channel.ts";
 export { MemoryUsageLimitEmailChannel } from "./channels/memory/memory.usage-limit-email.channel.ts";
 export { usageLimitEmailChannels } from "./channels/usage-limit-email-channels.registry.ts";
+export {
+  ConnectedInvoicingChannel,
+  type ConnectedInvoiceLine,
+  type ProviderInvoice,
+} from "./channels/connected-invoicing.channel.ts";
+export { MemoryConnectedInvoicingChannel } from "./channels/memory/memory.connected-invoicing.channel.ts";
+export {
+  HttpConnectedInvoicingChannel,
+  INVOICE_DAYS_UNTIL_DUE,
+} from "./channels/http/http.connected-invoicing.channel.ts";
+export { connectedInvoicingChannels } from "./channels/connected-invoicing-channels.registry.ts";
+export {
+  ConnectedBillingRepository,
+  type ConnectedBillingAccountRecord,
+  type ConnectedCreditGrantRecord,
+  type ConnectedInvoiceRecord,
+  type ConnectedSeatChangeRecord,
+  type PendingRenewal,
+} from "./repositories/connected-billing.repository.ts";
+export {
+  PrismaConnectedBillingRepository,
+  type ConnectedBillingDatabase,
+} from "./repositories/prisma/prisma.connected-billing.repository.ts";
+export { MemoryConnectedBillingRepository } from "./repositories/memory/memory.connected-billing.repository.ts";
+export { ConnectedSeatChangeService } from "./services/connected-seat-change.service.ts";
+export {
+  ConnectedBillingService,
+  CREDIT_GRANT_GRACE_DAYS,
+  type ConnectedBillingTerms,
+} from "./services/connected-billing.service.ts";
+export {
+  ConnectedMonthlyStatementService,
+  type CommitDrawdown,
+  type ConnectedCustomer,
+  type ConnectedStatement,
+  type ConnectedStatementSources,
+  type MonthlyStatementRunSummary,
+  type StatementSeats,
+  type StatementSpendLine,
+} from "./services/connected-monthly-statement.service.ts";
+export { ConnectedStatementMailChannel } from "./channels/connected-statement-mail.channel.ts";
+export { MemoryConnectedStatementMailChannel } from "./channels/memory/memory.connected-statement-mail.channel.ts";
+export { connectedStatementMailChannels } from "./channels/connected-statement-mail-channels.registry.ts";
+export {
+  METER_EVENT_MAX_AGE_DAYS,
+  isMeterEventTooOld,
+  meterEventTimestampSeconds,
+} from "./rules/meter-event-timestamp.rules.ts";
+export {
+  daysBetween,
+  proratedSeatUnitAmountCents,
+  seatInvoiceDescription,
+} from "./rules/connected-seat-proration.rules.ts";
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";
 export type {
   BillableEventRecord,

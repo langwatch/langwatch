@@ -55,17 +55,68 @@ export class LangWatchQLViewProvisioningService {
       // table becomes readable across tenants by the restricted identity.
       byTable.set(`${database}.${view.sourceTable}`, {
         table: view.sourceTable,
-        // Every source names the owning project the same way — the fact tables
-        // because that is their column, the PostgreSQL-engine tables because the
-        // approved view renamed the application's `projectId` to match. The
-        // catalog would have to grow a per-view tenant column if that ever
-        // stopped being true; today asserting it here is what would catch it.
-        tenantColumn: TENANT_COLUMN,
+        // Almost every source names the owning project `TenantId` — the fact
+        // tables because that is their column, the PostgreSQL-engine tables
+        // because the approved view renamed the application's `projectId` to
+        // match. A source that spells it differently declares the real column,
+        // and the row policy must filter that one or it reads zero rows.
+        tenantColumn: view.tenantColumn ?? TENANT_COLUMN,
         database,
       });
+      // A joined view reads a second fact table, which must be policed too or
+      // the join reaches the joined side unscoped. It is a ClickHouse fact table
+      // in the source database, a join being refused for PostgreSQL residents.
+      if (view.join) {
+        byTable.set(`${database}.${view.join.table}`, {
+          table: view.join.table,
+          tenantColumn: view.join.tenantColumn ?? TENANT_COLUMN,
+          database,
+        });
+      }
     }
 
     return [...byTable.values()];
+  }
+
+  /**
+   * The columns the restricted identity is granted on each ClickHouse source table, keyed by table
+   * — the map the Go chart renderer mirrors so its SaaS grants are column-scoped like the self-
+   * hosted ones.
+   */
+  sourceColumnGrants({
+    views = LWQL_VIEW_CATALOG,
+  }: {
+    views?: readonly LangWatchQLViewDefinition[];
+  } = {}): Record<string, string[]> {
+    const byTable = new Map<string, Set<string>>();
+    const add = (table: string, columns: readonly string[]): void => {
+      const set = byTable.get(table) ?? new Set<string>();
+      for (const column of columns) {
+        set.add(column);
+      }
+      byTable.set(table, set);
+    };
+
+    for (const view of views) {
+      if (catalogShapes.isPostgresResident(view)) {
+        continue;
+      }
+
+      add(view.sourceTable, viewStatements.grantedSourceColumns(view));
+      if (view.join) {
+        add(view.join.table, [
+          ...view.join.sourceColumns,
+          ...(view.join.onSourceColumns?.joined ?? []),
+        ]);
+      }
+    }
+
+    const grants: Record<string, string[]> = {};
+    for (const [table, columns] of byTable) {
+      grants[table] = [...columns].toSorted();
+    }
+
+    return grants;
   }
 
   /**
@@ -102,6 +153,17 @@ export class LangWatchQLViewProvisioningService {
           ? accessModel.grantStatement({ names, table: view.sourceTable })
           : viewStatements.sourceColumnGrantStatement({ names, sourceDatabase, view }),
       ),
+      // The joined side of a two-table view: its own column-scoped grant, since
+      // an INVOKER view reads that table as the caller too.
+      ...views.flatMap((view) => {
+        const grant = viewStatements.joinSourceColumnGrantStatement({
+          names,
+          sourceDatabase,
+          view,
+        });
+
+        return grant ? [grant] : [];
+      }),
       ...views.map((view) => accessModel.grantStatement({ names, table: view.name })),
     ];
   }

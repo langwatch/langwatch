@@ -105,6 +105,9 @@
     "GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026": {
       "test": "price_1T291iIMsTw08cudWlyDf1pH",
       "live": "price_1T2FT0IMsTw08cudNjcizYxH"
+    },
+    "CONNECTED_HOSTED_USAGE_QUARTERLY": {
+      "test": "price_1UHNqNIMsTw08cuduqNIf6LU"
     }
   },
   "meters": {
@@ -1775,6 +1778,22 @@
       },
       "nickname": "Growth Events - USD Annual",
       "lookupKey": "GROWTH_EVENTS_USD_ANNUAL",
+      "metadata": {}
+    },
+    "price_1UHNqNIMsTw08cuduqNIf6LU": {
+      "id": "price_1UHNqNIMsTw08cuduqNIf6LU",
+      "active": true,
+      "livemode": false,
+      "product": "prod_VHxlgfNxATXndm",
+      "unitAmount": 100,
+      "currency": "usd",
+      "type": "recurring",
+      "recurring": {
+        "interval": "month",
+        "intervalCount": 3
+      },
+      "nickname": "Connected hosted usage, quarterly",
+      "lookupKey": "connected_hosted_usage_quarterly",
       "metadata": {}
     }
   }

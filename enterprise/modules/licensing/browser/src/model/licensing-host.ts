@@ -48,6 +48,12 @@ export abstract class LicensingHostApi {
   abstract succeeded(notice: LicensingSuccessNotice): void;
 
   abstract failed(failure: LicensingFailureNotice): void;
+
+  /** Whether the signed-in member may manage the organization. Fail-closed. */
+  abstract canManageOrganization(): boolean;
+
+  /** One failure as a sentence, its words resolved from its code (#5984). */
+  abstract describeFailure(failure: LicensingFailureNotice): string;
 }
 
 const LicensingHostContext = createContext<LicensingHostApi | undefined>(void 0);

@@ -6,6 +6,7 @@
 
 import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";
 import { Temporal } from "@langwatch/time";
+import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
@@ -342,6 +343,123 @@ describe("a target rather than a statement", () => {
     });
 
     expect(asked).toEqual([]);
+  });
+});
+
+describe("a target whose filter the trace view's dialect answers first", () => {
+  const shorthand = {
+    target: "traces",
+    questions: [{ id: "annoyed", kind: "boolean", instructions: "Is the user annoyed?" }],
+  } as const;
+  const run = (filter: string) => ({
+    projectId: "project-1",
+    actor: ACTOR,
+    input: { shorthand: { ...shorthand, filter, questions: [...shorthand.questions] } },
+  });
+  const answering = (answer: LangWatchQLTraceFilter) => () => answer;
+
+  it("writes a compiled filter into the statement and resolves no selection", async () => {
+    const asked: string[] = [];
+    const { service, statements } = harness({
+      peers: {
+        compileFilter: answering({
+          kind: "compiled",
+          sql: "Attributes['service.name'] = {service_0:String}",
+          parameters: { service_0: "checkout" },
+        }),
+        selectTraceIds: async ({ filter }) => {
+          asked.push(filter);
+          return [];
+        },
+      },
+    });
+
+    await service.createRun(run("service:checkout"));
+
+    expect(asked).toEqual([]);
+    expect(statements.accepted[0]?.sql).toContain(
+      "Attributes['service.name'] = {service_0:String}",
+    );
+    expect(statements.accepted[0]?.parameters).toMatchObject({ service_0: "checkout" });
+    expect(statements.accepted[0]?.parameters).not.toHaveProperty("instant_eval_selection_ids");
+  });
+
+  /** @scenario "The run service resolves the selection itself when the dialect refuses the filter" */
+  it("binds the explorer's own selection when the dialect names the field out of reach", async () => {
+    const asked: { filter: string; window: { from: number; to: number } }[] = [];
+    const { service, statements } = harness({
+      peers: {
+        compileFilter: answering({
+          kind: "unsupported",
+          field: "evaluator",
+          supportedFields: ["service"],
+        }),
+        selectTraceIds: async ({ filter, window }) => {
+          asked.push({ filter, window });
+          return ["trace-1"];
+        },
+      },
+    });
+
+    await service.createRun(run("evaluator:my-eval"));
+
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.filter).toBe("evaluator:my-eval");
+    expect(asked[0]?.window.to).toBe(NOW.epochMilliseconds);
+    expect(statements.accepted[0]?.parameters).toMatchObject({
+      instant_eval_selection_ids: ["trace-1"],
+    });
+  });
+
+  /** @scenario "A filter field the trace view cannot answer is refused by name" */
+  it("refuses a field out of reach by name where nothing resolves a selection", async () => {
+    const { service, statements } = harness({
+      peers: {
+        compileFilter: answering({
+          kind: "unsupported",
+          field: "evaluator",
+          supportedFields: ["model", "service", "status"],
+        }),
+      },
+    });
+
+    const refusal = service.createRun(run("evaluator:my-eval"));
+
+    await expect(refusal).rejects.toMatchObject({ code: "instant_eval_query_invalid" });
+    await expect(refusal).rejects.toThrow(/"evaluator".*service.*statement/s);
+    expect(statements.accepted).toEqual([]);
+  });
+
+  /** @scenario "A filter the language cannot parse is refused" */
+  it("says a filter it cannot read could not be read", async () => {
+    const { service } = harness({
+      peers: {
+        compileFilter: () => {
+          throw new FilterParseError("Invalid filter syntax");
+        },
+      },
+    });
+
+    await expect(service.createRun(run('service:"unclosed'))).rejects.toMatchObject({
+      code: "instant_eval_query_invalid",
+      message: expect.stringMatching(/could not be read/),
+    });
+  });
+
+  it("refuses a value the trace view would have to guess at", async () => {
+    const { service } = harness({
+      peers: {
+        compileFilter: answering({
+          kind: "refused",
+          field: "status",
+          reason: "A shorthand filter can only ask for status:error.",
+        }),
+      },
+    });
+
+    await expect(service.createRun(run("status:ok"))).rejects.toMatchObject({
+      code: "instant_eval_query_invalid",
+    });
   });
 });
 

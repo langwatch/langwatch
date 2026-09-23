@@ -8,6 +8,7 @@ import type {
   StoredObjectStorageUsage,
 } from "./metadata.ts";
 import type { StoredObjectReference } from "./references.ts";
+import type { StoredObjectStorageDestination } from "./storage-uri.ts";
 import type {
   StoredObjectsDeleteInput,
   StoredObjectsDeleteOutput,
@@ -98,6 +99,12 @@ export interface StoredObjectApi {
   headById(input: { projectId: string; id: string }): Promise<StoredObjectHead>;
   readById(input: { projectId: string; id: string }): Promise<StoredObjectFileRead | null>;
   resolveOwner(input: { id: string }): Promise<{ projectId: string } | null>;
+  /** Where this project's objects are written, for the checkup. */
+  getStorageDestination(input: {
+    projectId: StoredObjectProjectId;
+  }): Promise<StoredObjectStorageDestination>;
+  /** Writes a small object where the project's objects go, then removes it; throws on refusal. */
+  probeStorage(input: { projectId: StoredObjectProjectId }): Promise<void>;
 }
 
 export const StoredObjectApi = moduleApi<StoredObjectApi>()("stored-object");

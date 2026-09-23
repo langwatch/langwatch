@@ -27,6 +27,8 @@ export interface MetricApi {
     piiRedactionLevel: MetricPiiRedactionLevel;
     acceptedAt?: number;
   }): Promise<MetricDataPointPreparation>;
+  /** Sends prepared points onto the `metric_processing` pipeline for durable storage. */
+  recordCanonicalMetricDataPoints(points: readonly CanonicalMetricDataPoint[]): Promise<void>;
 }
 
 export const MetricApi = moduleApi<MetricApi>()("metric");

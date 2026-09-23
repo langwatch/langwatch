@@ -27,7 +27,7 @@ export const langWatchQLStatisticsSchema = z
 export type LangWatchQLStatistics = z.infer<typeof langWatchQLStatisticsSchema>;
 
 export const LWQL_DIAGNOSTIC_CODES = [
-  "RESULT_TRUNCATED",
+  "MULTI_PROJECT_RESULT",
   "POSSIBLE_FANOUT",
   "UNBOUNDED_TIME_RANGE",
   "MISSING_TIME_BUCKETS",
@@ -52,7 +52,6 @@ export const langWatchQLQueryResultSchema = z
     columns: z.array(langWatchQLColumnSchema).readonly(),
     rows: z.array(z.record(z.string(), z.unknown())).readonly(),
     statistics: langWatchQLStatisticsSchema,
-    truncated: z.boolean(),
     diagnostics: z.array(langWatchQLDiagnosticSchema).readonly(),
     followsTimeWindow: z.boolean(),
     followsGranularity: z.boolean(),
@@ -80,7 +79,12 @@ export const langWatchQLSchemaDatasetSchema = z
     description: z.string(),
     grain: z.string(),
     joinKeys: z.array(z.string()).readonly(),
-    timeColumn: z.string(),
+    /**
+     * Filter on this to prune partitions, or `null` for a view with no temporal
+     * column. Explicitly `null` rather than absent, like `unit`, so a consumer
+     * can tell "this view has no time column" from an older API.
+     */
+    timeColumn: z.string().nullable(),
     freshness: z.string(),
     columns: z.array(langWatchQLSchemaColumnSchema).readonly(),
     exampleSql: z.string(),
@@ -119,7 +123,9 @@ export type LangWatchQLSchemaAppFunction = z.infer<typeof langWatchQLSchemaAppFu
 export const langWatchQLSchema = z
   .object({
     database: z.string(),
-    datasets: z.array(langWatchQLSchemaDatasetSchema).readonly(),
+    /** Every function name a query may call, equal to the validator's allowlist. */
+    functions: z.array(z.string()).readonly(),
+    views: z.array(langWatchQLSchemaDatasetSchema).readonly(),
     /** Last, so every field a consumer already read keeps the position it had. */
     appFunctions: z.array(langWatchQLSchemaAppFunctionSchema).readonly(),
   })
@@ -196,6 +202,14 @@ export type LangWatchQLExecuteInput = LangWatchQLRunContext &
   }>;
 
 /**
+ * One restricted execution over a SET of projects — every project an API key may read. Their
+ * secrets become the tenant-capability set, so the query reads the union of their rows; an
+ * empty set is a valid scope that reads zero rows.
+ */
+export type LangWatchQLProjectSetExecuteInput = Omit<LangWatchQLExecuteInput, "project"> &
+  Readonly<{ projects: readonly LangWatchQLCaller[] }>;
+
+/**
  * What the extraction half of a judged plan is asked for: one page's traces,
  * read back through the statement with the judged columns holding their text.
  */
@@ -249,6 +263,9 @@ export abstract class LangWatchQLService {
   abstract validate(input: LangWatchQLValidationInput): LangWatchQLAcceptedStatement;
   abstract execute(
     input: LangWatchQLExecuteInput & LangWatchQLEvalGate,
+  ): Promise<LangWatchQLQueryResult>;
+  abstract executeForProjects(
+    input: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate,
   ): Promise<LangWatchQLQueryResult>;
 }
 

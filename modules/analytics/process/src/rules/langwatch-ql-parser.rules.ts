@@ -1,7 +1,7 @@
 /**
  * LangWatchQL analytics SQL — the parser seam. The validator walks a tree of `{ type, ...fields
  * }` nodes and knows nothing about how that tree was produced.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 import { parse } from "@clickhouse/parser";
 import type { SqlSourcePosition } from "@langwatch/analytics-contract";

@@ -101,6 +101,10 @@ export interface AuthzApi {
   listGroupBindings(
     args: Queries.AuthzListGroupBindingsInput,
   ): Promise<Queries.AuthzAccessBindingsOutput>;
+  /** The grants each of these keys holds, read off the grants head. */
+  listApiKeyBindings(
+    args: Queries.AuthzListApiKeyBindingsInput,
+  ): Promise<Queries.AuthzAccessBindingsOutput>;
   listTeamMemberBindings(
     args: Queries.AuthzListTeamMemberBindingsInput,
   ): Promise<Map<string, Queries.AuthzTeamMemberBinding[]>>;

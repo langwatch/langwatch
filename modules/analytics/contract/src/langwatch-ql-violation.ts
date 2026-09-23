@@ -1,6 +1,6 @@
 /**
  * LangWatchQL analytics SQL — what a rejection says.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 export interface SqlSourcePosition {
   readonly line: number;
@@ -38,8 +38,15 @@ export const LWQL_VIOLATION_CODES = [
   "FUNCTION_NOT_ALLOWED",
   /** A restricted field was referenced. */
   "GATED_COLUMN",
-  /** A wildcard column set was selected while restricted fields exist. */
+  /** A wildcard column set was referenced, in any position, while restricted fields exist. */
   "WILDCARD_NOT_ALLOWED",
+  /**
+   * The statement's own top-level `LIMIT` asks for more rows than one request may return. The
+   * cap and how to page under it ride on the violation (`maxRows`, `hint`).
+   */
+  "LIMIT_TOO_HIGH",
+  /** A `UNION` branch names no `LIMIT` of its own, so no appended default can bound it. */
+  "LIMIT_REQUIRED_PER_BRANCH",
   /** Subqueries, CTEs, or expressions nested past the allowed depth. */
   "NESTING_TOO_DEEP",
   /** The default-deny fallthrough: syntax the validator does not recognise. */
@@ -98,4 +105,16 @@ export interface LangWatchQLViolation {
   readonly message: string;
   /** Where in the submitted SQL, when the parser reported a position. */
   readonly at?: SqlSourcePosition;
+  /** A code-keyed corrective sentence on every violation: the floor under the sharper fields. */
+  readonly hint: string;
+  /** The complete function allowlist, on `FUNCTION_NOT_ALLOWED` and no other code. */
+  readonly allowedFunctions?: readonly string[];
+  /** The views the caller may reference, on a `TABLE_NOT_ALLOWED` that named a view. */
+  readonly availableViews?: readonly string[];
+  /** The view a `GATED_COLUMN` field was read from, when exactly one table resolves. */
+  readonly view?: string;
+  /** The columns of `view` the caller may reference, when the policy carries them. */
+  readonly availableColumns?: readonly string[];
+  /** The row cap a `LIMIT_TOO_HIGH` or `LIMIT_REQUIRED_PER_BRANCH` refusal names. */
+  readonly maxRows?: number;
 }

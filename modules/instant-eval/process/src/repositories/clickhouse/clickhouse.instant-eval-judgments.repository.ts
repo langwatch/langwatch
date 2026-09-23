@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type { InstantEvalClickHouseResolver } from "../../app/instant-eval.members.ts";
 import type {
@@ -18,6 +19,8 @@ import {
 } from "./clickhouse.instant-eval-judgments.mapper.ts";
 
 const TABLE_NAME = "instant_eval_judgments" as const;
+
+const totalRowsSchema = z.array(z.object({ Total: z.string() }));
 
 const logger = createLogger("langwatch:instant-evals:judgments-repository");
 
@@ -50,6 +53,35 @@ export class ClickHouseInstantEvalJudgmentsRepository implements InstantEvalJudg
     resolveClient: InstantEvalClickHouseResolver;
   }): ClickHouseInstantEvalJudgmentsRepository {
     return new ClickHouseInstantEvalJudgmentsRepository(resolveClient);
+  }
+
+  /** Per project, so each read routes to the tenant's server; FINAL, as the report always read it. */
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<number> {
+    const window =
+      since === undefined ? "" : "AND CreatedAt >= fromUnixTimestamp64Milli({since:Int64})";
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const client = await this.resolveClient(tenantId);
+        const result = await client.query({
+          query: `
+            SELECT toString(count()) AS Total
+            FROM ${TABLE_NAME} FINAL
+            WHERE TenantId = {tenantId:String}
+              ${window}`,
+          query_params: since === undefined ? { tenantId } : { tenantId, since },
+          format: "JSONEachRow",
+        });
+        const [row] = totalRowsSchema.parse(await result.json());
+        return Number.parseInt(row?.Total ?? "0", 10);
+      }),
+    );
+    return perProject.reduce((sum, total) => sum + total, 0);
   }
 
   async insert(records: readonly InstantEvalJudgmentRecord[]): Promise<void> {

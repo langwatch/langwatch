@@ -28,6 +28,13 @@ export const organizationWeb = defineWebModule("organization")
       label: "Members",
       load: () => import("./ui/sections/organization/members.screen.tsx"),
     },
+    "pages/settings/authentication": {
+      path: "/settings/authentication",
+      within: "settings",
+      label: "Authentication",
+      load: () =>
+        import("./features/authentication-settings/ui/sections/authentication-settings.screen.tsx"),
+    },
     "pages/settings/groups": {
       path: "/settings/groups",
       within: "settings",
@@ -71,6 +78,17 @@ export const organizationWeb = defineWebModule("organization")
         default: (await import("./ui/sections/invite-member-drawer.tsx")).InviteMemberDrawer,
       }),
     },
+  })
+  /**
+   * The post-login join offer the shell renders over a dashboard (and the
+   * onboarding welcome): it RUNS joinRequests queries, so it is declared, not kitted.
+   */
+  .withCapabilities({
+    joinOffer: {
+      load: () => import("./features/join-offer/ui/sections/join-your-team-takeover.tsx"),
+    },
+    /** Shown in place of the dashboard body to a member on none of its teams. */
+    teamAccessWaiting: { load: () => import("./ui/sections/team-access-waiting.tsx") },
   })
   .publishSurfaces({
     "surfaces/personal-workspace-features": {

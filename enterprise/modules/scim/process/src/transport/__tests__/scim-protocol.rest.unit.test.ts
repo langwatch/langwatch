@@ -113,6 +113,14 @@ function mount(
           headers: authorization ? { authorization } : {},
         }),
       ),
+    post: (path: string, body: string) =>
+      hono.fetch(
+        new Request(`http://api.test${path}`, {
+          method: "POST",
+          headers: { authorization: BEARER, "content-type": "application/scim+json" },
+          body,
+        }),
+      ),
   };
 }
 
@@ -148,6 +156,45 @@ describe("given a directory holding this organization's SCIM bearer token", () =
       expect(response.headers.get("content-type")).toContain("application/scim+json");
       expect(api.scim.listUsers).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: ORGANIZATION_ID, startIndex: 1, count: 100 }),
+      );
+    });
+  });
+
+  describe("when a directory pushes a body that is not JSON", () => {
+    it("answers 400 and files the refusal on the connection's request log", async () => {
+      const { scim, post } = mount();
+
+      const response = await post("/api/scim/v2/Users", "{not json");
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        status: "400",
+        detail: "The request body could not be read as JSON",
+      });
+      expect(scim.recordRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: ORGANIZATION_ID,
+          method: "POST",
+          resource: "Users",
+          status: 400,
+          reason: "malformed_body",
+        }),
+      );
+    });
+  });
+
+  describe("when a directory pushes a resource we would not accept", () => {
+    it("names only the fields it refused, never the parser's own message", async () => {
+      const { scim, post } = mount();
+
+      const response = await post("/api/scim/v2/Groups", JSON.stringify({ schemas: [] }));
+
+      expect(response.status).toBe(400);
+      const answer = (await response.json()) as { detail: string };
+      expect(answer.detail).toMatch(/^The resource is not valid: /);
+      expect(answer.detail).toContain("displayName");
+      expect(scim.recordRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ resource: "Groups", status: 400, reason: "invalid_resource" }),
       );
     });
   });

@@ -30,6 +30,28 @@ const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
  */
 const LAST_MIGRATION_NEEDING_DIMENSION_COMPAT = 86;
 
+/**
+ * `spawnSync` defaults to one megabyte and kills a verbose migration run
+ * past it with ENOBUFS, which reads as a failed migration that in fact
+ * applied. See specs/clickhouse/migration-output-buffer.feature.
+ */
+const GOOSE_OUTPUT_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * ENOENT means the binary is missing; ENOBUFS means goose printed past
+ * {@link GOOSE_OUTPUT_MAX_BYTES} - the message points at the buffer, not
+ * the schema, since it says nothing about whether migrations applied.
+ */
+export function messageForSpawnError(message: string): string {
+  if (message.includes("ENOENT")) {
+    return "Goose binary not found. Install from https://github.com/pressly/goose";
+  }
+  if (message.includes("ENOBUFS")) {
+    return `Goose printed more than ${GOOSE_OUTPUT_MAX_BYTES} bytes and was cut off, so this run cannot say whether the migrations applied. Re-run it, and raise GOOSE_OUTPUT_MAX_BYTES if it happens again: ${message}`;
+  }
+  return message;
+}
+
 export interface GooseOptions {
   connectionUrl?: string;
   database?: string; // Optional database override (takes precedence over URL path)
@@ -462,13 +484,11 @@ function executeGoose({
     encoding: "utf-8",
     stdio: "pipe",
     env: envVars,
+    maxBuffer: GOOSE_OUTPUT_MAX_BYTES,
   });
 
   if (result.error) {
-    const errorMessage = result.error.message;
-    const message = errorMessage.includes("ENOENT")
-      ? "Goose binary not found. Install from https://github.com/pressly/goose"
-      : errorMessage;
+    const message = messageForSpawnError(result.error.message);
     throw new MigrationError(`Goose migration failed: ${message}`, "migrate");
   }
 

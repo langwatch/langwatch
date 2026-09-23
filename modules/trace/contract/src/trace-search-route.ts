@@ -10,11 +10,8 @@ export const SEARCH_ROUTE_KINDS = ["filter", "instant_eval", "free_text", "langy
 
 export type SearchRouteKind = (typeof SEARCH_ROUTE_KINDS)[number];
 
-/**
- * Who made the call: the classifier, the FAST model, a fallback rule, or the
- * caller when it already knew the route.
- */
-export const SEARCH_ROUTE_DECIDERS = ["classifier", "model", "fallback", "caller"] as const;
+/** Who made the call: the classifier, the FAST model, or a fallback rule. */
+export const SEARCH_ROUTE_DECIDERS = ["classifier", "model", "fallback"] as const;
 
 export type SearchRouteDecidedBy = (typeof SEARCH_ROUTE_DECIDERS)[number];
 
@@ -49,12 +46,6 @@ export const routeSearchInputSchema = z.object({
   lensId: z.string().max(200).optional(),
   /** Whether the assistant route is open to this user. Defaults to true. */
   isLangyAvailable: z.boolean().optional(),
-  /**
-   * The route the caller already knows, which skips the classifier. Set when
-   * the text comes from a search that was routed once already, so re-running
-   * it cannot land somewhere else.
-   */
-  forceKind: z.enum(SEARCH_ROUTE_KINDS).optional(),
 });
 
 export type RouteSearchInput = z.infer<typeof routeSearchInputSchema>;

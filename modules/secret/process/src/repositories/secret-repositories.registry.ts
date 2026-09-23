@@ -1,9 +1,9 @@
 import { defineRepositories } from "@langwatch/kernel";
 
+import { LiveSecretRepositories } from "./live/live.secret.repositories.ts";
 import { MemorySecretRepositories } from "./memory/memory.secret.repositories.ts";
-import { PostgresSecretRepositories } from "./prisma/prisma.secret.repositories.ts";
 
 export const secretRepositories = defineRepositories({
-  live: PostgresSecretRepositories,
+  live: LiveSecretRepositories,
   memory: MemorySecretRepositories,
 });

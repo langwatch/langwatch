@@ -5,7 +5,6 @@
  */
 import type { Instant } from "@langwatch/time";
 
-import type { LangWatchQLResultLimits } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import type { LangWatchQLColumn } from "../services/langwatch-ql-executor.service.ts";
 import type {
@@ -18,8 +17,8 @@ import type {
  * something different* on seeing it, which is the same bar the violation codes are held to.
  */
 export const LWQL_DIAGNOSTIC_CODES = [
-  /** A response ceiling cut the answer short. */
-  "RESULT_TRUNCATED",
+  /** A key reading several projects got rows from more than one of them. */
+  "MULTI_PROJECT_RESULT",
   /** A join repeats one dataset's rows once per row of another. */
   "POSSIBLE_FANOUT",
   /** A dataset was read with no predicate on the column that prunes it. */
@@ -51,11 +50,6 @@ export interface LangWatchQLDiagnosticsInput {
   readonly views: readonly LangWatchQLViewDefinition[];
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
-  /** Whether a response ceiling cut the result short. */
-  readonly truncated: boolean;
-  readonly limits: LangWatchQLResultLimits;
-  /** Rows actually handed back, after the ceilings. */
-  readonly rowsReturned: number;
   /**
    * The instant "has this bucket finished yet" is asked against. Injected rather than read from
    * the clock so that the answer is a function of its inputs — the same result at the same
@@ -64,16 +58,12 @@ export interface LangWatchQLDiagnosticsInput {
   readonly now: Instant;
 }
 
-// ---------------------------------------------------------------------------
-// Truncation
-// ---------------------------------------------------------------------------
-
-/** One of a block's table references, resolved to the dataset it names. */
+/** One of a block's table references, resolved to the view it names. */
 export interface ResolvedTableReference {
   /** How a join condition would qualify it: its alias, or its bare name. */
   readonly qualifier: string;
   /** The name a caller writes, qualified with the LangWatchQL database. */
-  readonly datasetName: string;
+  readonly viewName: string;
   readonly view: LangWatchQLViewDefinition;
 }
 
@@ -103,7 +93,7 @@ export function resolveTableReferences({
 
     resolved.push({
       qualifier: reference.alias ?? view.name.toLowerCase(),
-      datasetName: `${database}.${view.name}`,
+      viewName: `${database}.${view.name}`,
       view,
     });
   }

@@ -19,6 +19,12 @@ export async function givenIAmOnTheMembersPage(page: Page) {
   // session's active org), not project-prefixed — every app nav link uses this
   // exact href. The org context comes from the
   // authenticated session, not the URL.
+  //
+  // The address is kept rather than updated to `/settings/directory` on
+  // purpose: members became the first cut of Directory, and `members.tsx` is
+  // now a `<Navigate>` that forwards the old address on. Arriving the way a
+  // stale link does is what proves that forward still works, so this step
+  // covers the redirect as well as the page it lands on.
   await page.goto(`/settings/members`);
   await expect(page.getByRole("heading", { name: "Organization Members" })).toBeVisible({
     timeout: 15000,
@@ -30,10 +36,15 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Click the "Add members" button and wait for the dialog to appear.
+ * Open the invite drawer from People and wait for it to appear.
+ *
+ * The trigger is called "Invite people" now, beside the inline invite box that
+ * launches the same drawer (`PeopleSection` -> `PeopleHeader`). Only the
+ * BUTTON was renamed: the drawer it opens still leads with "Add members",
+ * which is what the wait below still keys on.
  */
 export async function whenIClickAddMembers(page: Page) {
-  await page.getByRole("button", { name: /Add members/i }).click();
+  await page.getByRole("button", { name: /Invite people/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(page.getByRole("heading", { name: "Add members" }).last()).toBeVisible({
     timeout: 5000,
@@ -93,17 +104,16 @@ export async function whenICloseInviteLinkDialog(page: Page) {
 // =============================================================================
 
 /**
- * Assert that an email appears in the "Invites" list with an invited badge.
+ * Assert that the invitation appears in Directory with its pending status.
  */
 export async function thenISeeSentInviteFor(page: Page, email: string) {
-  const invitesHeading = page.getByRole("heading", { name: "Invites" });
-  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
+  const row = page
+    .getByTestId("people-list")
+    .getByTestId("invite-row")
+    .filter({ has: page.getByText(email, { exact: true }) });
 
-  const invitesSection = invitesHeading.locator("..");
-  const row = invitesSection.getByRole("row").filter({ hasText: email });
-
-  await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Invited")).toBeVisible({ timeout: 5000 });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await expect(row.getByTestId("invite-status")).toHaveText("Invited");
 }
 
 /**

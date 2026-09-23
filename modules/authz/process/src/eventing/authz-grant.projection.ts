@@ -32,7 +32,13 @@ import type {
 } from "./authz-grant.events.ts";
 
 export type GrantProjectionWrite =
-  | { kind: "grant.upsert"; row: GrantRowShape }
+  | {
+      kind: "grant.upsert";
+      row: GrantRowShape;
+      /** The membership lifetime the insert is fenced to, when it has one. */
+      membershipStamp?: string;
+      membershipBootstrap?: boolean;
+    }
   | {
       kind: "grant.setRole";
       grantId: string;
@@ -103,6 +109,8 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
     const { data } = event;
     return {
       kind: "grant.upsert",
+      ...(data.membershipStamp ? { membershipStamp: data.membershipStamp } : {}),
+      ...(data.membershipBootstrap ? { membershipBootstrap: data.membershipBootstrap } : {}),
       row: {
         id: data.grantId,
         organizationId: event.tenantId,

@@ -27,6 +27,7 @@ import type {
   StoredObjectsDeleteOutput,
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
+  StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
@@ -212,5 +213,13 @@ export class StoredObjectApp implements StoredObjectApi {
 
   deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
     return this.#storage.deleteOwnedBy(input);
+  }
+
+  getStorageDestination(input: { projectId: string }): Promise<StoredObjectStorageDestination> {
+    return this.#storage.getStorageDestination(input);
+  }
+
+  probeStorage(input: { projectId: string }): Promise<void> {
+    return this.#storage.probeStorage(input);
   }
 }

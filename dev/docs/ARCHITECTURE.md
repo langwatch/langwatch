@@ -363,8 +363,10 @@ await server.run(app);
 
 **Transport selection and pipeline participation are separate fluent APIs.**
 `exposeTransports` exists only on the API builder. Its callback selects
-`.trpc()`, `.rest()` and `.browserBundle()`; it carries no members, logger,
-stores, credentials or paths. Required slots derive from the installed
+`.trpc()`, `.rest()` and `.browserBundle()`, plus `.framedDocument({ path,
+document })` for a module-built document that answers on the app origin
+under the sandbox frame policy (a fresh nonce per answer, its own CSP, never
+the app's); it carries no members, logger, stores, credentials or paths. Required slots derive from the installed
 module declarations: an omitted declared transport refuses boot by name.
 The bundle is explicit, including an explicit opt-out for deployments
 without one. Both processes use `withPipelines`: the API's callback offers
@@ -972,6 +974,14 @@ export const tracePipeline = definePipeline("trace")
   .withJobs({ retentionSweep: cron("0 3 * * *") }); // schedules              (worker-only)
 ```
 
+A module may host several pipelines: it calls `.withEventing(...)` once per
+pipeline, each a `defineEventingModule` declaration over the same app and
+repositories. The process builds, registers and connects them one at a time in
+the order declared, so a later pipeline's `build` may read senders an earlier
+one's `connect` handed the app. Each still follows the role table below — the
+api constructs none of their reactions. A pipeline the module defines but does
+not declare this way is registered by nobody; no application line stands in.
+
 `withPipelines((pipelines) => pipelines.produce())` selects API production;
 `withPipelines((pipelines) => pipelines.consume())` selects worker consumption.
 Neither declaration exposes a transport. `boot()` translates the same module
@@ -1076,7 +1086,7 @@ invented:
   | `withDrawers`                | 11        | `installedDrawerLoaders`             |
   | `withConfig`                 | 1         | yes                                  |
   | `withApi`                    | 1 of 33   | `installedModuleApis`                |
-  | `withCapabilities`           | 0         | being built                          |
+  | `withCapabilities`           | 6         | `declared(name)` (`declarations.ts`) |
   | `withSlots`                  | **0**     | built (`browser-host/src/slots.tsx`) |
   | `withFailureInterceptors`    | **0**     | built (`ui-feature-shell.tsx:162`)   |
   | `withSeatTypeCopy`           | **0**     | built (`slots.tsx:143`)              |
@@ -1507,8 +1517,8 @@ not landed.
 
 The linter is the authority: the file grammar lives in
 `packages/oxlint-rules/grammar/feature-layout-policy.mjs`, the boundaries in
-`packages/architecture-enforcer/`, the banned spellings in
-`banned-legacy-names`. ADR-147 (compiler-checked supply) and ADR-148
+`langwatch/package-boundaries` and `packages/architecture-enforcer/`
+(`pnpm lint:architecture`). ADR-147 (compiler-checked supply) and ADR-148
 (declared browser supply) are the ruling decision records and are cited by
 this document; all earlier composition ADRs are historical. When someone
 finds this document teaching something the tree refuses, the fix is a change

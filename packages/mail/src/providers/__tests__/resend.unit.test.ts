@@ -18,6 +18,7 @@ vi.mock("undici", () => ({
 }));
 
 import { parseOutboundProxyConfig } from "@langwatch/egress";
+
 import { ResendEmailProvider } from "../resend.ts";
 import { EmailProviderConfigurationError } from "../types.ts";
 
@@ -89,6 +90,7 @@ describe("ResendEmailProvider.send", () => {
 
       expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.resend.com/emails");
       expect(sentInit().headers.Authorization).toBe("Bearer re_test_key");
+      expect(sentInit().headers).not.toHaveProperty("Idempotency-Key");
       expect(sentPayload()).toMatchObject({
         from: "LangWatch <noreply@langwatch.ai>",
         to: ["a@example.com"],
@@ -104,6 +106,32 @@ describe("ResendEmailProvider.send", () => {
       });
 
       expect(result).toEqual({ id: "msg_123" });
+    });
+  });
+
+  describe("given an outbox delivery identity", () => {
+    /** @scenario "Resend retries reuse the same provider idempotency key" */
+    it("reuses an opaque key on retry and separates recipient deliveries", async () => {
+      const content = {
+        to: "a@example.com",
+        subject: "Joined",
+        html: "<p>Joined</p>",
+      };
+      for (const idempotencyKey of ["org:join:a", "org:join:a", "org:join:b"]) {
+        await makeProvider().send({
+          content: { ...content, idempotencyKey },
+          defaultFrom: "noreply@langwatch.ai",
+        });
+      }
+      const requests = fetchMock.mock.calls.map(([, request]) => request);
+      expect(requests).toHaveLength(3);
+      expect(requests[0].headers["Idempotency-Key"]).toMatch(/^[a-f0-9]{64}$/);
+      expect(requests[1].headers["Idempotency-Key"]).toBe(requests[0].headers["Idempotency-Key"]);
+      expect(requests[2].headers["Idempotency-Key"]).not.toBe(
+        requests[0].headers["Idempotency-Key"],
+      );
+      expect(requests[1].body).toBe(requests[0].body);
+      expect(requests[0].body).not.toContain("idempotencyKey");
     });
   });
 

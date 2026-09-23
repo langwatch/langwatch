@@ -4,15 +4,14 @@ name: code-scanners
 #
 # `.coderabbit.yaml` has enabled gitleaks and pointed semgrep at
 # `dev/lint/semgrep/langwatch.yml` for a long time, and `coderabbit-config-check.yml`
-# proves that ruleset PARSES — but nothing has ever run either against the
-# repository except CodeRabbit itself, once per PR, as a comment. Same shape as
-# the ast-grep ruleset before it moved to dev/lint/ast-grep/.
+# proves that ruleset PARSES — but nothing ran either against the repository
+# except CodeRabbit itself, once per PR, as a comment.
 #
-# Everything here is DIFF-SCOPED. Measured baselines at the time of writing:
+# Everything here is DIFF-SCOPED. Measured baseline, 2026-09-23:
 #
-#   semgrep      347  (290 clickhouse-no-qualified-table, 57 pii-in-logger-call)
+#   semgrep      68  (68 pii-in-logger-call, 0 clickhouse-no-qualified-table)
 #
-# A full-tree gate at those numbers would be switched off within a day, and
+# A full-tree gate at that number would be switched off within a day, and
 # `.coderabbit.yaml` already frames these rules as "flag ONLY newly added or
 # modified lines". `--baseline-commit` is semgrep's own implementation of
 # exactly that, so the rule text and the gate finally agree.
@@ -192,20 +191,10 @@ jobs:
       - name: Ruleset validates
         run: semgrep --validate --config dev/lint/semgrep/langwatch.yml
 
-      # REPORT-ONLY for now, for two measured reasons — promote to --error
-      # once both are dealt with:
-      #
-      #  1. `pii-in-logger-call` counts `userId` as PII, but logging a raw
-      #     userId is a deliberate decision here (opaque id, and the identity
-      #     link is deleted with the account). 57 of the 347 findings are that
-      #     rule. Drop userId from the rule's field list before this blocks,
-      #     or the gate argues with a policy that already exists.
-      #
-      #  2. --baseline-commit attributes a finding to whoever last touched the
-      #     LINE. This branch reformats the repository, so 4 untouched
-      #     pii-in-logger-call sites read as newly introduced. Any baseline
-      #     diff is unreliable across a format sweep; it becomes reliable again
-      #     once that sweep is on main.
+      # REPORT-ONLY for now: --baseline-commit attributes a finding to
+      # whoever last touched the LINE, so a format sweep makes untouched
+      # pii-in-logger-call sites read as newly introduced. Promote to --error
+      # once the 68 standing findings are triaged and no sweep is in flight.
       - name: Scan (diff-scoped on PRs, full tree elsewhere)
         continue-on-error: true
         run: |

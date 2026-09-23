@@ -13,6 +13,7 @@ import type {
   TraceDestinationProject,
   UpdateProjectInput,
   UpdateProjectMetadataInput,
+  ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -97,4 +98,9 @@ export interface ProjectRepository {
     organizationId: string;
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null>;
+  /** The usage report's counts; the caller never passes an empty organization list. */
+  countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount>;
 }

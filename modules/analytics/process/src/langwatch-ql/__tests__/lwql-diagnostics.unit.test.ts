@@ -1,7 +1,7 @@
 /**
  * The advisory diagnostics: which shapes earn one, and which do not. Driven through the real
  * validator rather than through hand-built blocks.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { Temporal, type Instant } from "@langwatch/time";
@@ -16,7 +16,6 @@ import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "../../services/langwatch-ql-diagnostics.service.ts";
 import type { LangWatchQLColumn } from "../../services/langwatch-ql-executor.service.ts";
-import { DEFAULT_LWQL_RESULT_LIMITS } from "../../services/langwatch-ql-executor.service.ts";
 import { validateLangWatchQL } from "./lwql-validate.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
@@ -41,13 +40,11 @@ function diagnose({
   sql,
   columns = [],
   rows = [],
-  truncated = false,
   now = LONG_AFTER,
 }: {
   sql: string;
   columns?: readonly LangWatchQLColumn[];
   rows?: readonly Record<string, unknown>[];
-  truncated?: boolean;
   now?: Instant;
 }): readonly LangWatchQLDiagnostic[] {
   const validation = validateLangWatchQL({
@@ -72,9 +69,6 @@ function diagnose({
     views: LWQL_VIEW_CATALOG,
     columns,
     rows,
-    truncated,
-    limits: DEFAULT_LWQL_RESULT_LIMITS,
-    rowsReturned: rows.length,
     now,
   });
 }
@@ -133,19 +127,51 @@ describe("given a LangWatchQL query that ran", () => {
     });
   });
 
-  describe("when a response ceiling cut the result short", () => {
-    it("names the ceiling and how many rows survived it", () => {
+  describe("when the result draws rows from more than one project", () => {
+    const TENANT_TRACES =
+      "SELECT TenantId, TraceId FROM analytics.traces " +
+      "WHERE OccurredAt >= toDateTime64('2026-02-16 00:00:00', 3)";
+    const TENANT_COLUMNS: readonly LangWatchQLColumn[] = [
+      { name: "TenantId", type: "String" },
+      { name: "TraceId", type: "String" },
+    ];
+
+    /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
+    it("names how many projects contributed, and how to narrow to one", () => {
       const diagnostics = diagnose({
-        sql: BOUNDED_TRACES,
-        rows: [{ TraceId: "a" }, { TraceId: "b" }],
-        truncated: true,
+        sql: TENANT_TRACES,
+        columns: TENANT_COLUMNS,
+        rows: [
+          { TenantId: "project-a", TraceId: "1" },
+          { TenantId: "project-b", TraceId: "2" },
+          { TenantId: "project-a", TraceId: "3" },
+        ],
       });
 
-      expect(codesOf(diagnostics)).toEqual(["RESULT_TRUNCATED"]);
-      expect(find(diagnostics, "RESULT_TRUNCATED")!.meta).toMatchObject({
-        maxRows: DEFAULT_LWQL_RESULT_LIMITS.maxRows,
-        rowsReturned: 2,
+      expect(codesOf(diagnostics)).toEqual(["MULTI_PROJECT_RESULT"]);
+      expect(find(diagnostics, "MULTI_PROJECT_RESULT")!.meta).toEqual({ projectCount: 2 });
+      expect(find(diagnostics, "MULTI_PROJECT_RESULT")!.message).toContain("WHERE TenantId =");
+    });
+
+    /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
+    it("says nothing for a result confined to one project", () => {
+      const diagnostics = diagnose({
+        sql: TENANT_TRACES,
+        columns: TENANT_COLUMNS,
+        rows: [
+          { TenantId: "project-a", TraceId: "1" },
+          { TenantId: "project-a", TraceId: "2" },
+        ],
       });
+
+      expect(codesOf(diagnostics)).toEqual([]);
+    });
+
+    /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
+    it("says nothing when the project column was not selected", () => {
+      expect(
+        codesOf(diagnose({ sql: BOUNDED_TRACES, rows: [{ TraceId: "1" }, { TraceId: "2" }] })),
+      ).toEqual([]);
     });
   });
 
@@ -164,8 +190,8 @@ describe("given a LangWatchQL query that ran", () => {
       const fanout = find(diagnostics, "POSSIBLE_FANOUT");
       expect(codesOf(diagnostics)).toEqual(["POSSIBLE_FANOUT"]);
       expect(fanout!.meta).toMatchObject({
-        dataset: "analytics.traces",
-        multipliedBy: "analytics.spans",
+        view: "analytics.traces",
+        multipliedByView: "analytics.spans",
         unmatchedGrainColumns: ["SpanId"],
         aggregated: true,
       });
@@ -227,9 +253,7 @@ describe("given a LangWatchQL query that ran", () => {
 
       // Only one direction: evaluations repeat a trace, a trace never repeats
       // an evaluation.
-      expect(diagnostics.map((diagnostic) => diagnostic.meta?.dataset)).toEqual([
-        "analytics.traces",
-      ]);
+      expect(diagnostics.map((diagnostic) => diagnostic.meta?.view)).toEqual(["analytics.traces"]);
     });
 
     it("stays quiet when the datasets are joined through a common table expression it cannot resolve", () => {
@@ -259,7 +283,7 @@ describe("given a LangWatchQL query that ran", () => {
 
       expect(codesOf(diagnostics)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(find(diagnostics, "UNBOUNDED_TIME_RANGE")!.meta).toEqual({
-        dataset: "analytics.traces",
+        view: "analytics.traces",
         timeColumn: "OccurredAt",
       });
     });
@@ -276,7 +300,7 @@ describe("given a LangWatchQL query that ran", () => {
       expect(
         diagnostics
           .filter((diagnostic) => diagnostic.code === "UNBOUNDED_TIME_RANGE")
-          .map((diagnostic) => diagnostic.meta?.dataset),
+          .map((diagnostic) => diagnostic.meta?.view),
       ).toEqual(["analytics.spans"]);
     });
 
@@ -520,7 +544,7 @@ describe("given a LangWatchQL query that ran", () => {
   });
 
   describe("when several things are worth reading twice at once", () => {
-    it("carries every one of them, truncation first", () => {
+    it("carries every one of them together", () => {
       const diagnostics = diagnose({
         sql:
           "SELECT toStartOfHour(t.OccurredAt) AS bucket, sum(t.TotalDurationMs) AS total " +
@@ -535,11 +559,9 @@ describe("given a LangWatchQL query that ran", () => {
           hourlyBucket("2026-02-20 11:00:00"),
           hourlyBucket("2026-02-20 14:00:00"),
         ],
-        truncated: true,
       });
 
       expect(codesOf(diagnostics)).toEqual([
-        "RESULT_TRUNCATED",
         "POSSIBLE_FANOUT",
         "UNBOUNDED_TIME_RANGE",
         "UNBOUNDED_TIME_RANGE",

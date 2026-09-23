@@ -1,7 +1,6 @@
 import { Box, Button, Flex, Heading, HStack, Stack, Text } from "@chakra-ui/react";
 import { nowInstant } from "@langwatch/time";
 import { type TimeRange, useExplorerStore } from "@langwatch/trace-browser-kit";
-import { queryWithoutInstantEvalChips } from "@langwatch/trace-contract";
 import type React from "react";
 
 import { useSearchSubmitRequestStore } from "../../../../behavior/search-submit-request.store.ts";
@@ -191,8 +190,9 @@ function emptyStateActions({
   judgeTheseResults: () => void;
 }): ActionButton[] {
   const actions: ActionButton[] = [];
-  // The question goes back through the search bar as a sentence, so the run
-  // gets the same estimate, cost rule and refusals a typed one gets.
+  // The query goes back through the search bar as it stands, so the chip's run
+  // starts the way Enter on it does: the same estimate, cost rule and refusals,
+  // with the question judged as written.
   if (unjudgedChip) {
     actions.push({ label: "Judge these results", primary: true, onClick: judgeTheseResults });
   }
@@ -247,10 +247,7 @@ export const EmptyFilterState: React.FC = () => {
     setTimeRange,
     judgeTheseResults: () => {
       if (!unjudgedChip) return;
-      requestSubmit({
-        text: `${queryWithoutInstantEvalChips(queryText)} ${unjudgedChip.question}`.trim(),
-        forceKind: "instant_eval",
-      });
+      requestSubmit({ text: queryText });
     },
   });
 

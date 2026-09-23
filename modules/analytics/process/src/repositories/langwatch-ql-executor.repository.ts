@@ -5,34 +5,29 @@
  */
 import type { LangWatchQLColumn, LangWatchQLStatistics } from "@langwatch/analytics-contract";
 
-/** A submitted, already-validated query and the ceilings on what it returns. */
+/** A submitted, already-validated query as it reaches the transport. */
 export interface LangWatchQLExecutionRequest {
-  /** Exactly as the caller wrote it. Never rewritten. */
+  /** The caller's statement, save for the default `LIMIT` appended when it names none. */
   readonly sql: string;
   /** Values for the parameters the SQL declares. */
   readonly parameters?: Readonly<Record<string, unknown>>;
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
-  readonly limits: LangWatchQLResultLimits;
 }
 
-/**
- * How much of a result reaches the caller.
- */
+/** The two bounds the service applies to a result; neither is enforced by the executor. */
 export interface LangWatchQLResultLimits {
-  /** Most rows a response may carry. */
+  /** The row cap — the `LIMIT` appended to a statement naming none. */
   readonly maxRows: number;
-  /** Approximate JSON byte budget for those rows. */
+  /** The hard JSON byte ceiling; a result past it is refused, never cut. */
   readonly maxResultBytes: number;
 }
 
-/** A finished execution, already bounded by the result ceilings. */
+/** A finished execution: every row the database returned. The service bounds them. */
 export interface LangWatchQLExecutionResult {
   readonly columns: readonly LangWatchQLColumn[];
   readonly rows: readonly Record<string, unknown>[];
   readonly statistics: LangWatchQLStatistics;
-  /** Whether a ceiling cut the result short. Never silent. */
-  readonly truncated: boolean;
 }
 
 /** How to reach the LangWatchQL schema as the restricted identity. */

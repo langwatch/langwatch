@@ -5,6 +5,7 @@ import type {
   GraphLayout,
   SavedWorkbenchChart,
   SavedWorkbenchChartDefinition,
+  DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
 
 /** Which chart kinds a row belongs to: the builder's, or a saved LangWatchQL one. */
@@ -115,4 +116,6 @@ export interface DashboardRepository {
     projectId: string;
     chartId: string;
   }): Promise<SavedWorkbenchChartRecord>;
+  /** The usage report's count; the caller never passes an empty project list. */
+  countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCount>;
 }

@@ -5,6 +5,7 @@ import {
 } from "@langwatch/api-key-contract";
 
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
+import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const MAX_VISIBLE_PROJECT_CANDIDATES = 5_000;
@@ -15,23 +16,28 @@ export class ApiKeyVisibilityService {
     return new ApiKeyVisibilityService(options.repository, options);
   }
 
+  private readonly bindings: ApiKeyBindingsService;
+
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
-  ) {}
+  ) {
+    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+  }
 
   async resolveVisibleProjects(input: {
     apiKeyId: string;
     organizationId: string;
   }): Promise<ApiKeyVisibleProjects> {
     const parsed = apiKeyVisibleProjectsInputSchema.parse(input);
-    const key = await this.repository.findByIdInOrganization({
+    const row = await this.repository.findByIdInOrganization({
       id: parsed.apiKeyId,
       organizationId: parsed.organizationId,
     });
-    if (!key) {
+    if (!row) {
       return { kind: "some", ids: [] };
     }
+    const key = await this.bindings.attachOne(row);
 
     const principal = { type: "apiKey" as const, id: key.id };
     const organizationWide = await this.options.authz.can({

@@ -26,7 +26,6 @@ function repositoryOver({
     repository: EventingAuthzGrantRepository.create({
       database: database as never,
       writer: {} as never,
-      selectHead: async () => true,
     }),
   };
 }

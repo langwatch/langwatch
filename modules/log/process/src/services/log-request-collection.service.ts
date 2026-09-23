@@ -22,7 +22,8 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 export interface LogRequestCollectionDeps {
   traceCanonicalisation: TraceCanonicalisationService;
   traceIo: LogTraceIoExtractor;
-  logs: LogApi;
+  /** Only the preparation half of `LogApi`: this collector sends its own batch, itself. */
+  logs: Pick<LogApi, "prepareCanonicalLogRecords">;
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
   recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
 }

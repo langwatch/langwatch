@@ -35,6 +35,7 @@ describe("auth server configuration", () => {
             passkeyHandleSecret: undefined,
             trustedIdpOrigins: undefined,
             idpSimulatorUrl: undefined,
+            localPasswords: false,
           },
           "secret",
         ),

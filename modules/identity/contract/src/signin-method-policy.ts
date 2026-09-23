@@ -23,6 +23,8 @@ export interface SignInMethodPolicyInputs {
   federationLicensed(): Promise<boolean>;
   /** Whether the passkey plugin was registered at boot. */
   offersPasskeys(): boolean;
+  /** Whether a federating deployment also issues its own passwords (D09). */
+  issuesOwnPasswords(): boolean;
   /** Whether this is a self-hosted deployment, which auto-redirects on its sole connection. */
   selfHosted(): boolean;
 }
@@ -103,8 +105,12 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
     // time. It is appended, so the order the screen renders does not move.
     const passkeys = this.inputs.offersPasskeys() ? [PASSKEY_METHOD] : [];
 
+    // A deployment that federates AND issues its own passwords offers both:
+    // the federated method leads, and the password stands behind it (D09).
+    const local = !federated || this.inputs.issuesOwnPasswords() ? LOCAL_METHOD_SET : [];
+
     return {
-      defaultMethods: [...(federated ? [federated] : LOCAL_METHOD_SET), ...passkeys],
+      defaultMethods: [...(federated ? [federated] : []), ...local, ...passkeys],
       // NOT the passkeys. Break-glass works from any machine, which a
       // credential bound to one device does not — this line has to agree
       // with `PASSKEY_METHOD`'s own definition.

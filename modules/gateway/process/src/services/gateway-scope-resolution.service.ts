@@ -1,27 +1,35 @@
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
+import { MANAGED_MODELS, type VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 /**
  * Resolves the eligible model-provider set and order for a virtual key in two passes: eligibility
  * takes every provider reachable through the upward scope cascade, skipping disabled and
  * soft-deleted rows, and ordering follows the routing policy or else fallback priority.
  */
-import { isDispatchableProvider } from "@langwatch/model-provider-contract";
+import { isDispatchableProvider, type ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type {
   EligibleModelProvider,
   GatewayScopeResolutionRepository,
 } from "../repositories/gateway-scope-resolution.repository.ts";
+import { platformProviderRows } from "../rules/gateway-platform-providers.rules.ts";
+
+/** The providers the deployment holds its own keys for, as the model-provider peer answers them. */
+export type GatewayPlatformProviders = Pick<ModelProviderApi, "platformProviderChain">;
 
 /**
  * Which model providers a virtual key reaches, and in which dispatch order.
  */
 export class GatewayScopeResolutionService {
-  private constructor(private readonly repository: GatewayScopeResolutionRepository) {}
+  private constructor(
+    private readonly repository: GatewayScopeResolutionRepository,
+    private readonly platformProviders: GatewayPlatformProviders,
+  ) {}
 
   static create(input: {
     repository: GatewayScopeResolutionRepository;
+    platformProviders: GatewayPlatformProviders;
   }): GatewayScopeResolutionService {
-    return new GatewayScopeResolutionService(input.repository);
+    return new GatewayScopeResolutionService(input.repository, input.platformProviders);
   }
 
   /**
@@ -51,6 +59,10 @@ export class GatewayScopeResolutionService {
     vk: VirtualKeyWithScopes,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<EligibleModelProvider[]> {
+    if (vk.purpose === "CONNECT") {
+      return this.managedKeyProviders(vk, transaction);
+    }
+
     const candidates = await this.scopeReachableModelProvidersForVk(vk, transaction);
     if (candidates.length === 0) {
       return [];
@@ -78,6 +90,29 @@ export class GatewayScopeResolutionService {
     }
 
     return candidates.toSorted(deterministicMpOrder);
+  }
+
+  /**
+   * A license's managed key never reaches the customer's own credentials (ADR-156 section 8):
+   * it dispatches on the platform chain when its stored services name managed models, else nowhere.
+   */
+  private async managedKeyProviders(
+    vk: VirtualKeyWithScopes,
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<EligibleModelProvider[]> {
+    const services = await this.repository.findManagedKeyConnectServices({
+      virtualKeyId: vk.id,
+      organizationId: vk.organizationId,
+      transaction,
+    });
+    if (!services.includes(MANAGED_MODELS)) {
+      return [];
+    }
+
+    return platformProviderRows({
+      organizationId: vk.organizationId,
+      chain: await this.platformProviders.platformProviderChain(),
+    });
   }
 
   /**

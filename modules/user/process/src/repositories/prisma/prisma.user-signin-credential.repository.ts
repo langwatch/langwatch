@@ -35,11 +35,8 @@ export class PrismaUserCredentialRepository
 {
   static readonly create = this.factory((prisma) => new PrismaUserCredentialRepository(prisma));
 
-  readonly #database: UserCredentialDatabase;
-
   private constructor(prisma: UserCredentialDatabase) {
     super(prisma);
-    this.#database = prisma;
   }
 
   async findCredentialAccount(input: { userId: string }): Promise<UserCredentialAccount | null> {
@@ -79,24 +76,20 @@ export class PrismaUserCredentialRepository
   }
 
   async unlinkAccount(input: UnlinkUserAccountInput): Promise<UnlinkUserAccountOutcome> {
-    // Serializable isolation prevents the read of the account count from being
-    // a stale snapshot if a concurrent unlink commits between this
-    // transaction's count and its delete.
-    return this.#database.$transaction(
-      async (transaction) => {
-        const accountCount = await transaction.account.count({ where: { userId: input.userId } });
-        if (accountCount <= 1) return "last_account" as const;
+    // Serializable so a concurrent unlink cannot leave the count stale; the
+    // base retries the loser of that race against the winner's state.
+    return this.serializableTransaction(async (transaction) => {
+      const accountCount = await transaction.account.count({ where: { userId: input.userId } });
+      if (accountCount <= 1) return "last_account" as const;
 
-        const account = await transaction.account.findFirst({
-          where: { id: input.accountId, userId: input.userId },
-        });
-        if (!account) return "not_found" as const;
+      const account = await transaction.account.findFirst({
+        where: { id: input.accountId, userId: input.userId },
+      });
+      if (!account) return "not_found" as const;
 
-        await transaction.account.delete({ where: { id: input.accountId } });
+      await transaction.account.delete({ where: { id: input.accountId } });
 
-        return "unlinked" as const;
-      },
-      { isolationLevel: "Serializable" },
-    );
+      return "unlinked" as const;
+    });
   }
 }

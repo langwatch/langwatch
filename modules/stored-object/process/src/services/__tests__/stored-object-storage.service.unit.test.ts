@@ -55,7 +55,40 @@ class ThrowingReadDriver extends MemoryDriver {
   }
 }
 
+class RecordingDriver extends MemoryDriver {
+  readonly written: string[] = [];
+
+  override async put(uri: string, bytes: Buffer) {
+    this.written.push(uri);
+    await super.put(uri, bytes);
+  }
+}
+
 describe("StoredObjectStoragePortAdapter", () => {
+  describe("when the checkup probes a project's destination", () => {
+    it("writes an object under the project and removes it again", async () => {
+      const driver = new RecordingDriver();
+      const adapter = StoredObjectStoragePortAdapter.create({
+        runtime: StoredObjectStorageRuntimeAdapter.create({
+          destination: new Destination(),
+          s3ForProject: () => driver,
+          fileForProject: () => driver,
+        }),
+        aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
+      });
+
+      await expect(adapter.resolveDestination({ projectId: "project-1" })).resolves.toEqual({
+        kind: "s3",
+        bucket: "bucket",
+      });
+      await adapter.probe({ projectId: "project-1" });
+
+      expect(driver.written).toHaveLength(1);
+      expect(driver.written[0]).toMatch(/^s3:\/\/bucket\/project-1\/checkup\//);
+      expect(driver.values.size).toBe(0);
+    });
+  });
+
   it("preserves canonical addresses and hashes existing bytes", async () => {
     const driver = new MemoryDriver();
     const runtime = StoredObjectStorageRuntimeAdapter.create({

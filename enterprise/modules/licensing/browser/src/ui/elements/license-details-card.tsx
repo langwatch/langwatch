@@ -13,6 +13,23 @@ interface LicenseDetailsCardProps {
   status: Extract<LicenseStatus, { hasLicense: true }>;
   onRemove: () => void;
   isRemoving: boolean;
+  /** Syncs the license with LangWatch now. Offered on a connected license only. */
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
+}
+
+function licenseStateBadgeOf({
+  isValid,
+  isExpired,
+  plan,
+}: {
+  isValid: boolean;
+  isExpired: boolean;
+  plan: string;
+}): { label: string; colorPalette: string } {
+  if (isValid) return { label: plan, colorPalette: "green" };
+  if (isExpired) return { label: "Expired", colorPalette: "orange" };
+  return { label: "Invalid", colorPalette: "red" };
 }
 
 /**
@@ -29,11 +46,7 @@ function LicenseStateBadge({
   isExpired: boolean;
   plan: string;
 }) {
-  const { label, colorPalette } = isValid
-    ? { label: plan, colorPalette: "green" }
-    : isExpired
-      ? { label: "Expired", colorPalette: "orange" }
-      : { label: "Invalid", colorPalette: "red" };
+  const { label, colorPalette } = licenseStateBadgeOf({ isValid, isExpired, plan });
 
   return (
     <Badge colorPalette={colorPalette} fontSize="sm" paddingX={2} paddingY={1}>
@@ -76,10 +89,17 @@ function InvalidLicenseNotice() {
   );
 }
 
-export function LicenseDetailsCard({ status, onRemove, isRemoving }: LicenseDetailsCardProps) {
+export function LicenseDetailsCard({
+  status,
+  onRemove,
+  isRemoving,
+  onRefresh,
+  isRefreshing = false,
+}: LicenseDetailsCardProps) {
   const isCorrupted = isCorruptedLicense(status);
   const isValid = status.valid;
   const isExpired = isLicenseExpired(status);
+  const canRefresh = status.valid && status.connected && onRefresh !== void 0;
 
   if (isCorrupted) {
     return (
@@ -174,6 +194,18 @@ export function LicenseDetailsCard({ status, onRemove, isRemoving }: LicenseDeta
         {!isValid && !isExpired && <InvalidLicenseNotice />}
 
         <HStack>
+          {canRefresh ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefresh}
+              loading={isRefreshing}
+              disabled={isRefreshing}
+              data-testid="refresh-license"
+            >
+              Refresh license
+            </Button>
+          ) : null}
           <Button
             variant="outline"
             size="sm"

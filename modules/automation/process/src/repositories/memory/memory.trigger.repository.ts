@@ -5,6 +5,7 @@ import {
   type Trigger,
   type TriggerSummary,
   type UpdateTriggerCommand,
+  type AutomationUsageCount,
 } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -26,6 +27,22 @@ export class MemoryTriggerRepository extends TriggerRepository {
 
   static create(memory: MemoryAutomationStore): MemoryTriggerRepository {
     return new MemoryTriggerRepository(memory);
+  }
+
+  countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AutomationUsageCount> {
+    const made = this.rows()
+      .filter((row) => projectIds.includes(row.projectId))
+      .map((row) => row.createdAt.getTime());
+    return Promise.resolve({
+      triggers: made.filter((at) => since === undefined || at >= since).length,
+      ...(made.length === 0 ? {} : { firstTriggerAt: Math.min(...made) }),
+    });
   }
 
   findActiveForProject(projectId: string): Promise<TriggerSummary[]> {

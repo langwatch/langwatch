@@ -96,7 +96,7 @@ describe("the guided onboarding kickoff", () => {
 
     it("returns null when the parts carry no kickoff", () => {
       expect(
-        settleGuidedKickoffParts({ parts: [{ type: "text", text: "hi" }], facts: {} }),
+        settleGuidedKickoffParts({ parts: [{ type: "text", text: "hi" }], facts: { paths: [] } }),
       ).toBeNull();
     });
   });

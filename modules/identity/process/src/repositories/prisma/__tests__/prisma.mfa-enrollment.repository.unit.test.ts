@@ -42,6 +42,16 @@ describe("PrismaMfaEnrollmentRepository", () => {
 
         expect(slugs).toEqual(["acme", "globex"]);
         expect(prisma.organizationUser.findMany).not.toHaveBeenCalled();
+        // A disabled seat holds no access, so it must not keep a factor switched on.
+        expect(prisma.user.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({
+            select: {
+              orgMemberships: expect.objectContaining({
+                where: { disabledAt: null, organization: { mfaRequired: true } },
+              }),
+            },
+          }),
+        );
       });
 
       it("answers empty for somebody the row lookup does not find", async () => {

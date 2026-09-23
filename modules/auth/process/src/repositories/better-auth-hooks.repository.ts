@@ -8,6 +8,8 @@ export type BetterAuthHookUser = {
   name: string | null;
   deactivatedAt: Instant | null;
   pendingSsoSetup: boolean;
+  /** A password sign-up still awaiting its emailed proof: no session until it lands. */
+  signupConfirmationPending: boolean;
 };
 
 /** An SSO-domain-matched organization, the fields the hooks act on. */

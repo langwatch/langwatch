@@ -38,7 +38,10 @@ import type {
   ConversationContext,
   DerivedTraceEvent,
   DiscoverResult,
+  ExplorerInstantEvalEstimate,
+  ExplorerInstantEvalProgress,
   ExplorerInstantEvalRuns,
+  ExplorerInstantEvalRunInput,
   FacetValuesResult,
   RouteSearchInput,
   RouteSearchResult,
@@ -188,6 +191,36 @@ export type TraceApiMap = {
     /** Pushed when a tenant's facet payload finishes its background refresh. */
     onDiscoverUpdate: {
       subscription: { input: ProjectScope; output: { projectId: string } };
+    };
+
+    /**
+     * The Explorer's Instant Eval: what a run would cost, the start, the
+     * cancel, and the counters a chip and the progress bar read back.
+     * @see specs/traces-v2/instant-eval-search.feature
+     */
+    instantEvalEstimate: {
+      mutation: {
+        input: ExplorerInstantEvalRunInput;
+        output: ExplorerInstantEvalEstimate;
+      };
+    };
+    instantEvalStart: {
+      mutation: {
+        input: ExplorerInstantEvalRunInput;
+        output: ExplorerInstantEvalProgress;
+      };
+    };
+    instantEvalCancel: {
+      mutation: {
+        input: ProjectScope & { runId: string };
+        output: ExplorerInstantEvalProgress;
+      };
+    };
+    instantEvalGet: {
+      query: {
+        input: ProjectScope & { runId: string };
+        output: ExplorerInstantEvalProgress;
+      };
     };
 
     /** One facet's values, paged. */

@@ -9,6 +9,120 @@ description: "How to upgrade LangWatch to the latest version"
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
 
+## Automatic identity and access migration
+
+Identity and access migrations run automatically during startup, organization
+by organization. A tenant whose authorization, identifier, and existing SSO
+data migrate cleanly is switched over. No preparatory release or manual
+migration pass is required.
+
+A tenant whose historical data disagrees with the migrated result is **held**
+on its existing legacy sign-in path: the migration leaves that tenant's data
+untouched, and the app still starts and serves it as before. A tenant whose
+migration throws is **parked** the same way, also without blocking startup.
+
+Both are retried automatically. The next restart re-drives them from the
+start of its own preflight, and an operator can also trigger a pass, or
+target one organization, without waiting for a restart. See
+[Check the migration results](#check-the-migration-results) below.
+
+Startup still refuses to serve traffic in three cases: the migration runner
+itself fails outright, the queue behind it fails to drain, or the fleet makes
+no progress for 25 passes (about two minutes: for example because Redis is
+unreachable, or another process holds every claim). In all three the process
+exits non-zero and the next start retries from scratch.
+
+Keep the current identity-provider configuration, callback URLs, and
+`CREDENTIALS_SECRET` during the upgrade. The migration preserves the existing
+SSO route; switching providers remains a separate operation.
+
+Take a fresh database backup and deploy normally. The diagnostics below help
+resolve held or parked tenants; they are not a routine preflight.
+
+## Check the migration results
+
+Sign in with an operator account from `ADMIN_EMAILS` and open **Ops >
+Migrations** (`/ops/migrations`). It lists every registered migration with
+Held and Parked counts, and lets you search for an organization to inspect
+its status, target a migration run for it, or kick a fresh pass immediately
+rather than waiting for the next restart.
+
+The live connection indexes deliberately refuse duplicate slots rather than
+silently choosing a connection. `REJECTED`, `DRAFT`, and `CLAIMED` still occupy
+slots; only `DISCARDED` and `TORN_DOWN` release them.
+
+```sql
+SELECT "organizationId",
+       CASE WHEN "source" = 'legacy-grandfathered' THEN 'legacy' ELSE 'direct' END AS slot,
+       count(*) AS connections
+FROM "SsoConnection"
+WHERE "state" NOT IN ('DISCARDED', 'TORN_DOWN')
+GROUP BY "organizationId", slot
+HAVING count(*) > 1;
+
+SELECT domains.domain, count(DISTINCT connection."organizationId") AS organizations
+FROM "SsoConnection" AS connection
+CROSS JOIN LATERAL unnest(connection."verifiedDomains") AS domains(domain)
+WHERE connection."state" NOT IN ('DISCARDED', 'TORN_DOWN')
+GROUP BY domains.domain
+HAVING count(DISTINCT connection."organizationId") > 1;
+```
+
+Resolve reported duplicates through the existing connection lifecycle before
+upgrading, or contact support. Do not delete the active connection or discard
+domain ownership to force the migration through.
+
+When upgrading an installation that already has connection-scoped SCIM data,
+also check for directory identities whose connection is missing:
+
+```sql
+SELECT DISTINCT identity."connectionId"
+FROM "ScimExternalId" AS identity
+LEFT JOIN "SsoConnection" AS connection ON connection."id" = identity."connectionId"
+WHERE connection."id" IS NULL;
+```
+
+If `ScimDirectoryUser` already exists, run the same query with that table as
+well. The ownership migration derives `organizationId` from the connection
+and refuses missing connections rather than guessing a tenant. It also
+backfills verified-domain routing for existing live connections of every source.
+
+SCIM now keeps each organization's directory profile and active state separately
+from the shared login account. A directory rename does not change the primary
+sign-in email, and deactivation removes access only to that organization.
+Inactive directory users remain available through SCIM reads. Group external
+identifiers are unique within each directory; legacy groups retain their
+organization-wide namespace.
+
+Directory usernames remain unique within each organization, ignoring case and
+surrounding whitespace. Deleted resources release their usernames. The migration
+refuses conflicting existing usernames rather than merging accounts. If both
+directory identity tables already exist, this query must also return no rows:
+
+```sql
+WITH claims AS (
+  SELECT "connectionId", "userId" FROM "ScimDirectoryUser"
+  UNION
+  SELECT "connectionId", "userId" FROM "ScimExternalId"
+)
+SELECT connection."organizationId", lower(btrim(account."email")) AS username,
+       count(DISTINCT account."id") AS users
+FROM claims
+JOIN "SsoConnection" AS connection ON connection."id" = claims."connectionId"
+JOIN "User" AS account ON account."id" = claims."userId"
+WHERE btrim(account."email") <> ''
+GROUP BY connection."organizationId", lower(btrim(account."email"))
+HAVING count(DISTINCT account."id") > 1;
+```
+
+For an earlier schema containing only `ScimExternalId`, use only that table's
+`SELECT` in the `claims` expression. Resolve any conflicts before upgrading.
+
+The migration preserves existing global account disables. It cannot distinguish
+an earlier SCIM disable from an administrator's security action, so it does not
+automatically reactivate those accounts. Review any historical disable through
+the administrator account controls when restoring access.
+
 ## Docker Compose
 
 ```bash

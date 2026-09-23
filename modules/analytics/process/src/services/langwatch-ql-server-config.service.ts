@@ -35,8 +35,9 @@ export class LangWatchQLServerConfigService {
   private constructor() {}
 
   /**
-   * Server-level ClickHouse config granting the *administrative* user the right to create
-   * users, profiles, row policies and named collections through SQL.
+   * Server-level config letting the *administrative* user create users, profiles, row policies
+   * and named collections. Never `show_named_collections_secrets`: `lwql_postgres` holds a
+   * plaintext password it would expose, which `infra/clickhouse-serverless` also refuses.
    */
   accessManagementConfigXml({ administrativeUser }: { administrativeUser: string }): string {
     sqlText.assertIdentifier(administrativeUser, "administrativeUser");
@@ -47,7 +48,6 @@ export class LangWatchQLServerConfigService {
               <access_management>1</access_management>
               <named_collection_control>1</named_collection_control>
               <show_named_collections>1</show_named_collections>
-              <show_named_collections_secrets>1</show_named_collections_secrets>
           </${administrativeUser}>
       </users>
   </clickhouse>

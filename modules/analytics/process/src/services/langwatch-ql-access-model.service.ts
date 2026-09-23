@@ -1,8 +1,13 @@
 /**
  * @see ./postgres-mapping.ts — the PostgreSQL-resident datasets this model covers
  * @see ./sql-text.ts — the escaping and identifier rules these statements obey
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
+
+import {
+  DEFAULT_LWQL_RESOURCE_LIMITS,
+  type LangWatchQLResourceLimits,
+} from "@langwatch/analytics-contract/langwatch-ql-limits";
 
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { LangWatchQLAppFunctionStatementsService } from "../services/langwatch-ql-app-function-statements.service.ts";
@@ -51,50 +56,35 @@ export interface LangWatchQLTable {
 }
 
 /**
- * Ceilings pinned `CONST` by the profile. Belt and braces rather than the load-bearing control:
- * `readonly = 1` already rejects *every* setting change except the tenant capability, including
- * settings the profile never mentions.
+ * The tenant predicate, byte-identical to the Go renderer's `lwqlTenantPredicate.sql` (ADR-101).
+ * A row's tenant must be the one, and only the one, an in-set hash maps to; grouping by the hash
+ * fails a conflicting hash closed without starving the rest.
  */
-export interface LangWatchQLResourceLimits {
-  maxExecutionTimeSeconds: number;
-  maxMemoryUsageBytes: number;
-  /** Per-query thread ceiling, so one LangWatchQL query cannot saturate the server's cores. */
-  maxThreads: number;
-  /**
-   * How many LangWatchQL queries the shared restricted identity may run at once. The only
-   * ceiling here that is not per-query, and the reason it exists: every other bound in this
-   * interface constrains a single statement and says nothing about N of them arriving together.
-   */
-  maxConcurrentQueriesForUser: number;
-  /**
-   * Scan ceilings, enforced with `read_overflow_mode = 'throw'`: a query that would read past
-   * either bound fails instead of silently returning a partial result — partial data that looks
-   * complete is the worse failure for an analytics caller.
-   */
-  maxRowsToRead: number;
-  maxBytesToRead: number;
-}
+export const LWQL_TENANT_PREDICATE_TEMPLATE =
+  "{tenantColumn} IN (SELECT any({tenantId}) FROM {keyMap} WHERE has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash}) GROUP BY {keyHash} HAVING uniqExact({tenantId}) = 1)";
 
 /**
- * The shipped ceilings. `maxExecutionTimeSeconds` and `maxMemoryUsageBytes` were measured
- * working against `clickhouse/clickhouse-server:25.10.2.65`.
+ * The key map's self-policy, a set membership too (`lwqlKeyMapSelfFilter.sql`): ClickHouse applies
+ * it inside the tenant predicate's own subquery, so a bare equality against the joined set would
+ * match no row and starve every tenant.
  */
-export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
-  maxExecutionTimeSeconds: 10,
-  maxMemoryUsageBytes: 1_000_000_000,
-  maxThreads: 4,
-  maxConcurrentQueriesForUser: 10,
-  maxRowsToRead: 1_000_000_000,
-  maxBytesToRead: 10_000_000_000,
-};
+export const LWQL_KEY_MAP_SELF_FILTER_TEMPLATE =
+  "has(splitByChar(',', getSetting('{tenantSetting}')), {keyHash})";
 
-/**
- * The `USING` expression every LangWatchQL row policy shares: the row's tenant must be the one
- * — and only the one — this request's key hash maps to.
- */
 /** `database.table`, with the LangWatchQL database filled in when none is named. */
 function qualifiedName(names: LangWatchQLNames, table: string, database?: string): string {
   return `${sqlText.assertIdentifier(database ?? names.database, "database")}.${sqlText.assertIdentifier(table, "table")}`;
+}
+
+/** Fills a template's `{slot}`s. Every value is an asserted identifier, never caller text. */
+function renderPredicateTemplate(
+  template: string,
+  substitutions: Readonly<Record<string, string>>,
+): string {
+  return Object.entries(substitutions).reduce(
+    (rendered, [name, value]) => rendered.split(`{${name}}`).join(value),
+    template,
+  );
 }
 
 function tenantPredicate({
@@ -104,12 +94,13 @@ function tenantPredicate({
   names: LangWatchQLNames;
   tenantColumn: string;
 }): string {
-  return (
-    `${sqlText.assertIdentifier(tenantColumn, "tenantColumn")} IN (` +
-    `SELECT any(${KEY_MAP_COLUMNS.tenantId}) FROM ${qualifiedName(names, names.keyMapTable)} ` +
-    `WHERE ${KEY_MAP_COLUMNS.keyHash} = getSetting(${clickHouseLiteral(names.tenantSetting)}) ` +
-    `HAVING uniqExact(${KEY_MAP_COLUMNS.tenantId}) = 1)`
-  );
+  return renderPredicateTemplate(LWQL_TENANT_PREDICATE_TEMPLATE, {
+    tenantColumn: sqlText.assertIdentifier(tenantColumn, "tenantColumn"),
+    tenantId: KEY_MAP_COLUMNS.tenantId,
+    keyHash: KEY_MAP_COLUMNS.keyHash,
+    keyMap: qualifiedName(names, names.keyMapTable),
+    tenantSetting: sqlText.assertIdentifier(names.tenantSetting, "tenantSetting"),
+  });
 }
 
 /** Policy name for a LangWatchQL object, derived so it is stable across runs. */
@@ -198,7 +189,10 @@ export class LangWatchQLAccessModelService {
       `           max_concurrent_queries_for_user = ${limits.maxConcurrentQueriesForUser} CONST,\n` +
       `           max_rows_to_read = ${limits.maxRowsToRead} CONST,\n` +
       `           max_bytes_to_read = ${limits.maxBytesToRead} CONST,\n` +
-      `           read_overflow_mode = 'throw' CONST`
+      `           read_overflow_mode = 'throw' CONST,\n` +
+      `           max_result_rows = ${limits.maxResultRows} CONST,\n` +
+      `           max_result_bytes = ${limits.maxResultBytes} CONST,\n` +
+      `           result_overflow_mode = 'throw' CONST`
     );
   }
 
@@ -240,8 +234,8 @@ export class LangWatchQLAccessModelService {
   }
 
   /**
-   * The key map polices itself: the restricted identity sees exactly the row its
-   * own hash matches, so it can neither enumerate other tenants' hashes nor
+   * The key map polices itself: the restricted identity sees exactly the rows its
+   * own hash set matches, so it can neither enumerate other tenants' hashes nor
    * confirm a guessed one.
    */
   keyMapRowPolicyStatement({ names }: { names: LangWatchQLNames }): string {
@@ -250,7 +244,10 @@ export class LangWatchQLAccessModelService {
     return (
       `CREATE ROW POLICY OR REPLACE ${keyMapPolicyName(names.keyMapTable)} ` +
       `ON ${this.qualified(names, names.keyMapTable)}\n` +
-      `  USING ${KEY_MAP_COLUMNS.keyHash} = getSetting(${clickHouseLiteral(names.tenantSetting)})\n` +
+      `  USING ${renderPredicateTemplate(LWQL_KEY_MAP_SELF_FILTER_TEMPLATE, {
+        keyHash: KEY_MAP_COLUMNS.keyHash,
+        tenantSetting: names.tenantSetting,
+      })}\n` +
       `  TO ${names.restrictedUser}`
     );
   }

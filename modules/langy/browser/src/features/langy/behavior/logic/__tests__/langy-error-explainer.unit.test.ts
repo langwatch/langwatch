@@ -142,7 +142,7 @@ describe("explainLangyError", () => {
 
         expect(presentation.kind).toBe("llm_upstream_error");
         expect(presentation.description).toBe(
-          "The model provider is rate-limiting these calls. Wait a moment and try again.",
+          "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.",
         );
         expect(presentation.action).toEqual({
           label: "Try again",

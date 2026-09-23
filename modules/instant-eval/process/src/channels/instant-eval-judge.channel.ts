@@ -37,6 +37,8 @@ export interface InstantEvalJudgeChannel {
   ): Promise<InstantEvalJudgement>;
   /** Releases the transport, where the implementation holds one. */
   close?(): Promise<void>;
+  /** Whether it judges for this organization; absent judges for every one. */
+  isAvailableForOrganization?(organizationId: string): Promise<boolean>;
 }
 
 /** What one classification asks the limiter for. */

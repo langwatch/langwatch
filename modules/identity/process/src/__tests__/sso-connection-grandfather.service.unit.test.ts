@@ -81,6 +81,7 @@ function serviceOf(store: InMemoryConnections): SsoConnectionService {
   return SsoConnectionService.create(
     SsoConnectionGuardsService.create({
       connections: store,
+      registrationSlots: store,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),
       // The grandfather verb states history and runs no operator gate; an

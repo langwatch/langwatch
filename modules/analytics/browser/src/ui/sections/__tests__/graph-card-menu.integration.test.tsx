@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * What the card menu offers, per kind: no datapoint picker on a builder
  * graph, and no Edit item on a saved chart (its workbench route is gone).
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { render, screen } from "@testing-library/react";

@@ -38,6 +38,7 @@ import {
   ProjectNotFoundError,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
+  type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -409,6 +410,13 @@ export class ProjectService {
     const parsed = projectNamesByIdsInputSchema.parse(input);
 
     return this.repository.findNamesByIds([...new Set(parsed.projectIds)]);
+  }
+
+  countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount> {
+    return this.repository.countUsage(input);
   }
 
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]> {

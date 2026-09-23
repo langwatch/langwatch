@@ -2,7 +2,7 @@
  * The chart half of a dashboard widget, behind the Vega boundary. Mount
  * via `LazyLangWatchQLWidgetChart`, never import this directly, or
  * megabytes of Vega land in the entry chunk. Validation isn't repeated here.
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { Box } from "@chakra-ui/react";

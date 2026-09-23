@@ -41,11 +41,11 @@ function resolverOver(queryText: string, { hide = true }: { hide?: boolean } = {
 describe("given a query that names one facet's field", () => {
   describe("when that facet is counted", () => {
     it("compiles the query with its own terms left out", () => {
-      const { filterFor, compile } = resolverOver("status:error AND model:gpt-4o");
+      const { filterFor, compile } = resolverOver("status:error AND model:gpt-5-mini");
 
       filterFor({ key: "status", table: "trace_summaries" });
 
-      expect(compile).toHaveBeenCalledWith("model:gpt-4o");
+      expect(compile).toHaveBeenCalledWith("model:gpt-5-mini");
     });
   });
 

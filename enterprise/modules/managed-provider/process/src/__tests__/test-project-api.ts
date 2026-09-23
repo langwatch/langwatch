@@ -6,6 +6,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * everything else refuses by name.
  */
 export class TestProjectApi implements ProjectApi {
+  countUsage(): Promise<{ projects: number; teams: number; updatedProjects: number }> {
+    return Promise.resolve({ projects: 0, teams: 0, updatedProjects: 0 });
+  }
+
   constructor(protected readonly overrides: Partial<ProjectApi> = {}) {}
 
   listPaths(input: Parameters<ProjectApi["listPaths"]>[0]): ReturnType<ProjectApi["listPaths"]> {

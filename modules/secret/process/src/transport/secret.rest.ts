@@ -9,7 +9,11 @@
 
 import type { Actor } from "@langwatch/actor";
 import { AuthenticatedActorRequiredError, PayloadTooLargeError } from "@langwatch/api";
-import { defineRestRouter, type RestTransportDeclaration } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  type RestTransportDeclaration,
+  UnauthorizedError,
+} from "@langwatch/api/rest";
 import {
   SecretApi,
   secretPublicCreateInputSchema,
@@ -38,7 +42,8 @@ const secretBodyLimit = {
  * row carries `createdById`/`updatedById`, and a key is not a person.
  */
 function callerOf(actor: Actor | null): SecretCaller {
-  if (actor && (actor.type === "user" || actor.type === "api_key")) return { id: actor.id };
+  if (actor === null) throw new UnauthorizedError("Authentication required");
+  if (actor.type === "user" || actor.type === "api_key") return { id: actor.id };
 
   throw new AuthenticatedActorRequiredError();
 }

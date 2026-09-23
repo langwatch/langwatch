@@ -10,6 +10,10 @@ export enum OnboardingScreenIndex {
   DESIRES = 2,
   ROLE = 3,
   INTENT = 4,
+  /** The takeover screens of the guided variant: Langy speaks, no card. */
+  HELLO = 5,
+  VALUE = 6,
+  PROVIDER = 7,
 }
 
 export enum ProductScreenIndex {
@@ -120,7 +124,7 @@ export interface OnboardingNavigation {
   canProceed: () => boolean;
 }
 
-export type OnboardingFlowVariant = "full" | "self_hosted";
+export type OnboardingFlowVariant = "full" | "self_hosted" | "guided";
 
 export interface OnboardingFlowConfig {
   variant: OnboardingFlowVariant;

@@ -43,7 +43,6 @@ function emptyResult(rows: readonly Record<string, unknown>[]): LangWatchQLQuery
     columns: [{ name: "transcript", type: "String" }],
     rows,
     statistics: { elapsedMs: 1, rowsRead: rows.length, bytesRead: 1, rowsReturned: rows.length },
-    truncated: false,
     diagnostics: [],
     followsTimeWindow: true,
     followsGranularity: true,

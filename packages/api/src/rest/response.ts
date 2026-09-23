@@ -1,13 +1,13 @@
-import { HandledError, type SerializedReason } from "@langwatch/handled-error";
-import { createLogger } from "@langwatch/observability";
-import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { Actor } from "@langwatch/actor";
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { HandledError, type SerializedReason } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import { INVALID_TRACE_ID } from "@langwatch/observability/constants";
+import { nowInstant, toEpochMs } from "@langwatch/time";
 import { trace } from "@opentelemetry/api";
 import type { Context, ErrorHandler } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { resolver, type DescribeRouteOptions } from "hono-openapi";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z, type ZodType } from "zod";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -429,6 +429,11 @@ export const canonicalConflictResponses: Record<409, RouteResponse> = {
   409: canonicalResponse("Conflict"),
 };
 
+/** The canonical 404, for routes that address one resource by id. */
+export const canonicalNotFoundResponses: Record<404, RouteResponse> = {
+  404: canonicalResponse("Not Found"),
+};
+
 /**
  * The documented 200 for a route that answers with one schema. One definition
  * here so a change to the success envelope reaches every family that publishes
@@ -812,7 +817,8 @@ export function createCanonicalFamilyErrorHandler(options: {
   const logger = createLogger(options.loggerName);
 
   const mapError =
-    options.mapError ?? ((error: unknown, c: Context<any>) => canonicalErrorFor(error, requestTraceIds(c)));
+    options.mapError ??
+    ((error: unknown, c: Context<any>) => canonicalErrorFor(error, requestTraceIds(c)));
 
   return async (error, c) => {
     const { status, body } = mapError(error, c);

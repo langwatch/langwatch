@@ -3,14 +3,8 @@ import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
 import { topicServer } from "../../topic.server.ts";
-import { fakeTopicSchedulePrisma, topicTestWake } from "./topic.fixture.ts";
-
-const WAKE = 1_800_000_060_000;
-
-function process(role: "api" | "worker", nextWakeAt: Date | null = null) {
-  return createApp({ role })
-    .withModules([withMemoryRepositories(topicServer)])
-    .withRelational(fakeTopicSchedulePrisma(nextWakeAt));
+function process(role: "api" | "worker") {
+  return createApp({ role }).withModules([withMemoryRepositories(topicServer)]);
 }
 
 describe("topic app installation", () => {
@@ -31,16 +25,16 @@ describe("topic app installation", () => {
     }
   });
 
-  describe("when the process schedules a clustering wake", () => {
-    it("reports it as the next run", async () => {
-      const runtime = await process("worker", new Date(WAKE)).boot();
+  describe("when no clustering wake is scheduled in the memory tier", () => {
+    it("reports no next run rather than reaching for a database", async () => {
+      const runtime = await process("worker").boot();
 
       try {
         const status = await runtime.service(TopicApi).getClusteringStatus({
           projectId: "project-1",
         });
 
-        expect(status.nextRunAt).toBe(topicTestWake(WAKE).epochMilliseconds);
+        expect(status.nextRunAt).toBeNull();
         expect(status.isInProgress).toBe(false);
         expect(status.isRunInFlight).toBe(false);
       } finally {

@@ -1,6 +1,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import {
+  type JoinRequestJoining,
   OrganizationService as OrganizationServiceContract,
   OrganizationNotFoundError,
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
@@ -53,6 +54,7 @@ import {
   type UpdateOrganizationTeamWithMembersInput,
   type UpdateOrganizationSettingsInput,
   type UpdateOrganizationSettingsResult,
+  type OrganizationUsageCount,
 } from "@langwatch/organization-contract";
 
 import type {
@@ -142,6 +144,14 @@ export class OrganizationService extends OrganizationServiceContract {
    * Which of the named organizations this person belongs to, resolved in one
    * read rather than one per organization.
    */
+  findAllIds(): Promise<string[]> {
+    return this.repository.findAllIds();
+  }
+
+  countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {
+    return this.repository.countUsage(input);
+  }
+
   memberOrganizationIds(input: { userId: string; organizationIds: string[] }): Promise<string[]> {
     return this.teams.memberOrganizationIds(input);
   }
@@ -181,6 +191,15 @@ export class OrganizationService extends OrganizationServiceContract {
     }
 
     return { ...stored, ...this.decryptSettings(stored) };
+  }
+
+  /** How colleagues on a matching domain get in, where the organization keeps it. */
+  getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining> {
+    return this.repository.getJoinSetting(input);
+  }
+
+  saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void> {
+    return this.repository.saveJoinSetting(input);
   }
 
   /** The guided-onboarding record, where the organization keeps it. */

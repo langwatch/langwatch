@@ -48,17 +48,12 @@ export class AuthzOffboardingService {
       principal: { type: "user", id: userId },
       organizationId,
     });
-    const offboardIncomplete =
-      grants.isOrgMember || grants.bindings.length > 0 || grants.legacyTeamMemberships.length > 0;
-    if (!offboardIncomplete) {
-      return;
-    }
+    if (!grants.isOrgMember && grants.bindings.length === 0) return;
 
     throw new OffboardIncompleteError({
       userId,
       organizationId,
       remainingBindings: grants.bindings.length,
-      remainingLegacyRows: grants.legacyTeamMemberships.length,
       stillOrgMember: grants.isOrgMember,
     });
   }

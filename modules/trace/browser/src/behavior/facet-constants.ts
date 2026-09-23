@@ -32,6 +32,7 @@ import {
   User,
   UserSquare,
   Users,
+  Wand2,
   Workflow,
 } from "lucide-react";
 
@@ -232,6 +233,7 @@ export const GROUP_ICONS: Record<string, LucideIcon> = {
   model: Sparkles,
   prompts: BookMarked,
   quality: CheckSquare,
+  instantEvals: Wand2,
   topics: Tag,
   cost: DollarSign,
   latency: Clock,
@@ -248,6 +250,7 @@ export interface FacetGroupDef {
     | "model"
     | "prompts"
     | "quality"
+    | "instantEvals"
     | "topics"
     | "cost"
     | "latency"
@@ -337,6 +340,16 @@ export const FACET_GROUPS: FacetGroupDef[] = [
       "annotation",
     ],
   },
+  // "Judge this now" — a question answered per row when the chip is applied,
+  // unlike Quality's stored evaluator results: these have no facet to browse
+  // and they cost money to run. Named after the feature so the suggestion
+  // dropdown says what the four fields are instead of dropping them into the
+  // trailing "Other".
+  {
+    id: "instantEvals",
+    label: "Instant Evals",
+    keys: ["eval", "eval.trace", "eval.conversation", "eval.llm"],
+  },
   // "What is this trace about?" — the semantic-clustering axis.
   {
     id: "topics",
@@ -412,6 +425,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
       "cost",
       "model",
       "quality",
+      "instantEvals",
       "topics",
       "prompts",
       "custom",
@@ -424,6 +438,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
       "model",
       "prompts",
       "quality",
+      "instantEvals",
       "topics",
       "subjects",
       "cost",
@@ -446,6 +461,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
       "traces",
       "errors",
       "quality",
+      "instantEvals",
       "spans",
       "subjects",
       "topics",

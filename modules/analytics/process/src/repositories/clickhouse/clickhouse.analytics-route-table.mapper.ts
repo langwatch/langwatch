@@ -314,6 +314,8 @@ export interface PickAnalyticsTableInput {
   traceIds?: string[];
   /** Invert the user's filter selection (toolbar toggle). Legacy-builder-only. */
   negateFilters?: boolean;
+  /** Trace origins left out of the count. The rollup has no origin column. */
+  excludeOrigins?: string[];
 }
 
 /**
@@ -366,9 +368,14 @@ export function pickAnalyticsTable(input: PickAnalyticsTableInput): AnalyticsTab
   // Attributes map and only survive on the legacy table.
   if (filtersHitBlocklist(input.filters)) return legacyFallbackFor(source);
 
+  // The rollup is keyed by bucket, not by trace, so it has no origin to leave
+  // out: an origin exclusion reads the per-trace tables.
+  const excludesOrigins = input.excludeOrigins !== undefined && input.excludeOrigins.length > 0;
+
   // ---------- Rollup eligibility ----------
   const rollupOk =
     !hasPipeline &&
+    !excludesOrigins &&
     rollupHandlesAllSeries(input.series, source, input.groupBy) &&
     rollupHandlesGroupBy(input.groupBy, source) &&
     rollupHandlesFilters(input.filters, source);

@@ -3,30 +3,32 @@ import {
   HIDDEN_SYSTEM_KEY_NAMES,
   type ApiKeyRevocationCause,
 } from "@langwatch/api-key-contract";
-import { PrismaRepository, type PrismaModelClient } from "@langwatch/prisma-client";
+import { prismaTables, type PrismaModelClient } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
   ApiKeyCreateRecord,
   ApiKeyRepository,
+  ApiKeyRow,
   ApiKeyUpdateRecord,
-  StoredApiKey,
 } from "../api-key.repository.ts";
 
-export type PrismaApiKeyDatabase = PrismaModelClient<"ApiKey">;
+/** The key rows, plus the raw write the fenced revoke needs. */
+export type PrismaApiKeyDatabase = PrismaModelClient<"ApiKey"> & Pick<PrismaClient, "$executeRaw">;
 
 /** Prisma persistence is private to the API-key server package. */
-export class PrismaApiKeyRepository
-  extends PrismaRepository.for("ApiKey")
-  implements ApiKeyRepository
-{
-  static readonly create = this.factory((prisma) => new PrismaApiKeyRepository(prisma));
+export class PrismaApiKeyRepository implements ApiKeyRepository {
+  /** Declared, not inherited: the model-scoped client carries no `$executeRaw`. */
+  static readonly tables = prismaTables("ApiKey");
 
-  private get database(): PrismaApiKeyDatabase {
-    return this.prisma;
+  static create({ prisma }: { prisma: PrismaApiKeyDatabase }): PrismaApiKeyRepository {
+    return new PrismaApiKeyRepository(prisma);
   }
 
-  create(input: ApiKeyCreateRecord): Promise<StoredApiKey> {
+  private constructor(private readonly database: PrismaApiKeyDatabase) {}
+
+  create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
     const { roleBindings: _roleBindings, startsDisabled, expiresAt, ...data } = input;
     return this.database.apiKey.create({
       data: {
@@ -34,41 +36,33 @@ export class PrismaApiKeyRepository
         expiresAt: expiresAt ? toDate(expiresAt) : null,
         ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
-      include: { roleBindings: true },
     });
   }
-  activate(input: { id: string }): Promise<StoredApiKey> {
+  activate(input: { id: string }): Promise<ApiKeyRow> {
     return this.database.apiKey.update({
       where: { id: input.id },
       data: { revokedAt: null },
-      include: { roleBindings: true },
     });
   }
-  findByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null> {
+  findByLookupId(input: { lookupId: string }): Promise<ApiKeyRow | null> {
     return this.database.apiKey.findFirst({
       where: {
         lookupId: input.lookupId,
         OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
-      include: { roleBindings: true },
     });
   }
-  findById(input: { id: string }): Promise<StoredApiKey | null> {
+  findById(input: { id: string }): Promise<ApiKeyRow | null> {
     return this.database.apiKey.findFirst({
       where: { id: input.id },
-      include: { roleBindings: true },
     });
   }
-  findByIdInOrganization(input: {
-    id: string;
-    organizationId: string;
-  }): Promise<StoredApiKey | null> {
+  findByIdInOrganization(input: { id: string; organizationId: string }): Promise<ApiKeyRow | null> {
     return this.database.apiKey.findFirst({
       where: { id: input.id, organizationId: input.organizationId },
-      include: { roleBindings: true },
     });
   }
-  listForUser(input: { organizationId: string; userId: string }): Promise<StoredApiKey[]> {
+  listForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]> {
     return this.database.apiKey.findMany({
       where: {
         organizationId: input.organizationId,
@@ -76,22 +70,20 @@ export class PrismaApiKeyRepository
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId: input.userId }, { userId: null, ingestSourceType: null }],
       },
-      include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
     });
   }
-  listForOrganization(input: { organizationId: string }): Promise<StoredApiKey[]> {
+  listForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]> {
     return this.database.apiKey.findMany({
       where: {
         organizationId: input.organizationId,
         revokedAt: null,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
       },
-      include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
     });
   }
-  update(input: ApiKeyUpdateRecord): Promise<StoredApiKey> {
+  update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const { id, roleBindings: _roleBindings, revokedAt, lastUsedAt, ...data } = input;
     return this.database.apiKey.update({
       where: { id },
@@ -100,20 +92,25 @@ export class PrismaApiKeyRepository
         ...(revokedAt === void 0 ? {} : { revokedAt: revokedAt && toDate(revokedAt) }),
         ...(lastUsedAt === void 0 ? {} : { lastUsedAt: toDate(lastUsedAt) }),
       },
-      include: { roleBindings: true },
     });
   }
-  async revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<StoredApiKey> {
-    // `updateMany` fenced on a live row, so a key already revoked keeps the
-    // cause the first revocation recorded. Losing the race still returns a
-    // dead key, which is all the caller needs.
-    await this.database.apiKey.updateMany({
-      where: { id: input.id, revokedAt: null },
-      data: { revokedAt: new Date(), revocationCause: input.cause },
-    });
+  /**
+   * SQL, with the fence against the table: through `updateMany` it sits in a
+   * subquery, and a revoke parked on the row lock re-checks only the id, so
+   * the later cause would overwrite the first one.
+   */
+  async revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<ApiKeyRow> {
+    await this.database.$executeRaw`
+      -- @tenancy: addressed by the key's own id, which the caller resolved inside its organization.
+      UPDATE "ApiKey"
+         SET "revokedAt" = now(),
+             "revocationCause" = ${input.cause},
+             "updatedAt" = now()
+       WHERE "id" = ${input.id}
+         AND "revokedAt" IS NULL
+    `;
     return this.database.apiKey.findUniqueOrThrow({
       where: { id: input.id },
-      include: { roleBindings: true },
     });
   }
   async updateLastUsedAt(input: { id: string }): Promise<void> {
@@ -122,34 +119,34 @@ export class PrismaApiKeyRepository
   async upgradeHash(input: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id: input.id, hashedSecret: input.hashedSecret });
   }
-  findIngestKey(input: {
+  async findIngestKey(input: {
     organizationId: string;
-    projectId: string;
+    apiKeyIds: readonly string[];
     sourceType: string;
-  }): Promise<StoredApiKey | null> {
+  }): Promise<ApiKeyRow | null> {
+    if (input.apiKeyIds.length === 0) return null;
     return this.database.apiKey.findFirst({
       where: {
         organizationId: input.organizationId,
+        id: { in: [...input.apiKeyIds] },
         ingestSourceType: input.sourceType,
         revokedAt: null,
-        roleBindings: { some: { scopeType: "PROJECT", scopeId: input.projectId } },
       },
-      include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
     });
   }
-  findIngestKeysForProject(input: {
+  async findIngestKeys(input: {
     organizationId: string;
-    projectId: string;
-  }): Promise<StoredApiKey[]> {
+    apiKeyIds: readonly string[];
+  }): Promise<ApiKeyRow[]> {
+    if (input.apiKeyIds.length === 0) return [];
     return this.database.apiKey.findMany({
       where: {
         organizationId: input.organizationId,
+        id: { in: [...input.apiKeyIds] },
         ingestSourceType: { not: null },
         revokedAt: null,
-        roleBindings: { some: { scopeType: "PROJECT", scopeId: input.projectId } },
       },
-      include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
     });
   }

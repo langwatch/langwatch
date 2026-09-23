@@ -34,6 +34,8 @@ function ceremony({
   blockers = [],
   retirementFrees = true,
   paired = true,
+  blockersOnceGated = [],
+  retirementFailsOnce = false,
 }: {
   phase?: SsoMigrationPhase;
   legacyState?: SsoConnectionLifecycleState;
@@ -42,9 +44,14 @@ function ceremony({
   retirementFrees?: boolean;
   /** Whether the organization is running a cutover at all. */
   paired?: boolean;
+  /** Blockers a raced legacy callback raises after the gate has landed. */
+  blockersOnceGated?: SsoMigrationBlockerView[];
+  /** Whether the first retirement pass is interrupted. */
+  retirementFailsOnce?: boolean;
 } = {}) {
   const state = { phase, legacyState, legacyAccessRetired: false };
   const calls: string[] = [];
+  let interruptions = retirementFailsOnce ? 1 : 0;
   const record = (name: string, effect: () => void) => {
     calls.push(name);
     effect();
@@ -79,13 +86,20 @@ function ceremony({
           legacyConnectionId: LEGACY,
           legacyState: state.legacyState,
           phase: state.phase,
-          blockers,
+          blockers:
+            state.phase === "FINALIZING" && phase !== "FINALIZING"
+              ? [...blockers, ...blockersOnceGated]
+              : blockers,
           legacyAccessRetired: state.legacyAccessRetired,
         };
       },
     }),
     retirement: createApiFixture<SsoLegacyIdentityRetirementService>({
       retire: async () => {
+        if (interruptions > 0) {
+          interruptions -= 1;
+          throw new Error("identity ledger temporarily unavailable");
+        }
         record("retire", () => {
           state.legacyAccessRetired = retirementFrees;
         });
@@ -162,6 +176,42 @@ describe("finishing a direct cutover", () => {
       meta: { blockerCodes: ["legacy-access-remains"] },
     });
     expect(calls).not.toContain("finalizeMigration");
+  });
+
+  it("rechecks a legacy callback that raced the gate before retiring anything", async () => {
+    const { service, state, calls } = ceremony({
+      blockersOnceGated: [
+        { code: "legacy-activity-not-quiet", message: "A legacy sign-in raced finalization." },
+      ],
+    });
+
+    await expect(service.finalize(request)).rejects.toMatchObject({
+      code: "sso_migration_finalization_blocked",
+      meta: { blockerCodes: ["legacy-activity-not-quiet"] },
+    });
+    expect(state.phase).toBe("FINALIZING");
+    expect(calls).toEqual(["beginMigrationFinalization"]);
+  });
+
+  it("leaves the gate standing when retirement is interrupted, and completes each step once on retry", async () => {
+    const { service, state, calls } = ceremony({ retirementFailsOnce: true });
+
+    await expect(service.finalize(request)).rejects.toThrow(
+      "identity ledger temporarily unavailable",
+    );
+    expect(state).toMatchObject({ phase: "FINALIZING", legacyState: "ACTIVE" });
+
+    await service.finalize(request);
+    await service.finalize(request);
+
+    expect(state).toMatchObject({ phase: "FINALIZED", legacyState: "TORN_DOWN" });
+    expect(calls).toEqual([
+      "beginMigrationFinalization",
+      "retire",
+      "requestTeardown",
+      "completeTeardown",
+      "finalizeMigration",
+    ]);
   });
 
   it("refuses a connection running no cutover", async () => {

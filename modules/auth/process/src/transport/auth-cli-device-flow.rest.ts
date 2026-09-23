@@ -26,7 +26,11 @@ import {
   lookupQuerySchema,
   refreshRequestSchema,
 } from "@langwatch/auth-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type {
+  FeatureFlagApi,
+  FeatureFlagKey,
+  FeatureFlagTarget,
+} from "@langwatch/feature-flag-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -53,7 +57,7 @@ const CLI_LOGIN_UNKNOWN_DEVICE_LABEL = "unknown-device";
  * since the browser's holder is a browser module a server package may not
  * reach.
  */
-const GOVERNANCE_RELEASE_FLAG = "release_ui_ai_governance_enabled";
+const GOVERNANCE_RELEASE_FLAG: FeatureFlagKey = "release_ui_ai_governance_enabled";
 
 /** The personal workspace a device session ships the key of. */
 export type CliPersonalWorkspace = Readonly<{
@@ -650,16 +654,15 @@ async function approve({
   // Governance gate: provisioning a personal workspace/virtual key is a
   // governance-plane capability. Flag defaults ON, so this only fires for
   // organizations without it, pointing them at project login instead.
+  const governanceTarget: FeatureFlagTarget = {
+    kind: "organization",
+    userId: person.id,
+    userEmail: person.email ?? undefined,
+    organizationId: organization_id,
+  };
   const governanceEnabled = await app
     .featureFlags()
-    .isEnabled(
-      GOVERNANCE_RELEASE_FLAG as never,
-      {
-        kind: "organization",
-        userId: person.id,
-        organizationId: organization_id,
-      } as never,
-    )
+    .isEnabled(GOVERNANCE_RELEASE_FLAG, governanceTarget)
     .catch(() => true);
 
   if (!governanceEnabled) {

@@ -59,6 +59,7 @@ Reusable framework decisions live with their packages:
 | [082](./082-lwql-analytics-views-invoker-column-grants-final-dedup.md) | The LangWatchQL `analytics.*` schema is invoker-rights views, column grants, and `FINAL`                                  | Accepted                  |
 | [083](./083-lwql-diagnostics-read-the-single-parse.md)                 | LangWatchQL diagnostics read the validator's single parse, never a second one                                             | Accepted                  |
 | [084](./084-lwql-postgres-mapping-tenant-predicate.md)                 | PostgreSQL-resident data is reached through an approved view, a policed engine table, and a view-carried tenant predicate | Accepted                  |
+| [085](./085-lwql-chart-runtime-without-eval.md)               | The LangWatchQL chart runtime runs without `eval` — ahead-of-time schema validator, interpreted expressions, injected data   | Accepted                      |
 | [092](./092-unified-authorization-engine.md)                           | Unified authorization engine — one registry, one resolver, every principal                                                | Proposed                  |
 | [094](./094-simulation-execution-on-process-manager-substrate.md)      | Simulation execution on the process-manager substrate — durable execute/cancel intents, stall & cancel-grace watchdogs    | Accepted                  |
 | [101](./101-feature-package-surfaces.md)                               | Feature ownership roots contain physical contract, server, and optional web packages                                      | Accepted                  |
@@ -85,6 +86,7 @@ Reusable framework decisions live with their packages:
 | [153](./153-instant-eval-run-is-a-judgment-job.md)                     | An Instant Eval run is a judgment job over the same statement, not a monitor run                                          | Accepted                  |
 | [150](./150-nx-task-runner.md)                                         | Nx is the workspace task runner, over inferred pnpm targets                                                               | Accepted                  |
 | [154](./154-one-reference-door-two-query-languages.md)                 | One reference door describes both query languages, and every consumer reads it                                            | Accepted                  |
+| [157](./157-lwql-postgres-catalog-derived-opt-out.md)                  | The PostgreSQL half of the LangWatchQL catalog is derived from the Prisma manifest, opt-out                               | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

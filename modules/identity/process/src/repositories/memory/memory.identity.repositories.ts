@@ -16,6 +16,7 @@ import {
 } from "./memory.join-request.repositories.ts";
 import { MemoryMfaEnrollmentRepository } from "./memory.mfa-enrollment.repository.ts";
 import { MemorySsoBreakGlassRepository } from "./memory.sso-break-glass.repository.ts";
+import { MemorySsoConnectionRegistrationRepository } from "./memory.sso-connection-registration.repository.ts";
 import {
   MemorySsoConnectionBackofficeRepository,
   MemorySsoConnectionReadRepository,
@@ -55,6 +56,7 @@ export class MemoryIdentityRepositories {
       joinCandidates: MemoryJoinCandidateRepository.create(store),
       ssoConnections: MemorySsoConnectionReadRepository.create(store),
       ssoStranding: MemorySsoConnectionStrandingRepository.create(store),
+      ssoRegistrationSlots: MemorySsoConnectionRegistrationRepository.create(store),
       ssoBackoffice: MemorySsoConnectionBackofficeRepository.create(store),
       ssoReproofTargets: MemorySsoDomainReproofTargetRepository.create(store),
       ssoBreakGlass: MemorySsoBreakGlassRepository.create(store),

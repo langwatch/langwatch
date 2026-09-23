@@ -167,7 +167,7 @@ describe("a LangWatchQL result value", () => {
 
   describe("given a result whose columns list the same name twice", () => {
     describe("when the duplicates are looked for", () => {
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
+      /** @scenario "Duplicate columns, statistics, and diagnostics are honest" */
       it("names each repeated column once, in the order it first appeared", () => {
         expect(
           duplicateLangWatchQLColumnNames([
@@ -180,7 +180,7 @@ describe("a LangWatchQL result value", () => {
         ).toEqual(["total", "day"]);
       });
 
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
+      /** @scenario "Duplicate columns, statistics, and diagnostics are honest" */
       it("finds none when every name is distinct", () => {
         expect(
           duplicateLangWatchQLColumnNames([

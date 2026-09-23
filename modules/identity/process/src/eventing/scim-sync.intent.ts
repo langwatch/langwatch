@@ -10,6 +10,8 @@ import {
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
+  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
+  redriveScimApplyCommandDataSchema,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
   recordScimApplyFailureCommandDataSchema,
   recordScimGroupMappingCommandDataSchema,
@@ -106,6 +108,13 @@ export const RecordScimApplyFailureCommand = scimSyncCommand({
   schema: recordScimApplyFailureCommandDataSchema,
   description: "Record a directory apply that failed, and retire it if it never can succeed",
   verb: "recordScimApplyFailure",
+});
+
+export const RedriveScimApplyCommand = scimSyncCommand({
+  type: REDRIVE_SCIM_APPLY_COMMAND_TYPE,
+  schema: redriveScimApplyCommandDataSchema,
+  description: "Send a retired directory apply through again, on a platform operator's word",
+  verb: "redriveScimApply",
 });
 
 export const RevokeScimSyncCommand = scimSyncCommand({

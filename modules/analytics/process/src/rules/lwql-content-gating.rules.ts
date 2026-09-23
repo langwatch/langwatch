@@ -1,7 +1,7 @@
 /**
  * LangWatchQL analytics SQL — where captured content lives, derived rather than listed.
  * @see @langwatch/data-privacy-contract — the source of truth
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import {

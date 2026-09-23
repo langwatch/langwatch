@@ -19,7 +19,7 @@ const timeRange = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 describe("explorerHiddenOrigins", () => {
   describe("given a query with no origin term", () => {
     /** @scenario "The list leaves out Langy's turns by default" */
-    it.each(["", "   ", "checkout", "status:error AND model:gpt-4o"])(
+    it.each(["", "   ", "checkout", "status:error AND model:gpt-5-mini"])(
       "hides Langy's origin for %j",
       (query) => {
         expect(explorerHiddenOrigins(query)).toEqual([LANGY_TRACE_ORIGIN]);
@@ -40,7 +40,7 @@ describe("explorerHiddenOrigins", () => {
       "NOT origin:langy",
       "-origin:sample",
       "(origin:sample OR origin:application)",
-      "status:error AND (origin:langy OR model:gpt-4o)",
+      "status:error AND (origin:langy OR model:gpt-5-mini)",
     ])("hides nothing for %j", (query) => {
       expect(explorerHiddenOrigins(query)).toEqual([]);
     });
@@ -87,7 +87,7 @@ describe("findHiddenOriginConditions", () => {
     /** @scenario "The list leaves out Langy's turns by default" */
     it("keeps the filter whole and ANDs the exclusion after it", () => {
       const compiled = ClickHouseTraceQueryRepository.create().translateFilter({
-        queryText: "status:error OR model:gpt-4o",
+        queryText: "status:error OR model:gpt-5-mini",
         tenantId: "project_test",
         timeRange,
       });

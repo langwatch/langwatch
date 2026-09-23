@@ -66,3 +66,24 @@ export function resolveTrustedOrigins({
   // and an operator reading the resolved list sees it the way they wrote it.
   return [...new Set(origins)];
 }
+
+/**
+ * The identity-provider origins registration may dial although they answer
+ * privately: the same two lists sign-in trusts, so the two never disagree.
+ */
+export function resolveDialableIdentityProviderOrigins({
+  trustedIdpOrigins,
+  idpSimulatorUrl,
+  isProduction,
+}: {
+  trustedIdpOrigins: string | undefined;
+  idpSimulatorUrl: string | undefined;
+  isProduction: boolean;
+}): string[] {
+  return [
+    ...new Set([
+      ...originsIn(trustedIdpOrigins),
+      ...(isProduction ? [] : originsIn(idpSimulatorUrl)),
+    ]),
+  ];
+}

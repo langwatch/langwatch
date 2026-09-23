@@ -158,6 +158,7 @@ beforeEach(() => {
   connectionService = SsoConnectionService.create(
     SsoConnectionGuardsService.create({
       connections,
+      registrationSlots: connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding(),
       platformOperators: new StubPlatformOperators([OLIVE.id]),

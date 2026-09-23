@@ -7,8 +7,7 @@ import { liveShareLinkRow, ORG, PROJECT, TEAM, traceScope } from "./support/reso
 
 const customRoleBinding = [
   {
-    role: "CUSTOM" as const,
-    customRoleId: "cr-1",
+    roleKey: "custom:cr-1",
     scopeType: "PROJECT" as const,
     scopeId: PROJECT,
     viaGroupId: null,
@@ -27,7 +26,6 @@ describe("collector at the resource tier", () => {
       });
       expect(grants.bindings).toEqual([]);
       expect(grants.isOrgMember).toBe(false);
-      expect(grants.legacyTeamMemberships).toEqual([]);
       expect(reader.findOrganizationMembership).not.toHaveBeenCalled();
       expect(reader.findUserBindings).not.toHaveBeenCalled();
     });
@@ -51,9 +49,7 @@ describe("collector at the resource tier", () => {
 
       expect(grants.organizationRole).toBeNull();
       expect(grants.isOrgMember).toBe(false);
-      expect(grants.legacyTeamMemberships).toEqual([]);
       expect(reader.findOrganizationMembership).not.toHaveBeenCalled();
-      expect(reader.findLegacyTeamMemberships).not.toHaveBeenCalled();
       expect(reader.findCustomRolePermissions).toHaveBeenCalledWith({
         organizationId: ORG,
         principal: { type: "apiKey", id: "key-1" },
@@ -65,7 +61,9 @@ describe("collector at the resource tier", () => {
   describe("when a custom role's stored payload is malformed", () => {
     const collectWith = async (permissions: unknown) => {
       const reader = makeReader({
-        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabled: false }),
         findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
         findCustomRolePermissions: vi.fn().mockResolvedValue([{ id: "cr-1", permissions }]),
       });

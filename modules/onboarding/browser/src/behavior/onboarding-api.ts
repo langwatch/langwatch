@@ -3,19 +3,24 @@
  * cache keys. No credentials on this map.
  */
 
-import { createModuleApi } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type {
   GuidedOnboardingState as GuidedState,
   GuidedOnboardingStateWithInstance as GuidedStateWithInstance,
   GuidedOnboardingStateWithVariant as GuidedStateWithVariant,
 } from "@langwatch/onboarding-contract";
-import type { OrganizationIntent } from "@langwatch/organization-contract";
+import type {
+  joinRequestTrpc,
+  OrganizationInitialized,
+  OrganizationIntent,
+} from "@langwatch/organization-contract";
 import type { TimeInput } from "@langwatch/time";
 
 /** What a signing-up reader told us about themselves, verbatim. */
 type SignUpData = Readonly<Record<string, unknown>>;
 
-export type OnboardingApiMap = {
+/** `joinRequests.lookup` feeds the create screen's join-instead notice. */
+export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> & {
   onboarding: {
     /**
      * Mints the reader's first organization, its team and — on the LLM Ops
@@ -30,7 +35,7 @@ export type OnboardingApiMap = {
           primaryIntent: OrganizationIntent | undefined;
           signUpData: SignUpData;
         };
-        output: { projectSlug: string | null };
+        output: OrganizationInitialized;
       };
     };
 

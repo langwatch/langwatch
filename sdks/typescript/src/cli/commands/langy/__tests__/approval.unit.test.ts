@@ -107,8 +107,8 @@ describe("the options a permission ask offers", () => {
   describe("when a chain would grant several patterns", () => {
     /** @scenario "A chain names every pattern the grant would cover" */
     it("names every one of them", () => {
-      expect(approvalOptions(["git fetch", "git checkout"])[0]?.label).toBe(
-        'Yes, allow "git fetch" and "git checkout" for this session',
+      expect(approvalOptions(["uv sync", "uv run"])[0]?.label).toBe(
+        'Yes, allow "uv sync" and "uv run" for this session',
       );
     });
   });
@@ -206,8 +206,8 @@ describe("the box the selector draws", () => {
       ],
       [
         "a chain",
-        ["git add", "git commit", "git push"],
-        'The session grant covers every command that starts with "git add", "git commit" and "git push".',
+        ["uv sync", "uv run", "gh pr"],
+        'The session grant covers every command that starts with "uv sync", "uv run" and "gh pr".',
       ],
       [
         "a pattern over the whole command name",
@@ -229,11 +229,11 @@ describe("the box the selector draws", () => {
     it("wraps the label inside the frame", () => {
       const drawn = renderBox({
         card: approvalCardFor({
-          call: bashCall("git add . && git commit -m x && git push"),
+          call: bashCall("uv sync && uv run pytest && gh pr create --title x"),
           workspaceName: "acme",
-          summary: "git add . && git commit -m x && git push",
-          reason: "This changes the git repository and reaches the network.",
-          patterns: ["git add", "git commit", "git push", "gh pr", "uv run"],
+          summary: "uv sync && uv run pytest && gh pr create --title x",
+          reason: "This installs packages and reaches the network.",
+          patterns: ["uv sync", "uv run", "gh pr", "pnpm install", "make build"],
         }),
         selected: 0,
         width: 60,
@@ -241,7 +241,7 @@ describe("the box the selector draws", () => {
 
       for (const line of drawn) expect(line.length).toBe(60);
       expect(bodyText(drawn)).toContain(
-        'Yes, allow "git add", "git commit", "git push", "gh pr" and "uv run" for this session',
+        'Yes, allow "uv sync", "uv run", "gh pr", "pnpm install" and "make build" for this session',
       );
     });
   });
@@ -445,9 +445,11 @@ describe("the card a file call produces", () => {
     ["local_bash", "Langy wants to run in acme"],
     ["local_edit", "Langy wants to change a file in acme"],
     ["local_read", "Langy wants to read a file in acme"],
+    ["local_langwatch_env", "Langy wants to write a file in acme"],
   ];
   for (const [tool, title] of titles) {
     describe(`when the call is ${tool}`, () => {
+      /** @scenario "The credentials write says it writes" */
       it(`the heading reads ${title}`, () => {
         const call = {
           ...envelope,

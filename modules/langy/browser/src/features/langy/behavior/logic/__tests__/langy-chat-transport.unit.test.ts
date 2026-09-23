@@ -615,9 +615,30 @@ describe("createLangyChatTransport", () => {
   });
 
   describe("when reconnecting to the stream", () => {
-    it("returns null — resume is a panel-driven re-subscribe, not a transport reconnect", async () => {
-      const { transport } = makeTransport();
+    it("returns null when there is no adopted turn to reattach to", async () => {
+      const { transport } = makeTransport({}, { getResumeTarget: () => null });
       await expect(transport.reconnectToStream!(options())).resolves.toBeNull();
+      expect(subscription).not.toHaveBeenCalled();
+    });
+
+    it("subscribes to the adopted turn's stream, with no turn-start mutation", async () => {
+      const { transport, onIds } = makeTransport(
+        {},
+        {
+          getResumeTarget: () => ({ projectId: "p1", conversationId: "conv-9", turnId: "turn-9" }),
+        },
+      );
+
+      const stream = await transport.reconnectToStream!(options());
+
+      expect(stream).toBeInstanceOf(ReadableStream);
+      expect(mutation).not.toHaveBeenCalled();
+      expect(onIds).not.toHaveBeenCalled();
+      expect(subscription).toHaveBeenCalledWith(
+        "langy.onTurnStream",
+        expect.objectContaining({ projectId: "p1", conversationId: "conv-9", turnId: "turn-9" }),
+        expect.anything(),
+      );
     });
   });
 });

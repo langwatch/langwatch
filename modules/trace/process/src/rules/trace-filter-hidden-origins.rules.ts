@@ -43,3 +43,17 @@ export function andFilterConditions(conditions: readonly TraceFilterWhere[]): Tr
     params: Object.assign({}, ...conditions.map((condition) => condition.params)),
   };
 }
+
+/** The Explorer's hide step: a filter with the hidden origins ANDed in, or nothing at all. */
+export function explorerOriginExclusion({
+  hiddenOrigins,
+}: {
+  hiddenOrigins: readonly string[];
+}): (filter: TraceFilterWhere | undefined) => TraceFilterWhere | undefined {
+  const hidden = findHiddenOriginConditions({ hiddenOrigins });
+
+  return (filter) => {
+    const conditions = [...(filter ? [filter] : []), ...hidden];
+    return conditions.length === 0 ? undefined : andFilterConditions(conditions);
+  };
+}

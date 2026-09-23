@@ -290,6 +290,33 @@ Feature: Authorization grants
     Then that grant is denied too
     And the member holds no access afterwards
 
+  @integration
+  Scenario: A delayed live attach is rejected after offboarding
+    Given a live USER attach captured before the member is offboarded
+    When its projection arrives after the member leaves and rejoins
+    Then the old attach is rejected by the membership lifetime fence
+    And the old legacy USER binding is gone
+
+  @unit
+  Scenario: A live USER attach carries the membership lifetime it locked
+    Given an attach naming a member of "org_acme"
+    When the attach is stated
+    Then the fact carries the lifetime read under that membership's row lock
+    And an attach naming a user with no live membership is refused
+
+  @unit
+  Scenario: The insert is fenced on the lifetime the fact was stamped against
+    Given a stamped USER fact arriving at the projection
+    When the row is written
+    Then the insert names the membership lifetime and takes its row lock
+
+  @unit
+  Scenario: Only a founder's own admin grants may state their own lifetime
+    Given a grant carrying the founder bootstrap marker
+    When the wire reads it
+    Then it is accepted only as a stamped USER admin organization or team grant
+    And an organization bootstrap naming another organization is refused
+
   @unit @unimplemented
   Scenario: Offboarding records one revocation per grant
     When a member holding 12 grants is offboarded
@@ -306,18 +333,24 @@ Feature: Authorization grants
 
   # ═══ Read-your-writes ═════════════════════════════════════════════════
 
-  # An attach and a role definition hold, bounded, for the projection to make
-  # their rows readable. Timing out is normally not a failure: the append is
-  # durable and the fold converges. It IS a failure for a caller whose next
-  # step hands out access these rows decide, which is what `requireProjection`
-  # states.
+  # An attach and a role definition hold, bounded, for the authoritative
+  # projection to make their rows readable. The default write contract confirms
+  # before returning; an explicitly asynchronous attach can return after the
+  # durable append without reading the projection. Compatibility rows, revoked
+  # grants and deleted roles never confirm a write.
 
   @unit
-  Scenario: A write that nobody reads next passes when the projection lags
-    Given an attach whose caller does not require the projection
+  Scenario: A default write fails when its projection lags
+    Given an attach using the default read-your-writes contract
     When the read-your-writes window passes with the rows not readable
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: An asynchronous write is accepted before its projection lands
+    Given an attach whose caller explicitly writes asynchronously
+    When the durable append succeeds before the rows are readable
     Then the write is reported as done
-    And the lag is logged
+    And the projection is not read
 
   @unit
   Scenario: A write whose caller requires the projection fails when it lags
@@ -335,6 +368,42 @@ Feature: Authorization grants
   Scenario: A required write that lands inside the window passes
     Given an attach whose caller requires the projection
     When the rows become readable inside the window
+    Then the write is reported as done
+
+  @unit
+  Scenario: A compatibility-only row cannot confirm an attach
+    Given the compatibility row exists but the Grant row does not
+    When the read-your-writes window passes
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A revoked Grant cannot confirm an attach
+    Given the Grant row is revoked
+    When the read-your-writes window passes
+    Then the write fails with "authz_grant_not_confirmed"
+
+  @unit
+  Scenario: A delayed Grant projection confirms an attach
+    Given the Grant row arrives inside the read-your-writes window
+    When the projection is checked again
+    Then the write is reported as done
+
+  @unit
+  Scenario: A role definition is confirmed by the canonical Role projection
+    Given a canonical Role row with the requested name and permissions
+    When the role definition is written
+    Then the write is reported as done
+
+  @unit
+  Scenario: A changed binding role is confirmed by the canonical Grant projection
+    Given a canonical Grant row with the requested role
+    When the binding role is changed
+    Then the write is reported as done
+
+  @unit
+  Scenario: A deleted role is confirmed when the canonical Role projection is gone
+    Given the canonical Role row disappears
+    When the role is deleted
     Then the write is reported as done
 
   @unit
@@ -404,15 +473,15 @@ Feature: Authorization grants
     Given a filtered revoke naming a principal
     And that principal holds a Grant-head row the compat head cannot express
     When the revoke runs on the ledger fork
-    Then the revoked set is the union of the compat ids and the Grant ids
+    Then the revoked set contains the matching live Grant ids
     And the row with no compat binding is revoked, not left resolving
 
   @unit
-  Scenario: A filter the vocabulary cannot translate falls back to the compat ids
-    Given a filtered revoke whose shape the Grant translation does not cover
-    When the revoke runs on the ledger fork
-    Then only the compat ids are revoked
-    And the Grant head is not queried with a guessed predicate
+  Scenario: A filtered revoke preserves excluded grant ids
+    Given an API key with multiple custom-role grants
+    When selected roles are revoked while naming grants to retain
+    Then only live grants for those roles and that key are revoked
+    And the retained grant ids are excluded
 
   # ═══ Share links and the compat heads ═════════════════════════════════
   # Share links live on both heads until every organization has moved:
@@ -624,13 +693,20 @@ Feature: Authorization grants
     And only backdated history is left out
 
   @unit
-  Scenario: A write on the legacy path still records its audit row
-    Given "org_acme" has not completed the migration
-    When an authorization change is written on the legacy path
-    Then an audit row records it just the same
+  Scenario: A grant write is recorded on the grants path
+    Given "org_acme" receives an authorization change through the grants path
+    When the change is recorded
+    Then an audit row records the grant change
 
   @unit
   Scenario: A fact delivered twice writes one audit row
     Given a fact delivered twice
     When it is handled
     Then exactly one audit row exists
+
+  @unit @regression
+  Scenario: Migrated custom bindings retain their permission restrictions
+    Given an organization, team or project binding retains ADMIN beside its customRoleId
+    When the custom role only grants traces:view
+    Then project:delete is denied
+    And a missing custom role fails closed

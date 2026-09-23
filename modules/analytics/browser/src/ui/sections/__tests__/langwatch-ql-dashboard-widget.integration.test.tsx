@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Pins the wire-level request and response ordering, since neither is visible
  * from props. The tRPC client is mocked so a mutation can resolve out of order.
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -369,6 +369,23 @@ describe("LangyTurnRelayAdapter", () => {
       );
     });
 
+    it("carries a call that ran in the developer's shared folder onto the live card", async () => {
+      const { relay, buffer } = makeRelay();
+      await relay.handle(
+        frame({
+          type: "tool",
+          id: "tc-local",
+          name: "bash",
+          phase: "start",
+          input: { command: "langwatch trace search --format json" },
+          local: true,
+        }),
+      );
+      expect(buffer.appendTool).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "tc-local", local: true }),
+      );
+    });
+
     it("re-types a shell frame running the LangWatch CLI before anything is recorded", async () => {
       const { relay, buffer, conversations } = makeRelay();
       await relay.handle(

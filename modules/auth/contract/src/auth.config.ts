@@ -10,6 +10,12 @@ const onSwitch = z
   .optional()
   .transform((value) => value === "on");
 
+/** An explicit on/off switch, off when unset. */
+const onOffSwitch = z
+  .enum(["off", "on"])
+  .optional()
+  .transform((value) => value === "on");
+
 export const authServerConfig = Config.define((c) => ({
   sessionUrl: c.env("NEXTAUTH_URL", z.string().optional()),
   mfaEnrollmentOpen: c.env("MFA_ENROLLMENT_OPEN", onSwitch),
@@ -27,6 +33,8 @@ export const authServerConfig = Config.define((c) => ({
    * outside production ONLY — it signs whatever it is asked to sign.
    */
   idpSimulatorUrl: c.env("LANGWATCH_IDPSIM_URL", z.string().optional()),
+  /** D09: this deployment issues its own passwords beside a federated provider. */
+  localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", onOffSwitch),
 }));
 
 export type AuthServerConfig = ConfigOf<typeof authServerConfig>;

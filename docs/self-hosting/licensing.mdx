@@ -39,8 +39,9 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 </Note>
 
 <Note>
-  Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and
-  send no usage back to LangWatch.
+  Volume is bounded by your own hardware, not by us. A self-hosted deployment is not metered and
+  sends no usage back to LangWatch unless its license names a hosted service, in which case
+  [Connect](/self-hosting/connect) meters what that service judges or serves.
 </Note>
 
 ## What an Enterprise license adds
@@ -55,6 +56,8 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 | **AI Governance**                                       | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode).                                                                                                               |
 | **Extended retention**                                  | Multi-class retention policies configured per category.                                                                                                                                                               |
 | **Support and SLA**                                     | Named contact, response targets, upgrade guidance.                                                                                                                                                                    |
+
+A licensed install can also call LangWatch-hosted services, the Instant Evals judge and managed models, over one outbound connection. The license decides which of them this install may call, an organization admin can switch off the ones they do not want, and what you spend is metered and capped on the LangWatch side against your contract. See [Connect](/self-hosting/connect).
 
 The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`enterprise/`](https://github.com/langwatch/langwatch/tree/main/enterprise), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/enterprise/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
@@ -139,6 +142,6 @@ No. Members, lite members, teams, and projects are all uncapped on a self-hosted
 </Accordion>
 
 <Accordion title="Does self-hosted send usage data to LangWatch?">
-No. Self-hosted deployments are not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
+No, unless the license names a hosted service: [Connect](/self-hosting/connect) then meters what that service judges or serves, and the daily license sync reports your seat counts. A license that names none reaches no hosted service and the deployment is not metered. [Billable events](/pricing/billable-events) apply to LangWatch Cloud.
 </Accordion>
 </AccordionGroup>

@@ -21,6 +21,18 @@ export class TestOrganizationService extends OrganizationService {
     return unsupported();
   }
 
+  readGuidedOnboardingState(): never {
+    return unsupported();
+  }
+
+  writeGuidedOnboardingState(): never {
+    return unsupported();
+  }
+
+  organizationIdsForMember(): never {
+    return unsupported();
+  }
+
   updateSettings(): never {
     return unsupported();
   }

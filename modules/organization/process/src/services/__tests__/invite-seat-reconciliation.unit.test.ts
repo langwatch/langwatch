@@ -1,6 +1,6 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
@@ -45,6 +45,22 @@ describe("given an organization with 25 active members and a license for 10", ()
     /** @scenario "Inviting another member is refused while over the seat count" */
     it("is refused for exceeding the licensed seats", async () => {
       const { service } = buildService({ maxMembers: 10, currentFullMembers: 25 });
+
+      await expect(
+        service.checkLicenseLimits({
+          organizationId: "org-123",
+          newInvites: [{ role: "MEMBER", teams: [] }],
+        }),
+      ).rejects.toThrow(MemberSeatLimitReachedError);
+    });
+  });
+});
+
+describe("given 50 full member seats are in use on a license for 50", () => {
+  describe("when an admin invites another full member", () => {
+    /** @scenario "The licensed seat count is the hard cap" */
+    it("is refused for exceeding the licensed seats", async () => {
+      const { service } = buildService({ maxMembers: 50, currentFullMembers: 50 });
 
       await expect(
         service.checkLicenseLimits({

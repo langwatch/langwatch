@@ -23,7 +23,6 @@ export function makeReader(
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
     findApiKeyOwner: vi.fn().mockResolvedValue(null),
-    findLegacyTeamMemberships: vi.fn().mockResolvedValue([]),
     findCustomRolePermissions: vi.fn().mockResolvedValue([]),
     findShareLinks: vi.fn().mockResolvedValue([]),
     findProjectLineage: vi.fn().mockResolvedValue(null),

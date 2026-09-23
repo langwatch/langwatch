@@ -8,21 +8,17 @@
 import { randomUUID } from "node:crypto";
 
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
-import {
-  PrismaClient,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@langwatch/prisma-client/generated";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
+import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
 } from "../repositories/prisma/prisma.authz-binding.repository.ts";
-import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository.ts";
-import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL ?? process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -33,12 +29,12 @@ describe.skipIf(!DB_URL)("given a member whose project access is a team-scoped b
   });
   const database = prisma as unknown as AuthzDatabase;
   const authz = AuthzService.create({
-    repository: PrismaAuthzReadRepository.create(database),
-    listing: PrismaAuthzListingRepository.create(database),
+    repository: EventingAuthzReadRepository.create(database),
+    listing: EventingAuthzListingRepository.create(database),
     bindings: PrismaAuthzBindingRepository.create({
       database: prisma as unknown as AuthzBindingDatabase,
     }),
-    isOnEngine: async () => false,
+    isOnEngine: async () => true,
   });
 
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
@@ -91,22 +87,26 @@ describe.skipIf(!DB_URL)("given a member whose project access is a team-scoped b
     prodProjectId = await project("clienta-prod", clientTeamId);
     otherProjectId = await project("clientb-dev", otherTeamId);
 
-    // The binding, and nothing else: no TeamUser row anywhere, which is what
+    // The grant, and nothing else: no TeamUser row anywhere, which is what
     // makes this a binding-only reader rather than a member with legacy rows.
-    await prisma.roleBinding.create({
+    await prisma.grant.create({
       data: {
+        id: `grant-team-${suffix}`,
         organizationId,
-        userId,
-        scopeType: RoleBindingScopeType.TEAM,
+        principalType: "USER",
+        principalId: userId,
+        roleKey: "member",
+        source: "grants-service",
+        scopeType: "TEAM",
         scopeId: clientTeamId,
-        role: TeamUserRole.MEMBER,
+        occurredAt: new Date(),
       },
     });
   });
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
-      ["roleBinding", { organizationId }],
+      ["grant", { organizationId }],
       ["project", { team: { organizationId } }],
       ["team", { organizationId }],
       ["organizationUser", { organizationId }],

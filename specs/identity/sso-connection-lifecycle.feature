@@ -196,7 +196,8 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Given an ACTIVE connection for "acme"
     When a suspend command is handled
     Then the connection is SUSPENDED and stops routing its domains
-    And a resume command restores ACTIVE and routing
+    And a resume command without a live break-glass binding is refused
+    And with a live binding, resume restores ACTIVE and routing
 
   @unit
   Scenario: Teardown never strands a user
@@ -378,6 +379,14 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the screen reports no existing route
     And the setup journey is offered as before
 
+  # ── Routing flip ───────────────────────────────────────────────────────
+
+  # There is no fleet-wide flip, and the staged flag that was going to carry
+  # one was designed out rather than built. Routing asks the connection
+  # projection first and falls back to the columns per organization, so which
+  # of the two decides differs BY ORGANIZATION -- and a switch thrown for
+  # everybody could only ever have been wrong for somebody.
+  @unit
   # ── Routing flip ───────────────────────────────────────────────────────
 
   # There is no fleet-wide flip, and the staged flag that was going to carry
@@ -573,6 +582,7 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When that origin redirects the discovery request into our own network
     Then the connection is not registered
     And nothing in the answer describes our network back to them
+
 
   # ---------------------------------------------------------------------
   # What it is called

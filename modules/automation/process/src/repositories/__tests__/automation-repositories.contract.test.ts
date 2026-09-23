@@ -73,6 +73,19 @@ describe("given the memory automation repositories", () => {
     });
   });
 
+  describe("when the usage report counts triggers", () => {
+    it("counts the named projects only and dates the first", async () => {
+      const repositories = MemoryAutomationRepositories.create();
+      const created = await repositories.triggers.create(trigger);
+
+      const counted = await repositories.triggers.countUsage({ projectIds: [created.projectId] });
+      const elsewhere = await repositories.triggers.countUsage({ projectIds: ["another"] });
+
+      expect(counted).toEqual({ triggers: 1, firstTriggerAt: created.createdAt.getTime() });
+      expect(elsewhere).toEqual({ triggers: 0 });
+    });
+  });
+
   describe("when a send is claimed twice", () => {
     it("refuses the second claim", async () => {
       const repositories = MemoryAutomationRepositories.create();

@@ -1,0 +1,137 @@
+{{/*
+  The pre-roll migration gate (ADR-155).
+
+  Why. A migration is never breaking: it is applied to the live database while
+  the PREVIOUS image is still serving, and the new image must work on the old
+  schema until its own migration has run. That contract only buys anything if
+  the order is actually fixed, and until this hook it was not. Both the app and
+  the workers container run `start:prepare:db` themselves on boot, so on a helm
+  upgrade the migration ran inside whichever new pod won the advisory lock,
+  concurrently with the old pods still serving and with each other. Three
+  consequences, all of them things operators have hit:
+
+    - a migration that fails takes the new pod into CrashLoopBackOff rather
+      than stopping the upgrade, and the error is one line inside a restarting
+      container's log;
+    - the app and the workers race for the lock, so the loser's startupProbe
+      budget is spent waiting on the winner's DDL;
+    - nothing in the release says when the schema changed, so "was the schema
+      already migrated when that request failed?" cannot be answered.
+
+  What this does. One Job, on the NEW image, running only the migration tasks,
+  before helm applies any Deployment. It is fail-closed: a migration that fails
+  stops the upgrade with the new image never rolled and the old one still
+  serving the old schema, which is the state an operator can reason about. The
+  containers' own `start:prepare:db` stays exactly as it was and becomes a
+  no-op second pass — that is what keeps a first install, a non-helm install
+  and `docker compose` working unchanged.
+
+  Scope. pre-upgrade only, deliberately:
+    - not pre-install: helm applies hook resources before the rest of the
+      manifests, so on a first install the Secrets this Job reads do not exist
+      yet. The app container migrates on first boot, as it always has.
+    - not pre-rollback: a rollback must never run migrations. Rolling back to
+      the previous image on the migrated schema is precisely what the
+      expand/contract rules guarantee, and a "down" migration is not how the
+      way back works here.
+
+  ArgoCD and Flux map pre-upgrade to PreSync and will run this on every sync,
+  including the first. Both migration runners are idempotent (prisma keeps its
+  applied-checksum table, goose its version table) and hold an advisory lock,
+  so a redundant run is a no-op that exits 0.
+
+  Opt out with `app.migrations.preRoll: false`, for an operator who applies
+  migrations themselves as a separate pipeline step. They then still run inside
+  the containers on boot, so nothing is skipped by turning this off.
+*/}}
+{{- $preRoll := dig "migrations" "preRoll" true .Values.app }}
+{{- if $preRoll }}
+{{- $name := printf "%s-migrate-pre-roll" .Release.Name }}
+{{/* The migration sequence can legitimately take a long time on a large
+     installation, and a deadline shorter than the work turns a slow migration
+     into a failed upgrade half way through the DDL. The app's own startupProbe
+     budget is 40 minutes for the same sequence plus a boot, so this default
+     sits just under it. */}}
+{{- $deadline := dig "migrations" "preRollTimeoutSeconds" 2100 .Values.app }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade
+    # Ahead of every other pre-upgrade hook: nothing else in the release should
+    # be doing anything while the schema is moving.
+    helm.sh/hook-weight: "-20"
+    # A FAILED Job is left behind for the operator to read; the next attempt
+    # removes it before creating its own, so a failure never blocks the retry.
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  # One attempt. The runners are idempotent, so a retry is safe — but a
+  # migration that failed did so for a reason an operator has to read, and a
+  # backoff loop buries it under identical restarts.
+  backoffLimit: 0
+  activeDeadlineSeconds: {{ $deadline }}
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        {{- include "langwatch.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+      {{- with .Values.images.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 8 }}
+      {{- with (coalesce .Values.app.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.app.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          securityContext:
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.app) | nindent 12 }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          # The migration half of the app's own start script, and nothing else:
+          # no listener, no queues, no projections. A serving process holding
+          # DDL locks is how deploys die (ARCHITECTURE.md §7).
+          command: ["pnpm"]
+          args: ["-s", "run", "start:prepare:db"]
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            # Names this Job in telemetry, so its lines are not filed under the
+            # app they run ahead of.
+            - name: OTEL_SERVICE_NAME
+              value: "langwatch-migrate"
+            {{- with .Values.app.extraEnvs }}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "app.extraEnvs") }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.app.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          # /tmp only. The stored-objects PVC the app mounts is ReadWriteOnce
+          # and migrations never touch it; mounting it here would pin this Job
+          # to the node holding the attachment and re-open issue #7191.
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir:
+            sizeLimit: {{ .Values.app.scratchSizeLimit }}
+{{- end }}

@@ -31,6 +31,9 @@ import {
   gatewayInternalPatchSessionAnswers,
   gatewayInternalReportUsageAnswers,
   gatewayInternalBootstrapAnswers,
+  type GatewayLicenseTokenRefusal,
+  type GatewayVirtualKeyRecord,
+  LICENSE_TOKEN_PREFIX,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -86,6 +89,62 @@ function readJson(raw: string): unknown {
 }
 
 // ── the family's own door ───────────────────────────────────────────────
+
+/** How each license-token refusal reads on the wire, exactly as main answered it. */
+const LICENSE_TOKEN_REFUSALS: Record<
+  GatewayLicenseTokenRefusal,
+  { status: 400 | 401 | 403; message: string }
+> = {
+  connect_license_token_malformed: { status: 401, message: "the license token is malformed" },
+  connect_instance_required: {
+    status: 400,
+    message: "a license token must be presented with an instance id",
+  },
+  connect_license_not_registered: {
+    status: 401,
+    message: "this license is not registered for hosted services",
+  },
+  connect_license_revoked: { status: 403, message: "this license is no longer active" },
+  connect_license_expired: { status: 403, message: "this license has expired" },
+  connect_wrong_instance: { status: 403, message: "this license is bound to another instance" },
+};
+
+/**
+ * Signs for a key that may serve. `notAfter` ends the token at the key's (or the
+ * license's) end when that comes before the 15 minute TTL, so an auth cache never
+ * outlives the key; a license's services travel as the `connect_services` claim.
+ */
+async function keyResolution(
+  app: GatewayApi,
+  {
+    vk,
+    notAfter,
+    connectServices,
+  }: { vk: GatewayVirtualKeyRecord; notAfter: Instant | null; connectServices?: string[] },
+) {
+  // Null for a key written before the destination was stored, in an organization
+  // with no governance project: the gateway then skips span export instead.
+  const traceProject = vk.traceProjectId ? await app.findTraceDestination(vk.traceProjectId) : null;
+  const { jwt } = app.signJwt({
+    vk_id: vk.id,
+    project_id: traceProject?.id ?? null,
+    team_id: traceProject?.teamId ?? null,
+    org_id: vk.organizationId,
+    principal_id: vk.principalUserId,
+    revision: vk.revision.toString(),
+    notAfter,
+    ...(connectServices ? { connect_services: connectServices } : {}),
+  });
+  // Fire-and-forget last-used bump. Failures here must not deny the request.
+  void app.touchVirtualKeyUsage(vk.id).catch(() => void 0);
+
+  return {
+    jwt,
+    revision: vk.revision.toString(),
+    key_id: vk.id,
+    display_prefix: vk.displayPrefix,
+  };
+}
 
 // ── §4.1 resolving a presented virtual key ──────────────────────────────
 
@@ -183,6 +242,31 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       });
     }
 
+    if (presented.data.key_presented.startsWith(LICENSE_TOKEN_PREFIX)) {
+      const resolution = await app.resolveLicenseToken({
+        token: presented.data.key_presented,
+        instanceId: presented.data.instance_id,
+      });
+      if (!resolution.ok) {
+        const refusal = LICENSE_TOKEN_REFUSALS[resolution.code];
+        logAuthDecision(headers["x-langwatch-gateway-node"], resolution.code, refusal.status);
+
+        return refuse(refusal.status, {
+          type: resolution.code,
+          code: resolution.code,
+          message: refusal.message,
+        });
+      }
+
+      return answer(
+        await keyResolution(app, {
+          vk: resolution.key,
+          notAfter: resolution.notAfter ?? null,
+          connectServices: resolution.connectServices,
+        }),
+      );
+    }
+
     const parseRejection = virtualKeyParseRejection(presented.data.key_presented);
     if (parseRejection) {
       logAuthDecision(
@@ -220,37 +304,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       return refuse(statusRejection.status, { ...statusRejection });
     }
 
-    // Where this key's traces land, read off the key. Null for a key written
-    // before the destination was stored in an organization with no governance
-    // project to fall back to; the gateway then skips span export rather than
-    // failing the auth handshake.
-    const traceProject = vk.traceProjectId
-      ? await app.findTraceDestination(vk.traceProjectId)
-      : null;
-
-    // notAfter ends the token at the key's expiration date when that arrives
-    // before the ordinary 15 minute TTL, and travels on as the vk_expires_at
-    // claim. Without it the gateway holds a token that outlives the key, and its
-    // auth cache keeps serving that key while the control plane is unreachable.
-    const { jwt } = app.signJwt({
-      vk_id: vk.id,
-      project_id: traceProject?.id ?? null,
-      team_id: traceProject?.teamId ?? null,
-      org_id: vk.organizationId,
-      principal_id: vk.principalUserId,
-      revision: vk.revision.toString(),
-      notAfter: vk.expiresAt,
-    });
-
-    // Fire-and-forget last-used bump. Failures here must not deny the request.
-    void app.touchVirtualKeyUsage(vk.id).catch(() => void 0);
-
-    return answer({
-      jwt,
-      revision: vk.revision.toString(),
-      key_id: vk.id,
-      display_prefix: vk.displayPrefix,
-    });
+    return answer(await keyResolution(app, { vk, notAfter: vk.expiresAt }));
   })
 
   .post("/api/internal/gateway/codex/refresh", "gatewayInternalCodexRefresh")

@@ -61,6 +61,31 @@ describe("secret app installation", () => {
     }
   });
 
+  /** @scenario "The first read returns the secret and the second refuses" */
+  it("serves a one-time reveal through the installed app, once", async () => {
+    const runtime = await process("api").boot();
+
+    try {
+      const app = runtime.service(SecretApi);
+      const { revealId } = await app.stashReveal({
+        organizationId: "org_acme",
+        kind: "virtual_key",
+        keyId: "vk_1",
+        preview: "sk-\u20264f2a",
+        secret: "sk-live-9f2c",
+      });
+
+      await expect(app.revealOnce({ organizationId: "org_acme", revealId })).resolves.toMatchObject(
+        { secret: "sk-live-9f2c" },
+      );
+      await expect(app.revealOnce({ organizationId: "org_acme", revealId })).rejects.toMatchObject({
+        code: "secret_already_revealed",
+      });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   /** @scenario "Secret values never leave the boundary" */
   it("answers metadata that carries neither the value nor the ciphertext", async () => {
     const runtime = await process("api").boot();

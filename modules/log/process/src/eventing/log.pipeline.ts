@@ -1,8 +1,10 @@
 import {
   type AppendStore,
   defineAggregate,
+  defineEventingModule,
   defineEvents,
   definePipeline,
+  type EventingSetup,
   type EventSubscriberDefinition,
   type Projection,
   type StaticPipelineDefinition,
@@ -12,9 +14,11 @@ import {
   type LogProcessingEvent,
   LOG_COMMAND_COALESCE_MAX_BATCH,
   LOG_PROCESSING_EVENT_TYPES,
+  LOG_PROCESSING_PIPELINE_NAME,
   type RecordCanonicalLogCommandData,
 } from "@langwatch/log-contract";
 
+import type { LogApp } from "../app/log.app.ts";
 import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
 import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
 import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";
@@ -45,7 +49,7 @@ export function createLogProcessingPipeline(
   deps: LogProcessingPipelineDeps,
 ): LogProcessingPipeline {
   let builder = definePipeline<LogProcessingEvent>({
-    name: "log_processing",
+    name: LOG_PROCESSING_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: "log",
       events: defineEvents(LOG_PROCESSING_EVENT_TYPES),
@@ -93,3 +97,15 @@ export class LogProcessingAdapter {
     });
   }
 }
+
+/**
+ * The registration: the app builds the definition, and the senders are bound
+ * back to it once the runtime has built them (ADR-144). Cross-pipeline
+ * subscribers (e.g. coding-agent log-facts) are absent until that peer's own
+ * `*Api` operation exists; see modules/log/adrs/001-log-processing-boundary.md.
+ */
+export const logEventing = defineEventingModule({
+  pipeline: LOG_PROCESSING_PIPELINE_NAME,
+  build: ({ app }: EventingSetup<never, LogApp>) => app.eventingPipeline(),
+  connect: ({ app, commands }) => app.connectCommands(commands),
+});

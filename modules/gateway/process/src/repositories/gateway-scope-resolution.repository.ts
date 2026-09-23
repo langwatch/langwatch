@@ -35,6 +35,15 @@ export abstract class GatewayScopeResolutionRepository {
     projectIds: string[];
     transaction?: GatewayPersistenceTransaction;
   }): Promise<EligibleModelProvider[]>;
+  /**
+   * The platform services a CONNECT key may serve, as stored on the key; empty
+   * for any other key, a key of another organization, or one never granted any.
+   */
+  abstract findManagedKeyConnectServices(input: {
+    virtualKeyId: string;
+    organizationId: string;
+    transaction?: GatewayPersistenceTransaction;
+  }): Promise<string[]>;
   abstract findRoutingPolicyOrder(input: {
     routingPolicyId: string;
     transaction?: GatewayPersistenceTransaction;

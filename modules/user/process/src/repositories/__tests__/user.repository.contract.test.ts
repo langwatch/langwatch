@@ -36,6 +36,19 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   });
 
   describe("when a credential account is minted", () => {
+    it("says an account exists on its address's domain, and on no other", async () => {
+      const { users } = create();
+      await users.createCredentialUser({
+        name: "Ada",
+        email: "Ada@Example.com",
+        passwordHash: "hash",
+        issuer: ISSUER,
+      });
+
+      await expect(users.hasAccountOnDomain("example.com")).resolves.toBe(true);
+      await expect(users.hasAccountOnDomain("example.org")).resolves.toBe(false);
+    });
+
     it("reads the profile back by id and by email", async () => {
       const { users } = create();
 
@@ -172,6 +185,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
 
       await expect(users.findPasskeyNudgeStatus(created.id)).resolves.toEqual({
         hasPasskey: false,
+        twoStepEnabled: false,
         dismissedAt,
       });
     });

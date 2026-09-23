@@ -52,6 +52,7 @@ import {
   type WorkbenchSaveResult,
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
+  type ExperimentUsageCount,
 } from "@langwatch/experiment-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
@@ -241,6 +242,13 @@ export class ExperimentApp implements ExperimentApi {
   // ── Experiments ────────────────────────────────────────────────
 
   /** Every active experiment in the project. */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<ExperimentUsageCount> {
+    return this.#dependencies.experiments.countUsage(input);
+  }
+
   list(input: Readonly<{ projectId: string }>): Promise<Experiment[]> {
     return this.#dependencies.experiments.list(input);
   }

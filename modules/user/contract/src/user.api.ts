@@ -52,13 +52,22 @@ import type {
   UserFullProfile,
   UserProfilesInput,
   UserPasskeyNudgeStatus,
-  UserPasskeyOffer,
+  UserSecureAccountOffer,
   UserProfile,
   UserSsoStatus,
   UserTestArrival,
   UserTourPreference,
   UserVerificationCompleted,
 } from "./user.ts";
+
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * people on the install by the domain of their address, counted in the
+ * database so no address is ever read out.
+ */
+export interface UserUsageCount {
+  readonly emailDomains: Readonly<Record<string, number>>;
+}
 
 /** Portable User use cases exposed to process peers and transports. */
 export interface UserApi {
@@ -95,9 +104,15 @@ export interface UserApi {
   /** Verifies the current password, replaces it, then ends every other session. */
   changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus>;
-  /** Whether to offer this person a passkey right now (ADR-120). */
-  getPasskeyOffer(input: UserIdInput): Promise<UserPasskeyOffer>;
+  /** Whether to offer this person a passkey or two-step verification now, on this session. */
+  getPasskeyOffer(
+    input: UserIdInput & { sessionId: string | null },
+  ): Promise<UserSecureAccountOffer>;
   dismissPasskeyNudge(input: UserIdInput): Promise<void>;
+  /** The company domains this person said "no thanks" to being offered (D12). */
+  findJoinOfferDismissedDomains(input: UserIdInput): Promise<string[]>;
+  /** Remembers a "no thanks" for one domain; saying it twice changes nothing. */
+  dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void>;
   /** Verifies the current password and replaces it, as ONE operation. */
   rotatePassword(input: RotateUserPasswordInput): Promise<UserPasswordRotationOutcome>;
   /** The Auth0 database identity, or absent where the person holds only social ones. */
@@ -181,6 +196,10 @@ export interface UserApi {
   }): Promise<UserAvatarReadAllowance>;
   /** One avatar's row and, when the bytes are there, a stream of them. */
   readAvatarObject(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(): Promise<UserUsageCount>;
+  /** Whether anybody with an address on this domain has an account; no address leaves. */
+  hasAccountOnDomain(input: { domain: string }): Promise<boolean>;
 }
 
 export const UserApi = moduleApi<UserApi>()("user");

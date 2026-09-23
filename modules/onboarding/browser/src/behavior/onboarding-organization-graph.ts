@@ -20,6 +20,7 @@ type GraphOrganization = {
   id: string;
   name: string;
   primaryIntent: string | null;
+  signupData?: unknown;
   teams: GraphTeam[];
 };
 
@@ -46,6 +47,7 @@ function toHostOrganization(entry: GraphOrganization): OnboardingOrganization {
     id: entry.id,
     name: entry.name,
     primaryIntent: entry.primaryIntent,
+    signupData: entry.signupData,
     teams: toHostTeams(entry),
   };
 }

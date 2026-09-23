@@ -1,5 +1,5 @@
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyAccessService } from "../langy-access.service.ts";
@@ -90,6 +90,44 @@ describe("LangyAccessService", () => {
         kind: "user",
         userId: "customer-3",
       });
+    });
+  });
+
+  describe("given a session user with an email address", () => {
+    it("offers the address to the flag's targeting rules", async () => {
+      const { service, isEnabled } = featureFlags(true);
+
+      await LangyAccessService.create({ featureFlags: service }).hasAccess({
+        user: { id: "customer-4", email: "dev@example.com" },
+        projectId: "project-4",
+        organizationId: "org-4",
+      });
+
+      expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
+        kind: "project",
+        userId: "customer-4",
+        projectId: "project-4",
+        organizationId: "org-4",
+        userEmail: "dev@example.com",
+      });
+    });
+  });
+
+  describe("given an API key's owner, who carries no email", () => {
+    it("states no address rather than an empty one", async () => {
+      const { service, isEnabled } = featureFlags(true);
+
+      await LangyAccessService.create({ featureFlags: service }).hasAccess({
+        user: { id: "customer-5", email: null },
+        organizationId: "org-5",
+      });
+
+      expect(isEnabled).toHaveBeenCalledWith("release_langy_enabled", {
+        kind: "organization",
+        userId: "customer-5",
+        organizationId: "org-5",
+      });
+      expect(JSON.stringify(isEnabled.mock.calls)).not.toContain("userEmail");
     });
   });
 });

@@ -92,4 +92,8 @@ export class TestCodingAgentService implements CodingAgentApi {
   githubConnection(): Promise<never> {
     return this.unused();
   }
+
+  countUsage(): Promise<never> {
+    return this.unused();
+  }
 }

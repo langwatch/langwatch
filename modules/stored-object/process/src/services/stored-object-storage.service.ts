@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
+import { generate } from "@langwatch/ksuid";
 import {
   mintStoredObjectUri,
   ObjectNotFoundError,
@@ -90,6 +91,21 @@ export class StoredObjectStoragePortAdapter extends StoredObjectStorage {
     assertProjectAddress(input.projectId, input.address);
     const project = this.runtime.forProject(input.projectId, this.aws);
     await project.objectStore.delete(uriFor(input.address));
+  }
+
+  resolveDestination(input: { projectId: string }): Promise<StoredObjectStorageDestination> {
+    return this.runtime.forProject(input.projectId, this.aws).resolveDestination();
+  }
+
+  async probe(input: { projectId: string }): Promise<void> {
+    const project = this.runtime.forProject(input.projectId, this.aws);
+    const address = addressFor(
+      await project.resolveDestination(),
+      `${input.projectId}/checkup/${generate("stored-object").toString()}.txt`,
+    );
+    assertProjectAddress(input.projectId, address);
+    await project.objectStore.put(uriFor(address), Buffer.from("checkup"), "text/plain");
+    await project.objectStore.delete(uriFor(address));
   }
 }
 

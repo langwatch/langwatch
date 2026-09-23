@@ -55,7 +55,6 @@ class ScriptedRunner implements InstantEvalStatementRunner {
       columns: [{ name: "TraceId", type: "String" }],
       rows,
       statistics: { elapsedMs: 1, rowsRead: rows.length, bytesRead: 1, rowsReturned: rows.length },
-      truncated: false,
       diagnostics: [],
       followsTimeWindow: true,
       followsGranularity: true,

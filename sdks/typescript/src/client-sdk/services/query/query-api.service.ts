@@ -17,6 +17,17 @@ export type QuerySchemaResult =
   paths["/api/v1/query/schema"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /**
+ * Both query languages, as `GET /api/v1/query/reference` describes them.
+ *
+ * A superset of {@link QuerySchemaResult} in one direction only: it embeds the
+ * schema and adds the trace filter language, worked examples and the decision
+ * table. Nothing here is tenant data — the values a field holds come from
+ * `GET /api/traces/facets`.
+ */
+export type QueryReferenceResult =
+  paths["/api/v1/query/reference"]["get"]["responses"]["200"]["content"]["application/json"];
+
+/**
  * The body a query request sends.
  */
 export type QueryRunParams = NonNullable<
@@ -69,7 +80,7 @@ export class QueryApiService {
   }
 
   /**
-   * Runs one read-only LangWatchQL `SELECT` over the analytics datasets and
+   * Runs one read-only LangWatchQL `SELECT` over the analytics views and
    * returns typed columns, rows, execution statistics, truncation state and
    * diagnostics, scoped to the caller's project.
    */
@@ -98,5 +109,20 @@ export class QueryApiService {
       response,
       onError: this.handleApiError.bind(this),
     });
+  }
+
+  /**
+   * Describes both query languages in one payload: the LangWatchQL schema,
+   * limits and endpoints, the trace filter's syntax and fields, worked examples
+   * validated in both, and which language answers which kind of
+   * question.
+   */
+  async reference(): Promise<QueryReferenceResult> {
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/query/reference",
+      {},
+    );
+    if (error) this.handleApiError("read query reference", error, response);
+    return data;
   }
 }

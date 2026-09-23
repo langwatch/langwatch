@@ -1,6 +1,6 @@
 /**
  * The password this account signs in with, on the screens that ask for one.
- * Its own section since the security-page split. `canChangePassword`
+ * Its own section since the security-page split. `passwordOfferFor`
  * decides whether this deployment lets the product touch a password at all.
  */
 
@@ -10,21 +10,24 @@ import { useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
-import { canChangePassword } from "../../model/sign-in-methods.ts";
+import { isCredentialAccount, passwordOfferFor } from "../../model/sign-in-methods.ts";
 import { ChangePasswordDialog } from "./change-password-dialog.tsx";
 
 export function PasswordSection() {
   const host = usePersonalWorkspaceHost();
-  const authProvider = host.deployment().authProvider;
+  const deployment = host.deployment();
   const passwordStatus = api.user.hasPassword.useQuery({});
+  const accounts = api.user.getLinkedAccounts.useQuery({});
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  // Assumed held until the answer arrives: "Change Password" is what almost
-  // every account wants, and flickering "Set a password" in front of
-  // somebody who has one reads as their password having been lost.
-  const hasPassword = passwordStatus.data?.hasPassword ?? true;
-
-  if (!canChangePassword(authProvider)) return null;
+  const offer = passwordOfferFor({
+    authProvider: deployment.authProvider,
+    emailPasswordEnabled: deployment.emailPasswordEnabled ?? false,
+    holdsCredentialAccount: (accounts.data ?? []).some(isCredentialAccount),
+    hasPasswordAnswer: passwordStatus.data?.hasPassword,
+  });
+  if (!offer) return null;
+  const hasPassword = offer.held;
 
   return (
     <VStack align="start" gap={4} width="full" data-testid="password-section">

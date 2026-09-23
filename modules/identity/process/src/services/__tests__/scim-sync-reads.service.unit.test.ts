@@ -30,6 +30,16 @@ function readsOver(states: ScimSyncState[]) {
     async tryFindSync(): Promise<null> {
       return null;
     }
+    async findPageForOperator(): Promise<{ syncs: ScimSyncState[]; total: number }> {
+      return { syncs: states, total: states.length };
+    }
+    async findByConnectionForOperator({
+      connectionId,
+    }: {
+      connectionId: string;
+    }): Promise<ScimSyncState[]> {
+      return states.filter((state) => state.connectionId === connectionId);
+    }
     async findForOrganization({
       organizationId,
     }: {

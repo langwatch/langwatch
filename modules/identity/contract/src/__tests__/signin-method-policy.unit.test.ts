@@ -12,18 +12,20 @@ import {
   SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
 } from "../signin-method-policy.ts";
-import { routeSignIn } from "../signin-routing.ts";
+import { routeSignIn, routingIdentifierOf } from "../signin-routing.ts";
 
 const federationLicensed = vi.fn<() => Promise<boolean>>();
 const resolveAuthProvider = vi.fn<() => Promise<string>>();
 
 let selfHosted = true;
 let offersPasskeys = false;
+let issuesOwnPasswords = false;
 
 const inputs: SignInMethodPolicyInputs = {
   resolveAuthProvider: () => resolveAuthProvider(),
   federationLicensed: () => federationLicensed(),
   offersPasskeys: () => offersPasskeys,
+  issuesOwnPasswords: () => issuesOwnPasswords,
   selfHosted: () => selfHosted,
 };
 
@@ -42,6 +44,7 @@ describe("the instance sign-in method policy", () => {
     vi.clearAllMocks();
     selfHosted = true;
     offersPasskeys = false;
+    issuesOwnPasswords = false;
   });
   describe("given a self-hosted installation configured with a single OAuth provider", () => {
     beforeEach(() => {
@@ -171,6 +174,49 @@ describe("the instance sign-in method policy", () => {
       // email-mode deployment alone without a store read in the way.
       expect(SignInMethodPolicyService.deploymentIsFederationCapable("email")).toBe(false);
       expect(federationLicensed).not.toHaveBeenCalled();
+    });
+  });
+  describe("when the deployment issues its own passwords beside its provider", () => {
+    beforeEach(() => {
+      licensedStore(true);
+      offersPasskeys = true;
+      issuesOwnPasswords = true;
+    });
+
+    /** @scenario "A deployment that issues its own passwords offers one beside its provider" */
+    it("offers the password behind the federated method, which still leads", async () => {
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
+
+      expect(policy.defaultMethods).toEqual([
+        { id: "auth0", kind: "federated", connectionId: null },
+        PASSWORD_METHOD,
+        PASSKEY_METHOD,
+      ]);
+    });
+
+    /** @scenario "A deployment that issues its own passwords offers one beside its provider" */
+    it("offers no password beside it when the deployment does not issue its own", async () => {
+      issuesOwnPasswords = false;
+
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
+
+      expect(policy.defaultMethods.map((method) => method.id)).toEqual(["auth0", "passkey"]);
+    });
+
+    /** @scenario "The credential routes answer on a deployment that offers a password" */
+    it("ranks a password the account holds, which is what lets it be offered back", async () => {
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
+
+      const decision = routeSignIn({
+        identifier: routingIdentifierOf("sam@home.net"),
+        breakGlass: false,
+        policy,
+        domainConnection: null,
+        activeConnections: [],
+        account: { hasPassword: true, hasPasskey: false, providerIds: [], connectionIds: [] },
+      });
+
+      expect(decision.methodSet.map((method) => method.id)).toEqual(["password"]);
     });
   });
 });

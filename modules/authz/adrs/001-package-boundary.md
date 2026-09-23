@@ -91,8 +91,6 @@ modules/authz/
 │   │   │   │   ├── prisma.authz-read.repository.ts
 │   │   │   │   ├── prisma.authz-grant.repository.ts
 │   │   │   │   └── prisma.authz-migration.repository.ts
-│   │   │   ├── routed/
-│   │   │   │   └── routed.authz-read.repository.ts
 │   │   │   └── eventing/
 │   │   │       └── eventing.authz-grant.repository.ts
 │   │   ├── ports/
@@ -181,13 +179,13 @@ type.
 Repository ports are abstract classes inside the server package. Concrete
 Prisma-compatible classes receive a structural database capability from the
 runtime and map rows before returning contract values. Generated Prisma types
-never cross the package boundary. The legacy and projected read heads are
-selected by one routed repository using the existing per-organization
-migration-state gate.
+never cross the package boundary. Every decision and listing reads the
+projected grants head (main #7633, the grants-only cutover); the
+per-organization migration-state gate now answers only compatibility writes
+and legacy API-key adoption.
 
-Grant writes continue through Eventing for migrated organizations and through
-the existing compatibility path for organizations that have not migrated. The
-Eventing repository owns command dispatch. `AuthzGrantProjection` and
+Every grant write goes through Eventing; there is no per-organization
+compatibility write path. The Eventing repository owns command dispatch. `AuthzGrantProjection` and
 `EventingAuthzAuditAdapter` are classes. The audit adapter supplies the
 pipeline's subscriber action and keeps the existing insert-only write keyed by
 the source event identity. Handling the same source event again is a successful

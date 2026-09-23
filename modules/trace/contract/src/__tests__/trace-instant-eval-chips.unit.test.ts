@@ -8,6 +8,7 @@ import {
   instantEvalChipsOf,
   instantEvalChipText,
   instantEvalRunKey,
+  queryWithoutInstantEvalChip,
   queryWithoutInstantEvalChips,
   resolveInstantEvalChips,
 } from "../trace-instant-eval-chips.ts";
@@ -103,6 +104,37 @@ describe("queryWithoutInstantEvalChips", () => {
 
   it("is empty when the query is nothing but eval chips", () => {
     expect(queryWithoutInstantEvalChips('eval:"is it rude"')).toBe("");
+  });
+});
+
+describe("queryWithoutInstantEvalChip", () => {
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("takes one chip out and keeps the other eval chips beside the filter", () => {
+    expect(
+      queryWithoutInstantEvalChip({
+        queryText: 'service:api AND eval:"annoyed" AND eval.llm:"wrong"',
+        field: "eval",
+        question: "annoyed",
+      }),
+    ).toBe('service:api AND eval.llm:"wrong"');
+    expect(
+      queryWithoutInstantEvalChip({
+        queryText: 'eval:"annoyed"',
+        field: "eval",
+        question: "annoyed",
+      }),
+    ).toBe("");
+  });
+
+  /** @scenario "A chip typed by hand starts its run on Enter" */
+  it("keeps the same question under another target, since that is another chip", () => {
+    const queryText = 'eval.llm:"annoyed" AND eval:"annoyed"';
+    expect(queryWithoutInstantEvalChip({ queryText, field: "eval.llm", question: "annoyed" })).toBe(
+      'eval:"annoyed"',
+    );
+    expect(queryWithoutInstantEvalChip({ queryText, field: "eval", question: "annoyed" })).toBe(
+      'eval.llm:"annoyed"',
+    );
   });
 });
 

@@ -4,14 +4,16 @@ import {
   type LangWatchQLAppFunctionOption,
   type LangWatchQLAppFunctionSource,
   type LangWatchQLClause,
+  type LangWatchQLViolation,
   type LangWatchQLViolationCode,
 } from "@langwatch/analytics-contract";
+import { LWQL_MAX_RESULT_ROWS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 
 /**
  * LangWatchQL AST validator: defense in depth behind the database's own row-policy isolation.
  * An allowlist over node KINDS and FIELDS -- unlisted is refused -- so new parser syntax on an
  * existing node arrives refused, not silently admitted; functions are name-allowlisted separately.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  * @see ../services/langwatch-ql-access-model.service.ts — the database isolation this backs up
  */
@@ -25,6 +27,7 @@ import { isEvalFunctionName } from "./langwatch-ql-eval-function-catalog.rules.t
 import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
+  LWQL_ALLOWED_FUNCTION_NAMES,
 } from "./langwatch-ql-functions.rules.ts";
 import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
@@ -40,7 +43,7 @@ import {
   UNRESOLVABLE_COLUMN_SETS,
   type WalkContext,
 } from "./langwatch-ql-validation-shape.rules.ts";
-import { echoIdentifier } from "./langwatch-ql-violations.rules.ts";
+import { DEFAULT_VIOLATION_HINTS, echoIdentifier } from "./langwatch-ql-violations.rules.ts";
 
 /** The frame the outermost statement is walked in. */
 export const ROOT_FRAME: Frame = {
@@ -78,18 +81,25 @@ export function positionOf(node: SqlAstNode): SqlSourcePosition | undefined {
   return { line, column };
 }
 
+/** The sharper fields a call site can attach on top of the hint floor. */
+type ViolationExtra = Partial<
+  Pick<LangWatchQLViolation, "availableViews" | "view" | "availableColumns" | "maxRows">
+>;
+
 function report({
   ctx,
   frame,
   code,
   message,
   node,
+  extra,
 }: {
   ctx: WalkContext;
   frame: Frame;
   code: LangWatchQLViolationCode;
   message: string;
   node?: SqlAstNode;
+  extra?: ViolationExtra;
 }): void {
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
   const at = node ? positionOf(node) : undefined;
@@ -97,12 +107,16 @@ function report({
     code,
     clause: frame.isInSubquery ? "subquery" : frame.clause,
     message,
+    hint: DEFAULT_VIOLATION_HINTS[code],
     ...(at ? { at } : {}),
+    // Derived from the code, so the allowlist can ride on no other refusal nor miss this one.
+    ...(code === "FUNCTION_NOT_ALLOWED" ? { allowedFunctions: LWQL_ALLOWED_FUNCTION_NAMES } : {}),
+    ...extra,
   });
 }
 
 const UNSUPPORTED_SYNTAX_MESSAGE =
-  "This query uses SQL this API does not support. Rewrite it as a plain read query over the analytics datasets.";
+  "This query uses SQL this API does not support. Rewrite it as a plain read query over the analytics views.";
 
 /**
  * The default-deny fallthrough. Names neither the node kind nor the field: those are the
@@ -156,9 +170,22 @@ export function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void
   if (childFrame) walkFields({ rule, node, frame: childFrame, ctx });
 }
 
+/**
+ * `from` first, everything else in the parser's order: a gated-column refusal names the view it
+ * was read from, so a `SELECT`'s table must be on its block before its projection is walked.
+ * The sort is stable, so nothing else moves.
+ */
+function fieldsInWalkOrder(node: SqlAstNode): [string, unknown][] {
+  return Object.entries(node).toSorted(([left], [right]) => {
+    if (left === "from") return right === "from" ? 0 : -1;
+    if (right === "from") return 1;
+    return 0;
+  });
+}
+
 /** Every field the node carries, each against the rule that names it — or none. */
 function walkFields({ rule, node, frame, ctx }: NodeArgs & { rule: NodeRule }): void {
-  for (const [field, value] of Object.entries(node)) {
+  for (const [field, value] of fieldsInWalkOrder(node)) {
     if (METADATA_FIELDS.includes(field) || value === undefined) continue;
     const fieldRule = Object.hasOwn(rule.fields, field) ? rule.fields[field] : undefined;
     if (fieldRule) applyFieldRule({ rule: fieldRule, value, node, frame, ctx });
@@ -248,33 +275,76 @@ function walkChildNodes({
 // Custom field walkers
 // ---------------------------------------------------------------------------
 
-/** The columns a caller may not reference, matched on the reference's last segment. */
+/**
+ * The view a gated reference's usable columns are listed against, when the walk can tell: the
+ * segment before the gated one resolves through the block's aliases and tables; otherwise only a
+ * block reading exactly one table resolves. The gated names are subtracted from the list.
+ */
+function resolveGatedColumnView({
+  segments,
+  gatedIndex,
+  frame,
+  ctx,
+}: {
+  segments: readonly string[];
+  gatedIndex: number;
+  frame: Frame;
+  ctx: WalkContext;
+}): ViolationExtra {
+  const tables = frame.block?.tables ?? [];
+  const qualifier = gatedIndex > 0 ? segments[gatedIndex - 1]?.trim().toLowerCase() : undefined;
+  const byQualifier = qualifier
+    ? tables.find(
+        (entry) => entry.alias === qualifier || entry.table.split(".").at(-1) === qualifier,
+      )
+    : undefined;
+  const matched = byQualifier ?? (tables.length === 1 ? tables[0] : undefined);
+  if (!matched) return {};
+  const availableColumns = ctx.policy.viewColumns
+    .get(matched.table)
+    ?.filter((column) => !ctx.policy.gatedColumns.has(column.trim().toLowerCase()));
+  return {
+    view: matched.table,
+    ...(availableColumns ? { availableColumns } : {}),
+  };
+}
+
+/**
+ * The columns a caller may not reference, matched against every segment of a dotted name:
+ * `body.null` and `traces.body.null` both read the withheld `body` before a subfield of it.
+ */
 function gateColumnReference({
   name,
+  nameParts,
   ctx,
   frame,
   node,
 }: {
   name: string;
+  nameParts?: readonly string[];
   ctx: WalkContext;
   frame: Frame;
   node: SqlAstNode;
 }): void {
-  const leaf = name.split(".").at(-1)?.trim().toLowerCase() ?? "";
-  const isGated = ctx.policy.gatedColumns.has(leaf);
-  if (!isGated) return;
+  const segments = nameParts ?? name.split(".");
+  const gatedIndex = segments.findIndex((segment) =>
+    ctx.policy.gatedColumns.has(segment.trim().toLowerCase()),
+  );
+  if (gatedIndex === -1) return;
   report({
     ctx,
     frame,
     code: "GATED_COLUMN",
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
+    extra: resolveGatedColumnView({ segments, gatedIndex, frame, ctx }),
   });
 }
 
 /**
- * A projection list. Each direct element is checked for an unresolvable column set before it is
- * walked.
+ * A projection list, walked like any other node list except for a direct element calling an app
+ * function — the one position an app function is allowed in. Wildcards go through the same
+ * `walkChildNode` every list uses, where {@link enterColumnSet} refuses them in any position.
  */
 function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
   if (!Array.isArray(value)) {
@@ -283,29 +353,12 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
   }
   const projection: Frame = { ...frame, clause: "projection" };
   for (const element of value) {
-    if (!isNode(element)) {
-      refuseUnrecognised({ node, frame: projection, ctx });
-      continue;
-    }
-    const [definition] = directAppFunctionCalls(element);
-    if (definition) {
+    const [definition] = isNode(element) ? directAppFunctionCalls(element) : [];
+    if (definition && isNode(element)) {
       walkAppFunctionCall({ node: element, definition, frame: projection, ctx });
       continue;
     }
-    const isUngatableWildcard =
-      ctx.policy.gatedColumns.size > 0 && UNRESOLVABLE_COLUMN_SETS.includes(element.type);
-    if (isUngatableWildcard) {
-      report({
-        ctx,
-        frame: projection,
-        code: "WILDCARD_NOT_ALLOWED",
-        message:
-          "List the fields you need by name — a wildcard cannot be used here, because some fields are not available to you.",
-        node: element,
-      });
-      continue;
-    }
-    walkNode(element, projection, ctx);
+    walkChildNode({ value: element, node, frame: projection, ctx });
   }
 }
 
@@ -707,6 +760,102 @@ function walkInterpolatedColumn({ value, node, frame, ctx }: FieldArgs): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * The number a `LIMIT` literal spells, or `NaN` for an expression or bound parameter — whose
+ * value is decided at run time, so it is neither refused as too high nor counted as absent.
+ */
+function limitLiteralValue(limit: unknown): number {
+  if (!isNode(limit) || limit.type !== "Literal") return Number.NaN;
+  const { value } = limit;
+  return typeof value === "number" || typeof value === "string" ? Number(value) : Number.NaN;
+}
+
+/** Records how a top-level `SELECT` bounds its own result. A subquery's `SELECT` is skipped. */
+function recordTopLevelLimit({ node, frame, ctx }: NodeArgs): void {
+  if (frame.isInSubquery) return;
+  const { limit, offset } = node;
+  const at = isNode(limit) ? positionOf(limit) : undefined;
+  const offsetAt = isNode(offset) ? positionOf(offset) : undefined;
+  const rows = limitLiteralValue(limit);
+  const isStaticRowCount = Number.isInteger(rows) && rows >= 0;
+  ctx.topLevelLimits.push({
+    hasLimit: limit !== undefined,
+    hasOffset: offset !== undefined,
+    ...(isStaticRowCount ? { staticRows: rows } : {}),
+    ...(at ? { at } : {}),
+    ...(offsetAt ? { offsetAt } : {}),
+  });
+}
+
+/**
+ * Refuses a top-level `LIMIT` above the row cap, and — for a `UNION` — any branch naming no
+ * `LIMIT` of its own: each branch returns independently, so one appended default cannot bound
+ * it. Runs after the walk, over what {@link recordTopLevelLimit} collected.
+ */
+export function reportRowLimitViolations(ctx: WalkContext): void {
+  const maxRowsText = LWQL_MAX_RESULT_ROWS.toLocaleString("en-US");
+  for (const limit of ctx.topLevelLimits) {
+    if (limit.staticRows === undefined || limit.staticRows <= LWQL_MAX_RESULT_ROWS) continue;
+    pushLimitViolation({
+      ctx,
+      code: "LIMIT_TOO_HIGH",
+      message:
+        `The LIMIT of ${limit.staticRows.toLocaleString("en-US")} rows is above the maximum of ` +
+        `${maxRowsText} rows this API returns per request. ` +
+        `Lower it and page the rest with LIMIT/OFFSET and an ORDER BY.`,
+      at: limit.at,
+    });
+  }
+  if (ctx.topLevelLimits.length <= 1) return;
+  for (const limit of ctx.topLevelLimits) {
+    if (limit.hasLimit) continue;
+    pushLimitViolation({
+      ctx,
+      code: "LIMIT_REQUIRED_PER_BRANCH",
+      message:
+        "This UNION has a branch with no LIMIT of its own. Each branch runs and returns " +
+        `independently, so every branch needs its own LIMIT of ${maxRowsText} rows or fewer.`,
+      at: limit.at,
+    });
+  }
+}
+
+function pushLimitViolation({
+  ctx,
+  code,
+  message,
+  at,
+}: {
+  ctx: WalkContext;
+  code: "LIMIT_TOO_HIGH" | "LIMIT_REQUIRED_PER_BRANCH";
+  message: string;
+  at?: SqlSourcePosition;
+}): void {
+  if (ctx.violations.length >= MAX_VIOLATIONS) return;
+  ctx.violations.push({
+    code,
+    clause: "limit",
+    message,
+    hint: DEFAULT_VIOLATION_HINTS[code],
+    maxRows: LWQL_MAX_RESULT_ROWS,
+    ...(at ? { at } : {}),
+  });
+}
+
+/**
+ * Whether the service appends the default `LIMIT`, and before which `OFFSET`: only a single
+ * top-level `SELECT` naming no `LIMIT`. An accepted `UNION` is already bounded per branch.
+ */
+export function rowLimitAppend(ctx: WalkContext): {
+  appendRowLimit: boolean;
+  appendRowLimitBeforeOffset?: SqlSourcePosition;
+} {
+  const [singleBranch] = ctx.topLevelLimits.length === 1 ? ctx.topLevelLimits : [];
+  const appendRowLimit = singleBranch !== undefined && !singleBranch.hasLimit;
+  const offsetAt = appendRowLimit && singleBranch.hasOffset ? singleBranch.offsetAt : undefined;
+  return { appendRowLimit, ...(offsetAt ? { appendRowLimitBeforeOffset: offsetAt } : {}) };
+}
+
+/**
  * Marks the one `SELECT` whose projection may call an app function: only when
  * the root union holds exactly one, and cleared below it.
  */
@@ -722,6 +871,7 @@ function enterSelectWithUnionQuery({ node, frame }: NodeArgs): Frame {
  * anything else is walked.
  */
 function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
+  recordTopLevelLimit({ node, frame, ctx });
   const isOutermostSelect = frame.isRootSelect === true;
   const block: BlockAccumulator = {
     tables: [],
@@ -795,7 +945,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
-      message: "Name the dataset directly — a table cannot be chosen by a bound parameter.",
+      message: "Name the view directly — a table cannot be chosen by a bound parameter.",
       node,
     });
     return null;
@@ -809,7 +959,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       frame,
       code: "SCHEMA_NOT_ALLOWED",
       message:
-        "Server metadata is not readable through this API. Query the analytics datasets instead.",
+        "Server metadata is not readable through this API. Query the analytics views instead.",
       node,
     });
     return null;
@@ -834,8 +984,9 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
       ctx,
       frame,
       code: "TABLE_NOT_ALLOWED",
-      message: `The dataset "${echoIdentifier(written)}" is not available to you. Use one of the datasets from the schema endpoint.`,
+      message: `The view "${echoIdentifier(written)}" is not available to you. Use one of the views from the schema endpoint.`,
       node,
+      extra: { availableViews: ctx.policy.availableViews },
     });
     return null;
   }
@@ -941,25 +1092,87 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     refuseUnrecognised({ node, frame, ctx });
     return null;
   }
-  // Reaching here at all means this call is not a direct element of the
-  // outermost projection: the projection walk intercepts those. So an
-  // app-function name here is always a position violation, and saying so keeps
-  // the refusal actionable — the allowlist below would report a catalogued
-  // function as "not allowed", sending the caller after a name the schema lists.
+  // Reset on every call so an outer bare-`count(*)` exemption never leaks into this one's
+  // fields; {@link walkFunctionArguments} sets it back for exactly the `arguments` field.
+  const childFrame: Frame = { ...frame, isBareCountStarArgument: false };
+  // Reaching here means this call is not a direct element of the outermost projection, so an
+  // app-function name is a position violation — saying so beats the allowlist calling a
+  // catalogued function "not allowed".
   const [appFunction] = findLangWatchQLAppFunctions(name);
   if (appFunction) {
     reportAppFunctionPosition({ name: appFunction.name, node, frame, ctx });
-    return frame;
+    return childFrame;
   }
   if (!isAllowedLangWatchQLFunction(name)) {
     reportRefusedFunction({ name, node, frame, ctx });
-    return frame;
+    return childFrame;
   }
   const collapsesRows = isLangWatchQLAggregateFunction(name) && !isWindowCall(node);
-  if (frame.block && collapsesRows) {
-    frame.block.isAggregated = true;
+  if (childFrame.block && collapsesRows) {
+    childFrame.block.isAggregated = true;
   }
-  return frame;
+  return childFrame;
+}
+
+/**
+ * A `Function` node's `arguments`, walked with the bare-`count(*)` exemption scoped to this
+ * field alone, so `count(*) OVER (PARTITION BY COLUMNS('…'))` still refuses the matcher.
+ */
+function walkFunctionArguments({ value, node, frame, ctx }: FieldArgs): void {
+  walkChildNodes({
+    value,
+    node,
+    frame: { ...frame, isBareCountStarArgument: isBareCountStar(node) },
+    ctx,
+  });
+}
+
+/**
+ * Whether this call is a bare `count(*)`, the one place a star is a row count rather than a
+ * column set. `count(DISTINCT *)` parses as `countDistinct`, and `count(t.*)`,
+ * `count(* EXCEPT (…))` and `count(*, x)` all fall outside it.
+ */
+function isBareCountStar(node: SqlAstNode): boolean {
+  const { name, arguments: args } = node;
+  if (typeof name !== "string" || name.toLowerCase() !== "count") return false;
+  if (!Array.isArray(args) || args.length !== 1) return false;
+  const [arg] = args;
+  return (
+    isNode(arg) &&
+    arg.type === "Asterisk" &&
+    arg.transformers === undefined &&
+    arg.expression === undefined
+  );
+}
+
+const WILDCARD_NOT_ALLOWED_MESSAGE =
+  "List the fields you need by name — a wildcard cannot be used here, because some fields are not available to you.";
+
+/**
+ * Refuses a wildcard or regexp `COLUMNS()` matcher in any position for a caller with restricted
+ * fields, and does not walk the subtree. The star of a bare `count(*)` is exempt.
+ */
+function enterColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
+  if (!UNRESOLVABLE_COLUMN_SETS.includes(node.type)) return frame;
+  if (ctx.policy.gatedColumns.size === 0) return frame;
+  if (frame.isBareCountStarArgument === true) return frame;
+  report({ ctx, frame, code: "WILDCARD_NOT_ALLOWED", message: WILDCARD_NOT_ALLOWED_MESSAGE, node });
+  return null;
+}
+
+/**
+ * A `COLUMNS(a, b)` list matcher: walked when every member is an identifier, so each is gated
+ * like any reference; refused like a wildcard when a member is not (`COLUMNS('a', 'b')`).
+ */
+function enterColumnListMatcher({ node, frame, ctx }: NodeArgs): Frame | null {
+  if (ctx.policy.gatedColumns.size === 0) return frame;
+  const members = node.columns;
+  const isEveryMemberNamed =
+    Array.isArray(members) &&
+    members.every((member) => isNode(member) && member.type === "Identifier");
+  if (isEveryMemberNamed) return frame;
+  report({ ctx, frame, code: "WILDCARD_NOT_ALLOWED", message: WILDCARD_NOT_ALLOWED_MESSAGE, node });
+  return null;
 }
 
 /** Whether this call is a window function rather than a row-collapsing aggregate. */
@@ -987,7 +1200,7 @@ function reportRefusedFunction({
     ctx,
     frame,
     code: "FUNCTION_NOT_ALLOWED",
-    message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using the functions this API supports.`,
+    message: `The function "${echoIdentifier(name)}" cannot be used here. Rewrite the expression using one of the supported functions, listed under \`functions\` on GET /api/v1/query/schema and carried on this violation as \`allowedFunctions\`.`,
     node,
   });
 }
@@ -1034,7 +1247,10 @@ function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     });
     return null;
   }
-  gateColumnReference({ name, ctx, frame, node });
+  const segments = Array.isArray(nameParts)
+    ? nameParts.filter((part): part is string => typeof part === "string")
+    : undefined;
+  gateColumnReference({ name, nameParts: segments, ctx, frame, node });
   noteColumnPosition({ name, frame });
   return frame;
 }
@@ -1181,7 +1397,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
         kind: "refuse",
         code: "TABLE_FUNCTION",
         message:
-          "Table functions cannot be used here. Read from the analytics datasets listed by the schema endpoint.",
+          "Table functions cannot be used here. Read from the analytics views listed by the schema endpoint.",
       },
       subquery: { kind: "node" },
       final: SCALAR,
@@ -1279,7 +1495,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     enter: enterFunction,
     fields: {
       name: SCALAR,
-      arguments: { kind: "nodes" },
+      arguments: { kind: "custom", walk: walkFunctionArguments },
       parameters: { kind: "nodes" },
       is_operator: SCALAR,
       is_lambda_function: SCALAR,
@@ -1309,12 +1525,14 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
 
   // ---- column sets ----
   Asterisk: {
+    enter: enterColumnSet,
     fields: {
       transformers: { kind: "nodes" },
       expression: { kind: "node" },
     },
   },
   QualifiedAsterisk: {
+    enter: enterColumnSet,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },
@@ -1322,12 +1540,15 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   ColumnsRegexpMatcher: {
+    enter: enterColumnSet,
     fields: { pattern: SCALAR, transformers: { kind: "nodes" } },
   },
   ColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: { columns: { kind: "nodes" }, transformers: { kind: "nodes" } },
   },
   QualifiedColumnsRegexpMatcher: {
+    enter: enterColumnSet,
     fields: {
       pattern: SCALAR,
       qualifier: { kind: "identifierRef" },
@@ -1335,6 +1556,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   QualifiedColumnsListMatcher: {
+    enter: enterColumnListMatcher,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },

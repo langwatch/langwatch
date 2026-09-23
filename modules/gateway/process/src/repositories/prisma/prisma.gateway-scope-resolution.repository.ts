@@ -11,7 +11,7 @@ import {
 /** The client slice the scope graph is read through. */
 export type GatewayScopeResolutionDatabase = Pick<
   PrismaClient,
-  "modelProvider" | "project" | "routingPolicy"
+  "modelProvider" | "project" | "routingPolicy" | "virtualKey"
 >;
 
 type ScopePredicate =
@@ -89,6 +89,23 @@ export class PrismaGatewayScopeResolutionRepository extends GatewayScopeResoluti
       createdAt: fromDate(row.createdAt),
       updatedAt: fromDate(row.updatedAt),
     }));
+  }
+
+  async findManagedKeyConnectServices({
+    virtualKeyId,
+    organizationId,
+    transaction,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+    transaction?: GatewayPersistenceTransaction;
+  }): Promise<string[]> {
+    const row = await this.client(transaction).virtualKey.findFirst({
+      where: { id: virtualKeyId, organizationId, purpose: "CONNECT" },
+      select: { connectServices: true },
+    });
+
+    return row?.connectServices ?? [];
   }
 
   async findRoutingPolicyOrder({

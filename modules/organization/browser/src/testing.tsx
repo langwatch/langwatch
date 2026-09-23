@@ -12,6 +12,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
 import {
+  type AuthenticationOverviewCard,
   type OrganizationActor,
   type OrganizationProjectReading,
   type OrganizationSuccessNotice,
@@ -68,6 +69,7 @@ export class FakeOrganizationHost extends OrganizationHostApi {
       isPlanLoading?: boolean;
       hasEmailProvider?: boolean;
       flags?: ReadonlySet<string>;
+      overviewCards?: readonly AuthenticationOverviewCard[];
     } = {},
   ) {
     super();
@@ -154,6 +156,16 @@ export class FakeOrganizationHost extends OrganizationHostApi {
 
   download(file: OrganizationDownload): void {
     this.downloads.push(file);
+  }
+
+  signedOut = false;
+
+  signOut(): void {
+    this.signedOut = true;
+  }
+
+  authenticationOverviewCards(): readonly AuthenticationOverviewCard[] {
+    return this.options.overviewCards ?? [];
   }
 
   failed(failure: OrganizationFailureNotice): void {

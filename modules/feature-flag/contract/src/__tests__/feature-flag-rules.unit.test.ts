@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateRules,
   type FeatureFlagRules,
+  featureFlagRulesWriteSchema,
   parseRules,
   resolveEffectiveForListing,
 } from "../feature-flag-rules.ts";
@@ -98,6 +99,47 @@ describe("evaluateRules", () => {
           FLAG,
         ),
       ).toBeNull();
+    });
+  });
+});
+
+describe("a percentage rule", () => {
+  describe("when an operator writes a percentage outside 0 to 100", () => {
+    /** @scenario "a percentage outside 0 to 100 cannot be written" */
+    it("is rejected with a message naming the valid range, and both ends are accepted", () => {
+      const rule = (percentage: number): FeatureFlagRules => [
+        { match: { percentage }, enabled: true },
+      ];
+      const result = featureFlagRulesWriteSchema.safeParse(rule(150));
+
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toContain("between 0 and 100");
+      expect(featureFlagRulesWriteSchema.safeParse(rule(-1)).success).toBe(false);
+      expect(featureFlagRulesWriteSchema.safeParse(rule(0)).success).toBe(true);
+      expect(featureFlagRulesWriteSchema.safeParse(rule(100)).success).toBe(true);
+    });
+  });
+
+  describe("when it is combined with an organization and another organization's user is read", () => {
+    it("does not match, because every condition of a match must hold", () => {
+      const rules: FeatureFlagRules = [
+        { match: { organizationId: "org_acme", percentage: 100 }, enabled: true },
+      ];
+
+      expect(
+        evaluateRules(rules, { organizationId: "org_other", bucketingId: "user_1" }, FLAG),
+      ).toBeNull();
+      expect(
+        evaluateRules(rules, { organizationId: "org_acme", bucketingId: "user_1" }, FLAG),
+      ).toBe(true);
+    });
+  });
+
+  describe("when the flag is read without a flag key to salt the bucket", () => {
+    it("matches nothing rather than bucketing every flag the same way", () => {
+      const rules: FeatureFlagRules = [{ match: { percentage: 100 }, enabled: true }];
+
+      expect(evaluateRules(rules, { bucketingId: "user_1" })).toBeNull();
     });
   });
 });

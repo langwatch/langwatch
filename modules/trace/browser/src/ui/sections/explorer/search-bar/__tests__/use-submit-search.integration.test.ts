@@ -5,7 +5,7 @@
  * failure on the way is a phrase search rather than an error state.
  */
 import { useFilterStore } from "@langwatch/trace-browser-kit";
-import type { RouteSearchResult } from "@langwatch/trace-contract";
+import { instantEvalRunKey, type RouteSearchResult } from "@langwatch/trace-contract";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -70,8 +70,8 @@ describe("given the text has only field:value terms", () => {
     /** @scenario "Pressing Enter applies the query" */
     it("applies the query without calling the router", () => {
       const { result } = renderSubmit();
-      act(() => result.current.submitSearch("status:error AND model:gpt-4o"));
-      expect(useFilterStore.getState().queryText).toBe("status:error AND model:gpt-4o");
+      act(() => result.current.submitSearch("status:error AND model:gpt-5-mini"));
+      expect(useFilterStore.getState().queryText).toBe("status:error AND model:gpt-5-mini");
       expect(mutation.mutate).not.toHaveBeenCalled();
     });
 
@@ -97,7 +97,7 @@ describe("given the text has bare words", () => {
   describe("when Enter is pressed", () => {
     /** @scenario "Enter on a sentence asks the router" */
     it("calls the router with the text, the visible range, the applied query and the lens", () => {
-      useFilterStore.getState().applyQueryText("model:gpt-4o");
+      useFilterStore.getState().applyQueryText("model:gpt-5-mini");
       useFilterStore.getState().setTimeRange({ from: 1000, to: 2000, label: "Custom" });
       useFilterStore.setState({ activeLensId: "conversations" });
       const { result } = renderSubmit();
@@ -106,12 +106,12 @@ describe("given the text has bare words", () => {
         projectId: "project-1",
         text: "annoyed users",
         timeRange: { from: 1000, to: 2000 },
-        activeQuery: "model:gpt-4o",
+        activeQuery: "model:gpt-5-mini",
         lensId: "conversations",
         isLangyAvailable: true,
       });
       // Nothing lands on the store until the router answers.
-      expect(useFilterStore.getState().queryText).toBe("model:gpt-4o");
+      expect(useFilterStore.getState().queryText).toBe("model:gpt-5-mini");
     });
   });
 
@@ -259,6 +259,90 @@ describe("given the text has bare words", () => {
       act(() => result.current.submitSearch("annoyed users"));
       expect(mutation.mutate).not.toHaveBeenCalled();
       expect(useFilterStore.getState().queryText).toBe('"annoyed users"');
+    });
+  });
+});
+
+describe("given the text is an eval chip typed by hand", () => {
+  describe("when no run has answered it", () => {
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("applies the chip and hands the question, as written, to the Instant Eval handler", () => {
+      useFilterStore.getState().setTimeRange({ from: 1000, to: 2000, label: "Custom" });
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('status:error AND eval:"the user is annoyed"'));
+      // The chip is on screen while the run is arranged, so the reader sees
+      // what they typed rather than an empty bar.
+      expect(useFilterStore.getState().queryText).toBe(
+        'status:error AND eval:"the user is annoyed"',
+      );
+      // No router and no model between Enter and the estimate: the reader
+      // wrote the question, and the fallback keeps the chip where it is.
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).toHaveBeenCalledWith({
+        projectId: "project-1",
+        sentence: "the user is annoyed",
+        question: { instructions: "the user is annoyed" },
+        target: "traces",
+        otherQuery: "status:error",
+        fallbackQuery: 'status:error AND eval:"the user is annoyed"',
+        timeRange: { from: 1000, to: 2000 },
+      });
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("judges the unit a target spelling asked for, whatever the lens shows", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('eval.conversation:"the user is annoyed"'));
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({ target: "threads", otherQuery: "" }),
+      );
+    });
+
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("keeps the other eval chips beside the filter the run judges", () => {
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('eval.llm:"wrong tool" AND eval:"annoyed"'));
+      // The llm chip is pending too, so it is the first one started; the
+      // annoyed chip stays in the other terms and starts on the next Enter.
+      expect(handlers.onInstantEval).toHaveBeenCalledTimes(1);
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question: { instructions: "wrong tool" },
+          otherQuery: 'eval:"annoyed"',
+        }),
+      );
+    });
+
+    it("keeps the run out of the sample preview, which has nothing to judge", () => {
+      const { result } = renderSubmit({ isSamplePreview: true });
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a run already answered it", () => {
+    /** @scenario "A chip typed by hand starts its run on Enter" */
+    it("applies the chip and calls nothing", () => {
+      const { timeRange } = useFilterStore.getState();
+      useFilterStore.getState().registerEvalRun({
+        key: instantEvalRunKey({
+          question: "the user is annoyed",
+          target: "traces",
+          otherQuery: "",
+          window: {
+            from: timeRange.from,
+            to: timeRange.to,
+            ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
+          },
+        }),
+        runId: "run-1",
+      });
+      const { result } = renderSubmit();
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).not.toHaveBeenCalled();
+      expect(useFilterStore.getState().queryText).toBe('eval:"the user is annoyed"');
     });
   });
 });

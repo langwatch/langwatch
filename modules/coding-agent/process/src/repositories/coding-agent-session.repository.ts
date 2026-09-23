@@ -1,6 +1,7 @@
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
+  CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 
 /** Private persistence port for the session aggregate read model. */
@@ -62,4 +63,10 @@ export abstract class CodingAgentSessionRepository {
     sessionIds: string[];
     startedAtFromMs: number;
   }): Promise<CodingAgentSessionBranchRecord[]>;
+
+  /** The usage report's figures, one project at a time and added up. */
+  abstract countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount>;
 }

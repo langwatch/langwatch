@@ -44,6 +44,7 @@ describe("FACET_GROUPS configuration", () => {
       "cost",
       "model",
       "quality",
+      "instantEvals",
       "topics",
       "prompts",
       "custom",

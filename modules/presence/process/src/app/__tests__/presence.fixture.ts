@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { ResourceScope } from "@langwatch/kernel";
 /**
  * The presence graph as its tests need it: memory sessions, a fan-out that
@@ -8,7 +9,7 @@ import { ResourceScope } from "@langwatch/kernel";
  */
 import type { PresenceUser } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
@@ -82,5 +83,6 @@ export function createPresenceTestApp(
     },
     config: void 0,
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 }

@@ -1,7 +1,13 @@
 import { useExplorerStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useMemo } from "react";
 
+import {
+  type InstantEvalRunPhase,
+  selectInstantEvalRunPhase,
+  useInstantEvalRunStore,
+} from "../../../../behavior/instant-eval-run.store.ts";
 import { explorerCountSummary } from "../../../../model/explorer/explorer-count-summary.ts";
+import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 import { useSessionGroups } from "./use-session-groups.ts";
 import { useTraceListQuery } from "./use-trace-list-query.ts";
 
@@ -11,6 +17,8 @@ export interface ActiveInstantEval {
   judged: number;
   total: number | null;
   matched: number;
+  /** Judging, asked to stop, or ended with its last verdicts still landing. */
+  phase: Exclude<InstantEvalRunPhase, "settled">;
 }
 
 export interface ExplorerCounts {
@@ -51,10 +59,14 @@ export function useExplorerCounts(): ExplorerCounts {
     () => (byConversation ? [] : list.data.map((trace) => trace.traceId)),
     [byConversation, list.data],
   );
-  // The counters of a run still judging arrive with the Instant Eval browser
-  // half, which this tree does not install yet; until then nothing on the page
-  // reports progress and the summary is the plain count.
-  const instantEval: ActiveInstantEval | null = null;
+  const { chips } = useInstantEvalRuns();
+  const runs = useInstantEvalRunStore((s) => s.runs);
+  const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
+  const settled = useInstantEvalRunStore((s) => s.settled);
+  const instantEval = useMemo(
+    () => firstUnsettledInstantEval({ chips, state: { runs, stoppedByUser, settled } }),
+    [chips, runs, stoppedByUser, settled],
+  );
 
   const counts = byConversation
     ? {
@@ -92,4 +104,28 @@ export function useExplorerCounts(): ExplorerCounts {
     instantEval,
     summary: explorerCountSummary({ ...counts, instantEval }),
   };
+}
+
+/** The first run behind the query's chips that has not settled, or null. */
+function firstUnsettledInstantEval({
+  chips,
+  state,
+}: {
+  chips: readonly { runId: string | null }[];
+  state: Parameters<typeof selectInstantEvalRunPhase>[0];
+}): ActiveInstantEval | null {
+  for (const { runId } of chips) {
+    const run = runId === null ? undefined : state.runs[runId];
+    if (!run) continue;
+    const phase = selectInstantEvalRunPhase(state, run.id);
+    if (phase === null || phase === "settled") continue;
+    return {
+      runId: run.id,
+      judged: run.progress,
+      total: run.total,
+      matched: run.matched ?? 0,
+      phase,
+    };
+  }
+  return null;
 }

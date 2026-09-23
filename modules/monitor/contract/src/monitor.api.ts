@@ -20,6 +20,16 @@ import type {
   MonitorWithEvaluator,
 } from "./monitor.ts";
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many monitors were made, since `since` where one is given, and when the
+ * first was. Times are epoch milliseconds.
+ */
+export interface MonitorUsageCount {
+  readonly monitors: number;
+  readonly firstMonitorAt?: number;
+}
+
 export interface MonitorApi {
   /** Every monitor configured on the project, with its evaluator. */
   list(input: { projectId: string }): Promise<MonitorWithEvaluator[]>;
@@ -51,6 +61,8 @@ export interface MonitorApi {
   performanceForProject(input: MonitorPerformanceInput): Promise<OnlineEvaluationPerformance[]>;
   /** The platform address for a monitor resource. */
   platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<MonitorUsageCount>;
 }
 
 export const MonitorApi = moduleApi<MonitorApi>()("monitor");

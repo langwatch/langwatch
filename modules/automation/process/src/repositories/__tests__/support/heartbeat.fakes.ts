@@ -16,6 +16,9 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
     super();
   }
 
+  countUsage(): Promise<{ triggers: number }> {
+    return Promise.resolve({ triggers: 0 });
+  }
   findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
     return Promise.resolve(this.triggersByProject[projectId] ?? []);
   }

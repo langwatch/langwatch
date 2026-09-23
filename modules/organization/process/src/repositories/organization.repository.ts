@@ -1,11 +1,13 @@
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import type {
+  JoinRequestJoining,
   OrganizationBillingProfile,
   OrganizationIntent,
   OrganizationSettings,
   PersonalFeatures,
   PersonalWorkspace,
   PersonalWorkspaceInput,
+  OrganizationUsageCount,
 } from "@langwatch/organization-contract";
 
 export type PersonalWorkspaceResourceIds = {
@@ -50,6 +52,12 @@ export type StoredOrganizationSettings = {
  * row and the personal workspace it hosts. It never crosses into a caller.
  */
 export abstract class OrganizationRepository {
+  /** Every organization on the install; the usage report describes the install, not a tenant. */
+  abstract findAllIds(): Promise<string[]>;
+  /** The usage report's counts; the caller never passes an empty organization list. */
+  abstract countUsage(input: {
+    organizationIds: readonly string[];
+  }): Promise<OrganizationUsageCount>;
   abstract findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null>;
   /**
    * Persists already-encrypted `s3Endpoint`/`s3AccessKeyId`/`s3SecretAccessKey`
@@ -80,6 +88,12 @@ export abstract class OrganizationRepository {
     record: GuidedOnboardingRecord;
   }): Promise<GuidedOnboardingRecord>;
   /** Returns the oldest team or throws OrganizationHasNoTeamError. */
+  /** How colleagues on a matching domain get in; throws for an unknown organization. */
+  abstract getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining>;
+  abstract saveJoinSetting(input: {
+    organizationId: string;
+    setting: JoinRequestJoining;
+  }): Promise<void>;
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
   abstract claimBillingCustomerId(input: {

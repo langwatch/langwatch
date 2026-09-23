@@ -19,6 +19,7 @@ export const LANGY_NAVIGATE_RESOURCE_KINDS = [
   "monitor",
   "evaluator",
   "agent",
+  "scenario",
   "scenarioRun",
 ] as const;
 
@@ -37,6 +38,7 @@ const RESOURCE_PREFIXES: readonly (readonly [string, LangyNavigateResourceKind])
   ["monitor_", "monitor"],
   ["evaluator_", "evaluator"],
   ["agent_", "agent"],
+  ["scenario_", "scenario"],
   ["scenariorun_", "scenarioRun"],
 ];
 

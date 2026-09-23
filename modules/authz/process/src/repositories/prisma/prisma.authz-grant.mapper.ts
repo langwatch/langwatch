@@ -3,6 +3,8 @@ import {
   authzShareAudience,
   PRINCIPAL_KIND_FROM_STORED,
   STORED_PRINCIPAL_KIND,
+  storedPrincipalKindSchema,
+  storedScopeTierSchema,
 } from "@langwatch/authz-contract";
 import type {
   GrantEventSource,
@@ -16,7 +18,8 @@ import type {
   StoredScopeTier,
   TeamUserRole,
 } from "@langwatch/authz-contract";
-import { type Instant, Temporal } from "@langwatch/time";
+import { fromDate, type Instant, Temporal } from "@langwatch/time";
+import { z } from "zod";
 
 /** The single permission a share link has ever conferred (ADR-057) - the one
  *  spelling every minter and every importer of a share-link grant uses
@@ -83,6 +86,50 @@ export interface GrantRowShape {
   maxViews: number | null;
   occurredAt: Instant;
 }
+
+/** Exactly the columns a {@link GrantRowShape} holds, for a read that feeds one. */
+export const GRANT_ROW_COLUMNS = {
+  id: true,
+  organizationId: true,
+  principalType: true,
+  principalId: true,
+  roleKey: true,
+  legacyRole: true,
+  source: true,
+  scopeType: true,
+  scopeId: true,
+  token: true,
+  permission: true,
+  resourceKind: true,
+  projectId: true,
+  createdByUserId: true,
+  expiresAt: true,
+  maxViews: true,
+  occurredAt: true,
+} as const;
+
+/** The stored row as Postgres hands it back: Dates, not Instants. */
+const storedGrantRowSchema = z
+  .object({
+    id: z.string(),
+    organizationId: z.string(),
+    principalType: storedPrincipalKindSchema,
+    principalId: z.string().nullable(),
+    roleKey: z.string().nullable(),
+    legacyRole: z.string().nullable(),
+    source: z.string(),
+    scopeType: storedScopeTierSchema,
+    scopeId: z.string(),
+    token: z.string().nullable(),
+    permission: z.string().nullable(),
+    resourceKind: z.string().nullable(),
+    projectId: z.string().nullable(),
+    createdByUserId: z.string().nullable(),
+    expiresAt: z.date().nullable(),
+    maxViews: z.number().nullable(),
+    occurredAt: z.date(),
+  })
+  .strict();
 
 export interface RoleRowShape {
   id: string;
@@ -210,6 +257,16 @@ export class AuthzGrantMapper {
           : null,
       maxViews: grant.resource?.maxViews ?? null,
       occurredAt: Temporal.Instant.fromEpochMilliseconds(grant.occurredAtMs),
+    };
+  }
+
+  /** A row read with {@link GRANT_ROW_COLUMNS}; throws on one that is not a Grant row. */
+  static grantRowFromStored(stored: unknown): GrantRowShape {
+    const row = storedGrantRowSchema.parse(stored);
+    return {
+      ...row,
+      expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+      occurredAt: fromDate(row.occurredAt),
     };
   }
 

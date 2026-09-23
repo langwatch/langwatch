@@ -3,35 +3,32 @@ import type {
   JoinCandidateOrganization,
   JoinRequestAggregateState,
 } from "@langwatch/identity-contract";
-import { emptyJoinRequest } from "@langwatch/identity-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { DEFAULT_DOMAIN_JOIN_SETTING, emptyJoinRequest } from "@langwatch/identity-contract";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-/**
- * The shared counter, as the service now takes it: a dependency rather than a
- * module the suite mocks out from under it. Same assertions, one fewer thing
- * that can be true of the mock and false of production.
- */
-const rateLimitMock = vi.fn(
-  async (_input: { key: string; windowSeconds: number; max: number }) => ({
-    allowed: true,
-    resetAt: Date.now(),
-  }),
-);
 
 import {
   JOIN_REJECTION_COOLDOWN_MS,
   type JoinMembership,
-  type JoinRequestNotifier,
+  type JoinOfferDismissals,
   type JoinSetting,
+  type JoinSettingAudit,
 } from "../../rules/join-requests-contract.rules.ts";
 import { JoinRequestsService } from "../join-requests.service.ts";
 
 /**
- * Everything AROUND the lifecycle: the reveal discipline at the boundary, the anti-abuse limits,
- * the licence asymmetry, and how an approval becomes a membership.
- * Spec: specs/identity/join-requests.feature,
+ * Everything AROUND the lifecycle: reveal discipline, abuse limits, the licence asymmetry and
+ * how an approval becomes a membership. Spec: specs/identity/join-requests.feature,
+ * join-matching-and-privacy.feature, domain-auto-join.feature
  */
+
+/** The shared counter, as the service takes it: a dependency rather than a mocked module. */
+const rateLimitMock = vi.fn(
+  async (_input: { key: string; windowSeconds: number; max: number }) => ({
+    allowed: true,
+    resetAt: NOW + 60_000,
+  }),
+);
 
 const NOW = 1_700_000_000_000;
 
@@ -43,6 +40,7 @@ const acme: JoinCandidateOrganization = {
   verifiedMembersOnDomain: 3,
   memberCount: 117,
   autoJoinDomains: [],
+  domainProved: false,
 };
 
 const pendingState = (
@@ -62,57 +60,66 @@ function harness({
   pending = null,
   lastRejectionAt = null,
   licensed = true,
-  enabled = true,
+  policyEntitled = true,
   isMember = false,
+  memberOf,
+  dismissedDomains = [],
   setting = { domainJoin: "request" as DomainJoinSetting, joinDomains: [] },
 }: {
   candidates?: JoinCandidateOrganization[];
   held?: JoinRequestAggregateState | null;
   pending?: JoinRequestAggregateState | null;
-  lastRejectionAt?: Instant | null;
+  lastRejectionAt?: Date | null;
   licensed?: boolean;
-  enabled?: boolean;
+  /** Whether this organization's PLAN carries the who-can-join control. */
+  policyEntitled?: boolean;
   isMember?: boolean;
+  /** Membership per organization; overrides `isMember`. */
+  memberOf?: string[];
+  dismissedDomains?: string[];
   setting?: { domainJoin: DomainJoinSetting; joinDomains: string[] };
 } = {}) {
   const requests = {
-    requestJoin: vi.fn(async () => []),
-    approveJoin: vi.fn(async () => []),
-    // The command is declared so `mock.calls` carries its type: the
-    // assertion below is that a field is ABSENT from it, and an untyped
-    // mock makes that a cast rather than a check.
+    requestJoin: vi.fn(async (_command: Record<string, unknown>) => []),
+    approveJoin: vi.fn(async (_command: Record<string, unknown>) => []),
     rejectJoin: vi.fn(async (_command: Record<string, unknown>) => []),
     withdrawJoin: vi.fn(async () => []),
     expireJoin: vi.fn(async () => []),
   };
   const membership: JoinMembership = {
     attachDefaultMembership: vi.fn(async () => undefined),
-    isMember: vi.fn(async () => isMember),
+    isMember: vi.fn(async ({ organizationId }) =>
+      memberOf ? memberOf.includes(organizationId) : isMember,
+    ),
   };
-  const notifier = {
-    requestArrived: vi.fn(async () => undefined),
-    requestStillWaiting: vi.fn(async () => undefined),
-    requestApproved: vi.fn(async () => undefined),
-    requestRejected: vi.fn(async () => undefined),
-    requestExpired: vi.fn(async () => undefined),
-    joinedAutomatically: vi.fn(async () => undefined),
-  } satisfies JoinRequestNotifier;
   const settings: JoinSetting = {
     read: vi.fn(async () => setting),
     write: vi.fn(async () => undefined),
   };
+  const rejectedAt = lastRejectionAt
+    ? Temporal.Instant.fromEpochMilliseconds(lastRejectionAt.getTime())
+    : null;
   const reads = {
     tryFindRequest: vi.fn(async () => held),
     tryFindPendingRequest: vi.fn(async () => pending),
-    tryFindLastRejectionAt: vi.fn(async () => lastRejectionAt),
+    tryFindLastRejectionAt: vi.fn(async () => rejectedAt),
     findPendingForOrganization: vi.fn(async () => []),
     findPendingForUser: vi.fn(async () => []),
+    findAutomaticJoinsForOrganization: vi.fn(async () => []),
+    findApprovedForMembers: vi.fn(async () => []),
   };
+  const dismissals: JoinOfferDismissals = {
+    dismissedDomains: vi.fn(async () => dismissedDomains),
+    dismiss: vi.fn(async () => undefined),
+  };
+  const audit: JoinSettingAudit = { joiningChanged: vi.fn(async () => undefined) };
+  const autoJoinLicensed = vi.fn(async () => licensed);
+  const joinPolicyEntitled = vi.fn(async () => policyEntitled);
 
   const service = JoinRequestsService.create({
     rateLimit: rateLimitMock,
     requests: requests as never,
-    reads: reads as never,
+    reads,
     candidates: {
       findCandidateOrganizations: vi.fn(async () => candidates),
       tryFindCandidateOrganization: vi.fn(
@@ -121,14 +128,25 @@ function harness({
       ),
     },
     membership,
-    notifier,
     settings,
-    autoJoinLicensed: async () => licensed,
-    enabled: async () => enabled,
+    dismissals,
+    audit,
+    autoJoinLicensed,
+    joinPolicyEntitled,
     now: () => NOW,
   });
 
-  return { service, requests, membership, notifier, settings, reads };
+  return {
+    service,
+    requests,
+    membership,
+    settings,
+    reads,
+    dismissals,
+    audit,
+    autoJoinLicensed,
+    joinPolicyEntitled,
+  };
 }
 
 beforeEach(() => {
@@ -136,26 +154,53 @@ beforeEach(() => {
   rateLimitMock.mockResolvedValue({ allowed: true, resetAt: NOW + 60_000 });
 });
 
-describe("given the join-requests flag is off", () => {
-  describe("when somebody looks up or asks", () => {
-    /** @scenario With the flag off nothing here exists */
-    it("answers nothing and refuses the ask", async () => {
-      const { service, requests } = harness({ enabled: false });
+describe("given somebody who already belongs to one of the matches", () => {
+  const acmeLabs: JoinCandidateOrganization = {
+    ...acme,
+    organizationId: "org_acme_labs",
+    name: "Acme Labs",
+  };
 
-      expect(
-        await service.lookup({
-          userId: "user_sam",
-          verifiedEmail: "sam@acme.com",
-        }),
-      ).toEqual({ outcome: "none" });
-      await expect(
-        service.request({
-          userId: "user_sam",
-          verifiedEmail: "sam@acme.com",
-          organizationId: "org_acme",
-        }),
-      ).rejects.toMatchObject({ code: "join_not_available" });
-      expect(requests.requestJoin).not.toHaveBeenCalled();
+  describe("when the organizations open to their address are looked up", () => {
+    /** @scenario An organization I am already in is not offered, and the others still are */
+    it("offers the one they are not in and never the one they are", async () => {
+      const { service } = harness({
+        candidates: [acme, acmeLabs],
+        memberOf: ["org_acme"],
+      });
+
+      const decision = await service.lookup({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      // Belonging somewhere is not a reason to be told nothing: the second
+      // organization is a real thing to ask for, and the offer is the only
+      // way they would learn it exists.
+      expect(decision.outcome).toBe("ask");
+      const offered =
+        decision.outcome === "ask"
+          ? decision.organizations.map((entry) => entry.organizationId)
+          : [];
+      expect(offered).toEqual(["org_acme_labs"]);
+    });
+
+    /** @scenario An organization I am already in is not offered, and the others still are */
+    it("answers the universal nothing when the only match is one they are in", async () => {
+      const { service } = harness({
+        candidates: [acme],
+        memberOf: ["org_acme"],
+      });
+
+      const decision = await service.lookup({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      // The same nothing every other closed door gives. An "ask to join"
+      // beside the workspace somebody is already using reads as the product
+      // not knowing who they are, and asking could only ever be refused.
+      expect(decision).toEqual({ outcome: "none" });
     });
   });
 });
@@ -221,7 +266,7 @@ describe("given a person an administrator has rejected", () => {
     /** @scenario A rejected person cannot immediately ask again */
     it("refuses with the throttle code, never a rejection code", async () => {
       const { service } = harness({
-        lastRejectionAt: Temporal.Instant.fromEpochMilliseconds(NOW - 60_000),
+        lastRejectionAt: new Date(NOW - 60_000),
       });
 
       // The THROTTLE code on purpose: a person who could tell "you were
@@ -240,9 +285,7 @@ describe("given a person an administrator has rejected", () => {
   describe("when they ask after the cool-down", () => {
     it("opens a fresh request", async () => {
       const { service, requests } = harness({
-        lastRejectionAt: Temporal.Instant.fromEpochMilliseconds(
-          NOW - JOIN_REJECTION_COOLDOWN_MS - 1,
-        ),
+        lastRejectionAt: new Date(NOW - JOIN_REJECTION_COOLDOWN_MS - 1),
       });
 
       const result = await service.request({
@@ -261,7 +304,7 @@ describe("given an administrator approving a request", () => {
   describe("when the requester is not yet a member", () => {
     /** @scenario Membership lands through the same ledger an invitation uses */
     it("states the approval, then attaches the membership", async () => {
-      const { service, requests, membership, notifier } = harness({
+      const { service, requests, membership } = harness({
         held: pendingState(),
       });
 
@@ -283,9 +326,10 @@ describe("given an administrator approving a request", () => {
       expect(membership.attachDefaultMembership).toHaveBeenCalledWith({
         userId: "user_sam",
         organizationId: "org_acme",
+        joinRequestId: "jreq_1",
+        commandId: "join-approve:jreq_1:user:user_ana",
         approvedByUserId: "user_ana",
       });
-      expect(notifier.requestApproved).toHaveBeenCalledOnce();
     });
   });
 
@@ -330,7 +374,7 @@ describe("given an administrator approving a request", () => {
 describe("given an administrator rejecting a request", () => {
   describe("when they reject it", () => {
     it("records no reason and tells the requester nothing about who decided", async () => {
-      const { service, requests, notifier } = harness({ held: pendingState() });
+      const { service, requests } = harness({ held: pendingState() });
 
       await service.reject({
         joinRequestId: "jreq_1",
@@ -344,13 +388,6 @@ describe("given an administrator rejecting a request", () => {
       expect(requests.rejectJoin).toHaveBeenCalledTimes(1);
       const [command] = requests.rejectJoin.mock.calls[0] ?? [];
       expect(command).not.toHaveProperty("reason");
-      // The notifier is told WHO to tell, and nothing about the rejector
-      // reaches the requester's mail.
-      expect(notifier.requestRejected).toHaveBeenCalledWith({
-        joinRequestId: "jreq_1",
-        organizationId: "org_acme",
-        requesterUserId: "user_sam",
-      });
     });
   });
 });
@@ -359,23 +396,23 @@ describe("given a domain that admits colleagues automatically", () => {
   describe("when a verified colleague arrives", () => {
     /** @scenario A verified colleague joins an opted-in organization immediately */
     it("makes the request and approves it by policy in one move", async () => {
-      const { service, requests, membership, notifier } = harness({
+      const { service, requests, membership } = harness({
         candidates: [
           {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 2,
+            domainProved: true,
           },
         ],
       });
 
-      const joined = await service.tryJoinAutomaticallyIfAdmitted({
+      const joined = await service.joinAutomaticallyIfAdmitted({
         userId: "user_sam",
         verifiedEmail: "sam@acme.com",
       });
 
-      expect(joined?.organization.organizationId).toBe("org_acme");
+      expect(joined.organization?.organizationId).toBe("org_acme");
       // Not a second mechanism: the same request, approved by policy the
       // moment it is made. What differs is only who resolves it.
       expect(requests.requestJoin).toHaveBeenCalledOnce();
@@ -384,13 +421,15 @@ describe("given a domain that admits colleagues automatically", () => {
           resolvedBy: { type: "policy", id: "domain-auto" },
         }),
       );
-      expect(membership.attachDefaultMembership).toHaveBeenCalledWith({
-        userId: "user_sam",
-        organizationId: "org_acme",
-        approvedByUserId: null,
-      });
-      // A surprising join has to be visible the moment it happens.
-      expect(notifier.joinedAutomatically).toHaveBeenCalledOnce();
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user_sam",
+          organizationId: "org_acme",
+          joinRequestId: expect.any(String),
+          commandId: expect.stringContaining("join-approve:"),
+          approvedByUserId: null,
+        }),
+      );
     });
   });
 
@@ -404,17 +443,17 @@ describe("given a domain that admits colleagues automatically", () => {
             ...acme,
             domainJoin: "auto",
             autoJoinDomains: ["acme.com"],
-            verifiedMembersOnDomain: 4,
+            domainProved: true,
           },
         ],
       });
 
       expect(
-        await service.tryJoinAutomaticallyIfAdmitted({
+        await service.joinAutomaticallyIfAdmitted({
           userId: "user_sam",
           verifiedEmail: "sam@acme.com",
         }),
-      ).toBeNull();
+      ).toEqual({ organization: null });
       expect(requests.approveJoin).not.toHaveBeenCalled();
 
       // Asking still works: the gate holds `auto` and lets `request` through.
@@ -427,6 +466,116 @@ describe("given a domain that admits colleagues automatically", () => {
   });
 });
 
+describe("given an organization whose plan does not carry the joining control", () => {
+  describe("when the administrator opens the door to people who ask", () => {
+    /** @scenario Opening the door needs the plan that carries it */
+    /** @scenario The refusal holds at the boundary, not only on the screen */
+    it("refuses with the plan's own code and writes nothing", async () => {
+      const { service, settings } = harness({
+        policyEntitled: false,
+        setting: { domainJoin: "off", joinDomains: [] },
+      });
+
+      await expect(
+        service.setJoining({
+          actorUserId: "user_admin",
+          organizationId: "org_acme",
+          domainJoin: "request",
+          domains: [],
+        }),
+      ).rejects.toMatchObject({ code: "join_policy_not_licensed" });
+      expect(settings.write).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the administrator opens the door to a whole domain", () => {
+    /** @scenario Opening the door needs the plan that carries it */
+    it("refuses on the plan before it ever asks about the domain", async () => {
+      const { service, autoJoinLicensed } = harness({
+        policyEntitled: false,
+        setting: { domainJoin: "off", joinDomains: [] },
+      });
+
+      await expect(
+        service.setJoining({
+          actorUserId: "user_admin",
+          organizationId: "org_acme",
+          domainJoin: "auto",
+          domains: ["acme.com"],
+        }),
+      ).rejects.toMatchObject({ code: "join_policy_not_licensed" });
+      // The plan is the cheapest thing to fix and the first thing checked, so
+      // the deployment licence is never consulted for an organization that
+      // cannot hold the control anyway.
+      expect(autoJoinLicensed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the administrator closes a door that is already open", () => {
+    /** @scenario Closing the door is never refused for the plan */
+    it("saves, so a lapsed plan is never a door that cannot be shut", async () => {
+      const { service, settings, joinPolicyEntitled } = harness({
+        policyEntitled: false,
+        setting: { domainJoin: "auto", joinDomains: ["acme.com"] },
+      });
+
+      await service.setJoining({
+        actorUserId: "user_admin",
+        organizationId: "org_acme",
+        domainJoin: "off",
+        domains: [],
+      });
+
+      expect(settings.write).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        domainJoin: "off",
+        joinDomains: [],
+      });
+      expect(joinPolicyEntitled).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the administrator saves the setting they already had", () => {
+    /** @scenario Closing the door is never refused for the plan */
+    it("is not refused, because nothing was opened", async () => {
+      const { service, settings } = harness({
+        policyEntitled: false,
+        candidates: [{ ...acme, domainProved: true }],
+        setting: { domainJoin: "auto", joinDomains: ["acme.com"] },
+      });
+
+      await service.setJoining({
+        actorUserId: "user_admin",
+        organizationId: "org_acme",
+        domainJoin: "auto",
+        domains: ["acme.com"],
+      });
+
+      expect(settings.write).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the administrator adds a domain to a door already open", () => {
+    /** @scenario Opening the door needs the plan that carries it */
+    it("refuses, because another domain is more people let in", async () => {
+      const { service, settings } = harness({
+        policyEntitled: false,
+        setting: { domainJoin: "auto", joinDomains: ["acme.com"] },
+      });
+
+      await expect(
+        service.setJoining({
+          actorUserId: "user_admin",
+          organizationId: "org_acme",
+          domainJoin: "auto",
+          domains: ["acme.com", "acme.co.uk"],
+        }),
+      ).rejects.toMatchObject({ code: "join_policy_not_licensed" });
+      expect(settings.write).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("given an administrator turning automatic joining on", () => {
   describe("when the deployment is unlicensed", () => {
     /** @scenario An unlicensed deployment cannot turn automatic joining on */
@@ -435,6 +584,7 @@ describe("given an administrator turning automatic joining on", () => {
 
       await expect(
         service.setJoining({
+          actorUserId: "user_admin",
           organizationId: "org_acme",
           domainJoin: "auto",
           domains: ["acme.com"],
@@ -451,6 +601,7 @@ describe("given an administrator turning automatic joining on", () => {
 
       await expect(
         service.setJoining({
+          actorUserId: "user_admin",
           organizationId: "org_acme",
           domainJoin: "auto",
           domains: ["gmail.com"],
@@ -459,15 +610,18 @@ describe("given an administrator turning automatic joining on", () => {
     });
   });
 
-  describe("when only one member has verified the domain", () => {
-    /** @scenario Turning it on names the domain and needs corroboration */
-    it("refuses until a second verified member corroborates it", async () => {
+  describe("when the domain has not been proved", () => {
+    /** @scenario Turning it on names the domain and needs the domain proved */
+    it("refuses however many members hold addresses on it", async () => {
+      // Four verified members and still no: receiving mail on a domain is
+      // not controlling it, and nobody gates the automatic path.
       const { service } = harness({
-        candidates: [{ ...acme, verifiedMembersOnDomain: 1 }],
+        candidates: [{ ...acme, verifiedMembersOnDomain: 4, domainProved: false }],
       });
 
       await expect(
         service.setJoining({
+          actorUserId: "user_admin",
           organizationId: "org_acme",
           domainJoin: "auto",
           domains: ["acme.com"],
@@ -485,6 +639,7 @@ describe("given an administrator turning automatic joining on", () => {
 
       await expect(
         service.setJoining({
+          actorUserId: "user_admin",
           organizationId: "org_acme",
           domainJoin: "auto",
           domains: ["acme.com"],
@@ -495,9 +650,14 @@ describe("given an administrator turning automatic joining on", () => {
 
   describe("when everything checks out", () => {
     it("saves the setting with the named domain", async () => {
-      const { service, settings } = harness();
+      // Proved is what lets the door open: the record or file ceremony, an
+      // attestation, or a licence — never a count of members.
+      const { service, settings } = harness({
+        candidates: [{ ...acme, domainProved: true }],
+      });
 
       const result = await service.setJoining({
+        actorUserId: "user_admin",
         organizationId: "org_acme",
         domainJoin: "auto",
         domains: ["  ACME.com "],
@@ -508,7 +668,14 @@ describe("given an administrator turning automatic joining on", () => {
         domainJoin: "auto",
         joinDomains: ["acme.com"],
       });
-      expect(result).toEqual({ previous: "request", next: "auto" });
+      // Both values and both domain lists, because the audit row the caller
+      // writes has to say what it was as well as what it became.
+      expect(result).toEqual({
+        previous: "request",
+        next: "auto",
+        previousDomains: [],
+        nextDomains: ["acme.com"],
+      });
     });
   });
 
@@ -520,6 +687,7 @@ describe("given an administrator turning automatic joining on", () => {
       });
 
       await service.setJoining({
+        actorUserId: "user_admin",
         organizationId: "org_acme",
         domainJoin: "request",
         domains: ["acme.com"],
@@ -612,6 +780,479 @@ describe("given the lookup answering for a verified address", () => {
       expect(rateLimitMock).toHaveBeenCalledWith(
         expect.objectContaining({ key: "joinRequests.lookup:user_sam" }),
       );
+    });
+  });
+});
+
+describe("given an organization that admits its domain automatically", () => {
+  const admitting: JoinCandidateOrganization = {
+    ...acme,
+    domainJoin: "auto",
+    autoJoinDomains: ["acme.com"],
+    domainProved: true,
+  };
+
+  describe("when a verified colleague walks in", () => {
+    /** @scenario The automatic path is the same lifecycle, approved by policy */
+    it("makes a request and resolves it against the same aggregate", async () => {
+      const { service, requests } = harness({ candidates: [admitting] });
+
+      await service.joinAutomaticallyIfAdmitted({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      const [requested] = requests.requestJoin.mock.calls[0]!;
+      const [approved] = requests.approveJoin.mock.calls[0]!;
+      // The SAME request, on the same aggregate and the same tenant, which is
+      // what puts it in the same panel and the same history as an approval
+      // somebody clicked. Only the resolver differs.
+      expect(approved.joinRequestId).toBe(requested.joinRequestId);
+      expect(approved.tenantId).toBe(requested.tenantId);
+      expect(approved.organizationId).toBe("org_acme");
+      expect(approved.resolvedBy).toEqual({
+        type: "policy",
+        id: "domain-auto",
+      });
+    });
+
+    /** @scenario The automatic path is the same lifecycle, approved by policy */
+    it("records the policy rather than a person as what resolved it", async () => {
+      const { service, requests, membership } = harness({
+        candidates: [admitting],
+      });
+
+      await service.joinAutomaticallyIfAdmitted({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      const [approved] = requests.approveJoin.mock.calls[0]!;
+      expect((approved.resolvedBy as { type: string }).type).not.toBe("user");
+      // And nobody is named as the approver on the membership either.
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({ approvedByUserId: null }),
+      );
+    });
+
+    /** @scenario Walking in still grants only the default role */
+    it("attaches the default membership and carries no role at all", async () => {
+      const { service, membership } = harness({ candidates: [admitting] });
+
+      await service.joinAutomaticallyIfAdmitted({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      // No role on the call and never will be: an approval — by an admin or
+      // by the policy — grants the organization's default and nothing more.
+      const [attached] = vi.mocked(membership.attachDefaultMembership).mock.calls[0] ?? [];
+      expect(Object.keys(attached ?? {}).toSorted()).toEqual([
+        "approvedByUserId",
+        "commandId",
+        "joinRequestId",
+        "organizationId",
+        "userId",
+      ]);
+    });
+  });
+
+  describe("when the address has not been verified", () => {
+    /** @scenario An unverified address never walks in */
+    it("admits nobody, and verifying is what changes that", async () => {
+      const { service, requests, membership } = harness({
+        candidates: [admitting],
+      });
+
+      expect(
+        await service.joinAutomaticallyIfAdmitted({
+          userId: "user_sam",
+          verifiedEmail: null,
+        }),
+      ).toEqual({ organization: null });
+      expect(requests.requestJoin).not.toHaveBeenCalled();
+      expect(membership.attachDefaultMembership).not.toHaveBeenCalled();
+
+      // The same person, the same organization, one address proved.
+      const joined = await service.joinAutomaticallyIfAdmitted({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+      expect(joined.organization?.organizationId).toBe("org_acme");
+    });
+  });
+
+  describe("when a second organization claims the same domain", () => {
+    /** @scenario An ambiguous domain refuses to admit and falls back to asking */
+    it("admits neither and offers both as somewhere to ask", async () => {
+      const { service, requests } = harness({
+        candidates: [admitting, { ...admitting, organizationId: "org_other", name: "Other" }],
+      });
+
+      expect(
+        await service.joinAutomaticallyIfAdmitted({
+          userId: "user_sam",
+          verifiedEmail: "sam@acme.com",
+        }),
+      ).toEqual({ organization: null });
+      expect(requests.requestJoin).not.toHaveBeenCalled();
+
+      // Guessing which company somebody works for is the one thing this must
+      // never do, so the choice goes back to them.
+      const decision = await service.lookup({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+      expect(decision.outcome).toBe("ask");
+      expect(
+        decision.outcome === "ask"
+          ? decision.organizations.map((offer) => offer.organizationId).toSorted()
+          : [],
+      ).toEqual(["org_acme", "org_other"]);
+    });
+  });
+});
+
+describe("given a newly created self-serve organization", () => {
+  describe("when its joining setting is read", () => {
+    /** @scenario Asking is the default and automatic is never inferred */
+    it("lets colleagues ask, and admits nobody automatically", async () => {
+      // Exactly what the column's own default produces, and nothing an
+      // administrator has touched.
+      const { service } = harness({
+        candidates: [
+          {
+            ...acme,
+            domainJoin: DEFAULT_DOMAIN_JOIN_SETTING,
+            autoJoinDomains: [],
+            verifiedMembersOnDomain: 5,
+          },
+        ],
+      });
+
+      expect(
+        (
+          await service.lookup({
+            userId: "user_sam",
+            verifiedEmail: "sam@acme.com",
+          })
+        ).outcome,
+      ).toBe("ask");
+      expect(
+        await service.joinAutomaticallyIfAdmitted({
+          userId: "user_sam",
+          verifiedEmail: "sam@acme.com",
+        }),
+      ).toEqual({ organization: null });
+    });
+  });
+});
+
+describe("given a deployment that has never held a genuine license", () => {
+  describe("when a colleague asks to join and an administrator approves", () => {
+    /** @scenario An unlicensed deployment still lets colleagues ask */
+    it("opens the request, admits them, and never consults the license", async () => {
+      const asking = harness({ licensed: false });
+
+      const asked = await asking.service.request({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+        organizationId: "org_acme",
+      });
+      expect(asked.state).toBe("PENDING");
+
+      const approving = harness({
+        licensed: false,
+        held: pendingState({ joinRequestId: asked.joinRequestId }),
+      });
+      await approving.service.approve({
+        joinRequestId: asked.joinRequestId,
+        organizationId: "org_acme",
+        adminUserId: "user_ana",
+      });
+      expect(approving.membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user_sam",
+          organizationId: "org_acme",
+        }),
+      );
+
+      // The gate holds AUTOMATIC joining and lets asking through, so nothing
+      // on this path reads it at all.
+      expect(asking.autoJoinLicensed).not.toHaveBeenCalled();
+      expect(approving.autoJoinLicensed).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given somebody who asked rather than creating an organization", () => {
+  describe("when the request is open", () => {
+    /** @scenario No organization is created for somebody who did not ask for one */
+    it("asks, and creates nothing on their behalf", async () => {
+      const { service, requests, membership } = harness();
+
+      const asked = await service.request({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+        organizationId: "org_acme",
+      });
+
+      expect(asked.state).toBe("PENDING");
+      // The whole invariant: asking opens a request and nothing else. No
+      // membership lands until somebody answers, and nothing on this path
+      // mints an organization.
+      expect(membership.attachDefaultMembership).not.toHaveBeenCalled();
+      expect(requests.approveJoin).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when they created a workspace while waiting and are then approved", () => {
+    /** @scenario Approval reaches somebody who created a workspace while waiting */
+    it("adds the second membership and tells them", async () => {
+      // A member of their OWN new organization, and not of this one — which
+      // is what `isMember` answers for the organization being approved.
+      const { service, membership } = harness({
+        held: pendingState(),
+        isMember: false,
+      });
+
+      await service.approve({
+        joinRequestId: "jreq_1",
+        organizationId: "org_acme",
+        adminUserId: "user_ana",
+      });
+
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        joinRequestId: "jreq_1",
+        commandId: "join-approve:jreq_1:user:user_ana",
+        approvedByUserId: "user_ana",
+      });
+    });
+  });
+});
+
+describe("given an existing account whose domain matches an organization", () => {
+  describe("when the offer has never been waved away", () => {
+    /** @scenario An existing user is offered their colleagues once, and can dismiss it */
+    it("offers the organization", async () => {
+      const { service } = harness();
+
+      expect(
+        (
+          await service.offerForSignedInUser({
+            userId: "user_sam",
+            verifiedEmail: "sam@acme.com",
+          })
+        ).outcome,
+      ).toBe("ask");
+    });
+  });
+
+  describe("when they have dismissed it for that domain", () => {
+    /** @scenario An existing user is offered their colleagues once, and can dismiss it */
+    it("offers nothing again for that domain", async () => {
+      const { service } = harness({ dismissedDomains: ["acme.com"] });
+
+      expect(
+        await service.offerForSignedInUser({
+          userId: "user_sam",
+          verifiedEmail: "sam@acme.com",
+        }),
+      ).toEqual({ outcome: "none" });
+    });
+
+    /** @scenario An existing user is offered their colleagues once, and can dismiss it */
+    it("remembers the dismissal against that domain and no other", async () => {
+      const { service, dismissals } = harness();
+
+      await service.dismissOffer({
+        userId: "user_sam",
+        verifiedEmail: "Sam.J+news@Acme.com",
+      });
+
+      // Folded the way every other join decision folds an address, so a
+      // dismissal and a match can never disagree about what the domain is.
+      expect(dismissals.dismiss).toHaveBeenCalledWith({
+        userId: "user_sam",
+        domain: "acme.com",
+      });
+    });
+  });
+});
+
+/**
+ * THE SECOND DOOR: here a request exists because an account row appeared, a
+ * person signing in through a connection whose arrivals answer is "wait".
+ * Spec: specs/identity/join-requests.feature, "A request nobody clicked".
+ */
+describe("given a connection whose arrivals wait for approval", () => {
+  describe("when somebody signs in through it for the first time", () => {
+    /** @scenario "Somebody an identity provider admits but does not let straight in waits in the queue" */
+    it("puts them in the queue and tells the administrators", async () => {
+      const { service, requests } = harness();
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).toMatchObject({ raised: true });
+      expect(requests.requestJoin).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "The request a sign-in made is attributed to the system, not to the person" */
+    it("records the system as what made it, and nobody as having asked", async () => {
+      const { service, requests } = harness();
+
+      await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      const command = requests.requestJoin.mock.calls[0]?.[0];
+      // "sam" pressed nothing. An audit page that named them as the asker
+      // would be describing a decision nobody made.
+      expect(command?.actor).toEqual({ type: "system", id: null });
+      expect(command?.matchedVia).toBe("sso-connection-domain");
+    });
+
+    /** @scenario "An arrival is not re-asked the question the organization answered about strangers" */
+    it("never consults the organization's join policy, which is about strangers", async () => {
+      // Closed to people asking off the internet — and silent about its own
+      // staff, who are who this path is for.
+      const { service, requests, settings } = harness({
+        candidates: [{ ...acme, domainJoin: "off" }],
+        setting: { domainJoin: "off", joinDomains: [] },
+      });
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).toMatchObject({ raised: true });
+      expect(requests.requestJoin).toHaveBeenCalledTimes(1);
+      expect(settings.read).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the person was already rejected by an administrator", () => {
+    /** @scenario "Somebody already rejected does not climb back into the queue when their account is touched" */
+    it("makes no request and tells nobody", async () => {
+      // A row appearing again is routine: a provider rotation, an unlink, the
+      // account reconcile. None of them is "sam" asking a second time, and an
+      // administrator who said no should not have to say it again.
+      const { service, requests } = harness({
+        lastRejectionAt: new Date(NOW - JOIN_REJECTION_COOLDOWN_MS / 2),
+      });
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).toEqual({ raised: false });
+      expect(requests.requestJoin).not.toHaveBeenCalled();
+    });
+
+    it("lets them back in the queue once the cool-down has run out", async () => {
+      const { service, requests } = harness({
+        lastRejectionAt: new Date(NOW - JOIN_REJECTION_COOLDOWN_MS - 1),
+      });
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).toMatchObject({ raised: true });
+      expect(requests.requestJoin).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given somebody who has dismissed an offer", () => {
+  /** @scenario "A dismissed offer reads exactly like no offer at all" */
+  it("answers the same nothing a domain with no organization behind it answers", async () => {
+    const { service } = harness({ dismissedDomains: ["acme.com"] });
+
+    const dismissed = await service.offerForSignedInUser({
+      userId: "user_sam",
+      verifiedEmail: "sam@acme.com",
+    });
+    // The control: a domain nobody is behind. Anything that told these two
+    // apart would say which domains have an organization behind them.
+    const neverOffered = await service.offerForSignedInUser({
+      userId: "user_sam",
+      verifiedEmail: null,
+    });
+
+    expect(dismissed).toEqual({ outcome: "none" });
+    expect(dismissed).toEqual(neverOffered);
+  });
+
+  /** @scenario "Saying no thanks is remembered for that domain and no other" */
+  it("leaves an offer on a different address standing", async () => {
+    const { service } = harness({ dismissedDomains: ["acme.com"] });
+
+    const other = await service.offerForSignedInUser({
+      userId: "user_sam",
+      verifiedEmail: "sam@beta.example",
+    });
+
+    // Dismissal is per domain. A person who said "not this one" has said
+    // nothing about the next.
+    expect(other).not.toEqual({ outcome: "none" });
+  });
+});
+
+describe("given an administrator saving the joining setting", () => {
+  describe("when the save succeeds", () => {
+    /** @scenario The setting change is itself audited */
+    it("records the actor and both values before answering", async () => {
+      const { service, audit } = harness({
+        setting: { domainJoin: "off", joinDomains: [] },
+      });
+
+      const change = await service.setJoining({
+        actorUserId: "user_ana",
+        organizationId: "org_acme",
+        domainJoin: "request",
+        domains: [],
+      });
+
+      expect(change).toEqual({
+        previous: "off",
+        next: "request",
+        previousDomains: [],
+        nextDomains: [],
+      });
+      expect(audit.joiningChanged).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        actorUserId: "user_ana",
+        change,
+      });
+    });
+  });
+});
+
+describe("given the members area asking who walked in lately", () => {
+  /** @scenario The admins are told after the fact, straight away */
+  it("reads the automatic joins inside the fourteen-day notice window", async () => {
+    const { service, reads } = harness();
+
+    await service.automaticJoinsForOrganization({ organizationId: "org_acme" });
+
+    expect(reads.findAutomaticJoinsForOrganization).toHaveBeenCalledWith({
+      organizationId: "org_acme",
+      resolvedAfterMs: NOW - 14 * 24 * 60 * 60 * 1000,
     });
   });
 });

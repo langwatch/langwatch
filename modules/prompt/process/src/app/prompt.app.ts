@@ -36,6 +36,7 @@ import {
   type PromptPushToCopiesResult,
   type PromptExecuteRequest,
   type PlaygroundStreamEvent,
+  type PromptUsageCount,
 } from "@langwatch/prompt-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -294,6 +295,10 @@ export class PromptApp implements PromptApi {
   }
 
   /** Seeds a new organization's tag catalogue with the built-in tags. */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<PromptUsageCount> {
+    return this.#dependencies.prompts.countUsage(input);
+  }
+
   seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
     return this.#dependencies.prompts.seedTagsForOrganization(input);
   }

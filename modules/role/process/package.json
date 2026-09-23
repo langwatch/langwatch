@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -2,7 +2,7 @@
   "name": "@langwatch/enterprise-saas-contract",
   "version": "0.1.0",
   "private": true,
-  "description": "Portable Enterprise SaaS browser contracts.",
+  "description": "Portable Enterprise SaaS contracts: the LangWatch Cloud API and the browser integrations.",
   "license": "SEE LICENSE IN ../../../LICENSE.md",
   "files": [
     "src"
@@ -22,6 +22,9 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

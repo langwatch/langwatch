@@ -8,6 +8,7 @@ import { EventEmitter } from "node:events";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -41,6 +42,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
+      billing: createApiFixture<BillingApi>(),
     },
     config: undefined,
     resources: createApiFixture<ResourceOwnership>(),
@@ -64,6 +66,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
+      idempotency: { claim: async () => true },
     },
   });
 }

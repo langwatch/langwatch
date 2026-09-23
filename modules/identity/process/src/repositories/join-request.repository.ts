@@ -39,8 +39,20 @@ export abstract class JoinRequestListReadRepository extends JoinRequestReadRepos
     organizationId: string;
   }): Promise<JoinRequestAggregateState[]>;
 
+  /** Who a domain setting admitted with nobody approving, resolved from `resolvedAfterMs`. */
+  abstract findAutomaticJoinsForOrganization(args: {
+    organizationId: string;
+    resolvedAfterMs: number;
+  }): Promise<JoinRequestAggregateState[]>;
+
   /** Everything one person is waiting on. */
   abstract findPendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]>;
+
+  /** The approved requests of these people on one organization; bounded by both. */
+  abstract findApprovedForMembers(args: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<JoinRequestAggregateState[]>;
 }
 
 /**

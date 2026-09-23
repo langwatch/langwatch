@@ -4,6 +4,12 @@ import type { Instant } from "@langwatch/time";
 
 import type { BillableEventRecord } from "../billable-events-meter.repository.ts";
 import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
+import type {
+  ConnectedBillingAccountRecord,
+  ConnectedCreditGrantRecord,
+  ConnectedInvoiceRecord,
+  ConnectedSeatChangeRecord,
+} from "../connected-billing.repository.ts";
 import type { NurturingProfile } from "../nurturing-profile.repository.ts";
 import type { BillingSubscriptionRecord } from "../subscription.repository.ts";
 
@@ -15,6 +21,8 @@ export type MemoryBillingOrganization = {
   pricingModel: string | null;
   currency: string | null;
   license: string | null;
+  /** An operator marked this organization a connected self-hosted customer. */
+  selfHostedCustomer: boolean;
   teamIds: string[];
   signupData: Record<string, unknown>;
 };
@@ -48,6 +56,14 @@ export type MemoryTraceSummary = {
  */
 export class MemoryBillingStore {
   readonly organizations = new Map<string, MemoryBillingOrganization>();
+  /** Connected self-hosted billing accounts, keyed by organization. */
+  readonly connectedBillingAccounts = new Map<string, ConnectedBillingAccountRecord>();
+  readonly connectedSeatChanges = new Map<string, ConnectedSeatChangeRecord>();
+  /** The prepaid credits of one account, oldest first. */
+  readonly connectedCreditGrants = new Map<string, ConnectedCreditGrantRecord[]>();
+  readonly connectedInvoices = new Map<string, ConnectedInvoiceRecord & { accountId: string }>();
+  /** When each account's statement for a month went out, keyed `accountId|month`. */
+  readonly connectedStatements = new Map<string, string>();
   readonly subscriptions: BillingSubscriptionRecord[] = [];
   readonly checkpoints = new Map<string, BillingCheckpoint>();
   readonly organizationOfTenant = new Map<string, string>();

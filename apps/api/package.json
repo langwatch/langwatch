@@ -75,6 +75,7 @@
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/enterprise-managed-provider-process": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
+    "@langwatch/enterprise-saas-process": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/entitlement-process": "workspace:*",
@@ -167,6 +168,8 @@
     "zod-validation-error": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",

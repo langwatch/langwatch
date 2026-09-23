@@ -12,8 +12,8 @@ Feature: Instant Evals inside the Trace Explorer
   - Progress is visible on the table, matches appear as pages finish, and every refusal is a
     closable popover that leaves a phrase search behind, never an error state.
 
-  # The run service, the table's progress and the refusal popover are the Instant Eval module's
-  # own; they arrive with it. What is here is the search bar's half: the handover, how a chip is
+  # The run service and the refusal popover are the Instant Eval module's own; they arrive
+  # with it. What is here is the search bar's half: the handover, how a chip is
   # spelled and keyed, and the four procedures the Explorer drives a run through.
 
   Background:
@@ -30,6 +30,30 @@ Feature: Instant Evals inside the Trace Explorer
       Then the pending estimate is abandoned before the new search runs
       And it cannot come back, start a run and put its chip over what is now on screen
       And the dialog and the refusal popover close with it
+
+    @integration
+    Scenario: A chip typed by hand starts its run on Enter
+      Given the reader types `status:error AND eval:"the user is annoyed"` and no run has answered that chip
+      When Enter is pressed
+      Then the chip is applied so the reader sees what they typed
+      And the run is estimated and started on the question as written, with the other terms as its filter
+      And no model rewrites the question on the way, since the reader wrote it
+      And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
+      And the same question under another target is another chip, kept in the filter of the run that starts
+      And a chip a run already answered is applied with no call at all
+      And a refusal leaves the typed chip where it is rather than replacing it with a phrase search
+      And "Judge these results" under an empty table starts the same run the same way
+
+    @unit
+    Scenario: A space belongs to the question being typed
+      Given the reader has typed `eval:annoyed` with no quotes
+      When they press space
+      Then the value is quoted and the caret stays inside the quotes, so the next words join the question
+      And picking `eval` from the field list opens the quotes for them in the same way
+      And a space inside a value already quoted is typed as a space
+      And a space after an ordinary field's value still ends the term
+      And while the caret is inside the quotes no field list opens on a word of the question
+      And Arrow Right, End or a click leaves the quotes, Enter searches from inside them, and a quote typed against the closing quote steps over it rather than opening a second pair
 
     @unit
     Scenario: The bar names the step between Enter and the progress bar
@@ -63,6 +87,31 @@ Feature: Instant Evals inside the Trace Explorer
       Given a question whose target is not what the lens judges
       When the chip is spelled
       Then it carries the forcing field, quoted, and the bare field otherwise
+
+    @integration
+    Scenario: A registered run is sent with every read the Explorer makes
+      Given a chip `eval:"the user is annoyed"` and a run registered under its key
+      When the list, the facets and the new count are read
+      Then each read carries evalRuns with the question, the target and the run id
+
+    @unit
+    Scenario: An eval chip is green, whatever its target
+      Given the search bar holds `eval:"the user is annoyed"`, `eval.trace:"a"`, `eval.conversation:"b"` and `eval.llm:"c"`
+      When the chips are drawn
+      Then each is drawn as an eval chip, apart from the blue filter chips
+
+    @integration
+    Scenario: An eval chip sweeps while its run is under way
+      Given an eval chip in the search bar
+      When its run is being estimated, started, queued, planned or judged
+      Then a band of light sweeps across the chip from left to right
+      And once the run has finished, stopped or failed the chip rests
+
+    @integration
+    Scenario: A chip with no registered run is pending
+      Given a chip `eval:"the user is annoyed"` and no run under its key
+      When the chips are resolved
+      Then the chip is reported as pending and no evalRuns entry is sent for it
 
   Rule: tRPC wraps the run service for the Explorer
 
@@ -162,3 +211,52 @@ Feature: Instant Evals inside the Trace Explorer
       When the search field registry is read
       Then eval and its three target spellings are published under the eval group
 
+  Rule: Progress is visible while a run judges
+
+    @integration
+    Scenario: A determinate bar reads the run's counters
+      Given a run with total 10,000, progress 3,200 and 412 matched
+      When the progress bar renders
+      Then it reads "Judging 3,200 / 10,000 · 412 matched" with a Stop button
+      And the bar is at 32 percent
+
+    @integration
+    Scenario: Matches appear as pages finish
+      Given a run whose progress moves from 1,000 to 2,000
+      When the poll reports the new progress
+      Then the list and the facets are refetched
+      And while the run judges the list is read again at most every 2 seconds and the facets at most every 8
+      And a read still in flight is left to finish instead of being started again
+      And when the run ends both are read once more, so the settled numbers are final
+
+    @integration
+    Scenario: The header count reads the run's counters during a run
+      Given a run with total 10,000, progress 3,200 and 412 matched
+      When the explorer counts are read
+      Then the summary reads "412 matched so far · 3,200 of 10,000 judged"
+      And after the run finishes the summary is the plain count
+
+    @integration
+    Scenario: Stop cancels the run and keeps the chip as partial
+      Given a running run
+      When Stop is pressed
+      Then cancel is called with the run id
+      And the chip stays, marked partial, with a tooltip naming judged versus total
+      And the partial chip shows the question in quotes, as the running chip does
+
+    @integration
+    Scenario: A stopped run is read until its numbers hold still
+      Given a running run that was asked to stop
+      Then the bar stays and says it is stopping, with Stop disabled
+      When the run's status turns cancelled
+      Then the run is still polled, because the page it held lands its verdicts last
+      And the header, the pagination and the sidebar keep reading the run's counters
+      When a second read answers the same counters
+      Then the list and the facets are read one last time
+      And only after they answer do the bar leave, the chip read partial and the counts read the list's total
+
+    @unit
+    Scenario: A run that ended long before the page opened is settled at once
+      Given a run that finished more than fifteen seconds ago
+      When the page reads it for the first time
+      Then it is settled without a second read, and no bar is shown

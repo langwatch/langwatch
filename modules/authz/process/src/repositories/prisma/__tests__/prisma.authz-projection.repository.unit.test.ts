@@ -119,6 +119,23 @@ describe("PrismaAuthzProjectionRepository", () => {
       expect(updateClause).not.toContain('"revokedAt"');
       expect(updateClause).not.toContain('"revokedReason"');
     });
+
+    /** @scenario "The insert is fenced on the lifetime the fact was stamped against" */
+    it("fences a stamped USER insert on the live membership row", async () => {
+      const { repository, executeRaw } = build();
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow(),
+        membershipStamp: "membership_1",
+      } as GrantProjectionWrite);
+
+      const sql = sqlFrom(executeRaw);
+      expect(sql).toContain('"OrganizationUser"');
+      expect(sql).toContain('"membershipStamp"');
+      expect(sql).toContain("FOR UPDATE");
+      expect(executeRaw.mock.calls[0]).toContain("membership_1");
+    });
   });
 
   describe("given a write that states one field", () => {

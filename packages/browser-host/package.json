@@ -26,6 +26,10 @@
       "types": "./dist/slots.d.ts",
       "default": "./src/slots.tsx"
     },
+    "./declarations": {
+      "types": "./dist/declarations.d.ts",
+      "default": "./src/declarations.ts"
+    },
     "./capabilities": {
       "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"

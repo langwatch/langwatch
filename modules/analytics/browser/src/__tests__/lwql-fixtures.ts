@@ -12,8 +12,9 @@ import type { LangWatchQLQueryResult, LangWatchQLSchema } from "@langwatch/analy
  */
 export const SCHEMA_RESPONSE: LangWatchQLSchema = {
   database: "analytics",
+  functions: [],
   appFunctions: [],
-  datasets: [
+  views: [
     {
       name: "analytics.traces_daily",
       description: "One row per trace, rolled up by day.",
@@ -82,15 +83,15 @@ export const SCHEMA_RESPONSE: LangWatchQLSchema = {
 };
 
 /** Every dataset name the response carries. */
-export const SCHEMA_DATASET_NAMES = SCHEMA_RESPONSE.datasets.map((dataset) => dataset.name);
+export const SCHEMA_DATASET_NAMES = SCHEMA_RESPONSE.views.map((dataset) => dataset.name);
 
 /** Every column name the response carries, gated ones included. */
-export const SCHEMA_COLUMN_NAMES = SCHEMA_RESPONSE.datasets.flatMap((dataset) =>
+export const SCHEMA_COLUMN_NAMES = SCHEMA_RESPONSE.views.flatMap((dataset) =>
   dataset.columns.map((column) => column.name),
 );
 
 /** Every column name the response marks available to this member. */
-export const SCHEMA_AVAILABLE_COLUMN_NAMES = SCHEMA_RESPONSE.datasets.flatMap((dataset) =>
+export const SCHEMA_AVAILABLE_COLUMN_NAMES = SCHEMA_RESPONSE.views.flatMap((dataset) =>
   dataset.columns.filter((column) => column.available).map((column) => column.name),
 );
 
@@ -106,7 +107,6 @@ export function lwqlResult(
       bytesRead: 65_536,
       rowsReturned: 1,
     },
-    truncated: false,
     diagnostics: [],
     followsTimeWindow: true,
     followsGranularity: false,

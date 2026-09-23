@@ -14,6 +14,8 @@ import {
   UnrevokedSsoConnectionDirectory,
 } from "../../services/eventing-sso-connection-teardown.service.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../../services/local-door-break-glass-binding.service.ts";
+import { SsoBreakGlassRecoveryService } from "../../services/sso-break-glass-recovery.service.ts";
+import { RequiresLocalDoorAndBinding } from "../../services/sso-break-glass.service.ts";
 import { SsoConnectionGuardsService } from "../../services/sso-connection-guards.service.ts";
 import { SsoConnectionPipelineDefinitionAdapter } from "../../services/sso-connection-pipeline-definition.service.ts";
 import { SsoConnectionService } from "../../services/sso-connection.service.ts";
@@ -27,6 +29,10 @@ import {
   type PrismaJoinRequestAudienceDatabase,
 } from "./prisma.join-request-audience.repository.ts";
 import {
+  type PrismaSsoBreakGlassDatabase,
+  PrismaSsoBreakGlassRepository,
+} from "./prisma.sso-break-glass.repository.ts";
+import {
   PrismaSsoConnectionProjectionRepository,
   type PrismaSsoConnectionProjectionDatabase,
 } from "./prisma.sso-connection-projection.repository.ts";
@@ -37,6 +43,10 @@ import {
   type PrismaSsoConnectionStrandingDatabase,
 } from "./prisma.sso-connection-reads.repository.ts";
 import {
+  type PrismaSsoConnectionRegistrationDatabase,
+  PrismaSsoConnectionRegistrationRepository,
+} from "./prisma.sso-connection-registration.repository.ts";
+import {
   AdminEmailPlatformOperatorsRepository,
   type PrismaSsoPlatformOperatorDatabase,
 } from "./prisma.sso-platform-operators.repository.ts";
@@ -46,7 +56,9 @@ import {
  * members a domain-proof notice is addressed to, which is the audience the
  * join-request notices already read.
  */
-export type SsoConnectionPipelineDatabase = PrismaSsoConnectionProjectionDatabase &
+export type SsoConnectionPipelineDatabase = PrismaSsoBreakGlassDatabase &
+  PrismaSsoConnectionRegistrationDatabase &
+  PrismaSsoConnectionProjectionDatabase &
   PrismaSsoConnectionReadDatabase &
   PrismaSsoConnectionStrandingDatabase &
   PrismaSsoPlatformOperatorDatabase &
@@ -145,7 +157,13 @@ export class PostgresSsoConnectionPipelineAdapter {
     );
     const guards = SsoConnectionGuardsService.create({
       connections: PrismaSsoConnectionReadRepository.create(database),
-      breakGlass: LocalDoorBreakGlassBindingAdapter.create(),
+      registrationSlots: PrismaSsoConnectionRegistrationRepository.create(database),
+      breakGlass: RequiresLocalDoorAndBinding.create({
+        localDoor: LocalDoorBreakGlassBindingAdapter.create(),
+        bindings: SsoBreakGlassRecoveryService.create({
+          bindings: PrismaSsoBreakGlassRepository.create(database),
+        }),
+      }),
       stranding: PrismaSsoConnectionStrandingRepository.create(database),
       platformOperators: AdminEmailPlatformOperatorsRepository.create({ database, operators }),
     });

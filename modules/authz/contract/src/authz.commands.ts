@@ -75,17 +75,47 @@ export const attachGrantEntrySchema = z
     source: grantEventSourceSchema,
     actor: grantsLedgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
+    /** Current membership lifetime for a USER grant. Imported history omits
+     *  this field so replay keeps its pre-fence behavior. */
+    membershipStamp: z.string().min(1).optional(),
+    /** Only founder creation may use this while its transaction is open. */
+    membershipBootstrap: z.boolean().optional(),
   })
   .strict()
   .refine(grantShapeRefinement.check, {
     message: grantShapeRefinement.message,
     path: [...grantShapeRefinement.path],
-  });
+  })
+  .refine((grant) => !grant.membershipBootstrap || grant.membershipStamp, {
+    message: "membershipBootstrap requires membershipStamp",
+    path: ["membershipStamp"],
+  })
+  .refine(
+    (grant) =>
+      !grant.membershipBootstrap ||
+      (grant.principal.type === "user" &&
+        grant.roleKey === "admin" &&
+        (grant.scope.type === "TEAM" || grant.scope.type === "ORGANIZATION")),
+    {
+      message:
+        "membershipBootstrap is only valid for stamped USER ADMIN organization/team bindings",
+      path: ["membershipBootstrap"],
+    },
+  );
 export type AttachGrantEntry = z.infer<typeof attachGrantEntrySchema>;
 
 export const attachGrantCommandDataSchema = commandDataSchema({
   grant: attachGrantEntrySchema,
-});
+}).refine(
+  (data) =>
+    !data.grant.membershipBootstrap ||
+    data.grant.scope.type !== "ORGANIZATION" ||
+    data.grant.scope.id === data.organizationId,
+  {
+    message: "organization bootstrap must target its tenant organization",
+    path: ["grant", "scope", "id"],
+  },
+);
 export type AttachGrantCommandData = z.infer<typeof attachGrantCommandDataSchema>;
 
 export const changeGrantRoleCommandDataSchema = commandDataSchema({

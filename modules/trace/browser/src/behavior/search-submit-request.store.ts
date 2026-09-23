@@ -1,11 +1,8 @@
-import type { SearchRouteKind } from "@langwatch/trace-contract";
 import { create } from "zustand";
 
 /** A text another part of the page asked the search bar to submit. */
 export interface SearchSubmitRequest {
   text: string;
-  /** The route the caller already knows, passed on to the router. */
-  forceKind?: SearchRouteKind;
   /** Makes two identical requests two distinct values. */
   nonce: number;
 }

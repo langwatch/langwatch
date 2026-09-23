@@ -1,6 +1,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -51,6 +52,7 @@ function harness() {
       presence: createApiFixture<PresenceApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(),
+      billing: createApiFixture<BillingApi>(),
     },
     config: undefined,
     resources: {} as ResourceOwnership,
@@ -69,6 +71,7 @@ function harness() {
       runConfigurations: {} as RunConfigurationsService,
       encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
+      idempotency: { claim: async () => true },
       broadcast: {
         getTenantEmitter: () => {
           throw new Error("the queue path subscribes to nothing");
@@ -346,6 +349,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           presence: createApiFixture<PresenceApi>(),
           auditLog: createApiFixture<AuditLogApi>(),
           traces: createApiFixture<TraceApi>(),
+          billing: createApiFixture<BillingApi>(),
         },
         config: undefined,
         resources: {} as ResourceOwnership,
@@ -363,6 +367,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           runConfigurations: {} as RunConfigurationsService,
           encryption: createApiFixture<Encryption>(),
           rateLimiter: { check: async () => ({ allowed: true }) },
+          idempotency: { claim: async () => true },
           broadcast: {
             getTenantEmitter: () => {
               throw new Error("this read subscribes to nothing");
@@ -395,6 +400,7 @@ describe("given a process that supplies no simulations member but does read Clic
         presence: createApiFixture<PresenceApi>(),
         auditLog: createApiFixture<AuditLogApi>(),
         traces: createApiFixture<TraceApi>(),
+        billing: createApiFixture<BillingApi>(),
       },
       config: undefined,
       resources: {} as ResourceOwnership,
@@ -416,6 +422,7 @@ describe("given a process that supplies no simulations member but does read Clic
         runConfigurations: {} as RunConfigurationsService,
         encryption: createApiFixture<Encryption>(),
         rateLimiter: { check: async () => ({ allowed: true }) },
+        idempotency: { claim: async () => true },
         broadcast: {
           getTenantEmitter: () => {
             throw new Error("this read subscribes to nothing");

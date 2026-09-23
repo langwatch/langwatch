@@ -89,6 +89,13 @@ describe("the sign-in capability auth publishes", () => {
       expect(subject.normalizeSignInErrorCode("account_not_linked")).toBe("OAuthAccountNotLinked");
     });
 
+    /** @scenario "A SAML account-link refusal is explained as a local sign-in failure" */
+    it("folds the SAML plugin's spaced spelling onto the same code", () => {
+      const { subject } = capability({ data: {} });
+
+      expect(subject.normalizeSignInErrorCode("account not linked")).toBe("OAuthAccountNotLinked");
+    });
+
     it("leaves a code it has nothing to say about alone", () => {
       const { subject } = capability({ data: {} });
 

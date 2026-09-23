@@ -40,6 +40,12 @@ export type DataPrivacyMetricAttributes = {
 /** Callable data-privacy operations shared by process peers after composition. */
 export interface DataPrivacyApi {
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;
+  /**
+   * Hands the deployment's Google service-account credential, which this
+   * module owns, to `build` — undefined where none is configured — and
+   * answers what `build` made of it: the value never leaves the closure.
+   */
+  intoGoogleApplicationCredentials<Out>(build: (credential: string | undefined) => Out): Out;
   listOrganizationRules(input: { organizationId: string }): Promise<DataPrivacyPolicy[]>;
   /**
    * The system write, anchored to an organization the caller already resolved.

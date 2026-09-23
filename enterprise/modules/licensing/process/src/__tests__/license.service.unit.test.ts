@@ -21,9 +21,12 @@ import {
 } from "../testing.ts";
 
 /** A freshly minted key, bound to one organization or to none. */
-function mintLicenseKey(options: { organizationId?: string } = {}): string {
+function mintLicenseKey(
+  options: { organizationId?: string; connectServices?: string[] } = {},
+): string {
   return LicenseGenerationService.create(NodeLicenseCryptographyAdapter.create()).generate({
     ...(options.organizationId ? { organizationId: options.organizationId } : {}),
+    ...(options.connectServices ? { connectServices: options.connectServices } : {}),
     organizationName: "Acme Corp",
     email: "buyer@acme.com",
     planType: "GROWTH",
@@ -119,6 +122,16 @@ describe("LicenseService", () => {
   let logger: RecordingLicenseLogger;
   let service: LicenseService;
 
+  /** The same service, on a deployment an operator licensed with `LANGWATCH_LICENSE_KEY`. */
+  function serviceWithInstanceKey(instanceLicenseKey: string): LicenseService {
+    return LicenseService.create({
+      repository,
+      cryptography: NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY }),
+      logger,
+      instanceLicenseKey,
+    });
+  }
+
   beforeEach(() => {
     repository = new MemoryLicenseRepository();
     retention = new MemoryLicenseRetention();
@@ -144,9 +157,7 @@ describe("LicenseService", () => {
 
   /** @scenario "Inspect platform access for another feature" */
   it("lets a valid instance license satisfy platform access without listing organizations", async () => {
-    const result = await service.inspectPlatformAccess({
-      instanceLicenseKey: VALID_LICENSE_KEY,
-    });
+    const result = await serviceWithInstanceKey(VALID_LICENSE_KEY).inspectPlatformAccess();
 
     expect(result).toMatchObject({
       allowed: true,
@@ -163,9 +174,7 @@ describe("LicenseService", () => {
       validatedAt: Temporal.Instant.from("1999-01-01T00:00:00.000Z"),
     });
 
-    const result = await service.inspectPlatformAccess({
-      instanceLicenseKey: TAMPERED_LICENSE_KEY,
-    });
+    const result = await serviceWithInstanceKey(TAMPERED_LICENSE_KEY).inspectPlatformAccess();
 
     expect(result.allowed).toBe(true);
     expect(result.inspections).toEqual([
@@ -198,7 +207,7 @@ describe("LicenseService", () => {
       validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
     });
 
-    const result = await service.inspectPlatformAccess({});
+    const result = await service.inspectPlatformAccess();
 
     expect(result.allowed).toBe(true);
   });
@@ -256,6 +265,61 @@ describe("LicenseService", () => {
     expect(repository.stored.size).toBe(0);
   });
 
+  describe("when platform single sign-on is asked about", () => {
+    /** @scenario "One organization's genuine license enables SSO for the whole deployment" */
+    it("answers licensed when any organization holds a genuine license, and scans once per process", async () => {
+      repository.stored.set(ORGANIZATION_ID, {
+        licenseKey: EXPIRED_LICENSE_KEY,
+        expiresAt: Temporal.Instant.from("2000-01-01T00:00:00.000Z"),
+        validatedAt: Temporal.Instant.from("1999-01-01T00:00:00.000Z"),
+      });
+
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(true);
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(true);
+      expect(repository.listCalls).toBe(1);
+    });
+
+    it("answers unlicensed where no organization holds a genuine license", async () => {
+      repository.stored.set(ORGANIZATION_ID, {
+        licenseKey: TAMPERED_LICENSE_KEY,
+        expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+        validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
+      });
+
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+    });
+
+    it("counts the deployment's own instance license without scanning", async () => {
+      await expect(
+        serviceWithInstanceKey(VALID_LICENSE_KEY).isPlatformSsoLicensed({ isSaas: false }),
+      ).resolves.toBe(true);
+      expect(repository.listCalls).toBe(0);
+    });
+
+    it("answers licensed on LangWatch Cloud without scanning", async () => {
+      await expect(service.isPlatformSsoLicensed({ isSaas: true })).resolves.toBe(true);
+      expect(repository.listCalls).toBe(0);
+    });
+
+    it("denies while the scan fails, and scans again on the next ask", async () => {
+      const findOrganizationsWithLicense = repository.findOrganizationsWithLicense.bind(repository);
+      let failing = true;
+      repository.findOrganizationsWithLicense = async () => {
+        if (failing) throw new Error("database unreachable");
+        return findOrganizationsWithLicense();
+      };
+      repository.stored.set(ORGANIZATION_ID, {
+        licenseKey: VALID_LICENSE_KEY,
+        expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+        validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
+      });
+
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+      failing = false;
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(true);
+    });
+  });
+
   /** @scenario "A license activates only on the organization it was issued for" */
   it("activates a license issued for this organization", async () => {
     const result = await service.validateAndStoreLicense({
@@ -285,7 +349,7 @@ describe("LicenseService", () => {
       validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
     });
 
-    const result = await service.inspectPlatformAccess({});
+    const result = await service.inspectPlatformAccess();
 
     expect(result.allowed).toBe(false);
     expect(result.inspections).toEqual([
@@ -319,6 +383,27 @@ describe("LicenseService", () => {
       type: "PRO",
       maxMembers: 5,
       free: false,
+    });
+  });
+
+  it("reads a license naming a hosted service as connected, and an offline one as not", async () => {
+    const store = (licenseKey: string) =>
+      repository.stored.set(ORGANIZATION_ID, {
+        licenseKey,
+        expiresAt: Temporal.Instant.fromEpochMilliseconds(0),
+        validatedAt: Temporal.Instant.fromEpochMilliseconds(0),
+      });
+
+    store(mintLicenseKey({ connectServices: ["instant_evals"] }));
+    await expect(service.getLicenseStatus(ORGANIZATION_ID)).resolves.toMatchObject({
+      valid: true,
+      connected: true,
+    });
+
+    store(mintLicenseKey());
+    await expect(service.getLicenseStatus(ORGANIZATION_ID)).resolves.toMatchObject({
+      valid: true,
+      connected: false,
     });
   });
 

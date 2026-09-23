@@ -1,12 +1,12 @@
 /**
  * The questions the LangWatchQL analytics SQL API answers, asked against an
  * engineered seed across two tenants.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @vitest-environment node
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
+import { langWatchQLKeyReach, MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { LocalFeatureApis } from "@langwatch/kernel";
 import { Temporal } from "@langwatch/time";
@@ -29,12 +29,7 @@ import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capabi
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
-import {
-  AnalyticsQueryApi,
-  langWatchQLCallerProtections,
-  langWatchQLCallerReach,
-  queryRest,
-} from "../query.rest.ts";
+import { AnalyticsQueryApi, queryRest } from "../query.rest.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 
@@ -1043,8 +1038,8 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // the reader rather than making itself.
       expect(codes(result)).toEqual(["POSSIBLE_FANOUT"]);
       expect(diagnostic(result, "POSSIBLE_FANOUT").meta).toMatchObject({
-        dataset: `${database}.traces`,
-        multipliedBy: `${database}.evaluations`,
+        view: `${database}.traces`,
+        multipliedByView: `${database}.evaluations`,
       });
     });
   });
@@ -1231,8 +1226,8 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       const fanout = diagnostic(result, "POSSIBLE_FANOUT");
       expect(codes(result)).toEqual(["POSSIBLE_FANOUT"]);
       expect(fanout.meta).toMatchObject({
-        dataset: `${database}.traces`,
-        multipliedBy: `${database}.spans`,
+        view: `${database}.traces`,
+        multipliedByView: `${database}.spans`,
         unmatchedGrainColumns: ["SpanId"],
         aggregated: true,
       });
@@ -1341,7 +1336,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       expect(Number(result.rows[0].value)).toBeGreaterThan(0);
       expect(codes(result)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(diagnostic(result, "UNBOUNDED_TIME_RANGE").meta).toEqual({
-        dataset: `${database}.traces`,
+        view: `${database}.traces`,
         timeColumn: "OccurredAt",
       });
 
@@ -1374,16 +1369,27 @@ function mountQueryDoor({
     // tenant, resolved as the project scope every handler reads.
     identity: {
       authenticate: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: projectScope() }),
+      identify: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: projectScope() }),
     },
   });
 
+  // The scope a key resolves to, faked: the one authenticated tenant, fully permitted.
+  const protections = { canSeeCosts: true, canSeeCapturedInput: true, canSeeCapturedOutput: true };
   const queryApi: AnalyticsQueryApi = {
-    resolveApiKeyRunCaller: async () => tenant(),
-    describeLangWatchQLSchema: async ({ protections }) => service().describeSchema({ protections }),
-    describeQueryReference: async ({ protections, canRunLangWatchQL }) =>
+    runLangWatchQLForKey: ({ sql, parameters, timeWindow, granularitySeconds }) =>
+      service().executeForProjects({
+        projects: [tenant()],
+        protections,
+        sql,
+        ...(parameters ? { parameters } : {}),
+        ...(timeWindow ? { timeWindow } : {}),
+        ...(granularitySeconds === undefined ? {} : { granularitySeconds }),
+      }),
+    describeLangWatchQLSchemaForKey: async () => service().describeSchema({ protections }),
+    describeQueryReferenceForKey: async () =>
       buildQueryReference({
         protections,
-        lwqlEnabled: canRunLangWatchQL,
+        lwqlEnabled: true,
         database: LWQL_EXAMPLE_DATABASE,
         schema: service().describeSchema({ protections }),
         limits: {
@@ -1394,7 +1400,6 @@ function mountQueryDoor({
         },
         traceFilterExamples: TRACE_FILTER_EXAMPLES,
       }),
-    executeLangWatchQL: (input) => service().execute(input),
   };
 
   // Reached through the operations-only feature-API proxy, the way the
@@ -1411,12 +1416,10 @@ function mountQueryDoor({
       app: () => apis.reference(AnalyticsQueryApi),
       onError: renderHandled,
       facts: [
-        bindRestMiddleware(langWatchQLCallerProtections, () => ({
-          canSeeCosts: true,
-          canSeeCapturedInput: true,
-          canSeeCapturedOutput: true,
+        bindRestMiddleware(langWatchQLKeyReach, () => ({
+          kind: "project" as const,
+          projectId: tenant().id,
         })),
-        bindRestMiddleware(langWatchQLCallerReach, () => ({ canRunLangWatchQL: true })),
       ],
     }),
   );

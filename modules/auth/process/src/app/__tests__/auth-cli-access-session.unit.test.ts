@@ -1,6 +1,8 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { cliAccessTokenKey } from "@langwatch/auth-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
@@ -34,6 +36,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       passkeyHandleSecret: undefined,
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
+      localPasswords: false,
     },
     repositories,
     dependencies: {
@@ -42,6 +45,8 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       featureFlags: createApiFixture<FeatureFlagApi>(),
       identity: createApiFixture<IdentityApi>(),
       organizations: createApiFixture<OrganizationApi>(),
+      entitlements: createApiFixture<EntitlementApi>(),
+      auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
     },
     members: {
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },

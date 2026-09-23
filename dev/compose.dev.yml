@@ -248,7 +248,7 @@ services:
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
       RELEASE_UI_SUITES_ENABLED: "1"
       # Use email login for dev (no Auth0 dependency)
-      NEXTAUTH_PROVIDER: "email"
+      AUTH_PROVIDER: "email"
       # Where Vite proxies /api. On the host the default is PORT+1000 on
       # loopback; in compose the API is a sibling service, so it is named.
       LANGWATCH_API_URL: http://api:6560
@@ -320,7 +320,7 @@ services:
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:${APP_PORT:-5560}}
       RELEASE_UI_SIMULATIONS_MENU_ENABLED: "1"
       RELEASE_UI_SUITES_ENABLED: "1"
-      NEXTAUTH_PROVIDER: "email"
+      AUTH_PROVIDER: "email"
     env_file:
       - .env
       - path: .env.dev-up

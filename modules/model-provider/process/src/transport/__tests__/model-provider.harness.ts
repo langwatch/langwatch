@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * What a mounted model-provider declaration runs on in a test: the runtime's
@@ -8,7 +9,6 @@ import type {
   ModelProviderApi,
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
 import type { ModelProviderApp } from "../../app/model-provider.app.ts";
@@ -166,6 +166,8 @@ export function mountableModelProviderApp(options: {
 function forwarded(app: ModelProviderApp): ModelProviderApi {
   return {
     estimateCost: (...args) => app.estimateCost(...args),
+    countUsage: (...args) => app.countUsage(...args),
+    platformProviderChain: (...args) => app.platformProviderChain(...args),
     listForProject: (...args) => app.listForProject(...args),
     listForOrganization: (...args) => app.listForOrganization(...args),
     getForProject: (...args) => app.getForProject(...args),

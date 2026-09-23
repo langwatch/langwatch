@@ -355,6 +355,12 @@ const buildTargetNode = (
           throw new Error(
             `Connected agent target ${targetConfig.id} cannot run inside an experiment workflow`,
           );
+        case "voice":
+          // A voice agent runs as a scenario against a live call, not as an
+          // experiment cell — there is no node that dials the transport.
+          throw new Error(
+            `Voice agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
         default: {
           // Every declared agent type is handled above, so the narrowing has
           // nothing left here and `loadedData.agent` is itself `never`. The

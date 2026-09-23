@@ -195,7 +195,6 @@ const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
 const REDACTED_SCALAR_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "secrets.create": ["value"],
   "secrets.update": ["value"],
-  "license.generate": ["privateKey"],
   "license.upload": ["licenseKey"],
 };
 
@@ -255,6 +254,7 @@ function redactSensitiveNames(value: unknown, depth = 0): unknown {
 
   for (const [name, field] of Object.entries(record)) {
     if (isSensitiveFieldName(name)) {
+      if (field === "") continue;
       next ??= { ...record };
       next[name] = redactObjectField(field) ?? "[redacted]";
       continue;

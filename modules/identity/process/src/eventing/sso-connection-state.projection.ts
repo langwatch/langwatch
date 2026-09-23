@@ -267,7 +267,19 @@ export type SsoConnectionFoldState = SsoConnectionState & {
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
+  /** Recovery reservations carried by activation events in this fold batch;
+   *  the store consumes them in the same transaction as the head. */
+  ActivationReservationCommandIds?: readonly string[];
 };
+
+function withReservationCommandId(
+  held: readonly string[] | undefined,
+  commandId: string | undefined,
+): readonly string[] {
+  const reservations = held ?? [];
+  if (commandId === undefined || reservations.includes(commandId)) return reservations;
+  return [...reservations, commandId];
+}
 
 /**
  * Postgres `SsoConnection` row per connection, applied through `.withProjection()`'s direct
@@ -450,7 +462,13 @@ export class SsoConnectionStateFoldProjection
     event: ConnectionActivatedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
-    return this.fold(event, state);
+    return {
+      ...this.fold(event, state),
+      ActivationReservationCommandIds: withReservationCommandId(
+        state.ActivationReservationCommandIds,
+        event.data.activationReservationCommandId,
+      ),
+    };
   }
 
   handleIdentityConnectionSuspended(
@@ -464,7 +482,13 @@ export class SsoConnectionStateFoldProjection
     event: ConnectionResumedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
-    return this.fold(event, state);
+    return {
+      ...this.fold(event, state),
+      ActivationReservationCommandIds: withReservationCommandId(
+        state.ActivationReservationCommandIds,
+        event.data.activationReservationCommandId,
+      ),
+    };
   }
 
   handleIdentityTeardownRequested(

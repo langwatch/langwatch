@@ -20,10 +20,11 @@ const projectScope = {
 
 const key = { type: "apiKey", id: "key-1" } as const;
 
-const projectBinding = (role: CollectedBinding["role"]): CollectedBinding[] => [
+const projectBinding = (
+  roleKey: CollectedBinding["roleKey"],
+): CollectedBinding[] => [
   {
-    role,
-    customRoleId: null,
+    roleKey,
     scopeType: "PROJECT",
     scopeId: PROJECT,
     viaGroupId: null,
@@ -46,9 +47,11 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
     const reader = () =>
       makeReader({
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
-        findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
-        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
-        findUserBindings: vi.fn().mockResolvedValue(projectBinding("VIEWER")),
+        findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("admin")),
+        findOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findUserBindings: vi.fn().mockResolvedValue(projectBinding("viewer")),
       });
 
     /** @scenario "Permission decisions are unchanged by the package move" */
@@ -100,7 +103,7 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
     it("decides from the key's own grants alone", async () => {
       const reader = makeReader({
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: null }),
-        findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
+        findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("admin")),
       });
 
       const decision = await makeAuthz(reader).check({
@@ -118,7 +121,7 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
     it("decides from the key's own grants alone, like a service key", async () => {
       const reader = makeReader({
         findApiKeyOwner: vi.fn().mockResolvedValue(null),
-        findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
+        findApiKeyBindings: vi.fn().mockResolvedValue(projectBinding("admin")),
       });
 
       const decision = await makeAuthz(reader).check({
@@ -134,8 +137,10 @@ describe("AuthzService and the api-key owner ceiling (ADR-092 §9)", () => {
   describe("given a user principal", () => {
     it("never looks for an owner", async () => {
       const reader = makeReader({
-        findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
-        findUserBindings: vi.fn().mockResolvedValue(projectBinding("ADMIN")),
+        findOrganizationMembership: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabled: false }),
+        findUserBindings: vi.fn().mockResolvedValue(projectBinding("admin")),
       });
 
       const decision = await makeAuthz(reader).check({

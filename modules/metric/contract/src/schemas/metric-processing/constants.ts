@@ -1,3 +1,5 @@
+export const METRIC_PROCESSING_PIPELINE_NAME = "metric_processing" as const;
+
 export const METRIC_DATA_POINT_RECEIVED_EVENT_TYPE = "lw.obs.metric.data_point_received" as const;
 export const METRIC_DATA_POINT_RECEIVED_EVENT_VERSION_LATEST = "2026-07-15" as const;
 
@@ -20,3 +22,6 @@ export const MAX_CANONICAL_METRIC_PAYLOAD_BYTES = 256 * 1024;
 export const DEFAULT_METRIC_COMMAND_SHARDS = 16;
 export const MIN_METRIC_COMMAND_SHARDS = 1;
 export const MAX_METRIC_COMMAND_SHARDS = 128;
+
+/** Product ceiling, not a deployment fact: no environment spells it. */
+export const METRIC_DEFAULT_RETENTION_DAYS = 30;

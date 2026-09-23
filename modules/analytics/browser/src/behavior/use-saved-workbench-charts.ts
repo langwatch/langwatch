@@ -2,7 +2,7 @@
  * Saving and reopening the chart a member built in the workbench. One
  * piece of state — which saved chart is open — decides whether Save
  * writes back or creates, so pressing Save twice never orphans a chart.
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";

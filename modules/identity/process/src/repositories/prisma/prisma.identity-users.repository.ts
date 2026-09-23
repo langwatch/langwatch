@@ -3,7 +3,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { IdentityUsersRepository } from "../identity-users.repository.ts";
 
 /** The one model the identity guards touch on the legacy side of the fork. */
-export type PrismaIdentityUsersDatabase = Pick<PrismaClient, "user">;
+export type PrismaIdentityUsersDatabase = Pick<PrismaClient, "user" | "$executeRaw">;
 
 /**
  * The two `User` columns identity touches. `userHashKey` is written only
@@ -24,10 +24,16 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
     userId: string;
     userHashKey: string;
   }): Promise<void> {
-    await this.database.user.updateMany({
-      where: { id: userId, userHashKey: null },
-      data: { userHashKey },
-    });
+    // As SQL so a mint parked on the row lock re-checks the committed row;
+    // `updateMany`'s subquery would let the second writer overwrite the first.
+    await this.database.$executeRaw`
+      -- @tenancy: User is an identity table, addressed by its own id.
+      UPDATE "User"
+         SET "userHashKey" = ${userHashKey},
+             "updatedAt" = now()
+       WHERE "id" = ${userId}
+         AND "userHashKey" IS NULL
+    `;
   }
 
   async tryFindEmail({ userId }: { userId: string }): Promise<string | null> {

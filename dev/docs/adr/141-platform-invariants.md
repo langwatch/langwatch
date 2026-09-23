@@ -2,18 +2,19 @@
 
 **Date:** 2026-09-09
 
-**Status:** Proposed
+**Status:** Proposed. Amended 2026-09-23: the ast-grep rows and three plugin rules
+are gone, and the fetch timeout is a plugin rule (see the last section).
 
 **Behavioural contract:**
 [One clock](../../../specs/tooling/lint-temporal-only.feature),
 [id origin](../../../specs/tooling/lint-id-generation-origin.feature),
 [environment boundaries](../../../specs/tooling/lint-environment-boundaries.feature),
-[secrets through the source chain](../../../specs/tooling/lint-secrets-through-source.feature),
 [a service given its config](../../../specs/tooling/lint-service-loads-its-own-config.feature),
 [plan literals](../../../specs/tooling/lint-plan-literals.feature),
-[raw Hono mounts](../../../specs/tooling/lint-no-raw-hono-mount.feature),
-[API context services](../../../specs/tooling/lint-api-context-services.feature),
-[the ast-grep invariants](../../../specs/tooling/lint-platform-invariants.feature)
+[fetch timeouts](../../../specs/tooling/lint-require-fetch-timeout.feature),
+[boot hooks](../../../specs/tooling/lint-no-boot-hook-outside-guard.feature),
+[inline dynamic imports](../../../specs/tooling/lint-no-inline-dynamic-import.feature),
+[the explicit-any scope](../../../specs/tooling/lint-platform-invariants.feature)
 
 **Related:** [ADR-132: secrets are not configuration](./132-secrets-are-not-config.md),
 [ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md),
@@ -44,21 +45,17 @@ quotes a customer a different number on a different page.
 | `langwatch/temporal-only` | plugin | No `Date` in governed source: not `new Date`, `Date.now`, `Date.parse`, `Date.UTC`, nor a value typed `Date`. The Prisma seam, the two named conversion helpers and the time package keep theirs. |
 | `langwatch/id-generation-origin` | plugin | Ids are ksuids behind a kind prefix: no `nanoid`, no `uuid`, no `crypto.randomUUID()`. An `idempotencyKey` is not an id and is exempt. |
 | `langwatch/idempotency-key-is-stable` | plugin | An `idempotencyKey` is not minted where the request is built, because every attempt would then carry a different key. Derive it from the request's own content, or bind it once for the operation it identifies. |
-| `langwatch/environment-boundaries` | plugin | Only a `platform/config/` module or a process boot file reads `process.env`. |
-| `langwatch/secrets-through-source` | plugin | A key classified in `@langwatch/secrets/keys.json` is never read straight from the environment. See ADR-132. |
-| `langwatch/service-loads-its-own-config` | plugin | A service or adapter under `server/src/{services,adapters}` does not declare its own `loadConfig`/`resolveConfig`/`readConfig` or read `process.env`; config is a named member of the argument `create` takes. See fc80f65635. |
+| `langwatch/environment-boundaries` | plugin | Only an app's `src/main.ts` or `src/config.ts` reads `process.env`; a module declares the key in its config schema and takes the parsed value. |
+| `langwatch/service-loads-its-own-config` | plugin | A service does not declare its own `loadConfig`/`resolveConfig`/`readConfig`; config is a named member of the argument `create` takes. See fc80f65635. |
 | `langwatch/plan-literals` | plugin | Two or more plan limit fields in one object outside `@langwatch/plans` is a second plan definition. |
-| `langwatch/no-raw-hono-mount` | plugin | Mount through `app.access(policy)`; a verb on the raw Hono app is a route the access policy never saw. |
-| `langwatch/api-context-services` | plugin | An API class does not construct services, cast its context to recover them, take per-request resolvers, or double-await one call. |
-| `no-localhost-fallback` | ast-grep | No `?? "http://localhost:..."`. A required variable is validated in the Zod schema and consumed without a fallback. |
-| `require-fetch-timeout` | ast-grep | `fetch(...)` carries `signal: AbortSignal.timeout(ms)`, or it hangs as long as the peer holds the socket. |
-| `no-export-star-shim` | ast-grep | `export * from "..."` is a backwards-compatibility shim; update the consumers instead. |
-| `no-double-type-assertion` | ast-grep | `x as unknown as T` switches the type checker off; a single `as T` at least has to prove an overlap. |
-| `no-clickhouse-env-skip-guard` | ast-grep | An inverted ClickHouse skip guard means "always skip", so the suite reports green having run nothing. |
+| `langwatch/require-fetch-timeout` | plugin | A `fetch` in a channel carries an abort signal, or it hangs as long as the peer holds the socket. |
+| `langwatch/no-boot-hook-outside-guard` | plugin | A process lifecycle listener is registered only by the boot guard: the `Server` for a long-running process, `bootNodeExecutable` for a one-shot. |
+| `langwatch/no-inline-dynamic-import` | plugin | No inline `import(…)`; a dependency is a top-level import. |
+| `langwatch/em-dash-in-copy` | plugin | No em dash in customer-facing copy. |
 
 Every plugin rule here is a candidate for oxlint configuration and is
-deliberately not written there yet: ADR-135 records the classification, the
-718 baseline entries in the way, and the message-quality cost.
+deliberately not written there yet: ADR-135 records the classification and the
+message-quality cost. (The 718 baseline entries once in the way are gone.)
 
 `no-explicit-any` was deleted from ast-grep under ADR-135's class-A migration
 and its built-in replacement, `typescript/no-explicit-any`, was measured
@@ -69,6 +66,8 @@ file. `pnpm lint:oxlint` runs `--quiet`, which makes a "warn" severity
 invisible and an unbaselined "error" a hard failure on every one of the
 1,782 - neither is what "enabled" should mean, so `typescript/no-explicit-any`
 carries no row here and no config line. See `specs/tooling/lint-platform-invariants.feature`.
+On 2026-09-23 it was enabled at `error` for TypeScript source outside tests, by
+an `overrides` block rather than workspace-wide (ADR-135).
 
 ## Consequences
 
@@ -79,10 +78,6 @@ by hand: the boundary helpers for `Date`, the config and boot paths for
 `process.env`, the CLI startup path for `import()`. An exemption list that
 grows is the signal the invariant is wrong, not that the rule is annoying.
 
-`no-clickhouse-env-skip-guard` is here rather than under test quality on
-purpose: an inverted skip guard is not a bad test, it is a suite that reports
-success without running, which is the failure mode this repository has been
-bitten by.
 
 ## Amendment, 2026-09-17: `no-inline-dynamic-import` (ast-grep) deleted as a duplicate
 
@@ -91,3 +86,17 @@ oxlint plugin rule it duplicated — scoped to `apps/**` + `packages/**`, missin
 every file under `modules/**` — and worded differently for the same shape. The
 plugin rule is the one of record now; its files, fixtures and this table row
 are gone.
+
+## Amendment, 2026-09-23: ast-grep, secrets and the Hono rules are gone
+
+ast-grep was removed. `require-fetch-timeout` became a plugin rule scoped to
+channels; `no-localhost-fallback`, `no-double-type-assertion` and
+`no-clickhouse-env-skip-guard` were deleted (the last had no live target, and
+`langwatch/stand-in-cast` refuses the double cast); `no-export-star-shim` was
+deleted because the tree's barrels are legitimate `export *`.
+
+`langwatch/secrets-through-source` was deleted: it held an empty key set and
+never fired. `langwatch/no-raw-hono-mount` and `langwatch/api-context-services`
+were deleted with the shapes they guarded. `no-console` and
+`no-restricted-imports` joined this family as native rules scoped to process
+source (ADR-135).

@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Evaluator application with memory persistence and stub collaborators;
  * repository is real but in-memory.
@@ -7,7 +8,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { vi } from "vitest";
@@ -95,6 +96,7 @@ export function createEvaluatorTestApp(
       },
       config: undefined,
       resources: new ResourceScope(),
+      secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     },
     graph,
   );

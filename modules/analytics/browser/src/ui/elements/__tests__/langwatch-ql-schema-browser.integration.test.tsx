@@ -129,7 +129,7 @@ describe("the LangWatchQL schema browser", () => {
             name: "Insert example query for analytics.traces_daily",
           }),
         );
-        expect(onInsert).toHaveBeenCalledWith(SCHEMA_RESPONSE.datasets[0]!.exampleSql);
+        expect(onInsert).toHaveBeenCalledWith(SCHEMA_RESPONSE.views[0]!.exampleSql);
       });
     });
 

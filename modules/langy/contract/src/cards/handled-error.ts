@@ -330,6 +330,69 @@ const TERMINAL_STATUSES = new Set([401, 402, 403, 404, 410]);
 export const isTerminalFailure = (error: CliHandledError): boolean =>
   error.isHandled && TERMINAL_STATUSES.has(error.httpStatus);
 
+/**
+ * The constructors raised for a fault in the PROGRAM, not a request that did
+ * not answer. `SyntaxError` is absent: with no status it is almost always
+ * `response.json()` over a body that was not JSON, which a retry can clear.
+ */
+const PROGRAM_FAULT_NAMES = new Set(["TypeError", "RangeError", "ReferenceError"]);
+
+/**
+ * The codes a transport failure arrives with, as libuv and OpenSSL spell them.
+ * A named set rather than a SCREAMING_SNAKE shape, because Node writes its own
+ * program-fault codes that way too (`TypeError [ERR_INVALID_URL]`).
+ */
+const TRANSPORT_CODES = new Set([
+  // libuv, the codes a socket, a DNS lookup or a connection carries.
+  "EADDRNOTAVAIL",
+  "EAI_AGAIN",
+  "ECANCELED",
+  "ECONNABORTED",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "EHOSTDOWN",
+  "EHOSTUNREACH",
+  "ENETDOWN",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EPIPE",
+  "EPROTO",
+  "ETIMEDOUT",
+  // OpenSSL, verifying the certificate the other end presented.
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+]);
+
+/** True for a code the transport put there; `UND_ERR_` is undici's own prefix. */
+const isTransportCode = (code: unknown): boolean =>
+  typeof code === "string" && (TRANSPORT_CODES.has(code) || code.startsWith("UND_ERR_"));
+
+/**
+ * Evidence the throw came from the TRANSPORT: the cause carries
+ * `syscall`/`errno`, or a transport code of its own for a TLS failure.
+ * `originalError` is scanned too, because the SDK wraps a throw under it.
+ */
+const hasTransportEvidence = (error: unknown): boolean => {
+  const outer = asRecord(error);
+  const original = asRecord(outer?.originalError);
+  return [outer, asRecord(outer?.cause), original, asRecord(original?.cause)].some(
+    (candidate) =>
+      typeof candidate?.syscall === "string" ||
+      typeof candidate?.errno === "number" ||
+      isTransportCode(candidate?.code),
+  );
+};
+
+/** True when the throw is a fault in our own code rather than a failed request. */
+const isProgramFault = (error: unknown): boolean =>
+  error instanceof Error && PROGRAM_FAULT_NAMES.has(error.name) && !hasTransportEvidence(error);
+
 /** A stable code for a failure the platform did not name itself. */
 const codeForStatus = (status: number): string => {
   if (status === 401 || status === 403) return "unauthorized";
@@ -534,10 +597,40 @@ export const handledErrorFromThrown = (error: unknown): CliHandledError => {
   const status = statusOf(cause) || statusOf(outer);
   const parsed = parseHandledError({ status, body: cause });
 
+  const message = error instanceof Error && error.message ? error.message : parsed.message;
+
+  // A transport failure is infrastructure whatever system error it carries.
+  // `isSystemError` disqualifies by `errno`/`syscall`, which misses a TLS
+  // failure: that one carries neither, so its code read as a discriminant the
+  // platform had chosen. The throw fetch makes is the tell.
+  if (status === 0 && hasTransportEvidence(error)) {
+    return {
+      code: "network_error",
+      kind: "network_error",
+      message,
+      httpStatus: 0,
+      meta: {},
+      isHandled: false,
+      retryable: false,
+    };
+  }
+
+  // No status and a program fault: the request is not what failed, so do not
+  // send the reader to their network. Read BEFORE the envelope, because the
+  // runtime hangs codes of its own on these throws and a code Node chose is
+  // not a discriminant the platform chose.
+  if (status === 0 && isProgramFault(error)) {
+    return {
+      ...parsed,
+      code: "internal_error",
+      kind: "internal_error",
+      message,
+      meta: {},
+      isHandled: false,
+    };
+  }
+
   if (parsed.isHandled) return parsed;
 
-  return {
-    ...parsed,
-    message: error instanceof Error && error.message ? error.message : parsed.message,
-  };
+  return { ...parsed, message };
 };

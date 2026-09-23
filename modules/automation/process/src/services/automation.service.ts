@@ -26,6 +26,7 @@ import {
   type WebhookDeliveryRow,
   type AutomationPersistCapCount,
   type AutomationPersistCapDecision,
+  type AutomationUsageCount,
 } from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
 
@@ -97,6 +98,13 @@ export class AutomationService {
       deps.templates,
       deps.persistCaps,
     );
+  }
+
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AutomationUsageCount> {
+    return this.triggers.countUsage(input);
   }
 
   validateTemplateDraft(input: TestFireTemplateDraft): void {

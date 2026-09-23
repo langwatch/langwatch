@@ -1,3 +1,5 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
+
 import type { TopicRepositories } from "../topic.repositories.ts";
 import { MemoryTopicClusteringRepository } from "./memory.topic-clustering.repository.ts";
 import { MemoryTopicRepository } from "./memory.topic.repository.ts";
@@ -16,6 +18,7 @@ export class MemoryTopicRepositories {
     return {
       topics: MemoryTopicRepository.create(store),
       clustering: MemoryTopicClusteringRepository.create(store),
+      processStore: InMemoryProcessStore.createForLocalDevelopment(),
     };
   }
 }

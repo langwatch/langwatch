@@ -70,6 +70,43 @@ async function assertNotTheLastWayIn({
  * itself, which is what keeps a previous end date readable after a renewal.
  */
 export class PrismaSsoBreakGlassRepository extends SsoBreakGlassRepository {
+  /** Spends an activation's recovery reservation once the head it rests on is projected. */
+  static async consumeReservationInTransaction(
+    tx: Prisma.TransactionClient,
+    args: { organizationId: string; connectionId: string; commandId: string },
+  ): Promise<void> {
+    await tx.$executeRaw`
+      DELETE FROM "SsoActivationRecoveryReservation"
+      WHERE "commandId" = ${args.commandId}
+        AND "organizationId" = ${args.organizationId}
+        AND "connectionId" = ${args.connectionId}
+    `;
+  }
+
+  /** Clears a reservation only after the same transaction projected a terminal state. */
+  static async cancelReservationInTransaction(
+    tx: Prisma.TransactionClient,
+    args: { organizationId: string; connectionId: string },
+  ): Promise<void> {
+    await tx.$executeRaw`
+      DELETE FROM "SsoActivationRecoveryReservation" AS reservation
+      USING "SsoConnection" AS connection
+      WHERE reservation."organizationId" = ${args.organizationId}
+        AND reservation."connectionId" = ${args.connectionId}
+        AND connection."id" = reservation."connectionId"
+        AND connection."organizationId" = reservation."organizationId"
+        AND connection."state" IN ('DISCARDED', 'TORN_DOWN')
+    `;
+  }
+
+  /** The same organization lock a reservation and a revocation take. */
+  static async lockOrganizationInTransaction(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<void> {
+    await lockOrganization(tx, organizationId);
+  }
+
   static create(database: PrismaSsoBreakGlassDatabase): PrismaSsoBreakGlassRepository {
     return new PrismaSsoBreakGlassRepository(database);
   }

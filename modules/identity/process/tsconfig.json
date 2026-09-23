@@ -38,6 +38,12 @@
       "path": "../../../packages/egress/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {

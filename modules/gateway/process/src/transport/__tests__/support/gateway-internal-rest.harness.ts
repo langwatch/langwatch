@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The `/api/internal/gateway` family on a runtime standing in for the
  * process: no framework credential, the family's own HMAC gate, the Go
@@ -6,7 +7,6 @@
 import { apiErrorBody, createRestRuntime } from "@langwatch/api/rest";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -73,6 +73,7 @@ export function mountGatewayInternalRest(
   const app = createApiFixture<GatewayApi>(
     {
       findVirtualKeyBySecret: (secret) => protocol.findVirtualKeyBySecret(secret),
+      resolveLicenseToken: (input) => protocol.resolveLicenseToken(input),
       findTraceDestination: (projectId) => protocol.findTraceDestination(projectId),
       signJwt: (input) => protocol.signJwt(input),
       touchVirtualKeyUsage: (id) => protocol.touchVirtualKeyUsage(id),

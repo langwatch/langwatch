@@ -26,7 +26,6 @@ function result(overrides: Partial<LangWatchQLQueryResult> = {}): LangWatchQLQue
     columns: [{ name: "TraceId", type: "String" }],
     rows: [{ TraceId: "t1" }],
     statistics: { elapsedMs: 1, rowsRead: 1, bytesRead: 1, rowsReturned: 1 },
-    truncated: false,
     diagnostics: [],
     followsTimeWindow: true,
     followsGranularity: true,
@@ -87,15 +86,6 @@ describe("given a read that came back longer than the pass bounded it to", () =>
     it("refuses it rather than reporting a smaller total", async () => {
       // The count pass asks for one row; two means the bound did not hold.
       const { source } = sourceOver(result({ rows: [{ total: 12 }, { total: 13 }] }));
-
-      await expect(
-        source.count({ caller: CALLER, protections: PROTECTIONS, sql: SQL, limit: 10_001 }),
-      ).rejects.toBeInstanceOf(InstantEvalResultTruncatedError);
-    });
-
-    /** @scenario "A read that came back truncated fails the step" */
-    it("refuses a result the executor itself cut short", async () => {
-      const { source } = sourceOver(result({ rows: [{ total: 12 }], truncated: true }));
 
       await expect(
         source.count({ caller: CALLER, protections: PROTECTIONS, sql: SQL, limit: 10_001 }),

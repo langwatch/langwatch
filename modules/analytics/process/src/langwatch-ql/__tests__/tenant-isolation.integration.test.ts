@@ -1,6 +1,6 @@
 /**
  * Isolation proof, part 1: row-policy enforcement as the restricted identity.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

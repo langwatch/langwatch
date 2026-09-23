@@ -10,7 +10,7 @@ import type {
  * Ordered decision steps; ORDER lives in AuthzEngine.decide() (engine.ts).
  * Legacy quirks tagged LEGACY-QUIRK(<stage>) (ADR-092 §2).
  */
-import { bindingGrants, legacyTeamFallbackGrants, findResourceGrant } from "./matchers.ts";
+import { bindingGrants, findResourceGrant } from "./matchers.ts";
 import { builtinRoleGrants, builtinRolePermissions } from "./roles.ts";
 import type { ScopeChainLink } from "./scope.ts";
 
@@ -123,27 +123,6 @@ export function findBindingsStep({
   return;
 }
 
-/** LEGACY-QUIRK(B): the TeamUser fallback (see legacyTeamFallbackGrants). */
-export function findLegacyTeamFallbackStep({
-  grants,
-  permission,
-  scope,
-  chain,
-  chainBindings,
-  base,
-}: DecideContext): AuthzDecision | undefined {
-  if (principalLacksMembership(grants)) return;
-  const granted = legacyTeamFallbackGrants({
-    grants,
-    scope,
-    chain,
-    chainBindingCount: chainBindings.length,
-    permission,
-  });
-  if (!granted) return;
-  return { ...base, allowed: true, via: "legacy-team-fallback" };
-}
-
 /** ADR-092 §8 — the resource tier (see findResourceGrant). */
 export function findResourceGrantStep({
   grants,
@@ -178,8 +157,7 @@ export function denyStep({ grants, chainBindings, base }: DecideContext): AuthzD
   if (grants.membershipDisabled) {
     return { ...base, allowed: false, denialReason: "membership-disabled" };
   }
-  const hadAnyPath =
-    grants.isOrgMember || chainBindings.length > 0 || grants.legacyTeamMemberships.length > 0;
+  const hadAnyPath = grants.isOrgMember || chainBindings.length > 0;
 
   return {
     ...base,

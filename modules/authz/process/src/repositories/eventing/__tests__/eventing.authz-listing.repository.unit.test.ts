@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzDatabase } from "../../authz-read.repository.ts";
-import { PrismaAuthzListingRepository } from "../../prisma/prisma.authz-listing.repository.ts";
 import { EventingAuthzListingRepository } from "../eventing.authz-listing.repository.ts";
 
 /**
@@ -287,41 +286,13 @@ describe("EventingAuthzListingRepository", () => {
     });
   });
 
-  describe("when the two heads list the same imported binding", () => {
+  describe("when the grants head lists an imported binding", () => {
     /** @scenario "A listing row keeps its identity across the cutover" */
-    it("lists it under the same id on both heads", async () => {
-      // The imported grant ADOPTS the binding's row id, so the two heads are
-      // the same row to a consumer holding its id.
+    it("lists it under the binding's own id, rendered in the legacy vocabulary", async () => {
+      // The imported grant ADOPTS the binding's row id, so a consumer holding
+      // that id still finds the same row.
       const sharedId = "rb_1";
-      const legacyPrisma = {
-        roleBinding: {
-          findMany: vi.fn().mockResolvedValue([
-            {
-              id: sharedId,
-              organizationId: ORG,
-              userId: "alice",
-              groupId: null,
-              apiKeyId: null,
-              role: "MEMBER",
-              customRoleId: null,
-              scopeType: "TEAM",
-              scopeId: "team-1",
-              createdAt: new Date("2026-01-05T00:00:00Z"),
-              user: {
-                id: "alice",
-                name: "Alice",
-                email: "a@x.io",
-                image: null,
-              },
-              group: null,
-              apiKey: null,
-              customRole: null,
-            },
-          ]),
-        },
-      };
-      const legacy = PrismaAuthzListingRepository.create(legacyPrisma as unknown as AuthzDatabase);
-      const { repository: grants } = prismaWith({
+      const { repository } = prismaWith({
         grants: [
           grantRow({
             id: sharedId,
@@ -333,19 +304,28 @@ describe("EventingAuthzListingRepository", () => {
         users: [{ id: "alice", name: "Alice", email: "a@x.io", image: null }],
       });
 
-      const [legacyRows, grantRows] = await Promise.all([
-        legacy.findUserBindings({ organizationId: ORG, userId: "alice" }),
-        grants.findUserBindings({ organizationId: ORG, userId: "alice" }),
-      ]);
+      const rows = await repository.findUserBindings({ organizationId: ORG, userId: "alice" });
 
-      expect(legacyRows[0]?.id).toBe(sharedId);
-      expect(grantRows[0]?.id).toBe(sharedId);
-      // Not just the id: the whole rendered row, since any column that
-      // differs is a cell that changes on cutover day. `createdAt` is the
-      // one to watch: legacy reports the binding's own createdAt, the
-      // grants head reports occurredAt, and they agree only because the
-      // import backdates it - stamped at import time, every "since when" would jump.
-      expect(grantRows[0]).toEqual(legacyRows[0]);
+      // The whole rendered row: `createdAt` is the fact's business time, which
+      // the import backdates to the binding's own creation.
+      expect(rows).toEqual([
+        {
+          id: sharedId,
+          organizationId: ORG,
+          userId: "alice",
+          groupId: null,
+          apiKeyId: null,
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          createdAt: new Date("2026-01-05T00:00:00Z"),
+          user: { id: "alice", name: "Alice", email: "a@x.io", image: null },
+          group: null,
+          apiKey: null,
+          customRole: null,
+        },
+      ]);
     });
   });
 

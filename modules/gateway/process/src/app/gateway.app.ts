@@ -32,10 +32,15 @@ import {
   type UpdateGatewayCacheRuleInput,
   type UpdateGatewayGuardrailInput,
   type GatewayApi,
+  type GatewayUsageCount,
   gatewayConfig,
+  type GatewayDeploymentAddresses,
+  type GatewayConnectUpstream,
+  type GatewayLicenseTokenResolution,
   type GatewayServerConfig,
 } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
@@ -55,10 +60,13 @@ import type { z } from "zod";
 
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
+import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
 import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import {
   GatewayAgentCacheService,
@@ -66,6 +74,7 @@ import {
 } from "../services/gateway-agent-cache.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
+import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
 import {
   GatewayElevenLabsWebhookService,
   type ElevenLabsWebhookCollaborators,
@@ -151,6 +160,8 @@ export type GatewayVirtualKeyOperations = Readonly<{
     externalId?: string | null;
     metadata?: Record<string, string>;
     actorUserId: string;
+    /** Anything other than USER marks the key product-managed. */
+    purpose?: "USER" | "LANGY" | "CONNECT";
   }): Promise<{ virtualKey: VirtualKeyWithScopes; secret: string }>;
   update(input: {
     id: string;
@@ -178,6 +189,30 @@ export type GatewayVirtualKeyOperations = Readonly<{
     organizationId: string;
     actorUserId: string;
   }): Promise<VirtualKeyWithScopes>;
+  /** Ends a product-managed key for the feature that owns it. Safe to repeat. */
+  revokeManagedInternal(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<void>;
+  /** Makes every gateway resolve a product-managed key again, unchanged. */
+  invalidateManagedInternal(input: { id: string; organizationId: string }): Promise<void>;
+  /** Replaces the platform services a CONNECT key may serve. Safe to repeat. */
+  setConnectServicesInternal(input: {
+    id: string;
+    organizationId: string;
+    services: readonly string[];
+  }): Promise<void>;
+  /** Records the license a CONNECT key serves. Safe to repeat. */
+  setLicenseFactsInternal(input: {
+    id: string;
+    organizationId: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant | null;
+  }): Promise<void>;
+  /** A CONNECT key by the registry hash of its license token. */
+  findByLicenseTokenHashInternal(tokenHash: string): Promise<GatewayLicensedKey | null>;
   disable(input: {
     id: string;
     organizationId: string;
@@ -405,6 +440,12 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     actor: GatewayActor;
     scopes: readonly GatewayVirtualKeyScope[];
   }): Promise<void>;
+  /** A project credential's own project needs `virtualKeys:create`; anything wider, manage. */
+  assertCanCreateScopes(input: {
+    actor: GatewayActor;
+    scopes: readonly GatewayVirtualKeyScope[];
+    callerProjectId: string;
+  }): Promise<void>;
   /** One named permission on AT LEAST ONE of the key's existing scopes. */
   assertCanOperateOnAnyScope(input: {
     actor: GatewayActor;
@@ -500,8 +541,10 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse"> &
+  Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption"> &
     Readonly<{
+      /** The expected control plane, where the gateway's own setting says nothing. */
+      publicBaseUrl?: string | undefined;
       elevenLabsWebhook: ElevenLabsWebhookCollaborators | undefined;
       gatewayInternalProtocol: GatewayInternalProtocolCollaborators;
     }>,
@@ -549,6 +592,8 @@ export class GatewayApp implements GatewayApi {
      */
     organizations: OrganizationApi,
     featureFlags: FeatureFlagApi,
+    /** The deployment's own providers, the only chain a license's managed key may dispatch on. */
+    modelProviders: ModelProviderApi,
   };
   static readonly config = gatewayConfig;
   /**
@@ -569,8 +614,10 @@ export class GatewayApp implements GatewayApi {
   static readonly reads = [
     "prisma",
     "clickhouse",
+    "encryption",
     "elevenLabsWebhook",
     "gatewayInternalProtocol",
+    "publicBaseUrl",
   ] as const;
 
   static async create(setup: GatewaySetup): Promise<GatewayApp> {
@@ -599,10 +646,15 @@ export class GatewayApp implements GatewayApi {
         projects: setup.dependencies.projects,
         evaluators: setup.dependencies.evaluators,
         monitors: setup.dependencies.monitors,
+        platformProviders: setup.dependencies.modelProviders,
       },
       virtualKeyPepper: secrets.virtualKeyPepper,
     });
     const internalCollaborators = setup.members.gatewayInternalProtocol;
+    const connectUpstream = GatewayConnectUpstreamService.create({
+      repository: PrismaGatewayConnectUpstreamRepository.create(setup.members.prisma),
+      cipher: setup.members.encryption,
+    });
     const config =
       internalCollaborators.modelProviderCredentials && internalCollaborators.configAssembly
         ? GatewayConfigMaterialiserService.create({
@@ -613,6 +665,7 @@ export class GatewayApp implements GatewayApi {
             credentials: internalCollaborators.modelProviderCredentials,
             assembly: internalCollaborators.configAssembly,
             langyMirrorProjectId: internalCollaborators.langyMirrorProjectId,
+            connectUpstream,
           })
         : void 0;
     const guardrails = internalCollaborators.evaluatorRunner
@@ -660,11 +713,18 @@ export class GatewayApp implements GatewayApi {
         organizations: setup.dependencies.organizations,
         featureFlags: setup.dependencies.featureFlags,
       },
+      {
+        baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
+        publicUrl: setup.config?.publicUrl ?? setup.config?.baseUrl,
+        expectedControlPlaneUrl: setup.config?.controlPlaneUrl ?? setup.members.publicBaseUrl,
+      },
+      connectUpstream,
     );
   }
 
   #coreDependencies: GatewayAppDependencies | undefined;
   #agentCache: GatewayAgentCacheService | undefined;
+  #connectManagedKeys: ConnectManagedKeyService | undefined;
   #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
   #spend: GatewaySpendCollaborators | undefined;
   #spendScope: PrismaGatewaySpendScopeRepository | undefined;
@@ -673,6 +733,8 @@ export class GatewayApp implements GatewayApi {
   #budgetOverview: BudgetOverviewService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
   #internalDoor: RestIdentity;
+  #connectUpstream: GatewayConnectUpstreamService | undefined;
+  #addresses: GatewayDeploymentAddresses;
 
   private constructor(
     members: GatewayInfrastructure,
@@ -680,7 +742,15 @@ export class GatewayApp implements GatewayApi {
     internalDoor: RestIdentity,
     spend?: GatewaySpendCollaborators,
     budgetOverviewDeps?: GatewayBudgetOverviewDeps,
+    addresses: GatewayDeploymentAddresses = {
+      baseUrl: void 0,
+      publicUrl: void 0,
+      expectedControlPlaneUrl: void 0,
+    },
+    connectUpstream?: GatewayConnectUpstreamService,
   ) {
+    this.#addresses = addresses;
+    this.#connectUpstream = connectUpstream;
     this.#spend = spend;
     this.#internalProtocol = internalProtocol;
     this.#internalDoor = internalDoor;
@@ -705,6 +775,13 @@ export class GatewayApp implements GatewayApi {
     ...args: Parameters<GatewayInternalProtocolService["findVirtualKeyBySecret"]>
   ) {
     return this.#internalProtocol.findVirtualKeyBySecret(...args);
+  }
+
+  resolveLicenseToken(input: {
+    token: string;
+    instanceId: string | undefined;
+  }): Promise<GatewayLicenseTokenResolution> {
+    return this.#internalProtocol.resolveLicenseToken(input);
   }
 
   findTraceDestination(
@@ -911,6 +988,13 @@ export class GatewayApp implements GatewayApi {
    */
   spendEvents(): GatewaySpendEventsService | undefined {
     return this.#coreDependencies?.spendEvents;
+  }
+
+  /** The usage report's figures (ADR-156, section 10); refused where no spend ledger is composed. */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount> {
+    const spendEvents = this.spendEvents();
+    if (!spendEvents) return Promise.reject(this.spendStoreUnavailable());
+    return spendEvents.countUsage(input);
   }
 
   budgetSpend(): GatewayBudgetSpend | undefined {
@@ -1152,6 +1236,72 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.virtualKeys.revoke(input);
   }
 
+  provisionConnectManagedKey(input: {
+    organizationId: string;
+    licenseId: string;
+    actorUserId: string;
+  }): Promise<{ id: string }> {
+    return this.#connectManagedKeyService().provision(input);
+  }
+
+  revokeManagedInternal(input: {
+    virtualKeyId: string;
+    organizationId: string;
+    actorId: string;
+  }): Promise<void> {
+    return this.#connectManagedKeyService().retire(input);
+  }
+
+  invalidateManagedInternal(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<void> {
+    return this.#connectManagedKeyService().invalidate(input);
+  }
+
+  setManagedKeyConnectServicesInternal(input: {
+    virtualKeyId: string;
+    organizationId: string;
+    services: readonly string[];
+  }): Promise<void> {
+    return this.#connectManagedKeyService().setConnectServices(input);
+  }
+
+  setManagedKeyLicenseInternal(input: {
+    virtualKeyId: string;
+    organizationId: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant | null;
+  }): Promise<void> {
+    return this.#connectManagedKeyService().setLicense(input);
+  }
+
+  setConnectUpstreamInternal(input: GatewayConnectUpstream): Promise<void> {
+    return this.#connectUpstreamService().set(input);
+  }
+
+  clearConnectUpstreamInternal(input: { organizationId: string }): Promise<void> {
+    return this.#connectUpstreamService().clear(input);
+  }
+
+  #connectUpstreamService(): GatewayConnectUpstreamService {
+    if (!this.#connectUpstream) {
+      throw new Error("this process composes no hosted provider slot for connected installs");
+    }
+    return this.#connectUpstream;
+  }
+
+  #connectManagedKeyService(): ConnectManagedKeyService {
+    const dependencies = this.#dependencies;
+    this.#connectManagedKeys ??= ConnectManagedKeyService.create({
+      virtualKeys: dependencies.virtualKeys,
+      home: dependencies.projects,
+    });
+
+    return this.#connectManagedKeys;
+  }
+
   disableVirtualKey(input: GatewayVirtualKeyDisableInput) {
     return this.#dependencies.virtualKeys.disable(input);
   }
@@ -1166,6 +1316,10 @@ export class GatewayApp implements GatewayApi {
 
   isSpendSourceAvailable(): boolean {
     return this.#dependencies.spendSourceAvailable;
+  }
+
+  getDeploymentAddresses(): GatewayDeploymentAddresses {
+    return this.#addresses;
   }
 
   parseVirtualKeyBudget(input: unknown) {
@@ -1362,6 +1516,32 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
+   * A project credential's create: integrity before permission, so a scope outside this
+   * organization answers `gateway_scope_org_mismatch` rather than a generic denial.
+   */
+  private async authorizeProjectCredentialScopes(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    scopes: readonly GatewayVirtualKeyScope[];
+    traceProjectId: string | null | undefined;
+    callerProjectId: string;
+  }): Promise<void> {
+    const { actor, organizationId, scopes, traceProjectId, callerProjectId } = input;
+    await this.#dependencies.assertScopesBelongToOrganization({ organizationId, scopes });
+    await this.#dependencies.assertCanCreateScopes({ actor, scopes, callerProjectId });
+    await this.#dependencies.assertTraceProjectBelongsToOrganization({
+      organizationId,
+      traceProjectId,
+    });
+    if (traceProjectId) {
+      await this.#dependencies.assertCanManageAllScopes({
+        actor,
+        scopes: [{ scopeType: "PROJECT", scopeId: traceProjectId }],
+      });
+    }
+  }
+
+  /**
    * Everything that must hold before a key is minted: scope selection, then guardrail
    * attachments against the resolved project. Read-only, not folded into the mint — the
    * public create dispatches via an idempotency receipt, and skipping this trusts a stale grant.
@@ -1372,14 +1552,25 @@ export class GatewayApp implements GatewayApi {
     scopes: readonly GatewayVirtualKeyScope[];
     traceProjectId: string | null | undefined;
     guardrailAttachments: readonly GuardrailAttachment[] | undefined;
+    callerProjectId?: string | undefined;
   }): Promise<void> {
     const { actor, organizationId, scopes, traceProjectId, guardrailAttachments } = input;
-    await this.authorizeVirtualKeyScopeSelection({
-      actor,
-      organizationId,
-      scopes,
-      traceProjectId,
-    });
+    if (input.callerProjectId === undefined) {
+      await this.authorizeVirtualKeyScopeSelection({
+        actor,
+        organizationId,
+        scopes,
+        traceProjectId,
+      });
+    } else {
+      await this.authorizeProjectCredentialScopes({
+        actor,
+        organizationId,
+        scopes,
+        traceProjectId,
+        callerProjectId: input.callerProjectId,
+      });
+    }
     const projectId = await this.#dependencies.resolveVirtualKeyProjectId({
       organizationId,
       virtualKeyId: null,

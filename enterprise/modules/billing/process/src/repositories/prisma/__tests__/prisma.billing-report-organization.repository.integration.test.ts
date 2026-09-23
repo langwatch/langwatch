@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
  * stop the fix from being written as "always answer not_usage_billed".
  *
  * @see specs/licensing/billing-meter-dispatch.feature
+ * @see specs/self-hosting/connected-services/connected-billing.feature
  */
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -33,6 +34,9 @@ describe("given organizations on either side of usage-based pricing", () => {
   let repository: PrismaBillingReportOrganizationRepository;
   let usageBilledId: string;
   let tieredId: string;
+  let connectedId: string;
+  let halfOnboardedId: string;
+  let neverOnboardedId: string;
 
   /**
    * Cleanup reads this, not the fixtures. A create that throws leaves its
@@ -66,10 +70,49 @@ describe("given organizations on either side of usage-based pricing", () => {
     });
     tieredId = tiered.id;
     createdIds.push(tiered.id);
+
+    connectedId = await selfHostedCustomer("connected", { usageSubscriptionId: "sub_usage" });
+    halfOnboardedId = await selfHostedCustomer("half-onboarded", { usageSubscriptionId: null });
+    neverOnboardedId = await selfHostedCustomer("never-onboarded", null);
   });
+
+  /** A self-hosted customer on no Cloud plan, with or without a billing account. */
+  async function selfHostedCustomer(
+    label: string,
+    account: { usageSubscriptionId: string | null } | null,
+  ): Promise<string> {
+    const organization = await prisma.organization.create({
+      data: {
+        name: `${label} ${namespace}`,
+        slug: `${label}-${namespace}`,
+        pricingModel: "TIERED",
+        selfHostedCustomer: true,
+      },
+    });
+    createdIds.push(organization.id);
+    if (account) {
+      await prisma.connectedBillingAccount.create({
+        data: {
+          organizationId: organization.id,
+          stripeCustomerId: `cus_${label}_${namespace}`,
+          usageSubscriptionId: account.usageSubscriptionId,
+          termStartsAt: new Date("2026-01-01T00:00:00.000Z"),
+          termEndsAt: new Date("2027-01-01T00:00:00.000Z"),
+          seatCurrency: "USD",
+          seatRateCents: 1000,
+          seats: 5,
+          billingEmail: `billing@${label}.test`,
+        },
+      });
+    }
+    return organization.id;
+  }
 
   afterAll(async () => {
     if (createdIds.length > 0) {
+      await prisma.connectedBillingAccount.deleteMany({
+        where: { organizationId: { in: createdIds } },
+      });
       await prisma.organization.deleteMany({ where: { id: { in: createdIds } } });
     }
     await prisma.$disconnect();
@@ -86,6 +129,7 @@ describe("given organizations on either side of usage-based pricing", () => {
       // of what the handler needs, and leaking it would invite a second check
       // of the same condition at the call site.
       expect(result.organization).not.toHaveProperty("pricingModel");
+      expect(result.organization.contract).toBe("cloud");
     });
   });
 
@@ -103,6 +147,49 @@ describe("given organizations on either side of usage-based pricing", () => {
       const result = await repository.getOrganizationForBilling(`missing-${namespace}`);
 
       expect(result.outcome).toBe("not_found");
+    });
+  });
+
+  describe("when the lookup runs for a self-hosted customer with a connected billing account", () => {
+    /** @scenario "A connected customer is not skipped for lacking a Cloud plan" */
+    it("admits it under the connected contract, on the account's subscription", async () => {
+      const result = await repository.getOrganizationForBilling(connectedId);
+
+      expect(result).toEqual({
+        outcome: "usage_billed",
+        organization: {
+          id: connectedId,
+          stripeCustomerId: `cus_connected_${namespace}`,
+          subscriptions: [{ id: "sub_usage" }],
+          contract: "connected",
+        },
+      });
+    });
+
+    it("carries no subscription until onboarding created the usage subscription", async () => {
+      const result = await repository.getOrganizationForBilling(halfOnboardedId);
+
+      expect(result).toMatchObject({
+        outcome: "usage_billed",
+        organization: { id: halfOnboardedId, subscriptions: [], contract: "connected" },
+      });
+    });
+  });
+
+  describe("when the lookup runs for a self-hosted customer never onboarded for billing", () => {
+    it("answers not_usage_billed", async () => {
+      const result = await repository.getOrganizationForBilling(neverOnboardedId);
+
+      expect(result).toEqual({ outcome: "not_usage_billed" });
+    });
+  });
+
+  describe("when the lookup runs for an organization that is neither usage billed nor a self-hosted customer", () => {
+    /** @scenario "An organization that is neither usage billed nor a self-hosted customer is still skipped" */
+    it("still answers not_usage_billed", async () => {
+      const result = await repository.getOrganizationForBilling(tieredId);
+
+      expect(result).toEqual({ outcome: "not_usage_billed" });
     });
   });
 });

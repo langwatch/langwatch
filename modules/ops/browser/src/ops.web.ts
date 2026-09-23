@@ -8,10 +8,26 @@ import { defineWebModule } from "@langwatch/ui-kernel";
 
 export const opsWeb = defineWebModule("ops")
   .withHosts({
-    requires: ["OpsHostApi"],
-    mounts: { OpsHostApi: { load: () => import("./behavior/ops-host-mount.tsx") } },
+    requires: ["OpsHostApi", "CheckupHostApi"],
+    mounts: {
+      OpsHostApi: { load: () => import("./behavior/ops-host-mount.tsx") },
+      CheckupHostApi: {
+        load: () => import("./features/checkup/behavior/checkup-host-mount.tsx"),
+      },
+    },
+  })
+  // The install's one-time usage-report notice; the shell draws it where the page body starts.
+  .withCapabilities({
+    startupNotice: { load: () => import("./features/checkup/ui/sections/startup-notice.tsx") },
   })
   .withScreens({
+    // Placed by the application's settings table beside License and Connect.
+    "pages/settings/checkup": {
+      path: "/settings/checkup",
+      within: "settings",
+      label: "Checkup",
+      load: () => import("./features/checkup/ui/sections/checkup.screen.tsx"),
+    },
     "pages/ops/index": {
       load: () => import("./ui/sections/ops/ops-dashboard.screen.tsx"),
     },
@@ -84,6 +100,18 @@ export const opsWeb = defineWebModule("ops")
       load: async () => ({
         default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
           .BackofficeBugReportsScreen,
+      }),
+    },
+    "pages/ops/backoffice/licenses": {
+      load: async () => ({
+        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
+          .BackofficeLicensesScreen,
+      }),
+    },
+    "pages/ops/backoffice/self-hosted-instances": {
+      load: async () => ({
+        default: (await import("./ui/sections/ops/backoffice-screens.tsx"))
+          .BackofficeSelfHostedInstancesScreen,
       }),
     },
   })

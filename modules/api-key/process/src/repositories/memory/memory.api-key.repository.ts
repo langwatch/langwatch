@@ -9,8 +9,8 @@ import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import type {
   ApiKeyCreateRecord,
   ApiKeyRepository,
+  ApiKeyRow,
   ApiKeyUpdateRecord,
-  StoredApiKey,
 } from "../api-key.repository.ts";
 import { MemoryApiKeyDatabase } from "./memory.api-key.database.ts";
 
@@ -28,10 +28,10 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     return new MemoryApiKeyRepository(input.memory);
   }
 
-  async create(input: ApiKeyCreateRecord): Promise<StoredApiKey> {
+  async create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
     const now = toDate(nowInstant());
     const { roleBindings: _roleBindings, startsDisabled, expiresAt, ...data } = input;
-    const key: StoredApiKey = {
+    const key: ApiKeyRow = {
       ...data,
       createdByDeviceLabel: data.createdByDeviceLabel ?? null,
       parentApiKeyId: data.parentApiKeyId ?? null,
@@ -42,37 +42,34 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       lastUsedAt: null,
       createdAt: now,
       updatedAt: now,
-      // Bindings are written by the grants side, exactly as the Prisma create
-      // discards them and reads back an empty include.
-      roleBindings: [],
     };
     this.#database.replaceKey(key);
 
     return structuredClone(key);
   }
 
-  async activate(input: { id: string }): Promise<StoredApiKey> {
+  async activate(input: { id: string }): Promise<ApiKeyRow> {
     return this.#write(input.id, (key) => ({ ...key, revokedAt: null }));
   }
 
-  async findByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null> {
+  async findByLookupId(input: { lookupId: string }): Promise<ApiKeyRow | null> {
     return this.#find(
       (key) => key.lookupId === input.lookupId && !this.#database.isUserDeactivated(key.userId),
     );
   }
 
-  async findById(input: { id: string }): Promise<StoredApiKey | null> {
+  async findById(input: { id: string }): Promise<ApiKeyRow | null> {
     return this.#find((key) => key.id === input.id);
   }
 
   async findByIdInOrganization(input: {
     id: string;
     organizationId: string;
-  }): Promise<StoredApiKey | null> {
+  }): Promise<ApiKeyRow | null> {
     return this.#find((key) => key.id === input.id && key.organizationId === input.organizationId);
   }
 
-  async listForUser(input: { organizationId: string; userId: string }): Promise<StoredApiKey[]> {
+  async listForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]> {
     return this.#list(
       (key) =>
         key.organizationId === input.organizationId &&
@@ -82,7 +79,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
-  async listForOrganization(input: { organizationId: string }): Promise<StoredApiKey[]> {
+  async listForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]> {
     return this.#list(
       (key) =>
         key.organizationId === input.organizationId &&
@@ -91,7 +88,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
-  async update(input: ApiKeyUpdateRecord): Promise<StoredApiKey> {
+  async update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const { id, roleBindings: _roleBindings, revokedAt, lastUsedAt, ...data } = input;
 
     return this.#write(id, (key) => ({
@@ -104,7 +101,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
   }
 
   /** The cause of the FIRST revocation stands, as the fenced `updateMany` keeps it. */
-  async revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<StoredApiKey> {
+  async revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<ApiKeyRow> {
     return this.#write(input.id, (key) =>
       key.revokedAt === null
         ? { ...key, revokedAt: toDate(nowInstant()), revocationCause: input.cause }
@@ -122,30 +119,30 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
 
   async findIngestKey(input: {
     organizationId: string;
-    projectId: string;
+    apiKeyIds: readonly string[];
     sourceType: string;
-  }): Promise<StoredApiKey | null> {
+  }): Promise<ApiKeyRow | null> {
     const [newest] = this.#list(
       (key) =>
         key.organizationId === input.organizationId &&
         key.ingestSourceType === input.sourceType &&
         key.revokedAt === null &&
-        this.#reachesProject(key, input.projectId),
+        input.apiKeyIds.includes(key.id),
     );
 
     return newest ?? null;
   }
 
-  async findIngestKeysForProject(input: {
+  async findIngestKeys(input: {
     organizationId: string;
-    projectId: string;
-  }): Promise<StoredApiKey[]> {
+    apiKeyIds: readonly string[];
+  }): Promise<ApiKeyRow[]> {
     return this.#list(
       (key) =>
         key.organizationId === input.organizationId &&
         key.ingestSourceType !== null &&
         key.revokedAt === null &&
-        this.#reachesProject(key, input.projectId),
+        input.apiKeyIds.includes(key.id),
     );
   }
 
@@ -221,20 +218,14 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     this.#database.replaceKey({ ...key, expiresAt: toDate(input.expiresAt) });
   }
 
-  #reachesProject(key: StoredApiKey, projectId: string): boolean {
-    return key.roleBindings.some(
-      (binding) => binding.scopeType === "PROJECT" && binding.scopeId === projectId,
-    );
-  }
-
-  #find(matches: (key: StoredApiKey) => boolean): StoredApiKey | null {
+  #find(matches: (key: ApiKeyRow) => boolean): ApiKeyRow | null {
     const key = this.#database.keys().find(matches);
 
     return key ? structuredClone(key) : null;
   }
 
   /** Newest first, as every Prisma list here orders by `createdAt desc`. */
-  #list(matches: (key: StoredApiKey) => boolean): StoredApiKey[] {
+  #list(matches: (key: ApiKeyRow) => boolean): ApiKeyRow[] {
     return this.#database
       .keys()
       .filter(matches)
@@ -242,7 +233,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       .map((key) => structuredClone(key));
   }
 
-  #write(id: string, change: (key: StoredApiKey) => StoredApiKey): StoredApiKey {
+  #write(id: string, change: (key: ApiKeyRow) => ApiKeyRow): ApiKeyRow {
     const key = this.#database.keys().find((row) => row.id === id);
     if (!key) throw new Error(`No API key ${id}`);
 

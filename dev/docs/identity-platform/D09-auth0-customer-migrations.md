@@ -9,14 +9,25 @@ Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wa
 
 # Overview
 
-Enterprise customers move off the Auth0 broker onto direct OIDC connections, one tenant at a time, driven by a **migration wizard** in org settings (assumed frontend shape — Open Q7 — pending validation against the Notion comment). Grace with both connections active is the rollback. A temporary **legacy callback shim** (R9) keeps customer-pinned Auth0 redirect URIs working through grace, so no customer is ever forced to reconfigure their IdP mid-migration.
+Enterprise customers move off the Auth0 broker onto direct OIDC or SAML
+connections, one tenant at a time. The current legacy connection remains the
+customer's active route while a LangWatch operator inventories readiness and
+imports the customer's supplied provider configuration. The shared
+`SsoSelfServeService.startLegacyMigration` command validates and seals that
+configuration, and records an explicit replacement relation. Customer
+settings show the active legacy status and, once a replacement exists, the
+same progress and cutover evidence used by the operator surface.
+
+Grace with both connections active is the rollback. A callback shim keeps
+customer-pinned Auth0 redirect URIs working through grace, so no customer is
+forced to reconfigure their IdP mid-migration.
 
 # What Auth0 is today, and what removes each piece
 
 | Auth0 dependency today                                                 | What retires it                                                            | When                                                |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
 | OIDC broker for enterprise SSO (genericOAuth `auth0`/`okta` providers) | Direct per-org `SsoConnection` (OIDC/SAML), one customer at a time         | this deliverable, per tenant                        |
-| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set                                                     | D13, at the `IDENTITY_ROUTER_V2` flip               |
+| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set                                                     | D13 — shipped; flag and legacy screens removed               |
 | `Organization.ssoDomain`/`ssoProvider` string routing                  | Connection-based routing                                                   | D04 (`SSOCONN_ROUTING`)                             |
 | `src/server/auth0/passwordService.ts` (Management API password ops)    | Identifier-model password change (`change-password-auth0.feature` rewrite) | D10                                                 |
 | Federated logout                                                       | Direct-connection logout semantics                                         | this deliverable per tenant; code deleted D10       |
@@ -27,16 +38,30 @@ Enterprise customers move off the Auth0 broker onto direct OIDC connections, one
 
 # Requirements
 
-**Migration wizard** (org Settings → SSO; reuses D05 machinery):
+**Operator-led migration** (back office → organization Settings → SSO; reuses
+D05 machinery):
 
-- **Step 0 — detect:** the org has a grandfathered legacy (Auth0-broker) connection → "Migrate your SSO" banner. Ops can also enroll an org from the ops surface.
-- **Step 1 — create direct OIDC connection:** pick IdP vendor (Okta / Entra / Google Workspace cheat sheets), enter issuer/clientId/secret; we display the redirect URIs to register — with the explicit note that the legacy URI keeps working via the shim, so there's no IdP-side cutoff moment.
-- **Step 2 — domains:** already verified (grandfathered at D04) — no re-verification.
-- **Step 3 — test login** as the org admin.
-- **Step 4 — activate alongside legacy** → grace begins.
-- **Step 5 — progress view:** % of active users linked (link-on-login: unambiguous → auto-link; ambiguous → org-admin confirm), straggler list, one-click nudge emails.
-- **Step 6 — SCIM repoint** if the customer uses SCIM (D08 connection-scoped tokens; the Auth0 log-stream webhook is retired for this customer).
-- **Step 7 — teardown:** enabled at 100% of active users linked (admin override possible, standard guards apply): detach legacy identifiers → teardown legacy connection.
+- **Step 0, inventory:** a staff-gated operator reads the legacy connection,
+  qualified domain proof, existing replacement relation, member-link evidence,
+  recovery evidence and SCIM status. Organization and connection identifiers
+  are audited; provider secrets and SAML documents are never audited.
+- **Step 1, import:** the operator supplies the customer's actual OIDC issuer,
+  client id and secret, or the customer's actual SAML entry point and metadata
+  or certificate. Shared Auth0 broker credentials, domain strings and
+  grandfathered routing facts are not upstream provider configuration.
+  `startLegacyMigration` validates and seals the supplied values.
+- **Step 2, domain and test sign-in:** inherited domain facts remain visible,
+  but a qualified proof, a successful test sign-in and a recovery path are
+  still required by the normal activation guards.
+- **Step 3, activate alongside legacy:** the direct connection is activated
+  only after all normal gates pass; grace begins and the legacy route remains
+  available.
+- **Step 4, progress:** the operator and customer read the same active-member
+  links, stragglers, quiet-period and SCIM evidence. Customer controls may
+  switch or roll back the route only where the existing migration phase allows.
+- **Step 5, teardown:** enabled only after the standard finalization proof,
+  including complete member linking, quiet legacy traffic, usable recovery,
+  SCIM readiness and the existing identifier-detach guards.
 
 **Nudges + exception queue:**
 
@@ -73,7 +98,11 @@ Per-tenant migration state is a `@langwatch/system-migrations` record (migration
 // finalized is what enables Step 7 teardown; rolled_back pins the org on grace
 ```
 
-Progress reads are queries over identifier data (`Identifier` rows with `connectionId = <direct>` vs legacy — ADR-116 retires `Account`, so nothing here may read it), not stored counters; the wizard and the report render the same query.
+Progress reads are queries over identifier and account evidence through the
+existing migration read port; they are not stored counters. The customer and
+operator surfaces render the same progress query. Legacy `Organization`
+`ssoDomain` and `ssoProvider` values identify inventory candidates only; they
+do not prove upstream provider configuration or qualified domain ownership.
 
 # Out of Scope
 
@@ -83,11 +112,14 @@ Progress reads are queries over identifier data (`Identifier` rows with `connect
 
 - Auth0 today: OIDC provider via genericOAuth; `src/server/auth0/passwordService.ts`; federated logout; SCIM log-stream webhook. SaaS infra: `AUTH0_*` via the opaque `langwatch_secrets` blob (passthrough — no Terraform diff).
 - Customer IdP apps pin `/api/auth/callback/auth0` (`specs/auth/auth-signin-flows.feature:46-48`) — the shim exists precisely so this is not a day-one outage.
-- The support threads in the epic are the failure modes this wizard must surface instead: every stuck state is visible on the ops surface with a guarded action.
+- The support threads in the epic are the failure modes the operator inventory
+  must surface: every stuck state is visible on the back office with a guarded
+  action.
 
 # Technical Plan
 
-1. Wizard UI driving D05's connection commands + progress reads (% linked from identifier data).
+1. Operator inventory/import UI driving D05's guarded connection commands and
+   the existing self-serve migration command.
 2. Comms pack: email templates + per-IdP cheat sheets.
 3. Shim + per-org hit metric — must exist **before the pilot activates** (pilot checklist item).
 4. Playbook doc (engineering/CS) + exception-queue views on the ops surface.
@@ -95,7 +127,11 @@ Progress reads are queries over identifier data (`Identifier` rows with `connect
 
 # Exit gate / rollback
 
-- **Exit per customer:** all active users linked; quiet grace (no legacy logins for N days, shim hits at zero); teardown event.
+- **Exit per customer:** qualified domain proof remains valid; the replacement
+  passed test sign-in and activation; a usable recovery path exists; all active
+  users are linked; SCIM is ready where applicable; quiet grace has no legacy
+  logins and shim hits are zero; teardown event is accepted by the existing
+  finalization guards.
 - **Program exit:** zero ACTIVE legacy connections.
 - **Rollback:** grace _is_ the rollback — legacy stays ACTIVE until teardown.
 
@@ -107,4 +143,5 @@ Progress reads are queries over identifier data (`Identifier` rows with `connect
 
 # Open Questions
 
-- (Epic 7) validate the wizard shape against the Notion frontend-flow comment when it surfaces; adjust scope if it contradicts.
+- Confirm the pilot's operator checklist and customer supplied configuration
+  handoff before enabling additional migration cohorts.

@@ -19,6 +19,9 @@ export type MemoryUserRow = {
   lastHomePath: string | null;
   tracesExplorerTourDismissedAt: Instant | null;
   passkeyNudgeDismissedAt: Instant | null;
+  /** Two-step verification confirmed on the account, as the plugin records it. */
+  twoFactorEnabled: boolean;
+  joinOfferDismissedDomains: readonly string[];
 };
 
 export type MemoryUserAccountRow = {
@@ -45,6 +48,11 @@ export class MemoryUserDatabase {
 
   static create(): MemoryUserDatabase {
     return new MemoryUserDatabase();
+  }
+
+  /** Every stored user, for the install-wide usage report. */
+  rows(): MemoryUserRow[] {
+    return [...this.#users.values()];
   }
 
   user(id: string): MemoryUserRow | undefined {

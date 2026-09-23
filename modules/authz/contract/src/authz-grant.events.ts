@@ -113,11 +113,19 @@ export const grantAttachedPayloadSchema = z
     legacyRole: legacyBindingRoleSchema.optional(),
     source: grantEventSourceSchema,
     actor: grantsLedgerActorSchema,
+    /** Present on live USER grants; absent on imported history. */
+    membershipStamp: z.string().min(1).optional(),
+    /** Founder-only marker for a membership created in the same transaction. */
+    membershipBootstrap: z.boolean().optional(),
   })
   .strict()
   .refine(grantShapeRefinement.check, {
     message: grantShapeRefinement.message,
     path: [...grantShapeRefinement.path],
+  })
+  .refine((grant) => !grant.membershipBootstrap || grant.membershipStamp, {
+    message: "membershipBootstrap requires membershipStamp",
+    path: ["membershipStamp"],
   });
 export type GrantAttachedPayload = z.infer<typeof grantAttachedPayloadSchema>;
 
@@ -207,6 +215,8 @@ export const grantFactSchema = z
     resource: resourceGrantTermsSchema.optional(),
     legacyRole: legacyBindingRoleSchema.optional(),
     source: grantEventSourceSchema,
+    /** Current USER membership lifetime; absent for non-user/resource facts. */
+    membershipStamp: z.string().min(1).optional(),
     occurredAtMs: z.number().int().nonnegative(),
   })
   .strict()

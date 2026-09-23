@@ -2,6 +2,7 @@ import {
   modelProviderSchema,
   type ModelDefaultScope,
   type ModelProvider,
+  type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
 
 import type { ModelProviderRecord, ModelProviderRepository } from "../model-provider.repository.ts";
@@ -31,6 +32,22 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
   }
 
   private constructor(private readonly database: MemoryModelProviderDatabase) {}
+
+  async countUsage({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<ModelProviderUsageCount> {
+    const rows = [...this.database.providers.values()].filter(
+      (row) => row.organizationId !== undefined && organizationIds.includes(row.organizationId),
+    );
+    return {
+      providers: [...new Set(rows.map((row) => row.provider))].sort(),
+      ...(rows.length === 0
+        ? {}
+        : { firstModelProviderAt: Math.min(...rows.map((row) => row.createdAt.getTime())) }),
+    };
+  }
 
   tryFindById(input: {
     id: string;

@@ -26,7 +26,7 @@ class FakeAuditLog implements AuditLogApi {
     this.rows.unshift(command);
     this.reads.record({
       auditId: `audit_${this.rows.length}`,
-      operatorUserId: command.userId,
+      operatorUserId: command.userId ?? null,
       operatorName: null,
       act: command.action.replace("identityLookup.", ""),
       address:

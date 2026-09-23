@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 /**
  * Guided onboarding state, owned by `modules/organization`
  * (`Organization.signupData.guidedOnboarding`) and reached only through
@@ -19,6 +20,8 @@ import {
   guidedOnboardingTrackedEvent,
   type GuidedOnboardingEvent,
 } from "../rules/guided-onboarding-analytics.rules.ts";
+
+const logger = createLogger("langwatch:onboarding:guided");
 
 export type TourStatus = "completed" | "skipped" | "replayed";
 
@@ -238,16 +241,16 @@ export class GuidedOnboardingService {
       organizationId,
       record: { state: next, variant: previous.variant },
     });
-    this.track({ organizationId, userId, event, payload, state: next });
+    await this.track({ organizationId, userId, event, payload, state: next });
     return next;
   }
 
   /**
-   * Fire and forget, and only when the write carries a user: a project
-   * credential with no user attaches to nobody, so it tracks nothing rather
-   * than guessing an admin to attribute the event to.
+   * Never fails the write. A write through a project credential has no user, so the
+   * organization's admin stands in, the same person the other onboarding milestones
+   * are tracked against; an organization without one tracks nothing.
    */
-  private track({
+  private async track({
     organizationId,
     userId,
     event,
@@ -259,10 +262,21 @@ export class GuidedOnboardingService {
     event: GuidedOnboardingEvent;
     payload: Record<string, string | string[] | number | undefined>;
     state: GuidedOnboardingState;
-  }): void {
-    if (!userId) return;
+  }): Promise<void> {
     const tracked = guidedOnboardingTrackedEvent({ event, payload, state, organizationId });
     if (!tracked.tracked) return;
-    this.events.track({ userId, event: tracked.name, properties: tracked.properties });
+    const distinctId = userId ?? (await this.findAdminUserIds(organizationId))[0];
+    if (!distinctId) return;
+    this.events.track({ userId: distinctId, event: tracked.name, properties: tracked.properties });
+  }
+
+  private async findAdminUserIds(organizationId: string): Promise<string[]> {
+    try {
+      const administrators = await this.organizations.findAdministrators({ organizationId });
+      return administrators.map((administrator) => administrator.userId);
+    } catch (error) {
+      logger.warn({ error, organizationId }, "guided onboarding event found no admin to attribute");
+      return [];
+    }
   }
 }

@@ -1,10 +1,11 @@
-import { Checkbox, Field, Icon, Input, VStack } from "@chakra-ui/react";
+import { Alert, Checkbox, Field, Icon, Input, Text, VStack } from "@chakra-ui/react";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { ExternalLink } from "lucide-react";
 import type React from "react";
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 
 import { LEGAL_LINKS } from "../../behavior/legal-links.ts";
+import { onboardingApi } from "../../behavior/onboarding-api.ts";
 import { desireItems, roleItems, usageStyleItems } from "../../behavior/onboarding-data.ts";
 import {
   type DesireType,
@@ -15,6 +16,8 @@ import {
   type RoleType,
   type UsageStyle,
 } from "../../behavior/types.ts";
+import { extractJoinInsteadNames, formatJoinInsteadNames } from "../../model/join-instead.ts";
+import { useOnboardingHost } from "../../model/onboarding-host.ts";
 import { IconCheckboxCardGroup } from "../elements/forms/icon-checkbox-card-group.tsx";
 import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group.tsx";
 import { Link } from "../elements/link.tsx";
@@ -22,14 +25,55 @@ import { BasicInfoConditionalFields } from "./basic-info-conditional-fields.tsx"
 import { useOnboardingFormContext } from "./form-context.tsx";
 import { IntentSelectionScreen } from "./intent-selection-screen.tsx";
 
+/**
+ * "Acme is already here — join instead?" (D12). Nudged, never blocked: nothing
+ * is disabled and the form below still completes. Renders nothing when nothing
+ * is open to the reader's own verified address, which is most people.
+ */
+function JoinInsteadNotice({ lookup }: { lookup: unknown }) {
+  const names = extractJoinInsteadNames(lookup);
+  if (names.length === 0) return null;
+
+  return (
+    <Alert.Root status="info" width="full" size="sm" data-testid="join-instead-notice">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>
+          <Text>
+            {formatJoinInsteadNames(names)} {names.length === 1 ? "is" : "are"} already on LangWatch
+            with your email domain.{" "}
+            <Link href="/auth/join" variant="underline" fontWeight="medium">
+              Join instead
+            </Link>
+            , or carry on and create a new one.
+          </Text>
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
 // Module-scope screen components and their props
 const OrganizationScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   const { organizationName, agreement, setOrganizationName, setAgreement } =
     useOnboardingFormContext();
   const analytics = useUiAnalytics();
+  // Answers only for the caller's OWN verified address, so no organization
+  // name reaches the browser before the domain is proved.
+  const joinLookup = onboardingApi.joinRequests.lookup.useQuery();
+  const joinOffers = useOnboardingHost().joinOffers();
 
   return (
     <VStack gap={5} align="stretch" w="full" minW="0">
+      {/* The decision comes first, as a screen: nudged, never blocked, and its
+          way past lands back on this form with nothing lost. */}
+      {joinOffers.map(({ key, JoinOffer }) => (
+        <Suspense key={key} fallback={null}>
+          <JoinOffer dismissLabel="Create a new organization instead" />
+        </Suspense>
+      ))}
+      {/* For somebody who already declined for this domain: the sentence, not the screen. */}
+      <JoinInsteadNotice lookup={joinLookup.data} />
       <Field.Root colorPalette="orange" w="full">
         <Input
           aria-label="Organization name"
@@ -187,6 +231,9 @@ const RoleScreen: React.FC<OnboardingScreenProps> = ({ surface }) => {
   );
 };
 
+/** The takeover phases draw themselves full-bleed, outside the card. */
+const TakeoverScreen: React.FC = () => null;
+
 interface IntroScreensProps {
   flow: OnboardingFlowConfig;
 }
@@ -228,6 +275,28 @@ export const useCreateWelcomeScreens = ({ flow }: IntroScreensProps): Onboarding
         heading: "Let's tailor your experience",
         subHeading: "What best describes you?",
         component: RoleScreen,
+      },
+      // The guided takeover gives the flow its indices; headings name the page.
+      [OnboardingScreenIndex.HELLO]: {
+        id: "hello",
+        required: true,
+        heading: "Hello",
+        component: TakeoverScreen,
+        widthVariant: "full",
+      },
+      [OnboardingScreenIndex.VALUE]: {
+        id: "value",
+        required: true,
+        heading: "What to set up",
+        component: TakeoverScreen,
+        widthVariant: "full",
+      },
+      [OnboardingScreenIndex.PROVIDER]: {
+        id: "provider",
+        required: true,
+        heading: "Connect a provider",
+        component: TakeoverScreen,
+        widthVariant: "full",
       },
     }),
     [],

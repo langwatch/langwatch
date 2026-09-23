@@ -16,6 +16,7 @@ import {
   type StoredObjectIdDeriver,
   type StoredObjectMetadata,
   type StoredObjectReference,
+  type StoredObjectStorageDestination,
   type StoredObjectStorageUsage,
   type StoredObjectsCreateUploadOutput,
   type StoredObjectsDeleteOutput,
@@ -205,6 +206,14 @@ export class StoredObjectService {
     }
 
     return result;
+  }
+
+  getStorageDestination(input: { projectId: string }): Promise<StoredObjectStorageDestination> {
+    return this.options.storage.resolveDestination(input);
+  }
+
+  probeStorage(input: { projectId: string }): Promise<void> {
+    return this.options.storage.probe(input);
   }
 
   async deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {

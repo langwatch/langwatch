@@ -3,13 +3,17 @@
  * and not overridable, but not which ceilings it carries — a dropped limit
  * would leave every suite green. This is the inventory check for that.
  * @see ../../services/langwatch-ql-access-model.service.ts — the statements under test
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
-
-import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
+  LWQL_MAX_RESULT_BYTES,
+  LWQL_MAX_RESULT_ROWS,
+} from "@langwatch/analytics-contract/langwatch-ql-limits";
+import { describe, expect, it } from "vitest";
+
+import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
 } from "../../services/langwatch-ql-access-model.service.ts";
@@ -37,6 +41,8 @@ const LIMITS = {
   maxConcurrentQueriesForUser: 5,
   maxRowsToRead: 222_000,
   maxBytesToRead: 333_000,
+  maxResultRows: 444_000,
+  maxResultBytes: 555_000,
 };
 
 describe("given the LangWatchQL settings profile statement", () => {
@@ -50,6 +56,9 @@ describe("given the LangWatchQL settings profile statement", () => {
       ["rows scanned", "max_rows_to_read = 222000 CONST"],
       ["bytes scanned", "max_bytes_to_read = 333000 CONST"],
       ["scan overflow", "read_overflow_mode = 'throw' CONST"],
+      ["rows returned", "max_result_rows = 444000 CONST"],
+      ["bytes returned", "max_result_bytes = 555000 CONST"],
+      ["result overflow", "result_overflow_mode = 'throw' CONST"],
     ])("pins the %s ceiling", (_label, expected) => {
       expect(accessModel.settingsProfileStatement({ names: NAMES, limits: LIMITS })).toContain(
         expected,
@@ -82,6 +91,17 @@ describe("given the LangWatchQL settings profile statement", () => {
       // A ceiling of zero is ClickHouse's "unlimited", so a default that
       // drifted to 0 would read as configured while bounding nothing.
       expect(DEFAULT_LWQL_RESOURCE_LIMITS.maxConcurrentQueriesForUser).toBeGreaterThan(0);
+    });
+
+    /** A `LIMIT {n:UInt64}` evades the validator's cap; the profile must pin the same number. */
+    it("pins the server-side result ceiling at the validator's row and byte caps", () => {
+      const statement = accessModel.settingsProfileStatement({ names: NAMES });
+
+      expect(statement).toContain(`max_result_rows = ${LWQL_MAX_RESULT_ROWS} CONST`);
+      expect(statement).toContain(`max_result_bytes = ${LWQL_MAX_RESULT_BYTES} CONST`);
+      expect(statement).toContain("result_overflow_mode = 'throw' CONST");
+      expect(LWQL_MAX_RESULT_ROWS).toBeGreaterThan(0);
+      expect(LWQL_MAX_RESULT_BYTES).toBeGreaterThan(0);
     });
   });
 });

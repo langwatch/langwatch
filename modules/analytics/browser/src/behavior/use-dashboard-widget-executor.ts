@@ -5,6 +5,12 @@
  */
 
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import type {
+  ChartFrameDashboardContext,
+  ChartQueryError,
+  ChartQueryResult,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
+import { toChartQueryResult } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
@@ -13,12 +19,6 @@ import {
   type DashboardWidgetQuery,
   validateDashboardWidgetQueryParams,
 } from "../model/dashboard-widget-definition.ts";
-import type {
-  ChartFrameDashboardContext,
-  ChartQueryError,
-  ChartQueryResult,
-} from "../model/dashboard-widget/bridge-protocol.ts";
-import { toChartQueryResult } from "../model/dashboard-widget/bridge-protocol.ts";
 import { readHandledError } from "../model/handled-error.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 import { analyticsApi } from "./analytics-api.ts";

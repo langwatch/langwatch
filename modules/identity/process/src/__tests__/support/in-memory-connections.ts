@@ -6,19 +6,42 @@ import {
 } from "@langwatch/identity-contract";
 
 import type {
+  SsoConnectionRegistrationRepository,
+  SsoConnectionRegistrationSlot,
+} from "../../repositories/sso-connection-registration.repository.ts";
+import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
 } from "../../repositories/sso-connection.repository.ts";
+import { findBlockingRegistrationSlots } from "../../rules/sso-connection-registration.rules.ts";
+import { ownedVerifiedDomains } from "../../rules/sso-domain-ownership.rules.ts";
 
 /**
  * The connection guards' three reads, in memory — using the SAME reducer the
  * projection folds with, so a guard can never pass against a state the real
  * projection never produces.
  */
-export class InMemoryConnections implements SsoConnectionReadRepository {
+export class InMemoryConnections
+  implements SsoConnectionReadRepository, SsoConnectionRegistrationRepository
+{
   private readonly states = new Map<string, SsoConnectionState>();
+  private readonly registrationSlots = new Map<string, SsoConnectionRegistrationSlot>();
+
+  /** The registration lock, by the same rule the Postgres twin applies. */
+  async claim(candidate: SsoConnectionRegistrationSlot): Promise<SsoConnectionRegistrationSlot> {
+    const slots = [...this.registrationSlots.values()].filter(
+      (slot) => slot.organizationId === candidate.organizationId,
+    );
+    const stateByConnection = new Map(
+      [...this.states.values()].map((state) => [state.connectionId, state.state]),
+    );
+    const [blocking] = findBlockingRegistrationSlots({ candidate, slots, stateByConnection });
+    if (blocking) return blocking;
+    this.registrationSlots.set(`${candidate.organizationId}:${candidate.kind}`, candidate);
+    return candidate;
+  }
 
   async tryFindConnection({
     connectionId,
@@ -33,15 +56,13 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
   }: {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null> {
-    for (const state of this.states.values()) {
-      if (state.state === "ACTIVE" && state.verifiedDomains.includes(domain)) {
-        return {
-          connectionId: state.connectionId,
-          organizationId: state.organizationId,
-        };
-      }
-    }
-    return null;
+    const holders = [...this.states.values()].filter((state) =>
+      ownedVerifiedDomains(state).includes(domain),
+    );
+    const owner = holders.find((state) => state.replacesConnectionId === null) ?? holders[0];
+    return owner
+      ? { connectionId: owner.connectionId, organizationId: owner.organizationId }
+      : null;
   }
 
   async findForOrganization({
@@ -83,6 +104,10 @@ export class StubBreakGlassBindings implements SsoBreakGlassBindingRepository {
   constructor(private live: boolean) {}
 
   async hasLiveBinding(): Promise<boolean> {
+    return this.live;
+  }
+
+  async reserveActivationRecovery(): Promise<boolean> {
     return this.live;
   }
 

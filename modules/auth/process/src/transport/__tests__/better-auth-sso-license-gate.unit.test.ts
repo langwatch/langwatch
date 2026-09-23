@@ -4,6 +4,7 @@
  * and which paths never even ask because the gate cannot change their answer.
  */
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity-contract";
+import { nowInstant } from "@langwatch/time";
 import { APIError } from "better-auth/api";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,7 +17,10 @@ import {
   createAuthOptions,
   type BetterAuthDeploymentConfiguration,
 } from "../../channels/http/http.better-auth.channel.ts";
+import { CredentialSessionGuard } from "../../channels/http/http.credential-session-guard.channel.ts";
 import type { SignInRouterShadow } from "../../channels/http/http.sign-in-router-shadow.channel.ts";
+import { signInSecurityFixture } from "../../services/__tests__/sign-in-security.fixture.ts";
+import { CredentialSignInPolicyService } from "../../services/credential-sign-in-policy.service.ts";
 
 const PASSWORD: SignInMethod = { id: "password", kind: "password", connectionId: null };
 const OKTA: SignInMethod = { id: "okta", kind: "federated", connectionId: "org_acme" };
@@ -86,8 +90,11 @@ const deployment: BetterAuthDeploymentConfiguration = {
   isProduction: false,
 };
 
-function buildHook(federation: StubFederation) {
-  const authOptions = createAuthOptions({
+function buildOptions(
+  federation: StubFederation,
+  addressRoutesToConnection: (input: { email: string }) => Promise<boolean> = async () => false,
+) {
+  return createAuthOptions({
     repo: {} as never,
     deployment,
     storage: new StubStorage(),
@@ -96,7 +103,24 @@ function buildHook(federation: StubFederation) {
     shadow: new StubShadow(),
     hooks: {} as never,
     ssoIssuers: { issuersForRequest: async () => [] },
+    /** No organization has set a threshold, so nothing is ever locked out. */
+    signInLockout: signInSecurityFixture({ now: nowInstant }).lockout,
+    addressRoutesToConnection,
+    credentialGuard: CredentialSessionGuard.create(
+      CredentialSignInPolicyService.create({
+        routing: null,
+        connections: { getOrganization: async () => ({ organizationId: "org-absent" }) },
+        recovery: { findGrants: async () => [] },
+      }),
+    ),
   });
+}
+
+function buildHook(
+  federation: StubFederation,
+  addressRoutesToConnection: (input: { email: string }) => Promise<boolean> = async () => false,
+) {
+  const authOptions = buildOptions(federation, addressRoutesToConnection);
   const before = authOptions.hooks?.before;
   if (!before) throw new Error("createAuthOptions did not wire a `before` hook");
   return (path: string, body: unknown = {}) =>
@@ -224,6 +248,80 @@ describe("the SSO license-gate request hook", () => {
 
       await expect(run("/api/auth/sign-out")).resolves.toBeUndefined();
       expect(federation.resolvePolicy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("a deployment that issues its own passwords beside its provider (D09)", () => {
+  const OKTA_INSTANCE: SignInMethod = { id: "okta", kind: "federated", connectionId: null };
+
+  describe("given its offered methods include a password and a federated method", () => {
+    /** @scenario "The credential routes answer on a deployment that offers a password" */
+    it("lets a credential sign-in through rather than refusing it as provider-managed", async () => {
+      const federation = new StubFederation();
+      federation.policy = {
+        defaultMethods: [OKTA_INSTANCE, PASSWORD],
+        localMethods: [PASSWORD],
+        federationLicensed: true,
+        selfHosted: false,
+      };
+
+      await expect(
+        buildHook(federation)("/api/auth/sign-in/email", { email: "sam@home.net" }),
+      ).resolves.toBeUndefined();
+    });
+
+    /** @scenario "The credential routes answer on a deployment that offers a password" */
+    it("still refuses it where only federated methods are offered", async () => {
+      const federation = new StubFederation();
+      federation.policy = {
+        defaultMethods: [OKTA_INSTANCE],
+        localMethods: [PASSWORD],
+        federationLicensed: true,
+        selfHosted: false,
+      };
+
+      await expect(
+        buildHook(federation)("/api/auth/sign-in/email", { email: "sam@home.net" }),
+      ).rejects.toMatchObject({ body: { code: "EMAIL_PASSWORD_DISABLED" } });
+    });
+  });
+
+  describe("given an address its organization routes through its own identity provider", () => {
+    const governed = async ({ email }: { email: string }) => email.endsWith("@acme.com");
+
+    /** @scenario "An organization's own connection still refuses a local password" */
+    it("refuses a password reset for that address and lets an ordinary one through", async () => {
+      const federation = new StubFederation();
+      federation.federationCapableValue = false;
+      const run = buildHook(federation, governed);
+
+      await expect(
+        run("/api/auth/request-password-reset", { email: "jo@acme.com" }),
+      ).rejects.toMatchObject({ body: { code: "EMAIL_PASSWORD_DISABLED" } });
+      await expect(
+        run("/api/auth/request-password-reset", { email: "sam@home.net" }),
+      ).resolves.toBeUndefined();
+    });
+
+    /** @scenario "An organization's own connection still refuses a local password" */
+    it("allows an address-less reset, which carries a token and no email", async () => {
+      const federation = new StubFederation();
+      federation.federationCapableValue = false;
+      const lookup = vi.fn(async () => true);
+
+      await expect(
+        buildHook(federation, lookup)("/api/auth/reset-password", { token: "t", newPassword: "x" }),
+      ).resolves.toBeUndefined();
+      expect(lookup).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given Redis is the secondary storage", () => {
+  describe("when a SAML assertion reserves its replay slot", () => {
+    it("writes the reservation to the primary database, where a replay is refused", () => {
+      expect(buildOptions(new StubFederation()).verification?.storeInDatabase).toBe(true);
     });
   });
 });

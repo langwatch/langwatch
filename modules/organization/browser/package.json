@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",

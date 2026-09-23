@@ -28,6 +28,8 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import type { InstantEvalJudgeChannel } from "../../channels/instant-eval-judge.channel.ts";
+import { MemoryInstantEvalJudgeChannel } from "../../channels/memory/memory.instant-eval-judge.channel.ts";
 import { instantEvalServer } from "../../instant-eval.server.ts";
 
 const PROJECT = "project-1";
@@ -51,7 +53,6 @@ function execution(rows: readonly Readonly<Record<string, unknown>>[]): LangWatc
     ],
     rows,
     statistics: { elapsedMs: 1, rowsRead: rows.length, bytesRead: 0, rowsReturned: rows.length },
-    truncated: false,
     diagnostics: [],
     followsTimeWindow: true,
     followsGranularity: true,
@@ -77,32 +78,62 @@ function planFor({ free }: { free: boolean }): Plan {
  * declared handle: `createApp` composes no secrets chain, so the scope is
  * handed to the declaration's install (handoff §10 carries the kernel seam).
  */
-const judgeSecrets = new ScopedSecrets(async (handle, build) =>
-  build(handle.id === "JEV_API_KEY" ? "test-judge-key" : undefined),
-);
+function judgeSecrets(judgeKey: string | undefined): ScopedSecrets {
+  return new ScopedSecrets(async (handle, build) =>
+    build(handle.id === "JEV_API_KEY" ? judgeKey : undefined),
+  );
+}
 
 const instantEval = withMemoryRepositories(instantEvalServer);
-const installable: typeof instantEval = {
-  ...instantEval,
-  install: (args) => instantEval.install({ ...args, secrets: judgeSecrets }),
-};
+function installableWith({ judgeKey }: { judgeKey: string | undefined }): typeof instantEval {
+  return {
+    ...instantEval,
+    install: (args) => instantEval.install({ ...args, secrets: judgeSecrets(judgeKey) }),
+  };
+}
+
+/** A connect judge that records which organizations it was asked about. */
+function connectJudgeAskedAbout(asked: string[]): InstantEvalJudgeChannel {
+  const memory = MemoryInstantEvalJudgeChannel.create();
+  return {
+    limits: memory.limits,
+    pricing: memory.pricing,
+    classify: () => memory.classify(),
+    isAvailableForOrganization: async (organizationId) => {
+      asked.push(organizationId);
+      return true;
+    },
+  };
+}
 
 /** The peers a run resolves through, each answering the one question it asks. */
 function installation({
   isReleased = true,
   isFreePlan = true,
-}: { isReleased?: boolean; isFreePlan?: boolean } = {}) {
+  classifier = "jev",
+  judgeKey = "test-judge-key",
+  connectJudge = null,
+  isBounded = false,
+}: {
+  isReleased?: boolean;
+  isFreePlan?: boolean;
+  classifier?: "jev" | "null" | undefined;
+  /** `null` is an install that configured no key of its own. */
+  judgeKey?: string | null;
+  connectJudge?: InstantEvalJudgeChannel | null;
+  isBounded?: boolean;
+} = {}) {
   return (
     createApp({ role: "api" })
-      .withModules([installable])
+      .withModules([installableWith({ judgeKey: judgeKey ?? undefined })])
       .withConfig({
         "instant-eval": {
-          classifier: "jev",
+          classifier,
           classifierBaseUrl: undefined,
           classifierModel: undefined,
           globalTokensPerSecond: 300_000,
           tenantTokensPerSecond: 150_000,
-          isBounded: false,
+          isBounded,
           queryTokenBudget: 4_000_000,
         },
       })
@@ -117,6 +148,7 @@ function installation({
       )
       // The shared bucket, the holds and the cancel hints each have a twin.
       .withKeyvalue(null)
+      .withMembers({ connectJudge })
       .provide({
         analytics: createApiFixture<AnalyticsApi>({
           isLangWatchQLAvailable: () => true,
@@ -149,7 +181,7 @@ function installation({
 }
 
 async function withInstallation<T>(
-  options: { isReleased?: boolean; isFreePlan?: boolean },
+  options: Parameters<typeof installation>[0],
   read: (api: InstantEvalApi) => Promise<T>,
 ): Promise<T> {
   const runtime = await installation(options).boot();
@@ -292,6 +324,67 @@ describe("given a process that installs Instant Evals over the memory tier", () 
         expect(run.sql).toContain("traces");
         expect(run.questions.map((question) => question.id)).toEqual(["polite"]);
       });
+    });
+  });
+});
+
+describe("given a deployment choosing which judge answers", () => {
+  describe("when the install sets no judge key and a connect judge is composed", () => {
+    /** @scenario "An install that sets nothing new keeps the classifier it had" */
+    it("judges through the connect judge, which answers per organization", async () => {
+      const asked: string[] = [];
+      await withInstallation(
+        { classifier: undefined, judgeKey: null, connectJudge: connectJudgeAskedAbout(asked) },
+        async (api) => {
+          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
+        },
+      );
+
+      expect(asked).toEqual([ORGANIZATION]);
+    });
+  });
+
+  describe("when the install has its own judge key as well", () => {
+    /** @scenario "An install with its own judge key keeps using it" */
+    it("judges with that key and never asks the connect judge", async () => {
+      const asked: string[] = [];
+      await withInstallation(
+        { classifier: undefined, connectJudge: connectJudgeAskedAbout(asked) },
+        async (api) => {
+          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(true);
+        },
+      );
+
+      expect(asked).toEqual([]);
+    });
+  });
+
+  describe("when the install asked for no classifier at all", () => {
+    it("takes that over both a judge key and the connect judge", async () => {
+      await withInstallation(
+        { classifier: "null", connectJudge: connectJudgeAskedAbout([]) },
+        async (api) => {
+          await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(false);
+        },
+      );
+    });
+  });
+
+  describe("when there is neither a key nor a connect judge", () => {
+    it("publishes the eval functions as unavailable", async () => {
+      await withInstallation({ classifier: undefined, judgeKey: null }, async (api) => {
+        await expect(api.isEnabled({ projectId: PROJECT })).resolves.toBe(false);
+      });
+    });
+  });
+});
+
+describe("given a deployment that bounds the free budget", () => {
+  describe("when the process has no Redis for the budget holds", () => {
+    it("refuses to install rather than keeping the holds to itself", async () => {
+      await expect(installation({ isBounded: true }).boot()).rejects.toThrow(
+        /needs a Redis connection for the budget holds/,
+      );
     });
   });
 });

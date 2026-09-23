@@ -17,16 +17,25 @@ import {
 } from "../../../model/licensing-host.ts";
 import { useLicenseActions } from "../use-license-actions.ts";
 
-const { uploadMutationOptions, removeMutationOptions, publicEnvData, invalidateMock, toaster } =
-  vi.hoisted(() => ({
-    uploadMutationOptions: { current: null as null | Record<string, any> },
-    removeMutationOptions: { current: null as null | Record<string, any> },
-    publicEnvData: {
-      current: undefined as undefined | { IS_SAAS: boolean },
-    },
-    invalidateMock: vi.fn(),
-    toaster: { create: vi.fn() },
-  }));
+const {
+  uploadMutationOptions,
+  removeMutationOptions,
+  activateMutationOptions,
+  refreshMutationOptions,
+  publicEnvData,
+  invalidateMock,
+  toaster,
+} = vi.hoisted(() => ({
+  uploadMutationOptions: { current: null as null | Record<string, any> },
+  removeMutationOptions: { current: null as null | Record<string, any> },
+  activateMutationOptions: { current: null as null | Record<string, any> },
+  refreshMutationOptions: { current: null as null | Record<string, any> },
+  publicEnvData: {
+    current: undefined as undefined | { IS_SAAS: boolean },
+  },
+  invalidateMock: vi.fn(),
+  toaster: { create: vi.fn() },
+}));
 
 // `trpc.invalidate()` replaced a full-page reload that used to tear the
 // toast off-screen; this spy guards the regression. The hook cannot reach
@@ -43,9 +52,28 @@ vi.mock("../../../behavior/licensing-api.ts", () => ({
           return { mutate: vi.fn(), isPending: false };
         },
       },
+      activate: {
+        useMutation: (options: Record<string, any>) => {
+          activateMutationOptions.current = options;
+          return { mutate: vi.fn(), isPending: false };
+        },
+      },
       remove: {
         useMutation: (options: Record<string, any>) => {
           removeMutationOptions.current = options;
+          return { mutate: vi.fn(), isPending: false };
+        },
+      },
+    },
+  },
+}));
+
+vi.mock("../../../behavior/connect-api.ts", () => ({
+  connectApi: {
+    connect: {
+      refreshLicense: {
+        useMutation: (options: Record<string, any>) => {
+          refreshMutationOptions.current = options;
           return { mutate: vi.fn(), isPending: false };
         },
       },
@@ -86,6 +114,14 @@ class TestLicensingHost extends LicensingHostApi {
   failed(failure: LicensingFailureNotice): void {
     toaster.create({ title: failure.fallbackTitle, type: "error" });
   }
+
+  canManageOrganization(): boolean {
+    return true;
+  }
+
+  describeFailure(failure: LicensingFailureNotice): string {
+    return failure.fallbackTitle;
+  }
 }
 
 const host = new TestLicensingHost();
@@ -109,6 +145,72 @@ describe("useLicenseActions", () => {
     vi.clearAllMocks();
     uploadMutationOptions.current = null;
     removeMutationOptions.current = null;
+    activateMutationOptions.current = null;
+    refreshMutationOptions.current = null;
+  });
+
+  describe("when an activation code is redeemed on a self-hosted deployment", () => {
+    /** @scenario Activating a license takes effect at the next restart */
+    it("says the same thing as a pasted license, restart line included", () => {
+      publicEnvData.current = { IS_SAAS: false };
+
+      renderActions();
+      activateMutationOptions.current?.onSuccess();
+
+      expect(toaster.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "License activated",
+          description: expect.stringContaining("restart the server"),
+        }),
+      );
+    });
+  });
+
+  describe("when an admin refreshes a connected license", () => {
+    /** @scenario An admin refreshes the license and gets the new seat count */
+    it("names the seats the reissued license covers and refreshes plan state", () => {
+      publicEnvData.current = { IS_SAAS: false };
+
+      renderActions();
+      refreshMutationOptions.current?.onSuccess({
+        outcome: "updated",
+        maxMembers: 80,
+        expiresAt: "2027-01-01T00:00:00Z",
+      });
+
+      expect(toaster.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "License updated",
+          description: "Your license now covers 80 seats.",
+        }),
+      );
+      expect(invalidateMock).toHaveBeenCalled();
+    });
+
+    /** @scenario An admin refreshes a license that is already current */
+    it("says the license is up to date and leaves plan state alone", () => {
+      publicEnvData.current = { IS_SAAS: false };
+
+      renderActions();
+      refreshMutationOptions.current?.onSuccess({ outcome: "unchanged" });
+
+      expect(toaster.create).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Your license is up to date" }),
+      );
+      expect(invalidateMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A refresh that the registry rate limits is refused with its code */
+    it("hands the refusal to the host, which words it from its code", () => {
+      publicEnvData.current = { IS_SAAS: false };
+
+      renderActions();
+      refreshMutationOptions.current?.onError(new Error("connect_sync_rate_limited"));
+
+      expect(toaster.create).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Couldn't refresh license", type: "error" }),
+      );
+    });
   });
 
   describe("when a license is activated on a self-hosted deployment", () => {

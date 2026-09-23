@@ -100,6 +100,11 @@ export type PersonalDeployment = {
    * sign-in-methods section is the one signed-in surface that also needs it.
    */
   authProvider: string | undefined;
+  /**
+   * Whether this deployment issues its own passwords (the server's
+   * `EMAIL_PASSWORD_ENABLED`), even behind an enterprise provider. Absent reads as no.
+   */
+  emailPasswordEnabled?: boolean;
 };
 
 /**

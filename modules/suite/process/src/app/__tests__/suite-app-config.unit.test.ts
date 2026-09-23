@@ -1,4 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * SuiteApp reads `publicBaseUrl` off the process's own member.
  * @vitest-environment node
@@ -8,7 +9,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { SuiteApp } from "../suite.app.ts";
@@ -37,9 +38,10 @@ function buildProductionApp(publicBaseUrl: string | undefined) {
         findOrganizationId: async () => "organization-1",
       }),
     },
-    members: { clickhouse: unreachableClickHouse(), publicBaseUrl },
+    members: { clickhouse: unreachableClickHouse(), publicBaseUrl, redis: null },
     config: undefined,
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 }
 

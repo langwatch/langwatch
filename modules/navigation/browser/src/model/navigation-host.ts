@@ -60,11 +60,18 @@ export type NavigationUser = {
 export type NavigationDeployment = {
   isSaaS: boolean;
   isDevelopment: boolean;
+  /** A development build that asked to draw without the development badge. */
+  hideDevIndicator?: boolean;
   /** The shared demo project, when this deployment configures one. */
   demoProjectSlug?: string;
   hasNlpService: boolean;
   hasLangevals: boolean;
 };
+
+/** The DEV badge and glow: a development build, unless HIDE_DEV_INDICATOR is set. */
+export function showsDevelopmentIndicator(deployment: NavigationDeployment): boolean {
+  return deployment.isDevelopment && deployment.hideDevIndicator !== true;
+}
 
 /**
  * The plan the menu's gates read. `isLoading` matters because enterprise
@@ -302,6 +309,31 @@ export abstract class NavigationHost {
 
   /** What the application draws for an address that names no page. */
   abstract notFound(): ReactNode;
+
+  /**
+   * The install's one-time usage-report notice, drawn where the page body
+   * starts. The shell answers it from ops' `startupNotice` capability.
+   */
+  startupNotice(): ReactNode {
+    return null;
+  }
+
+  /**
+   * The post-login join offer drawn over the page body; the shell answers it
+   * from organization's `joinOffer` capability. Nothing where none is wired.
+   */
+  joinOffer(_input: { currentOrganizationId: string | undefined }): ReactNode {
+    return null;
+  }
+
+  /**
+   * What a member on none of the organization's teams sees in place of the
+   * body; organization's `teamAccessWaiting` capability, with the shell's own
+   * reload behind "check again". Null keeps the chrome's own refusal.
+   */
+  teamAccessWaiting(_input: { organizationName: string }): ReactNode {
+    return null;
+  }
 
   /**
    * Sets the document's title, and hands back the way to put it back.

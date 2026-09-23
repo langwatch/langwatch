@@ -12,6 +12,8 @@ export const BACKOFFICE_RESOURCES = [
   "subscriptions",
   "sso-connections",
   "bug-reports",
+  "licenses",
+  "self-hosted-instances",
 ] as const;
 
 export type BackofficeResource = (typeof BACKOFFICE_RESOURCES)[number];

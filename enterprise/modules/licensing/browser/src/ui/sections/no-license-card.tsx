@@ -1,4 +1,4 @@
-import { Box, Button, Field, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
@@ -12,13 +12,16 @@ import { formatFileSize } from "../../model/license-status.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
 import { Link } from "../../ui/elements/link.tsx";
 
-type ActivationMethod = "file" | "key";
+type ActivationMethod = "code" | "file" | "key";
 
 interface NoLicenseCardProps {
   licenseKey: string;
   onLicenseKeyChange: (value: string) => void;
   onActivate: () => void;
   onFileActivate?: (fileContent: string) => void;
+  activationCode: string;
+  onActivationCodeChange: (value: string) => void;
+  onCodeActivate: () => void;
   isActivating: boolean;
 }
 
@@ -27,12 +30,15 @@ export function NoLicenseCard({
   onLicenseKeyChange,
   onActivate,
   onFileActivate,
+  activationCode,
+  onActivationCodeChange,
+  onCodeActivate,
   isActivating,
 }: NoLicenseCardProps) {
   const host = useLicensingHost();
   const purchaseLinkUrl = host.licensePurchaseUrl() ?? DEFAULT_LICENSE_PURCHASE_URL;
 
-  const [activationMethod, setActivationMethod] = useState<ActivationMethod>("file");
+  const [activationMethod, setActivationMethod] = useState<ActivationMethod>("code");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,24 +93,22 @@ export function NoLicenseCard({
   }, []);
 
   const handleActivate = useCallback(() => {
-    if (activationMethod === "file" && uploadedFile) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        if (onFileActivate) {
-          onFileActivate(content);
-        }
-      };
-      reader.readAsText(uploadedFile);
-    } else if (activationMethod === "key") {
-      onActivate();
-    }
-  }, [activationMethod, uploadedFile, onFileActivate, onActivate]);
+    const activations: Record<ActivationMethod, () => void> = {
+      code: onCodeActivate,
+      key: onActivate,
+      file: () => {
+        if (uploadedFile && onFileActivate) readLicenseFile(uploadedFile, onFileActivate);
+      },
+    };
+    activations[activationMethod]();
+  }, [activationMethod, uploadedFile, onFileActivate, onActivate, onCodeActivate]);
 
-  const isActivateDisabled =
-    isActivating ||
-    (activationMethod === "file" && !uploadedFile) ||
-    (activationMethod === "key" && !licenseKey.trim());
+  const hasInput: Record<ActivationMethod, boolean> = {
+    code: activationCode.trim().length > 0,
+    file: uploadedFile !== null,
+    key: licenseKey.trim().length > 0,
+  };
+  const isActivateDisabled = isActivating || !hasInput[activationMethod];
 
   return (
     <Box borderWidth="1px" borderRadius="lg" padding={6} width="full">
@@ -127,6 +131,7 @@ export function NoLicenseCard({
             disabled={isActivating}
           >
             <HStack gap={4}>
+              <Radio value="code">Enter activation code</Radio>
               <Radio value="file">Upload license file</Radio>
               <Radio value="key">Enter license key</Radio>
             </HStack>
@@ -203,6 +208,25 @@ export function NoLicenseCard({
             </Box>
           )}
 
+          {activationMethod === "code" && (
+            <Field.Root width="full">
+              <Field.Label srOnly>Activation code</Field.Label>
+              <Input
+                value={activationCode}
+                onChange={(e) => onActivationCodeChange(e.target.value)}
+                placeholder="LW-XXXX-XXXX-XXXX-XXXX"
+                fontFamily="mono"
+                maxWidth="360px"
+                disabled={isActivating}
+              />
+              <Field.HelperText>
+                Your code was sent with your order. This install asks LangWatch for the license it
+                covers, so it needs to reach the internet. If it cannot, upload the license file
+                instead.
+              </Field.HelperText>
+            </Field.Root>
+          )}
+
           {activationMethod === "key" && (
             <Field.Root width="full">
               <Field.Label srOnly>License key</Field.Label>
@@ -252,4 +276,13 @@ export function NoLicenseCard({
       </VStack>
     </Box>
   );
+}
+
+/** Reads a dropped license file as text and hands its content on. */
+function readLicenseFile(file: File, onRead: (content: string) => void): void {
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (typeof reader.result === "string") onRead(reader.result);
+  };
+  reader.readAsText(file);
 }

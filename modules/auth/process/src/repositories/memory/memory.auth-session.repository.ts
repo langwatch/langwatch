@@ -17,8 +17,51 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
     return new MemoryAuthSessionRepository(memory);
   }
 
+  async countSignedInUsers({ at }: { at: number }): Promise<number> {
+    const signedIn = [...this.memory.sessions.values()].filter(
+      (session) => session.expires !== undefined && session.expires.epochMilliseconds >= at,
+    );
+    return new Set(signedIn.map((session) => session.userId)).size;
+  }
+
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
-    return this.memory.sessions.get(id) ?? null;
+    const session = this.memory.sessions.get(id);
+    if (!session) return null;
+
+    return {
+      id: session.id,
+      userId: session.userId,
+      sessionToken: session.sessionToken,
+      impersonating: session.impersonating,
+      createdAt: session.createdAt ?? EPOCH,
+      lastSeenAt: session.lastSeenAt ?? null,
+      updatedAt: session.updatedAt ?? EPOCH,
+    };
+  }
+
+  async touch({ sessionId, at }: { sessionId: string; at: Instant }): Promise<void> {
+    const session = this.memory.sessions.get(sessionId);
+    if (!session) return;
+
+    this.memory.sessions.set(sessionId, { ...session, lastSeenAt: at });
+  }
+
+  async findStoredForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly StoredBrowserSession[]> {
+    return [...this.memory.sessions.values()]
+      .filter((session) => session.userId === userId)
+      .map((session) => ({
+        id: session.id,
+        userId: session.userId,
+        sessionToken: session.sessionToken,
+        impersonating: session.impersonating,
+        createdAt: session.createdAt ?? EPOCH,
+        lastSeenAt: session.lastSeenAt ?? null,
+        updatedAt: session.updatedAt ?? EPOCH,
+      }));
   }
 
   async findForUser({ userId }: { userId: string }): Promise<readonly BrowserSessionRecord[]> {

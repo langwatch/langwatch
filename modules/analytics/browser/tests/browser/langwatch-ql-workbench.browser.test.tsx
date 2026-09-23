@@ -144,7 +144,6 @@ function evaluationResult(): LangWatchQLQueryResult {
       bytesRead: 65_536,
       rowsReturned: ROW_COUNT,
     },
-    truncated: false,
     diagnostics: [],
     followsTimeWindow: false,
     followsGranularity: false,

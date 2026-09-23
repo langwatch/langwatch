@@ -11,6 +11,12 @@ export const billingWeb = defineWebModule("billing")
     requires: ["BillingHostApi"],
     mounts: { BillingHostApi: { load: () => import("./behavior/billing-host-mount.tsx") } },
   })
+  // The license drawer's Billing section, for the backoffice that hosts that drawer.
+  .withCapabilities({
+    licenseBillingSection: {
+      load: () => import("./features/connected-billing/ui/sections/license-billing-section.tsx"),
+    },
+  })
   .withScreens({
     // Placed by the application's settings table until a settings anchor
     // accepts declared routes; the loader is this module's either way.

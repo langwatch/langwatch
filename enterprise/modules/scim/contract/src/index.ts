@@ -8,6 +8,27 @@ export {
 export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export { ScimService } from "./scim.service.ts";
 export { scimReconciliationTrpc } from "./scim-reconciliation.trpc.ts";
+export { scimOversightTrpc } from "./scim-oversight.trpc.ts";
+export {
+  DIRECTORY_IDENTITY_PAGE_SIZE,
+  directoryIdentityRowSchema,
+  listOversightSyncsInputSchema,
+  oversightConnectionInputSchema,
+  oversightFailureSchema,
+  oversightSyncListSchema,
+  oversightSyncSchema,
+  redriveRetiredApplyInputSchema,
+  redriveRetiredApplyResultSchema,
+  type DirectoryIdentityRow,
+  type ListOversightSyncsInput,
+  type OversightConnectionInput,
+  type OversightFailure,
+  type OversightSync,
+  type OversightSyncList,
+  type RedriveRetiredApplyInput,
+  type RedriveRetiredApplyResult,
+  type ScimOperator,
+} from "./scim-oversight.ts";
 export {
   RECENT_DIRECTORY_CHANGE_LIMIT,
   connectionReconciliationSchema,
@@ -43,6 +64,8 @@ export {
   type ScimRequestRecord,
 } from "./scim-request-log.ts";
 export {
+  ScimApplyNotRedrivableError,
+  ScimApplyNotRetiredError,
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,
   ScimProtocolError,

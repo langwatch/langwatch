@@ -50,7 +50,7 @@
   },
   "scripts": {
     "build": "tsup && tsc -p tsconfig.publish.json",
-    "typecheck": "tsc -b",
+    "typecheck": "pnpm -w exec tsc -b packages/ksuid",
     "test": "vitest run",
     "prepublishOnly": "pnpm build"
   },

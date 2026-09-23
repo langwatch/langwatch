@@ -61,6 +61,11 @@ export const licenseDataSchema = z.object({
   // bytes it was signed over, so the position and the optionality are part of
   // the signature contract, not style.
   organizationId: z.string().optional(),
+  // The LangWatch-hosted services this license may call (ADR-156, section 2).
+  // Last and optional for the same reason `organizationId` is: a license signed
+  // before it existed must re-serialize byte for byte. Absent means the install
+  // calls nothing, which an air-gapped operator proves from the blob itself.
+  connectServices: z.array(z.string()).optional(),
 });
 
 export type LicenseData = z.infer<typeof licenseDataSchema>;
@@ -161,6 +166,8 @@ type ValidLicenseStatus = {
   planName: string;
   expiresAt: string;
   organizationName: string;
+  /** The license names a hosted service, so an admin can sync it on demand (ADR-156, section 6). */
+  connected: boolean;
 } & LicenseResourceLimits;
 
 export type LicenseStatus =
@@ -221,6 +228,7 @@ export const licenseStatusSchema: z.ZodType<LicenseStatus> = z.union([
     .object({
       hasLicense: z.literal(true),
       valid: z.literal(true),
+      connected: z.boolean(),
       ...licenseMetadataShape,
       ...licenseResourceLimitsShape,
     })
@@ -252,6 +260,3 @@ export const licenseUploadedSchema = z
 export const licenseRemovedSchema = z
   .object({ success: z.literal(true), removed: z.literal(true) })
   .strict();
-
-/** A freshly minted and signed key. The one answer that carries one. */
-export const licenseGeneratedSchema = z.object({ licenseKey: z.string() }).strict();

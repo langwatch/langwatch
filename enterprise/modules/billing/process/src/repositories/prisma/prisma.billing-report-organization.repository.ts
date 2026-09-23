@@ -12,7 +12,10 @@ import {
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type BillingReportOrganizationDatabase = Pick<PrismaClient, "organization">;
+export type BillingReportOrganizationDatabase = Pick<
+  PrismaClient,
+  "organization" | "connectedBillingAccount"
+>;
 
 /**
  * Prisma implementation of the monthly roll-up's one organization read.
@@ -60,6 +63,7 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
         id: true,
         pricingModel: true,
         stripeCustomerId: true,
+        selfHostedCustomer: true,
         subscriptions: {
           where: {
             status: "ACTIVE",
@@ -73,11 +77,52 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
     });
 
     if (!organization) return { outcome: "not_found" };
+
     if (organization.pricingModel !== "SEAT_EVENT") {
-      return { outcome: "not_usage_billed" };
+      // A connected self-hosted customer buys no Cloud plan, so it never
+      // reaches SEAT_EVENT pricing. Its hosted usage is still invoiced, on the
+      // quarterly subscription its billing account names (ADR-156 section 7).
+      // The second read runs only for an organization an operator marked as a
+      // self-hosted customer, which is a handful of rows.
+      return organization.selfHostedCustomer
+        ? await this.connectedOrganizationForBilling(organizationId)
+        : { outcome: "not_usage_billed" };
     }
 
-    const { pricingModel: _pricingModel, ...forBilling } = organization;
-    return { outcome: "usage_billed", organization: forBilling };
+    const {
+      pricingModel: _pricingModel,
+      selfHostedCustomer: _selfHostedCustomer,
+      ...forBilling
+    } = organization;
+
+    return { outcome: "usage_billed", organization: { ...forBilling, contract: "cloud" } };
+  }
+
+  /**
+   * The billing identity of a connected self-hosted customer: the invoice
+   * customer and the usage subscription live on its `ConnectedBillingAccount`,
+   * not on the organization row, because it holds neither a Cloud customer nor
+   * a Cloud subscription.
+   */
+  private async connectedOrganizationForBilling(
+    organizationId: string,
+  ): Promise<BillingReportOrganizationLookup> {
+    const account = await this.prisma.connectedBillingAccount.findUnique({
+      where: { organizationId },
+      select: { stripeCustomerId: true, usageSubscriptionId: true },
+    });
+    if (!account) return { outcome: "not_usage_billed" };
+
+    return {
+      outcome: "usage_billed",
+      organization: {
+        id: organizationId,
+        stripeCustomerId: account.stripeCustomerId,
+        // Onboarding that stopped before the subscription existed leaves this
+        // empty, and the caller skips the organization until it does.
+        subscriptions: account.usageSubscriptionId ? [{ id: account.usageSubscriptionId }] : [],
+        contract: "connected",
+      },
+    };
   }
 }

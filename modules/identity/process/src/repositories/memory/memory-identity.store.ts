@@ -15,6 +15,7 @@ import type { BackfillAccountRow } from "../identity-backfill.repository.ts";
 import type { IdentifierReservationHolder } from "../identity-reservations.repository.ts";
 import type { LegacySignInAccount } from "../identity-signin-accounts.repository.ts";
 import type { IdentityVerificationRecord } from "../identity-verification.repository.ts";
+import type { SsoConnectionRegistrationSlot } from "../sso-connection-registration.repository.ts";
 
 /** The `User` row as the memory tier keeps it, plus the opaque payload a
  *  newborn commit carries through. */
@@ -52,6 +53,8 @@ export class MemoryIdentityStore {
   readonly joinRejections = new Map<string, Instant>();
   readonly joinCandidates = new Map<string, JoinCandidateOrganization[]>();
   readonly ssoConnections = new Map<string, SsoConnectionState>();
+  /** Registration slots, keyed `organizationId:kind`. */
+  readonly ssoRegistrationSlots = new Map<string, SsoConnectionRegistrationSlot>();
   /** The engine's provider rows, keyed by the connection they project. */
   readonly ssoEngineProviders = new Map<string, SsoEngineProviderRow>();
   /** When the re-proof sweep last LOOKED at a connection, by its id. */

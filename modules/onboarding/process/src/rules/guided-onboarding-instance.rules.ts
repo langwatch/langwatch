@@ -6,15 +6,12 @@
  */
 import { ensureGatewayV1BaseUrl } from "@langwatch/langy-contract";
 
-export type GuidedOnboardingGatewayConfig = Readonly<{
-  publicUrl?: string;
-  baseUrl?: string;
-}>;
+export type GuidedOnboardingGatewayConfig = Readonly<{ publicUrl: string | undefined }>;
 
 export function withInstanceFacts<S extends object>(
   state: S,
   gateway: GuidedOnboardingGatewayConfig,
 ): S & Readonly<{ gatewayUrl?: string }> {
-  const base = gateway.publicUrl ?? gateway.baseUrl;
+  const base = gateway.publicUrl;
   return base ? { ...state, gatewayUrl: ensureGatewayV1BaseUrl(base) } : state;
 }

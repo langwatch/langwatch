@@ -90,6 +90,10 @@ class FakeAppTokens implements GithubAppTokenCache {
 }
 
 class FakeRepository extends GithubPullRequestsRepository {
+  countUsage(): Promise<{ pullRequests: number }> {
+    return Promise.resolve({ pullRequests: 0 });
+  }
+
   readonly upserts: UpsertGithubBranchCheckInput[] = [];
   branchCheck: GithubBranchCheckRow | null = null;
 

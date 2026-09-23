@@ -119,6 +119,10 @@ async function mountWebhook(): Promise<MountableRestApp> {
     .withConfig({
       gateway: {
         spendSettlementGraceMs: undefined,
+        internalUrl: undefined,
+        controlPlaneUrl: undefined,
+        baseUrl: undefined,
+        publicUrl: undefined,
       },
     })
     .withRelational(database())
@@ -136,6 +140,8 @@ async function mountWebhook(): Promise<MountableRestApp> {
       sessions: sessionCollaborators(),
     })
     .withMember("gatewayInternalProtocol", {})
+    .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
+    .withMember("publicBaseUrl", "http://langwatch.test")
     .provide({
       webhook: peer("webhook"),
       entitlement: peer("entitlement"),
@@ -145,6 +151,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       monitor: peer("monitor"),
       organization: peer("organization"),
       "feature-flag": peer("feature flag"),
+      "model-provider": peer("model provider"),
     })
     .boot();
   const gateway = runtime.module(gatewayServer).provided;

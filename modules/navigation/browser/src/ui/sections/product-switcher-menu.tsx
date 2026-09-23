@@ -54,7 +54,7 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button {...productPillStyle} aria-label="Switch product">
+        <Button {...productPillStyle} aria-label="Switch product" data-tour="product-switcher">
           <ActiveIcon size={14} color="var(--chakra-colors-fg-muted)" />
           <Text truncate>{active.label}</Text>
           <ChevronsUpDown size={13} color="var(--chakra-colors-gray-400)" />

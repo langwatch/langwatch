@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+
 import {
   drainBackend,
   startBackend,
@@ -97,7 +98,6 @@ describe("given the backend process hosts both applications", () => {
         close: async () => {
           throw new Error("queue wedged");
         },
-        observability: fakeObservability(),
       };
 
       await expect(drainBackend({ api, worker })).rejects.toThrow("queue wedged");

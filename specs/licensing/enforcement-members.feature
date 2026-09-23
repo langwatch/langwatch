@@ -264,6 +264,14 @@ Feature: Member Limit Enforcement with License
     And the modal shows "team members: 3 / 3"
     And the modal includes an upgrade call-to-action
 
+  @integration
+  Scenario: The upgrade modal opening is counted with what stopped the action
+    Given the organization has a license with maxMembers 5
+    And the organization has 5 members (at limit)
+    When I click the "Add members" button
+    Then an upgrade modal is displayed
+    And one event is emitted naming the limit that stopped the action
+
   @unit @unimplemented
   Scenario: Clicking Add members when allowed opens add members form
     Given the organization has a license with maxMembers 5

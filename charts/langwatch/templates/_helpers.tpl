@@ -1399,6 +1399,39 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
+{{- /* The version this install reports in its license sync and its usage
+       report, so we know which release each install runs. The app image tag is
+       the release. Emitted on every render: it names the build and carries no
+       decision. */}}
+- name: SERVICE_VERSION
+  value: {{ .Values.images.app.tag | default .Chart.AppVersion | quote }}
+
+{{- /* LangWatch-hosted services. There is no switch that turns them on: the
+       license decides what an install may call, and a license naming no hosted
+       service reaches nothing. So a default render carries no LANGWATCH_CONNECT_
+       variable, and an install that upgrades and changes no value behaves as it
+       did. What is emitted here is the operator's overrides: the off switch an
+       auditor asks for, and the addresses of a private LangWatch. In sharedEnv
+       beside the license because the workers judge too, and an app and a worker
+       disagreeing about which services are reachable would make the same query
+       behave differently depending on which one ran it. */}}
+{{- if .Values.app.connect.disabled }}
+- name: LANGWATCH_CONNECT_DISABLED
+  value: "true"
+{{- end }}
+{{- if .Values.app.connect.gatewayEndpoint }}
+- name: LANGWATCH_CONNECT_GATEWAY_ENDPOINT
+  value: {{ .Values.app.connect.gatewayEndpoint | quote }}
+{{- end }}
+{{- if .Values.app.connect.licenseEndpoint }}
+- name: LANGWATCH_CONNECT_LICENSE_ENDPOINT
+  value: {{ .Values.app.connect.licenseEndpoint | quote }}
+{{- end }}
+{{- if .Values.app.connect.instanceId }}
+- name: LANGWATCH_CONNECT_INSTANCE_ID
+  value: {{ .Values.app.connect.instanceId | quote }}
+{{- end }}
+
 # Email gateway. Naming a provider is what turns email on. In sharedEnv rather
 # than the app Deployment because scheduled reports and alert notifications are
 # dispatched by the workers, so a workers pod without a gateway configured

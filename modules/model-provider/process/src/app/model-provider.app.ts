@@ -1,4 +1,5 @@
 import { AuthzApi } from "@langwatch/authz-contract";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 /**
  * The model-provider feature's application: what `modelProvider.*`, `llmModelCost.*` and
@@ -58,10 +59,13 @@ import {
   type TranslateOutput,
   modelProviderConfig,
   type ModelProviderServerConfig,
+  type PlatformProviderEntry,
+  type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { Secret } from "@langwatch/secrets";
 
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
@@ -78,6 +82,7 @@ import { ModelProviderPlaygroundService } from "../services/model-provider-playg
 import { ModelProviderStructuredGenerationService } from "../services/model-provider-structured-generation.service.ts";
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
+import { PlatformProviderChainService } from "../services/platform-provider-chain.service.ts";
 import { buildModelProviderInfrastructure } from "./model-provider-composition.build.ts";
 import type {
   CodexTokenRefresher,
@@ -192,16 +197,58 @@ export class ModelProviderApp implements ModelProviderApi {
     projects: ProjectApi,
     organizations: OrganizationApi,
     permissions: AuthzApi,
+    dataPrivacy: DataPrivacyApi,
   };
   static readonly config = modelProviderConfig;
+  /**
+   * The platform's own provider credentials, keyed by registry provider. Every
+   * one is optional: a deployment holding none dispatches on customer
+   * credentials alone, which is what a self-hosted install does.
+   */
+  static readonly secrets = {
+    openai: Secret.load("OPENAI_API_KEY", { optional: true }),
+    openai_codex: Secret.load("CODEX_ACCESS_TOKEN", { optional: true }),
+    anthropic: Secret.load("ANTHROPIC_API_KEY", { optional: true }),
+    gemini: Secret.load("GEMINI_API_KEY", { optional: true }),
+    google_agent_platform: Secret.load("GOOGLE_AGENT_PLATFORM_API_KEY", { optional: true }),
+    azure: Secret.load("AZURE_OPENAI_API_KEY", { optional: true }),
+    bedrock: Secret.load("AWS_ACCESS_KEY_ID", { optional: true }),
+    deepseek: Secret.load("DEEPSEEK_API_KEY", { optional: true }),
+    xai: Secret.load("XAI_API_KEY", { optional: true }),
+    cerebras: Secret.load("CEREBRAS_API_KEY", { optional: true }),
+    groq: Secret.load("GROQ_API_KEY", { optional: true }),
+    voyage: Secret.load("VOYAGE_API_KEY", { optional: true }),
+    elevenlabs: Secret.load("ELEVENLABS_API_KEY", { optional: true }),
+    custom: Secret.load("CUSTOM_API_KEY", { optional: true }),
+  } as const;
   static readonly reads = [...reads("redis"), "nlpServiceUrl"] as const;
 
-  static create({
-    repositories,
-    dependencies,
-    members,
-    config,
-  }: ModelProviderSetup): ModelProviderApp {
+  static async create(setup: ModelProviderSetup): Promise<ModelProviderApp> {
+    return ModelProviderApp.withPlatformChain(
+      setup,
+      await ModelProviderApp.resolvePlatformChain(setup.secrets),
+    );
+  }
+
+  /**
+   * One credential at a time, each closed over by the chain that carries it:
+   * the collaborator escapes the resolver, the value never does (ADR-132 §6).
+   */
+  private static async resolvePlatformChain(
+    secrets: ModelProviderSetup["secrets"],
+  ): Promise<PlatformProviderChainService> {
+    let chain = PlatformProviderChainService.create();
+    for (const [provider, handle] of Object.entries(ModelProviderApp.secrets)) {
+      chain = await secrets.into(handle, (credential) => chain.with(provider, credential));
+    }
+
+    return chain;
+  }
+
+  private static withPlatformChain(
+    { repositories, dependencies, members, config }: ModelProviderSetup,
+    platformChain: PlatformProviderChainService,
+  ): ModelProviderApp {
     const executionProxyBaseUrl = members.nlpServiceUrl
       ? `${members.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
       : UNCONFIGURED_EXECUTION_PROXY;
@@ -220,7 +267,13 @@ export class ModelProviderApp implements ModelProviderApi {
       config: buildConfig,
       dependencies,
     });
-    return new ModelProviderApp(repositories, dependencies, infrastructure, executionProxyBaseUrl);
+    return new ModelProviderApp(
+      repositories,
+      dependencies,
+      infrastructure,
+      executionProxyBaseUrl,
+      platformChain,
+    );
   }
 
   /**
@@ -233,12 +286,14 @@ export class ModelProviderApp implements ModelProviderApi {
     dependencies: ModelProviderSetup["dependencies"];
     members: ModelProviderInfrastructure;
     executionProxyBaseUrl?: string;
+    platformChain?: PlatformProviderChainService;
   }): ModelProviderApp {
     return new ModelProviderApp(
       setup.repositories,
       setup.dependencies,
       setup.members,
       setup.executionProxyBaseUrl ?? "http://nlp-engine-not-configured.invalid",
+      setup.platformChain ?? PlatformProviderChainService.create(),
     );
   }
 
@@ -266,6 +321,7 @@ export class ModelProviderApp implements ModelProviderApi {
    * re-authorizes a probe: it leaves for the vendor with the caller's keys.
    */
   readonly #providerAuthorization: ModelProviderWriteAuthorizationService;
+  readonly #dataPrivacy: DataPrivacyApi;
   readonly #playground: ModelProviderPlaygroundService;
   readonly #structuredGeneration: ModelProviderStructuredGenerationService;
 
@@ -274,7 +330,9 @@ export class ModelProviderApp implements ModelProviderApi {
     dependencies: ModelProviderSetup["dependencies"],
     members: ModelProviderInfrastructure,
     executionProxyBaseUrl: string,
+    private readonly platformChain: PlatformProviderChainService,
   ) {
+    this.#dataPrivacy = dependencies.dataPrivacy;
     this.#modelProviders = ModelProviderGateway.create({
       repository: repositories.providers,
       defaults: repositories.defaults,
@@ -467,6 +525,22 @@ export class ModelProviderApp implements ModelProviderApi {
     for (const role of CODEX_CODING_ROLES) {
       await this.setDefault({ scope, key: role, model: CODEX_DEFAULT_MODEL }, by);
     }
+  }
+
+  /**
+   * The providers this deployment holds its own keys for, in dispatch order.
+   * Empty where it holds none, which is a self-hosted install's answer.
+   */
+  countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {
+    return this.#modelProviders.countUsage(input);
+  }
+
+  async platformProviderChain(): Promise<PlatformProviderEntry[]> {
+    return this.#dataPrivacy
+      .intoGoogleApplicationCredentials((credential) =>
+        this.platformChain.with("vertex_ai", credential),
+      )
+      .chain();
   }
 
   // ── default models ─────────────────────────────────────────────────────────

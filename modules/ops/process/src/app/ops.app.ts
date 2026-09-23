@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
 /** Operator back office application: holds every capability the feature api
  * reaches, and centralizes rules the transport was deciding separately. */
@@ -9,27 +11,50 @@ import {
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
+import { AutomationApi } from "@langwatch/automation-contract";
+import { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { DashboardApi } from "@langwatch/dashboard-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type {
   RegisteredFoldProjection,
   RegisteredMapProjection,
   RegisteredStateProjection,
   ReplayService as EventingReplayService,
 } from "@langwatch/eventing";
+import { ExperimentApi } from "@langwatch/experiment-contract";
 import {
   FeatureFlagApi,
   listFeatureFlags,
   type FeatureFlagRules,
   type OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
+import { GithubApi } from "@langwatch/github-contract";
 import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
+import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { LangyApi } from "@langwatch/langy-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import {
   AdminSessionExpiredError,
   AdminSurfaceHiddenError,
   OpsApi,
   adminResourceNameSchema,
+  type CheckupAnswer,
+  CheckupNotSelfHostedError,
+  type CheckupResult,
+  type ExplicitCheckInput,
+  type ProjectCheckupReport,
+  OpsCapabilityUnavailableError,
+  type StartupNoticeState,
+  type UsageReportAnswer,
   opsConfig,
+  type ActivationCodePage,
+  type ActivationCodeView,
   type AdminIdentity,
   type AggregateDiscovery,
   type AggregateEventView,
@@ -43,6 +68,11 @@ import {
   type DeadLetterCount,
   type DeadOutboxMessageView,
   type GroupInfo,
+  type IssuedActivationCode,
+  type IssuedLicensePage,
+  type IssuedLicenseView,
+  type LicenseCustomer,
+  type LicenseTermsInput,
   type ListBugReportsInput,
   type OpsApiGetBadgeCountsOutput,
   type OpsEventLogSearchWindow,
@@ -70,28 +100,46 @@ import {
   type ReplayHistoryEntry,
   type ReplayStatus,
   type RunAdminOperationInput,
+  type SeatChangeResult,
+  type SelfHostedInstanceDetail,
+  type SelfHostedInstancePage,
+  type SignedIssuedLicense,
   type StartAdminImpersonationInput,
   type StopAdminImpersonationInput,
   type OpsServerConfig,
+  type ProductAnalyticsTarget,
   type SubmitBugReport,
 } from "@langwatch/ops-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
   type SearchProjectsResult,
 } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { type Instant, nowInstant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
+import { LicenseRegistryAuditService } from "#services/license-registry-audit.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 
+import { HttpCheckupProbeChannel } from "../channels/http/http.checkup-probe.channel.ts";
+import { HttpUsageReportChannel } from "../channels/http/http.usage-report.channel.ts";
+import { ClickHouseClickHouseHealthRepository } from "../repositories/clickhouse/clickhouse.datastore-health.repository.ts";
+import { PrismaPostgresHealthRepository } from "../repositories/prisma/prisma.datastore-health.repository.ts";
+import { RedisRedisHealthRepository } from "../repositories/redis/redis.datastore-health.repository.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
+import { OpsCheckupService } from "../services/ops-checkup.service.ts";
 import type { OpsService } from "../services/ops.service.ts";
 import { buildOpsInfrastructure, type OpsProcessMembers } from "./ops-composition.build.ts";
 /**
@@ -315,6 +363,76 @@ export interface OpsSystemMigrationRunner {
   rollBack(input: { migrationName: string; tenantId: string; actorUserId: string }): Promise<void>;
 }
 
+/** The license registry (ADR-156), an availability decision: `licensing` is
+ * enterprise-only, so the real one is supplied by composition when installed. */
+export interface OpsLicenseRegistry {
+  list(input: { page: number; pageSize: number; search?: string }): Promise<IssuedLicensePage>;
+  getById(input: { id: string }): Promise<IssuedLicenseView>;
+  issue(input: {
+    customer: LicenseCustomer;
+    email: string;
+    planType: string;
+    maxMembers: number;
+    maxMembersLite?: number;
+    expiresAt: string;
+    terms?: LicenseTermsInput;
+    operatorId: string;
+  }): Promise<SignedIssuedLicense>;
+  registerLegacy(input: {
+    licenseKey: string;
+    organizationId: string;
+    operatorId: string;
+  }): Promise<IssuedLicenseView>;
+  revoke(input: { id: string; reason: string; operatorId: string }): Promise<IssuedLicenseView>;
+  reissue(input: {
+    id: string;
+    maxMembers?: number;
+    maxMembersLite?: number;
+    expiresAt: string;
+    operatorId: string;
+  }): Promise<SignedIssuedLicense>;
+  changeSeats(input: {
+    id: string;
+    maxMembers: number;
+    operatorId: string;
+  }): Promise<SeatChangeResult>;
+  resetInstanceBinding(input: { id: string }): Promise<IssuedLicenseView>;
+  updateTerms(
+    input: { id: string; operatorId: string } & LicenseTermsInput,
+  ): Promise<IssuedLicenseView>;
+  linkToOrganization(input: {
+    id: string;
+    organizationId: string;
+    operatorId: string;
+  }): Promise<IssuedLicenseView>;
+  /** Minting and revoking are the backoffice's; redeeming is a public route. */
+  activationCodes(input: { page: number; pageSize: number }): Promise<ActivationCodePage>;
+  issueActivationCode(input: {
+    organizationId: string;
+    organizationName: string;
+    email: string;
+    planType: string;
+    maxMembers: number;
+    maxMembersLite?: number;
+    licenseTermDays: number;
+    services?: string[];
+    expiresAt: string;
+    reusable?: boolean;
+    operatorId: string;
+  }): Promise<IssuedActivationCode>;
+  revokeActivationCode(input: { id: string; operatorId: string }): Promise<ActivationCodeView>;
+}
+
+/**
+ * The registry of self-hosted installs (ADR-156, section 10), an
+ * availability decision like {@link OpsLicenseRegistry}: read only, because
+ * every number was reported by an install and never edited by an operator.
+ */
+export interface OpsSelfHostedInstances {
+  list(input: { page: number; pageSize: number; search?: string }): Promise<SelfHostedInstancePage>;
+  getById(input: { id: string }): Promise<SelfHostedInstanceDetail>;
+}
+
 /** Team alert for a filed report. Best-effort: intake already succeeded. */
 export interface BugReportNotifier {
   notify(input: { report: BugReport }): Promise<void>;
@@ -359,6 +477,8 @@ export interface OpsAppInfrastructure {
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
   systemMigrations: OpsSystemMigrationRunner;
+  licenseRegistry: OpsLicenseRegistry;
+  selfHostedInstances: OpsSelfHostedInstances;
   bugReportRateLimiter: BugReportRateLimiter;
   bugReportNotifier: BugReportNotifier;
   /** The ClickHouse account an operator EXPLAIN runs as. */
@@ -369,6 +489,8 @@ export interface OpsAppInfrastructure {
    * configured none, which refuses every call.
    */
   findOpsApiKey(): string | null;
+  /** The product-analytics target this deployment configured, for peers that send to it. */
+  findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   /**
    * Whether this deployment is production, for the explain service's own
    * fail-closed rule. Passed rather than read from the environment: a feature
@@ -387,14 +509,19 @@ type OpsRuntimeDependencies = Readonly<{
   eventLogWindow: OpsEventLogWindowReader;
   grafana: OpsGrafanaLinks;
   systemMigrations: OpsSystemMigrationRunner;
+  licenseRegistry: LicenseRegistryAuditService;
+  selfHostedInstances: OpsSelfHostedInstances;
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
+  /** Settings, Checkup and the usage report; absent where a composition built none. */
+  checkup: OpsCheckupService | undefined;
   findOpsApiKey(): string | null;
+  findProductAnalyticsTargets(): ProductAnalyticsTarget[];
   isProduction: boolean;
 }>;
 
-/** {@link OpsAppDependencies} plus the two contract peers only `create()` itself reads. */
+/** {@link OpsAppDependencies} plus the contract peers only `create()` itself reads. */
 type OpsAppRuntimeDependencies = OpsAppDependencies &
   Readonly<{ apiKeys: ApiKeyApiContract; featureFlags: FeatureFlagApi }>;
 
@@ -521,6 +648,28 @@ export class OpsApp implements OpsApi {
     auditLog: AuditLogApi,
     apiKeys: ApiKeyApi,
     featureFlags: FeatureFlagApi,
+    // The checkup and the usage report ask each owner for its own facts.
+    organizations: OrganizationApi,
+    licensing: LicensingApi,
+    modelProviders: ModelProviderApi,
+    datasets: DatasetApi,
+    annotations: AnnotationApi,
+    monitors: MonitorApi,
+    experiments: ExperimentApi,
+    prompts: PromptApi,
+    workflows: WorkflowApi,
+    automations: AutomationApi,
+    github: GithubApi,
+    langy: LangyApi,
+    dashboards: DashboardApi,
+    traces: TraceApi,
+    scenarios: ScenarioApi,
+    gateway: GatewayApi,
+    instantEvals: InstantEvalApi,
+    codingAgents: CodingAgentApi,
+    notifications: NotificationApi,
+    storedObjects: StoredObjectApi,
+    analytics: AnalyticsApi,
   };
   static readonly config = opsConfig;
   static readonly reads = [
@@ -531,6 +680,10 @@ export class OpsApp implements OpsApi {
     "logger",
     "nodeEnvironment",
     "adminEmails",
+    "isSaas",
+    "serviceVersion",
+    "publicBaseUrl",
+    "processName",
   ] as const;
 
   /**
@@ -543,12 +696,42 @@ export class OpsApp implements OpsApi {
       members: setup.members,
       config: setup.config,
       resources: setup.resources,
+      processStore: setup.repositories.processStore,
+    });
+
+    const { dependencies } = setup;
+    const { members } = setup;
+    const checkup = OpsCheckupService.create({
+      members,
+      config: setup.config,
+      peers: {
+        ...dependencies,
+        auth: dependencies.auth,
+        projects: dependencies.projects,
+        users: dependencies.users,
+        organizationDirectory: dependencies.organizations,
+        providerTests: dependencies.modelProviders,
+        projectDirectory: dependencies.projects,
+        mail: dependencies.notifications,
+        storage: dependencies.storedObjects,
+        lwql: dependencies.analytics,
+      },
+      repositories: {
+        postgres: PrismaPostgresHealthRepository.create(members.prisma),
+        clickhouse: ClickHouseClickHouseHealthRepository.create(members.clickhouse),
+        redis: RedisRedisHealthRepository.create(members.redis),
+      },
+      channels: {
+        usageReport: HttpUsageReportChannel.create(),
+        probes: HttpCheckupProbeChannel.create(),
+      },
     });
 
     return OpsApp.fromInfrastructure({
       infrastructure,
-      dependencies: setup.dependencies,
+      dependencies,
       repositories: setup.repositories,
+      checkup,
     });
   }
 
@@ -561,6 +744,7 @@ export class OpsApp implements OpsApi {
     infrastructure: OpsAppInfrastructure;
     dependencies: OpsAppRuntimeDependencies;
     repositories: OpsRepositories;
+    checkup?: OpsCheckupService;
   }): OpsApp {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -582,13 +766,20 @@ export class OpsApp implements OpsApi {
       pipelines: members.pipelines,
       eventLogWindow: members.eventLogWindow,
       grafana: members.grafana,
+      licenseRegistry: LicenseRegistryAuditService.create({
+        registry: members.licenseRegistry,
+        auditLog: dependencies.auditLog,
+      }),
+      selfHostedInstances: members.selfHostedInstances,
       systemMigrations: members.systemMigrations,
       explain: OpsExplainService.create({
         repository: OpsExplainClickHouseRepository.create({
           resolver: members.explainClients,
         }),
       }),
+      checkup: setup.checkup,
       findOpsApiKey: () => members.findOpsApiKey(),
+      findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
       isProduction: members.isProduction,
     });
   }
@@ -1130,6 +1321,10 @@ export class OpsApp implements OpsApi {
     return this.#dependencies.grafana.findLinkConfig();
   }
 
+  findProductAnalyticsTargets(): ProductAnalyticsTarget[] {
+    return this.#dependencies.findProductAnalyticsTargets();
+  }
+
   // -- in-place system migrations --------------------------------------------
 
   listSystemMigrations(): Promise<OpsMigrationOverview[]> {
@@ -1346,6 +1541,279 @@ export class OpsApp implements OpsApi {
     });
   }
 
+  // -- the license registry (ADR-156), an availability-decided capability ---
+
+  listIssuedLicenses(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicensePage> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    const { operator: _operator, ...rest } = input;
+    return this.#dependencies.licenseRegistry.list({ ...rest, operatorId: staff.id });
+  }
+
+  getIssuedLicense(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicenseView> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.licenseRegistry.getById({ id: input.id, operatorId: staff.id });
+  }
+
+  issueLicense(input: {
+    customer: LicenseCustomer;
+    email: string;
+    planType: string;
+    maxMembers: number;
+    maxMembersLite?: number;
+    expiresAt: string;
+    terms?: LicenseTermsInput;
+    operator: OpsOperator | null;
+  }): Promise<SignedIssuedLicense> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    const { operator: _operator, ...rest } = input;
+    return this.#dependencies.licenseRegistry.issue({ ...rest, operatorId: staff.id });
+  }
+
+  registerLegacyLicense(input: {
+    licenseKey: string;
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicenseView> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.licenseRegistry.registerLegacy({
+      licenseKey: input.licenseKey,
+      organizationId: input.organizationId,
+      operatorId: staff.id,
+    });
+  }
+
+  revokeIssuedLicense(input: {
+    id: string;
+    reason: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicenseView> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.licenseRegistry.revoke({
+      id: input.id,
+      reason: input.reason,
+      operatorId: staff.id,
+    });
+  }
+
+  reissueLicense(input: {
+    id: string;
+    maxMembers?: number;
+    maxMembersLite?: number;
+    expiresAt: string;
+    operator: OpsOperator | null;
+  }): Promise<SignedIssuedLicense> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    const { operator: _operator, ...rest } = input;
+    return this.#dependencies.licenseRegistry.reissue({ ...rest, operatorId: staff.id });
+  }
+
+  changeLicenseSeats(input: {
+    id: string;
+    maxMembers: number;
+    operator: OpsOperator | null;
+  }): Promise<SeatChangeResult> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.licenseRegistry.changeSeats({
+      id: input.id,
+      maxMembers: input.maxMembers,
+      operatorId: staff.id,
+    });
+  }
+
+  resetLicenseInstanceBinding(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicenseView> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.licenseRegistry.resetInstanceBinding({
+      id: input.id,
+      operatorId: staff.id,
+    });
+  }
+
+  updateLicenseTerms(
+    input: { id: string; operator: OpsOperator | null } & LicenseTermsInput,
+  ): Promise<IssuedLicenseView> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    const { operator: _operator, id, ...terms } = input;
+    return this.#dependencies.licenseRegistry.updateTerms({ id, operatorId: staff.id, ...terms });
+  }
+
+  linkLicenseToOrganization(input: {
+    id: string;
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<IssuedLicenseView> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.licenseRegistry.linkToOrganization({
+      id: input.id,
+      organizationId: input.organizationId,
+      operatorId: staff.id,
+    });
+  }
+
+  listActivationCodes(input: {
+    page: number;
+    pageSize: number;
+    operator: OpsOperator | null;
+  }): Promise<ActivationCodePage> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    const { operator: _operator, ...rest } = input;
+    return this.#dependencies.licenseRegistry.activationCodes({ ...rest, operatorId: staff.id });
+  }
+
+  issueActivationCode(input: {
+    organizationId: string;
+    organizationName: string;
+    email: string;
+    planType: string;
+    maxMembers: number;
+    maxMembersLite?: number;
+    licenseTermDays: number;
+    services?: string[];
+    expiresAt: string;
+    reusable?: boolean;
+    operator: OpsOperator | null;
+  }): Promise<IssuedActivationCode> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    const { operator: _operator, ...rest } = input;
+    return this.#dependencies.licenseRegistry.issueActivationCode({
+      ...rest,
+      operatorId: staff.id,
+    });
+  }
+
+  revokeActivationCode(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<ActivationCodeView> {
+    const staff = this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.licenseRegistry.revokeActivationCode({
+      id: input.id,
+      operatorId: staff.id,
+    });
+  }
+
+  // -- the registry of self-hosted installs (ADR-156, section 10) -----------
+
+  listSelfHostedInstances(input: {
+    page: number;
+    pageSize: number;
+    search?: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedInstancePage> {
+    this.admitBackOfficeStaff(input.operator);
+    const { operator: _operator, ...rest } = input;
+    return this.#dependencies.selfHostedInstances.list(rest);
+  }
+
+  getSelfHostedInstance(input: {
+    id: string;
+    operator: OpsOperator | null;
+  }): Promise<SelfHostedInstanceDetail> {
+    this.admitBackOfficeStaff(input.operator);
+    return this.#dependencies.selfHostedInstances.getById({ id: input.id });
+  }
+
+  // -- Settings, Checkup and the usage report (specs/self-hosting/checkup) --
+
+  /** The free checks, or "not a self-hosted install" on LangWatch Cloud. */
+  async getCheckup({ organizationId }: { organizationId: string }): Promise<CheckupAnswer> {
+    const checkup = this.#checkup;
+    if (checkup.isSaas) return { deployment: "saas" };
+    const result = await checkup.checkupFor({ organizationId, requestedBy: "checkup" }).cheap();
+    return { deployment: "self-hosted", ...result };
+  }
+
+  async runCheckup({
+    organizationId,
+    requestedBy,
+    ...input
+  }: {
+    organizationId: string;
+    requestedBy?: string;
+  } & ExplicitCheckInput): Promise<CheckupAnswer> {
+    const checkup = this.#checkup;
+    if (checkup.isSaas) return { deployment: "saas" };
+    const result = await checkup
+      .checkupFor({ organizationId, requestedBy: requestedBy ?? "checkup" })
+      .explicit(input);
+    return { deployment: "self-hosted", ...result };
+  }
+
+  async getUsageReport(_input: { organizationId: string }): Promise<UsageReportAnswer> {
+    const checkup = this.#checkup;
+    if (checkup.isSaas) return { deployment: "saas" };
+    return { deployment: "self-hosted", ...(await checkup.usageReports.preview()) };
+  }
+
+  async setUsageReportSwitches({
+    organizationId: _organizationId,
+    ...switches
+  }: {
+    organizationId: string;
+    optionalMetricsOptOut?: boolean;
+    hostnameOptOut?: boolean;
+  }): Promise<UsageReportAnswer> {
+    const checkup = this.#checkup;
+    if (checkup.isSaas) return { deployment: "saas" };
+    return { deployment: "self-hosted", ...(await checkup.usageReports.setSwitches(switches)) };
+  }
+
+  /** The key names a project, the project names the organization, and the checkup runs for it. */
+  async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
+    const checkup = this.#checkup;
+    if (checkup.isSaas) throw new CheckupNotSelfHostedError();
+    const organizationId = await this.#dependencies.projects.getOrganizationId(projectId);
+    const [result, usageReport] = await Promise.all([
+      checkup.checkupFor({ organizationId, requestedBy: "checkup" }).cheap(),
+      checkup.usageReports.preview(),
+    ]);
+    return { ...result, usageReport };
+  }
+
+  async runProjectCheckup({
+    projectId,
+    ...input
+  }: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult> {
+    const checkup = this.#checkup;
+    if (checkup.isSaas) throw new CheckupNotSelfHostedError();
+    const organizationId = await this.#dependencies.projects.getOrganizationId(projectId);
+    return checkup.checkupFor({ organizationId, requestedBy: "checkup" }).explicit(input);
+  }
+
+  getStartupNotice(_input: { organizationId: string }): Promise<StartupNoticeState> {
+    return this.#checkup.usageReports.getStartupNotice();
+  }
+
+  async dismissStartupNotice({
+    schemaVersion,
+  }: {
+    organizationId: string;
+    schemaVersion: number;
+  }): Promise<{ dismissed: boolean }> {
+    return { dismissed: await this.#checkup.usageReports.dismissStartupNotice({ schemaVersion }) };
+  }
+
+  /** The daily report's one send for `ops_usage_report`; never throws for a refusal. */
+  sendUsageReport(): Promise<string> {
+    return this.#checkup.usageReports.send();
+  }
+
+  get #checkup(): OpsCheckupService {
+    const { checkup } = this.#dependencies;
+    if (!checkup) throw new OpsCapabilityUnavailableError("the checkup");
+    return checkup;
+  }
+
   /**
    * Writes reach explicit registry entries and the kill-switch keys the live
    * pipeline graph advertises, and nothing else: family-prefix matching alone
@@ -1453,18 +1921,9 @@ export interface OpsWorkerHandle {
   stop(): void | Promise<void>;
 }
 
-export interface UsageStatsWorkerConfig {
-  disabled: boolean;
-  installMethod: string;
-  hostname: string | undefined;
-  environment: string | undefined;
-  now: () => Instant;
-}
-
 /** Process controls for the complete Ops worker graph. */
 export interface OpsWorker {
   tryStartAnomalyWorker(): OpsWorkerHandle | undefined;
-  tryStartUsageStatsWorker(): OpsWorkerHandle | undefined;
   /**
    * The fleet's queue-metrics writer. One process publishes the snapshot every other one reads, so
    * the handle's `stop` hands the lease back rather than letting the fleet wait out its TTL.
@@ -1547,84 +2006,4 @@ export interface StorageStatsMetrics {
     succeededAtSeconds: number;
     sizeBytes: number;
   }): void;
-}
-
-export interface UsageStatsOrganization {
-  id: string;
-  name: string;
-}
-
-export interface UsageStatsProjectCounts {
-  projectIds: string[];
-  annotations: number;
-  annotationQueues: number;
-  annotationQueueItems: number;
-  annotationScores: number;
-  batchEvaluations: number;
-  customGraphs: number;
-  datasets: number;
-  datasetRecords: number;
-  experiments: number;
-  triggers: number;
-  workflows: number;
-}
-
-export interface UsageStatsCountDelegate {
-  count(input: { where: { projectId: { in: string[] } } }): Promise<number>;
-}
-
-export interface UsageStatsOrganizationDatabase {
-  organization: {
-    findMany(input: { select: { id: true; name: true } }): Promise<UsageStatsOrganization[]>;
-  };
-}
-
-export interface UsageStatsProjectDatabase {
-  project: {
-    findMany(input: {
-      where: { team: { organizationId: string } };
-      select: { id: true };
-    }): Promise<{ id: string }[]>;
-  };
-  annotation: UsageStatsCountDelegate;
-  annotationQueue: UsageStatsCountDelegate;
-  annotationQueueItem: UsageStatsCountDelegate;
-  annotationScore: UsageStatsCountDelegate;
-  batchEvaluation: UsageStatsCountDelegate;
-  customGraph: {
-    count(input: { where: { projectId: { in: string[] }; kind: string } }): Promise<number>;
-  };
-  dataset: UsageStatsCountDelegate;
-  datasetRecord: UsageStatsCountDelegate;
-  experiment: UsageStatsCountDelegate;
-  trigger: UsageStatsCountDelegate;
-  workflow: UsageStatsCountDelegate;
-}
-
-export interface UsageStatsWorkerDatabase
-  extends UsageStatsOrganizationDatabase, UsageStatsProjectDatabase {}
-
-export interface UsageStatsReport extends Omit<UsageStatsProjectCounts, "projectIds"> {
-  totalTraces: number;
-  totalScenarioEvents: number;
-  timestamp: string;
-}
-
-export interface UsageStatsCountInput {
-  organizationId: string;
-  projectIds: string[];
-}
-
-export interface UsageStatsCollector {
-  collect(input: { organizationId: string }): Promise<UsageStatsReport>;
-}
-
-/** Infrastructure boundary for the self-hosted telemetry receiver. */
-export interface UsageStatsTelemetryClient {
-  send(report: Record<string, unknown>): Promise<void>;
-}
-
-/** Infrastructure boundary for reporting a per-organization delivery failure. */
-export interface UsageStatsErrorReporter {
-  capture(input: { instanceId: string; error: unknown }): Promise<void>;
 }

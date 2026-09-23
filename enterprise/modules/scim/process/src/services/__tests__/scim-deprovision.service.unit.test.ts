@@ -14,6 +14,7 @@ class LifecycleFake implements ScimSyncLifecycle {
   readonly userPushed = vi.fn(async () => undefined);
   readonly groupMapped = vi.fn(async () => undefined);
   readonly applyFailed = vi.fn(async () => undefined);
+  readonly applyRedriven = vi.fn(async () => undefined);
   readonly revoked = vi.fn(async () => undefined);
 }
 

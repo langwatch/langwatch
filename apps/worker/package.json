@@ -68,6 +68,7 @@
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/enterprise-managed-provider-process": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
+    "@langwatch/enterprise-saas-process": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/entitlement-process": "workspace:*",
@@ -169,7 +170,9 @@
   },
   "devDependencies": {
     "@ai-sdk/openai": "catalog:",
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/scenario": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "esbuild": "catalog:",
     "typescript": "catalog:",

@@ -24,6 +24,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

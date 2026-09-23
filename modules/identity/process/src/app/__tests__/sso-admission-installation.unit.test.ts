@@ -1,6 +1,9 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
@@ -14,16 +17,25 @@ import { identityServer } from "../../identity.server.ts";
 const bootIdentity = () =>
   createApp({ role: "api" })
     .withModules([withMemoryRepositories(identityServer)])
-    .withMembers({ producesPipelines: false, adminEmails: [], publicBaseUrl: undefined })
+    .withMembers({
+      producesPipelines: false,
+      adminEmails: [],
+      publicBaseUrl: undefined,
+      isSaas: false,
+      rateLimiter: { check: async () => ({ allowed: true }) },
+    })
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
     .withConfig({ identity: { ssoDomainProofDnsServers: [] } })
     .withRelational(createApiFixture<PrismaClient>())
-    .withEventing(new EventSourcing({ enabled: false }))
+    .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))
     .provide({
       organization: createApiFixture<OrganizationApi>(),
       authz: createApiFixture<AuthzApi>(),
       auth: createApiFixture<AuthApi>(),
       user: createApiFixture<UserApi>(),
+      entitlement: createApiFixture<EntitlementApi>(),
+      "audit-log": createApiFixture<AuditLogApi>(),
+      licensing: createApiFixture<LicensingApi>(),
     })
     .boot();
 

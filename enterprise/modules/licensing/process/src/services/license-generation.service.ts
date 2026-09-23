@@ -32,6 +32,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     maxMembersLite,
     maxMessagesPerMonth,
     expiresAt: requestedExpiresAt,
+    connectServices,
     privateKey,
     now = toDate(nowInstant()),
   }: GenerateLicenseInput): GenerateLicenseOutput {
@@ -73,6 +74,9 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
       }),
       // The binding: without it the key activates on any organization.
       ...(organizationId ? { organizationId } : {}),
+      // Signed last and only when there is one, so a license naming no hosted
+      // service re-serializes exactly as it did before ADR-156 existed.
+      ...(connectServices?.length ? { connectServices } : {}),
     };
     const signedLicense = this.cryptography.signLicense(licenseData, privateKey);
 

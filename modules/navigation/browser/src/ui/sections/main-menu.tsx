@@ -263,7 +263,13 @@ function BuildSection({
   canSeeAutomations,
 }: ProjectSectionProps & { canSeeAutomations: boolean }) {
   return (
-    <SidebarSection id="library" label="Build" showExpanded={showExpanded} defaultExpanded={false}>
+    <SidebarSection
+      id="library"
+      label="Build"
+      showExpanded={showExpanded}
+      defaultExpanded={false}
+      tourId="nav-group-build"
+    >
       <PageMenuLink
         path={projectNavItems.prompts.path}
         icon={featureIcons.prompts.icon}

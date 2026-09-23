@@ -49,6 +49,10 @@ import {
 import { instantEvalHydrationPlan } from "../rules/instant-eval-run-sizing.rules.ts";
 import type { InstantEvalTextSource } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
+import {
+  InstantEvalReadAheadService,
+  type InstantEvalReadPage,
+} from "./instant-eval-read-ahead.service.ts";
 import type { InstantEvalRowSourceService } from "./instant-eval-row-source.service.ts";
 import type {
   InstantEvalLoadedRun,
@@ -105,6 +109,7 @@ export class InstantEvalJudgePageService {
     private readonly judgments: Pick<InstantEvalJudgmentsRepository, "insert">,
     private readonly cancellation: InstantEvalCancellationChannel,
     private readonly budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">,
+    private readonly readAhead: InstantEvalReadAheadService,
     private readonly concurrency: number,
     private readonly now: () => number,
   ) {}
@@ -117,6 +122,7 @@ export class InstantEvalJudgePageService {
     judgments,
     cancellation,
     budget,
+    readAhead = InstantEvalReadAheadService.create(),
     concurrency = INSTANT_EVAL_PAGE_CONCURRENCY,
     now = () => nowInstant().epochMilliseconds,
   }: {
@@ -127,6 +133,8 @@ export class InstantEvalJudgePageService {
     judgments: Pick<InstantEvalJudgmentsRepository, "insert">;
     cancellation: InstantEvalCancellationChannel;
     budget: Pick<InstantEvalFreeBudgetService, "assertWithinBudget">;
+    /** The next page of each run, read while the current one judges. */
+    readAhead?: InstantEvalReadAheadService;
     concurrency?: number;
     now?: () => number;
   }): InstantEvalJudgePageService {
@@ -138,6 +146,7 @@ export class InstantEvalJudgePageService {
       judgments,
       cancellation,
       budget,
+      readAhead,
       concurrency,
       now,
     );
@@ -145,6 +154,22 @@ export class InstantEvalJudgePageService {
 
   /** One page: its keys, its verdicts, and what it added to the run. */
   async judgePage(input: InstantEvalJudgePageInput): Promise<InstantEvalPageOutcome> {
+    try {
+      return await this.#judgePageOrThrow(input);
+    } catch (error) {
+      // What was read ahead belongs to a loop that just broke; the retry
+      // starts from the recorded cursor and reads for itself.
+      this.readAhead.discard({ runId: input.runId });
+      throw error;
+    }
+  }
+
+  /** Drops what a run read ahead, once the run is finishing. */
+  discardReadAhead({ runId }: { runId: string }): void {
+    this.readAhead.discard({ runId });
+  }
+
+  async #judgePageOrThrow(input: InstantEvalJudgePageInput): Promise<InstantEvalPageOutcome> {
     const { projectId, runId, page } = input;
     // Before anything is read: a lease with no room left is a page not started
     // at all, and the throw is retried under a fresh one.
@@ -154,7 +179,10 @@ export class InstantEvalJudgePageService {
     // Checked before the page rather than during it: a page is seconds of
     // judging, and stopping between pages is what the cancel contract
     // promises. The watch below is what stops one already under way.
-    if (await this.cancellation.isRequested({ runId })) return EMPTY_INSTANT_EVAL_PAGE;
+    if (await this.cancellation.isRequested({ runId })) {
+      this.readAhead.discard({ runId });
+      return EMPTY_INSTANT_EVAL_PAGE;
+    }
 
     // Thrown rather than answered empty: a run stopped by the budget did not
     // finish its selection, and recording it as complete would report a
@@ -165,20 +193,11 @@ export class InstantEvalJudgePageService {
       inFlightUsd: this.#spentSoFarUsd(loaded.row.tokens),
     });
 
-    const keyPage = await this.rowSource.keys({
-      caller: loaded.caller,
-      protections: loaded.protections,
-      sql: loaded.row.sql,
-      parameters: loaded.parameters,
-      keyColumns: input.keyColumns,
-      limit: input.pageSize,
-      ...(input.afterTraceId === null
-        ? {}
-        : { after: { traceId: input.afterTraceId, spanId: input.afterSpanId } }),
-    });
+    const startedPage = this.now();
+    const { keyPage, rows, isReadAhead } = await this.#takePageAndReadAhead({ loaded, input });
     if (keyPage.keys.length === 0) return EMPTY_INSTANT_EVAL_PAGE;
 
-    const { judged, stop } = await this.#judgeKeys({ loaded, keyPage, input });
+    const { judged, stop } = await this.#judgeKeys({ loaded, rows, input });
     const cut = cutPageAtStop({ judged, keys: keyPage.keys });
     const counters = await this.#write({
       loaded,
@@ -196,8 +215,94 @@ export class InstantEvalJudgePageService {
         "Instant Eval page stopped part way; what was judged is written",
       );
     }
+    // A run slower than its judging is explained per page, not by the total.
+    logger.debug(
+      {
+        projectId,
+        runId,
+        page,
+        rows: counters.rows,
+        inputTokens: judged.usage.inputTokens,
+        isReadAhead,
+        limiterWaitMs: judged.usage.limiterWaitMs,
+        pageMs: this.now() - startedPage,
+      },
+      "Instant Eval page profile",
+    );
 
     return outcomeFor({ input, cut, keyPage, counters, usage: judged.usage, stop });
+  }
+
+  /**
+   * The page this intent asked for, off the read-ahead when it read this very
+   * page, and the next one started behind it: by the time this returns, the
+   * next page's reads are under way against services the judge does not use.
+   */
+  async #takePageAndReadAhead({
+    loaded,
+    input,
+  }: {
+    loaded: InstantEvalLoadedRun;
+    input: InstantEvalJudgePageInput;
+  }): Promise<InstantEvalReadPage & { isReadAhead: boolean }> {
+    const cursor = {
+      afterTraceId: input.afterTraceId,
+      afterSpanId: input.afterSpanId,
+      limit: input.pageSize,
+    };
+    const [taken] = await this.readAhead.take({ runId: input.runId, ...cursor });
+    const current = taken ?? (await this.#readPage({ loaded, input, ...cursor }));
+
+    const last = current.keyPage.keys.at(-1);
+    const remaining = input.remaining - current.keyPage.keys.length;
+    if (current.keyPage.hasMore && remaining > 0 && last) {
+      // The limit the next intent asks for when every key became a judged
+      // row, the common case; one asking for anything else misses.
+      const next = {
+        afterTraceId: last.traceId,
+        afterSpanId: last.spanId ? last.spanId : null,
+        limit: Math.max(1, Math.min(input.pageSize, remaining)),
+      };
+      this.readAhead.start({
+        key: { runId: input.runId, ...next },
+        read: () => this.#readPage({ loaded, input, ...next }),
+      });
+    }
+    return { ...current, isReadAhead: taken !== undefined };
+  }
+
+  /** One page's keys, and the rows it owns with their texts in place. */
+  async #readPage({
+    loaded,
+    input,
+    afterTraceId,
+    afterSpanId,
+    limit,
+  }: {
+    loaded: InstantEvalLoadedRun;
+    input: InstantEvalJudgePageInput;
+    afterTraceId: string | null;
+    afterSpanId: string | null;
+    limit: number;
+  }): Promise<InstantEvalReadPage> {
+    const keyPage = await this.rowSource.keys({
+      caller: loaded.caller,
+      protections: loaded.protections,
+      sql: loaded.row.sql,
+      parameters: loaded.parameters,
+      keyColumns: input.keyColumns,
+      limit,
+      ...(afterTraceId === null ? {} : { after: { traceId: afterTraceId, spanId: afterSpanId } }),
+    });
+    if (keyPage.keys.length === 0) return { keyPage, rows: [] };
+
+    return {
+      keyPage,
+      rows: instantEvalOwnedRows({
+        rows: await this.#readTexts({ loaded, keyPage }),
+        keys: keyPage.keys,
+      }),
+    };
   }
 
   /**
@@ -218,17 +323,13 @@ export class InstantEvalJudgePageService {
   /** The page's texts, judged, with a cancel or the lease able to stop it. */
   async #judgeKeys({
     loaded,
-    keyPage,
+    rows,
     input,
   }: {
     loaded: InstantEvalLoadedRun;
-    keyPage: InstantEvalKeyPage;
+    rows: readonly Record<string, unknown>[];
     input: InstantEvalJudgePageInput;
   }): Promise<{ judged: InstantEvalJudgedPage; stop: InstantEvalPageStop | null }> {
-    const rows = instantEvalOwnedRows({
-      rows: await this.#readTexts({ loaded, keyPage }),
-      keys: keyPage.keys,
-    });
     // Measured again after the reads, which spent part of the same lease.
     const deadlineMs = this.#leaseMsLeft(input);
     const deadline = Number.isFinite(deadlineMs) ? AbortSignal.timeout(deadlineMs) : null;
@@ -259,7 +360,7 @@ export class InstantEvalJudgePageService {
     if (deadlineMs > 0) return deadlineMs;
 
     throw new Error(
-      `instant eval page ${input.page} of run ${input.runId} has no lease left to judge under`,
+      `instant eval page ${input.page} of run ${input.runId} has no lease left to judge under; retrying under a fresh one`,
     );
   }
 

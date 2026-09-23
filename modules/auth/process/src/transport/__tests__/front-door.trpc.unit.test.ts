@@ -22,7 +22,11 @@ const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
+  countUsage: vi.fn(),
   offersPasskeys: () => false,
+  offersTwoStepVerification: () => false,
+  getSignedInWith: () => unreached("getSignedInWith"),
+  findDialableIdentityProviderOrigins: () => unreached("findDialableIdentityProviderOrigins"),
   isWithinBudget,
   route,
   addressIsRegistered,
@@ -43,6 +47,10 @@ const door: AuthApi = {
   retireLegacySsoAccess: () => unreached("retireLegacySsoAccess"),
   countLegacySsoAccess: () => unreached("countLegacySsoAccess"),
   findFederatedAccountProviders: () => unreached("findFederatedAccountProviders"),
+  issuesOwnPasswords: () => unreached("issuesOwnPasswords"),
+  getSignInSecuritySettings: () => unreached("getSignInSecuritySettings"),
+  saveSignInSecuritySettings: () => unreached("saveSignInSecuritySettings"),
+  releaseHeldAccount: () => unreached("releaseHeldAccount"),
 };
 
 /** The front door reaches no session operation: naming one here would be a bug. */

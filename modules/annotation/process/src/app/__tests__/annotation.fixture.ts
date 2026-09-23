@@ -1,9 +1,9 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
@@ -108,5 +108,6 @@ export function createAnnotationTestApp(
       permissions: input.dependencies?.permissions ?? createAnnotationTestAuthz(),
       entitlement: input.dependencies?.entitlement ?? createAnnotationTestEntitlement(),
     },
+    config: undefined,
   });
 }

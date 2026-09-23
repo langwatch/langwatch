@@ -21,6 +21,7 @@ import {
   OrganizationCapabilityUnavailableError,
   OrganizationGroupService,
   OrganizationNotFoundForTeamError,
+  type OrganizationUsageCount,
 } from "@langwatch/organization-contract";
 import type {
   AddOrganizationGroupBindingInput,
@@ -47,10 +48,10 @@ import type {
   OrganizationBillingProfile,
   OrganizationGroup,
   OrganizationGroupBinding,
+  JoinRequestJoining,
   OrganizationGroupDetails,
   OrganizationGroupPage,
   OrganizationGroupSummary,
-  OrganizationService,
   OrganizationTeam,
   OrganizationTeamAccess,
   OrganizationTeamWithMembers,
@@ -82,6 +83,7 @@ import type {
   GroupListItem,
   GroupMembershipView,
   TeamWithProjects,
+  OrganizationMemberProvenance,
 } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -98,6 +100,7 @@ import {
   organizationProvisioningSummaryFromDate,
 } from "../rules/organization-time-boundary.rules.ts";
 import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
+import { MemberProvenanceService } from "../services/member-provenance.service.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
 import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
@@ -173,7 +176,7 @@ export interface OrganizationCaller {
 
 /** What the process composes this feature's application from. */
 export interface ServerOrganizationAppDependencies {
-  organizations: OrganizationService;
+  organizations: OrganizationEntityService;
   membership: OrganizationMembershipService;
   groups: OrganizationGroupService;
   projects: OrganizationProjectApi;
@@ -335,13 +338,18 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       settingsSecrets: members.settingsSecrets,
       diagnostics: members.diagnostics,
     });
+    const membershipRepository = setup.repositories.membership(setup.dependencies.permissions);
     const membership = OrganizationMembershipService.create({
-      repository: setup.repositories.membership(setup.dependencies.permissions),
+      repository: membershipRepository,
       prompts: members.prompts,
       seats: members.seats,
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
-      testArrivals: setup.dependencies.identity.ssoTestArrival(),
+      admissions: setup.dependencies.permissions,
+      // Resolved per call: the peer API is unreachable while the process constructs.
+      testArrivals: {
+        standingFor: (args) => setup.dependencies.identity.ssoTestArrival().standingFor(args),
+      },
     });
     const groups = OrganizationGroupScopeService.create({
       organizations,
@@ -358,6 +366,12 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     });
 
     application.#members = members;
+    application.#memberProvenance = MemberProvenanceService.create({
+      members: membershipRepository,
+      admissions: {
+        findForMembers: (args) => setup.dependencies.identity.joinAdmissions().findForMembers(args),
+      },
+    });
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => membership.getAllForUser(input),
@@ -411,6 +425,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     members?: Partial<OrganizationInfrastructure>;
     /** Defaults to a reader that finds no personal team in any scope. */
     personalTeamScope?: PersonalTeamScopeReader;
+    memberProvenance?: MemberProvenanceService;
   }): ServerOrganizationApp {
     const { groups, shares, apiKeys, ...dependencies } = setup.dependencies;
     const application = new ServerOrganizationApp({
@@ -438,6 +453,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     } as OrganizationInfrastructure;
 
     application.#members = members;
+    application.#memberProvenance =
+      setup.memberProvenance ?? refusing<MemberProvenanceService>("member provenance");
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => dependencies.membership.getAllForUser(input),
@@ -489,6 +506,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   // services close over the application itself, which the constructor cannot
   // hand them.
   #members!: OrganizationInfrastructure;
+  #memberProvenance!: MemberProvenanceService;
   #visibility!: OrganizationVisibilityService;
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
@@ -562,6 +580,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
    * existing share link now has to be revoked (ADR-057) — only the write saw the stored value
    * beforehand, so the answer is carried through rather than dropped here.
    */
+  getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining> {
+    return this.#dependencies.organizations.getJoinSetting(input);
+  }
+
+  saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void> {
+    return this.#dependencies.organizations.saveJoinSetting(input);
+  }
+
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord> {
     return this.#dependencies.organizations.readGuidedOnboardingState(input);
   }
@@ -716,6 +742,24 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     }
   }
 
+  createSelfHostedCustomer(input: { name: string }): Promise<{ id: string; name: string }> {
+    return this.#dependencies.membership.createSelfHostedCustomer(input);
+  }
+
+  markSelfHostedCustomer(input: { organizationId: string }): Promise<void> {
+    return this.#dependencies.membership.markSelfHostedCustomer(input);
+  }
+
+  findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
+    return this.#dependencies.membership.findSelfHostedCustomers();
+  }
+
+  findRepresentatives(input: {
+    organizationId: string;
+  }): Promise<{ userId: string; organizationName: string }[]> {
+    return this.#dependencies.membership.findRepresentatives(input);
+  }
+
   deleteProvisionedOrganization(
     input: Parameters<OrganizationMembershipService["deleteProvisionedOrganization"]>[0],
   ) {
@@ -736,6 +780,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /** The batched form of {@link isMember}, for the feature-flag resolver: the workspace switcher
    * asks a flag per listed organization, and this avoids a membership query per row. */
+  findAllIds(): Promise<string[]> {
+    return this.#dependencies.organizations.findAllIds();
+  }
+
+  countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {
+    return this.#dependencies.organizations.countUsage(input);
+  }
+
   memberOrganizationIds(input: { userId: string; organizationIds: string[] }): Promise<string[]> {
     return this.#dependencies.organizations.memberOrganizationIds(input);
   }
@@ -776,6 +828,13 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null> {
     return this.#dependencies.membership.findMemberById({ ...input, currentUserId: by.id });
+  }
+
+  /** Why each member is here, keyed by user id. */
+  getMemberProvenance(input: {
+    organizationId: string;
+  }): Promise<Record<string, OrganizationMemberProvenance>> {
+    return this.#memberProvenance.getForOrganization(input);
   }
 
   /** Every member of one organization, for the member pickers. */
@@ -1509,6 +1568,26 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Parameters<OrganizationJoinDoorService["setJoining"]>[0],
   ): ReturnType<OrganizationJoinDoorService["setJoining"]> {
     return this.#joinRequests.setJoining(input);
+  }
+
+  offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
+    return this.#joinRequests.offer(input);
+  }
+
+  dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void> {
+    return this.#joinRequests.dismissOffer(input);
+  }
+
+  admitAutomatically(
+    input: Readonly<{ userId: string }>,
+  ): ReturnType<OrganizationJoinDoorService["admitAutomatically"]> {
+    return this.#joinRequests.admitAutomatically(input);
+  }
+
+  listAutomaticJoins(
+    input: Readonly<{ organizationId: string }>,
+  ): ReturnType<OrganizationJoinDoorService["listAutomaticJoins"]> {
+    return this.#joinRequests.listAutomaticJoins(input);
   }
 
   // -- the sign-up ceremony --------------------------------------------------

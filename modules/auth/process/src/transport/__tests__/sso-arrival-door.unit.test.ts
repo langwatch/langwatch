@@ -35,6 +35,7 @@ const WORKER: BetterAuthHookUser = {
   name: "Dana",
   deactivatedAt: null,
   pendingSsoSetup: false,
+  signupConfirmationPending: false,
 };
 
 function repoFor(user: Partial<BetterAuthHookUser> | null = {}): BetterAuthHooksRepository {

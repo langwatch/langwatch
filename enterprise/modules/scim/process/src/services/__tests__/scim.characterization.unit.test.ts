@@ -29,6 +29,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     scimConnectionExists: vi.fn(async () => true),
     findDirectoryUserId: vi.fn(async () => null),
     findDirectoryOwnership: vi.fn(async () => []),
+    findDirectoryIdentities: vi.fn(async () => []),
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
@@ -329,6 +330,7 @@ describe("SCIM characterization: provisioning invariants", () => {
           userPushed: vi.fn(async () => undefined),
           groupMapped: vi.fn(async () => undefined),
           applyFailed: vi.fn(async () => undefined),
+          applyRedriven: vi.fn(async () => undefined),
           revoked: vi.fn(async () => undefined),
         };
         const writer = new GrantsFake();

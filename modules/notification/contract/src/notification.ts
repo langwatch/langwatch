@@ -46,3 +46,15 @@ export const notificationRecentQuerySchema = z
   .strict();
 
 export type NotificationRecentQuery = z.infer<typeof notificationRecentQuerySchema>;
+
+/** How mail leaves this install, as the checkup reads it (specs/self-hosting/checkup.feature). */
+export const mailDeliveryViewSchema = z
+  .object({
+    /** The gateway this deployment sends through; absent where none is configured. */
+    provider: z.string().optional(),
+    /** Whether an SMTP relay is named, so a connection to it can be verified. */
+    smtpConfigured: z.boolean(),
+  })
+  .strict();
+
+export type MailDeliveryView = z.infer<typeof mailDeliveryViewSchema>;

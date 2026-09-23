@@ -1,24 +1,28 @@
 import { createHash } from "node:crypto";
 
-import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import { ApiKeyNotFoundError, type ApiKeyBinding } from "@langwatch/api-key-contract";
+import type {
+  AuthzAccessBinding,
+  AuthzApi,
+  AuthzListApiKeyBindingsInput,
+} from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   projectIdentitySchema,
   projectWithTeamSchema,
   type ProjectApi,
 } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
 import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
 import {
   ApiKeyRepository,
   type ApiKeyCreateRecord,
+  type ApiKeyRow,
   type ApiKeyUpdateRecord,
-  type StoredApiKey,
 } from "../api-key.repository.ts";
 import { ApiKeyTokenAdapter } from "../memory/memory.api-key-token.repository.ts";
 
@@ -34,27 +38,64 @@ class TestApiKeyBindingId implements ApiKeyBindingId {
   }
 }
 
+/** What the grants side holds for each key; the service joins it, as it joins the grants head. */
+const KEY_GRANTS = new Map<string, ApiKeyBinding[]>();
+
+beforeEach(() => KEY_GRANTS.clear());
+
+function grantKey(id: string, bindings: ApiKeyCreateRecord["roleBindings"]): void {
+  KEY_GRANTS.set(
+    id,
+    bindings.map((binding, index) => ({
+      ...binding,
+      customRoleId: binding.customRoleId ?? null,
+      id: `binding-${index + 1}`,
+    })),
+  );
+}
+
+async function listApiKeyBindings({
+  organizationId,
+  apiKeyIds,
+}: AuthzListApiKeyBindingsInput): Promise<AuthzAccessBinding[]> {
+  return apiKeyIds.flatMap((apiKeyId) =>
+    (KEY_GRANTS.get(apiKeyId) ?? []).map((binding) => ({
+      ...binding,
+      organizationId,
+      userId: null,
+      groupId: null,
+      apiKeyId,
+      createdAt: new Date(0),
+      user: null,
+      group: null,
+      apiKey: null,
+      customRole: null,
+    })),
+  );
+}
+
 class MemoryApiKeys extends ApiKeyRepository {
-  private rows: StoredApiKey[] = [];
-  create(input: ApiKeyCreateRecord): Promise<StoredApiKey> {
+  private rows: ApiKeyRow[] = [];
+  create(input: ApiKeyCreateRecord): Promise<ApiKeyRow> {
     const now = toDate(nowInstant());
-    const row = {
-      ...input,
+    const { roleBindings, startsDisabled, ...record } = input;
+    const row: ApiKeyRow = {
+      ...record,
+      createdByDeviceLabel: record.createdByDeviceLabel ?? null,
+      parentApiKeyId: record.parentApiKeyId ?? null,
+      revocationCause: null,
       expiresAt: input.expiresAt ? toDate(input.expiresAt) : null,
       id: `key-${this.rows.length + 1}`,
-      revokedAt: input.startsDisabled ? now : null,
+      revokedAt: startsDisabled ? now : null,
       lastUsedAt: null,
       createdAt: now,
       updatedAt: now,
-      roleBindings: input.roleBindings.map((binding, index) => ({
-        ...binding,
-        id: `binding-${index + 1}`,
-      })),
-    } as StoredApiKey;
+    };
+    grantKey(row.id, roleBindings);
     this.rows.push(row);
     return Promise.resolve(row);
   }
-  activate({ id }: { id: string }): Promise<StoredApiKey> {
+  activate({ id }: { id: string }): Promise<ApiKeyRow> {
     return this.update({ id, revokedAt: null });
   }
   revokeExpiredByName({ name, now }: { name: string; now: Instant }): Promise<number> {
@@ -68,10 +109,10 @@ class MemoryApiKeys extends ApiKeyRepository {
     for (const row of matched) row.revokedAt = toDate(now);
     return Promise.resolve(matched.length);
   }
-  findByLookupId({ lookupId }: { lookupId: string }): Promise<StoredApiKey | null> {
+  findByLookupId({ lookupId }: { lookupId: string }): Promise<ApiKeyRow | null> {
     return Promise.resolve(this.rows.find((row) => row.lookupId === lookupId) ?? null);
   }
-  findById({ id }: { id: string }): Promise<StoredApiKey | null> {
+  findById({ id }: { id: string }): Promise<ApiKeyRow | null> {
     return Promise.resolve(this.rows.find((row) => row.id === id) ?? null);
   }
   findByIdInOrganization({
@@ -80,7 +121,7 @@ class MemoryApiKeys extends ApiKeyRepository {
   }: {
     id: string;
     organizationId: string;
-  }): Promise<StoredApiKey | null> {
+  }): Promise<ApiKeyRow | null> {
     return Promise.resolve(
       this.rows.find((row) => row.id === id && row.organizationId === organizationId) ?? null,
     );
@@ -91,7 +132,7 @@ class MemoryApiKeys extends ApiKeyRepository {
   }: {
     organizationId: string;
     userId: string;
-  }): Promise<StoredApiKey[]> {
+  }): Promise<ApiKeyRow[]> {
     return Promise.resolve(
       this.rows.filter(
         (row) =>
@@ -101,29 +142,26 @@ class MemoryApiKeys extends ApiKeyRepository {
       ),
     );
   }
-  listForOrganization({ organizationId }: { organizationId: string }): Promise<StoredApiKey[]> {
+  listForOrganization({ organizationId }: { organizationId: string }): Promise<ApiKeyRow[]> {
     return Promise.resolve(
       this.rows.filter((row) => row.organizationId === organizationId && row.revokedAt === null),
     );
   }
-  update(input: ApiKeyUpdateRecord): Promise<StoredApiKey> {
+  update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const row = this.rows.find((candidate) => candidate.id === input.id);
     if (!row) throw new Error("missing");
-    Object.assign(row, input, {
+    const { roleBindings, ...columns } = input;
+    Object.assign(row, columns, {
       updatedAt: toDate(nowInstant()),
       ...(input.revokedAt === void 0
         ? {}
         : { revokedAt: input.revokedAt && toDate(input.revokedAt) }),
       ...(input.lastUsedAt === void 0 ? {} : { lastUsedAt: toDate(input.lastUsedAt) }),
     });
-    if (input.roleBindings)
-      row.roleBindings = input.roleBindings.map((binding, index) => ({
-        ...binding,
-        id: `binding-${index + 1}`,
-      }));
+    if (roleBindings) grantKey(row.id, roleBindings);
     return Promise.resolve(row);
   }
-  revoke({ id }: { id: string }): Promise<StoredApiKey> {
+  revoke({ id }: { id: string }): Promise<ApiKeyRow> {
     return this.update({ id, revokedAt: nowInstant() });
   }
   async updateLastUsedAt({ id }: { id: string }): Promise<void> {
@@ -132,13 +170,13 @@ class MemoryApiKeys extends ApiKeyRepository {
   async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id, hashedSecret });
   }
-  get(id: string): StoredApiKey | undefined {
+  get(id: string): ApiKeyRow | undefined {
     return this.rows.find((row) => row.id === id);
   }
-  findIngestKey(): Promise<StoredApiKey | null> {
+  findIngestKey(): Promise<ApiKeyRow | null> {
     return Promise.resolve(null);
   }
-  findIngestKeysForProject(): Promise<StoredApiKey[]> {
+  findIngestKeys(): Promise<ApiKeyRow[]> {
     return Promise.resolve([]);
   }
   findLiveChildren(input: {
@@ -294,6 +332,7 @@ function projectPeer(memory: MemoryProjects): ProjectApi {
 function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDependencies {
   return {
     authz: createApiFixture<AuthzApi>({
+      listApiKeyBindings,
       can: vi.fn().mockResolvedValue(true),
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserBindings: vi.fn().mockResolvedValue([]),
@@ -532,7 +571,13 @@ describe("API-key service", () => {
       bindings: [],
     });
     expect(created.apiKey.roleBindings).toEqual([
-      { scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN", id: "binding-1" },
+      {
+        scopeType: "ORGANIZATION",
+        scopeId: "org-1",
+        role: "ADMIN",
+        customRoleId: null,
+        id: "binding-1",
+      },
     ]);
   });
 
@@ -592,6 +637,7 @@ describe("API-key service", () => {
   it("validates the owner ceiling at the resolved project team scope", async () => {
     const can = vi.fn().mockResolvedValue(true);
     const authz = createApiFixture<AuthzApi>({
+      listApiKeyBindings,
       can,
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
@@ -687,6 +733,7 @@ describe("API-key service", () => {
       organizationRole: null,
     });
     const authz = createApiFixture<AuthzApi>({
+      listApiKeyBindings,
       can: vi.fn().mockResolvedValue(false),
       canBatchByIds,
       hasPermission: vi.fn().mockResolvedValue(true),
@@ -751,6 +798,7 @@ describe("API-key service", () => {
   it("refuses to silently truncate a visibility decision", async () => {
     const repository = new MemoryApiKeys();
     const authz = createApiFixture<AuthzApi>({
+      listApiKeyBindings,
       can: vi.fn().mockResolvedValue(false),
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),

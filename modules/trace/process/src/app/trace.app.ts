@@ -100,8 +100,10 @@ import {
   type ExplorerInstantEvalRunInput,
   explorerHiddenOrigins,
   FilterParseError,
+  type LangWatchQLTraceFilter,
   type ResolvedInstantEvalRun,
   type TraceDateField,
+  type TraceUsageCount,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -109,6 +111,7 @@ import {
 } from "@langwatch/trace-contract/conversation";
 import { z } from "zod";
 
+import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
@@ -118,6 +121,7 @@ import {
 } from "../rules/trace-facet-filter.rules.ts";
 import {
   andFilterConditions,
+  explorerOriginExclusion,
   findHiddenOriginConditions,
 } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
@@ -528,6 +532,8 @@ const TRACE_FALLBACK_VISIBILITY_DAYS = 14;
  * Stateless (no store, no client), so one instance serves every request.
  */
 const traceQueryTranslator = ClickHouseTraceQueryRepository.create();
+/** The same language compiled against the LangWatchQL trace view; stateless too. */
+const langWatchQLTraceFilter = ClickHouseTraceQueryLangWatchQLRepository.create();
 
 /**
  * The store members this process opens, plus the three facts the process
@@ -888,6 +894,10 @@ export class TraceApp implements TraceApi, CollectorApp {
     return bounds;
   }
 
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount> {
+    return this.#dependencies.traces.existence.countUsage(input);
+  }
+
   findExistingTraceIds(input: {
     projectId: string;
     traceIds: readonly string[];
@@ -1102,6 +1112,11 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
   }
 
+  /** The filter compiled against the LangWatchQL trace view, for a statement a caller runs. */
+  compileLangWatchQLTraceFilter(input: { filter: string }): LangWatchQLTraceFilter {
+    return langWatchQLTraceFilter.compile(input);
+  }
+
   /**
    * The Explorer's own filter: the query compiled, hidden origins left out
    * unless the query (or `originNamed`) names one. `dateField` refuses a
@@ -1236,9 +1251,6 @@ export class TraceApp implements TraceApi, CollectorApp {
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
   }): Promise<DiscoverResult> {
-    const hiddenConditions = findHiddenOriginConditions({
-      hiddenOrigins: explorerHiddenOrigins(input.query),
-    });
     const filterFor = createFacetFilterResolver({
       queryText: input.query,
       compile: (text) =>
@@ -1248,11 +1260,7 @@ export class TraceApp implements TraceApi, CollectorApp {
           timeRange: input.timeRange,
           ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
         }) ?? undefined,
-      hide: (filter) => {
-        const conditions = [...(filter ? [filter] : []), ...hiddenConditions];
-
-        return conditions.length === 0 ? undefined : andFilterConditions(conditions);
-      },
+      hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(input.query) }),
     });
 
     const facets = await this.#dependencies.traces.list.getFacets({

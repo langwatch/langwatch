@@ -18,6 +18,7 @@ import {
   type UiCapabilities,
   UiScope,
 } from "@langwatch/browser-host/capabilities";
+import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
 import { useOptionalNavigationHost } from "@langwatch/navigation-browser/navigation";
 import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -99,6 +100,23 @@ class SignedInScope extends UiScope {
 class SignedInSession extends UiSession {
   currentUser(): UiActor {
     return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
+  }
+  snapshot(): UiSessionSnapshot {
+    return {
+      session: { status: "authenticated", user: this.currentUser() },
+      scope: {
+        status: "ready",
+        organization: { id: ORGANIZATION_ID },
+        team: undefined,
+        project: undefined,
+      },
+      permissions: {
+        status: "ready",
+        isLoading: false,
+        can: () => false,
+        canInOrganization: () => false,
+      },
+    };
   }
   hasPermission(): boolean {
     return false;
@@ -223,5 +241,44 @@ describe("the application chrome", () => {
     expect(screen.getByTestId("probe").getAttribute("data-flag")).toBe(
       JSON.stringify({ enabled: false, isLoading: true }),
     );
+  });
+
+  describe("when the workspace read is refused", () => {
+    /** @scenario "A refused workspace read offers a retry instead of loading forever" */
+    it("says the workspace could not be opened and offers to try again", async () => {
+      class RefusingRpc extends GraphRpc {
+        override query(): Promise<unknown> {
+          return Promise.reject(new Error("the workspace graph refused"));
+        }
+      }
+      const reload = vi.fn();
+      vi.spyOn(window, "location", "get").mockReturnValue(
+        Object.create(window.location, { reload: { value: reload } }),
+      );
+
+      render(
+        <MemoryRouter initialEntries={["/my-project/traces"]}>
+          <QueryClientProvider
+            client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+          >
+            <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new RefusingRpc() }}>
+              <UiDesignSystemShell>
+                <Routes>
+                  <Route element={<UiAppChrome />}>
+                    <Route path="/:project/traces" element={<HostProbe />} />
+                  </Route>
+                </Routes>
+              </UiDesignSystemShell>
+            </UiCapabilityContextProvider>
+          </QueryClientProvider>
+        </MemoryRouter>,
+      );
+
+      const retry = await screen.findByTestId("retry-workspace");
+      expect(screen.getByText("We couldn't open your workspace")).toBeTruthy();
+      expect(screen.queryByTestId("probe")).toBeNull();
+      retry.click();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
   });
 });

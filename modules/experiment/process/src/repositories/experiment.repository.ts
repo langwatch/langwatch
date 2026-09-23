@@ -1,6 +1,7 @@
 import type {
   Experiment,
   ExperimentType,
+  ExperimentUsageCount,
   SaveExperimentInput,
   WorkbenchActor,
   WorkbenchStateView,
@@ -44,6 +45,11 @@ export abstract class ExperimentRepository {
     take: number;
   }): Promise<Experiment[]>;
   abstract count(input: { projectId: string }): Promise<number>;
+  /** The usage report's count, archived included; the caller never passes an empty project list. */
+  abstract countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<ExperimentUsageCount>;
   abstract findLatest(input: { projectId: string }): Promise<Experiment | null>;
   abstract findForWorkflow(input: {
     projectId: string;

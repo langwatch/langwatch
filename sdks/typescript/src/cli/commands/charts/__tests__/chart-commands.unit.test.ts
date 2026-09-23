@@ -21,11 +21,16 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+// `failSpinner` writes the human refusal through the spinner rather than
+// console.error, so the fail mock is shared and readable: it is the only place
+// a test can see the sentence a person is shown.
+const spinner = vi.hoisted(() => ({ fail: vi.fn() }));
+
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
-    fail: vi.fn(),
+    fail: spinner.fail,
   }),
 }));
 
@@ -35,6 +40,7 @@ import { getChartCommand } from "../get";
 import { listChartsCommand } from "../list";
 import { placeChartCommand } from "../place";
 import { runChartCommand } from "../run";
+import { chartSchemaCommand } from "../schema";
 import { unplaceChartCommand } from "../unplace";
 import { updateChartCommand } from "../update";
 
@@ -396,5 +402,39 @@ describe("the chart family while the workbench switch is off", () => {
       expect(mocks.place).toHaveBeenCalledTimes(1);
       expect(mocks.unplace).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+/**
+ * `chart schema` read `.views.length` straight off the response, so a payload
+ * without `views` crashed with a TypeError that the error reader then filed as
+ * `network_error` and told the user to check their connection. The shape is
+ * checked before it is read, and the refusal names the fix.
+ */
+describe("given the analytics schema comes back in an unexpected shape", () => {
+  /** @scenario "chart schema names a payload it does not recognise" */
+  it("refuses with a validation error instead of crashing on views", async () => {
+    mocks.schema.mockResolvedValue({ database: "langwatch" });
+
+    await expect(chartSchemaCommand()).rejects.toThrow(ProcessExitError);
+
+    const said = spinner.fail.mock.calls.flat().join(" ");
+    expect(said).toContain("shape this CLI does not recognise");
+    expect(said).toContain("npm install -g langwatch@latest");
+    expect(said).not.toContain("Cannot read properties of undefined");
+  });
+
+  it("refuses the same way when views is not a list at all", async () => {
+    mocks.schema.mockResolvedValue({ database: "langwatch", views: null });
+
+    await expect(chartSchemaCommand()).rejects.toThrow(ProcessExitError);
+  });
+
+  it("still reads a schema that carries its views", async () => {
+    mocks.schema.mockResolvedValue({ database: "langwatch", views: [] });
+
+    const result = await chartSchemaCommand();
+
+    expect(result).toMatchObject({ data: { database: "langwatch" } });
   });
 });

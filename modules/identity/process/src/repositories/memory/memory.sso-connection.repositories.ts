@@ -1,5 +1,6 @@
 import type { SsoConnectionState } from "@langwatch/identity-contract";
 
+import { ownedVerifiedDomains } from "../../rules/sso-domain-ownership.rules.ts";
 import type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,
@@ -11,7 +12,6 @@ import type {
 import { MemoryIdentityStore } from "./memory-identity.store.ts";
 
 const VERIFIED = "VERIFIED";
-const ACTIVE = "ACTIVE";
 
 /** The connection-read twin: the guards' folded head and the domain owner. */
 export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepository {
@@ -28,10 +28,13 @@ export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepos
   async tryFindDomainOwner(args: {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null> {
-    const owner = [...this.store.ssoConnections.values()].find(
-      (connection) =>
-        connection.state === ACTIVE && this.verifiedDomains(connection).includes(args.domain),
+    // The Postgres twin reads the ownership rows the projection keeps; the
+    // same rule derives them here, predecessor first.
+    const holders = [...this.store.ssoConnections.values()].filter((connection) =>
+      ownedVerifiedDomains(connection).includes(args.domain),
     );
+    const owner =
+      holders.find((connection) => connection.replacesConnectionId === null) ?? holders[0];
 
     return owner
       ? { connectionId: owner.connectionId, organizationId: owner.organizationId }
@@ -46,12 +49,6 @@ export class MemorySsoConnectionReadRepository implements SsoConnectionReadRepos
     return [...this.store.ssoConnections.values()]
       .filter((connection) => connection.organizationId === organizationId)
       .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
-  }
-
-  private verifiedDomains(connection: SsoConnectionState): readonly string[] {
-    const domains = Reflect.get(connection, "verifiedDomains");
-
-    return Array.isArray(domains) ? domains.filter((value) => typeof value === "string") : [];
   }
 }
 

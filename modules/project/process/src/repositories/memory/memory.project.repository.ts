@@ -17,6 +17,7 @@ import {
   type TraceSharingConfig,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
+  type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -265,6 +266,35 @@ export class MemoryProjectRepository implements ProjectRepository {
 
       return identity ? [identity] : [];
     });
+  }
+
+  async countUsage({
+    organizationIds,
+    since,
+  }: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount> {
+    const after = (at: number) => since === undefined || at >= since;
+    const projects = this.#database
+      .projects()
+      .filter((project) =>
+        organizationIds.some((organizationId) =>
+          this.#database.isInOrganization(project, organizationId),
+        ),
+      );
+    const made = projects.map((project) => project.createdAt.getTime());
+    return {
+      projects: projects.filter((project) => after(project.createdAt.getTime())).length,
+      teams: this.#database
+        .teams()
+        .filter(
+          (team) =>
+            organizationIds.includes(team.organizationId) && after(team.createdAt.getTime()),
+        ).length,
+      updatedProjects: projects.filter((project) => after(project.updatedAt.getTime())).length,
+      ...(made.length === 0 ? {} : { firstProjectAt: Math.min(...made) }),
+    };
   }
 
   async findIdsByOrganization(organizationId: string): Promise<string[]> {

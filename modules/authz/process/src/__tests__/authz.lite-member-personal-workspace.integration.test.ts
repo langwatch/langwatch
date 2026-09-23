@@ -12,12 +12,12 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
+import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
 } from "../repositories/prisma/prisma.authz-binding.repository.ts";
-import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository.ts";
-import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL;
@@ -30,14 +30,13 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
   });
   const database = prisma as unknown as AuthzDatabase;
   const authz = AuthzService.create({
-    repository: PrismaAuthzReadRepository.create(database),
-    listing: PrismaAuthzListingRepository.create(database),
+    repository: EventingAuthzReadRepository.create(database),
+    listing: EventingAuthzListingRepository.create(database),
     bindings: PrismaAuthzBindingRepository.create({
       database: prisma as unknown as AuthzBindingDatabase,
     }),
-    // The legacy RoleBinding head, which is what these rows are. No cache is
-    // configured either, so each read below sees the role as it stands.
-    isOnEngine: async () => false,
+    // No cache is configured, so each read below sees the role as it stands.
+    isOnEngine: async () => true,
   });
 
   const testNamespace = `pw-lite-${uniqueSuffix()}`;
@@ -110,21 +109,29 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
     });
     sharedTeamId = sharedTeam.id;
 
-    await prisma.roleBinding.createMany({
+    await prisma.grant.createMany({
       data: [
         {
-          userId: seatUserId,
+          id: `grant-${testNamespace}-personal`,
           organizationId,
-          role: "ADMIN",
+          principalType: "USER",
+          principalId: seatUserId,
+          roleKey: "admin",
+          source: "grants-service",
           scopeType: "TEAM",
           scopeId: personalTeamId,
+          occurredAt: new Date(),
         },
         {
-          userId: seatUserId,
+          id: `grant-${testNamespace}-shared`,
           organizationId,
-          role: "VIEWER",
+          principalType: "USER",
+          principalId: seatUserId,
+          roleKey: "viewer",
+          source: "grants-service",
           scopeType: "TEAM",
           scopeId: sharedTeamId,
+          occurredAt: new Date(),
         },
       ],
     });
@@ -134,7 +141,7 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
     if (!organizationId) return;
     await cleanupTestRows(prisma, [
       ["project", { team: { organizationId } }],
-      ["roleBinding", { organizationId }],
+      ["grant", { organizationId }],
       ["organizationUser", { organizationId }],
       ["team", { organizationId }],
       ["organization", { id: organizationId }],

@@ -37,6 +37,19 @@ export class MemoryInstantEvalJudgmentsRepository implements InstantEvalJudgment
     return new MemoryInstantEvalJudgmentsRepository();
   }
 
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<number> {
+    return [...this.records.values()].filter(
+      (record) =>
+        projectIds.includes(record.projectId) && (since === undefined || record.createdAt >= since),
+    ).length;
+  }
+
   async insert(records: readonly InstantEvalJudgmentRecord[]): Promise<void> {
     for (const record of records) {
       this.records.set(keyOf(record), {

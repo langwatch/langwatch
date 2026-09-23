@@ -106,6 +106,7 @@ class StubRepository implements ProjectRepository {
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
   findIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
+  countUsage = vi.fn(async () => ({ projects: 0, teams: 0, updatedProjects: 0 }));
   create = vi.fn(async () => applicationProject);
   findById = vi.fn(async () => applicationProject);
   findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(async () => "org");
@@ -160,6 +161,18 @@ class StubOrganizationService extends OrganizationServiceContract {
   }
 
   getSettings(): never {
+    throw new Error("not used by this test");
+  }
+
+  readGuidedOnboardingState(): never {
+    throw new Error("not used by this test");
+  }
+
+  writeGuidedOnboardingState(): never {
+    throw new Error("not used by this test");
+  }
+
+  organizationIdsForMember(): never {
     throw new Error("not used by this test");
   }
 

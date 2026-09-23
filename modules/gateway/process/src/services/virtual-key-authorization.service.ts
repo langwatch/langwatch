@@ -209,6 +209,36 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
+   * Create gate for a project credential: a key for exactly its own project
+   * needs `virtualKeys:create` there; any wider scope needs manage everywhere.
+   */
+  async assertActorCanCreateScopes(
+    ctx: ActorContext,
+    { scopes, callerProjectId }: { scopes: Scope[]; callerProjectId: string },
+  ): Promise<void> {
+    const [only] = scopes;
+    const ownProjectOnly =
+      scopes.length === 1 &&
+      only !== undefined &&
+      only.scopeType === "PROJECT" &&
+      only.scopeId === callerProjectId;
+    if (!ownProjectOnly) {
+      return this.assertActorCanManageAllScopes(ctx, scopes);
+    }
+
+    if (ctx.actor.kind === "session" && !ctx.actor.session) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
+    }
+
+    if (!(await this.actorHasPermissionAtScope(ctx, only, "virtualKeys:create"))) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `permission_denied: virtualKeys:create at ${scopeLabel(only)}`,
+      });
+    }
+  }
+
+  /**
    * Update / rotate / delete gate: require the op permission on at least one
    * of the key's existing scopes. Throws FORBIDDEN when the caller holds it
    * on none of them.

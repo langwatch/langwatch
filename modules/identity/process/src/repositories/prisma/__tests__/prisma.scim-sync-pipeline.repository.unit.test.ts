@@ -77,6 +77,7 @@ describe("PostgresScimSyncPipelineAdapter", () => {
         "recordScimUserPush",
         "recordScimGroupMapping",
         "recordScimApplyFailure",
+        "redriveScimApply",
         "revokeScimSync",
       ]);
       expect([...(pipeline.stateProjections?.keys() ?? [])]).toEqual(["scimSyncState"]);

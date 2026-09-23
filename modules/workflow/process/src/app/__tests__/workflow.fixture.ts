@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What a test hands the workflow module in place of a process: every
  * members member it declares, each one throwing when a test reaches it
@@ -5,7 +6,6 @@
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { StudioWorkflow, Workflow } from "@langwatch/workflow-contract";
 
 import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
@@ -48,6 +48,12 @@ class RecordingWorkflowRows extends WorkflowRowRepository {
     this.created.push(input);
 
     return Promise.resolve();
+  }
+
+  countUsage(input: { projectIds: readonly string[] }): Promise<{ workflows: number }> {
+    return Promise.resolve({
+      workflows: this.created.filter((row) => input.projectIds.includes(row.projectId)).length,
+    });
   }
 }
 

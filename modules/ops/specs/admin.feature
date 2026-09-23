@@ -67,11 +67,11 @@ Feature: Platform administration package boundary
     And a failed tick retries after sixty seconds without stopping the worker
 
   @unit
-  Scenario: Self-hosted usage telemetry is composed without package environment access
-    Given enabled self-hosted telemetry configuration and an organization list
-    When the Ops worker contribution reaches noon UTC
-    Then it sends one daily_usage_stats report per organization
-    And a failed organization report is captured without skipping later organizations
+  Scenario: The daily usage report is one report for the whole install
+    Given a self-hosted install carrying two organizations
+    When the daily usage report is posted
+    Then one daily_usage_stats report goes out under the install's minted identity
+    And the answer is written down, so a refused report shows on the checkup page
 
   # The Ops workspace and the Back office are gated separately on purpose, and
   # the page shells that carried the two checks said so out loud: widening

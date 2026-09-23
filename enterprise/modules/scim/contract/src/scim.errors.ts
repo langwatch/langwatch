@@ -75,3 +75,34 @@ export class ScimWriteOutsideConnectionError extends HandledError {
     this.name = "ScimWriteOutsideConnectionError";
   }
 }
+
+/** The named apply is not a dead letter: it is still being retried, or never failed. */
+export class ScimApplyNotRetiredError extends HandledError {
+  declare readonly code: "scim_apply_not_retired";
+
+  constructor(meta: { connectionId?: string } = {}) {
+    super(
+      "scim_apply_not_retired",
+      "Only a directory operation that has stopped being retried can be sent through again",
+      { httpStatus: 409, fault: "customer", meta },
+    );
+    this.name = "ScimApplyNotRetiredError";
+  }
+}
+
+/**
+ * A sync fact carries ids and a reason code only, so an addition has no payload
+ * left to resend; a removal is fully described by the person and organization.
+ */
+export class ScimApplyNotRedrivableError extends HandledError {
+  declare readonly code: "scim_apply_not_redrivable";
+
+  constructor(meta: { op?: string } = {}) {
+    super(
+      "scim_apply_not_redrivable",
+      "Only a removal can be sent through again; anything the directory adds is re-asserted by its next push",
+      { httpStatus: 422, fault: "customer", meta },
+    );
+    this.name = "ScimApplyNotRedrivableError";
+  }
+}

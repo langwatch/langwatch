@@ -234,6 +234,8 @@ export class AuthzApp implements AuthzApi {
     this.#permissions.listUserAndGroupBindings(a);
   listScopeBindings: AuthzApi["listScopeBindings"] = (a) => this.#permissions.listScopeBindings(a);
   listGroupBindings: AuthzApi["listGroupBindings"] = (a) => this.#permissions.listGroupBindings(a);
+  listApiKeyBindings: AuthzApi["listApiKeyBindings"] = (a) =>
+    this.#permissions.listApiKeyBindings(a);
   listTeamMemberBindings: AuthzApi["listTeamMemberBindings"] = (a) =>
     this.#permissions.listTeamMemberBindings(a);
   listBindingsForSynthesis: AuthzApi["listBindingsForSynthesis"] = (a) =>

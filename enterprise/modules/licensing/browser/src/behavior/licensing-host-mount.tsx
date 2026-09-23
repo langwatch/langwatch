@@ -10,6 +10,7 @@ import {
   useUiScope,
   type UiFeedback,
 } from "@langwatch/browser-host/capabilities";
+import { describeError } from "@langwatch/browser-host/errors";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -27,6 +28,7 @@ class CapabilityLicensingHost extends LicensingHostApi {
     private readonly purchaseUrl: string | undefined,
     private readonly invalidate: () => void,
     private readonly feedback: UiFeedback,
+    private readonly mayManageOrganization: boolean,
   ) {
     super();
   }
@@ -59,6 +61,14 @@ class CapabilityLicensingHost extends LicensingHostApi {
   failed(failure: LicensingFailureNotice): void {
     this.feedback.failed(failure);
   }
+
+  canManageOrganization(): boolean {
+    return this.mayManageOrganization;
+  }
+
+  describeFailure(failure: LicensingFailureNotice): string {
+    return describeError(failure);
+  }
 }
 
 /**
@@ -67,7 +77,8 @@ class CapabilityLicensingHost extends LicensingHostApi {
  * is what `mounts.load` resolves.
  */
 export default function LicensingHostMount({ children }: { children?: ReactNode }) {
-  const { feedback } = useUiCapabilities();
+  const { feedback, session } = useUiCapabilities();
+  const mayManageOrganization = session.hasPermission("organization:manage");
   const { organizationId } = useUiScope().activeScope();
   const deployment = useUiDeployment();
   const utils = licensingApi.useUtils();
@@ -80,8 +91,9 @@ export default function LicensingHostMount({ children }: { children?: ReactNode 
         void 0,
         () => void utils.invalidate(),
         feedback,
+        mayManageOrganization,
       ),
-    [organizationId, deployment.isSaaS, utils, feedback],
+    [organizationId, deployment.isSaaS, utils, feedback, mayManageOrganization],
   );
 
   return <LicensingHostProvider value={host}>{children}</LicensingHostProvider>;

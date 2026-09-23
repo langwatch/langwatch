@@ -25,6 +25,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/secrets": "workspace:*",

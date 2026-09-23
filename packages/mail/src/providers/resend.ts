@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
+
+import { hostnameOf, resolveProxyForHost, type OutboundProxyConfig } from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
 import { EnvHttpProxyAgent, fetch as undiciFetch } from "undici";
-import { hostnameOf, resolveProxyForHost, type OutboundProxyConfig } from "@langwatch/egress";
+
 import { sanitizeHeaders } from "./mime.ts";
 import {
   type EmailContent,
@@ -104,6 +107,9 @@ export class ResendEmailProvider implements EmailProvider {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          ...(content.idempotencyKey && {
+            "Idempotency-Key": createHash("sha256").update(content.idempotencyKey).digest("hex"),
+          }),
         },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

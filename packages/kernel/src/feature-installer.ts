@@ -11,7 +11,7 @@ import type {
   TokenMap,
 } from "./dependency-token.ts";
 import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
-import type { FeatureEventing } from "./module-eventing.ts";
+import { withAnotherPipeline, type FeatureEventing } from "./module-eventing.ts";
 import type { ModuleName, PublicNamespace } from "./module-namespace.ts";
 import { publicNamespace, publicNamespaceFromUnknown } from "./module-namespace.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
@@ -1263,9 +1263,9 @@ class RepositoryAppBuilder<
   }
 
   /**
-   * This module's event sourcing, declared with `defineEventingModule`. It is
-   * built over the repositories and app above, so a declaration written for
-   * another module is not assignable here.
+   * One of this module's pipelines, declared with `defineEventingModule` and
+   * built over the repositories and app above. Call it once per pipeline the
+   * module hosts; they register in the order declared.
    */
   withEventing<Definition>(
     eventing: FeatureEventing<ModuleRepositories<Live, Memory>, App, unknown, Definition>,
@@ -1604,7 +1604,8 @@ function withContributions<
       withContributions(declaration, workers, [...tasks, ...next], eventing),
     withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
       withContributions(bindingTransportFacts(declaration, bind), workers, tasks, eventing),
-    withEventing: (next: FeatureEventing) => withContributions(declaration, workers, tasks, next),
+    withEventing: (next: FeatureEventing) =>
+      withContributions(declaration, workers, tasks, withAnotherPipeline(eventing, next)),
   } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
 
   return contributions;

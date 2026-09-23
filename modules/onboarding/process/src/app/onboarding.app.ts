@@ -1,45 +1,41 @@
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
   OnboardingApi,
-  onboardingConfig,
   type OnboardingApi as OnboardingApiContract,
   type GuidedOnboardingState,
   type GuidedOnboardingStateWithInstance,
   type GuidedOnboardingStateWithVariant,
   type OnboardingCallerInput,
-  type OnboardingServerConfig,
 } from "@langwatch/onboarding-contract";
+import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 
 import { HttpPostHogEventsChannel } from "../channels/http/http.posthog-events.channel.ts";
-import { MemoryPostHogEventsChannel } from "../channels/memory/memory.posthog-events.channel.ts";
-import type { PostHogEventsChannel } from "../channels/posthog-events.channel.ts";
-import {
-  withInstanceFacts,
-  type GuidedOnboardingGatewayConfig,
-} from "../rules/guided-onboarding-instance.rules.ts";
+import { withInstanceFacts } from "../rules/guided-onboarding-instance.rules.ts";
 import { GuidedOnboardingService } from "../services/guided-onboarding.service.ts";
 
-type OnboardingSetup = FeatureSetup<
-  typeof OnboardingApp.dependencies,
-  never,
-  OnboardingServerConfig
->;
+type OnboardingSetup = FeatureSetup<typeof OnboardingApp.dependencies, never, undefined>;
 
 export class OnboardingApp implements OnboardingApiContract {
   static readonly contract = OnboardingApi;
-  static readonly dependencies = { organizations: OrganizationApi, permissions: AuthzApi };
-  static readonly config = onboardingConfig;
+  static readonly dependencies = {
+    organizations: OrganizationApi,
+    permissions: AuthzApi,
+    ops: OpsApi,
+    /** Where an app on this instance points; the gateway owns the address. */
+    gateway: GatewayApi,
+  };
 
   readonly #guided: GuidedOnboardingService;
   readonly #permissions: AuthzApi;
-  readonly #gateway: GuidedOnboardingGatewayConfig;
+  readonly #gateway: Pick<GatewayApi, "getDeploymentAddresses">;
 
   private constructor(
     guided: GuidedOnboardingService,
     permissions: AuthzApi,
-    gateway: GuidedOnboardingGatewayConfig,
+    gateway: Pick<GatewayApi, "getDeploymentAddresses">,
   ) {
     this.#guided = guided;
     this.#permissions = permissions;
@@ -47,30 +43,17 @@ export class OnboardingApp implements OnboardingApiContract {
   }
 
   static create(setup: OnboardingSetup): OnboardingApp {
-    const events = OnboardingApp.eventsChannelOf(setup);
-    if (events instanceof HttpPostHogEventsChannel) {
-      setup.resources.own("Onboarding PostHog client", () => events.close());
-    }
+    const ops = setup.dependencies.ops;
+    const events = HttpPostHogEventsChannel.create({
+      targets: () => ops.findProductAnalyticsTargets(),
+    });
+    setup.resources.own("Onboarding PostHog client", () => events.close());
     const guided = GuidedOnboardingService.create({
       organizations: setup.dependencies.organizations,
       events,
     });
 
-    return new OnboardingApp(guided, setup.dependencies.permissions, setup.config.gateway);
-  }
-
-  /**
-   * Fail-safe rather than fail-closed: a deployment with no PostHog key gets
-   * the memory channel, which tracks nothing rather than refusing a write.
-   */
-  private static eventsChannelOf(setup: OnboardingSetup): PostHogEventsChannel {
-    const key = setup.config.productAnalytics.key;
-    if (!key) return MemoryPostHogEventsChannel.create();
-
-    return HttpPostHogEventsChannel.create({
-      key,
-      ...(setup.config.productAnalytics.host ? { host: setup.config.productAnalytics.host } : {}),
-    });
+    return new OnboardingApp(guided, setup.dependencies.permissions, setup.dependencies.gateway);
   }
 
   async getGuidedState(input: {
@@ -80,7 +63,7 @@ export class OnboardingApp implements OnboardingApiContract {
     await this.authorizeOrganizationView(input.userId, input.organizationId);
     const state = await this.#guided.getStateWithVariant({ organizationId: input.organizationId });
 
-    return withInstanceFacts(state, this.#gateway);
+    return withInstanceFacts(state, this.#gateway.getDeploymentAddresses());
   }
 
   async recordPaths(
@@ -134,7 +117,7 @@ export class OnboardingApp implements OnboardingApiContract {
     await this.authorizeOrganizationView(input.userId, input.organizationId);
     const state = await this.#guided.beginPath(this.actorOf(input), { path: input.path });
 
-    return withInstanceFacts(state, this.#gateway);
+    return withInstanceFacts(state, this.#gateway.getDeploymentAddresses());
   }
 
   async completePath(

@@ -29,9 +29,22 @@ export type UiAnalyticsEvent = {
   attributes?: Readonly<Record<string, unknown>>;
 };
 
-/** Where a module's named events go. */
+/** The reader every later event is attributed to, as the session knows them. */
+export type UiAnalyticsReader = Readonly<{ id: string; email: string | null }>;
+
+/** The organization every later event is grouped under. */
+export type UiAnalyticsGroup = Readonly<{ id: string; name?: string }>;
+
+/**
+ * Where a module's named events go, and who they are about. Identity is the
+ * shell's to set from the session; a module only ever tracks.
+ */
 export abstract class UiAnalytics {
   abstract track(event: UiAnalyticsEvent): void;
+  abstract identify(reader: UiAnalyticsReader): void;
+  abstract group(organization: UiAnalyticsGroup): void;
+  /** Forgets the reader: sign-out, or a different person signing in. */
+  abstract reset(): void;
 }
 
 /**
@@ -43,6 +56,9 @@ class InertUiAnalytics extends UiAnalytics {
   track(): void {
     // Deliberately nothing.
   }
+  identify(): void {}
+  group(): void {}
+  reset(): void {}
 }
 
 /** What a composition that installed no analytics destination reads as. */

@@ -69,13 +69,6 @@ Feature: Hono API endpoint authorization and tenant isolation
       # The sweep used to skip an undeclared procedure, so the one shape it
       # could say nothing about was the one it reported as fine.
 
-    @unit
-    Scenario: The raw Hono app cannot be mounted around the policy
-      Given a secured app whose routes are declared through access(policy)
-      When source code registers a verb on the underlying Hono app instead
-      Then the architecture linter refuses that source
-      And the published view of the app carries no verb methods to call
-
     @integration
     Scenario: A public or internal route declares a documented reason
       Given the route registry

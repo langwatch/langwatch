@@ -16,7 +16,10 @@ import {
   type GatewayGovernanceSignals,
 } from "../app/gateway.members.ts";
 import type { GatewayKeyBudgetRepository } from "../repositories/gateway-key-budget.repository.ts";
-import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
+import type {
+  GatewayLicensedKey,
+  GatewayVirtualKeyRepository,
+} from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import { VirtualKeyProvisioningService } from "./virtual-key-provisioning.service.ts";
@@ -174,6 +177,41 @@ export class VirtualKeyService {
   /** Terminal stop: the key dies and its own caps are archived. */
   async revoke(input: RevokeVirtualKeyInput): Promise<VirtualKeyWithScopes> {
     return this.status.revoke(input);
+  }
+
+  /** Ends a product-managed key for the feature that owns it. Safe to repeat. */
+  async revokeManagedInternal(input: RevokeVirtualKeyInput): Promise<void> {
+    await this.status.revokeManagedInternal(input);
+  }
+
+  /** Makes every gateway resolve a product-managed key again, unchanged. */
+  async invalidateManagedInternal(input: { id: string; organizationId: string }): Promise<void> {
+    await this.status.invalidateManagedInternal(input);
+  }
+
+  /** Replaces the platform services a CONNECT key may serve. Safe to repeat. */
+  async setConnectServicesInternal(input: {
+    id: string;
+    organizationId: string;
+    services: readonly string[];
+  }): Promise<void> {
+    await this.status.setConnectServicesInternal(input);
+  }
+
+  /** Records the license a CONNECT key serves. Safe to repeat. */
+  async setLicenseFactsInternal(input: {
+    id: string;
+    organizationId: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant | null;
+  }): Promise<void> {
+    await this.status.setLicenseFactsInternal(input);
+  }
+
+  /** Used by the `/resolve-key` license-token path — do not expose on public tRPC. */
+  async findByLicenseTokenHashInternal(tokenHash: string): Promise<GatewayLicensedKey | null> {
+    return this.repository.findByLicenseTokenHash(tokenHash);
   }
 
   /** Reversible stop, leaving budgets and key material untouched. */

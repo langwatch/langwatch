@@ -78,3 +78,12 @@ Feature: Data Privacy service
       Given the same privacy rules written to each backend
       When the same reads and writes run against every backend
       Then each answers the same rules, the same absences, and never a rule another organization wrote
+
+  Rule: The Google service-account credential has one owner
+
+    @unit
+    Scenario: A peer borrows the Google credential without the value leaving data privacy
+      Given a deployment configured with a Google service-account credential
+      When a peer asks data privacy to build something from it
+      Then the peer receives what it built from the credential
+      And a deployment with no credential lends undefined instead of refusing

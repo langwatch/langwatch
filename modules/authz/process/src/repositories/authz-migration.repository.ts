@@ -33,6 +33,8 @@ export type OrganizationMemberFact = {
   userId: string;
   role: string;
   createdAtMs: number;
+  /** The lifetime an imported USER fact is stamped with. */
+  membershipStamp: string;
 };
 
 export type RoleHeadRow = {

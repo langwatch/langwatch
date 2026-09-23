@@ -63,3 +63,26 @@ Feature: How the Enterprise single sign-on module installs, gates and records
     Scenario: A refused command leaves no audit row
       When a command is refused, whether by the gate or by the ledger
       Then no audit row is written
+
+  Rule: the worker keeps connection evidence current on a schedule the module declares
+
+    @unit
+    Scenario: The worker hosts identity's scheduled sweeps from the module
+      Given a worker with the identity module installed
+      When the worker boots
+      Then identity's maintenance pipeline is registered by the module's own declaration
+      And no line in the worker names a sweep
+
+    @unit
+    Scenario: Every proved domain is re-read three times a day by the worker
+      Given the identity maintenance pipeline is registered
+      When its eight-hourly schedule fires
+      Then the installed domain re-proof sweep runs once
+      And the sweep's own bookkeeping older than a week is pruned
+
+    @unit
+    Scenario: An ending way back in is warned about by the worker, not by a request
+      Given the identity maintenance pipeline is registered
+      When its hourly schedule fires
+      Then the installed break-glass warning sweep runs once
+      And each warning reaches the operator log naming the organization and the days remaining

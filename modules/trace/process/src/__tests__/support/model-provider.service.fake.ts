@@ -5,6 +5,10 @@ import {
 } from "@langwatch/model-provider-contract";
 
 export class TestModelProviderService implements ModelProviderApi {
+  countUsage(): Promise<{ providers: string[] }> {
+    return Promise.resolve({ providers: [] });
+  }
+
   readonly costInputs: ModelCostEstimateInput[] = [];
 
   constructor(private readonly cost = 0) {}
@@ -172,5 +176,9 @@ export class TestModelProviderService implements ModelProviderApi {
 
   previewCostRuleMatchingSpans(): Promise<never> {
     throw new Error("Not used by Trace tests.");
+  }
+
+  platformProviderChain(): Promise<[]> {
+    return Promise.resolve([]);
   }
 }

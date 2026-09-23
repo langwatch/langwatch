@@ -7,6 +7,7 @@ import type {
   StoredObjectOperationId,
   StoredObjectProjectId,
   StoredObjectReference,
+  StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -136,6 +137,14 @@ export abstract class StoredObjectStorage {
     projectId: StoredObjectProjectId;
     address: StoredObjectStorageAddress;
   }): Promise<void>;
+
+  /** Where this project's bytes are written. */
+  abstract resolveDestination(input: {
+    projectId: StoredObjectProjectId;
+  }): Promise<StoredObjectStorageDestination>;
+
+  /** Writes a small object where the project's bytes go, then removes it. */
+  abstract probe(input: { projectId: StoredObjectProjectId }): Promise<void>;
 }
 
 export abstract class StoredObjectUploadTokenCodec {

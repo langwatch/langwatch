@@ -98,6 +98,9 @@ type DataPrivacySetup = FeatureSetup<
   DataPrivacyRepositories
 >;
 
+/** Applies a closure to the resolved credential without handing the value out. */
+type GoogleCredentialsUse = <Out>(build: (credential: string | undefined) => Out) => Out;
+
 /** The one public object of the scoped privacy rules. */
 export class DataPrivacyApp implements DataPrivacyApi {
   static readonly contract = DataPrivacyApi;
@@ -108,7 +111,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     permissions: AuthzApi,
   };
   static readonly reads = ["dataPrivacy"] as const;
-  /** Points at the DLP service account's JSON key file; never read here. */
+  /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
     googleApplicationCredentials: Secret.load("GOOGLE_APPLICATION_CREDENTIALS", { optional: true }),
   } as const;
@@ -119,6 +122,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
   #scopeAuthorization: DataPrivacyScopeAuthorizationService;
   #contentDrop: ContentDropPolicyService;
   #projects: ProjectApi;
+  #googleCredentials: GoogleCredentialsUse;
 
   private constructor(services: {
     privacy: DataPrivacyService;
@@ -127,6 +131,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     scopeAuthorization: DataPrivacyScopeAuthorizationService;
     contentDrop: ContentDropPolicyService;
     projects: ProjectApi;
+    googleCredentials: GoogleCredentialsUse;
   }) {
     this.#privacy = services.privacy;
     this.#redaction = services.redaction;
@@ -134,13 +139,21 @@ export class DataPrivacyApp implements DataPrivacyApi {
     this.#scopeAuthorization = services.scopeAuthorization;
     this.#contentDrop = services.contentDrop;
     this.#projects = services.projects;
+    this.#googleCredentials = services.googleCredentials;
   }
 
-  static create({
+  static async create({
     repositories,
     members: supplied,
     dependencies,
-  }: DataPrivacySetup): DataPrivacyApp {
+    secrets,
+  }: DataPrivacySetup): Promise<DataPrivacyApp> {
+    const googleCredentials = await secrets.into(
+      DataPrivacyApp.secrets.googleApplicationCredentials,
+      (credential): GoogleCredentialsUse =>
+        (build) =>
+          build(credential),
+    );
     const members = supplied.dataPrivacy;
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
@@ -172,7 +185,12 @@ export class DataPrivacyApp implements DataPrivacyApi {
       }),
       contentDrop: ContentDropPolicyService.create(),
       projects: dependencies.projects,
+      googleCredentials,
     });
+  }
+
+  intoGoogleApplicationCredentials<Out>(build: (credential: string | undefined) => Out): Out {
+    return this.#googleCredentials(build);
   }
 
   getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {

@@ -108,6 +108,7 @@ describe("LangyConversationTurnFoldProjection", () => {
     const running = fold.apply(fold.init(), started(1000));
 
     describe("when it is initiated then succeeds", () => {
+      /** @scenario "A tool call reaches exactly one terminal, succeeded or failed" */
       it("accretes one tool call and resolves it to succeeded", () => {
         const initiated = fold.apply(
           running,
@@ -141,6 +142,7 @@ describe("LangyConversationTurnFoldProjection", () => {
     });
 
     describe("when it fails", () => {
+      /** @scenario "A failing tool call is a distinct event carrying the error" */
       it("resolves the call to failed carrying the error text", () => {
         const initiated = fold.apply(running, toolInitiated({}, 1100));
         const failed = fold.apply(
@@ -254,6 +256,7 @@ describe("LangyConversationTurnFoldProjection", () => {
     });
 
     describe("when the response fails with no answer to carry", () => {
+      /** @scenario "A stalled response with no answer to carry fails distinctly" */
       it("marks the turn failed with the error and no answer parts", () => {
         const state = fold.apply(
           running,
@@ -319,6 +322,128 @@ describe("LangyConversationTurnFoldProjection", () => {
       expect(state.Plan).toEqual([
         { content: "Step one", status: "completed" },
         { content: "Step two", status: "in_progress" },
+      ]);
+    });
+  });
+});
+
+describe("a turn as its own render document", () => {
+  const answered = (turnId: string, occurredAt: number) =>
+    event(
+      "AGENT_RESPONDED",
+      LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+      {
+        turnId,
+        messageId: `answer-${turnId}`,
+        role: "assistant",
+        parts: [{ type: "text", text: `the whole answer of ${turnId}` }],
+        outcome: "completed",
+      },
+      occurredAt,
+    );
+
+  /** Folds one whole turn: two tool calls, one of each outcome, then the answer. */
+  function foldTurn(turnId: string, base: number): LangyConversationTurnData {
+    let state = fold.apply(
+      fold.init(),
+      event(
+        "AGENT_TURN_ACCEPTED",
+        LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+        { turnId },
+        base,
+      ),
+    );
+    state = fold.apply(
+      state,
+      toolInitiated({ turnId, toolCallId: `${turnId}-tc-1` }, base + 10),
+    );
+    state = fold.apply(
+      state,
+      event(
+        "TOOL_CALL_SUCCEEDED",
+        LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_SUCCEEDED,
+        {
+          turnId,
+          toolCallId: `${turnId}-tc-1`,
+          toolName: "bash",
+          durationMs: 7,
+        },
+        base + 20,
+      ),
+    );
+    state = fold.apply(
+      state,
+      toolInitiated({ turnId, toolCallId: `${turnId}-tc-2` }, base + 30),
+    );
+    state = fold.apply(
+      state,
+      event(
+        "TOOL_CALL_FAILED",
+        LANGY_CONVERSATION_EVENT_VERSIONS.TOOL_CALL_FAILED,
+        {
+          turnId,
+          toolCallId: `${turnId}-tc-2`,
+          toolName: "bash",
+          errorText: `${turnId} exploded`,
+        },
+        base + 40,
+      ),
+    );
+    return fold.apply(state, answered(turnId, base + 50));
+  }
+
+  describe("given a response that initiated two tool calls and then answered", () => {
+    /** @scenario "A turn folds into one render document keyed per turn" */
+    it("carries the status, the whole answer, and both calls with their outcomes", () => {
+      const state = foldTurn(TURN, 1000);
+
+      expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
+      expect(state.AnswerParts).toEqual([
+        { type: "text", text: "the whole answer of turn-1" },
+      ]);
+      expect(state.ToolCalls).toHaveLength(2);
+      expect(state.ToolCalls.map((call) => call.status)).toEqual([
+        LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
+        LANGY_TURN_TOOL_CALL_STATUS.FAILED,
+      ]);
+      expect(state.ToolCalls[1]?.errorText).toBe("turn-1 exploded");
+
+      // Keyed by conversation AND turn, so the document is never read or
+      // written under the conversation spine's own key.
+      const key = fold.key(answered(TURN, 1100));
+      expect(key).toBe(makeConversationTurnKey(CONVERSATION, TURN));
+      expect(key).not.toBe(CONVERSATION);
+      expect(parseConversationTurnKey(key)).toEqual({
+        conversationId: CONVERSATION,
+        turnId: TURN,
+      });
+    });
+  });
+
+  describe("given one conversation with two completed turns", () => {
+    /** @scenario "Two turns of one conversation fold into two separate documents" */
+    it("gives each turn its own document, with no answer or tool call bleeding across", () => {
+      const first = foldTurn(TURN, 1000);
+      const second = foldTurn("turn-2", 2000);
+
+      expect(fold.key(answered(TURN, 1100))).not.toBe(
+        fold.key(answered("turn-2", 2100)),
+      );
+      expect(first.TurnId).toBe(TURN);
+      expect(second.TurnId).toBe("turn-2");
+      expect(first.AnswerParts).toEqual([
+        { type: "text", text: "the whole answer of turn-1" },
+      ]);
+      expect(second.AnswerParts).toEqual([
+        { type: "text", text: "the whole answer of turn-2" },
+      ]);
+      expect(first.ToolCalls.map((call) => call.toolCallId)).toEqual([
+        "turn-1-tc-1",
+        "turn-1-tc-2",
+      ]);
+      expect(second.ToolCalls.map((call) => call.toolCallId)).toEqual([
+        "turn-2-tc-1",
+        "turn-2-tc-2",
       ]);
     });
   });

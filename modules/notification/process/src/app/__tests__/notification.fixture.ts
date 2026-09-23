@@ -17,7 +17,12 @@ export function createNotificationTestApp(
   return NotificationApp.create({
     repositories: input.repositories ?? MemoryNotificationRepositories.create(),
     dependencies: {},
-    config: void 0,
+    config: {
+      defaultFrom: undefined,
+      provider: undefined,
+      ses: { enabled: undefined, region: undefined, endpoint: undefined },
+      smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
+    },
     resources: new ResourceScope(),
     secrets,
   });

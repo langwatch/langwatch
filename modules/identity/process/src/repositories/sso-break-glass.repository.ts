@@ -49,16 +49,3 @@ export abstract class SsoBreakGlassRepository {
     limit: number;
   }): Promise<BreakGlassBinding[]>;
 }
-
-/**
- * Who is told a way back in is ending. A channel rather than a mailer call so
- * the sweep says WHAT is due and the process decides how it reaches somebody
- * — the same split the identity email service already makes.
- */
-export abstract class SsoBreakGlassWarningChannel {
-  abstract warn(args: {
-    binding: BreakGlassBinding;
-    /** How many days remain: fourteen, seven or one. */
-    daysRemaining: number;
-  }): Promise<void>;
-}

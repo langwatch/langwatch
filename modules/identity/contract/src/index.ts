@@ -94,6 +94,7 @@ export {
   type SsoDomainProofState,
   type SsoDomainVerification,
   type SsoIdpMetadata,
+  type SsoDomainClaim,
   type SsoDomainClaimAuthority,
   type SsoPublishedProofChannel,
   type SsoVerificationCeremonyMethod,
@@ -107,6 +108,7 @@ export {
   ssoDomainProofStateSchema,
   ssoIdpMetadataSchema,
   ssoDomainClaimAuthoritySchema,
+  ssoDomainClaimSchema,
   ssoPublishedProofChannelSchema,
   ssoVerificationCeremonyMethodSchema,
   ssoVerificationMethodSchema,
@@ -286,6 +288,7 @@ export {
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
+  JoinPolicyNotLicensedError,
   JoinNotAvailableError,
   JoinRequestAlreadyPendingError,
   JoinRequestNotFoundError,
@@ -301,6 +304,8 @@ export {
   SsoConnectionAlreadyRegisteredError,
   SsoConnectionCommandRefusedError,
   SsoConnectionDomainTakenError,
+  SsoDomainClaimThrottledError,
+  SsoDomainNotEligibleError,
   SsoAssertionRefusedError,
   SsoAssertionWithoutAddressError,
   SsoCertificateInvalidError,
@@ -349,7 +354,6 @@ export {
   DOMAIN_JOIN_SETTINGS,
   type DomainJoinSetting,
   isPublicEmailDomain,
-  JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
   JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD,
   type JoinCandidateOrganization,
   type JoinLookupDecision,
@@ -589,6 +593,7 @@ export {
 export { reduceIdentity } from "./reduce.ts";
 export {
   emptyScimSync,
+  pickRetiredLetter,
   reduceScimSync,
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_OPS,
@@ -601,6 +606,7 @@ export {
   SCIM_SYNC_STATES,
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
   SCIM_USER_OPS,
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimApplyOp,
@@ -623,6 +629,7 @@ export {
   scimSyncStateSchema,
   scimTokenIssuedPayloadSchema,
   scimTokenRevokedPayloadSchema,
+  scimApplyRedrivenPayloadSchema,
   scimUserOpSchema,
   scimUserPushedPayloadSchema,
 } from "./scim-sync.ts";
@@ -633,8 +640,11 @@ export {
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
+  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
   type RecordScimApplyFailureCommandData,
+  type RedriveScimApplyCommandData,
+  redriveScimApplyCommandDataSchema,
   type RecordScimGroupMappingCommandData,
   type RecordScimUserPushCommandData,
   type RevokeScimSyncCommandData,
@@ -653,11 +663,13 @@ export {
   isLocalSignInMethod,
   legacyProviderOf,
   rankAccountMethods,
+  isOrganizationManagedDecision,
   type RoutableConnection,
   type RoutingDecision,
   type RoutingIdentifier,
   type RoutingInput,
   routeSignIn,
+  routesToOrganizationConnection,
   routingDecisionSchema,
   routingIdentifierOf,
   SIGNIN_METHOD_KINDS,
@@ -703,6 +715,12 @@ export {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "./sso-connection-events.ts";
 export * from "./signin-callback.errors.ts";
+export {
+  domainClaimRetryAfterSeconds,
+  isClaimableSsoDomain,
+  SSO_DOMAIN_CLAIM_WINDOW_MS,
+  SSO_DOMAIN_CLAIMS_PER_WINDOW,
+} from "./sso-domain-claims.ts";
 export * from "./identity.api.ts";
 export * from "./identity-lookup.ts";
 export * from "./identity.config.ts";

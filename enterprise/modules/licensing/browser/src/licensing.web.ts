@@ -22,6 +22,12 @@ export const licensingWeb = defineWebModule("licensing")
       label: "License",
       load: () => import("./ui/sections/license.screen.tsx"),
     },
+    "pages/settings/connect": {
+      path: "/settings/connect",
+      within: "settings",
+      label: "Connect",
+      load: () => import("./ui/sections/connect.screen.tsx"),
+    },
   })
   /** What another module may mount. billing and organization both do today. */
   .publishSurfaces({

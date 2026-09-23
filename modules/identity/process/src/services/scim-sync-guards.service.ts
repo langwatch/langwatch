@@ -3,7 +3,10 @@ import {
   type RecordScimApplyFailureCommandData,
   type RecordScimGroupMappingCommandData,
   type RecordScimUserPushCommandData,
+  type RedriveScimApplyCommandData,
   type RevokeScimSyncCommandData,
+  pickRetiredLetter,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
@@ -150,6 +153,34 @@ export class ScimSyncGuardsService {
     }
 
     return facts;
+  }
+
+  /**
+   * A platform operator sends a retired apply through again (ADR-122). States
+   * the fact only for a dead letter still retired and not yet re-driven, so a
+   * second press of the control appends nothing.
+   */
+  async redriveScimApply(data: RedriveScimApplyCommandData): Promise<ScimSyncFactInput[]> {
+    const state = await this.load(data);
+    if (!state || state.state === "REVOKED") return [];
+    const letter = pickRetiredLetter({ state, retiredAtMs: data.retiredAtMs });
+    if (!letter) return [];
+
+    return [
+      {
+        type: SCIM_APPLY_REDRIVEN_EVENT_TYPE,
+        data: {
+          scimSyncId: data.scimSyncId,
+          connectionId: data.connectionId,
+          organizationId: data.organizationId,
+          op: letter.op,
+          errorCode: letter.errorCode,
+          userId: letter.userId,
+          retiredAtMs: data.retiredAtMs,
+          actor: data.actor,
+        },
+      },
+    ];
   }
 
   /** The connection's sync ends. Idempotent: a second revoke states nothing. */

@@ -9,6 +9,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -140,6 +141,7 @@ function application(options: { apiKeys?: Partial<TestApiKeyService> } = {}): {
     },
     config: undefined,
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
   return { app, database };

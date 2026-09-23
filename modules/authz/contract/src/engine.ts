@@ -15,7 +15,6 @@ import {
   type DecideContext,
   findDemoProjectStep,
   denyStep,
-  findLegacyTeamFallbackStep,
   findOrganizationMembershipGateStep,
   findOrganizationRoleFloorStep,
   findResourceGrantStep,
@@ -71,7 +70,6 @@ export class AuthzEngine {
       findOrganizationMembershipGateStep(context) ??
       findOrganizationRoleFloorStep(context) ??
       findBindingsStep(context) ??
-      findLegacyTeamFallbackStep(context) ??
       findResourceGrantStep(context) ??
       denyStep(context)
     );
@@ -134,7 +132,7 @@ export class AuthzEngine {
     decision: AuthzDecision;
   }): string {
     const who = binding.viaGroupId ? ` (via group ${binding.viaGroupId})` : "";
-    const label = `${binding.customRoleId ? `custom:${binding.customRoleId}` : binding.role.toLowerCase()} @ ${binding.scopeType.toLowerCase()} ${binding.scopeId}${who}`;
+    const label = `${binding.roleKey} @ ${binding.scopeType.toLowerCase()} ${binding.scopeId}${who}`;
     const onChain = chain.some(
       (link) => link.scopeType === binding.scopeType && link.scopeId === binding.scopeId,
     );
@@ -170,11 +168,6 @@ export class AuthzEngine {
     lines.push(`collected ${grants.bindings.length} binding(s):`);
     for (const binding of grants.bindings) {
       lines.push(this.explainBindingLine({ binding, chain, decision }));
-    }
-    if (grants.bindings.length === 0 && grants.legacyTeamMemberships.length > 0) {
-      lines.push(
-        `  - legacy team membership fallback consulted (${grants.legacyTeamMemberships.length} team(s))`,
-      );
     }
     if (!decision.allowed) {
       lines.push(`denial reason: ${decision.denialReason ?? "unknown"}`);

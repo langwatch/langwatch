@@ -1,8 +1,9 @@
 /**
- * Langy's takeover after the tailor step: hello, then the value question.
- * Phases fade through the stage. @see specs/features/onboarding/guided-welcome-takeover.feature
+ * Langy's takeover after the tailor step: hello, the value question, the provider connect, then a
+ * landing on the first pick's page (or a pending continuation). Phases fade through the stage.
+ * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
-import type { GuidedPath } from "@langwatch/onboarding-contract";
+import { type GuidedPath, guidedPathLanding } from "@langwatch/onboarding-contract";
 import { useEffect, useRef, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 
@@ -15,27 +16,29 @@ import { ProviderScreen } from "./provider-screen.tsx";
 import { TAKEOVER_FADE_MS, TakeoverStage } from "./takeover-stage.tsx";
 import { ValueScreen } from "./value-screen.tsx";
 
-/**
- * What follows the provider phase (the tour) is not ported yet — see the
- * handoff. `returnTo` and the land-on-completion navigation return with it.
- */
 export function GuidedTakeover({
   organizationId,
   organizationName,
+  projectId,
+  projectSlug,
   userName,
   usageStyle,
   initialPhase,
   initialPaths = [],
+  returnTo,
 }: {
   organizationId: string;
   organizationName: string;
+  /** Still resolving right after creation; the provider panel waits for it. */
+  projectId: string | undefined;
+  projectSlug: string;
   userName: string | null | undefined;
   usageStyle: string | null | undefined;
   initialPhase: TakeoverPhase;
   initialPaths?: GuidedPath[];
+  returnTo: string | null;
 }) {
   const host = useOnboardingHost();
-  const { project } = host.scope();
   const [phase, setPhase] = useState<TakeoverPhase>(initialPhase);
   const [fading, setFading] = useState(false);
   const [paths, setPaths] = useState<GuidedPath[]>(initialPaths);
@@ -52,6 +55,13 @@ export function GuidedTakeover({
         setFading(false);
       }, TAKEOVER_FADE_MS),
     );
+  };
+
+  // A full navigation: the product's shell boots fresh on the landing, with the organization and
+  // the project it now has.
+  const land = () => {
+    const first = paths[0] ?? "llmops";
+    host.hardRedirect(returnTo ?? guidedPathLanding({ path: first, projectSlug }));
   };
 
   const firstName = greetingName(userName);
@@ -90,13 +100,18 @@ export function GuidedTakeover({
           <ProviderScreen
             picksCount={paths.length}
             organizationId={organizationId}
-            projectId={project?.id}
+            projectId={projectId}
             fading={fading}
-            onConnected={() => undefined}
-            onSkip={() => undefined}
+            onConnected={() => {
+              setFading(true);
+              timers.current.push(window.setTimeout(land, 500));
+            }}
+            onSkip={land}
+            onSkipFailed={(error) =>
+              host.failed({ error, fallbackTitle: "Couldn't skip the guided tour" })
+            }
           />
         )}
-        {/* What phase follows "provider" (the tour) is not ported yet; see the handoff. */}
       </TakeoverStage>
     </AnalyticsBoundary>
   );

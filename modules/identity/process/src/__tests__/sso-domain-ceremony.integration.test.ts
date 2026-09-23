@@ -21,6 +21,10 @@ import type {
   SsoDomainTxtLookup,
 } from "../channels/sso-domain-proof.channel.ts";
 import type {
+  SsoConnectionRegistrationRepository,
+  SsoConnectionRegistrationSlot,
+} from "../repositories/sso-connection-registration.repository.ts";
+import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -57,7 +61,12 @@ const IDP = {
 
 /** The guards' three reads, folded with the projection's own reducer so a
  *  guard can never pass against a state the projection never produces. */
-class LocalConnections implements SsoConnectionReadRepository {
+class LocalConnections implements SsoConnectionReadRepository, SsoConnectionRegistrationRepository {
+  /** One organization, one connection: nothing here competes for a slot. */
+  async claim(candidate: SsoConnectionRegistrationSlot): Promise<SsoConnectionRegistrationSlot> {
+    return candidate;
+  }
+
   private readonly states = new Map<string, SsoConnectionState>();
 
   async tryFindConnection({
@@ -113,6 +122,10 @@ class LocalConnections implements SsoConnectionReadRepository {
 
 class LocalBreakGlass implements SsoBreakGlassBindingRepository {
   async hasLiveBinding(): Promise<boolean> {
+    return true;
+  }
+
+  async reserveActivationRecovery(): Promise<boolean> {
     return true;
   }
 }
@@ -263,6 +276,7 @@ beforeEach(() => {
   connectionService = SsoConnectionService.create(
     SsoConnectionGuardsService.create({
       connections,
+      registrationSlots: connections,
       breakGlass: new LocalBreakGlass(),
       stranding: new LocalStranding(),
       platformOperators: new LocalPlatformOperators(),

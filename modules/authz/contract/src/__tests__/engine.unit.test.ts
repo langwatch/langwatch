@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  AuthzScopeRef,
-  CollectedBinding,
-  CollectedGrants,
-  LegacyTeamMembership,
-  ResourceGrant,
-} from "../authz.ts";
+import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } from "../authz.ts";
 import { AuthzEngine } from "../engine.ts";
 
 const engine = new AuthzEngine();
@@ -55,7 +49,6 @@ function makeGrants({
   bindings = [] as CollectedBinding[],
   organizationRole = "MEMBER" as CollectedGrants["organizationRole"],
   isOrgMember = organizationRole != null,
-  legacyTeamMemberships = [] as LegacyTeamMembership[],
   customRolePermissions = new Map<string, readonly string[]>(),
   principal = { type: "user", id: "user-1" } as CollectedGrants["principal"],
   membershipDisabled = false,
@@ -67,7 +60,6 @@ function makeGrants({
     isOrgMember,
     membershipDisabled,
     bindings,
-    legacyTeamMemberships,
     customRolePermissions,
   };
 }
@@ -75,8 +67,7 @@ function makeGrants({
 const binding = (
   partial: Partial<CollectedBinding> & Pick<CollectedBinding, "scopeType" | "scopeId">,
 ): CollectedBinding => ({
-  role: "MEMBER",
-  customRoleId: null,
+  roleKey: "member",
   viaGroupId: null,
   ...partial,
 });
@@ -84,12 +75,13 @@ const binding = (
 describe("authz engine decide()", () => {
   describe("given an org admin binding and a project viewer binding", () => {
     const bindings = [
-      binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG }),
-      binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT }),
+      binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG }),
+      binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT }),
     ];
     const grants = makeGrants({ bindings });
 
     /** @scenario "Grants are an additive union across scopes" */
+    /** @scenario "A permission check uses the caller's current grants" */
     it("grants via the union — the narrower binding is inert", () => {
       const decision = engine.decide({
         grants,
@@ -114,7 +106,7 @@ describe("authz engine decide()", () => {
 
   describe("given only a viewer binding on one project", () => {
     const grants = makeGrants({
-      bindings: [binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT })],
+      bindings: [binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT })],
     });
 
     it("grants view on that project", () => {
@@ -139,6 +131,7 @@ describe("authz engine decide()", () => {
     });
 
     /** @scenario "Narrow access is expressed by granting less, not by overriding" */
+    /** @scenario "A permission check without a matching grant is denied" */
     it("denies everything on a different project (scope chain filter)", () => {
       expect(
         engine.decide({
@@ -158,8 +151,7 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-1",
+            roleKey: "custom:cr-1",
             scopeType: "TEAM",
             scopeId: TEAM,
           }),
@@ -179,8 +171,7 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-1",
+            roleKey: "custom:cr-1",
             scopeType: "ORGANIZATION",
             scopeId: ORG,
           }),
@@ -200,7 +191,13 @@ describe("authz engine decide()", () => {
   describe("given org-scoped built-in bindings (scope-conditional enum semantics)", () => {
     it("ADMIN at org scope grants everything", () => {
       const grants = makeGrants({
-        bindings: [binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG })],
+        bindings: [
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
       });
       expect(
         engine.decide({
@@ -213,7 +210,13 @@ describe("authz engine decide()", () => {
 
     it("MEMBER at org scope grants only the org-member bag", () => {
       const grants = makeGrants({
-        bindings: [binding({ role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORG })],
+        bindings: [
+          binding({
+            roleKey: "member",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
       });
       expect(
         engine.decide({
@@ -237,7 +240,7 @@ describe("authz engine decide()", () => {
     it("caps a team MEMBER binding at the lite-member bag", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",
-        bindings: [binding({ role: "MEMBER", scopeType: "TEAM", scopeId: TEAM })],
+        bindings: [binding({ roleKey: "member", scopeType: "TEAM", scopeId: TEAM })],
       });
       expect(
         engine.decide({
@@ -260,8 +263,7 @@ describe("authz engine decide()", () => {
         organizationRole: "EXTERNAL",
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-2",
+            roleKey: "custom:cr-2",
             scopeType: "TEAM",
             scopeId: TEAM,
           }),
@@ -280,7 +282,13 @@ describe("authz engine decide()", () => {
     it("skips org-scoped non-CUSTOM bindings entirely", () => {
       const grants = makeGrants({
         organizationRole: "EXTERNAL",
-        bindings: [binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG })],
+        bindings: [
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
       });
       expect(
         engine.decide({
@@ -293,12 +301,11 @@ describe("authz engine decide()", () => {
   });
 
   describe("given an empty custom role", () => {
-    it("falls through to the viewer-level CUSTOM bag (legacy quirk)", () => {
+    it("denies instead of inheriting the viewer bag", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "CUSTOM",
-            customRoleId: "cr-empty",
+            roleKey: "custom:cr-empty",
             scopeType: "TEAM",
             scopeId: TEAM,
           }),
@@ -311,7 +318,7 @@ describe("authz engine decide()", () => {
           permission: "datasets:view",
           scope: projectScope,
         }).allowed,
-      ).toBe(true);
+      ).toBe(false);
       expect(
         engine.decide({
           grants,
@@ -320,75 +327,24 @@ describe("authz engine decide()", () => {
         }).allowed,
       ).toBe(false);
     });
-  });
 
-  describe("given a pre-bindings user (TeamUser fallback)", () => {
-    it("resolves project access through the chain team's legacy row", () => {
-      const grants = makeGrants({
-        legacyTeamMemberships: [
-          {
-            teamId: TEAM,
-            role: "ADMIN",
-            customRoleId: null,
-            isPersonal: false,
-          },
-        ],
-      });
-      const decision = engine.decide({
-        grants,
-        permission: "project:delete",
-        scope: projectScope,
-      });
-      expect(decision.allowed).toBe(true);
-      expect(decision.via).toBe("legacy-team-fallback");
-    });
-
-    it("skips the fallback when a chain binding exists", () => {
-      const grants = makeGrants({
-        bindings: [binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT })],
-        legacyTeamMemberships: [
-          {
-            teamId: TEAM,
-            role: "ADMIN",
-            customRoleId: null,
-            isPersonal: false,
-          },
-        ],
-      });
-      expect(
-        engine.decide({
-          grants,
-          permission: "project:delete",
-          scope: projectScope,
-        }).allowed,
-      ).toBe(false);
-    });
-
-    it("still applies the fallback when only off-chain bindings exist", () => {
+    it("denies when the custom role fact is missing", () => {
       const grants = makeGrants({
         bindings: [
           binding({
-            role: "ADMIN",
-            scopeType: "PROJECT",
-            scopeId: "proj-other",
+            roleKey: "custom:cr-missing",
+            scopeType: "TEAM",
+            scopeId: TEAM,
           }),
-        ],
-        legacyTeamMemberships: [
-          {
-            teamId: TEAM,
-            role: "ADMIN",
-            customRoleId: null,
-            isPersonal: false,
-          },
         ],
       });
       expect(
         engine.decide({
           grants,
-          permission: "project:delete",
+          permission: "datasets:view",
           scope: projectScope,
         }).allowed,
-      ).toBe(true);
+      ).toBe(false);
     });
   });
 
@@ -397,7 +353,13 @@ describe("authz engine decide()", () => {
       const grants = makeGrants({
         organizationRole: null,
         isOrgMember: false,
-        bindings: [binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG })],
+        bindings: [
+          binding({
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+        ],
       });
       const decision = engine.decide({
         grants,
@@ -425,67 +387,6 @@ describe("authz engine decide()", () => {
         }).allowed,
       ).toBe(false);
     });
-
-    it("unions non-personal legacy team rows on any denial, even with bindings present", () => {
-      const grants = makeGrants({
-        bindings: [binding({ role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORG })],
-        legacyTeamMemberships: [
-          {
-            teamId: TEAM,
-            role: "ADMIN",
-            customRoleId: null,
-            isPersonal: false,
-          },
-        ],
-      });
-      expect(
-        engine.decide({
-          grants,
-          permission: "gatewayBudgets:manage",
-          scope: orgScope,
-        }).allowed,
-      ).toBe(true);
-    });
-
-    it("excludes personal-workspace teams from the org-scope union", () => {
-      const grants = makeGrants({
-        legacyTeamMemberships: [
-          {
-            teamId: "personal-team",
-            role: "ADMIN",
-            customRoleId: null,
-            isPersonal: true,
-          },
-        ],
-      });
-      expect(
-        engine.decide({
-          grants,
-          permission: "gatewayBudgets:manage",
-          scope: orgScope,
-        }).allowed,
-      ).toBe(false);
-    });
-
-    it("never lets the team union grant org-exclusive permissions", () => {
-      const grants = makeGrants({
-        legacyTeamMemberships: [
-          {
-            teamId: TEAM,
-            role: "ADMIN",
-            customRoleId: null,
-            isPersonal: false,
-          },
-        ],
-      });
-      expect(
-        engine.decide({
-          grants,
-          permission: "organization:manage",
-          scope: orgScope,
-        }).allowed,
-      ).toBe(false);
-    });
   });
 
   describe("given a user with no OrganizationUser row", () => {
@@ -495,7 +396,13 @@ describe("authz engine decide()", () => {
     it("denies at project scope despite a PROJECT binding naming them", () => {
       const decision = engine.decide({
         grants: nonMember({
-          bindings: [binding({ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT })],
+          bindings: [
+            binding({
+              roleKey: "admin",
+              scopeType: "PROJECT",
+              scopeId: PROJECT,
+            }),
+          ],
         }),
         permission: "traces:view",
         scope: projectScope,
@@ -507,29 +414,10 @@ describe("authz engine decide()", () => {
     it("denies at team scope despite a TEAM binding naming them", () => {
       const decision = engine.decide({
         grants: nonMember({
-          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
         }),
         permission: "traces:view",
         scope: teamScope,
-      });
-      expect(decision.allowed).toBe(false);
-      expect(decision.denialReason).toBe("no-membership");
-    });
-
-    it("denies at project scope despite a legacy TeamUser row", () => {
-      const decision = engine.decide({
-        grants: nonMember({
-          legacyTeamMemberships: [
-            {
-              teamId: TEAM,
-              role: "ADMIN",
-              customRoleId: null,
-              isPersonal: false,
-            },
-          ],
-        }),
-        permission: "project:delete",
-        scope: projectScope,
       });
       expect(decision.allowed).toBe(false);
       expect(decision.denialReason).toBe("no-membership");
@@ -541,24 +429,12 @@ describe("authz engine decide()", () => {
       // removed member's leftover PROJECT binding reads every trace under it.
       const decision = engine.decide({
         grants: nonMember({
-          bindings: [binding({ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT })],
-        }),
-        permission: "traces:view",
-        scope: traceScope,
-      });
-      expect(decision.allowed).toBe(false);
-    });
-
-    it("denies at resource scope despite a leftover legacy TeamUser row", () => {
-      const decision = engine.decide({
-        grants: nonMember({
-          legacyTeamMemberships: [
-            {
-              teamId: TEAM,
-              role: "ADMIN",
-              customRoleId: null,
-              isPersonal: false,
-            },
+          bindings: [
+            binding({
+              roleKey: "admin",
+              scopeType: "PROJECT",
+              scopeId: PROJECT,
+            }),
           ],
         }),
         permission: "traces:view",
@@ -675,12 +551,12 @@ describe("authz engine decideWithCeiling()", () => {
     principal: { type: "apiKey", id: "key-1" },
     organizationRole: null,
     isOrgMember: false,
-    bindings: [binding({ role: "MEMBER", scopeType: "PROJECT", scopeId: PROJECT })],
+    bindings: [binding({ roleKey: "member", scopeType: "PROJECT", scopeId: PROJECT })],
   });
 
   describe("given an owner whose access was reduced to viewer", () => {
     const ownerGrants = makeGrants({
-      bindings: [binding({ role: "VIEWER", scopeType: "PROJECT", scopeId: PROJECT })],
+      bindings: [binding({ roleKey: "viewer", scopeType: "PROJECT", scopeId: PROJECT })],
     });
 
     /** @scenario "An API key is capped by its owner's current grants" */
@@ -709,7 +585,7 @@ describe("authz engine decideWithCeiling()", () => {
 
   describe("given an owner who holds more than the key", () => {
     const ownerGrants = makeGrants({
-      bindings: [binding({ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORG })],
+      bindings: [binding({ roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG })],
     });
 
     /** @scenario "Promotion does not grow a scoped API key" */
@@ -741,7 +617,7 @@ describe("authz engine decideWithCeiling()", () => {
     it("caps the key exactly like the owner's own session", () => {
       const ownerGrants = makeGrants({
         organizationRole: "EXTERNAL",
-        bindings: [binding({ role: "MEMBER", scopeType: "TEAM", scopeId: TEAM })],
+        bindings: [binding({ roleKey: "member", scopeType: "TEAM", scopeId: TEAM })],
       });
       const decision = engine.decideWithCeiling({
         keyGrants,
@@ -766,48 +642,6 @@ describe("authz engine decideWithCeiling()", () => {
       ).toBe(true);
     });
   });
-
-  describe("given an owner whose access predates the RoleBinding migration", () => {
-    /**
-     * The population this fallback exists for is DEFINED by holding zero
-     * RoleBindings, so an owner with none relies entirely on their legacy
-     * team row to pass the ceiling — a key minted for them must still work.
-     */
-    const ownerGrants = makeGrants({
-      bindings: [],
-      legacyTeamMemberships: [
-        { teamId: TEAM, role: "ADMIN", customRoleId: null, isPersonal: false },
-      ],
-    });
-
-    /** @scenario "A key minted from legacy membership works at request time" */
-    it("permits the request the legacy role covers", () => {
-      const decision = engine.decideWithCeiling({
-        keyGrants,
-        ownerGrants,
-        permission: "traces:view",
-        scope: projectScope,
-      });
-      expect(decision.allowed).toBe(true);
-    });
-
-    it("still denies what the legacy role does not cover", () => {
-      const viewerOwnerGrants = makeGrants({
-        bindings: [],
-        legacyTeamMemberships: [
-          { teamId: TEAM, role: "VIEWER", customRoleId: null, isPersonal: false },
-        ],
-      });
-      const decision = engine.decideWithCeiling({
-        keyGrants,
-        ownerGrants: viewerOwnerGrants,
-        permission: "datasets:manage",
-        scope: projectScope,
-      });
-      expect(decision.allowed).toBe(false);
-      expect(decision.denialReason).toBe("owner-ceiling");
-    });
-  });
 });
 
 describe("authz engine explain()", () => {
@@ -815,7 +649,7 @@ describe("authz engine explain()", () => {
     const grants = makeGrants({
       bindings: [
         binding({
-          role: "VIEWER",
+          roleKey: "viewer",
           scopeType: "TEAM",
           scopeId: TEAM,
           viaGroupId: "group-9",
@@ -833,10 +667,8 @@ describe("authz engine explain()", () => {
     expect(lines.join("\n")).toContain("denial reason: no-binding");
   });
   describe("given a membership an admin disabled to free its seat", () => {
-    /**
-     * The collector is what turns a disabled row into `isOrgMember: false` (its bindings do not
-     * even come back from the reader, which fences on an active membership).
-     */
+    /** These cases pin what the ENGINE does with a disabled snapshot: deny
+     *  everywhere a member could act, and say which gate closed. */
     const disabled = (overrides: Partial<CollectedGrants> = {}): CollectedGrants =>
       makeGrants({
         organizationRole: null,
@@ -885,7 +717,7 @@ describe("authz engine explain()", () => {
       // reaches the engine, membership still decides before bindings do.
       const decision = engine.decide({
         grants: disabled({
-          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
         }),
         permission: "project:delete",
         scope: projectScope,
@@ -953,7 +785,7 @@ describe("authz engine explain()", () => {
           principal: { type: "apiKey", id: "key-1" },
           organizationRole: null,
           isOrgMember: false,
-          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
         }),
         ownerGrants: disabled(),
         permission: "traces:view",
@@ -970,7 +802,7 @@ describe("authz engine explain()", () => {
           principal: { type: "apiKey", id: "key-2" },
           organizationRole: null,
           isOrgMember: false,
-          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
         }),
         ownerGrants: null,
         permission: "traces:view",
@@ -985,7 +817,7 @@ describe("authz engine explain()", () => {
           organizationRole: "MEMBER",
           isOrgMember: true,
           membershipDisabled: false,
-          bindings: [binding({ role: "ADMIN", scopeType: "TEAM", scopeId: TEAM })],
+          bindings: [binding({ roleKey: "admin", scopeType: "TEAM", scopeId: TEAM })],
         }),
         permission: "project:delete",
         scope: projectScope,
@@ -993,4 +825,49 @@ describe("authz engine explain()", () => {
       expect(decision.allowed).toBe(true);
     });
   });
+});
+
+describe("migrated custom bindings", () => {
+  /** @scenario "Migrated custom bindings retain their permission restrictions" */
+  it.each(["ORGANIZATION", "TEAM", "PROJECT"] as const)(
+    "honors the custom role key at %s scope",
+    (scopeType) => {
+      const scopeIds = { ORGANIZATION: ORG, TEAM, PROJECT };
+      const grants = makeGrants({
+        bindings: [
+          binding({
+            roleKey: "custom:restricted",
+            scopeType,
+            scopeId: scopeIds[scopeType],
+          }),
+        ],
+        customRolePermissions: new Map([["restricted", ["traces:view"]]]),
+      });
+      expect(
+        engine.decide({
+          grants,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(true);
+      expect(
+        engine.decide({
+          grants,
+          permission: "project:delete",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+      const missingRole = {
+        ...grants,
+        customRolePermissions: new Map<string, readonly string[]>(),
+      };
+      expect(
+        engine.decide({
+          grants: missingRole,
+          permission: "traces:view",
+          scope: projectScope,
+        }).allowed,
+      ).toBe(false);
+    },
+  );
 });

@@ -37,7 +37,7 @@ function makeRepository(name: string): ApiKeyRepository {
 function makeService(name: string) {
   const repository = makeRepository(name);
   const dependencies = {
-    authz: {} as never,
+    authz: { listApiKeyBindings: async () => [] } as never,
     grants: { revokeBindingsWhere: vi.fn(), deleteRole: vi.fn() } as never,
     organizations: {} as never,
     projects: {} as never,

@@ -33,6 +33,7 @@ import {
   type UserProfilesInput,
   type UserSsoStatus,
   type UserTourPreference,
+  type UserUsageCount,
 } from "@langwatch/user-contract";
 
 import type { UserAvatarStorage } from "../app/user.members.ts";
@@ -64,6 +65,17 @@ export class UserService {
       options.credentialIssuer,
       options.now ?? nowInstant,
     );
+  }
+
+  countUsage(): Promise<UserUsageCount> {
+    return this.repository.countUsage();
+  }
+
+  /** A domain with a wildcard in it is no domain, so it matches nobody. */
+  hasAccountOnDomain({ domain }: { domain: string }): Promise<boolean> {
+    const normalised = domain.trim().toLowerCase();
+    if (!normalised || normalised.includes("%")) return Promise.resolve(false);
+    return this.repository.hasAccountOnDomain(normalised);
   }
 
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
@@ -135,6 +147,20 @@ export class UserService {
   async dismissPasskeyNudge(input: UserIdInput): Promise<void> {
     const parsed = userIdInputSchema.parse(input);
     await this.repository.setPasskeyNudgeDismissedAt({ id: parsed.id, dismissedAt: this.now() });
+  }
+
+  findJoinOfferDismissedDomains(input: UserIdInput): Promise<string[]> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findJoinOfferDismissedDomains(parsed.id);
+  }
+
+  /** Read first, so a second "no thanks" for the same domain writes nothing. */
+  async dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void> {
+    const parsed = userIdInputSchema.parse({ id: input.id });
+    const held = await this.repository.findJoinOfferDismissedDomains(parsed.id);
+    if (held.includes(input.domain)) return;
+    await this.repository.addJoinOfferDismissedDomain({ id: parsed.id, domain: input.domain });
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {

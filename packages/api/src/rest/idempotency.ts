@@ -248,15 +248,12 @@ export type IdempotencyReceiptRecord = {
   responseBody: string | null;
 };
 
-export type IdempotencyReceiptUpdateInput = Partial<
-  Pick<
-    IdempotencyReceiptRecord,
-    "claimId" | "heartbeatAt" | "expiresAt" | "responseStatus" | "responseBody"
-  >
->;
-
-/** Minimal durable receipt store used by the idempotency protocol. */
+/**
+ * Minimal durable receipt store used by the idempotency protocol. The fenced
+ * writes are SQL (see {@link takeOverClaim}), so a transaction client fits too.
+ */
 export interface IdempotencyReceiptPersistence {
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): PromiseLike<number>;
   readonly idempotencyReceipt: {
     create(input: {
       data: IdempotencyReceiptCreateInput;
@@ -265,10 +262,6 @@ export interface IdempotencyReceiptPersistence {
     findUnique(input: {
       where: { scopeId_key: { scopeId: string; key: string } };
     }): Promise<IdempotencyReceiptRecord | null>;
-    updateMany(input: {
-      where: { id: string; claimId?: string; responseStatus?: null };
-      data: IdempotencyReceiptUpdateInput;
-    }): Promise<{ count: number }>;
     deleteMany(input: { where: { id: string; claimId?: string } }): Promise<{ count: number }>;
   };
 }
@@ -416,12 +409,17 @@ function startClaimHeartbeat({
   claimId: string;
 }): ClaimHeartbeat {
   const timer = setInterval(() => {
-    receipts.idempotencyReceipt
-      .updateMany({
-        where: { id: receiptId, claimId },
-        data: { heartbeatAt: toDate(nowInstant()) },
-      })
-      .then(({ count }) => {
+    Promise.resolve(
+      receipts.$executeRaw`
+        -- @tenancy: a receipt is addressed by its own id, resolved from the
+        -- (scopeId, key) pair the caller holds.
+        UPDATE "IdempotencyReceipt"
+           SET "heartbeatAt" = ${toDate(nowInstant())}
+         WHERE "id" = ${receiptId}
+           AND "claimId" = ${claimId}
+      `,
+    )
+      .then((count) => {
         if (count > 0) return;
 
         // The claim is somebody else's now. Warn once and stop, rather than
@@ -449,9 +447,9 @@ function startClaimHeartbeat({
 /**
  * The `claimId` predicate is the fence. Zero rows affected means this
  * request was declared dead and replaced mid-handler, so it logs loudly
- * rather than overwriting the new claim's row.
+ * rather than overwriting the new claim's row. SQL for {@link takeOverClaim}'s reason.
  */
-async function finalizeClaim({
+export async function finalizeClaim({
   receipts,
   cipher,
   receiptId,
@@ -466,11 +464,15 @@ async function finalizeClaim({
   status: number;
   serializedBody: string;
 }): Promise<void> {
-  const { count } = await receipts.idempotencyReceipt.updateMany({
-    where: { id: receiptId, claimId },
-    // Ciphertext; see `readStoredBody` for why.
-    data: { responseStatus: status, responseBody: cipher.encrypt(serializedBody) },
-  });
+  // Ciphertext; see `readStoredBody` for why.
+  const count = await receipts.$executeRaw`
+    -- @tenancy: addressed by receipt id, fenced on the claim this request holds.
+    UPDATE "IdempotencyReceipt"
+       SET "responseStatus" = ${status},
+           "responseBody" = ${cipher.encrypt(serializedBody)}
+     WHERE "id" = ${receiptId}
+       AND "claimId" = ${claimId}
+  `;
 
   if (count === 0) {
     idempotencyLogger.error(
@@ -604,10 +606,11 @@ export function isClaimAbandoned({
 }
 
 /**
- * An update, not delete-and-insert, so the row keeps its identity. The
- * `claimId` predicate resolves two racing takeovers to one winner.
+ * An update, not delete-and-insert, so the row keeps its identity. SQL, not
+ * `updateMany`, whose subquery re-checks a parked write on its own old snapshot
+ * and tells two racing takeovers yes; against the table only one wins.
  */
-async function takeOverClaim({
+export async function takeOverClaim({
   receipts,
   existing,
   now,
@@ -618,14 +621,17 @@ async function takeOverClaim({
 }): Promise<ExistingVerdict> {
   const claimId = randomUUID();
 
-  const { count } = await receipts.idempotencyReceipt.updateMany({
-    where: { id: existing.id, claimId: existing.claimId, responseStatus: null },
-    data: {
-      claimId,
-      heartbeatAt: toDate(now),
-      expiresAt: toDate(now.add({ milliseconds: RECEIPT_TTL_MS })),
-    },
-  });
+  const count = await receipts.$executeRaw`
+    -- @tenancy: a receipt is addressed by its own id, resolved from the
+    -- (scopeId, key) pair the caller holds.
+    UPDATE "IdempotencyReceipt"
+       SET "claimId" = ${claimId},
+           "heartbeatAt" = ${toDate(now)},
+           "expiresAt" = ${toDate(now.add({ milliseconds: RECEIPT_TTL_MS }))}
+     WHERE "id" = ${existing.id}
+       AND "claimId" = ${existing.claimId}
+       AND "responseStatus" IS NULL
+  `;
 
   if (count === 0) return { kind: "retry" };
 

@@ -29,7 +29,7 @@ interface ShellTopBarProps {
  * logo and dropdown lead; in "icon-rail" the rail carries them instead.
  */
 export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProps) {
-  const { user, activeProductId, isDevelopment } = state;
+  const { user, activeProductId, showDevelopmentIndicator } = state;
   const host = useNavigationHost();
   const accountMenu = host.accountMenu();
   // The product cluster spans the sidebar column, so the organization and
@@ -51,7 +51,7 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
       gap={4}
       overflow="hidden"
     >
-      {(user?.impersonator || isDevelopment) && (
+      {(user?.impersonator || showDevelopmentIndicator) && (
         <Box
           position="absolute"
           top={-5}
@@ -82,7 +82,7 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
       </HStack>
 
       <HStack gap={2} justifyContent="flex-end" overflow="hidden">
-        {isDevelopment && <DevBadge />}
+        {showDevelopmentIndicator && <DevBadge />}
         {accountMenu?.headerBanner}
         {host.commandBar()?.trigger}
         <AppHeaderUserMenu />

@@ -31,4 +31,8 @@ export const secretTrpcTransport = defineTrpcRouter(SecretApi, secretTrpc)
 
     return { success: true };
   })
+
+  .procedure("revealOnce")
+  .withPermission("secrets:view")
+  .handle(async ({ app, input }) => app.revealOnce(input))
   .build();

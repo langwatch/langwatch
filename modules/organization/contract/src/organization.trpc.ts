@@ -10,6 +10,7 @@ import {
   organizationInviteResentSchema,
   organizationInvitesCreatedSchema,
   organizationListedInvitesSchema,
+  organizationMemberProvenanceByUserSchema,
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
   organizationWriteAckSchema,
@@ -94,6 +95,11 @@ export const organizationTrpc = defineTrpcContract("organization")
   .query("getMemberById")
   .withInput(organizationApiMemberScopeSchema)
   .withOutput(organizationAggregateSchema)
+
+  /** Why each member is here; a second query so a failure degrades only the chips. */
+  .query("getMemberProvenance")
+  .withInput(organizationApiScopeSchema)
+  .withOutput(organizationMemberProvenanceByUserSchema)
 
   .mutation("createInvites")
   .withInput(organizationApiCreateInvitesInputSchema)

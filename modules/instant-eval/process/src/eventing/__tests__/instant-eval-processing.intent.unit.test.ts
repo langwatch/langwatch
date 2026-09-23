@@ -65,7 +65,10 @@ class ScriptedExecutor implements InstantEvalRunExecutor {
     return { total: 1_200, pageSize: 500, isCapped: false, keyColumns: ["ThreadId"] };
   }
 
-  async judgePage(): Promise<InstantEvalPageOutcome> {
+  readonly deadlines: (number | null | undefined)[] = [];
+
+  async judgePage(input: { deadlineAt?: number | null }): Promise<InstantEvalPageOutcome> {
+    this.deadlines.push(input.deadlineAt);
     if (this.raises) throw this.raises;
 
     return {
@@ -167,6 +170,20 @@ describe("given a step that succeeds", () => {
         cursor: "t1000",
         hasNextPage: true,
       });
+    });
+  });
+
+  describe("when the delivery carries its lease", () => {
+    it("bounds the page by the instant the lease lapses", async () => {
+      const executor = new ScriptedExecutor();
+      const { deps: dispatch } = deps();
+
+      await createInstantEvalJudgePageHandler({ ...dispatch, executor })(PAGE_PAYLOAD, {
+        ...intentContext(1),
+        leaseExpiresAt: NOW + 45_000,
+      });
+
+      expect(executor.deadlines).toEqual([NOW + 45_000]);
     });
   });
 

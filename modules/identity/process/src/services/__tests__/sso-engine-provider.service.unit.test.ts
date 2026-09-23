@@ -26,6 +26,7 @@ function connectionOf(overrides: Partial<SsoConnectionState> = {}): SsoConnectio
     type: "oidc",
     state: "ACTIVE",
     claimedDomains: ["acme.test"],
+    domainClaims: [],
     approvedDomains: ["acme.test"],
     verifiedDomains: ["acme.test"],
     domainVerifications: [],

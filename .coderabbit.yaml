@@ -7,8 +7,8 @@
 #
 # Issue #3754. The investigation produced four flips off the original ACs:
 #  (1) AC1 split — YAML alone is advisory; branch-protection lives in AC1b.
-#  (2) AC3 deterministic rules move to ast-grep / semgrep; path_instructions
-#      keeps only judgment rules.
+#  (2) AC3 deterministic rules move to the langwatch oxlint plugin (and two
+#      semgrep rules); path_instructions keeps only judgment rules.
 #  (3) AC5 leaves CodeRabbit entirely (path_instructions cannot see PR
 #      descriptions). It now lives in .github/workflows/deployment-impact-check.yml.
 #  (4) Phased rollout — mode:warning for sprint 1, per-rule promotion to error
@@ -61,13 +61,6 @@ reviews:
     semgrep:
       enabled: true
       config_file: dev/lint/semgrep/langwatch.yml
-    # Deterministic syntactic rules (AC3). The ruleset is NOT CodeRabbit-owned —
-    # it lives at dev/lint/ast-grep/ and runs as a plain linter in CI and via
-    # `make lint-rules`. CodeRabbit is one consumer of it, not the gate.
-    ast-grep:
-      essential_rules: true
-      rule_dirs:
-        - dev/lint/ast-grep/rules
 
   path_instructions:
     # ── AC4: structural ${...} guard ───────────────────────────────────────
@@ -121,8 +114,8 @@ reviews:
         fields needed for debugging, redact the rest.
 
     # ── AC3: layering / convention rules (judgment, not syntax) ────────────
-    # Syntactic checks (no `any`, inline import(), form.watch() in child,
-    # export * from re-export shims) live in /dev/lint/ast-grep/rules/.
+    # Syntactic checks (inline import(), form.watch() in child, aliased
+    # re-exports) are langwatch oxlint rules (dev/docs/lint-rules.md).
     # ClickHouse fully-qualified table names live in dev/lint/semgrep/langwatch.yml.
     # path_instructions only carries the judgment calls.
     #
@@ -164,9 +157,7 @@ reviews:
         (`class X extends React.Component`, `class X extends Component`).
         Use function components + hooks instead.
 
-    # Localhost-fallback judgment fallback (the ast-grep rule covers the
-    # syntactic shapes; this catches creative variations the syntactic
-    # rule misses).
+    # Localhost-fallback is a judgment rule only; no linter carries it.
     - path: "{apps,packages}/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.

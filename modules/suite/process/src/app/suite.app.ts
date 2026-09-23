@@ -3,6 +3,7 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
  * The suite feature's application: what both of its doors call.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { RepositoryFoldStore, type FoldProjectionStore } from "@langwatch/eventing";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
@@ -23,8 +24,10 @@ import {
 import {
   SuiteApi,
   SuiteNotFoundError,
+  SUITE_RUN_PROJECTION_VERSIONS,
   type SuiteRunParameters,
   type SuiteRunResult,
+  type SuiteRunStateData,
   SuiteScopeNotAllowedError,
   type SuiteTarget,
   type CreateSuiteCommand,
@@ -40,12 +43,19 @@ import {
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
 import type { Instant } from "@langwatch/time";
+import type { Cluster, Redis } from "ioredis";
 
+import { ClickhouseSuiteEventingRepository } from "../repositories/clickhouse/clickhouse.suite-eventing.repository.ts";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
+import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
+import {
+  SuiteRunProcessingPipelineAdapter,
+  type SuiteRunProcessingPipeline,
+} from "../services/suite-run-processing.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 import { buildSuiteInfrastructure } from "./suite-composition.build.ts";
 
@@ -88,6 +98,8 @@ export interface SuiteAppDependencies {
 type SuiteProcessMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   publicBaseUrl: string | undefined;
+  /** Absent in a deployment without Redis; the run fold reads the ClickHouse store uncached. */
+  redis: Redis | Cluster | null;
 }>;
 
 /**
@@ -110,8 +122,8 @@ export class SuiteApp implements SuiteApi {
     prompts: PromptApi,
     projects: ProjectApi,
   };
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["clickhouse", "publicBaseUrl"] as const;
+  /** Every name is from the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["clickhouse", "publicBaseUrl", "redis"] as const;
 
   static create(setup: SuiteSetup): SuiteApp {
     const { members, dependencies, repositories } = setup;
@@ -138,7 +150,41 @@ export class SuiteApp implements SuiteApi {
       ...dependencies,
       suites,
       publicBaseUrl: infrastructure.publicBaseUrl,
+      pipeline: SuiteApp.buildEventingPipeline({
+        clickhouse: members.clickhouse,
+        redis: members.redis,
+        defaultRetentionDays: infrastructure.defaultRetentionDays,
+      }),
     });
+  }
+
+  /**
+   * `suite_run_processing` (ADR-144), ported from the deleted
+   * `SuiteWorkerFeatureInstaller`: the fold caches through Redis where this
+   * deployment has one, and reads the ClickHouse store uncached otherwise.
+   */
+  private static buildEventingPipeline(options: {
+    clickhouse: ClickHouseQueryClient;
+    redis: Redis | Cluster | null;
+    defaultRetentionDays: number;
+  }) {
+    if (options.redis) {
+      return RedisSuiteRunProcessingRepository.create({
+        clickhouse: options.clickhouse,
+        defaultRetentionDays: options.defaultRetentionDays,
+        redis: options.redis,
+      }).buildProcessing();
+    }
+
+    const suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData> = new RepositoryFoldStore(
+      ClickhouseSuiteEventingRepository.create({
+        clickhouse: options.clickhouse,
+        defaultRetentionDays: options.defaultRetentionDays,
+      }).build().suiteRunState,
+      SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+    );
+
+    return SuiteRunProcessingPipelineAdapter.create({ suiteRunStateFoldStore });
   }
 
   // Test-only construction with overridable collaborators and in-memory run projection.
@@ -178,16 +224,31 @@ export class SuiteApp implements SuiteApi {
 
   #dependencies: SuiteAppDependencies & { suites: SuiteService };
   readonly #publicBaseUrl: string | undefined;
+  readonly #pipeline: SuiteRunProcessingPipeline | undefined;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
       suites: SuiteService;
       publicBaseUrl: string | undefined;
+      pipeline?: SuiteRunProcessingPipeline;
     },
   ) {
-    const { publicBaseUrl, ...rest } = dependencies;
+    const { publicBaseUrl, pipeline, ...rest } = dependencies;
     this.#publicBaseUrl = publicBaseUrl;
+    this.#pipeline = pipeline;
     this.#dependencies = rest;
+  }
+
+  /**
+   * The pipeline `suite_run_processing` registers (ADR-144). Built once by
+   * {@link create}; `createForTesting` builds no pipeline.
+   */
+  eventingPipeline(): SuiteRunProcessingPipeline {
+    if (!this.#pipeline) {
+      throw new Error("Suite was asked for its eventing pipeline, but none was built");
+    }
+
+    return this.#pipeline;
   }
 
   // -- reads -----------------------------------------------------------------

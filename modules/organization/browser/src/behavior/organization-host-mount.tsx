@@ -6,15 +6,17 @@
 
 import {
   useUiCapabilities,
+  useUiDeclarations,
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useMemo, type ReactNode } from "react";
+import { lazy, useMemo, type ReactNode } from "react";
 
 import {
   OrganizationHostApi,
   OrganizationHostProvider,
+  type AuthenticationOverviewCard,
   type OrganizationActor,
   type OrganizationDownload,
   type OrganizationFailureNotice,
@@ -52,6 +54,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       ) => void;
       navigate: (to: string) => void;
       failed: (failure: OrganizationFailureNotice) => void;
+      overviewCards: readonly AuthenticationOverviewCard[];
     },
   ) {
     super();
@@ -133,6 +136,14 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     downloadInBrowser(file);
   }
 
+  signOut(): void {
+    if (typeof window !== "undefined") window.location.assign("/api/auth/logout");
+  }
+
+  authenticationOverviewCards(): readonly AuthenticationOverviewCard[] {
+    return this.deps.overviewCards;
+  }
+
   failed(failure: OrganizationFailureNotice): void {
     this.deps.failed(failure);
   }
@@ -152,6 +163,20 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
   const facts = useUiOrganizationFacts();
   const sessionActor = session.currentUser();
   const reading = route.reading();
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so a card is not remounted.
+  const overviewCards = useMemo(
+    () =>
+      declarations
+        .declared("authenticationOverviewCard")
+        .toSorted(
+          (left, right) =>
+            Number(right.capability.section === "sign-in") -
+            Number(left.capability.section === "sign-in"),
+        )
+        .map(({ module, capability }) => ({ key: module, Card: lazy(capability.load) })),
+    [declarations],
+  );
 
   const host = useMemo(
     () =>
@@ -180,6 +205,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         setQuery: (next, options) => route.setQuery(next, options),
         navigate: (to) => navigation.navigate(to),
         failed: (failure) => feedback.failed(failure),
+        overviewCards,
       }),
     [
       activeScope.organizationId,
@@ -197,6 +223,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       reading,
       route,
       navigation,
+      overviewCards,
     ],
   );
 

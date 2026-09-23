@@ -26,6 +26,16 @@ export interface SignInDomainRouting {
 }
 
 /**
+ * The legacy `Organization.ssoDomain`/`ssoProvider` columns, read SECOND:
+ * until every connection is projected they are what routes a grandfathered
+ * customer, so a domain the projection cannot decide falls through to them.
+ */
+export interface SignInLegacyDomainRouting {
+  findLegacyConnectionForDomain(input: { domain: string }): Promise<RoutableConnection | null>;
+  findLegacyActiveConnections(): Promise<readonly RoutableConnection[]>;
+}
+
+/**
  * What the submitted address's account holds (ADR-117). The one per-user
  * read the router makes: answers KINDS, never a credential. `null` means no
  * account holds the address — routes to sign-up, not a password box.
@@ -81,6 +91,9 @@ const defaultRecorder: SignInRoutingRecorder = {
 
 export interface SignInRouterDeps {
   domains: SignInDomainRouting;
+  /** Absent where the deployment composed no legacy columns: the projection
+   *  is then the only answer, which is where every instance ends up. */
+  legacy?: SignInLegacyDomainRouting | undefined;
   policy: SignInMethodPolicyResolver;
   breakGlass: SignInBreakGlassLimiter;
   accounts: SignInAccountLookup;
@@ -101,6 +114,7 @@ export class SignInRouterService {
   }
 
   private readonly domains: SignInDomainRouting;
+  private readonly legacy: SignInLegacyDomainRouting | null;
   private readonly policy: SignInMethodPolicyResolver;
   private readonly breakGlass: SignInBreakGlassLimiter;
   private readonly accounts: SignInAccountLookup;
@@ -108,6 +122,7 @@ export class SignInRouterService {
 
   private constructor(deps: SignInRouterDeps) {
     this.domains = deps.domains;
+    this.legacy = deps.legacy ?? null;
     this.policy = deps.policy;
     this.breakGlass = deps.breakGlass;
     this.accounts = deps.accounts;
@@ -186,16 +201,27 @@ export class SignInRouterService {
     activeConnections: readonly RoutableConnection[];
   }> {
     if (domain) {
-      const [domainConnection] = await this.domains.findConnectionsForDomain({
-        domain,
-      });
+      const [projected] = await this.domains.findConnectionsForDomain({ domain });
+      // A SUSPENDED projection decides: an operator paused it deliberately,
+      // and falling back to the legacy columns would roll that back silently.
+      // Only a connection that is not serving at all defers to them.
+      if (projected !== undefined && projected.state !== "INACTIVE") {
+        return { domainConnection: projected, activeConnections: [] };
+      }
 
-      return { domainConnection: domainConnection ?? null, activeConnections: [] };
+      const legacy = (await this.legacy?.findLegacyConnectionForDomain({ domain })) ?? null;
+
+      return { domainConnection: legacy ?? projected ?? null, activeConnections: [] };
+    }
+
+    const projectedActive = await this.domains.findActiveConnections();
+    if (projectedActive.length > 0) {
+      return { domainConnection: null, activeConnections: projectedActive };
     }
 
     return {
       domainConnection: null,
-      activeConnections: await this.domains.findActiveConnections(),
+      activeConnections: (await this.legacy?.findLegacyActiveConnections()) ?? [],
     };
   }
 }

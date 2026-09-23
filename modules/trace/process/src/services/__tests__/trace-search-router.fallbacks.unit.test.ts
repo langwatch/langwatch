@@ -8,7 +8,7 @@ import {
   TraceSearchRouterService,
   type TraceSearchRouterDeps,
 } from "../trace-search-router.service.ts";
-import { answering, deps, input, NoModel, RANGE } from "./trace-search-router.harness.ts";
+import { deps, input, NoModel, RANGE } from "./trace-search-router.harness.ts";
 
 const router = (deps: TraceSearchRouterDeps) => TraceSearchRouterService.create(deps);
 
@@ -23,11 +23,11 @@ describe("given no classifier", () => {
         })),
       });
 
-      const result = await router(d).route(input({ text: "failing calls model:gpt-4o" }));
+      const result = await router(d).route(input({ text: "failing calls model:gpt-5-mini" }));
 
       expect(result).toEqual({
         kind: "filter",
-        query: "model:gpt-4o AND (status:error OR status:warning)",
+        query: "model:gpt-5-mini AND (status:error OR status:warning)",
         decidedBy: "model",
       });
       expect(d.routeWithModel).toHaveBeenCalledWith({
@@ -129,24 +129,6 @@ describe("given no classifier", () => {
       expect(d.routeWithModel).toHaveBeenCalledWith(
         expect.objectContaining({ known: { evaluators: [], events: [] } }),
       );
-    });
-  });
-});
-
-describe("given the caller names the route", () => {
-  describe("when the text is submitted again", () => {
-    /** @scenario "A search the page routed once is not classified again" */
-    it("builds that route without asking the classifier", async () => {
-      const classifier = answering("filter");
-      const d = deps({ classifier });
-
-      const result = await router(d).route(
-        input({ text: "annoyed users", forceKind: "instant_eval" }),
-      );
-
-      expect(classifier.classify).not.toHaveBeenCalled();
-      expect(d.routeWithModel).not.toHaveBeenCalled();
-      expect(result).toMatchObject({ kind: "instant_eval", decidedBy: "caller" });
     });
   });
 });

@@ -12,6 +12,16 @@
 export const MAX_LWQL_LENGTH = 50_000;
 
 /**
+ * The row cap, in one place: the validator refuses a top-level `LIMIT` above it
+ * (`LIMIT_TOO_HIGH`), the service appends it to a statement naming none, and the settings
+ * profile pins it server-side as `max_result_rows`.
+ */
+export const LWQL_MAX_RESULT_ROWS = 10_000;
+
+/** The byte ceiling a finished result may not exceed, pinned server-side as `max_result_bytes`. */
+export const LWQL_MAX_RESULT_BYTES = 8_000_000;
+
+/**
  * Ceilings pinned `CONST` by the profile -- belt and braces, not the load-bearing control:
  * `readonly = 1` already rejects almost every setting change. The `CONST` pins survive any
  * future relaxation of `readonly`.
@@ -34,6 +44,13 @@ export interface LangWatchQLResourceLimits {
    */
   maxRowsToRead: number;
   maxBytesToRead: number;
+  /**
+   * Output ceilings, enforced with `result_overflow_mode = 'throw'`: the server-side backstop
+   * for the row cap, catching a `LIMIT {n:UInt64}` bound parameter the static validator cannot
+   * read. Reaches the caller as `lwql_result_too_large` (TOO_MANY_ROWS_OR_BYTES, 396).
+   */
+  maxResultRows: number;
+  maxResultBytes: number;
 }
 
 /**
@@ -48,4 +65,6 @@ export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
   maxConcurrentQueriesForUser: 10,
   maxRowsToRead: 1_000_000_000,
   maxBytesToRead: 10_000_000_000,
+  maxResultRows: LWQL_MAX_RESULT_ROWS,
+  maxResultBytes: LWQL_MAX_RESULT_BYTES,
 };

@@ -24,9 +24,9 @@ const words = (count: number): string =>
 describe("splitBareWords", () => {
   describe("given only field:value terms", () => {
     it("has no sentence and keeps the query as typed", () => {
-      expect(splitBareWords("status:error AND model:gpt-4o")).toEqual({
+      expect(splitBareWords("status:error AND model:gpt-5-mini")).toEqual({
         sentence: "",
-        explicitQuery: "status:error AND model:gpt-4o",
+        explicitQuery: "status:error AND model:gpt-5-mini",
       });
     });
   });
@@ -69,9 +69,9 @@ describe("splitBareWords", () => {
     });
 
     it("keeps a word under an OR nested inside a group explicit too", () => {
-      expect(splitBareWords("model:gpt-4o AND (status:error OR refund)")).toEqual({
+      expect(splitBareWords("model:gpt-5-mini AND (status:error OR refund)")).toEqual({
         sentence: "",
-        explicitQuery: "model:gpt-4o AND (status:error OR refund)",
+        explicitQuery: "model:gpt-5-mini AND (status:error OR refund)",
       });
     });
 
@@ -108,8 +108,8 @@ describe("combineQueries", () => {
   });
 
   it("parenthesises a side carrying OR so AND cannot rebind it", () => {
-    expect(combineQueries({ base: "status:error", addition: "model:gpt-4o OR model:claude" })).toBe(
-      "status:error AND (model:gpt-4o OR model:claude)",
+    expect(combineQueries({ base: "status:error", addition: "model:gpt-5-mini OR model:claude" })).toBe(
+      "status:error AND (model:gpt-5-mini OR model:claude)",
     );
   });
 
@@ -145,8 +145,8 @@ describe("requoteBareTerms", () => {
 
   describe("given no bare words", () => {
     it("returns the query untouched", () => {
-      expect(requoteBareTerms("status:error AND model:gpt-4o")).toBe(
-        "status:error AND model:gpt-4o",
+      expect(requoteBareTerms("status:error AND model:gpt-5-mini")).toBe(
+        "status:error AND model:gpt-5-mini",
       );
     });
   });

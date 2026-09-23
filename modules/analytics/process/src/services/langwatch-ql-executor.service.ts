@@ -1,8 +1,11 @@
 /**
- * What the LangWatchQL executor seam needs decided outside a transport: how much of a finished
- * result reaches the caller, and whether this deployment provisioned a restricted identity at
- * all.
+ * What the LangWatchQL executor seam needs decided outside a transport: the result bounds the
+ * service applies, and whether this deployment provisioned a restricted identity at all.
  */
+import {
+  LWQL_MAX_RESULT_BYTES,
+  LWQL_MAX_RESULT_ROWS,
+} from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { createLogger } from "@langwatch/observability";
 
 import type {
@@ -15,11 +18,11 @@ const logger = createLogger("langwatch:analytics:lwql:executor");
 export type { LangWatchQLColumn, LangWatchQLStatistics } from "@langwatch/analytics-contract";
 
 /**
- * The shipped result ceilings.
+ * The shipped result bounds, single-sourced with the validator's `LIMIT_TOO_HIGH` cap.
  */
 export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
-  maxRows: 10_000,
-  maxResultBytes: 8_000_000,
+  maxRows: LWQL_MAX_RESULT_ROWS,
+  maxResultBytes: LWQL_MAX_RESULT_BYTES,
 };
 
 export class LangWatchQLExecutorService {
@@ -28,36 +31,6 @@ export class LangWatchQLExecutorService {
   }
 
   private constructor() {}
-
-  /**
-   * Applies the row ceiling, then the byte ceiling, reporting whether either bit. Byte cost is
-   * measured on the JSON encoding of each retained row, which is what the response body
-   * actually carries.
-   */
-  applyResultLimits({
-    rows,
-    limits,
-  }: {
-    rows: readonly Record<string, unknown>[];
-    limits: LangWatchQLResultLimits;
-  }): { rows: Record<string, unknown>[]; truncated: boolean } {
-    const capped = rows.slice(0, limits.maxRows);
-    let truncated = capped.length < rows.length;
-
-    const kept: Record<string, unknown>[] = [];
-    let bytes = 0;
-    for (const row of capped) {
-      bytes += JSON.stringify(row)?.length ?? 0;
-      if (bytes > limits.maxResultBytes) {
-        truncated = true;
-        break;
-      }
-
-      kept.push(row);
-    }
-
-    return { rows: kept, truncated };
-  }
 
   /**
    * Reads the restricted identity's connection out of the environment a process handed over, or

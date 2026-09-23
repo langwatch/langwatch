@@ -71,6 +71,12 @@ export type WebhookService = {
   handleSubscriptionUpdated(params: { subscription: Stripe.Subscription }): Promise<void>;
 };
 
+/** A finalized invoice of a connected self-hosted customer completes a waiting renewal. */
+export interface ConnectedBillingInvoiceEvents {
+  accountFor(stripeCustomerId: string): Promise<{ organizationId: string } | null>;
+  completeRenewalIfDue(input: { organizationId: string }): Promise<unknown>;
+}
+
 export class EEWebhookService implements WebhookService {
   private readonly subscriptionRepository: BillingWebhookSubscription;
   private readonly organizationRepository: BillingWebhookOrganization;
@@ -82,6 +88,7 @@ export class EEWebhookService implements WebhookService {
   private readonly licensePrivateKey?: string;
   private readonly getPostHog?: () => PostHog | null;
   private readonly host: BillingWebhookHost;
+  private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
   private readonly bestEffort = BestEffortService.create();
   private readonly lifecycle: BillingSubscriptionLifecycleService;
   private readonly checkout: BillingCheckoutCompletionService;
@@ -97,6 +104,7 @@ export class EEWebhookService implements WebhookService {
     licensePrivateKey,
     getPostHog,
     host,
+    connectedBilling,
   }: {
     subscriptionRepository: BillingWebhookSubscription;
     organizationRepository: BillingWebhookOrganization;
@@ -108,6 +116,7 @@ export class EEWebhookService implements WebhookService {
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
+    connectedBilling?: ConnectedBillingInvoiceEvents;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -119,6 +128,7 @@ export class EEWebhookService implements WebhookService {
     this.licensePrivateKey = licensePrivateKey;
     this.getPostHog = getPostHog;
     this.host = host;
+    this.connectedBilling = connectedBilling;
     this.checkout = BillingCheckoutCompletionService.create({
       subscriptionRepository,
       organizationRepository,
@@ -148,6 +158,7 @@ export class EEWebhookService implements WebhookService {
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
+    connectedBilling?: ConnectedBillingInvoiceEvents;
   }): EEWebhookService {
     return new EEWebhookService(options);
   }
@@ -167,6 +178,10 @@ export class EEWebhookService implements WebhookService {
         event.type === "invoice.payment_failed"
       ) {
         return await this.routeCheckoutOrInvoice(event);
+      }
+
+      if (event.type === "invoice.finalized") {
+        return await this.routeConnectedInvoiceFinalized(event);
       }
 
       if (
@@ -250,6 +265,26 @@ export class EEWebhookService implements WebhookService {
       stripe: this.stripe,
       privateKey: this.licensePrivateKey,
     });
+
+    return { status: "ok" };
+  }
+
+  private async routeConnectedInvoiceFinalized(
+    event: Stripe.Event & { type: "invoice.finalized" },
+  ): Promise<HandleEventResult> {
+    const invoice = event.data.object;
+    const customerId =
+      typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+    if (!this.connectedBilling || !customerId) return { status: "ok" };
+
+    const account = await this.connectedBilling.accountFor(customerId);
+    if (!account) return { status: "ok" };
+
+    await this.connectedBilling.completeRenewalIfDue({ organizationId: account.organizationId });
+    logger.info(
+      { eventId: event.id, organizationId: account.organizationId },
+      "[stripeWebhook] Connected customer invoice finalized",
+    );
 
     return { status: "ok" };
   }

@@ -274,7 +274,7 @@ describe("the LangWatchQL result table", () => {
 
   describe("given a result whose columns list the same name twice", () => {
     describe("when the table renders", () => {
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
+      /** @scenario "Duplicate columns, statistics, and diagnostics are honest" */
       it("warns that the repeated name carries one value per row", () => {
         renderTable(
           lwqlResult({
@@ -291,7 +291,7 @@ describe("the LangWatchQL result table", () => {
         expect(warning).toHaveTextContent("one value per name");
       });
 
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
+      /** @scenario "Duplicate columns, statistics, and diagnostics are honest" */
       it("says nothing when every column name is distinct", () => {
         renderTable(lwqlResult());
 

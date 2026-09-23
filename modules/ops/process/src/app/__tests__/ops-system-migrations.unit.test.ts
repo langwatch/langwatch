@@ -1,4 +1,3 @@
-import { guardOrganizationId } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,9 +37,8 @@ function migrationOf({
 }
 
 /**
- * Storage is faked; the cohort composition is what is under test. The
- * membership delegate runs the REAL organization tenancy guard, so a probe
- * spanning every organization at once (ADR-021) fails here rather than ships.
+ * Storage is faked; the cohort composition is what is under test. The probe
+ * reads the user's own memberships, so no statement grows with the enrolled set.
  */
 function stubDatabase({
   enrollments,
@@ -49,21 +47,17 @@ function stubDatabase({
   enrollments: { organizationId: string; migrationName: string }[];
   memberships: Record<string, string[]>;
 }) {
-  const findFirst = vi.fn(
-    async (args: { where: { userId: string; organizationId: { in: string[] } } }) =>
-      guardOrganizationId({ model: "OrganizationUser", action: "findFirst", args }, async () =>
-        (memberships[args.where.userId] ?? []).some((organizationId) =>
-          args.where.organizationId.in.includes(organizationId),
-        )
-          ? { userId: args.where.userId }
-          : null,
-      ),
-  );
+  const findUnique = vi.fn(async (args: { where: { id: string } }) => {
+    const organizationIds = memberships[args.where.id];
+    return organizationIds
+      ? { orgMemberships: organizationIds.map((organizationId) => ({ organizationId })) }
+      : null;
+  });
   const findMany = vi.fn().mockResolvedValue([]);
   const projectFindMany = vi.fn().mockResolvedValue([]);
   const projectOrganization = vi.fn().mockResolvedValue({ team: { organizationId: "org_acme" } });
   return {
-    findFirst,
+    findUnique,
     findMany,
     projectFindMany,
     projectOrganization,
@@ -75,8 +69,8 @@ function stubDatabase({
       $queryRaw: vi.fn().mockResolvedValue([]),
       organization: { findMany: vi.fn().mockResolvedValue([]) },
       project: { findMany: projectFindMany, findUniqueOrThrow: projectOrganization },
-      user: { findMany: vi.fn().mockResolvedValue([]) },
-      organizationUser: { findFirst, findMany },
+      user: { findMany: vi.fn().mockResolvedValue([]), findUnique },
+      organizationUser: { findMany },
     } as unknown as PrismaClient,
   };
 }
@@ -99,7 +93,7 @@ describe("OpsSystemMigrations", () => {
   describe("when one organization is enrolled in the identifier backfill and another is not", () => {
     /** @scenario "Organization enrollment is what puts a user in the backfill's cohort" */
     it("admits exactly the enrolled organizations' members; org-less users stay out", async () => {
-      const { database, findFirst, findMany } = stubDatabase({
+      const { database, findUnique, findMany } = stubDatabase({
         enrollments: [{ organizationId: "org_acme", migrationName: IDENTIFIER_BACKFILL }],
         memberships: {
           user_sam: ["org_acme"],
@@ -127,19 +121,15 @@ describe("OpsSystemMigrations", () => {
       await expect(
         cohort({ tenantId: "user_solo", migrationName: IDENTIFIER_BACKFILL }),
       ).resolves.toBe(false);
-      expect(findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            userId: "user_sam",
-            organizationId: { in: ["org_acme"] },
-          }),
-        }),
-      );
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: "user_sam" },
+        select: { orgMemberships: { select: { organizationId: true } } },
+      });
       expect(findMany).not.toHaveBeenCalled();
     });
 
     it("reads no membership and admits nobody when nothing is enrolled", async () => {
-      const { database, findFirst } = stubDatabase({ enrollments: [], memberships: {} });
+      const { database, findUnique } = stubDatabase({ enrollments: [], memberships: {} });
       const { adapter } = adapterOn(database);
 
       const cohort = await adapter.userCohort({
@@ -151,11 +141,11 @@ describe("OpsSystemMigrations", () => {
       await expect(
         cohort({ tenantId: "user_sam", migrationName: IDENTIFIER_BACKFILL }),
       ).resolves.toBe(false);
-      expect(findFirst).not.toHaveBeenCalled();
+      expect(findUnique).not.toHaveBeenCalled();
     });
 
     it("admits every user for a migration that enrolls automatically", async () => {
-      const { database, findFirst } = stubDatabase({ enrollments: [], memberships: {} });
+      const { database, findUnique } = stubDatabase({ enrollments: [], memberships: {} });
       const { adapter } = adapterOn(database);
 
       const cohort = await adapter.userCohort({
@@ -167,7 +157,7 @@ describe("OpsSystemMigrations", () => {
       await expect(
         cohort({ tenantId: "user_solo", migrationName: "identity-automatic" }),
       ).resolves.toBe(true);
-      expect(findFirst).not.toHaveBeenCalled();
+      expect(findUnique).not.toHaveBeenCalled();
     });
   });
 

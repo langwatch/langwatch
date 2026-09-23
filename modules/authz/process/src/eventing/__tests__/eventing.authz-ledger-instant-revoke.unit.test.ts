@@ -11,7 +11,7 @@ describe("EventingAuthzLedgerAdapter instant revocation", () => {
       incr: vi.fn().mockRejectedValue(new Error("redis stopped")),
     };
     const epoch = RedisAuthzEpochRepository.create({ redis });
-    const { writer, db, sent } = harness({ onLedger: true, epoch });
+    const { writer, db, sent } = harness({ epoch });
 
     await expect(
       writer.revokeBindings({

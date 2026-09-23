@@ -102,6 +102,10 @@ it("does X when Y given Z", () => {
 });
 ```
 
+## Stories, acceptance criteria, and feature files
+
+Issues are authored as Scrum stories (As a / I want / so that) with acceptance criteria (Given/When/Then) and a separate Definition of Done. When picked up, the story becomes the Feature narrative and each AC becomes one Scenario in `specs/**/*.feature`, bound to tests via `/** @scenario` JSDoc. See `specs/README.md` for complete binding details.
+
 ## Coverage is Mandatory
 
 Every change ships with tests. No exceptions. This is not aspirational — it is a hard requirement.
@@ -255,6 +259,15 @@ and bound by Go and runner unit tests. Start with
 `go run ./cmd/visualdiff run -dry-run`; the routes and flows it renders live in
 `tools/visualdiff/visualdiff.yaml`, so widening the coverage is editing
 YAML. See `tools/visualdiff/README.md`.
+## Use-proof
+
+A use-proof is a concrete, observable demonstration that the feature works as intended. It can be:
+- A screenshot of the rendered UI showing the feature in action
+- A command-line output demonstrating the API response
+- A browser-test report with screenshots of the full workflow
+- A trace or log showing the expected behavior occurred
+
+Use-proofs are embedded in PR descriptions or linked from the PR body, providing visual evidence that every acceptance criterion was validated before merge.
 
 ## Workflow
 

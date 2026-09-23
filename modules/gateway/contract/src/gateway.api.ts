@@ -42,6 +42,7 @@ import type {
   GatewayBudgetHealth,
   GatewayBudgetScopeReachResult,
 } from "./gateway.budget.ts";
+import type { GatewayDeploymentAddresses } from "./gateway.config.ts";
 import type {
   GatewaySpendEventPage,
   GatewayUsageSummary,
@@ -238,8 +239,43 @@ export type GatewayInternalSpendSubmission =
   | { status: "unregistered"; command: "admitSpend" | "confirmSpend" | "failSpend" }
   | { status: "accepted"; accepted: number; rejected: { index: number; code: string }[] };
 
+/** The LangWatch-hosted provider a connected install's gateway reaches for one organization. */
+export type GatewayConnectUpstream = Readonly<{
+  organizationId: string;
+  /** The Connect gateway endpoint; the slot calls its `/v1`. */
+  baseUrl: string;
+  /** The install's `lwl_` token, presented as the slot's key. */
+  token: string;
+  instanceId: string;
+}>;
+
+/** Why a presented license token resolves to no key; each is its own wire code. */
+export type GatewayLicenseTokenRefusal =
+  | "connect_license_token_malformed"
+  | "connect_instance_required"
+  | "connect_license_not_registered"
+  | "connect_license_revoked"
+  | "connect_license_expired"
+  | "connect_wrong_instance";
+
+/** The managed key a license token runs under, and what its token may carry. */
+export type GatewayLicenseTokenResolution =
+  | {
+      ok: true;
+      key: GatewayVirtualKeyRecord;
+      /** The license end or the key's own expiry, whichever comes first; absent for neither. */
+      notAfter?: Instant;
+      connectServices: string[];
+    }
+  | { ok: false; code: GatewayLicenseTokenRefusal };
+
 export interface GatewayInternalProtocol {
   findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null>;
+  /** Resolves an `lwl_` token by the facts licensing wrote onto its managed key. */
+  resolveLicenseToken(input: {
+    token: string;
+    instanceId: string | undefined;
+  }): Promise<GatewayLicenseTokenResolution>;
   findTraceDestination(projectId: string): Promise<{ id: string; teamId: string } | null>;
   signJwt(input: {
     vk_id: string;
@@ -249,6 +285,8 @@ export interface GatewayInternalProtocol {
     principal_id: string | null;
     revision: string;
     notAfter?: Instant | null;
+    /** The hosted services of the license a CONNECT key runs under; absent otherwise. */
+    connect_services?: string[];
   }): { jwt: string; expiresAt: number };
   touchVirtualKeyUsage(id: string): Promise<void>;
   refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> | null;
@@ -329,6 +367,17 @@ export interface GatewayInternalProtocol {
     virtualKeyId: string;
     usage: SpendUsage;
   }): Promise<"already_closed" | "closed" | "not_found" | null>;
+}
+
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * requests through the gateway and what they cost, since `since` where one is
+ * given, and when the first request was. Epoch milliseconds.
+ */
+export interface GatewayUsageCount {
+  readonly requests: number;
+  readonly spendUsd: number;
+  readonly firstRequestAt?: number;
 }
 
 export interface GatewayApi extends GatewayInternalProtocol {
@@ -507,6 +556,60 @@ export interface GatewayApi extends GatewayInternalProtocol {
   updateVirtualKey(input: GatewayVirtualKeyUpdateCommand): Promise<GatewayVirtualKeyRecord>;
   rotateVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayMintedVirtualKey>;
   revokeVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
+
+  /**
+   * The managed key a license resolves to (ADR-156 section 3): one per
+   * license, on the customer's hidden governance project, its secret
+   * discarded. Repeating this mints a second key; the registry calls it once.
+   */
+  provisionConnectManagedKey(input: {
+    organizationId: string;
+    licenseId: string;
+    actorUserId: string;
+  }): Promise<{ id: string }>;
+  /**
+   * Ends a managed key for the feature that owns it; customer-facing revocation
+   * refuses one. A key already gone is left alone, so this is safe to repeat,
+   * which is what makes revoking a license retryable.
+   */
+  revokeManagedInternal(input: {
+    virtualKeyId: string;
+    organizationId: string;
+    actorId: string;
+  }): Promise<void>;
+  /**
+   * Tells every gateway to resolve a managed key again, unchanged, through the
+   * change feed each already polls — for cached state outside the key row,
+   * such as the install a license is bound to.
+   */
+  invalidateManagedInternal(input: { virtualKeyId: string; organizationId: string }): Promise<void>;
+  /**
+   * The platform services a CONNECT key may serve, replaced whole; empty serves none.
+   * Only the feature holding the license gate writes it, never a transport.
+   */
+  setManagedKeyConnectServicesInternal(input: {
+    virtualKeyId: string;
+    organizationId: string;
+    services: readonly string[];
+  }): Promise<void>;
+  /**
+   * The license a CONNECT key serves: the registry hash of its token, the bound
+   * install and its end. Written by licensing at activation and on every sync.
+   */
+  setManagedKeyLicenseInternal(input: {
+    virtualKeyId: string;
+    organizationId: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant | null;
+  }): Promise<void>;
+  /**
+   * Where one organization's gateway reaches LangWatch-hosted models, replaced whole.
+   * Only licensing writes it, and it clears it on every change of license, service or Connect.
+   */
+  setConnectUpstreamInternal(input: GatewayConnectUpstream): Promise<void>;
+  /** Drops the organization's hosted provider slot. Safe to repeat. */
+  clearConnectUpstreamInternal(input: { organizationId: string }): Promise<void>;
   disableVirtualKey(input: GatewayVirtualKeyDisableCommand): Promise<GatewayVirtualKeyRecord>;
   enableVirtualKey(input: GatewayVirtualKeyCommand): Promise<GatewayVirtualKeyRecord>;
 
@@ -517,13 +620,17 @@ export interface GatewayApi extends GatewayInternalProtocol {
     scopes: readonly GatewayVirtualKeyScope[];
     traceProjectId?: string | null;
   }): Promise<void>;
-  /** The whole create pre-flight, including the guardrail references. */
+  /**
+   * The whole create pre-flight, including the guardrail references. A project
+   * credential names its project: a key for exactly that project needs create, not manage.
+   */
   authorizeVirtualKeyCreate(input: {
     actor: GatewayCaller;
     organizationId: string;
     scopes: readonly GatewayVirtualKeyScope[];
     traceProjectId?: string | null;
     guardrailAttachments?: unknown;
+    callerProjectId?: string;
   }): Promise<void>;
   /**
    * The update pre-flight: standing on the key, plus manage on any new scope.
@@ -550,6 +657,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
 
   /** Whether this deployment has the spend source a key's cost is read from. */
   isSpendSourceAvailable(): boolean;
+  /** Where the gateway runs for this deployment, as configured; undefined where nothing says. */
+  getDeploymentAddresses(): GatewayDeploymentAddresses;
   usageSummary(input: {
     organizationId: string;
     virtualKeyIds: string[];
@@ -617,6 +726,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
     cursor?: { occurredAtMs: number; gatewayRequestId: string };
     limit?: number;
   }): Promise<GatewaySpendEventPage | null>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount>;
 }
 
 export const GatewayApi = moduleApi<GatewayApi>()("gateway");

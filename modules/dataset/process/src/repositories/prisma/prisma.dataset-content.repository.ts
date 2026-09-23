@@ -234,20 +234,19 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
 
   /**
    * Atomically claim a pending upload: flip `uploading` → `processing` only if
-   * still `uploading`. The `updateMany` WHERE-clause is the concurrency guard —
-   * two racing finalize calls can't both win. Returns rows claimed (1 = won).
+   * still `uploading`. As SQL, so a finalize parked on the row lock re-checks
+   * the committed status and two racing calls can't both win. 1 = won.
    */
   async claimForProcessing(input: { id: string; projectId: string }): Promise<number> {
-    const { count } = await this.prisma.dataset.updateMany({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-        status: "uploading",
-        archivedAt: null,
-      },
-      data: { status: "processing" },
-    });
-    return count;
+    return this.prisma.$executeRaw`
+      UPDATE "Dataset"
+         SET "status" = 'processing',
+             "updatedAt" = now()
+       WHERE "id" = ${input.id}
+         AND "projectId" = ${input.projectId}
+         AND "status" = 'uploading'
+         AND "archivedAt" IS NULL
+    `;
   }
 
   /**

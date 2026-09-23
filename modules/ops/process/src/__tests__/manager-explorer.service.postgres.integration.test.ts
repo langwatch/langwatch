@@ -25,6 +25,7 @@ import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
+import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 /** The audit log this suite records on: the same rows, written straight to Postgres. */
 class PrismaAuditLogTestSink implements AuditLogApi {
@@ -372,6 +373,43 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       });
       expect(auditRows).toHaveLength(1);
       expect(auditRows[0]?.metadata).toMatchObject({ messageKey: "dead-1" });
+    });
+  });
+
+  describe("when two operators redrive and discard one dead message at the same moment", () => {
+    /** @scenario "A redrive and a discard on one dead message: only the first lands" */
+    it("applies the redrive and refuses the discard, which waited on the row", async () => {
+      const id = await seedMessage({
+        processKey: "stuck-both",
+        messageKey: "dead-both",
+        status: "dead",
+        nextAttemptAt: new Date(NOW - 1_000),
+      });
+      const ref = { processName: ns, projectId: PROJECT, processKey: "stuck-both" };
+
+      const acts = await raceOnOneRow({
+        prisma,
+        table: "ProcessManagerOutbox",
+        first: (tx) =>
+          ProcessOpsPrismaRepository.create({ prisma: tx }).tryRedriveDeadMessage({
+            ref,
+            messageId: id,
+            now: NOW,
+          }),
+        second: (tx) =>
+          ProcessOpsPrismaRepository.create({ prisma: tx }).tryDiscardDeadMessage({
+            ref,
+            messageId: id,
+            now: NOW,
+          }),
+      });
+
+      expect(acts.first).toEqual({ messageKey: "dead-both" });
+      expect(acts.second).toBeNull();
+      const row = await prisma.processManagerOutbox.findFirstOrThrow({
+        where: { id, projectId: PROJECT },
+      });
+      expect(row.status).toBe("pending");
     });
   });
 

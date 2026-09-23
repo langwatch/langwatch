@@ -2133,6 +2133,7 @@ function allowHeaderOf(methods: ReadonlySet<HttpMethod>): string {
 const HANDLER_CREDENTIAL = {
   project: "apiKey",
   organization: "apiKey",
+  apiKey: "apiKey",
   scimToken: "apiKey",
   "instance-admin": "apiKey",
   browser: "session",

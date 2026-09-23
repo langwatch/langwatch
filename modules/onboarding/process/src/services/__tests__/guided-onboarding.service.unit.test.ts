@@ -247,3 +247,59 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
   });
 });
+
+describe("GuidedOnboardingService attribution of a write with no user", () => {
+  function serviceWithAdministrators(findAdministrators: OrganizationApi["findAdministrators"]) {
+    const records = new Map<string, GuidedOnboardingRecord>([
+      ["org_1", { state: { paths: [], donePaths: [] }, variant: "guided" }],
+    ]);
+    const organizations = createApiFixture<OrganizationApi>({
+      readGuidedOnboardingState: ({ organizationId }) =>
+        Promise.resolve(
+          records.get(organizationId) ?? { state: { paths: [], donePaths: [] }, variant: null },
+        ),
+      writeGuidedOnboardingState: ({ organizationId, record }) => {
+        records.set(organizationId, record);
+        return Promise.resolve(record);
+      },
+      findAdministrators,
+    });
+    const events = MemoryPostHogEventsChannel.create();
+    const service = GuidedOnboardingService.create({ organizations, events });
+    return { service, events, records };
+  }
+
+  /** @scenario "a write through a project credential is tracked against the organization admin" */
+  it("tracks the event against the organization's admin", async () => {
+    const { service, events } = serviceWithAdministrators(() =>
+      Promise.resolve([{ userId: "user_admin", name: "Ada", email: "ada@acme.test" }]),
+    );
+
+    await service.completePath({ organizationId: "org_1", userId: undefined }, { path: "llmops" });
+
+    expect(events.tracked).toHaveLength(1);
+    expect(events.tracked[0]).toMatchObject({ userId: "user_admin" });
+  });
+
+  /** @scenario "a write through a project credential of an organization without an admin tracks nothing" */
+  it("tracks nothing when the organization has no admin", async () => {
+    const { service, events, records } = serviceWithAdministrators(() => Promise.resolve([]));
+
+    await service.completePath({ organizationId: "org_1", userId: undefined }, { path: "llmops" });
+
+    expect(events.tracked).toEqual([]);
+    expect(records.get("org_1")?.state.donePaths).toEqual(["llmops"]);
+  });
+
+  it("keeps the write when the admin lookup fails, and tracks nothing", async () => {
+    const { service, events, records } = serviceWithAdministrators(() =>
+      Promise.reject(new Error("directory unavailable")),
+    );
+
+    await expect(
+      service.completePath({ organizationId: "org_1", userId: undefined }, { path: "llmops" }),
+    ).resolves.toMatchObject({ donePaths: ["llmops"] });
+    expect(events.tracked).toEqual([]);
+    expect(records.get("org_1")?.state.donePaths).toEqual(["llmops"]);
+  });
+});

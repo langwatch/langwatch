@@ -6,6 +6,7 @@ import {
 } from "../policy/defaults.ts";
 import type { SecurityHeaders } from "../policy/security-headers.ts";
 import type { DocumentAccess } from "./browser-bundle.ts";
+import type { FramedDocumentSelection } from "./framed-document.ts";
 
 export type SurfacePolicy = (defaults: SecurityHeaders) => SecurityHeaders;
 export type BundleSelection = Readonly<{
@@ -22,6 +23,7 @@ export class TransportSelection {
   #trpc: SecurityHeaders | undefined;
   #rest: SecurityHeaders | undefined;
   #bundle: BundleSelection | false | undefined;
+  readonly #documents: FramedDocumentSelection[] = [];
 
   private constructor(readonly defaults: SurfaceDefaultsOptions) {}
 
@@ -53,10 +55,27 @@ export class TransportSelection {
     return this;
   }
 
+  /** A module-built document served on the app origin under the frame policy, beside the bundle. */
+  framedDocument(selection: FramedDocumentSelection): this {
+    if (!this.#bundle)
+      throw new Error("Select the browser bundle before a framed document; it answers beside it.");
+    if (this.#documents.some((document) => document.path === selection.path))
+      throw new Error(`Two framed documents claim "${selection.path}".`);
+
+    this.#documents.push(selection);
+
+    return this;
+  }
+
   get selected() {
     if (this.#bundle === undefined)
       throw new Error("surface.browserBundle must be selected or explicitly disabled.");
 
-    return { trpc: this.#trpc, rest: this.#rest, bundle: this.#bundle };
+    return {
+      trpc: this.#trpc,
+      rest: this.#rest,
+      bundle: this.#bundle,
+      documents: [...this.#documents],
+    };
   }
 }

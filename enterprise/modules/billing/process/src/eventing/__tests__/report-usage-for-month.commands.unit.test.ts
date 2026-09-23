@@ -20,6 +20,7 @@ const {
   mockCaptureException,
   mockQueryBillableEventsTotal,
   mockQueryInstantEvalSpendTotal,
+  mockConnectedUsageCeiling,
   mockLogger,
 } = vi.hoisted(() => {
   const reportUsageDeltaFn = vi.fn();
@@ -45,6 +46,8 @@ const {
     getOrganizationForBilling: vi.fn(),
   };
 
+  const connectedUsageCeilingFn = vi.fn(async () => null);
+
   const billingCheckpointsPort = {
     findCheckpoint: vi.fn(),
     writeIntent: vi.fn(),
@@ -61,6 +64,7 @@ const {
     mockCaptureException: captureExceptionFn,
     mockQueryBillableEventsTotal: queryBillableEventsTotalFn,
     mockQueryInstantEvalSpendTotal: queryInstantEvalSpendTotalFn,
+    mockConnectedUsageCeiling: connectedUsageCeilingFn,
     mockLogger: loggerInstance,
   };
 });
@@ -107,14 +111,33 @@ function makeCommand(
   };
 }
 
+/**
+ * The month before this one, and when it ended. A connected customer's event is
+ * dated at the end of the month it covers, which the meter only accepts inside
+ * its own age window — the previous month is always inside it.
+ */
+function previousBillingMonth(): [string, number] {
+  const now = new Date();
+  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  const previous = new Date(start);
+  previous.setUTCMonth(previous.getUTCMonth() - 1);
+
+  return [
+    `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, "0")}`,
+    start,
+  ];
+}
+
 function usageBilledOrg({
   id = "org-1",
   stripeCustomerId = "cus_123",
   hasSubscription = true,
+  contract = "cloud" as const,
 }: {
   id?: string;
   stripeCustomerId?: string | null;
   hasSubscription?: boolean;
+  contract?: "cloud" | "connected";
 } = {}) {
   return {
     outcome: "usage_billed" as const,
@@ -122,6 +145,7 @@ function usageBilledOrg({
       id,
       stripeCustomerId,
       subscriptions: hasSubscription ? [{ id: "sub-1" }] : [],
+      contract,
     },
   };
 }
@@ -143,6 +167,7 @@ async function createHandler() {
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
     errorReporter: errorReporter as any,
+    connectedUsageCeiling: mockConnectedUsageCeiling,
   });
 }
 
@@ -634,6 +659,87 @@ describe("ReportUsageForMonthCommand", () => {
         "payload.organizationId": "org-1",
         "payload.billingMonth": "2026-02",
       });
+    });
+  });
+  // ========================================================================
+  // A connected self-hosted customer (ADR-156 section 7)
+  // ========================================================================
+
+  describe("given a connected self-hosted customer", () => {
+    const connected = () => usageBilledOrg({ contract: "connected" });
+
+    function arrange({ measured, ceiling }: { measured: number; ceiling: number | null }) {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(connected());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue({
+        lastReportedTotal: 0,
+        pendingReportedTotal: null,
+        consecutiveFailures: 0,
+      });
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 0 });
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: measured });
+      mockConnectedUsageCeiling.mockResolvedValue(ceiling as never);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
+      mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
+      mockSelfDispatch.mockResolvedValue(undefined);
+    }
+
+    function hostedUsageEvent(): { value: number; timestamp: number } | undefined {
+      const calls = mockReportUsageDelta.mock.calls as [
+        { events: { eventName: string; value: number; timestamp: number }[] },
+      ][];
+      const hosted = calls.find(
+        ([argument]) => argument.events[0]?.eventName !== "langwatch_billable_events",
+      );
+
+      return hosted?.[0].events[0];
+    }
+
+    it("clamps hosted usage that ran past what the contract agreed", async () => {
+      arrange({ measured: 120_000, ceiling: 100_000 });
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(hostedUsageEvent()?.value).toBe(10);
+    });
+
+    it("reports the measured total when it stayed inside the contract", async () => {
+      arrange({ measured: 90_000, ceiling: 100_000 });
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(hostedUsageEvent()?.value).toBe(9);
+    });
+
+    it("dates the event at the end of the month, because the quarter is still open", async () => {
+      arrange({ measured: 90_000, ceiling: null });
+      const [billingMonth, monthEndMs] = previousBillingMonth();
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand("org-1", billingMonth));
+
+      expect(hostedUsageEvent()?.timestamp).toBe(Math.floor(monthEndMs / 1000));
+    });
+
+    it("falls back to the time of reporting for a month older than the meter accepts", async () => {
+      arrange({ measured: 90_000, ceiling: null });
+      const before = Math.floor(Date.now() / 1000);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand("org-1", "2020-02"));
+
+      expect(hostedUsageEvent()?.timestamp).toBeGreaterThanOrEqual(before);
+    });
+
+    it("never asks for a ceiling on the events meter, which no contract caps", async () => {
+      arrange({ measured: 90_000, ceiling: 100_000 });
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockConnectedUsageCeiling).toHaveBeenCalledTimes(1);
     });
   });
 });

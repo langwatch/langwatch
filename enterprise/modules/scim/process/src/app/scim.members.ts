@@ -36,6 +36,14 @@ export interface ScimSyncLifecycle {
     userId: string;
   }): Promise<void>;
 
+  /** A platform operator sent a retired apply through again (ADR-122). */
+  applyRedriven(input: {
+    organizationId: string;
+    connectionId: string;
+    retiredAtMs: number;
+    operator: { userId: string };
+  }): Promise<void>;
+
   revoked(input: {
     organizationId: string;
     connectionId: string;

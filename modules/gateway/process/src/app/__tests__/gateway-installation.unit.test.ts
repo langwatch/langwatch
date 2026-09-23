@@ -1,8 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
@@ -82,6 +84,7 @@ async function installGateway() {
         clickhouse: analyticalWithoutStore(),
         elevenLabsWebhook: undefined,
         gatewayInternalProtocol: {},
+        encryption: createApiFixture<Encryption>(),
       },
       role: "api",
       secrets,
@@ -143,6 +146,7 @@ describe("gateway app installation", () => {
           identities: {
             project: closed,
             organization: closed,
+            apiKey: closed,
             scimToken: closed,
             "instance-admin": closed,
             browser: closed,

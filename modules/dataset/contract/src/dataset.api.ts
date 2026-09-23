@@ -33,6 +33,19 @@ import type {
   UpsertDatasetInput,
 } from "./dataset.ts";
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many were made, since `since` where one is given, and when the first was.
+ * Times are epoch milliseconds; a first is absent where none exists.
+ */
+export interface DatasetUsageCount {
+  readonly datasets: number;
+  readonly datasetRecords: number;
+  readonly batchEvaluations: number;
+  readonly firstDatasetAt?: number;
+  readonly firstBatchEvaluationAt?: number;
+}
+
 /** Callable capability exposed by the composed Dataset application. */
 export interface DatasetApi {
   upsertDataset: (input: {
@@ -105,6 +118,8 @@ export interface DatasetApi {
    * static with no request-scoped builder, so the app composes this link.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The usage report's figures for these projects. */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount>;
 }
 
 export const DatasetApi = moduleApi<DatasetApi>()("dataset");

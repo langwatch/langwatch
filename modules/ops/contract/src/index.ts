@@ -21,10 +21,26 @@ export * from "./ops-snapshot.ts";
 export * from "./ops-snapshot.service.ts";
 export * from "./ops-system-migration.errors.ts";
 export * from "./ops-bug-report.ts";
+export * from "./license-registry.ts";
+export * from "./activation-code.ts";
+export * from "./self-hosted-instance.ts";
 export { opsBugReportTrpc } from "./ops-bug-report.trpc.ts";
+export { licenseRegistryTrpc } from "./license-registry.trpc.ts";
+export { selfHostedInstancesTrpc } from "./self-hosted-instance.trpc.ts";
 export { opsDashboardTrpc } from "./ops-dashboard.trpc.ts";
 export { opsEventLogTrpc } from "./ops-event-log.trpc.ts";
 export { opsPlatformTrpc } from "./ops-platform.trpc.ts";
 export { opsProcessTrpc } from "./ops-process.trpc.ts";
 export { opsQueueTrpc } from "./ops-queue.trpc.ts";
 export * from "./ops.config.ts";
+export * from "./usage-report.ts";
+export * from "./usage-report-docs.ts";
+export * from "./checkup.ts";
+export * from "./checkup-usage-report.ts";
+export {
+  checkupAnswerSchema,
+  checkupTrpc,
+  usageReportAnswerSchema,
+  type CheckupAnswer,
+  type UsageReportAnswer,
+} from "./checkup.trpc.ts";

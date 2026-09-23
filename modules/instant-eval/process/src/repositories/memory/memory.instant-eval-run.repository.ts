@@ -72,6 +72,21 @@ export class MemoryInstantEvalRunRepository implements InstantEvalRunRepository 
     return page.slice(0, limit);
   }
 
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<{ runs: number; firstRunAt?: number }> {
+    const rows = [...this.rows.values()].filter((row) => projectIds.includes(row.projectId));
+    const created = rows.map((row) => row.createdAt.epochMilliseconds);
+    return {
+      runs: created.filter((at) => since === undefined || at >= since).length,
+      ...(created.length === 0 ? {} : { firstRunAt: Math.min(...created) }),
+    };
+  }
+
   async write(row: InstantEvalRunRow): Promise<void> {
     this.rows.set(keyOf({ projectId: row.projectId, runId: row.id }), row);
   }

@@ -1,4 +1,4 @@
-import type { AuthzAccessBreakdownOutput } from "@langwatch/authz-contract";
+import type { AuthzAccessBreakdownOutput, GrantsLedgerActor } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
@@ -23,6 +23,8 @@ import type {
   RemoveOrganizationGroupBindingInput,
 } from "./group.ts";
 import type {
+  JoinRequestAdmitted,
+  JoinRequestAutomaticJoins,
   JoinRequestFiled,
   JoinRequestJoining,
   JoinRequestJoiningChanged,
@@ -36,6 +38,7 @@ import type {
   OrganizationInviteCreated,
   OrganizationInviteResent,
   OrganizationListedInvite,
+  OrganizationMemberProvenance,
   OrganizationPendingInviteApplied,
 } from "./organization.responses.ts";
 import type {
@@ -161,6 +164,17 @@ export interface OrganizationAdministrator {
   email: string | null;
 }
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * members, the single sign-on providers named (by name only), and when the
+ * second member joined, the first being whoever installed it. Epoch ms.
+ */
+export interface OrganizationUsageCount {
+  readonly members: number;
+  readonly ssoProviders: string[];
+  readonly secondMemberJoinedAt?: number;
+}
+
 export interface OrganizationApi {
   createAndAssign(
     input: Readonly<{
@@ -201,6 +215,12 @@ export interface OrganizationApi {
    * empty state with no variant; an unknown one refuses by name.
    */
   readGuidedOnboardingState(input: { organizationId: string }): Promise<GuidedOnboardingRecord>;
+  /**
+   * How colleagues on a matching domain get in, in the columns the
+   * organization owns; identity's join ledger reads and writes it here.
+   */
+  getJoinSetting(input: { organizationId: string }): Promise<JoinRequestJoining>;
+  saveJoinSetting(input: { organizationId: string; setting: JoinRequestJoining }): Promise<void>;
   /** Replaces the record, leaving every other sign-up answer where it is. */
   writeGuidedOnboardingState(input: {
     organizationId: string;
@@ -228,6 +248,18 @@ export interface OrganizationApi {
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
+  /** A self-hosted licence customer: the organization and its first team, marked. */
+  createSelfHostedCustomer(input: { name: string }): Promise<{ id: string; name: string }>;
+  markSelfHostedCustomer(input: { organizationId: string }): Promise<void>;
+  /** Every organization an operator marked as a self-hosted licence customer. */
+  findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]>;
+  /**
+   * The organization's longest-standing member, the person a customer's CRM traits are
+   * written through, with its name; empty where it has no member.
+   */
+  findRepresentatives(input: {
+    organizationId: string;
+  }): Promise<{ userId: string; organizationName: string }[]>;
   /**
    * Provisions an organization end to end: it, its first team, a bootstrap
    * admin key, the summary. A failure past creation deletes the organization
@@ -252,12 +284,16 @@ export interface OrganizationApi {
     }>,
   ): Promise<AuthzAccessBreakdownOutput>;
   /**
-   * Makes somebody a MEMBER, carrying the grant intent an unfinished
-   * automatic admission is resumed from (ADR-129). `"already-present"` when a
-   * concurrent sign-in callback or a retry already created the row.
+   * Makes somebody a MEMBER (ADR-129). With `admittedBy` the grant lands now,
+   * audited to that actor; without it an SSO arrival resumes the admission.
+   * `"already-present"` when a concurrent callback or a retry made the row.
    */
   createMembership(
-    input: Readonly<{ organizationId: string; userId: string }>,
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+    }>,
   ): Promise<"created" | "already-present">;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
@@ -278,6 +314,10 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null>;
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
+  /** Why each member is here, keyed by user id; explains, never grants. */
+  getMemberProvenance(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<Record<string, OrganizationMemberProvenance>>;
   /**
    * Every administrator who can still sign in, with what to call them. Asked
    * by a peer choosing somebody for a decision of an administrator's weight —
@@ -529,13 +569,22 @@ export interface OrganizationApi {
     input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
   ): Promise<void>;
   readJoiningPolicy(input: Readonly<{ organizationId: string }>): Promise<JoinRequestJoining>;
+  /** Audited against `actorUserId`, the administrator who saved it. */
   setJoiningPolicy(
     input: Readonly<{
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged>;
+  /** The post-login offer: the lookup minus the domains this person dismissed. */
+  offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
+  dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void>;
+  admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted>;
+  listAutomaticJoins(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<JoinRequestAutomaticJoins>;
 
   initializeOrganization(
     input: OnboardingInitializeOrganizationInput,
@@ -555,6 +604,10 @@ export interface OrganizationApi {
     input: Readonly<{ projectId: string }>,
     by: OrganizationCaller,
   ): Promise<PersonalFeatures>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount>;
+  /** Every organization on this install, for the install-wide usage report. */
+  findAllIds(): Promise<string[]>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>()("organization");

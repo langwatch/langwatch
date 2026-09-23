@@ -1,7 +1,10 @@
-import type { DataPrivacyScope, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
-import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { DataPrivacyScope, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import { withMemoryRepositories } from "@langwatch/kernel";
+import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 
+import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   type DataPrivacyDirectoryReader,
   type DataPrivacyOrganizationDirectory,
@@ -145,4 +148,15 @@ export function dataPrivacyTestInfrastructure(directory = MemoryDataPrivacyDirec
       piiRedactionMaxAttributeLength: 250_000,
     },
   };
+}
+
+/** `createApp` composes no secrets chain, so the module's one handle is answered here. */
+export function installableDataPrivacy(googleCredentials?: string) {
+  const server = withMemoryRepositories(dataPrivacyServer);
+  const secrets = new ScopedSecrets(async (_handle, build) => build(googleCredentials));
+  const installable: typeof server = {
+    ...server,
+    install: (args) => server.install({ ...args, secrets }),
+  };
+  return installable;
 }

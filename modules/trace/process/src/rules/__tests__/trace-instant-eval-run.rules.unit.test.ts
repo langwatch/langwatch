@@ -88,6 +88,17 @@ describe("explorerJudgedFilter", () => {
     );
     expect(explorerJudgedFilter("origin:langy")).toBe("origin:langy");
   });
+
+  it("drops a filter's eval chip, so no run compiles a judgement it has no run reference for", () => {
+    const input = toExplorerRunInput(
+      request({
+        filter: 'eval:"the user is annoyed" AND service:api',
+        question: { instructions: "the user asked twice" },
+      }),
+    );
+
+    expect(input.shorthand?.filter).toBe("service:api AND NOT origin:langy");
+  });
 });
 
 describe("toExplorerRunProgress", () => {

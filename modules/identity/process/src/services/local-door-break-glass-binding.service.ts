@@ -22,4 +22,9 @@ export class LocalDoorBreakGlassBindingAdapter implements SsoBreakGlassBindingRe
   async hasLiveBinding(_args: { organizationId: string }): Promise<boolean> {
     return this.localMethods().length > 0;
   }
+
+  /** The local door has nothing to reserve: it is open or it is not. */
+  async reserveActivationRecovery(args: { organizationId: string }): Promise<boolean> {
+    return this.hasLiveBinding(args);
+  }
 }

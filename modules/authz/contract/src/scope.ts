@@ -73,10 +73,8 @@ export function audienceMatches({
     case "organization":
       return grants.isOrgMember && grants.organizationId === audience.id;
     case "team":
-      return (
-        grants.bindings.some(
-          (binding) => binding.scopeType === "TEAM" && binding.scopeId === audience.id,
-        ) || grants.legacyTeamMemberships.some((row) => row.teamId === audience.id)
+      return grants.bindings.some(
+        (binding) => binding.scopeType === "TEAM" && binding.scopeId === audience.id,
       );
     case "project":
       return grants.bindings.some(

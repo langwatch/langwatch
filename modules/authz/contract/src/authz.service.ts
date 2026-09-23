@@ -34,6 +34,7 @@ import type {
   AuthzGetDecisionInput,
   AuthzGetProjectAnyDecisionInput,
   AuthzListBindingsForSynthesisInput,
+  AuthzListApiKeyBindingsInput,
   AuthzListGroupBindingsInput,
   AuthzListOrganizationBindingsInput,
   AuthzListScopeBindingsInput,
@@ -161,6 +162,10 @@ export abstract class AuthzService {
   abstract listScopeBindings(args: AuthzListScopeBindingsInput): Promise<AuthzAccessBindingsOutput>;
 
   abstract listGroupBindings(args: AuthzListGroupBindingsInput): Promise<AuthzAccessBindingsOutput>;
+
+  abstract listApiKeyBindings(
+    args: AuthzListApiKeyBindingsInput,
+  ): Promise<AuthzAccessBindingsOutput>;
 
   abstract listTeamMemberBindings(
     args: AuthzListTeamMemberBindingsInput,

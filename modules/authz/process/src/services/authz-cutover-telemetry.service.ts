@@ -34,7 +34,7 @@ export class ObservabilityAuthzCutoverAdapter extends AuthzCutoverFailureReporte
   report({ organizationId, error, ttlMs }: AuthzCutoverReadFailure): void {
     this.logger.warn(
       { organizationId, error, ttlMs },
-      "could not read the authz migration state; this organization stays on the legacy path until the cache expires",
+      "could not read the authz migration state; compatibility migration completion remains unknown until the cache expires",
     );
     this.options.counter.inc();
   }

@@ -4,15 +4,15 @@
  * params, so a widget cannot navigate into a different project's traces.
  */
 
+import {
+  NAVIGABLE_TARGETS,
+  type NavigableTarget,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
 import { Temporal } from "@langwatch/time";
 import { escapeValue, SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { useCallback } from "react";
 
 import { useAnalyticsHost } from "../model/analytics-host.ts";
-import {
-  NAVIGABLE_TARGETS,
-  type NavigableTarget,
-} from "../model/dashboard-widget/bridge-protocol.ts";
 
 /** The Explorer's default lens — the one an unfiltered explorer opens on. */
 const TRACE_EXPLORER_LENS = "all-traces";

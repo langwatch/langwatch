@@ -250,6 +250,28 @@ That is gone, so a fresh worktree now pays one cold build. Inside a worktree,
 `.tsbuildinfo` still makes every run after that incremental, the same as it
 always did.
 
+## Amendment: the packages held on 6 typecheck with 7 (2026-09-23)
+
+The three packages above, and `packages/ksuid` (whose publish build runs 6
+through the same `sdk-toolchain` catalog), hold `typescript@6` as a library —
+tsup's and the publish build's declaration emit, the enforcer's in-process
+parser — and until now also as their compiler: their `typecheck` script was a
+bare `tsc -b`, which resolves the package's own 6.0.3 binary. ksuid's own build
+project has 101 direct dependents, the enforcer's config references
+`packages/time/tsconfig.build.json`, and the SDK's reaches eleven build projects
+through `modules/langy/contract`, all of which the root solution also builds
+with 7. `tsc -b` treats build info written by another compiler version
+as out of date, so each compiler rebuilt what the other had just written, and
+everything downstream of `packages/time` with it.
+
+Their `typecheck` scripts now run the workspace compiler
+(`pnpm -w exec tsc -b <package>`); the root solution already did. What
+stays on 6 is only the library use, which never writes build info. The MCP
+server has no `typecheck` script and its tsup build emits no declarations, so
+it had nothing to move. Moving the enforcer's parsing itself to 7 remains
+blocked on batching, measured at 3.8x slower unbatched
+(`dev/docs/plans/static-analysis-consolidation-2026-09-17.md`).
+
 ## References
 
 - Related ADRs: [ADR-100](100-the-typecheck-memory-ceiling.md) (the memory

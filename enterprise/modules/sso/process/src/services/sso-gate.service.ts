@@ -123,9 +123,7 @@ export class SsoGateService {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const result = await Promise.race([
-        this.licensing.inspectPlatformAccess({
-          instanceLicenseKey: this.configuration.instanceLicenseKey,
-        }),
+        this.licensing.inspectPlatformAccess(),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
             () => reject(new SsoGateTimeoutError(this.evaluationTimeoutMs)),

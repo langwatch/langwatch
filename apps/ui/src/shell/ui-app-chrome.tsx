@@ -13,6 +13,7 @@ import { useUiOrgQueryParamSelection } from "@langwatch/organization-browser/sur
 import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 
 import { UiNavigationHost } from "./navigation-host-provider";
+import { useAnalyticsIdentity } from "./use-analytics-identity";
 
 export default function UiAppChrome() {
   const capabilities = useOptionalUiCapabilities();
@@ -32,6 +33,7 @@ export default function UiAppChrome() {
 
 /** Split so the hooks that read the host run only beneath it. */
 function UiAppChromeFrame() {
+  useAnalyticsIdentity();
   useNavigationTracking();
   useUiOrgQueryParamSelection();
   return (

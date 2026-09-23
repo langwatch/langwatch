@@ -139,6 +139,16 @@ Feature: The identifier model - identity as an event-sourced pipeline
     When the next pass states the same attach again
     Then the guard emits it, because the projection has still never folded
 
+  @integration
+  Scenario: A user's hash key is minted once, whichever writer arrives first
+    Given a user with no hash key
+    When the creation ceremony and a backfill pass each mint one at the same moment
+    Then the key the first writer minted is the one stored
+    And the second writer changes nothing
+    # A key rewritten under a user orphans every identifier hash already
+    # computed with the old one, in an immutable log. The second write waits
+    # on the first's row lock and re-reads the key as the first left it.
+
   @unit
   Scenario: Every identity event rides the pipeline's declared aggregate type
     When each identity command emits its event
@@ -332,6 +342,49 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the email identifier, which has no account row, is left alone
     And a further pass detaches nothing
 
+  # D09: the Auth0 broker's subject is a compound — `google-oauth2|<sub>`
+  # states the person's identity AT GOOGLE, wrapped in the broker's
+  # namespace. Unfolding it at adoption is what lets the native provider's
+  # callback resolve a user who has only ever signed in through the broker:
+  # no linking ceremony, no second account, sign-in works on the first day
+  # the native provider is mounted.
+  @unit
+  Scenario: An Auth0-brokered social account is adopted under its own provider too
+    Given "sam" has an Auth0 Account row whose subject names a Google identity
+    When the identity backfill migrates "sam"
+    Then a Google identifier is adopted beside the Auth0 one, carrying the upstream subject
+    And it carries the issuer Google itself asserts, so the native callback resolves "sam"
+    And an Auth0 subject naming no known upstream derives nothing
+    And deleting the Auth0 Account row detaches the derived identifier with it
+
+  # The derivation is a prediction: it states the native identity the broker's
+  # subject implies, so the native callback resolves before any native sign-in
+  # has happened. When one does happen, better-auth writes the real Account
+  # row and the prediction has been overtaken — but it does not stand down on
+  # its own. Its source broker row is still live, so the orphan compensation
+  # never reaches it, and it holds the provider subject against the identifier
+  # the real row implies, which carries that row's own business time and so is
+  # a different identifier entirely.
+  #
+  # Unretired, that is permanent: the attach loses the subject on every pass,
+  # the parity diff never clears, the user never finalizes, and their secrets
+  # are never carried across, so they sit on the legacy path indefinitely.
+  # This was 64 users on cloud, all of them Google or GitHub — exactly the
+  # upstreams the broker's subjects can be unfolded into.
+  @unit
+  Scenario: A real native account retires the derived identifier that predicted it
+    Given "sam" holds an Auth0 row naming a Google identity, adopted in an earlier pass
+    And "sam" has since signed in with Google directly, so a real Google Account row exists
+    When the identity backfill migrates "sam"
+    Then the derived identifier is detached and the real row's identifier holds the subject
+    And "sam" finalizes rather than being held on a collision that never clears
+
+  @unit
+  Scenario: A derived identifier with no real row behind it is left alone
+    Given "sam" holds only the Auth0 row and the identifier derived from it
+    When the identity backfill migrates "sam"
+    Then nothing is detached, because that identifier is still the only thing asserting the subject
+
   # The READ fork (ADR-101 §5). `User.email` is a legacy column answering a
   # question identity now owns, so a finalized user's email comes from their
   # identifiers and the column is a stale copy. One switch forks both
@@ -440,10 +493,49 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And an operator rollback closes it again
 
   @unit
-  Scenario: Organization enrollment is what puts a user in the backfill's cohort
+  Scenario: Identifier backfill automatically includes every user
     Given the installation is cloud
-    And "acme" is enrolled in the identifier backfill and "globex" is not
+    And the identifier backfill is enrolled automatically
     When a migration pass computes its user cohort
-    Then every member of "acme" is in the cohort
-    And a user who belongs only to "globex" is not
-    And a user outside every organization is not, and stays on the legacy path
+    Then every user is in the cohort
+    And organization membership is not read
+
+
+  @unit @regression
+  Scenario: An admitted SSO user is adopted without a fleet-wide migration pass
+    Given a proved active connection admits a new user
+    When the organization membership has been created
+    Then identity adoption runs for that user alone
+    And normal persisted finalization opens that user's identity write gate
+
+  @unit @regression
+  Scenario: Existing SSO members retry adoption when new arrivals are refused
+    Given an active connection refuses new arrivals
+    And the authenticated user already belongs to its organization
+    When the user signs in through that connection
+    Then identity adoption is retried without another membership or notice
+    And a fresh refused or waiting user is not adopted
+
+  @unit @regression
+  Scenario: User-targeted automatic adoption preserves per-user scope and leases
+    Given the identifier backfill is enrolled automatically
+    When a user-targeted adoption pass runs
+    Then it attempts the arriving user's migration without enrollment
+    And it never scans the other users
+    And an adoption pass cannot bypass another pass's user lease
+
+  @unit @regression
+  Scenario: Pending identity projection does not imply finalized adoption
+    Given a user's adoption remains held for projection parity
+    When the bounded callback retry ends
+    Then the persisted status remains migrated
+    And a later sign-in may retry adoption
+
+  @integration @regression
+  Scenario: A member without team access sees what they are waiting for
+    Given a signed-in organization member has not been added to a team
+    When they open a project page
+    Then they see a full-screen waiting page naming their organization
+    And the dashboard navigation is hidden and cannot receive focus
+    And they can check access again, return home, or sign out
+    And project content remains unavailable until they have team access

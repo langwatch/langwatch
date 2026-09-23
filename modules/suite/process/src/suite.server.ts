@@ -2,6 +2,7 @@ import { bindRestHeader } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 
 import { SuiteApp } from "#app/suite.app";
+import { suiteRunProcessingEventing } from "#eventing/suite-run-processing.pipeline";
 import { suiteRepositories } from "#repositories/suite-repositories.registry";
 import { suiteSurfaceFact } from "#rules/suite-wire-v1.rules";
 import { createRunPlansRest } from "#transport/run-plans.rest";
@@ -23,4 +24,5 @@ export const suiteServer = defineServerModule("suite")
   // Which surface started a run, off `X-LangWatch-Surface` - all three suite
   // families record it on the runs they queue, and nothing a process
   // collaborator need answer.
-  .withTransportFacts(() => [bindRestHeader(suiteSurfaceFact, "x-langwatch-surface")]);
+  .withTransportFacts(() => [bindRestHeader(suiteSurfaceFact, "x-langwatch-surface")])
+  .withEventing(suiteRunProcessingEventing);

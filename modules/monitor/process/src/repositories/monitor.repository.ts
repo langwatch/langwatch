@@ -10,6 +10,7 @@ import type {
   MonitorToggleInput,
   MonitorUpdateInput,
   MonitorWithEvaluator,
+  MonitorUsageCount,
 } from "@langwatch/monitor-contract";
 
 /** The rows a monitor is stored in, as the feature reads and writes them. */
@@ -38,4 +39,6 @@ export interface MonitorRepository {
       executionMode: MonitorExecutionMode;
     },
   ): Promise<Monitor>;
+  /** The usage report's count; the caller never passes an empty project list. */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<MonitorUsageCount>;
 }

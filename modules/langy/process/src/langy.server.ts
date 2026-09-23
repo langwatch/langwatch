@@ -3,6 +3,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { LangyApp } from "./app/langy.app.ts";
 import type { LangyTitleGenerator, LangySessionKeyMetrics } from "./app/langy.members.ts";
+import { langyMaintenanceEventing } from "./eventing/langy-maintenance.pipeline.ts";
 import { LangyAnalyticsEventClickHouseRepository } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import type { LangyAnalyticsClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import { langyRepositories } from "./repositories/langy-repositories.registry.ts";
@@ -115,4 +116,5 @@ export const langyServer = defineServerModule("langy")
         },
       })),
     ];
-  });
+  })
+  .withEventing(langyMaintenanceEventing);

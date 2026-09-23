@@ -188,4 +188,47 @@ describe("setting a first password", () => {
       expect(auth.revokeOtherBrowserSessions).not.toHaveBeenCalled();
     });
   });
+
+  describe("given a deployment that federates and issues its own passwords (D09)", () => {
+    /** @scenario "An organization's own connection still refuses a local password" */
+    it("sets a first password for an ordinary address", async () => {
+      const account = passwordlessAccount();
+      const auth = createUserTestAuth("auth0", {
+        issuesOwnPasswords: true,
+        governedDomain: "other.com",
+      });
+      const app = createUserTestApp({ repositories: account.repositories, dependencies: { auth } });
+      const created = await account.create();
+
+      await app.setOwnFirstPassword({
+        userId: created.id,
+        caller: owner(created.id),
+        password: "a-good-password",
+        keepSessionId: "sess-1",
+      });
+
+      await expect(app.hasPassword({ id: created.id })).resolves.toBe(true);
+    });
+
+    /** @scenario "An organization's own connection still refuses a local password" */
+    it("refuses a first password for an address its organization routes to its own provider", async () => {
+      const account = passwordlessAccount();
+      const auth = createUserTestAuth("auth0", {
+        issuesOwnPasswords: true,
+        governedDomain: "acme.com",
+      });
+      const app = createUserTestApp({ repositories: account.repositories, dependencies: { auth } });
+      const created = await account.create();
+
+      await expect(
+        app.setOwnFirstPassword({
+          userId: created.id,
+          caller: owner(created.id),
+          password: "a-good-password",
+          keepSessionId: "sess-1",
+        }),
+      ).rejects.toBeInstanceOf(UserPasswordAuthUnavailableError);
+      await expect(app.hasPassword({ id: created.id })).resolves.toBe(false);
+    });
+  });
 });

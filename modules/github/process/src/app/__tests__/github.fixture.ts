@@ -152,6 +152,10 @@ export class TestGithubService implements GithubApi {
     return 0;
   }
 
+  async countUsage(): Promise<{ pullRequests: number }> {
+    return { pullRequests: 0 };
+  }
+
   async pruneStaleBranchLinkage(): Promise<{ branchChecks: number }> {
     return { branchChecks: 0 };
   }

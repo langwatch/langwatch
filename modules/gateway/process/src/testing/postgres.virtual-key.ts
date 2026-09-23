@@ -7,9 +7,17 @@ import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/pris
 import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
-import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+import {
+  GatewayScopeResolutionService,
+  type GatewayPlatformProviders,
+} from "../services/gateway-scope-resolution.service.ts";
 import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
 import { VirtualKeyService } from "../services/virtual-key.service.ts";
+
+/** A deployment holding no provider keys of its own, which is what a self-hosted install is. */
+const NO_PLATFORM_PROVIDERS: GatewayPlatformProviders = {
+  platformProviderChain: () => Promise.resolve([]),
+};
 
 /**
  * The write-path service wired to this deployment's Postgres, with a fixed
@@ -25,6 +33,7 @@ function createVirtualKeyServiceForTest(
     keyBudgets: PrismaGatewayKeyBudgetRepository.create({ database: prisma }),
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+      platformProviders: NO_PLATFORM_PROVIDERS,
     }),
     projects,
     repository: PrismaGatewayVirtualKeyRepository.create(prisma),

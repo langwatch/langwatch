@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { collectLangWatchQLKeys } from "../../rules/langwatch-ql-hydration-plan.rules.ts";
 import {
   LangWatchQLHydrationReadService,
+  LWQL_TRACES_PER_THREAD_CEILING,
   type LangWatchQLTraceSource,
 } from "../langwatch-ql-hydration-read.service.ts";
 
@@ -87,6 +88,7 @@ describe("LangWatchQLHydrationReadService", () => {
     ]);
   });
 
+  /** @scenario "A read past the byte budget is refused, not completed" */
   it("refuses by name once the traces read weigh more than the budget", async () => {
     const service = LangWatchQLHydrationReadService.create({ traces: traceSource() });
 
@@ -97,6 +99,49 @@ describe("LangWatchQLHydrationReadService", () => {
         resolved: resolvedTraceCall(["trace-a", "trace-b"]),
       }),
     ).rejects.toMatchObject({ code: "lwql_app_function_read_budget" });
+  });
+
+  /** @scenario "A page of conversations never loses a trace to the read's ceiling" */
+  it("asks each thread read for a ceiling sized by its threads, not the read's default", async () => {
+    const asked: { threadKeys: readonly string[]; maxTraces: number }[] = [];
+    const service = LangWatchQLHydrationReadService.create({
+      traces: traceSource({
+        readThreadTraces: async ({ threadKeys, maxTraces }) => {
+          asked.push({ threadKeys, maxTraces });
+          return [];
+        },
+      }),
+    });
+    const threads = Array.from({ length: 12 }, (_, index) => `thread-${index}`);
+
+    await service.readTraces({
+      ...readInput,
+      resolved: collectLangWatchQLKeys({
+        calls: [{ column: "transcript", function: "conversation", options: [] }],
+        rows: threads.map((thread) => ({ transcript: thread })),
+      }),
+    });
+
+    expect(asked.map((read) => read.maxTraces)).toEqual(
+      asked.map((read) => read.threadKeys.length * LWQL_TRACES_PER_THREAD_CEILING),
+    );
+    expect(asked.flatMap((read) => read.threadKeys)).toEqual(threads);
+  });
+
+  it("reads no thread at all when no row named one", async () => {
+    let reads = 0;
+    const service = LangWatchQLHydrationReadService.create({
+      traces: traceSource({
+        readThreadTraces: async () => {
+          reads += 1;
+          return [];
+        },
+      }),
+    });
+
+    await service.readTraces({ ...readInput, resolved: [] });
+
+    expect(reads).toBe(0);
   });
 
   it("groups a thread read back by the thread each trace belongs to", async () => {
@@ -123,6 +168,7 @@ describe("LangWatchQLHydrationReadService", () => {
     expect([...fetched.byThread.keys()]).toEqual(["thread-a", "thread-b"]);
   });
 
+  /** @scenario "A failed fetch is a platform failure, not a wrong answer" */
   it("turns a read that broke into a platform-fault refusal rather than null columns", async () => {
     const service = LangWatchQLHydrationReadService.create({
       traces: traceSource({
@@ -137,6 +183,7 @@ describe("LangWatchQLHydrationReadService", () => {
     ).rejects.toMatchObject({ code: "lwql_app_function_hydration_failed", fault: "platform" });
   });
 
+  /** @scenario "A cancelled read stops between chunks" */
   it("answers the caller's cancellation with the abort, not with a read failure", async () => {
     const service = LangWatchQLHydrationReadService.create({ traces: traceSource() });
 

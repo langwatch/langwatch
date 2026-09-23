@@ -1,6 +1,6 @@
 import type {
   JoinRequestJoining,
-  JoinRequestJoiningChanged,
+  JoinRequestAdmitted,
   OrganizationInvite,
   OrganizationInviteValidation,
   OrganizationListedInvite,
@@ -192,6 +192,7 @@ export type OrganizationJoinRequestState = Readonly<{
   domain: string;
   createdAtMs: number;
   expiresAtMs: number | null;
+  resolvedAtMs: number | null;
 }>;
 
 /**
@@ -200,6 +201,17 @@ export type OrganizationJoinRequestState = Readonly<{
  */
 export interface OrganizationJoinRequests {
   lookup(input: Readonly<{ userId: string; verifiedEmail: string | null }>): Promise<unknown>;
+  /** The post-login offer: the lookup, minus the domains this person dismissed. */
+  offerForSignedInUser(
+    input: Readonly<{ userId: string; verifiedEmail: string | null }>,
+  ): Promise<unknown>;
+  dismissOffer(input: Readonly<{ userId: string; verifiedEmail: string | null }>): Promise<void>;
+  joinAutomaticallyIfAdmitted(
+    input: Readonly<{ userId: string; verifiedEmail: string | null }>,
+  ): Promise<JoinRequestAdmitted>;
+  automaticJoinsForOrganization(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<readonly OrganizationJoinRequestState[]>;
   pendingForUser(
     input: Readonly<{ userId: string }>,
   ): Promise<readonly OrganizationJoinRequestState[]>;
@@ -222,8 +234,16 @@ export interface OrganizationJoinRequests {
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
       domains: readonly string[];
+      actorUserId: string;
     }>,
-  ): Promise<JoinRequestJoiningChanged>;
+  ): Promise<
+    Readonly<{
+      previous: JoinRequestJoining["domainJoin"];
+      next: JoinRequestJoining["domainJoin"];
+      previousDomains: readonly string[];
+      nextDomains: readonly string[];
+    }>
+  >;
   /** A formal invitation ANSWERS the same person's open request. */
   resolveByInvitation(
     input: Readonly<{ userId: string; organizationId: string; inviteId: string }>,

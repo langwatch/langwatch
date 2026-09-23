@@ -6,6 +6,10 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * surface treats as normal answer null, and everything else refuses by name.
  */
 export class TestProjectApi implements ProjectApi {
+  countUsage(): Promise<{ projects: number; teams: number; updatedProjects: number }> {
+    return Promise.resolve({ projects: 0, teams: 0, updatedProjects: 0 });
+  }
+
   constructor(private readonly overrides: Partial<ProjectApi>) {}
 
   findOrganizationId: ProjectApi["findOrganizationId"] = (projectId) =>

@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   emptyScimSync,
   SCIM_APPLY_FAILED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
   SCIM_TOKEN_ISSUED_EVENT_TYPE,
@@ -32,7 +34,12 @@ const commandIdentity = {
 
 function guardsOver(state: ScimSyncState | null) {
   return ScimSyncGuardsService.create({
-    syncs: { tryFindSync: async () => state, findForOrganization: async () => [] },
+    syncs: {
+      tryFindSync: async () => state,
+      findForOrganization: async () => [],
+      findPageForOperator: async () => ({ syncs: [], total: 0 }),
+      findByConnectionForOperator: async () => [],
+    },
   });
 }
 
@@ -96,6 +103,7 @@ describe("ScimSyncGuardsService", () => {
             errorCode: "offboard_incomplete",
             attempts: 2,
             retiredAtMs: null,
+            redrivenAtMs: null,
             userId: "user_sam",
             occurredAtMs: T0 - 1,
           },
@@ -174,6 +182,7 @@ describe("ScimSyncGuardsService", () => {
             errorCode: "offboard_incomplete",
             attempts: SCIM_APPLY_MAX_ATTEMPTS - 1,
             retiredAtMs: null,
+            redrivenAtMs: null,
             userId: "user_sam",
             occurredAtMs: T0 - 1,
           },
@@ -206,6 +215,7 @@ describe("ScimSyncGuardsService", () => {
             errorCode: "offboard_incomplete",
             attempts: SCIM_APPLY_MAX_ATTEMPTS - 1,
             retiredAtMs: null,
+            redrivenAtMs: null,
             userId: "user_sam",
             occurredAtMs: T0 - 1,
           },
@@ -247,6 +257,53 @@ describe("ScimSyncGuardsService", () => {
         const serialized = JSON.stringify(fact.data);
         expect(serialized).not.toMatch(/token|secret|https?:\/\//i);
       }
+    });
+  });
+
+  describe("when an operator re-drives a retired apply", () => {
+    const retired = {
+      op: "deactivate_user" as const,
+      errorCode: "grant_write_failed",
+      attempts: 5,
+      retiredAtMs: T0,
+      userId: "user_1",
+      occurredAtMs: T0,
+      redrivenAtMs: null,
+    };
+    const operator = { type: "user" as const, id: "user_operator" };
+
+    describe("given the dead letter is still retired", () => {
+      it("states the re-drive stamped with the operator", async () => {
+        const facts = await guardsOver(
+          syncing({ state: "ERROR", lastFailure: retired, deadLetters: [retired] }),
+        ).redriveScimApply({ ...commandIdentity, actor: operator, retiredAtMs: T0 });
+
+        expect(facts.map((fact) => fact.type)).toEqual([SCIM_APPLY_REDRIVEN_EVENT_TYPE]);
+        expect(facts[0]?.data).toMatchObject({ op: "deactivate_user", actor: operator });
+      });
+    });
+
+    describe("given the dead letter was already re-driven", () => {
+      it("states nothing, so a second press applies once", async () => {
+        const driven = { ...retired, redrivenAtMs: T0 + 1 };
+        const facts = await guardsOver(
+          syncing({ state: "ERROR", lastFailure: driven, deadLetters: [driven] }),
+        ).redriveScimApply({ ...commandIdentity, actor: operator, retiredAtMs: T0 });
+
+        expect(facts).toEqual([]);
+      });
+    });
+
+    describe("given no dead letter was retired at that time", () => {
+      it("states nothing", async () => {
+        const facts = await guardsOver(syncing()).redriveScimApply({
+          ...commandIdentity,
+          actor: operator,
+          retiredAtMs: T0,
+        });
+
+        expect(facts).toEqual([]);
+      });
     });
   });
 

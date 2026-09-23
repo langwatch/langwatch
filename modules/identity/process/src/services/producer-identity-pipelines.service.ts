@@ -14,6 +14,7 @@ import type { IdentityUsersRepository } from "../repositories/identity-users.rep
 import type { JoinRequestReadRepository } from "../repositories/join-request.repository.ts";
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
+import type { SsoConnectionRegistrationRepository } from "../repositories/sso-connection-registration.repository.ts";
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
@@ -98,19 +99,9 @@ function producerOnlyReads<TRepository extends object>(input: {
   });
 }
 
-/** The reminder and the lapse notice, refused: this process sends no mail here. */
+/** The expiry and every join-request notice, refused: this process sends no mail here. */
 class ProducerOnlyJoinRequestLifecycle implements JoinRequestLifecycle {
   constructor(private readonly processName: string) {}
-
-  remindAdmins(): Promise<void> {
-    return Promise.reject(
-      producerOnly({
-        processName: this.processName,
-        pipeline: "join-requests",
-        capability: "remind an organization's admins about a waiting request",
-      }),
-    );
-  }
 
   expireRequest(): Promise<void> {
     return Promise.reject(
@@ -118,6 +109,16 @@ class ProducerOnlyJoinRequestLifecycle implements JoinRequestLifecycle {
         processName: this.processName,
         pipeline: "join-requests",
         capability: "expire a join request",
+      }),
+    );
+  }
+
+  prepareNotification(): Promise<void> {
+    return Promise.reject(
+      producerOnly({
+        processName: this.processName,
+        pipeline: "join-requests",
+        capability: "tell people about a join request",
       }),
     );
   }
@@ -244,6 +245,11 @@ export class IdentityProducerPipelinesAdapter {
           processName: this.processName,
           pipeline,
           name: "connections",
+        }),
+        registrationSlots: producerOnlyReads<SsoConnectionRegistrationRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "registration slots",
         }),
         breakGlass: producerOnlyReads<SsoBreakGlassBindingRepository>({
           processName: this.processName,

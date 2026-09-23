@@ -13,6 +13,7 @@ import {
   type LangyStopTurnInput,
   type LangyTurnResultInput,
   type LangyLocalRecord,
+  type LangyUsageCount,
 } from "@langwatch/langy-contract";
 
 import { LangyConversationCommands } from "../app/langy.members.ts";
@@ -105,6 +106,10 @@ export class LangyService {
     const { projectId, allowlist } = langySetEgressInputSchema.parse(input);
 
     return this.credentials.trySetEgressAllowlist({ projectId, allowlist });
+  }
+
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
+    return this.conversations.countUsage(input);
   }
 
   getPage(input: {

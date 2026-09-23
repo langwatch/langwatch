@@ -51,6 +51,7 @@ import type {
   OrganizationInvitations,
   OrganizationInvitesCreated,
   OrganizationInviteWithOrganization,
+  OrganizationJoinRequests,
   OrganizationPlanGate,
   OrganizationPlanUser,
   OrganizationPromptSeed,
@@ -484,6 +485,33 @@ function organizationCeremony(options: { projects: ProjectApi }): OrganizationCe
 }
 
 /**
+ * Identity's join-request ledger, asked per call: a peer is not callable while
+ * the process is still constructing, and this door is built during it.
+ */
+function identityJoinRequests(
+  identity: Pick<IdentityApi, "joinRequests">,
+): OrganizationJoinRequests {
+  const ledger = () => identity.joinRequests();
+  return {
+    lookup: (input) => ledger().lookup(input),
+    offerForSignedInUser: (input) => ledger().offerForSignedInUser(input),
+    dismissOffer: (input) => ledger().dismissOffer(input),
+    joinAutomaticallyIfAdmitted: (input) => ledger().joinAutomaticallyIfAdmitted(input),
+    automaticJoinsForOrganization: (input) => ledger().automaticJoinsForOrganization(input),
+    pendingForUser: (input) => ledger().pendingForUser(input),
+    pendingForOrganization: (input) => ledger().pendingForOrganization(input),
+    request: (input) => ledger().request(input),
+    withdraw: (input) => ledger().withdraw(input),
+    approve: (input) => ledger().approve(input),
+    reject: (input) => ledger().reject(input),
+    readJoining: (input) => ledger().readJoining(input),
+    setJoining: (input) => ledger().setJoining(input),
+    resolveByInvitation: (input) => ledger().resolveByInvitation(input),
+    withdrawOnInvitationAccepted: (input) => ledger().withdrawOnInvitationAccepted(input),
+  };
+}
+
+/**
  * One person's verified address, and the display names a pending list renders.
  * The address comes from the SAME identity application `user.*` answers from;
  * the fallback is the legacy verified column, as the deleted composition read it.
@@ -560,7 +588,7 @@ export function buildOrganizationInfrastructure(input: {
   demoProject: Readonly<{ userId: string; projectId: string }>;
   dependencies: {
     projects: ProjectApi;
-    identity: Pick<IdentityApi, "verifiedEmailsOf">;
+    identity: Pick<IdentityApi, "verifiedEmailsOf" | "joinRequests">;
     entitlement: Pick<EntitlementApi, "getActivePlan" | "requestBound">;
     permissions: AuthzApi;
     roles: InviteAssignableRoles;
@@ -599,9 +627,8 @@ export function buildOrganizationInfrastructure(input: {
       rateLimit: RedisOrganizationInviteRateLimit.create(input.redis),
       plans: dependencies.entitlement,
     }),
-    // No join-request ledger is composed on this process, so the join door refuses by name;
-    // the invitation door's own join-request touches are silent no-ops when this is null.
-    joinRequests: null,
+    // Identity owns the join-request ledger; this feature serves its door.
+    joinRequests: identityJoinRequests(dependencies.identity),
     plans: organizationPlanGate({ plans: dependencies.entitlement }),
     signals: organizationSignals(logger),
     ceremony: organizationCeremony({ projects: dependencies.projects }),

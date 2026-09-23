@@ -3,7 +3,7 @@ import {
   EmailProviderConfigurationError,
   resolveDefaultFrom,
   type EmailProviderName,
-  type MailerConfiguration,
+  type MailGatewaySettings,
 } from "../channels/email-delivery.channel.ts";
 
 /** What an operator must set to finish configuring a half-configured gateway. */
@@ -19,7 +19,7 @@ const MISSING_SETTING_HINT: Record<EmailProviderName, string> = {
  * before MailerConfiguration.
  */
 export class EmailProviderService {
-  static create(configuration: MailerConfiguration): EmailProviderService {
+  static create(configuration: MailGatewaySettings): EmailProviderService {
     return new EmailProviderService(configuration);
   }
 
@@ -32,7 +32,7 @@ export class EmailProviderService {
     return resolveDefaultFrom(input);
   }
 
-  private constructor(private readonly configuration: MailerConfiguration) {}
+  private constructor(private readonly configuration: MailGatewaySettings) {}
 
   /** Whether each gateway has the settings it needs to attempt a send. */
   private configured(): Record<EmailProviderName, boolean> {

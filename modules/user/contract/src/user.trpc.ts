@@ -12,7 +12,7 @@ import {
   userApiIsAdminSchema,
   userApiLinkedAccountsSchema,
   userApiOkSchema,
-  userApiPasskeyNudgeSchema,
+  userApiUpdatedNameSchema,
   userApiPersonalBudgetSchema,
   userApiBrowserSessionEndedSchema,
   userApiBrowserSessionSchema,
@@ -31,12 +31,14 @@ import {
   userApiSetLastHomePathInputSchema,
   userApiSetPasswordInputSchema,
   userApiUnlinkAccountInputSchema,
+  userApiUpdateNameInputSchema,
   userApiUserInputSchema,
 } from "./user.schemas.ts";
 import {
   createdUserSchema,
   identityVerificationCompletedSchema,
   userAccountInfoSchema,
+  userSecureAccountOfferSchema,
   userAvatarResultSchema,
   userSsoStatusSchema,
   userTestArrivalSchema,
@@ -83,13 +85,17 @@ export const userTrpc = defineTrpcContract("user")
   .withInput(userApiUnlinkAccountInputSchema)
   .withOutput(userApiSuccessSchema)
 
-  .query("passkeyNudge")
+  .query("secureAccountNudge")
   .withInput(userApiEmptyInputSchema)
-  .withOutput(userApiPasskeyNudgeSchema)
+  .withOutput(userSecureAccountOfferSchema)
 
-  .mutation("dismissPasskeyNudge")
+  .mutation("dismissSecureAccountNudge")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiSuccessSchema)
+
+  .mutation("updateName")
+  .withInput(userApiUpdateNameInputSchema)
+  .withOutput(userApiUpdatedNameSchema)
 
   // Reading the browsers somebody is signed in on, and ending one of them.
   // Both answer about the CALLER's own account: the session id never names

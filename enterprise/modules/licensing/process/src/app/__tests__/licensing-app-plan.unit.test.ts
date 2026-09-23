@@ -1,9 +1,14 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
-import { ENTERPRISE_LICENSE_KEY, TAMPERED_LICENSE_KEY, TEST_PUBLIC_KEY } from "../../testing.ts";
+import {
+  ENTERPRISE_LICENSE_KEY,
+  TAMPERED_LICENSE_KEY,
+  TEST_LICENSING_CONFIG,
+} from "../../testing.ts";
 import { LicensingApp, type LicensingInfrastructure } from "../licensing.app.ts";
 import type { LicenseStorage } from "../licensing.members.ts";
 
@@ -17,13 +22,14 @@ describe("the installed licensing application's plan operation", () => {
       async (organizationId: string) => keys.get(organizationId) ?? null,
     );
     const repository = createApiFixture<LicenseStorage>({ tryReadLicense });
-    const app = LicensingApp.create({
-      dependencies: {},
+    const app = await LicensingApp.create({
+      dependencies: { gateway: createApiFixture<GatewayApi>() },
       members: {
         infrastructure: createApiFixture<LicensingInfrastructure>({ repository }),
         isSaas: true,
+        serviceVersion: "test",
       },
-      config: { publicKey: TEST_PUBLIC_KEY },
+      config: TEST_LICENSING_CONFIG,
       resources: new ResourceScope(),
       secrets: new ScopedSecrets(async (_handle, build) => build(void 0)),
     });

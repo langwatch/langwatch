@@ -33,6 +33,7 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     recordRequest: vi.fn(async () => undefined),
     findRequestLog: vi.fn(async () => []),
     findDirectoryOwnership: vi.fn(async () => []),
+    findDirectoryIdentities: vi.fn(async () => []),
     findExpiredRequestIds: vi.fn(async () => []),
     deleteRequests: vi.fn(async () => 0),
     findUserResource: vi.fn(async () => null),

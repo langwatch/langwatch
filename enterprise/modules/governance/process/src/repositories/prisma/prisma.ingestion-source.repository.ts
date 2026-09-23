@@ -142,15 +142,25 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     update: UpdateIngestionSourceRecord;
   }): Promise<GovernanceIngestionSource | null> {
     return this.database.$transaction(async (database) => {
-      const cursor =
+      // As SQL so a pin parked on the row lock re-checks the committed cursor;
+      // a JSON null and SQL NULL both mean "never pulled".
+      const matched =
         input.cursor === null
-          ? { equals: Prisma.AnyNull }
-          : { equals: input.cursor as Prisma.InputJsonValue };
-      const matched = await database.ingestionSource.updateMany({
-        where: { id: input.id, pollerCursor: cursor },
-        data: { updatedAt: new Date() },
-      });
-      if (matched.count === 0) return null;
+          ? await database.$executeRaw`
+              -- @tenancy: an ingestion source is addressed by its own primary key.
+              UPDATE "IngestionSource"
+                 SET "updatedAt" = now()
+               WHERE "id" = ${input.id}
+                 AND ("pollerCursor" IS NULL OR "pollerCursor" = 'null'::jsonb)
+            `
+          : await database.$executeRaw`
+              -- @tenancy: an ingestion source is addressed by its own primary key.
+              UPDATE "IngestionSource"
+                 SET "updatedAt" = now()
+               WHERE "id" = ${input.id}
+                 AND "pollerCursor" = ${JSON.stringify(input.cursor)}::jsonb
+            `;
+      if (matched === 0) return null;
 
       const data = updateDataOf(input.update);
       const row = await database.ingestionSource.update({

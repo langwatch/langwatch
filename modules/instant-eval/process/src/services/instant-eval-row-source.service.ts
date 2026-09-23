@@ -225,7 +225,7 @@ export class InstantEvalRowSourceService {
       sql,
       ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
     });
-    const isTruncated = execution.truncated || execution.rows.length > maxRows;
+    const isTruncated = execution.rows.length > maxRows;
     if (isTruncated && pass !== undefined) throw new InstantEvalResultTruncatedError(pass);
 
     return execution;

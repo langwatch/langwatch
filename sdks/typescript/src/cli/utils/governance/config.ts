@@ -208,7 +208,37 @@ function isWellFormedCliKeyScope(scope: GovernanceConfig["cli_api_key_scope"]): 
 export function configPath(): string {
   const env = process.env.LANGWATCH_CLI_CONFIG;
   if (env) return env;
+  return defaultConfigPath();
+}
+
+/** Where the config lives when nothing relocates it. */
+export function defaultConfigPath(): string {
   return path.join(os.homedir(), ".langwatch", "config.json");
+}
+
+/** The config path as shown to a person: the home is written `~`. */
+export function displayConfigPath(): string {
+  const file = configPath();
+  const home = os.homedir();
+  return file.startsWith(`${home}${path.sep}`)
+    ? `~${file.slice(home.length)}`
+    : file;
+}
+
+/**
+ * True when this process runs on a config of its own: LANGWATCH_CLI_CONFIG
+ * names a file other than the home's default one.
+ *
+ * The tool wiring under the home (`~/.claude/settings.json`, the `[otel]`
+ * block of `~/.codex/config.toml`, the shell rc functions) belongs to the
+ * login in the home's default config. A login kept in another file, which is
+ * what a test, a dogfood run or a second account does, is not the machine's
+ * login, so it never rewrites that wiring.
+ */
+export function isIsolatedConfig(): boolean {
+  const env = process.env.LANGWATCH_CLI_CONFIG?.trim();
+  if (!env) return false;
+  return path.resolve(env) !== path.resolve(defaultConfigPath());
 }
 
 /**

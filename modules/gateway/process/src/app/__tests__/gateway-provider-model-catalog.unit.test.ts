@@ -10,9 +10,19 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+
 import { GatewayConfigAssemblyAdapter } from "../gateway-config-assembly.composition.ts";
 
-const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
+const noPlatformProviders = createApiFixture<ModelProviderApi>({
+  platformProviderChain: () => Promise.resolve([]),
+});
+
+const assembly = GatewayConfigAssemblyAdapter.create({
+  prisma: {} as never,
+  platformProviders: noPlatformProviders,
+});
 
 describe("tryDeclaredModelsForProvider", () => {
   describe("when a custom provider declares models", () => {

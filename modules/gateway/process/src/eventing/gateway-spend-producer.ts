@@ -50,6 +50,10 @@ class ProducerOnlyGatewaySpendEvents extends GatewaySpendEvents {
   readEndUserSpend(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, "read one end user's spend"));
   }
+
+  countUsage(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "count the spend ledger"));
+  }
 }
 
 /** The gateway-spend pipeline for a process that only sends commands. */

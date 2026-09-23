@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
 /**
@@ -7,6 +8,7 @@ import { AuthUnavailableError } from "@langwatch/auth-contract";
  *
  * @see specs/auth/auth-rest-family-mounted.feature
  */
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -41,6 +43,7 @@ async function appFor(named = false): Promise<AuthApp> {
       passkeyHandleSecret: BROWSER_SESSION.passkeyHandleSecret,
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
+      localPasswords: false,
     },
     repositories: MemoryAuthRepositories.create(),
     dependencies: {
@@ -49,6 +52,8 @@ async function appFor(named = false): Promise<AuthApp> {
       featureFlags: {} as never,
       identity: createApiFixture<IdentityApi>(),
       organizations: createApiFixture<OrganizationApi>(),
+      entitlements: createApiFixture<EntitlementApi>(),
+      auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
     },
     members: {
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },

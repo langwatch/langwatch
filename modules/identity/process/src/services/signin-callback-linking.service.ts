@@ -5,6 +5,7 @@ import {
   normalizeIdentifierValue,
   IdentityJitDisabledError,
   IdentityLinkProposedError,
+  type SsoArrivalPolicy,
 } from "@langwatch/identity-contract";
 
 import type { IdentityCeremonyClock } from "../rules/ceremony-types.rules.ts";
@@ -28,6 +29,11 @@ export interface CallbackAssertion {
   emailVerified: boolean;
   /** Whether this connection may provision someone it has never seen. */
   allowsJit: boolean;
+  /** What this connection does with somebody it has never seen: admit them,
+   *  make them wait, or turn them away (ADR-117 §3). Bounded by routing, not
+   *  by this field: an address only reaches a connection that PROVED its
+   *  domain. */
+  arrivalPolicy: SsoArrivalPolicy;
 }
 
 /** A user the asserted address matched, and the evidence they carry. */
@@ -68,12 +74,15 @@ export interface SignInCallbackDirectory {
     normalizedEmail: string;
   }): Promise<void>;
 
-  /** Just-in-time provisioning, where the connection allows it. */
+  /** Just-in-time provisioning, where the connection allows it. `membership`
+   *  says what the account arrives as: a member, or an account with a request
+   *  to join standing. The account is identical either way. */
   provisionUser(input: {
     connectionId: string | null;
     provider: IdentifierProvider;
     subject: string;
     normalizedEmail: string;
+    membership: "join" | "request";
   }): Promise<{ userId: string }>;
 }
 
@@ -96,7 +105,8 @@ export interface CallbackAuditRecord {
 export type CallbackLinkOutcome =
   | { kind: "signed_in"; userId: string; linked: false }
   | { kind: "linked"; userId: string; linked: true }
-  | { kind: "provisioned"; userId: string; linked: true };
+  | { kind: "provisioned"; userId: string; linked: true }
+  | { kind: "awaiting_approval"; userId: string; linked: true };
 
 export interface SignInCallbackLinkingDeps {
   directory: SignInCallbackDirectory;
@@ -287,17 +297,25 @@ export class SignInCallbackLinkingService {
     assertion: CallbackAssertion,
     normalizedEmail: string | null,
   ): Promise<CallbackLinkOutcome> {
-    if (!assertion.allowsJit || !normalizedEmail) {
+    const admits = assertion.allowsJit && assertion.arrivalPolicy !== "refuse";
+    // An assertion carrying no address is refused whatever the policy says:
+    // every downstream question — which domain admitted them, who to tell,
+    // what an administrator deciding is shown — is asked of the address.
+    if (!admits || !normalizedEmail) {
       throw new IdentityJitDisabledError();
     }
 
+    const joins = assertion.arrivalPolicy === "admit";
     const { userId } = await this.directory.provisionUser({
       connectionId: assertion.connectionId,
       provider: assertion.provider,
       subject: assertion.subject,
       normalizedEmail,
+      membership: joins ? "join" : "request",
     });
 
-    return { kind: "provisioned", userId, linked: true };
+    return joins
+      ? { kind: "provisioned", userId, linked: true }
+      : { kind: "awaiting_approval", userId, linked: true };
   }
 }

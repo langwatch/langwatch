@@ -21,13 +21,17 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   title: string;
   subTitle?: string;
   compressedHeader?: boolean;
-  widthVariant?: "narrow" | "full";
+  /** `guided` is the guided variant's card width, wide enough for any company name. */
+  widthVariant?: "narrow" | "guided" | "full";
   showBackButton?: boolean;
   onBack?: () => void;
   skipHref?: string;
   /** Render the logo inside the card, above the title, instead of floating above it. */
   isLogoInside?: boolean;
 }
+
+/** The card width each narrow variant holds from `md` up. */
+const CARD_WIDTHS = { narrow: "540px", guided: "560px", full: "540px" } as const;
 
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   children,
@@ -212,7 +216,11 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         mx="auto"
         pt={isLogoInside ? (compressedHeader ? "8vh" : "14vh") : undefined}
         pb={16}
-        maxW={isFullWidth ? { base: "100%", "2xl": "1440px" } : { base: "100%", md: "540px" }}
+        maxW={
+          isFullWidth
+            ? { base: "100%", "2xl": "1440px" }
+            : { base: "100%", md: CARD_WIDTHS[widthVariant] }
+        }
         px={isFullWidth ? { base: 5, md: 10 } : { base: 4, md: 0 }}
         {...(isFullWidth ? { fluid: true } : {})}
       >

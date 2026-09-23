@@ -21,6 +21,7 @@ import {
   type TraceSharingConfig,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
+  type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -334,6 +335,13 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
 
   listNamesByIds(input: import("@langwatch/project-contract").ProjectNamesByIdsInput) {
     return this.#projectService.listNamesByIds(input);
+  }
+
+  countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount> {
+    return this.#projectService.countUsage(input);
   }
 
   listIdsByOrganization(

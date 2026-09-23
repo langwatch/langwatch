@@ -6,6 +6,7 @@ import type { BillingAccountFactsRepository } from "./billing-account-facts.repo
 import type { BillingCheckpointRepository } from "./billing-checkpoint.repository.ts";
 import type { BillingWebhookOrganization } from "./billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscription } from "./billing-webhook-subscription.repository.ts";
+import type { ConnectedBillingRepository } from "./connected-billing.repository.ts";
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
 import type { NurturingProfileRepository } from "./nurturing-profile.repository.ts";
 import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
@@ -19,6 +20,7 @@ import type { TenantOrganizationRepository } from "./tenant-organization.reposit
  */
 export interface BillingRepositories {
   readonly checkpoints: BillingCheckpointRepository;
+  readonly connectedBilling: ConnectedBillingRepository;
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
   readonly nurturingProfiles: NurturingProfileRepository;
   readonly organizations: BillingAccountFactsRepository;

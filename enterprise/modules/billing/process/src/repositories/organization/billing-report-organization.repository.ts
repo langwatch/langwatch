@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { UsageBillingContract } from "@langwatch/enterprise-billing-contract";
+
 /**
  * The organization as the monthly roll-up needs to see it: whether it is
- * billed per event at all, whether it has a Stripe customer, and whether a
- * live seat-event subscription stands behind it.
+ * billed for usage at all, whether it has a Stripe customer, whether a live
+ * subscription stands behind it, and which contract invoices it.
  */
 export type BillingReportOrganization = {
   id: string;
   stripeCustomerId: string | null;
   subscriptions: { id: string }[];
+  /** Which of the two contracts invoices this organization's hosted usage. */
+  contract: UsageBillingContract;
 };
 
 /**

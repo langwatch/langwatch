@@ -17,6 +17,14 @@ import type {
 
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 
+/** A CONNECT key with the license facts licensing wrote onto it. */
+export type GatewayLicensedKey = Readonly<{
+  key: GatewayVirtualKeyRecord;
+  instanceId: string | null;
+  expiresAt: Instant | null;
+  services: string[];
+}>;
+
 export type CreateGatewayVirtualKeyInput = {
   id: string;
   organizationId: string;
@@ -34,7 +42,7 @@ export type CreateGatewayVirtualKeyInput = {
   expiresAt?: Instant | null;
   routingPolicyId?: string | null;
   routingMode?: "FALLBACK_ALL" | "NONE" | "POLICY";
-  purpose?: "LANGY" | "USER";
+  purpose?: "LANGY" | "USER" | "CONNECT";
 };
 
 /**
@@ -144,6 +152,30 @@ export abstract class GatewayVirtualKeyRepository {
     input: SetGatewayVirtualKeyDisabledInput,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord>;
+  /**
+   * Replaces the platform services a CONNECT key may serve and bumps its
+   * revision. False when no such CONNECT key exists in the organization.
+   */
+  abstract setConnectServices(
+    input: { id: string; organizationId: string; services: readonly string[] },
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<boolean>;
+  /**
+   * Records the license a CONNECT key serves and bumps its revision. False when
+   * no such CONNECT key exists in the organization.
+   */
+  abstract setLicenseFacts(
+    input: {
+      id: string;
+      organizationId: string;
+      tokenHash: string;
+      instanceId: string | null;
+      expiresAt: Instant | null;
+    },
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<boolean>;
+  /** The CONNECT key a license token resolves to, by the token's registry hash. */
+  abstract findByLicenseTokenHash(tokenHash: string): Promise<GatewayLicensedKey | null>;
   abstract recordUsage(
     id: string,
     at: Instant,

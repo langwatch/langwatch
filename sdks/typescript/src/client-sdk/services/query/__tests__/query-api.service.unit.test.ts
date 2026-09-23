@@ -58,7 +58,6 @@ describe("given a QueryApiService", () => {
           bytesRead: 128,
           rowsReturned: 1,
         },
-        truncated: false,
         followsTimeWindow: true,
         followsGranularity: false,
         diagnostics: [],
@@ -101,7 +100,7 @@ describe("given a QueryApiService", () => {
     it("GETs the schema door and returns the catalog itself", async () => {
       const schemaResult = {
         database: "analytics",
-        datasets: [
+        views: [
           {
             name: "traces",
             description: "Trace-level records.",

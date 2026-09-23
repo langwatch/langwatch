@@ -47,6 +47,10 @@ class BreakGlassAnswering extends SsoBreakGlassBindingRepository {
   constructor(readonly hasLiveBinding: SsoBreakGlassBindingRepository["hasLiveBinding"]) {
     super();
   }
+
+  reserveActivationRecovery(): never {
+    throw new Error("the gate never reserves a way back in");
+  }
 }
 
 const CONNECTION_ID = "local_ssoc_0005NmMMMX8uk3JfupN0JsNdW368m";

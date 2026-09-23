@@ -87,3 +87,30 @@ describe("given the browser transport a feature package's hooks run on", () => {
     });
   });
 });
+
+describe("when a feature sends an answer on its way out of the document", () => {
+  it("keeps the request alive past navigation and never batches it", async () => {
+    const inits: RequestInit[] = [];
+    const urls: string[] = [];
+    const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      urls.push(input instanceof Request ? input.url : input.toString());
+      inits.push(init ?? {});
+      return new Response(
+        JSON.stringify(urls.length === 1 ? resultOf("kept") : [resultOf("other")]),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    }) as typeof globalThis.fetch;
+    const client = createUiFeatureApiClient({ fetch });
+    const outputs = await Promise.all([
+      client.mutation("onboarding.dismiss", { id: "n" }, { context: { keepalive: true } }),
+      client.query("prompts.getAll", { projectId: "p" }),
+    ]);
+    expect(outputs).toEqual(["kept", "other"]);
+    expect(inits[0]?.keepalive).toBe(true);
+    expect(urls[0]).not.toContain("batch=1");
+    expect(inits[1]?.keepalive).toBeUndefined();
+  });
+});

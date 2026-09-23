@@ -16,6 +16,8 @@ export const opsConfig = Config.define((c) => ({
   usageStats: {
     disabled: c.env("DISABLE_USAGE_STATS", environmentOneOrTrueSchema),
     installMethod: c.env("INSTALL_METHOD", z.string().optional()),
+    /** The Helm chart release, which moves separately from the app. */
+    chartVersion: c.env("LANGWATCH_CHART_VERSION", z.string().optional()),
   },
   collectClickHouseBackupMetrics: c.env(
     "CLICKHOUSE_BACKUP_METRICS_ENABLED",
@@ -31,6 +33,9 @@ export const opsConfig = Config.define((c) => ({
 }));
 
 export type OpsServerConfig = ConfigOf<typeof opsConfig>;
+
+/** Where server-side product analytics goes: the public PostHog project key, and its host. */
+export type ProductAnalyticsTarget = Readonly<{ key: string; host?: string }>;
 
 /** What a browser is told about product analytics and browser tracing. */
 export const opsWebConfigSchema = z.strictObject({

@@ -94,4 +94,35 @@ describe("changing an existing password", () => {
       ).rejects.toBeInstanceOf(ImpersonationCannotChangeCredentialsError);
     });
   });
+
+  describe("given a deployment that brokers through Auth0 and issues its own passwords", () => {
+    /** @scenario "A change targets the password the person actually signs in with" */
+    it("changes this deployment's own stored password for somebody holding one", async () => {
+      const auth = createUserTestAuth("auth0", { issuesOwnPasswords: true });
+      const app = createUserTestApp({ dependencies: { auth } });
+      const created = await app.createCredentialUser({
+        name: "Sam",
+        email: SELF.email,
+        passwordHash: "hashed:first",
+      });
+
+      await app.changeOwnPassword({
+        userId: created.id,
+        caller: owner(created.id),
+        currentPassword: "first",
+        newPassword: "a-good-password",
+        keepSessionId: "sess-1",
+      });
+
+      await expect(
+        app.changeOwnPassword({
+          userId: created.id,
+          caller: owner(created.id),
+          currentPassword: "a-good-password",
+          newPassword: "another-good-password",
+          keepSessionId: "sess-1",
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
 });

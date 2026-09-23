@@ -181,6 +181,95 @@ describe("the identifier-first sign-in router", () => {
       expect(decision.methodSet).toEqual([{ id: "passkey", kind: "passkey", connectionId: null }]);
     });
 
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("redirects an account whose one way in is a federated provider", () => {
+      const auth0: SignInMethod = {
+        id: "auth0",
+        kind: "federated",
+        connectionId: null,
+      };
+      const decision = route({
+        raw: "sam@home.net",
+        account: {
+          hasPassword: false,
+          hasPasskey: false,
+          providerIds: ["auth0"],
+          connectionIds: [],
+        },
+        methodPolicy: policy({ defaultMethods: [auth0, PASSWORD] }),
+      });
+
+      // No connectionId: the legacy env provider is instance-level, and a
+      // key holding `undefined` would still be a key the recorder reads.
+      expect(decision).toEqual({
+        outcome: "redirect_to_connection",
+        methodSet: [auth0],
+        reasonCode: "account_methods",
+      });
+    });
+
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("keeps the picker when the sole method belongs to a connection", () => {
+      // A connection carries a lifecycle this branch cannot see — SUSPENDED,
+      // unconfigured — and every other redirect to one passes those gates.
+      // Until the account branch can ask for the connection's state, a
+      // connection-scoped sole method draws the picker it always did.
+      const decision = route({
+        raw: "sam@home.net",
+        account: {
+          hasPassword: false,
+          hasPasskey: false,
+          providerIds: [],
+          connectionIds: ["conn_acme"],
+        },
+        methodPolicy: policy({ defaultMethods: [okta] }),
+      });
+
+      expect(decision).toEqual({
+        outcome: "method_picker",
+        methodSet: [okta],
+        reasonCode: "account_methods",
+      });
+    });
+
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("keeps the picker when a second method stands beside the federated one", () => {
+      const auth0: SignInMethod = {
+        id: "auth0",
+        kind: "federated",
+        connectionId: null,
+      };
+      const passkey: SignInMethod = {
+        id: "passkey",
+        kind: "passkey",
+        connectionId: null,
+      };
+      const decision = route({
+        raw: "sam@home.net",
+        account: {
+          hasPassword: false,
+          hasPasskey: true,
+          providerIds: ["auth0"],
+          connectionIds: [],
+        },
+        methodPolicy: policy({ defaultMethods: [auth0, passkey] }),
+      });
+
+      expect(decision.outcome).toBe("method_picker");
+      expect(decision.methodSet).toEqual([passkey, auth0]);
+    });
+
+    /** @scenario "An account whose only method is federated redirects straight to it" */
+    it("never redirects an account holding only a password", () => {
+      const decision = route({ raw: "sam@home.net", account: PASSWORD_ACCOUNT });
+
+      expect(decision).toEqual({
+        outcome: "method_picker",
+        methodSet: [PASSWORD],
+        reasonCode: "account_methods",
+      });
+    });
+
     /** @scenario "An account whose every method was turned off still gets a way in" */
     it("falls back to the uniform picker when policy offers none of the account's methods", () => {
       const decision = route({
@@ -302,8 +391,8 @@ describe("the identifier-first sign-in router", () => {
   });
 
   describe("given a self-hosted installation with exactly one ACTIVE connection", () => {
-    /** @scenario "A sole ACTIVE connection auto-redirects before any email is asked" */
-    it("redirects immediately, with no address asked for", () => {
+    /** @scenario "A sole ACTIVE connection is selected before any email is asked" */
+    it("selects the provider with no address asked for", () => {
       const decision = route({ activeConnections: [connection()] });
 
       expect(decision).toEqual({
@@ -383,6 +472,7 @@ describe("the identifier-first sign-in router", () => {
         expect(decision.methodSet.some((method) => method.kind === "federated")).toBe(false);
       }
       expect(withEmail.reasonCode).toBe("method_not_licensed");
+      expect(withEmail.domainManaged).toBe(true);
     });
   });
 
@@ -395,6 +485,7 @@ describe("the identifier-first sign-in router", () => {
 
       expect(decision.methodSet).toEqual([PASSWORD]);
       expect(decision.reasonCode).toBe("method_not_configured");
+      expect(decision.domainManaged).toBe(true);
     });
   });
 

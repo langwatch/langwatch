@@ -356,7 +356,7 @@ describe("the LangWatchQL result pane", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Result modes, statistics, diagnostics and truncation
+  // Result modes, statistics and diagnostics
   // -------------------------------------------------------------------------
 
   describe("given the member's first query succeeds", () => {
@@ -432,7 +432,7 @@ describe("the LangWatchQL result pane", () => {
     });
 
     describe("when the result pane renders", () => {
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
+      /** @scenario "Duplicate columns, statistics, and diagnostics are honest" */
       it("shows rows returned, elapsed time, rows read, and bytes read", () => {
         renderPane(
           stateWith({
@@ -507,22 +507,6 @@ describe("the LangWatchQL result pane", () => {
         expect(chip()).toBe("Current");
         unmountCurrent();
 
-        const { unmount: unmountPartial } = render(
-          <ChakraProvider value={defaultSystem}>
-            <LangWatchQLResultPane
-              state={stateWith({
-                answer: {
-                  kind: "result",
-                  result: lwqlResult({ truncated: true }),
-                },
-              })}
-              onRun={vi.fn()}
-            />
-          </ChakraProvider>,
-        );
-        expect(chip()).toBe("Partial");
-        unmountPartial();
-
         const { unmount: unmountStale } = render(
           <ChakraProvider value={defaultSystem}>
             <LangWatchQLResultPane
@@ -574,56 +558,6 @@ describe("the LangWatchQL result pane", () => {
     });
   });
 
-  describe("given a wide result the byte ceiling truncated well below the row ceiling", () => {
-    /** Far under the 10,000-row ceiling: the bytes ran out first. */
-    const truncatedResult = () =>
-      lwqlResult({
-        truncated: true,
-        statistics: {
-          elapsedMs: 320,
-          rowsRead: 900_000,
-          bytesRead: 8_000_000,
-          rowsReturned: 412,
-        },
-        diagnostics: [
-          {
-            code: "RESULT_TRUNCATED",
-            message:
-              "The result was cut off at this API's response ceiling. Aggregate further, or narrow the query, to see the whole answer.",
-          },
-        ],
-      });
-
-    describe("when the truncated state renders", () => {
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
-      it("cites the rows that actually arrived", () => {
-        renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
-
-        expect(screen.getByTestId("lwql-truncation-banner")).toHaveTextContent(
-          "Showing the first 412 rows",
-        );
-      });
-
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
-      it("never claims a row limit that was not the cause", () => {
-        renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
-
-        // The byte ceiling bit at 412 rows. Naming the row ceiling would send
-        // the member looking for ten thousand rows that were never coming.
-        const pane = screen.getByTestId("lwql-result-pane");
-        expect(pane.textContent).not.toContain("10,000");
-        expect(pane.textContent).not.toContain("10000");
-      });
-
-      /** @scenario "A result opens in a native table with deliberate states" */
-      it("marks the result as partial rather than showing it as whole", () => {
-        renderPane(stateWith({ answer: { kind: "result", result: truncatedResult() } }));
-
-        expect(screen.getByTestId("lwql-truncation-banner")).toHaveTextContent("Partial result");
-      });
-    });
-  });
-
   describe("given a query is in flight", () => {
     describe("when the pane renders", () => {
       /** @scenario "A result opens in a native table with deliberate states" */
@@ -667,7 +601,7 @@ describe("the LangWatchQL result pane", () => {
 
   describe("given a response carrying diagnostics", () => {
     const everyDiagnostic: LangWatchQLDiagnostic[] = [
-      { code: "RESULT_TRUNCATED", message: "The result was cut off." },
+      { code: "MULTI_PROJECT_RESULT", message: "This result draws rows from 2 projects." },
       { code: "POSSIBLE_FANOUT", message: "The join repeats each row." },
       { code: "UNBOUNDED_TIME_RANGE", message: "No condition on occurred_on." },
       { code: "MISSING_TIME_BUCKETS", message: "Two buckets have no rows." },
@@ -678,10 +612,10 @@ describe("the LangWatchQL result pane", () => {
     ];
 
     const withDiagnostics = (): LangWatchQLQueryResult =>
-      lwqlResult({ truncated: true, diagnostics: everyDiagnostic });
+      lwqlResult({ diagnostics: everyDiagnostic });
 
     describe("when the member views the result as a table and as a chart", () => {
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
+      /** @scenario "Duplicate columns, statistics, and diagnostics are honest" */
       it("displays every diagnostic unchanged in both modes", async () => {
         renderPane(
           stateWith({ answer: { kind: "result", result: withDiagnostics() } }),
@@ -705,32 +639,6 @@ describe("the LangWatchQL result pane", () => {
           expect(screen.getByText(message)).toBeInTheDocument();
         }
         expect(messagesOnScreen()).toHaveLength(everyDiagnostic.length);
-      });
-
-      /** @scenario "Duplicate columns, truncation, statistics, and diagnostics are honest" */
-      it("keeps the truncation diagnostic more prominent than the rest in both modes", async () => {
-        renderPane(
-          stateWith({ answer: { kind: "result", result: withDiagnostics() } }),
-          <div data-testid="chart-slot">chart</div>,
-        );
-
-        const severities = () =>
-          Object.fromEntries(
-            screen
-              .getAllByTestId("lwql-diagnostic")
-              .map((alert) => [
-                alert.getAttribute("data-diagnostic-code"),
-                alert.getAttribute("data-severity"),
-              ]),
-          );
-
-        const inTableMode = severities();
-        expect(inTableMode.RESULT_TRUNCATED).toBe("warning");
-        expect(inTableMode.POSSIBLE_FANOUT).toBe("info");
-        expect(inTableMode.UNBOUNDED_TIME_RANGE).toBe("info");
-
-        await selectResultMode("Chart");
-        expect(severities()).toEqual(inTableMode);
       });
     });
   });

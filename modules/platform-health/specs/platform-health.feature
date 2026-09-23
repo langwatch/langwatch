@@ -86,6 +86,12 @@ Feature: One platform health answer for an external monitor
     And the overall status is degraded rather than unhealthy
 
   @unit
+  Scenario: A probe credential scoped to one project stays scoped downstream
+    Given the probe credential resolves to exactly one project
+    When a subsystem probe posts its canary back through the public boundary
+    Then the canary names that project alongside the token
+
+  @unit
   Scenario: A blank key is refused rather than read as unconfigured
     Given a deployment that exported the platform health key with no value
     When its configuration is validated

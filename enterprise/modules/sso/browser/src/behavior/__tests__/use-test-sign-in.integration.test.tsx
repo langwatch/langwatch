@@ -97,14 +97,20 @@ describe("when the provider sends the browser back", () => {
     expect(result.current.failure?.detail).toBe("access_denied: AADSTS50105");
   });
 
-  it("spells a code the engine emits under two names the one way", () => {
-    const host = new FakeSsoHost({ query: { error: "account_not_linked", ssoTest: "conn-1" } });
-    const { result } = renderTestSignIn(host);
+  /** @scenario "A SAML account-link refusal is explained as a local sign-in failure" */
+  it.each(["account_not_linked", "OAuthAccountNotLinked"])(
+    "explains %s as ours, without quoting it or blaming the provider",
+    (error) => {
+      const host = new FakeSsoHost({ query: { error, ssoTest: "conn-1" } });
+      const { result } = renderTestSignIn(host);
 
-    expect(result.current.failure?.title).toBe(
-      "LangWatch couldn't link that sign-in to your account",
-    );
-  });
+      expect(result.current.failure?.title).toBe(
+        "LangWatch couldn't link that sign-in to your account",
+      );
+      expect(result.current.failure?.advice).toMatch(/address verified on your LangWatch account/);
+      expect(result.current.failure?.detail).toBeNull();
+    },
+  );
 
   it("leaves an error belonging to another flow alone", () => {
     const someoneElses = new FakeSsoHost({ query: { error: "access_denied", ssoTest: "conn-9" } });

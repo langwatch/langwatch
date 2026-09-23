@@ -7,13 +7,17 @@ import {
   type GatewayInternalSpendCommandName,
   type GatewayInternalSpendCommandRecord,
   type GatewayInternalProtocol,
+  isLicenseTokenShape,
+  registryHashForToken,
+  type GatewayLicenseTokenRefusal,
+  type GatewayLicenseTokenResolution,
   type GatewayPricedSpend,
   type GatewayPricedSpendResult,
   type SpendUsage,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type {
   GatewayBudgetSpend,
@@ -100,6 +104,41 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
 
   findVirtualKeyBySecret(secret: string) {
     return this.#members.virtualKeys.findBySecretInternal(secret);
+  }
+
+  /**
+   * The key a presented license token runs under, judged only on the facts
+   * licensing wrote onto it. A key with no bound install has not synced, and
+   * reads as a license not registered for hosted services.
+   */
+  async resolveLicenseToken(input: {
+    token: string;
+    instanceId: string | undefined;
+  }): Promise<GatewayLicenseTokenResolution> {
+    if (!isLicenseTokenShape(input.token)) return refuse("connect_license_token_malformed");
+    const instanceId = input.instanceId?.trim() ?? "";
+    if (instanceId === "") return refuse("connect_instance_required");
+
+    const licensed = await this.#members.virtualKeys.findByLicenseTokenHashInternal(
+      await registryHashForToken(input.token),
+    );
+    if (!licensed?.instanceId) return refuse("connect_license_not_registered");
+    if (licensed.key.status !== "ACTIVE") return refuse("connect_license_revoked");
+    const now = nowInstant();
+    if (licensed.expiresAt && Temporal.Instant.compare(licensed.expiresAt, now) <= 0) {
+      return refuse("connect_license_expired");
+    }
+    if (licensed.instanceId !== instanceId) return refuse("connect_wrong_instance");
+
+    const [notAfter] = [licensed.expiresAt, licensed.key.expiresAt]
+      .filter((end): end is Instant => end !== null)
+      .toSorted((left, right) => Temporal.Instant.compare(left, right));
+    return {
+      ok: true,
+      key: licensed.key,
+      ...(notAfter ? { notAfter } : {}),
+      connectServices: licensed.services,
+    };
   }
 
   findTraceDestination(projectId: string) {
@@ -641,4 +680,8 @@ async function sendSpendCommands(
   }
 
   return null;
+}
+
+function refuse(code: GatewayLicenseTokenRefusal): GatewayLicenseTokenResolution {
+  return { ok: false, code };
 }

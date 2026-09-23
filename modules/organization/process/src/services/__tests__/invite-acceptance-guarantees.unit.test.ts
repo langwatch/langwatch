@@ -73,6 +73,7 @@ describe("given a pending invitation for the member role naming one team", () =>
 describe("given an invitation that recorded no sender", () => {
   describe("when it is accepted", () => {
     /** @scenario "An invitation with no recorded sender attributes its grants to the service, not the invitee" */
+    /** @scenario "Accepted invitation grants name the original sender" */
     it.concurrent("attributes the grant to the invite service rather than to the invitee", async () => {
       const invites = new FakeOrganizationInviteRepository();
       const grants = new FakeAuthzGrantsService();
@@ -88,6 +89,7 @@ describe("given an invitation that recorded no sender", () => {
       expect(orgBinding?.actor).toEqual({ type: "system", id: "system:invite-service" });
     });
 
+    /** @scenario "Accepted invitation grants name the original sender" */
     it.concurrent("attributes the grant to the person who sent it when one is recorded", async () => {
       const invites = new FakeOrganizationInviteRepository();
       const grants = new FakeAuthzGrantsService();

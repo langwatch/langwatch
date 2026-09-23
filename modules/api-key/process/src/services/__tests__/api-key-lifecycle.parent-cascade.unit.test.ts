@@ -60,7 +60,7 @@ function makeService({ children }: { children: { id: string }[] }) {
   } as unknown as ApiKeyRepository;
 
   const dependencies = {
-    authz: {} as never,
+    authz: { listApiKeyBindings: async () => [] } as never,
     grants: { revokeBindingsWhere: vi.fn(), deleteRole: vi.fn() } as never,
     organizations: {} as never,
     projects: {} as never,

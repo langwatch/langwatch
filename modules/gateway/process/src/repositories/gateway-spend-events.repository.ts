@@ -1,4 +1,4 @@
-import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
+import type { GatewayUsageCount, SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 
 import type { GatewaySpendState } from "../eventing/gateway-spend.projection.ts";
 
@@ -131,4 +131,10 @@ export abstract class GatewaySpendEvents {
     tokensOutputImage: number;
     imageCount: number;
   }>;
+
+  /** The usage report's figures: one row per request at its latest status. */
+  abstract countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<GatewayUsageCount>;
 }

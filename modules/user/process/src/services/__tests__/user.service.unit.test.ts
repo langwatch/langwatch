@@ -28,6 +28,8 @@ const ISSUER = "credential";
 const NOW = fromDate(new Date(42));
 
 class StubRepository implements UserRepository {
+  countUsage = vi.fn(async () => ({ emailDomains: {} }));
+  hasAccountOnDomain = vi.fn(async () => false);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async () => user);
   findByEmail = vi.fn(async () => user);
@@ -39,8 +41,14 @@ class StubRepository implements UserRepository {
   createPasskeyUser = vi.fn(async () => ({ id: user.id }));
   hasPassword = vi.fn(async () => true);
   setFirstPassword = vi.fn(async () => "set" as const);
-  findPasskeyNudgeStatus = vi.fn(async () => ({ hasPasskey: false, dismissedAt: null }));
+  findPasskeyNudgeStatus = vi.fn(async () => ({
+    hasPasskey: false,
+    twoStepEnabled: false,
+    dismissedAt: null,
+  }));
   setPasskeyNudgeDismissedAt = vi.fn(async () => undefined);
+  findJoinOfferDismissedDomains = vi.fn(async (): Promise<string[]> => ["acme.com"]);
+  addJoinOfferDismissedDomain = vi.fn(async () => undefined);
   findSsoStatus = vi.fn(async () => ({ pendingSsoSetup: false }));
   findTraceExplorerTourPreference = vi.fn(async () => ({
     dismissed: false,
@@ -157,6 +165,7 @@ describe("UserService", () => {
 
     await expect(service.getPasskeyNudgeStatus({ id: "user-1" })).resolves.toEqual({
       hasPasskey: false,
+      twoStepEnabled: false,
       dismissedAt: null,
     });
     await service.dismissPasskeyNudge({ id: "user-1" });
@@ -165,6 +174,19 @@ describe("UserService", () => {
     expect(repository.setPasskeyNudgeDismissedAt).toHaveBeenCalledWith({
       id: "user-1",
       dismissedAt: NOW,
+    });
+  });
+
+  it("remembers a join-offer dismissal once per domain", async () => {
+    const { service, repository } = createService();
+
+    await service.dismissJoinOffer({ id: "user-1", domain: "acme.com" });
+    await service.dismissJoinOffer({ id: "user-1", domain: "globex.com" });
+
+    expect(repository.addJoinOfferDismissedDomain).toHaveBeenCalledTimes(1);
+    expect(repository.addJoinOfferDismissedDomain).toHaveBeenCalledWith({
+      id: "user-1",
+      domain: "globex.com",
     });
   });
 
@@ -272,6 +294,24 @@ describe("UserService", () => {
  * The one column an avatar lives in, and the four things that decide what it holds.
  * Spec: specs/settings/user-avatar-upload.feature
  */
+describe("given a company domain a self-hosted install reported", () => {
+  it("asks for the domain however it was typed", async () => {
+    const { service, repository } = createService();
+    repository.hasAccountOnDomain.mockResolvedValue(true);
+
+    await expect(service.hasAccountOnDomain({ domain: "  ACME.test " })).resolves.toBe(true);
+    expect(repository.hasAccountOnDomain).toHaveBeenCalledWith("acme.test");
+  });
+
+  it("refuses a wildcard rather than matching every customer", async () => {
+    const { service, repository } = createService();
+
+    await expect(service.hasAccountOnDomain({ domain: "%" })).resolves.toBe(false);
+    await expect(service.hasAccountOnDomain({ domain: "  " })).resolves.toBe(false);
+    expect(repository.hasAccountOnDomain).not.toHaveBeenCalled();
+  });
+});
+
 describe("given a user whose photo came from their identity provider", () => {
   const SSO_PHOTO = "https://cdn.identity.test/photos/ada.png";
 

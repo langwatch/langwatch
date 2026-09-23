@@ -23,6 +23,15 @@ export type SavedWorkbenchChartDefinitionUpdate = Readonly<{
   protections: LangWatchQLProtections;
 }>;
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * charts built in the chart builder, lifetime. Saved workbench charts share
+ * the table but are another product and are not counted.
+ */
+export interface DashboardUsageCount {
+  readonly builderCharts: number;
+}
+
 /** Flat operations a door or a peer calls once the dashboard app is composed. */
 export interface DashboardApi {
   getAll(input: {
@@ -197,6 +206,8 @@ export interface DashboardApi {
     actorId: string;
     viewIds: string[];
   }): Promise<{ success: true }>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCount>;
 }
 
 export const DashboardApi = moduleApi<DashboardApi>()("dashboard");

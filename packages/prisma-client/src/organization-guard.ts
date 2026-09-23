@@ -1,4 +1,5 @@
 import { CLI_LOGIN_KEY_NAME_PREFIX, HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
+
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 
 /**
@@ -274,6 +275,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   AiToolEntry: {},
   GatewayBudget: {},
+  GatewayConnectUpstream: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by
   // organizationId, or by the parent budget (org-owned) through budgetId /
   // the compound unique key.
@@ -356,6 +358,23 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // the partition test stays green while the per-model call-site audit that
   // precedes enforcement (ADR-021) is completed.
   "BillingMeterCheckpoint",
+  // SSO, SCIM and connected self-hosted rows (#7633, #8232): every one carries
+  // the organization, but the per-model call-site audit has not run yet.
+  "ActivationCode",
+  "ConnectedBillingAccount",
+  "IssuedLicense",
+  "ScimDirectoryUser",
+  "ScimRequestLog",
+  "ScimUserResource",
+  "SelfHostedInstance",
+  "SsoActivationRecoveryReservation",
+  "SsoAuthenticationActivity",
+  "SsoBreakGlassBinding",
+  "SsoConnectionRegistrationSlot",
+  "SsoCredential",
+  "SsoProvider",
+  "SsoVerifiedDomain",
+  "SsoVerifiedDomainHolder",
   "Department",
   "GatewayCacheRule",
   "IngestionSource",

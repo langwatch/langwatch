@@ -22,6 +22,10 @@ export type GatewayJwtClaims = {
    *  this instant, so a key that runs out stops serving on schedule even while
    *  the control plane is unreachable. */
   vk_expires_at: number | null;
+  /** The hosted services a resolved license token is entitled to (ADR-156). A plain virtual
+   *  key omits the claim and a license entitled to nothing sends `[]`: omitted, not null,
+   *  because null would decode the same way the empty array does. */
+  connect_services?: string[];
 };
 
 /** What a caller hands the signer: the identity claims, plus the key's own
@@ -89,6 +93,7 @@ export class GatewayJwtService {
       principal_id: payload.principal_id,
       revision: payload.revision,
       vk_expires_at: payload.vk_expires_at ?? null,
+      ...(payload.connect_services ? { connect_services: payload.connect_services } : {}),
     };
   }
 }

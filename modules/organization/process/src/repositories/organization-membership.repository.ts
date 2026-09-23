@@ -295,6 +295,19 @@ export abstract class OrganizationMembershipRepository {
    */
   abstract deleteProvisionedOrganization(organizationId: string): Promise<void>;
 
+  /** Marks an organization as a self-hosted licence customer. Idempotent. */
+  abstract markSelfHostedCustomer(organizationId: string): Promise<void>;
+
+  /** Every organization marked as a self-hosted licence customer. */
+  abstract findSelfHostedCustomers(): Promise<
+    { organizationId: string; organizationName: string }[]
+  >;
+
+  /** The organization's oldest membership with its name; empty where it has none. */
+  abstract findRepresentatives(
+    organizationId: string,
+  ): Promise<{ userId: string; organizationName: string }[]>;
+
   abstract getAllForUser(params: {
     userId: string;
     isDemo: boolean;
@@ -336,6 +349,15 @@ export abstract class OrganizationMembershipRepository {
    * only one left" is a question a count cannot answer on its own.
    */
   abstract findActiveAdministratorIds: (params: { organizationId: string }) => Promise<string[]>;
+
+  /** Every member of the organization, disabled ones included. */
+  abstract findMemberUserIds(params: { organizationId: string }): Promise<string[]>;
+
+  /** Which of these people arrived on an invitation this organization sent and they accepted. */
+  abstract findInvitedMemberIds(params: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<string[]>;
 
   /** Paginated membership list for the management surface. */
   abstract findAllMembers: (params: {

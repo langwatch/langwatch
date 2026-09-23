@@ -6,7 +6,6 @@
 import type { LedgerActor } from "@langwatch/actor";
 import {
   AuthzGrantNotConfirmedError,
-  AuthzRoleDuplicateNameError,
   type DefineRoleCommandData,
   type GrantEventSource,
   type RevokeGrantCommandData,
@@ -15,7 +14,8 @@ import {
 } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { type Instant, Temporal, nowInstant, toDate } from "@langwatch/time";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type { AuthzCompatibilityLedger } from "../app/authz.app.ts";
 import type { AuthzEpochRepository } from "../repositories/authz-epoch.repository.ts";
@@ -25,13 +25,22 @@ import {
   DuplicateBindingError,
   type RoleBindingWrite,
 } from "../repositories/authz-grant.repository.ts";
+import type { AuthzMembershipStampRepository } from "../repositories/authz-membership-stamp.repository.ts";
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
 import { bindingIdentityKey } from "../repositories/eventing/eventing.authz-grant.mapper.ts";
-import { liveGrants } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
-import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
-import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
-import { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
-import { AUTHZ_AUDIT_ACTION_PREFIX, type AuthzAuditVerb } from "./authz-grant.subscriber.ts";
+import { liveGrants, liveRoles } from "../repositories/eventing/eventing.authz-live-rows.mapper.ts";
+import {
+  AuthzGrantMapper,
+  GRANT_ROW_COLUMNS,
+  PRINCIPAL_TO_DB,
+} from "../repositories/prisma/prisma.authz-grant.mapper.ts";
+import type { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository.ts";
+import {
+  membershipFenceFields,
+  userIdsNeedingStamp,
+  validateMembershipBootstrap,
+} from "../rules/membership-stamp-fence.rules.ts";
+import type { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -48,7 +57,17 @@ export type LedgerWriteSource = GrantEventSource;
 const CONVERGENCE_POLL_MS = 250;
 const CONVERGENCE_TIMEOUT_MS = 8_000;
 
-export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
+const storedIdSchema = z.object({ id: z.string() });
+const storedRoleKeySchema = z.object({ roleKey: z.string().nullable() });
+
+export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId"> & {
+  /** Internal generation captured by a membership transaction. Callers that
+   *  create the membership before emitting leave this unset; the writer reads
+   *  and locks the live row itself. */
+  membershipStamp?: string;
+  /** Founder-only marker for a membership created in the same transaction. */
+  membershipBootstrap?: boolean;
+};
 
 /**
  * The audience a resource fact names. `ShareVisibility`'s three values in the ledger's own
@@ -86,34 +105,24 @@ export type AttachOutcome = {
   duplicates: string[];
 };
 
-type LedgerDelegate = {
-  findFirst(args: unknown): Promise<any>;
-  findMany(args: unknown): Promise<any[]>;
+type LedgerGrantDelegate = {
+  findFirst(args: unknown): Promise<unknown>;
+  findMany(args: unknown): Promise<unknown[]>;
   count(args: unknown): Promise<number>;
-  create(args: unknown): Promise<any>;
-  createMany(args: unknown): Promise<{ count: number }>;
-  updateMany(args: unknown): Promise<{ count: number }>;
-  deleteMany(args: unknown): Promise<{ count: number }>;
-  upsert(args: unknown): Promise<any>;
 };
 
-export type AuthzLedgerDatabase = Omit<
-  AuthzDatabase,
-  "roleBinding" | "customRole" | "grant" | "shareLink"
-> & {
-  auditLog: LedgerDelegate;
-  roleBinding: LedgerDelegate;
-  customRole: LedgerDelegate;
-  grant: LedgerDelegate;
-  shareLink: LedgerDelegate;
+/** The grant head is the only one the writer reads: every organization writes to the ledger. */
+export type AuthzLedgerDatabase = Omit<AuthzDatabase, "grant"> & {
+  grant: LedgerGrantDelegate;
 };
 
 export type EventingAuthzLedgerAdapterOptions = {
   database: AuthzLedgerDatabase;
   dispatcher: AuthzGrantsCommandDispatcher;
-  cutover: AuthzCutoverGateService;
   epoch: AuthzEpochRepository;
   revocation: PrismaAuthzRevocationRepository;
+  /** The membership lifetime a USER attach is fenced to. */
+  membershipStamps: AuthzMembershipStampRepository;
   now?: () => number;
   newCommandId?: () => string;
   poll?: { intervalMs: number; timeoutMs: number };
@@ -165,47 +174,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     return this.options.dispatcher.commands();
   }
 
-  /** Whether THIS organization's grant writes go through the ledger yet. */
-  private onLedger(organizationId: string): Promise<boolean> {
-    return this.options.cutover.isOn({ organizationId });
-  }
-
-  /**
-   * The audit row a migrated organization would have got from the subscriber, written here
-   * because an unmigrated one has no event to subscribe to.
-   */
-  private async recordLegacyAudit({
-    organizationId,
-    actor,
-    verb,
-    createdAt,
-    facts,
-  }: {
-    organizationId: string;
-    actor: LedgerActor;
-    verb: AuthzAuditVerb;
-    createdAt: Instant;
-    facts: Record<string, unknown>[];
-  }): Promise<void> {
-    if (facts.length === 0) return;
-    try {
-      await this.options.database.auditLog.createMany({
-        data: facts.map((metadata) => ({
-          createdAt: toDate(createdAt),
-          userId: actor.type === "user" ? actor.id : null,
-          organizationId,
-          action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
-          metadata,
-        })),
-      });
-    } catch (err) {
-      logger.warn(
-        { err, organizationId, action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}` },
-        "failed to record the audit row for a grant write on the pre-ledger path; the write itself landed",
-      );
-    }
-  }
-
   /**
    * INSERT one or more binding facts. An arrow instance property, not a
    * prototype method, so a test's stand-in stub can be asserted on directly.
@@ -219,7 +187,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     commandId,
     occurredAtMs: occurredAtOverrideMs,
     awaitProjection = true,
-    requireProjection = false,
+    requireProjection = awaitProjection,
   }: {
     organizationId: string;
     bindings: LedgerBindingAttach[];
@@ -244,13 +212,17 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
      */
     awaitProjection?: boolean;
     /**
-     * Whether an unlanded projection is an error. Off by default: usually
-     * the fold converges later and that's fine. A caller minting access
-     * from these rows turns it on and gets {@link AuthzGrantNotConfirmedError}.
+     * Whether an unlanded projection is an error. Follows `awaitProjection`:
+     * a caller that waits is a caller that reads next, so a wait that ran out
+     * is {@link AuthzGrantNotConfirmedError} rather than a silent lie.
      */
     requireProjection?: boolean;
   }): Promise<AttachOutcome> => {
     if (bindings.length === 0) return { attached: [], duplicates: [] };
+
+    for (const binding of bindings) {
+      validateMembershipBootstrap({ organizationId, binding });
+    }
 
     const { fresh, duplicates } = await this.partitionByIdentity({
       organizationId,
@@ -260,17 +232,12 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (fresh.length === 0) return { attached: [], duplicates };
 
     const occurredAtMs = occurredAtOverrideMs ?? this.now();
-    if (!(await this.onLedger(organizationId))) {
-      return this.attachBindingsImperatively({
-        organizationId,
-        fresh,
-        duplicates,
-        actor,
-        source,
-        onDuplicate,
-        occurredAtMs,
-      });
-    }
+    // An import states the lifetime its own inventory read, so it neither
+    // needs nor may take the live lock.
+    const membershipStamps =
+      source === "migration"
+        ? new Map<string, string>()
+        : await this.captureMembershipStamps({ organizationId, bindings: fresh });
     // One command per grant, and a command id derived from the batch's own
     // so a retry of the same attach dedupes per grant at the event store.
     const batchId = commandId ?? this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId();
@@ -289,6 +256,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
             source,
             actor,
             occurredAtMs,
+            ...membershipFenceFields(binding, membershipStamps),
           },
         }),
       ),
@@ -296,26 +264,60 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
 
     const wanted = fresh.map((binding) => binding.bindingId);
     if (awaitProjection || requireProjection) {
-      const landed = await this.awaitProjection({
+      await this.awaitProjection({
         what: `attach of ${wanted.length} binding(s)`,
         organizationId,
+        // The CANONICAL Grant head, not the compat RoleBinding rows: a
+        // compatibility-only row is one the fold has not authored, and a
+        // revoked one confirms an attach that no longer grants anything.
         check: async () => {
-          const present = await this.options.database.roleBinding.count({
-            where: { organizationId, id: { in: wanted } },
+          const present = await this.options.database.grant.count({
+            where: {
+              organizationId,
+              revokedAt: null,
+              OR: fresh.map((binding) => ({
+                id: binding.bindingId,
+                ...AuthzLedgerMapper.grantIdentityWhere(binding),
+                occurredAt: { gte: toDate(Temporal.Instant.fromEpochMilliseconds(occurredAtMs)) },
+              })),
+            },
           });
           return present === wanted.length;
         },
+        required: requireProjection,
       });
-      if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
     }
     await this.options.epoch.bump({ organizationId });
     return { attached: wanted, duplicates };
   };
 
   /**
-   * Split a batch into the bindings that are genuinely new and the ids of the identical rows
-   * already present — the identity pre-check both sides of the fork run, so an
-   * organization's outcome does not change when it migrates.
+   * Each USER principal's current lifetime, read under its membership row
+   * lock. A user with no live membership refuses the batch: letting the grant
+   * through unstamped is the race this exists to close.
+   */
+  private async captureMembershipStamps({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+  }): Promise<Map<string, string>> {
+    const userIds = userIdsNeedingStamp(bindings);
+    if (userIds.length === 0) return new Map();
+
+    const rows = await this.options.membershipStamps.findLockedStamps({
+      organizationId,
+      userIds,
+    });
+    const stamps = new Map(rows.map((row) => [row.userId, row.membershipStamp]));
+    if (userIds.some((userId) => !stamps.has(userId))) throw new BindingMissingError();
+    return stamps;
+  }
+
+  /**
+   * Split a batch into the bindings that are genuinely new and the ids of the identical live
+   * grants already present. A repeat inside the same batch counts as a duplicate of itself.
    */
   private async partitionByIdentity({
     organizationId,
@@ -367,105 +369,32 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     bindings: LedgerBindingAttach[];
   }): Promise<Map<string, string>> {
     if (bindings.length === 0) return new Map();
-    const rows = await this.options.database.roleBinding.findMany({
+    const rows = await liveGrants(this.options.database).findMany({
       where: {
         organizationId,
-        OR: bindings.map((binding) =>
-          AuthzLedgerMapper.bindingIdentityWhere({ organizationId, binding }),
-        ),
+        OR: bindings.map((binding) => AuthzLedgerMapper.grantIdentityWhere(binding)),
       },
-      select: {
-        id: true,
-        userId: true,
-        groupId: true,
-        apiKeyId: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
+      select: GRANT_ROW_COLUMNS,
     });
     const byIdentity = new Map<string, string>();
     for (const row of rows) {
+      const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({
+        grant: AuthzGrantMapper.grantRowToFact(AuthzGrantMapper.grantRowFromStored(row)),
+        organizationId,
+      });
+      if (!binding) continue;
       byIdentity.set(
         bindingIdentityKey({
-          principal: AuthzLedgerMapper.principalWhereForRow(row),
-          role: row.role,
-          customRoleId: row.customRoleId,
-          scopeType: row.scopeType,
-          scopeId: row.scopeId,
+          principal: binding,
+          role: binding.role,
+          customRoleId: binding.customRoleId,
+          scopeType: binding.scopeType,
+          scopeId: binding.scopeId,
         }),
-        row.id,
+        binding.id,
       );
     }
     return byIdentity;
-  }
-
-  /**
-   * The pre-ledger attach, for an organization the genesis import has not reached: the rows
-   * are written directly (`insertBindingRows` below owns the two duplicate semantics).
-   */
-  private async attachBindingsImperatively({
-    organizationId,
-    fresh,
-    duplicates,
-    actor,
-    source,
-    onDuplicate,
-    occurredAtMs,
-  }: {
-    organizationId: string;
-    fresh: LedgerBindingAttach[];
-    duplicates: string[];
-    actor: LedgerActor;
-    source: LedgerWriteSource;
-    onDuplicate: "reject" | "skip";
-    occurredAtMs: number;
-  }): Promise<AttachOutcome> {
-    const rows = fresh.map((binding) =>
-      AuthzLedgerMapper.legacyBindingRow({ organizationId, binding }),
-    );
-
-    await this.insertBindingRows({ rows, onDuplicate });
-
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "attach",
-      createdAt: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
-      facts: AuthzLedgerMapper.attachAuditFacts({ fresh, source }),
-    });
-    await this.options.epoch.bump({ organizationId });
-    return { attached: rows.map((row) => row.id), duplicates };
-  }
-
-  /**
-   * The two INSERT semantics the call sites were built on: `reject` inserts
-   * row by row so the first collision becomes the 409 the REST contract
-   * froze, `skip` takes `createMany`'s own `skipDuplicates`.
-   */
-  private async insertBindingRows({
-    rows,
-    onDuplicate,
-  }: {
-    rows: ReturnType<typeof AuthzLedgerMapper.legacyBindingRow>[];
-    onDuplicate: "reject" | "skip";
-  }): Promise<void> {
-    if (onDuplicate !== "reject") {
-      await this.options.database.roleBinding.createMany({
-        data: rows,
-        skipDuplicates: true,
-      });
-      return;
-    }
-    for (const data of rows) {
-      try {
-        await this.options.database.roleBinding.create({ data });
-      } catch (error) {
-        if (AuthzLedgerMapper.isUniqueViolation(error)) throw new DuplicateBindingError();
-        throw error;
-      }
-    }
   }
 
   /**
@@ -494,29 +423,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     actor: LedgerActor;
     commandId?: string;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
-      let visibility: "PUBLIC" | "ORGANIZATION" | "PROJECT" = "PROJECT";
-      if (principal.type === "anyone") visibility = "PUBLIC";
-      if (principal.type === "organization") visibility = "ORGANIZATION";
-      await this.options.database.shareLink.create({
-        data: {
-          id: grantId,
-          token: resource.token,
-          resourceType: resource.kind === "thread" ? "THREAD" : "TRACE",
-          resourceId: scopeId,
-          projectId,
-          userId: resource.createdByUserId ?? null,
-          visibility,
-          expiresAt:
-            resource.expiresAtMs === undefined
-              ? null
-              : toDate(Temporal.Instant.fromEpochMilliseconds(resource.expiresAtMs)),
-          maxViews: resource.maxViews ?? null,
-        },
-      });
-      await this.options.epoch.bump({ organizationId });
-      return;
-    }
     await (
       await this.commands()
     ).commands.attachGrant.send({
@@ -538,8 +444,8 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       what: `attach of resource grant ${grantId}`,
       organizationId,
       check: async () => {
-        const row = await this.options.database.shareLink.findFirst({
-          where: { id: grantId, projectId },
+        const row = await liveGrants(this.options.database).findFirst({
+          where: { id: grantId, organizationId, projectId, scopeType: "RESOURCE" },
           select: { id: true },
         });
         return row !== null;
@@ -563,18 +469,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     reason?: string;
   }): Promise<void> {
     if (grantIds.length === 0) return;
-    try {
-      if (!(await this.options.cutover.readUncached({ organizationId }))) {
-        return;
-      }
-    } catch (error) {
-      // Revocation fails toward append: an unnecessary revoke fact on the
-      // legacy side is harmless, while missing one can resurrect access.
-      logger.warn(
-        { error, organizationId },
-        "could not read the authz cutover; appending the revocation anyway",
-      );
-    }
     const revocation: {
       organizationId: string;
       bindingIds: string[];
@@ -635,7 +529,9 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }
 
   /**
-   * UPDATE the role one binding carries, keeping its identity.
+   * UPDATE the role one binding carries, keeping its identity. A binding with
+   * no live grant is missing; a sibling already holding the target role at the
+   * same scope is a duplicate.
    */
   async changeBindingRole({
     organizationId,
@@ -650,103 +546,33 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
-    const row = await this.options.database.roleBinding.findFirst({
+    const stored = await liveGrants(this.options.database).findFirst({
       where: { id: bindingId, organizationId },
+      select: GRANT_ROW_COLUMNS,
     });
-    if (!row) throw new BindingMissingError();
+    if (stored === null || stored === undefined) throw new BindingMissingError();
+    const row = AuthzGrantMapper.grantRowFromStored(stored);
+    const binding = AuthzGrantMapper.findCompatBindingFromGrantFact({
+      grant: AuthzGrantMapper.grantRowToFact(row),
+      organizationId,
+    });
+    if (!binding) throw new BindingMissingError();
 
     const to = AuthzLedgerMapper.roleKeyFor({ role, customRoleId });
-    const from = AuthzLedgerMapper.roleKeyFor({
-      role: row.role,
-      customRoleId: row.customRoleId,
-    });
-    if (from === to) return;
-
-    const sibling = await this.options.database.roleBinding.findFirst({
+    if (row.roleKey === to) return;
+    const sibling = await liveGrants(this.options.database).findFirst({
       where: {
-        ...AuthzLedgerMapper.bindingIdentityWhere({
-          organizationId,
-          binding: {
-            principal: AuthzLedgerMapper.principalWhereForRow(row),
-            role,
-            customRoleId,
-            scopeType: row.scopeType,
-            scopeId: row.scopeId,
-          },
-        }),
+        organizationId,
+        principalType: row.principalType,
+        principalId: row.principalId,
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        roleKey: to,
         id: { not: bindingId },
       },
       select: { id: true },
     });
     if (sibling) throw new DuplicateBindingError();
-
-    if (!(await this.onLedger(organizationId))) {
-      return this.changeBindingRoleImperatively({
-        organizationId,
-        bindingId,
-        role,
-        customRoleId,
-        from,
-        to,
-        actor,
-      });
-    }
-    await this.changeBindingRoleOnLedger({
-      organizationId,
-      row,
-      bindingId,
-      role,
-      customRoleId,
-      from,
-      to,
-      actor,
-    });
-  }
-
-  /**
-   * The ledger-side role change.
-   */
-  private async changeBindingRoleOnLedger({
-    organizationId,
-    row,
-    bindingId,
-    role,
-    customRoleId,
-    from,
-    to,
-    actor,
-  }: {
-    organizationId: string;
-    row: {
-      id: string;
-      userId: string | null;
-      groupId: string | null;
-      apiKeyId: string | null;
-      scopeType: RoleBindingWrite["scopeType"];
-      scopeId: string;
-    };
-    bindingId: string;
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    from: string;
-    to: string;
-    actor: LedgerActor;
-  }): Promise<void> {
-    const known = await liveGrants(this.options.database).findFirst({
-      where: { id: bindingId, organizationId },
-      select: { id: true },
-    });
-    if (!known) {
-      await this.adoptStrandedRoleChange({
-        organizationId,
-        row,
-        role,
-        customRoleId,
-        actor,
-      });
-      await this.options.epoch.bump({ organizationId });
-      return;
-    }
 
     await (
       await this.commands()
@@ -755,7 +581,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       organizationId,
       commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
       grantId: bindingId,
-      from,
+      from: AuthzLedgerMapper.roleKeyFor(binding),
       to,
       actor,
       occurredAtMs: this.now(),
@@ -764,127 +590,12 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       what: `role change on binding ${bindingId}`,
       organizationId,
       check: async () => {
-        const updated = await this.options.database.roleBinding.findFirst({
+        const updated = await liveGrants(this.options.database).findFirst({
           where: { id: bindingId, organizationId },
-          select: { role: true, customRoleId: true },
+          select: { roleKey: true },
         });
-        return (
-          updated != null &&
-          AuthzLedgerMapper.roleKeyFor({
-            role: updated.role,
-            customRoleId: updated.customRoleId,
-          }) === to
-        );
+        return AuthzLedgerMapper.carriesRoleKey({ row: updated, roleKey: to });
       },
-    });
-    await this.options.epoch.bump({ organizationId });
-  }
-
-  /**
-   * Adopt a stranded compat row into the fold as part of changing its role: an attach fact
-   * for the row's own id, carrying the role the caller asked for, so the reducer's
-   * overwrite-by-id semantics for `grant_attached` both create the head entry and land the
-   */
-  private async adoptStrandedRoleChange({
-    organizationId,
-    row,
-    role,
-    customRoleId,
-    actor,
-  }: {
-    organizationId: string;
-    row: {
-      id: string;
-      userId: string | null;
-      groupId: string | null;
-      apiKeyId: string | null;
-      scopeType: RoleBindingWrite["scopeType"];
-      scopeId: string;
-    };
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    actor: LedgerActor;
-  }): Promise<void> {
-    const occurredAtMs = this.now();
-    await (
-      await this.commands()
-    ).commands.attachGrant.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: this.options.newCommandId?.() ?? AuthzLedgerMapper.newCommandId(),
-      grant: {
-        grantId: row.id,
-        principal: AuthzLedgerMapper.principalForWhere(AuthzLedgerMapper.principalWhereForRow(row)),
-        roleKey: AuthzLedgerMapper.roleKeyFor({ role, customRoleId }),
-        scope: { type: row.scopeType, id: row.scopeId },
-        source: "grants-service",
-        actor,
-        occurredAtMs,
-      },
-    });
-    await this.awaitProjection({
-      what: `adoption of stranded binding ${row.id} at role ${AuthzLedgerMapper.roleKeyFor({ role, customRoleId })}`,
-      organizationId,
-      check: async () => {
-        const updated = await this.options.database.roleBinding.findFirst({
-          where: { id: row.id, organizationId },
-          select: { role: true, customRoleId: true },
-        });
-        return (
-          updated != null &&
-          AuthzLedgerMapper.roleKeyFor({
-            role: updated.role,
-            customRoleId: updated.customRoleId,
-          }) === AuthzLedgerMapper.roleKeyFor({ role, customRoleId })
-        );
-      },
-    });
-  }
-
-  /**
-   * The pre-ledger role change, unchanged from the imperative writer: the two
-   * knowable database refusals keep their meaning, because neither the
-   * pre-read nor the sibling check above can close either race.
-   */
-  private async changeBindingRoleImperatively({
-    organizationId,
-    bindingId,
-    role,
-    customRoleId,
-    from,
-    to,
-    actor,
-  }: {
-    organizationId: string;
-    bindingId: string;
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    from: string;
-    to: string;
-    actor: LedgerActor;
-  }): Promise<void> {
-    try {
-      // `updateMany`, not `update` by bare id: the pre-read above already ran under
-      // `organizationId`, and the write should stay scoped to the same tenant rather than trust
-      // the id alone. `updateMany` never throws Prisma's not-found (P2025) the way a singular
-      // `update` does, so the same race — the row gone between the pre-read and here — is caught
-      // by the zero-match count instead.
-      const updated = await this.options.database.roleBinding.updateMany({
-        where: { id: bindingId, organizationId },
-        data: { role, customRoleId },
-      });
-      if (updated.count === 0) throw new BindingMissingError();
-    } catch (error) {
-      if (error instanceof BindingMissingError) throw error;
-      if (AuthzLedgerMapper.isUniqueViolation(error)) throw new DuplicateBindingError();
-      throw error;
-    }
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "role_change",
-      createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-      facts: [{ grantId: bindingId, from, to }],
     });
     await this.options.epoch.bump({ organizationId });
   }
@@ -905,27 +616,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     reason?: string;
   }): Promise<void> {
     if (bindingIds.length === 0) return;
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger revoke. An imperative delete IS instant enforcement —
-      // decision 7's synchronous deny effect is what this path always was —
-      // so there is no event and nothing to converge on.
-      await this.options.database.roleBinding.deleteMany({
-        where: { organizationId, id: { in: bindingIds } },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-        facts: bindingIds.map((grantId) => {
-          const fact: Record<string, unknown> = { grantId };
-          if (reason) fact.reason = reason;
-          return fact;
-        }),
-      });
-      await this.options.epoch.bump({ organizationId });
-      return;
-    }
     const revocation: {
       organizationId: string;
       bindingIds: string[];
@@ -961,54 +651,15 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         "revokeBindingsWhere refused a filter with no organization: a grant revocation is always tenant-scoped",
       );
     }
-    // `organizationId` LAST, so a caller's filter can never widen the
-    // tenancy the caller named.
-    const legacyWhere = { ...where, organizationId };
-
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger, filtered revoke: ONE `deleteMany(where)` statement, not a read followed
-      // by a delete-by-ids. There is no fold here to sweep a row that lands in the gap between
-      // the two — a row matching the filter, created between a read and a later delete, has to
-      // be caught by the single statement or it survives the revoke that was meant to catch it.
-      const { count } = await this.options.database.roleBinding.deleteMany({
-        where: legacyWhere,
-      });
-      const facts: Record<string, unknown>[] = [];
-      if (count > 0) {
-        const fact: Record<string, unknown> = { where: legacyWhere, count };
-        if (reason) fact.reason = reason;
-        facts.push(fact);
-      }
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-        facts,
-      });
-      await this.options.epoch.bump({ organizationId });
-      return count;
+    const grantWhere = AuthzLedgerMapper.findGrantWhereFromBindingWhere(where, organizationId);
+    if (grantWhere === null) {
+      throw new Error("revokeBindingsWhere refused a filter the grant head cannot express");
     }
-
-    // The compat head is not the whole head. A Grant-head row a custom-role import wrote
-    // (roleKey with no compat binding), a PLATFORM-tier row, or one whose compat write hit a
-    // swallowed conflict has no RoleBinding to enumerate, so revoking only the ids
-    // `roleBinding.findMany` returns would leave those resolving. Mirror `offboardMember`:
-    // union the compat ids with the Grant-head rows the same filter names.
-    const bindingRows = await this.options.database.roleBinding.findMany({
-      where: legacyWhere,
+    const grantRows = await liveGrants(this.options.database).findMany({
+      where: grantWhere,
       select: { id: true },
     });
-    const grantWhere = AuthzLedgerMapper.findGrantWhereFromBindingWhere(where, organizationId);
-    const grantRows = grantWhere
-      ? await this.options.database.grant.findMany({
-          where: grantWhere,
-          select: { id: true },
-        })
-      : [];
-    const bindingIds = [
-      ...new Set([...bindingRows.map((row) => row.id), ...grantRows.map((row) => row.id)]),
-    ];
+    const bindingIds = [...new Set(grantRows.map((row) => AuthzLedgerMapper.storedId(row)))];
     // revokeBindings early-returns on an empty id list, so no selector-only
     // fact is appended when nothing matched — the behaviour the old
     // skipAppendWhenNoMatches flag stood in for, now intrinsic.
@@ -1042,23 +693,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     revokedGrantIds: string[];
     actor: LedgerActor;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger offboard: the member's grant rows go, and the
-      // membership tables stay with the caller exactly as they do on the
-      // ledger side.
-      await this.options.database.roleBinding.deleteMany({
-        where: { organizationId, id: { in: revokedGrantIds } },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-        facts: [{ userId, revokedGrantIds }],
-      });
-      await this.options.epoch.bump({ organizationId });
-      return;
-    }
     // Offboarding is N revocations sharing one reason, not an event of its
     // own: a person is not an aggregate here, and an event that named one
     // would have to straddle every grant they hold.
@@ -1101,7 +735,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     permissions,
     kind,
     actor,
-    requireProjection = false,
+    requireProjection = true,
   }: {
     organizationId: string;
     roleId: string;
@@ -1118,18 +752,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     requireProjection?: boolean;
   }): Promise<void> {
     const occurredAtMs = this.now();
-    if (!(await this.onLedger(organizationId))) {
-      return this.defineRoleImperatively({
-        organizationId,
-        roleId,
-        name,
-        description,
-        permissions,
-        kind,
-        actor,
-        occurredAtMs,
-      });
-    }
     const role: DefineRoleCommandData["role"] = {
       roleId,
       name,
@@ -1152,19 +774,17 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     // that write fails if the role row is not there yet. Commands are queued
     // per command name, not per organization, so `attachGrants` can be picked
     // up before `defineRoles` and cannot stand in for this hold.
-    const landed = await this.awaitProjection({
+    await this.awaitProjection({
       what: `definition of role ${roleId}`,
       organizationId,
-      // The COMPAT head, like every other read-your-writes check here: that
-      // is the table `deleteRole` polls, the table the resolver reads, and
-      // the table every consumer of a freshly defined role reads. `Role` is
-      // the future head, written by the same `store()` — polling it would
-      // return before the row the caller is about to look for exists.
+      // The CANONICAL Role head, like every other read-your-writes check
+      // here: a deleted row confirms nothing, and the compat CustomRole rows
+      // can carry a definition the fold never authored.
       check: async () => {
-        const row = await this.options.database.customRole.findFirst({
+        const row = (await liveRoles(this.options.database).findFirst({
           where: { id: roleId, organizationId },
           select: { name: true, permissions: true },
-        });
+        })) as { name: string; permissions: unknown } | null;
         return (
           row != null &&
           row.name === name &&
@@ -1174,70 +794,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
           })
         );
       },
-    });
-    if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
-    await this.options.epoch.bump({ organizationId });
-  }
-
-  /**
-   * The pre-ledger role write. `role_defined` collapsed the editor's create and update into
-   * one verb; the upsert is that same collapse against the table, keyed on the id the caller
-   * minted — organization scoped on the update so a role can never be edited across tenants.
-   */
-  private async defineRoleImperatively({
-    organizationId,
-    roleId,
-    name,
-    description,
-    permissions,
-    kind,
-    actor,
-    occurredAtMs,
-  }: {
-    organizationId: string;
-    roleId: string;
-    name: string;
-    description?: string;
-    permissions: string[];
-    kind: "custom" | "system_api_key";
-    actor: LedgerActor;
-    occurredAtMs: number;
-  }): Promise<void> {
-    try {
-      await this.options.database.customRole.upsert({
-        where: { id: roleId, organizationId },
-        create: {
-          id: roleId,
-          organizationId,
-          name,
-          description: description ?? null,
-          permissions,
-          kind,
-        },
-        update: {
-          name,
-          description: description ?? null,
-          permissions,
-          kind,
-        },
-      });
-    } catch (error) {
-      if (AuthzLedgerMapper.isUniqueViolation(error)) throw new AuthzRoleDuplicateNameError();
-      throw error;
-    }
-    const fact: Record<string, unknown> = {
-      roleId,
-      name,
-      permissions,
-      kind,
-    };
-    if (description) fact.description = description;
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "role_defined",
-      createdAt: Temporal.Instant.fromEpochMilliseconds(occurredAtMs),
-      facts: [fact],
+      required: requireProjection,
     });
     await this.options.epoch.bump({ organizationId });
   }
@@ -1262,23 +819,6 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
      */
     awaitProjection?: boolean;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger role delete. `deleteMany` rather than `delete` keeps
-      // the imperative writer's shape: a role already gone is not an error,
-      // and the organization scoping is in the filter, not a later check.
-      await this.options.database.customRole.deleteMany({
-        where: { id: roleId, organizationId },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "role_deleted",
-        createdAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-        facts: [{ roleId }],
-      });
-      await this.options.epoch.bump({ organizationId });
-      return;
-    }
     await (
       await this.commands()
     ).commands.deleteRole.send({
@@ -1294,10 +834,11 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
         what: `deletion of role ${roleId}`,
         organizationId,
         check: async () => {
-          const present = await this.options.database.customRole.count({
+          const present = await liveRoles(this.options.database).findFirst({
             where: { id: roleId, organizationId },
+            select: { id: true },
           });
-          return present === 0;
+          return present === null;
         },
       });
     }
@@ -1306,17 +847,19 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
 
   /**
    * Bounded read-your-writes: poll until the projection reflects the write.
-   * Timing out is not itself a failure (append landed, fold will drain -
-   * Redis-down doctrine), but is one when `requireProjection` says so.
+   * The append is durable either way; an unlanded write is
+   * {@link AuthzGrantNotConfirmedError} unless the caller said it may converge later.
    */
   private async awaitProjection({
     what,
     organizationId,
     check,
+    required = true,
   }: {
     what: string;
     organizationId: string;
     check: () => Promise<boolean>;
+    required?: boolean;
   }): Promise<boolean> {
     const poll = this.options.poll ?? {
       intervalMs: CONVERGENCE_POLL_MS,
@@ -1334,6 +877,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
           { organizationId, what },
           "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
         );
+        if (required) throw new AuthzGrantNotConfirmedError();
         return false;
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
@@ -1341,63 +885,44 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }
 }
 
-/**
- * The revocation entries one revoke command carries. The selector rides the
- * first entry only, since the fold's sweep is absolute.
- */
-/** One binding fact as the legacy table's three optional principal columns. */
+/** The ledger's command vocabulary over one binding fact. */
 export class AuthzLedgerMapper {
   /** Decision 23: user-action paths mint a random command id; retries reuse it. */
   static newCommandId(): string {
     return generate("authzcmd").toString();
   }
 
-  static legacyBindingRow({
-    organizationId,
-    binding,
-  }: {
-    organizationId: string;
-    binding: LedgerBindingAttach;
-  }): {
-    id: string;
-    organizationId: string;
-    userId: string | null;
-    groupId: string | null;
-    apiKeyId: string | null;
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    scopeType: RoleBindingWrite["scopeType"];
+  /** The id of a live grant row read with `select: { id: true }`. */
+  static storedId(row: unknown): string {
+    return storedIdSchema.parse(row).id;
+  }
+
+  /** Whether a live grant row, if there is one, carries this role key. */
+  static carriesRoleKey({ row, roleKey }: { row: unknown; roleKey: string }): boolean {
+    return row != null && storedRoleKeySchema.parse(row).roleKey === roleKey;
+  }
+
+  /**
+   * A binding's identity as the canonical `Grant` head stores it. What the
+   * read-your-writes hold matches on beside the id, so a row carrying the id
+   * but somebody else's principal, role or scope cannot confirm this write.
+   */
+  static grantIdentityWhere(binding: LedgerBindingAttach): {
+    principalType: string;
+    principalId: string;
+    roleKey: string;
+    scopeType: string;
     scopeId: string;
   } {
+    const principal = this.principalForWhere(binding.principal);
+
     return {
-      id: binding.bindingId,
-      organizationId,
-      userId: binding.principal.userId ?? null,
-      groupId: binding.principal.groupId ?? null,
-      apiKeyId: binding.principal.apiKeyId ?? null,
-      role: binding.role,
-      customRoleId: binding.customRoleId,
+      principalType: PRINCIPAL_TO_DB[principal.type],
+      principalId: principal.id,
+      roleKey: this.roleKeyFor(binding),
       scopeType: binding.scopeType,
       scopeId: binding.scopeId,
     };
-  }
-
-  /** The `grant_attached` payloads the subscriber would have seen, minus actor. */
-  static attachAuditFacts({
-    fresh,
-    source,
-  }: {
-    fresh: LedgerBindingAttach[];
-    source: LedgerWriteSource;
-  }): Record<string, unknown>[] {
-    if (!this.auditableSource(source)) return [];
-    return fresh.map((binding) => ({
-      grantId: binding.bindingId,
-      principal: this.principalForWhere(binding.principal),
-      roleKey: this.roleKeyFor(binding),
-      scope: { type: binding.scopeType, id: binding.scopeId },
-      source,
-    }));
   }
 
   /**
@@ -1423,13 +948,6 @@ export class AuthzLedgerMapper {
     return (error as { code?: unknown } | null)?.code === "P2025";
   }
 
-  /**
-   * The subscriber's relevance guard, on the pre-ledger side (decision 17).
-   */
-  private static auditableSource(source: LedgerWriteSource): boolean {
-    return source !== "read-through-mint" && source !== "migration";
-  }
-
   static roleKeyFor({
     role,
     customRoleId,
@@ -1453,46 +971,6 @@ export class AuthzLedgerMapper {
       return { type: "group", id: principal.groupId };
     }
     return { type: "apiKey", id: principal.apiKeyId };
-  }
-
-  static principalWhereForRow(row: {
-    userId: string | null;
-    groupId: string | null;
-    apiKeyId: string | null;
-  }): BindingPrincipalWhere {
-    if (row.userId !== null) return { userId: row.userId };
-    if (row.groupId !== null) return { groupId: row.groupId };
-    if (row.apiKeyId !== null) return { apiKeyId: row.apiKeyId };
-    throw new Error("role binding row carries no principal");
-  }
-
-  /**
-   * Identity as the DATABASE defines it — the partial unique indexes key a
-   * built-in binding on its role and a custom one on its custom role id (see
-   * `bindingKey` in the backfill migration; same two-key rule).
-   */
-  static bindingIdentityWhere({
-    organizationId,
-    binding,
-  }: {
-    organizationId: string;
-    binding: Omit<LedgerBindingAttach, "bindingId">;
-  }): AuthzRoleBindingFilter {
-    const where: AuthzRoleBindingFilter = {
-      organizationId,
-      scopeType: binding.scopeType,
-      scopeId: binding.scopeId,
-      userId: binding.principal.userId ?? null,
-      groupId: binding.principal.groupId ?? null,
-      apiKeyId: binding.principal.apiKeyId ?? null,
-    };
-    if (binding.customRoleId === null) {
-      where.role = binding.role;
-      where.customRoleId = null;
-    } else {
-      where.customRoleId = binding.customRoleId;
-    }
-    return where;
   }
 
   /**

@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",

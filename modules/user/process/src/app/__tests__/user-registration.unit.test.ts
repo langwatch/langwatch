@@ -111,4 +111,33 @@ describe("registering a credential account", () => {
       );
     });
   });
+
+  describe("given a deployment that federates and issues its own passwords (D09)", () => {
+    /** @scenario "Sign-up offers a password where the deployment issues its own" */
+    it("registers an ordinary address with a password", async () => {
+      const app = createUserTestApp({
+        dependencies: { auth: createUserTestAuth("auth0", { issuesOwnPasswords: true }) },
+      });
+
+      await expect(register(app, "sam@home.net")).resolves.toMatchObject({
+        id: expect.any(String),
+      });
+    });
+
+    /** @scenario "Sign-up offers a password where the deployment issues its own" */
+    it("still hands an address whose domain routes to a connection to that provider", async () => {
+      const app = createUserTestApp({
+        dependencies: {
+          auth: createUserTestAuth("auth0", {
+            issuesOwnPasswords: true,
+            governedDomain: "acme.com",
+          }),
+        },
+      });
+
+      await expect(register(app, "jo@acme.com")).rejects.toBeInstanceOf(
+        UserRegistrationNotAvailableError,
+      );
+    });
+  });
 });

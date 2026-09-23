@@ -32,14 +32,18 @@
   },
   "scripts": {
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/entitlement-process": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -51,6 +55,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",

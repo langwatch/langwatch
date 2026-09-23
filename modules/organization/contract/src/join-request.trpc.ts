@@ -8,6 +8,8 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
+  joinRequestAdmittedSchema,
+  joinRequestAutomaticJoinsSchema,
   joinRequestFiledSchema,
   joinRequestJoiningChangedSchema,
   joinRequestJoiningSchema,
@@ -50,6 +52,24 @@ export const joinRequestTrpc = defineTrpcContract("joinRequests")
   .withInput(z.void())
   .withOutput(joinRequestLookupSchema)
 
+  /**
+   * The same answer for somebody already signed in with an organization — the
+   * post-login offer — minus the domains they have dismissed.
+   */
+  .query("offer")
+  .withInput(z.void())
+  .withOutput(joinRequestLookupSchema)
+
+  /** "No thanks", remembered for the caller's own verified domain. */
+  .mutation("dismissOffer")
+  .withInput(z.object({}))
+  .withOutput(joinRequestWriteAckSchema)
+
+  /** Walk in, where the organization asked for that; null organization when nothing admits. */
+  .mutation("admitAutomatically")
+  .withInput(z.object({}))
+  .withOutput(joinRequestAdmittedSchema)
+
   /** Everything this person is waiting on, so a screen can say so. */
   .query("mine")
   .withInput(z.void())
@@ -83,4 +103,9 @@ export const joinRequestTrpc = defineTrpcContract("joinRequests")
   .mutation("setJoining")
   .withInput(joinRequestApiSetJoiningInputSchema)
   .withOutput(joinRequestJoiningChangedSchema)
+
+  /** Who walked in without anybody approving, lately, for the members area. */
+  .query("automaticJoins")
+  .withInput(joinRequestApiOrganizationScopeSchema)
+  .withOutput(joinRequestAutomaticJoinsSchema)
   .build();

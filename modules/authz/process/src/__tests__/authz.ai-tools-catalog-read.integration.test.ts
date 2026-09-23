@@ -11,12 +11,12 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { AuthzDatabase } from "../repositories/authz-read.repository.ts";
+import { EventingAuthzListingRepository } from "../repositories/eventing/eventing.authz-listing.repository.ts";
+import { EventingAuthzReadRepository } from "../repositories/eventing/eventing.authz-read.repository.ts";
 import {
   PrismaAuthzBindingRepository,
   type AuthzBindingDatabase,
 } from "../repositories/prisma/prisma.authz-binding.repository.ts";
-import { PrismaAuthzListingRepository } from "../repositories/prisma/prisma.authz-listing.repository.ts";
-import { PrismaAuthzReadRepository } from "../repositories/prisma/prisma.authz-read.repository.ts";
 import { AuthzService } from "../services/authz.service.ts";
 
 const DB_URL = process.env.DATABASE_URL ?? process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -29,12 +29,12 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   });
   const database = prisma as unknown as AuthzDatabase;
   const authz = AuthzService.create({
-    repository: PrismaAuthzReadRepository.create(database),
-    listing: PrismaAuthzListingRepository.create(database),
+    repository: EventingAuthzReadRepository.create(database),
+    listing: EventingAuthzListingRepository.create(database),
     bindings: PrismaAuthzBindingRepository.create({
       database: prisma as unknown as AuthzBindingDatabase,
     }),
-    isOnEngine: async () => false,
+    isOnEngine: async () => true,
   });
 
   const testNamespace = `aitools-rbac-${uniqueSuffix()}`;
@@ -60,7 +60,7 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   afterAll(async () => {
     if (!organizationId) return;
     await cleanupTestRows(prisma, [
-      ["roleBinding", { organizationId }],
+      ["grant", { organizationId }],
       ["organizationUser", { organizationId }],
       ["organization", { id: organizationId }],
       ["user", { id: liteUserId }],
@@ -71,8 +71,8 @@ describe.skipIf(!DB_URL)("given an organization publishing an AI tools catalog",
   describe("when a lite member is checked for the catalog read grant", () => {
     /** @scenario External (lite) members can also list (portal must work for everyone) */
     it("allows aiTools:view on the organization, with no binding of their own", async () => {
-      const bindings = await prisma.roleBinding.count({
-        where: { organizationId, userId: liteUserId },
+      const bindings = await prisma.grant.count({
+        where: { organizationId, principalType: "USER", principalId: liteUserId },
       });
       expect(bindings).toBe(0);
 

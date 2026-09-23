@@ -5,6 +5,7 @@ import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
   CodingAgentSessionContextUsage,
+  CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -819,7 +820,61 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
       throw error;
     }
   }
+
+  /** By session id, so a session folded twice counts once; the first is lifetime. */
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount> {
+    const window =
+      since === undefined ? "" : "AND StartedAt >= fromUnixTimestamp64Milli({since:Int64})";
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const read = async (sql: string) =>
+          usageRowsSchema.parse(
+            (
+              await this.clickhouse.query<unknown>({
+                tenantId,
+                table: TABLE_NAME,
+                kind: "read",
+                sql,
+                params: since === undefined ? { tenantId } : { tenantId, since },
+              })
+            ).rows,
+          )[0];
+        const [counted, earliest] = await Promise.all([
+          read(`
+            SELECT toString(uniqExact(SessionId)) AS Total, '0' AS FirstMs
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              ${window}`),
+          read(`
+            SELECT toString(count()) AS Total,
+                   toString(toUnixTimestamp64Milli(min(StartedAt))) AS FirstMs
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}`),
+        ]);
+        return {
+          sessions: Number.parseInt(counted?.Total ?? "0", 10),
+          first:
+            Number.parseInt(earliest?.Total ?? "0", 10) === 0
+              ? []
+              : [Number(earliest?.FirstMs ?? "0")],
+        };
+      }),
+    );
+    const firsts = perProject.flatMap((project) => project.first);
+    return {
+      sessions: perProject.reduce((sum, project) => sum + project.sessions, 0),
+      ...(firsts.length === 0 ? {} : { firstSessionAt: Math.min(...firsts) }),
+    };
+  }
 }
+
+const usageRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));
 
 const asNumberArray = (value: unknown): number[] =>
   Array.isArray(value) ? value.map(asNumber) : [];

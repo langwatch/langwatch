@@ -5,6 +5,7 @@ import {
   type PrismaTableModel,
   type PrismaTables,
 } from "./ownership.ts";
+import { withSerializationRetry } from "./serializable-retry.ts";
 
 /** The native Prisma delegates declared by one repository. */
 export type PrismaRepositoryClient<Models extends readonly PrismaTableModel[]> = Readonly<
@@ -39,13 +40,12 @@ type PrismaRepositoryBase<
   Models extends readonly PrismaTableModel[],
   Database extends PrismaRepositoryClient<Models>,
   Instance extends PrismaRepository<Models> = PrismaRepository<Models>,
-> =
-  (abstract new (prisma: Database) => Instance) & {
-    readonly tables: PrismaTables<Models>;
-    readonly factory: <Repository>(
-      factory: (prisma: Database) => Repository,
-    ) => PrismaRepositoryFactory<Database, Repository>;
-  };
+> = (abstract new (prisma: Database) => Instance) & {
+  readonly tables: PrismaTables<Models>;
+  readonly factory: <Repository>(
+    factory: (prisma: Database) => Repository,
+  ) => PrismaRepositoryFactory<Database, Repository>;
+};
 
 /**
  * Base class for a Prisma repository that owns a declared set of model delegates.
@@ -119,6 +119,15 @@ export abstract class TransactionalPrismaRepository<
   ): Promise<Result> {
     return this.#transactionClient.$transaction(callback);
   }
+
+  /** A SERIALIZABLE transaction, run again only when it lost a race (#8200). */
+  protected serializableTransaction<Result>(
+    callback: (transaction: PrismaRepositoryTransactionClient<Models>) => Promise<Result>,
+  ): Promise<Result> {
+    return withSerializationRetry(() =>
+      this.#transactionClient.$transaction(callback, { isolationLevel: "Serializable" }),
+    );
+  }
 }
 
 type RepositoryInstances<Definitions extends Record<string, PrismaRepositoryDefinition>> = {
@@ -130,12 +139,16 @@ type RepositoryClaims<Definitions extends Record<string, PrismaRepositoryDefinit
 };
 
 /** Creates the single Prisma-backed repository provider for a feature. */
-export function prismaRepositories<const Definitions extends Record<string, PrismaRepositoryDefinition>>(
+export function prismaRepositories<
+  const Definitions extends Record<string, PrismaRepositoryDefinition>,
+>(
   definitions: Definitions,
 ): Readonly<{
   readonly requires: readonly ["prisma"];
   readonly repositories: RepositoryClaims<Definitions>;
-  readonly create: (input: Readonly<{ readonly prisma: PrismaClient }>) => RepositoryInstances<Definitions>;
+  readonly create: (
+    input: Readonly<{ readonly prisma: PrismaClient }>,
+  ) => RepositoryInstances<Definitions>;
 }> {
   const entries = Object.freeze(
     Object.entries(definitions).map(([name, repository]) =>

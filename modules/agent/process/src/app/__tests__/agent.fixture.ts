@@ -1,4 +1,5 @@
 import { agentSchema, type Agent, type AgentServerConfig } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -6,7 +7,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -70,6 +71,7 @@ export function createAgentAppFixture(
     members: { redis: memoryRedis(), publicBaseUrl: "https://langwatch.test", ...options.members },
     config: options.config ?? { replicaCount: 1, relayMaxPayloadMb: void 0 },
     resources,
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
   });
 

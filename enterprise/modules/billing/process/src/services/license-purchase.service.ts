@@ -1,6 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 
+import {
+  NullBillingErrorReporter,
+  type BillingErrorReporter,
+} from "./billing-error-reporter.service.ts";
+
 const logger = createLogger("langwatch:billing:licensePurchaseHandler");
 
 export type GeneratedLicense = {
@@ -60,10 +65,28 @@ export type LicensePurchaseNotification = {
 };
 
 export abstract class LicensePurchaseDelivery {
+  /** Writes the minted license to the license registry (ADR-156), source PURCHASE. */
+  abstract recordLicense(input: { licenseKey: string }): Promise<void>;
+
   abstract sendLicenseEmail(input: LicenseEmailDelivery): Promise<void>;
 
   abstract notifyLicensePurchase(input: LicensePurchaseNotification): Promise<void>;
 }
+
+/** The fields of a completed Stripe Checkout session the purchase reads. */
+export type PurchasedCheckout = Pick<
+  Stripe.Checkout.Session,
+  "id" | "amount_total" | "currency"
+> & { customer_details: { email: string | null; name: string | null } | null };
+
+/** The one Stripe read the purchase makes: the seats bought. */
+export type CheckoutLineItems = {
+  checkout: {
+    sessions: {
+      listLineItems(id: string): Promise<{ data: readonly { quantity: number | null }[] }>;
+    };
+  };
+};
 
 /** Generates and delivers a license purchased through Stripe Checkout. */
 export class LicensePurchaseService {
@@ -71,6 +94,7 @@ export class LicensePurchaseService {
     private readonly delivery: LicensePurchaseDelivery,
     private readonly generateLicense: LicenseGenerator,
     private readonly licenseFeatures: LicenseFeaturesResolver | undefined,
+    private readonly errorReporter: BillingErrorReporter,
   ) {}
 
   static create(options: {
@@ -78,11 +102,13 @@ export class LicensePurchaseService {
     generateLicense: LicenseGenerator;
     /** Resolves what the licence's tier unlocks. Absent skips the hook. */
     licenseFeatures?: LicenseFeaturesResolver;
+    errorReporter?: BillingErrorReporter;
   }): LicensePurchaseService {
     return new LicensePurchaseService(
       options.delivery,
       options.generateLicense,
       options.licenseFeatures,
+      options.errorReporter ?? NullBillingErrorReporter.create(),
     );
   }
 
@@ -91,8 +117,8 @@ export class LicensePurchaseService {
     stripe,
     privateKey,
   }: {
-    checkoutSession: Stripe.Checkout.Session;
-    stripe: Stripe;
+    checkoutSession: PurchasedCheckout;
+    stripe: CheckoutLineItems;
     privateKey: string;
   }): Promise<void> {
     const email = checkoutSession.customer_details?.email;
@@ -119,6 +145,18 @@ export class LicensePurchaseService {
       },
       "[licensePurchaseHandler] License generated",
     );
+    // The buyer has paid: a registry that cannot be written must not stand
+    // between them and their license. Reported, and the email still goes out.
+    try {
+      await this.delivery.recordLicense({ licenseKey });
+    } catch (error) {
+      logger.error(
+        { licenseId: licenseData.licenseId, error },
+        "[licensePurchaseHandler] License could not be recorded in the registry",
+      );
+      this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
+    }
+
     const unlockedFeatures = await this.tryResolveUnlockedFeatures(licenseData.plan.type);
     await this.delivery.sendLicenseEmail({
       email,

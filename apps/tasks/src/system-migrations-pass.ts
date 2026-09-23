@@ -15,6 +15,7 @@ import {
   type IdentityEventing,
   IdentityProducerPipelinesAdapter,
   PostgresIdentityNewbornSweepAdapter,
+  PostgresIdentityOrganizationMigrationsAdapter,
   PostgresIdentityUserMigrationsAdapter,
 } from "@langwatch/identity-process";
 import {
@@ -50,6 +51,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
     }
 
     const migrations: SystemMigration[] = [];
+    migrations.push(...PostgresIdentityOrganizationMigrationsAdapter.create({ database }).build());
     if (eventing) {
       const dispatcher = EventingAuthzCommandDispatcherAdapter.create();
       const bindingIds = KsuidAuthzBindingIdAdapter.create();

@@ -79,6 +79,12 @@ export interface LangyChatTransportDeps {
   /** Fired when a turn stream terminates — the reconcile trigger. */
   onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
   /**
+   * The turn a resume reattaches to: one the durable record named and this tab adopted without
+   * dispatching it (a server-started turn, another tab's send, a refresh mid-turn). Null means
+   * nothing to reattach to. Read at resume time, never captured, like `getContext`.
+   */
+  getResumeTarget?: () => { projectId: string; conversationId: string; turnId: string } | null;
+  /**
    * Every wire entry, unfiltered and before any interpretation — the tap the developer
    * drawer's tape records from.
    */
@@ -133,23 +139,32 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
         projectId: ctx.projectId,
         conversationId,
         turnId,
-        onSignal: deps.onSignal,
-        ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
-        ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
-        ...(deps.onLocalWait ? { onLocalWait: deps.onLocalWait } : {}),
-        ...(deps.onLocalWorkspace ? { onLocalWorkspace: deps.onLocalWorkspace } : {}),
-        onSettled: deps.onTurnSettled,
-        ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
+        ...streamCallbacks(deps),
         abortSignal: options.abortSignal,
       });
     },
 
-    // Resume is a re-subscribe + a fold-query reconcile, driven by the panel on
-    // remount — not a transport-level reconnect. Returning null tells useChat
-    // there is nothing to auto-reconnect to.
+    // A turn this tab did not dispatch has no stream here until something subscribes to it: the
+    // live-only entries (navigate, ui, the text as it is written) reach a tab only through
+    // `onTurnStream`, which replays the buffered prefix first, so a resume sees the whole turn.
     async reconnectToStream() {
-      return null;
+      const target = deps.getResumeTarget?.();
+      if (!target) return null;
+      return subscribeTurnStream({ ...target, ...streamCallbacks(deps) });
     },
+  };
+}
+
+/** The entry handlers both a dispatched and a resumed stream route through. */
+function streamCallbacks(deps: LangyChatTransportDeps) {
+  return {
+    onSignal: deps.onSignal,
+    ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
+    ...(deps.onUiAction ? { onUiAction: deps.onUiAction } : {}),
+    ...(deps.onLocalWait ? { onLocalWait: deps.onLocalWait } : {}),
+    ...(deps.onLocalWorkspace ? { onLocalWorkspace: deps.onLocalWorkspace } : {}),
+    onSettled: deps.onTurnSettled,
+    ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
   };
 }
 

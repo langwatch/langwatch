@@ -2,6 +2,7 @@ import type {
   AuthzAccessBinding,
   AuthzBindingForSynthesis,
   AuthzCustomRole,
+  AuthzListApiKeyBindingsInput,
   AuthzListBindingsForSynthesisInput,
   AuthzListGroupBindingsInput,
   AuthzListOrganizationBindingsInput,
@@ -31,6 +32,10 @@ export abstract class AuthzListingRepository {
   abstract findScopeBindings: (input: AuthzListScopeBindingsInput) => Promise<AuthzAccessBinding[]>;
 
   abstract findGroupBindings: (input: AuthzListGroupBindingsInput) => Promise<AuthzAccessBinding[]>;
+
+  abstract findApiKeyBindings: (
+    input: AuthzListApiKeyBindingsInput,
+  ) => Promise<AuthzAccessBinding[]>;
 
   abstract findTeamMemberBindings: (
     input: AuthzListTeamMemberBindingsInput,

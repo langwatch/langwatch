@@ -86,6 +86,19 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the passkey is attached to "sam"'s account
     And no account is created and no address is asked for
 
+  # The settings ceremony carries no address; a sign-up ceremony carries one.
+  # A signed-in browser running the sign-up one is not adding a passkey to its
+  # own account — it is trying to create a different address's — and the plugin
+  # attaches the credential to whoever is signed in, so the new account is never
+  # made and the credential lands on the wrong one, silently. Refused instead.
+  @unit @regression
+  Scenario: A signed-in browser cannot sign up a different address's passkey
+    Given "sam" is signed in
+    When "sam"'s browser runs a passkey sign-up ceremony for "robin"'s address
+    Then the ceremony is refused because a session is already open
+    And no account is created for "robin"'s address
+    And no passkey is attached to "sam"'s account
+
   # ONE offer, two halves (D06 follow-up). A person is asked once about their
   # ACCOUNT rather than once about a passkey and again about two-step
   # verification: two dialogs on the way in is a nag whatever each one says,
@@ -134,6 +147,17 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the offer is on screen
     But it is not shown at all when the sign-in was a passkey or an identity provider
     And it is not shown for a session that recorded no method
+
+  # The dialog is mounted on every page, so closing it is not the same as
+  # answering it: the answer has to reach what the next page reads, or the
+  # offer arrives again over whatever somebody was sent to. "Set up two-step"
+  # navigates the moment it is pressed, which is where this shows first.
+  @integration
+  Scenario: A dismissal is remembered on the next page, not just in the dialog
+    Given "sam" is shown the offer and answers it with "Not now"
+    When the next page mounts the offer again
+    Then it stays closed
+    And the account was told first, so a full page load cannot lose the answer
 
   @unit @unimplemented
   Scenario: A registered passkey becomes an identifier like every other method

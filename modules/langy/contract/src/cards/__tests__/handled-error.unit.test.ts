@@ -659,6 +659,118 @@ describe("handledErrorFromThrown", () => {
 });
 
 /**
+ * A crash in our own code arrives the way a dead socket does: no HTTP status,
+ * so the derived code was `network_error` and the reader was told to check a
+ * connection that was never the fault. Read the constructor, not the status.
+ */
+describe("handledErrorFromThrown, given a fault in our own code", () => {
+  /** @scenario "a TypeError with no status is an internal error, not a network one" */
+  it("calls a bare TypeError an internal error rather than a network one", () => {
+    const parsed = handledErrorFromThrown(
+      new TypeError("Cannot read properties of undefined (reading 'length')"),
+    );
+
+    expect(parsed.code).toBe("internal_error");
+    expect(parsed.code).not.toBe("network_error");
+    expect(parsed.message).toContain("Cannot read properties of undefined");
+  });
+
+  it("still marks it as a failure the platform never named", () => {
+    const parsed = handledErrorFromThrown(new TypeError("boom"));
+
+    expect(parsed).toMatchObject({ isHandled: false, httpStatus: 0 });
+  });
+
+  it("covers the other constructors that only a program fault raises", () => {
+    for (const thrown of [new RangeError("out of range"), new ReferenceError("x is not defined")]) {
+      expect(handledErrorFromThrown(thrown).code, thrown.name).toBe("internal_error");
+    }
+  });
+
+  /** @scenario "a body that would not parse stays a network failure" */
+  it("leaves a SyntaxError a network failure, since it is a body that would not parse", () => {
+    const parsed = handledErrorFromThrown(
+      new SyntaxError("Unexpected token '<', \"<html>\" is not valid JSON"),
+    );
+
+    expect(parsed.code).toBe("network_error");
+  });
+
+  /** @scenario "fetch failed with nothing behind it is a fault in our code" */
+  it("does not take the sentence 'fetch failed' as evidence of a transport", () => {
+    const parsed = handledErrorFromThrown(new TypeError("fetch failed"));
+
+    expect(parsed.code).toBe("internal_error");
+    expect(parsed.code).not.toBe("network_error");
+  });
+
+  /** @scenario "a Node error code is not a transport code" */
+  it("keeps a Node ERR_ code a program fault, since only the transport's own codes count", () => {
+    const badUrl = Object.assign(new TypeError("Invalid URL"), {
+      code: "ERR_INVALID_URL",
+      input: "app.langwatch.ai/api",
+    });
+
+    expect(handledErrorFromThrown(badUrl).code).toBe("internal_error");
+  });
+
+  /** @scenario "a transport failure the SDK wrapped is still a transport failure" */
+  it("finds the transport under originalError, which the body reader unwraps", () => {
+    const wrapped = Object.assign(new Error("request failed"), {
+      originalError: Object.assign(new TypeError("fetch failed"), {
+        cause: Object.assign(new Error("certificate has expired"), {
+          code: "CERT_HAS_EXPIRED",
+        }),
+      }),
+    });
+
+    const parsed = handledErrorFromThrown(wrapped);
+
+    expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
+    expect(parsed.code).not.toBe("CERT_HAS_EXPIRED");
+  });
+
+  it("reads undici's own codes as the transport speaking", () => {
+    const socket = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("other side closed"), {
+        code: "UND_ERR_SOCKET",
+      }),
+    });
+
+    expect(handledErrorFromThrown(socket).code).toBe("network_error");
+  });
+
+  /** @scenario "a request that never landed is still a network failure" */
+  it("leaves a plain Error with no status a network failure", () => {
+    expect(handledErrorFromThrown(new Error("something went wrong")).code).toBe("network_error");
+  });
+
+  it("leaves the TypeError fetch throws for a dead socket a network failure", () => {
+    const transport = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5560"), {
+        errno: -61,
+        code: "ECONNREFUSED",
+        syscall: "connect",
+      }),
+    });
+
+    expect(handledErrorFromThrown(transport).code).toBe("network_error");
+  });
+
+  /** @scenario "a TLS failure is a network failure, not a code the platform chose" */
+  it("leaves a TLS failure a network failure, which carries no errno", () => {
+    const tls = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("certificate has expired"), {
+        code: "CERT_HAS_EXPIRED",
+      }),
+    });
+
+    expect(handledErrorFromThrown(tls).code).toBe("network_error");
+    expect(handledErrorFromThrown(tls).code).not.toBe("CERT_HAS_EXPIRED");
+  });
+});
+
+/**
  * Fetch failures: the cause has the system error code, not the thrown TypeError.
  */
 const systemError = ({

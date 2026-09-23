@@ -458,6 +458,43 @@ describe("NotificationService", () => {
     });
   });
 
+  describe("sendSlackSelfHostedSignal()", () => {
+    const payload = {
+      headline: "A self-hosted install crossed 100 users",
+      instanceId: "inst_1",
+      organizationName: null,
+      leadingDomain: "acme.com",
+      version: "3.1.0",
+      users: 120,
+      traces28d: 5000,
+      instanceUrl: "https://app.langwatch.ai/ops/backoffice/self-hosted-instances",
+    };
+
+    describe("when only the signups channel is configured", () => {
+      it("posts the signal there, naming the install by its domain", async () => {
+        config.slackSignupsChannel = "https://hooks.slack.com/signups";
+
+        await service.sendSlackSelfHostedSignal(payload);
+
+        expect(mockSlackSend).toHaveBeenCalledTimes(1);
+        const body = mockSlackSend.mock.calls[0]?.[0];
+        expect(body.text).toBe(payload.headline);
+        expect(JSON.stringify(body.blocks)).toContain("*Company:*\\nacme.com");
+        expect(JSON.stringify(body.blocks)).toContain("instance `inst_1`");
+      });
+    });
+
+    describe("when neither channel is configured", () => {
+      it("returns without sending", async () => {
+        config.slackSignupsChannel = undefined;
+
+        await service.sendSlackSelfHostedSignal(payload);
+
+        expect(mockSlackSend).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("sendSlackSignupEvent()", () => {
     const payload = {
       userName: "Jane Doe",

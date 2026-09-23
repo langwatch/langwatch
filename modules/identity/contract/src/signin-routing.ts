@@ -139,6 +139,8 @@ export interface RoutingDecision {
   /** What the surface offers. On a redirect, the one method it redirects to. */
   methodSet: readonly SignInMethod[];
   reasonCode: SignInRoutingReasonCode;
+  /** True when an ACTIVE organization connection fell back to local methods. */
+  domainManaged?: true;
 }
 
 /** One offered method, as a transport states it. @see SignInMethod */
@@ -157,6 +159,7 @@ export const routingDecisionSchema = z.object({
   connectionId: z.string().optional(),
   methodSet: z.array(signInMethodSchema).readonly(),
   reasonCode: z.enum(SIGNIN_ROUTING_REASON_CODES),
+  domainManaged: z.literal(true).optional(),
 });
 
 /**
@@ -239,16 +242,22 @@ function redirectOrFall({
   connection,
   policy,
   reasonCode,
+  domainManaged = false,
 }: {
   connection: RoutableConnection;
   policy: SignInMethodPolicy;
   reasonCode: SignInRoutingReasonCode;
+  /** The fall still says the domain is managed: the organization routes this
+   *  address even where this deployment cannot serve its method today. */
+  domainManaged?: boolean;
 }): RoutingDecision {
   if (!policy.federationLicensed) {
-    return picker(policy.localMethods, "method_not_licensed");
+    const fallback = picker(policy.localMethods, "method_not_licensed");
+    return domainManaged ? { ...fallback, domainManaged: true } : fallback;
   }
   if (!connection.configured) {
-    return picker(policy.localMethods, "method_not_configured");
+    const fallback = picker(policy.localMethods, "method_not_configured");
+    return domainManaged ? { ...fallback, domainManaged: true } : fallback;
   }
   return {
     outcome: "redirect_to_connection",
@@ -259,10 +268,42 @@ function redirectOrFall({
 }
 
 /**
+ * Nothing to route on. A self-hosted instance running exactly ONE active
+ * connection is the exception: there is no other connection the address could
+ * have meant, so it routes anyway.
+ */
+function routeWithoutDomain({
+  policy,
+  activeConnections,
+}: {
+  policy: SignInMethodPolicy;
+  activeConnections: readonly RoutableConnection[];
+}): RoutingDecision {
+  const sole =
+    policy.selfHosted && activeConnections.length === 1 ? activeConnections[0] : undefined;
+  if (!sole) return picker(policy.defaultMethods, "no_domain_match");
+
+  return redirectOrFall({ connection: sole, policy, reasonCode: "sole_active_connection" });
+}
+
+/**
+ * Whether this decision hands the address to an ORGANIZATION's own connection
+ * (D04). An instance-level redirect carries no connection and is not somebody's
+ * company saying how its people sign in.
+ */
+export function routesToOrganizationConnection(decision: RoutingDecision): boolean {
+  return (
+    decision.outcome === "redirect_to_connection" &&
+    decision.methodSet.some((method) => method.connectionId !== null)
+  );
+}
+
+/**
  * The whole router: read top to bottom, this is ADR-117's decision table (2026-08-25 revision).
  * The account branches sit BELOW domain routing — load-bearing, since a just-in-time-provisioned
  * hire's domain must redirect to their identity provider before any account lookup happens.
  */
+
 export function routeSignIn(input: RoutingInput): RoutingDecision {
   const { identifier, breakGlass, policy, domainConnection, activeConnections, account } = input;
 
@@ -271,14 +312,7 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
   if (breakGlass) return picker(policy.localMethods, "break_glass");
 
   if (identifier === null || identifier.domain === null) {
-    const sole =
-      policy.selfHosted && activeConnections.length === 1 ? activeConnections[0] : undefined;
-    if (!sole) return picker(policy.defaultMethods, "no_domain_match");
-    return redirectOrFall({
-      connection: sole,
-      policy,
-      reasonCode: "sole_active_connection",
-    });
+    return routeWithoutDomain({ policy, activeConnections });
   }
 
   if (domainConnection?.state === "SUSPENDED") {
@@ -289,6 +323,7 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
       connection: domainConnection,
       policy,
       reasonCode: "domain_routed",
+      domainManaged: true,
     });
   }
 
@@ -319,7 +354,31 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
   if (held.length === 0) {
     return picker(policy.defaultMethods, "no_domain_match");
   }
+
+  // One federated method and nothing else is already a routing answer: a
+  // picker with a single button costs a click and says nothing the person did
+  // not just type. Only federated, and only an INSTANCE-LEVEL one - a
+  // connection carries a lifecycle this branch cannot see (SUSPENDED,
+  // unconfigured) and every other redirect to one passes those gates.
+  const sole = held.length === 1 ? held[0] : undefined;
+  if (sole?.kind === "federated" && sole.connectionId === null) {
+    return {
+      outcome: "redirect_to_connection",
+      methodSet: [sole],
+      reasonCode: "account_methods",
+    };
+  }
+
   return picker(held, "account_methods");
+}
+
+/** Whether routing established that an organization's domain owns this address. */
+export function isOrganizationManagedDecision(decision: RoutingDecision): boolean {
+  return (
+    decision.reasonCode === "domain_routed" ||
+    decision.reasonCode === "connection_suspended" ||
+    decision.domainManaged === true
+  );
 }
 
 /**

@@ -7,6 +7,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import { revealedSecretSchema, revealOnceInputSchema } from "./one-time-reveal.ts";
 import {
   createSecretInputSchema,
   listSecretsInputSchema,
@@ -51,4 +52,10 @@ export const secretTrpc = defineTrpcContract("secrets")
   .mutation("delete")
   .withInput(secretTrpcDeleteInputSchema)
   .withOutput(secretWriteAcknowledgedSchema)
+
+  // A mutation rather than a query: reading a reveal DESTROYS it, and a query
+  // is a thing a client may retry, prefetch or cache.
+  .mutation("revealOnce")
+  .withInput(revealOnceInputSchema)
+  .withOutput(revealedSecretSchema)
   .build();

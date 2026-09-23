@@ -14,6 +14,19 @@ export type TraceSearchBody = NonNullable<
 export type TraceSearchResponse =
   paths["/api/v1/traces/search"]["post"]["responses"]["200"]["content"]["application/json"];
 
+/**
+ * What `GET /api/traces/facets` takes.
+ *
+ * `field` is what splits the two answers: without it the endpoint describes
+ * every facet the project has, with it one field's values.
+ */
+export type TraceFacetsQuery = NonNullable<
+  paths["/api/traces/facets"]["get"]["parameters"]["query"]
+>;
+
+export type TraceFacetsResponse =
+  paths["/api/traces/facets"]["get"]["responses"]["200"]["content"]["application/json"];
+
 type TraceGetResponseRaw =
   paths["/api/v1/traces/{traceId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
@@ -71,6 +84,22 @@ export class TracesApiService {
       response,
       onError: this.handleApiError.bind(this),
     });
+  }
+
+  /**
+   * What the trace filter fields actually hold in this project.
+   *
+   * The values the query reference deliberately omits: they are tenant data
+   * that moves under the caller, so they live here and the reference names this
+   * door instead of inlining a snapshot of it.
+   */
+  async facets(query?: TraceFacetsQuery): Promise<TraceFacetsResponse> {
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/traces/facets",
+      { params: { query: query ?? {} } },
+    );
+    if (error) this.handleApiError("read trace facets", error, response);
+    return data;
   }
 
   async get(traceId: string, options?: { format?: "digest" | "json" }): Promise<TraceGetResponse> {

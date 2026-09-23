@@ -15,6 +15,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   #   (?local=1)              →    local method picker       break_glass
   #   email → normalize       →    domain in ACTIVE conn?
   #     yes                   →    redirect to the IdP       domain_routed
+  #     no, sole federated    →    redirect to the IdP       account_methods
   #     no, known account     →    account's method picker   account_methods
   #     no, unknown account   →    continue to sign-up       identifier_unknown
   #     lookup not wired      →    default method picker     no_domain_match
@@ -38,7 +39,31 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the value was normalized exactly as attach-time normalization does
     And the decision carries the reason code "domain_routed"
 
-  # RETIRED, and replaced by the four scenarios below (ADR-117, revision
+  @unit @regression
+  Scenario: Sign-up never reveals account existence on an SSO domain
+    Given "acme.com" is managed by an active or suspended SSO connection
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And the response directs the visitor to their organization's sign-in method
+    And no account-existence lookup or verification email is sent
+
+  @unit @regression
+  Scenario: Sign-up never reveals account existence when managed SSO cannot route
+    Given "acme.com" is managed by an active SSO connection
+    And that connection is unlicensed or its provider is not configured
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And no account-existence lookup or verification email is sent
+
+  @unit
+  Scenario: Sign-up still guides an existing account outside SSO domains
+    Given "home.net" is not managed by an SSO connection
+    And "sam@home.net" already has a confirmed account
+    When a signed-out visitor requests a sign-up verification link for "sam@home.net"
+    Then the response is "email_already_registered"
+    And no verification email is sent
+
+  # Outside SSO-managed domains, replaced by the four scenarios below (ADR-117, revision
   # 2026-08-25). The router used to answer a known address and an unknown one
   # identically, by construction. It no longer does, and the argument is in
   # the ADR: the sign-up door already answers "does this address have an
@@ -74,13 +99,12 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up with the reason code "identifier_unknown"
 
   @unit
-  Scenario: An account still waiting for identifier backfill keeps its way in
+  Scenario: An unlatched legacy account with a password offers password sign-in
     Given "home.net" belongs to no ACTIVE connection
-    And an existing account holds "legacy@home.net"
-    And that account's identifier backfill is not finalized
-    When "legacy@home.net" is submitted to the router
-    Then the decision offers the account's legacy sign-in method
-    And the decision never routes to sign-up with the reason code "identifier_unknown"
+    And the legacy account for "sam@home.net" has not completed identifier backfill and holds a password
+    When "sam@home.net" is submitted to the router
+    Then the decision offers the password with the reason code "account_methods"
+    And the decision never routes to sign-up
 
   @unit
   Scenario: A migrated account is answered from the projection alone
@@ -98,6 +122,21 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision offers the passkey and not the password
     And the methods are ordered strongest first
     And a method this deployment does not offer is never offered
+
+  # Nearly every cloud account today holds exactly the legacy identity
+  # provider, so without this the address step answered with a picker whose
+  # one button restated the question. A sole passkey or password never
+  # redirects: the passkey's ceremony and the password's form are the screen's
+  # to draw, and both need the person still on it.
+  @unit
+  Scenario: An account whose only method is federated redirects straight to it
+    Given "home.net" belongs to no ACTIVE connection
+    And the account for "sam@home.net" holds one federated method and nothing else
+    When "sam@home.net" is submitted to the router
+    Then the decision is a redirect to that method's identity provider
+    And the decision carries the reason code "account_methods"
+    And an account also holding a second method still gets the picker
+    And a method belonging to an organization's connection keeps the picker, whose route can see the connection's state
 
   @unit
   Scenario: A connected domain routes before the account is consulted
@@ -193,10 +232,10 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   # ── Self-hosted priority ───────────────────────────────────────────────
 
   @unit
-  Scenario: A sole ACTIVE connection auto-redirects before any email is asked
+  Scenario: A sole ACTIVE connection is selected before any email is asked
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested
-    Then the decision is an immediate redirect to that identity provider
+    Then the decision selects that identity provider for sign-in
     And the decision carries the reason code "sole_active_connection"
 
   @unit
@@ -212,6 +251,13 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the sign-in page is requested
     Then the configured provider is the offered method, exactly as before
     And a second method can be added without ending the first
+
+  @unit
+  Scenario: The provider setting answers to its modern name
+    Given a deployment setting AUTH_PROVIDER
+    Then the configured provider applies exactly as the legacy name configured it
+    And a deployment still setting only NEXTAUTH_PROVIDER keeps working and is warned once that the name is deprecated
+    And when both are set the modern name wins
 
   # ── Which social providers the door offers ─────────────────────────────
   #
@@ -231,9 +277,128 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
 
   @unit
   Scenario: A social provider this deployment never mounted is never offered
-    Given credentials are present for a social provider this deployment does not mount
+    Given a social provider's credentials are incomplete, so better-auth never mounted it
     When the sign-in page is requested
     Then that provider is not one of the offered methods
+
+  # Retiring the NextAuth-era "exactly one provider" rule is what lets the
+  # native providers mount beside the Auth0 broker during its migration
+  # (D09). Setting a client id and secret is the mounting decision; the
+  # provider env keeps selecting the generic-OAuth branch and leading the
+  # rail, and a provider env naming something unmountable still lands in
+  # email mode even while another provider's credentials are present.
+  @unit
+  Scenario: Social providers mount on their credentials, not on the provider env
+    Given credentials are present for two social identity providers
+    And the provider env names only one of them
+    When the sign-in page is requested
+    Then both providers are among the offered methods
+    And a provider whose credentials are absent is still never offered
+    And a deployment that chose email mode mounts and offers no social provider, whatever credentials linger
+    And a provider env naming something unmountable still lands in email mode with the password offered
+
+  # ── The Auth0 connection bridge (deliberately short-term, D09) ─────────
+  #
+  # SaaS's social sign-ins still broker through Auth0. Until they are native,
+  # the door shows each brokered connection as its own branded button, and
+  # clicking one dials Auth0 pre-scoped to that connection — the person picks
+  # their provider exactly once, on our screen, and Auth0's own picker never
+  # appears. Self-hosted Auth0 deployments are untouched: their tenant's
+  # connections have names no hardcoded bridge may guess, so they keep the
+  # generic hand-off to Auth0's own screen.
+
+  @unit
+  Scenario: SaaS shows the broker's social connections as their own buttons
+    Given a SaaS deployment whose provider is the Auth0 broker
+    When the sign-in page is requested
+    Then Google, GitHub and Microsoft are offered as branded methods ahead of the generic one
+    And dialing a branded method names the connection Auth0's own screen offered
+    And a self-hosted Auth0 deployment is offered only the generic method
+
+  @unit
+  Scenario: An account brokered through a social connection routes to its own button
+    Given the account for "sam@home.net" signed in through the broker's Google connection
+    When "sam@home.net" is submitted to the router on SaaS
+    Then the decision redirects to the branded Google method
+    And an account the broker holds as a database user keeps the generic method
+
+  # How the bridge ends: one provider at a time, on its credentials. Mounting
+  # a native client for a bridged provider IS that provider's cutover — the
+  # rail can never draw two buttons that both say "Continue with Google", and
+  # the accounts already brokered through that connection must follow the
+  # button the rail actually draws, or ranking drops them onto the generic
+  # picker the bridge exists to avoid.
+  @unit
+  Scenario: A natively mounted provider takes over its own bridge button
+    Given a SaaS deployment whose provider is the Auth0 broker
+    And credentials are present for the native Google provider
+    When the sign-in page is requested
+    Then the native Google method stands in the bridge's Google slot
+    And the providers with no native credentials keep their branded bridge methods
+    And an account brokered through the Google connection routes to the native method
+
+  # What of the ask survives on every deployment: the address was already
+  # typed once, on our screen, and typing it again on the provider's is the
+  # provider's screen failing to be told.
+  @unit
+  Scenario: The address typed on our screen rides along to the identity provider
+    Given an address that routes to a federated method
+    When the hand-off to the provider is dialed
+    Then the address is sent as the sign-in hint so the provider's screen arrives prefilled
+
+  # ── A deployment that issues its own passwords (D09) ───────────────────
+  #
+  # The rule this relaxes came from NextAuth: a deployment offered EITHER a
+  # provider OR passwords, never both, so nobody could sidestep the configured
+  # identity provider. On a deployment brokering through Auth0 that sentence
+  # is already untrue — the broker's own screen offers a password box and a
+  # sign-up link — so the door exists and is merely hosted elsewhere. Turning
+  # this on moves it here, which is what stops every new password account
+  # being minted inside the tenant we are leaving.
+  #
+  # Off by default, and email mode never asks: a deployment with no provider
+  # issues its own passwords by definition.
+
+  @unit
+  Scenario: A deployment that issues its own passwords offers one beside its provider
+    Given a deployment whose provider is configured and licensed
+    And that deployment issues its own passwords
+    When the sign-in page is requested
+    Then the password is offered alongside the federated methods
+    And the federated methods still lead the rail
+    And a deployment that does not issue its own passwords offers no password beside them
+
+  # The gate that would otherwise refuse the very form the door just drew.
+  @unit
+  Scenario: The credential routes answer on a deployment that offers a password
+    Given a deployment whose offered methods include a password and a federated method
+    When a credential sign-in is attempted
+    Then the request is not refused as provider-managed
+    And a deployment offering only federated methods still refuses it
+
+  # The switch has to reach the enrolment half too, or the door offers a
+  # password that nothing will create.
+  @unit
+  Scenario: Sign-up offers a password where the deployment issues its own
+    Given a deployment that federates and issues its own passwords
+    When an unknown address reaches the sign-up decision
+    Then a password is among the ways it may enroll
+    And an address whose domain routes to a connection is still handed to that provider
+
+  # The deployment saying "a password is offered here" and a company saying
+  # "my people sign in through us" are different claims, and the second wins.
+  # An organization mandating a connection gets session lifetime, conditional
+  # access and revocation from its own provider, and a local password beside
+  # that connection answers none of them — so the widening is refused for
+  # exactly those addresses, at the boundary as well as on the screen.
+  @unit
+  Scenario: An organization's own connection still refuses a local password
+    Given a deployment that federates and issues its own passwords
+    And an address its organization routes through its own identity provider
+    When a credential sign-in or a password reset is attempted for that address
+    Then the request is refused as provider-managed
+    And an ordinary address on the same deployment is let through
+    And setting a first password for that address is refused as well
 
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 

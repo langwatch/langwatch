@@ -31,7 +31,12 @@ const featureFlagRuleMatchSchema = z
      * with the other conditions rather than replacing them, so "20% of this
      * organization" is one rule.
      */
-    percentage: z.number().int().min(0).max(100).optional(),
+    percentage: z
+      .number()
+      .int()
+      .min(0, "A rollout percentage must be between 0 and 100")
+      .max(100, "A rollout percentage must be between 0 and 100")
+      .optional(),
     /**
      * Team QA in production: matches every signed-in user whose email is at
      * one of these lowercase domains (no `@`), compared exactly against the

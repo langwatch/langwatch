@@ -123,14 +123,11 @@ export class WebhookApp implements WebhookApiContract {
   /** The entitlement peer this app's own plan gate reads, composed in
    *  {@link buildWebhookComposition} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
-  /** The one raw member this app derives collaborators from: the durable
-   *  store a health read shares with the worker's delivery process manager.
-   *  `rateLimiter` is the test-fire door's per-organization counter. */
-  static readonly reads = reads("prisma", "rateLimiter");
+  /** The test-fire door's per-organization counter. */
+  static readonly reads = reads("rateLimiter");
 
   static create(input: WebhookSetup): WebhookApp {
     const built = buildWebhookComposition({
-      prisma: input.members.prisma,
       entitlement: input.dependencies.entitlement,
     });
 
@@ -143,7 +140,7 @@ export class WebhookApp implements WebhookApiContract {
       }),
       health: WebhookHealthService.create({
         endpoints: input.repositories.endpoints,
-        processStore: built.processStore,
+        processStore: input.repositories.processStore,
       }),
       assertEndpointsEntitled: built.assertEndpointsEntitled,
       dispatch: built.dispatch,
@@ -152,7 +149,7 @@ export class WebhookApp implements WebhookApiContract {
         rateLimiter: input.members.rateLimiter,
       }),
       endpointStream: WebhookEndpointStreamService.create({
-        processStore: built.processStore,
+        processStore: input.repositories.processStore,
       }),
     });
   }

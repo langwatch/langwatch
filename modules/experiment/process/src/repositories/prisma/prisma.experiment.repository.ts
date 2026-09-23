@@ -5,6 +5,7 @@ import {
   ExperimentVersionNotFoundError,
   type Experiment,
   type ExperimentType,
+  type ExperimentUsageCount,
   type SaveExperimentInput,
   type WorkbenchActor,
   type WorkbenchStateView,
@@ -80,6 +81,27 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     return this.database.experiment.count({
       where: { projectId: input.projectId, archivedAt: null },
     });
+  }
+
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<ExperimentUsageCount> {
+    const scope = { projectId: { in: [...projectIds] } };
+    const [experiments, first] = await Promise.all([
+      this.database.experiment.count({
+        where: since === undefined ? scope : { ...scope, createdAt: { gte: new Date(since) } },
+      }),
+      this.database.experiment.findFirst({
+        where: scope,
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    return { experiments, ...(first ? { firstExperimentAt: first.createdAt.getTime() } : {}) };
   }
 
   async findLatest(input: { projectId: string }): Promise<Experiment | null> {

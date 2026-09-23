@@ -1,3 +1,4 @@
+import type { GithubUsageCount } from "@langwatch/github-contract";
 import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
@@ -63,6 +64,20 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
 
   private constructor(private readonly prisma: PrismaGithubPullRequestsDatabase) {
     super();
+  }
+
+  async countUsage({
+    organizationIds,
+    since,
+  }: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<GithubUsageCount> {
+    const scope = { organizationId: { in: [...organizationIds] } };
+    const pullRequests = await this.prisma.githubPullRequest.count({
+      where: since === undefined ? scope : { ...scope, prCreatedAt: { gte: new Date(since) } },
+    });
+    return { pullRequests };
   }
 
   async upsertPullRequests({

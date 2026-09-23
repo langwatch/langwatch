@@ -40,8 +40,8 @@ const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
 const DISPATCH_LAG_ATTEMPTS = 12;
 const DISPATCH_LAG_RETRY_MS = 400;
 /**
- * How many attempts may pass with no pending handoff before concluding the id
- * is unknown. Cannot be zero: the handoff row is written by the dispatch
+ * How many attempts may pass with no admitted-turn receipt before concluding
+ * the id is unknown. Cannot be zero: the receipt is written by the send
  * itself, so an immediate read can find no evidence and wrongly return not-found.
  */
 const DISPATCH_HANDOFF_GRACE_ATTEMPTS = 3;
@@ -51,7 +51,7 @@ const conversationServiceLogger = createLogger("langwatch:langy:conversation-ser
 /**
  * Reading a conversation back: one by id, the event tail after a cursor, the local-control
  * record, and the sidebar's list and page. Every read tolerates the dispatch window, where an
- * accepted create has a pending handoff before its projection row lands.
+ * admitted send has a turn receipt before its projection row lands.
  */
 type LangyConversationReadOptions = {
   repository: LangyConversationRepository;
@@ -66,9 +66,9 @@ export class LangyConversationReadService {
   private constructor(private readonly deps: LangyConversationReadOptions) {}
 
   /**
-   * The visibility read, tolerant of the DISPATCH window: a just-accepted
-   * create has a pending handoff before its projection row lands, so "missing
-   * row + pending handoff" means NOT YET, retried briefly rather than reported as absent.
+   * The visibility read, tolerant of the DISPATCH window: a just-admitted
+   * send has a turn receipt before its projection row lands, so "missing row
+   * + receipt" means NOT YET, retried briefly rather than reported as absent.
    */
   private async findVisibleToleratingDispatchLag({
     id,
@@ -89,13 +89,13 @@ export class LangyConversationReadService {
         return row;
       }
 
-      // Re-asked every beat, not once up front: the handoff row lands on the
-      // same dispatch we are waiting for, so "no handoff yet" early on means
-      // "too soon to tell", not "no such conversation".
-      const handoff = await this.deps.repository
-        .tryFindPendingHandoff({ projectId, conversationId: id })
-        .catch(() => null);
-      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) {
+      // Re-asked every beat, not once up front: the receipt lands on the same
+      // send we are waiting for, so "no receipt yet" early on means "too soon
+      // to tell", not "no such conversation".
+      const admitted = await this.deps.repository
+        .hasAdmittedTurn({ projectId, conversationId: id, userId })
+        .catch(() => false);
+      if (!admitted && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) {
         return null;
       }
 

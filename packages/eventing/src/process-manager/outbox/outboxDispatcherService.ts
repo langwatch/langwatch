@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   propagation,
@@ -9,6 +10,7 @@ import {
   type Tracer,
   trace,
 } from "@opentelemetry/api";
+
 import {
   incrementEsProcessOutboxTotal,
   observeEsProcessOutboxDispatchLag,
@@ -36,6 +38,11 @@ export interface DispatchableMessage {
   sourceEventId: string | null;
   /** 1-based delivery attempt. */
   attempt: number;
+  /**
+   * When this delivery's lease lapses, in the dispatcher's clock: past it
+   * another dispatcher may lease the message, so paid work bounds itself by it.
+   */
+  leaseExpiresAt: number;
 }
 
 /**
@@ -489,6 +496,8 @@ export class OutboxDispatcherService {
           payload: message.payload,
           sourceEventId: message.sourceEventId,
           attempt,
+          // The store anchored the lease at this drain's `now`.
+          leaseExpiresAt: now + this.leaseDurationMs,
         },
       });
       const { applied } = await this.store.markDispatched({

@@ -224,3 +224,18 @@ describe("the SCIM request log", () => {
     });
   });
 });
+
+describe("the reconciliation overview", () => {
+  describe("given an organization whose plan does not include directory sync", () => {
+    it("refuses with the plan code, while the request log stays readable", async () => {
+      const { app } = scimTestApp({ scim: new ScimServiceFake(), planType: "FREE" });
+
+      await expect(
+        app.getDirectoryReconciliation({ organizationId: ORGANIZATION }),
+      ).rejects.toMatchObject({ code: "enterprise_plan_required" });
+      await expect(
+        app.findDirectoryRequests({ organizationId: ORGANIZATION, connectionId: CONNECTION }),
+      ).resolves.toEqual([]);
+    });
+  });
+});

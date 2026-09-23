@@ -290,10 +290,8 @@ export function createInstantEvalJudgePageHandler(
       outcome = await deps.executor.judgePage({
         ...payload,
         keyColumns: payload.keyColumns,
-        // Null until the runtime publishes when a delivery's lease lapses: a
-        // page that cannot see its own deadline stops on its token budget and
-        // its row cap alone (handoff §10, the eventing gap).
-        deadlineAt: null,
+        // The page stops before its lease lapses, so no paid judgment runs twice.
+        deadlineAt: intentContext.leaseExpiresAt ?? null,
       });
     } catch (error) {
       await handleInstantEvalIntentFailure({ deps, payload, error, intentContext, context });

@@ -49,23 +49,37 @@ import {
   type ScimTokenEntitlement,
   type ScimTokenSummary,
   type ScimUser,
+  type DirectoryIdentityRow,
+  type ListOversightSyncsInput,
+  type OversightConnectionInput,
+  type OversightSync,
+  type OversightSyncList,
+  type RedriveRetiredApplyInput,
+  type RedriveRetiredApplyResult,
+  type ScimOperator,
 } from "@langwatch/enterprise-scim-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
+  EnterprisePlanRequiredError,
   EntitlementApi,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
+import type { ZodError } from "zod";
 
-import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";
+import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
+import { ScimDeprovisionService } from "../services/scim-deprovision.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
+import { ScimOversightService } from "../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../services/scim-reconciliation.service.ts";
 import type { ScimSyncLifecycle } from "./scim.members.ts";
 
@@ -86,7 +100,8 @@ export type ScimBespokeMembers = Readonly<{
 type ScimSetup = FeatureSetup<
   typeof ScimApp.dependencies,
   ScimBespokeMembers & MembersRead<typeof ScimApp.reads>,
-  ScimServerConfig
+  ScimServerConfig,
+  ScimRepositories
 >;
 
 /** The protocol's own document for one refusal, at one status. */
@@ -98,6 +113,32 @@ function scimRefusal(status: number, detail: string): ScimProtocolError {
   };
 
   return new ScimProtocolError(response);
+}
+
+/**
+ * What a refused body is filed as, and what the directory is told: the field
+ * paths the schema refused, never the parser's own dump.
+ */
+function requestBodyRefusal(invalid: ZodError | undefined): {
+  reason: ScimRefusalReason;
+  detail: string;
+} {
+  if (!invalid) {
+    return { reason: "malformed_body", detail: "The request body could not be read as JSON" };
+  }
+  const fields = [
+    ...new Set(
+      invalid.issues.map((issue) => issue.path.join(".")).filter((path) => path.length > 0),
+    ),
+  ];
+
+  return {
+    reason: "invalid_resource",
+    detail:
+      fields.length > 0
+        ? `The resource is not valid: ${fields.join(", ")}`
+        : "The resource is not valid",
+  };
 }
 
 /**
@@ -151,6 +192,21 @@ function findBearer(authorization: string | null): string | null {
   return token.length > 0 ? token : null;
 }
 
+/** Whether this user is on the staff list that may read across every customer. */
+type ScimOperatorGate = (userId: string) => Promise<boolean>;
+
+type ScimAppOptions = {
+  scim: ScimService;
+  connections: ScimConnectionsService;
+  reconciliation: ScimReconciliationService;
+  entitlements: Pick<EntitlementApi, "getActivePlan">;
+  auditLog: Pick<AuditLogApi, "record">;
+  webhookSecret: () => string | undefined;
+  /** Absent in a test that exercises only the protocol doors. */
+  oversight?: ScimOversightService;
+  operators?: ScimOperatorGate;
+};
+
 export class ScimApp implements ScimApiContract {
   static readonly contract = ScimApi;
   static readonly dependencies = {
@@ -161,10 +217,11 @@ export class ScimApp implements ScimApiContract {
     auditLog: AuditLogApi,
     identity: IdentityApi,
     organization: OrganizationApi,
+    operators: OpsApi,
   };
   static readonly config = scimConfig;
   static readonly secrets = scimSecrets;
-  static readonly reads = reads("prisma");
+  static readonly reads = reads();
 
   readonly #scim: ScimService;
   readonly #connections: ScimConnectionsService;
@@ -173,16 +230,13 @@ export class ScimApp implements ScimApiContract {
   readonly #webhook: ScimDirectoryStreamService;
   readonly #retirement: ScimConnectionRetirementService;
   readonly #reconciliation: ScimReconciliationService;
+  readonly #oversight: ScimOversightService | undefined;
+  readonly #operators: ScimOperatorGate | undefined;
 
-  private constructor(options: {
-    scim: ScimService;
-    connections: ScimConnectionsService;
-    reconciliation: ScimReconciliationService;
-    entitlements: Pick<EntitlementApi, "getActivePlan">;
-    auditLog: Pick<AuditLogApi, "record">;
-    webhookSecret: () => string | undefined;
-  }) {
+  private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
+    this.#oversight = options.oversight;
+    this.#operators = options.operators;
     this.#connections = options.connections;
     this.#reconciliation = options.reconciliation;
     this.#entitlements = options.entitlements;
@@ -199,10 +253,10 @@ export class ScimApp implements ScimApiContract {
   }
 
   static async create(setup: ScimSetup): Promise<ScimApp> {
-    const { dependencies, members, config, secrets } = setup;
+    const { dependencies, members, config, secrets, repositories } = setup;
     const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
     const scim = PostgresScimService.create({
-      repository: PrismaScimRepository.create(members.prisma),
+      repository: repositories.scim,
       writer: dependencies.authorization,
       users: dependencies.users,
       governance: dependencies.governance,
@@ -224,6 +278,21 @@ export class ScimApp implements ScimApiContract {
       entitlements: dependencies.entitlements,
       auditLog: dependencies.auditLog,
       webhookSecret: () => auth0WebhookSecret,
+      oversight: ScimOversightService.create({
+        syncs: () => dependencies.identity.scimSyncReads(),
+        organizations: dependencies.organization,
+        identities: repositories.scim,
+        lifecycle: members.lifecycle,
+        deprovision: ScimDeprovisionService.create({
+          grants: dependencies.authorization,
+          lifecycle: members.lifecycle,
+          organization: dependencies.organization,
+        }),
+      }),
+      operators: async (userId) => {
+        const profile = await dependencies.users.findById({ id: userId });
+        return dependencies.operators.isAdmin({ email: profile?.email });
+      },
     });
   }
 
@@ -232,15 +301,13 @@ export class ScimApp implements ScimApiContract {
    * and the two peers the doors exercise, without a real database or the
    * three peers `create` resolves only to build the service.
    */
-  static createWithService(options: {
-    scim: ScimService;
-    connections: ScimConnectionsService;
-    reconciliation: ScimReconciliationService;
-    entitlements: Pick<EntitlementApi, "getActivePlan">;
-    auditLog: Pick<AuditLogApi, "record">;
-    webhookSecret: () => string | undefined;
-  }): ScimApp {
+  static createWithService(options: ScimAppOptions): ScimApp {
     return new ScimApp(options);
+  }
+
+  /** Drops recorded requests past their retention window; the worker's sweep. */
+  sweepExpiredRequests(input: { now: Instant }): Promise<number> {
+    return this.#scim.sweepExpiredRequests(input);
   }
 
   // ── The organization's provisioning tokens ───────────────────────────────
@@ -340,7 +407,12 @@ export class ScimApp implements ScimApiContract {
     return this.#scim.verifyToken(input);
   }
 
-  getDirectoryReconciliation(input: ScimReconciliationScope): Promise<OrganizationReconciliation> {
+  /** Plan-gated, unlike the request log: main's reconciliation read asks the plan. */
+  async getDirectoryReconciliation(
+    input: ScimReconciliationScope,
+  ): Promise<OrganizationReconciliation> {
+    if (!(await this.isEnterpriseEntitled(input))) throw new EnterprisePlanRequiredError("SCIM");
+
     return this.#reconciliation.getAll(input);
   }
 
@@ -348,6 +420,60 @@ export class ScimApp implements ScimApiContract {
     const entries = await this.#scim.findRequestLog({ ...input, limit: SCIM_REQUEST_FEED_LIMIT });
 
     return entries.map(({ organizationId: _tenant, connectionId: _connection, ...entry }) => entry);
+  }
+
+  // ── The platform operator's oversight (ADR-122) ─────────────────────────
+
+  listOversightSyncs(input: ListOversightSyncsInput, by: ScimOperator): Promise<OversightSyncList> {
+    return this.#overseen(by, "getAll", { page: input.page }, (oversight) => oversight.list(input));
+  }
+
+  findOversightSync(input: OversightConnectionInput, by: ScimOperator): Promise<OversightSync[]> {
+    return this.#overseen(by, "getById", { ...input }, (oversight) => oversight.find(input));
+  }
+
+  findDirectoryIdentities(
+    input: OversightConnectionInput,
+    by: ScimOperator,
+  ): Promise<DirectoryIdentityRow[]> {
+    return this.#overseen(by, "directoryIdentities", { ...input }, (oversight) =>
+      oversight.findDirectoryIdentities(input),
+    );
+  }
+
+  redriveRetiredApply(
+    input: RedriveRetiredApplyInput,
+    by: ScimOperator,
+  ): Promise<RedriveRetiredApplyResult> {
+    return this.#overseen(by, "redriveRetiredApply", { ...input }, (oversight, operator) =>
+      oversight.redriveRetiredApply({ ...input, operator }),
+    );
+  }
+
+  /**
+   * Gate, then record, then act: the record lands before the act so an act
+   * that then failed is still in the trail. Anyone off the staff list gets a
+   * 404 that says nothing about why; an impersonator is checked, not the user.
+   */
+  async #overseen<T>(
+    by: ScimOperator,
+    action: string,
+    args: Record<string, string | number>,
+    act: (oversight: ScimOversightService, operator: { userId: string }) => Promise<T>,
+  ): Promise<T> {
+    const userId = by.impersonatorId ?? by.id;
+    const oversight = this.#oversight;
+    const isOperator = this.#operators ? await this.#operators(userId) : false;
+    if (!oversight || !isOperator) throw new AdminSurfaceHiddenError();
+    await this.#auditLog.record({
+      userId,
+      action: `scimOversight.${action}`,
+      args: { ...args },
+      targetKind: "scimSync",
+      ...(typeof args.connectionId === "string" ? { targetId: args.connectionId } : {}),
+    });
+
+    return act(oversight, { userId });
   }
 
   /**
@@ -376,6 +502,27 @@ export class ScimApp implements ScimApiContract {
       reason,
       detail,
     });
+  }
+
+  async refuseRequestBody(input: {
+    organizationId: string;
+    connectionId?: string | null | undefined;
+    method: string;
+    resource: string;
+    invalid?: ZodError | undefined;
+  }): Promise<never> {
+    const refusal = requestBodyRefusal(input.invalid);
+    void this.#scim.recordRequest({
+      organizationId: input.organizationId,
+      connectionId: input.connectionId ?? null,
+      method: input.method,
+      resource: input.resource,
+      status: 400,
+      reason: refusal.reason,
+      detail: refusal.detail,
+    });
+
+    throw scimRefusal(400, refusal.detail);
   }
 
   // ── SCIM 2.0 users ───────────────────────────────────────────────────────

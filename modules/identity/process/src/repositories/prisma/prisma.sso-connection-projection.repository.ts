@@ -3,7 +3,11 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
-import { DEFAULT_SSO_ARRIVAL_POLICY, isSsoArrivalPolicy } from "@langwatch/identity-contract";
+import {
+  DEFAULT_SSO_ARRIVAL_POLICY,
+  isSsoArrivalPolicy,
+  ssoDomainClaimSchema,
+} from "@langwatch/identity-contract";
 import type {
   SsoConnectionLifecycleState,
   SsoConnectionSource,
@@ -14,12 +18,24 @@ import type {
   SsoVerificationMethod,
 } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient, SsoConnection } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
+import {
+  isTerminalSsoConnection,
+  ownedVerifiedDomains,
+  verifiedDomainCanBeShared,
+} from "../../rules/sso-domain-ownership.rules.ts";
 import type { SsoEngineProviderProjection } from "../sso-engine-provider.repository.ts";
+import { PrismaSsoBreakGlassRepository } from "./prisma.sso-break-glass.repository.ts";
 
-/** The one model the connection head reads and writes, and no other. */
-export type PrismaSsoConnectionProjectionDatabase = Pick<PrismaClient, "ssoConnection">;
+/** The connection head, and the ownership rows written in the same transaction. */
+export type PrismaSsoConnectionProjectionDatabase = Pick<
+  PrismaClient,
+  "ssoConnection" | "$transaction"
+>;
+
+const storedDomainClaimsSchema = z.array(ssoDomainClaimSchema).catch([]);
 
 /** The proof condition a decoded row carries. A row written before ADR-123
  *  has none and reads as VERIFIED: nothing had doubted it, and fabricating a
@@ -90,6 +106,7 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       type: state.type,
       state: state.state,
       claimedDomains: state.claimedDomains,
+      domainClaims: state.domainClaims,
       approvedDomains: state.approvedDomains,
       verifiedDomains: state.verifiedDomains,
       // Prisma's `InputJsonValue` does not accept a typed array directly (it
@@ -128,14 +145,45 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       createdAt: new Date(state.createdAtMs),
       updatedAt: new Date(state.updatedAtMs),
     };
-    await this.prisma.ssoConnection.upsert({
-      where: { id },
-      create: { id, ...columns },
-      update: columns,
+    // The head and the ownership rows together, or neither: the owner row is
+    // what the database refuses a second organization on.
+    await this.prisma.$transaction(async (tx) => {
+      const reservations = state.ActivationReservationCommandIds ?? [];
+      const terminal = isTerminalSsoConnection(state.state);
+      if (reservations.length > 0 || terminal) {
+        await PrismaSsoBreakGlassRepository.lockOrganizationInTransaction(tx, state.organizationId);
+      }
+      await tx.ssoConnection.upsert({
+        where: { id },
+        create: { id, ...columns },
+        update: columns,
+      });
+      await projectDomainOwnership({ tx, connectionId: id, state });
+      for (const commandId of reservations) {
+        await PrismaSsoBreakGlassRepository.consumeReservationInTransaction(tx, {
+          organizationId: state.organizationId,
+          connectionId: id,
+          commandId,
+        });
+      }
+      if (terminal) {
+        await PrismaSsoBreakGlassRepository.cancelReservationInTransaction(tx, {
+          organizationId: state.organizationId,
+          connectionId: id,
+        });
+      }
     });
     await this.engineProvider?.project({
       connection: { ...state, connectionId: id },
     });
+  }
+
+  /** The ownership rows a head holds, inside the caller's transaction (the backfill's write). */
+  static async projectOwnershipInTransaction(
+    tx: Prisma.TransactionClient,
+    { connectionId, state }: { connectionId: string; state: SsoConnectionState },
+  ): Promise<void> {
+    await projectDomainOwnership({ tx, connectionId, state });
   }
 
   /**
@@ -150,6 +198,7 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       type: row.type as SsoConnectionType,
       state: row.state as SsoConnectionLifecycleState,
       claimedDomains: row.claimedDomains,
+      domainClaims: storedDomainClaimsSchema.parse(row.domainClaims),
       approvedDomains: row.approvedDomains,
       verifiedDomains: row.verifiedDomains,
       domainVerifications: Array.isArray(row.domainVerifications)
@@ -187,6 +236,91 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       finalizedAtMs: row.finalizedAt?.getTime() ?? null,
     };
   }
+}
+
+/**
+ * The ownership rows this connection's proved domains hold; rows it no longer
+ * holds are dropped, so a withdrawn domain can be proved by the next
+ * organization. The constraints close the cross-organization race.
+ */
+async function projectDomainOwnership({
+  tx,
+  connectionId,
+  state,
+}: {
+  tx: Prisma.TransactionClient;
+  connectionId: string;
+  state: SsoConnectionState;
+}): Promise<void> {
+  const held = ownedVerifiedDomains(state);
+  const projected = await tx.ssoVerifiedDomainHolder.findMany({
+    where: { connectionId },
+    select: { domain: true },
+  });
+  const released = projected
+    .map((holder) => holder.domain)
+    .filter((domain) => !held.includes(domain));
+  if (released.length > 0) {
+    await tx.ssoVerifiedDomainHolder.deleteMany({
+      where: { connectionId, domain: { in: released } },
+    });
+    await tx.ssoVerifiedDomain.deleteMany({
+      where: { domain: { in: released }, holders: { none: {} } },
+    });
+  }
+  for (const domain of held) {
+    await projectDomainHolder({ tx, domain, connectionId, organizationId: state.organizationId });
+  }
+}
+
+async function projectDomainHolder({
+  tx,
+  domain,
+  connectionId,
+  organizationId,
+}: {
+  tx: Prisma.TransactionClient;
+  domain: string;
+  connectionId: string;
+  organizationId: string;
+}): Promise<void> {
+  await tx.ssoVerifiedDomain.createMany({
+    data: [{ domain, organizationId }],
+    skipDuplicates: true,
+  });
+  const ownership = await tx.ssoVerifiedDomain.findUnique({
+    where: { domain },
+    select: { organizationId: true, holders: { select: { connectionId: true } } },
+  });
+  // Plain errors on purpose: the guards refuse these first, so reaching one
+  // is a race the database closed, not something a caller can act on.
+  if (ownership === null || ownership.organizationId !== organizationId) {
+    throw new Error(
+      `sso_domain_owned_elsewhere: ${connectionId} folded ${domain}, already owned by another organization`,
+    );
+  }
+  if (ownership.holders.some((holder) => holder.connectionId === connectionId)) return;
+  if (ownership.holders.length === 0) {
+    await tx.ssoVerifiedDomainHolder.create({ data: { domain, connectionId, organizationId } });
+    return;
+  }
+  const existingConnectionId = ownership.holders[0]?.connectionId;
+  if (ownership.holders.length > 1 || existingConnectionId === undefined) {
+    throw new Error(`sso_domain_replacement_pair_full: ${connectionId} cannot hold ${domain}`);
+  }
+
+  const pair = await tx.ssoConnection.findMany({
+    where: { id: { in: [existingConnectionId, connectionId] } },
+    select: { id: true, organizationId: true, replacesConnectionId: true },
+  });
+  const existing = pair.find((connection) => connection.id === existingConnectionId);
+  const incoming = pair.find((connection) => connection.id === connectionId);
+  if (!existing || !incoming || !verifiedDomainCanBeShared({ existing, incoming })) {
+    throw new Error(
+      `sso_domain_replacement_mismatch: ${connectionId} cannot share ${domain} with ${existingConnectionId}`,
+    );
+  }
+  await tx.ssoVerifiedDomainHolder.create({ data: { domain, connectionId, organizationId } });
 }
 
 /** A ceremony written before ceremonies could expire has no deadline, and a

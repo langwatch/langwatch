@@ -45,6 +45,12 @@ import {
   FINALIZE_MIGRATION_COMMAND_TYPE,
   type FinalizeMigrationCommandData,
   finalizeMigrationCommandDataSchema,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  type RecordDomainProofPresentCommandData,
+  recordDomainProofAbsentCommandDataSchema,
+  recordDomainProofPresentCommandDataSchema,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
@@ -59,6 +65,9 @@ import {
   requestTeardownCommandDataSchema,
   requestVerificationCommandDataSchema,
   resumeConnectionCommandDataSchema,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  type SetArrivalPolicyCommandData,
+  setArrivalPolicyCommandDataSchema,
   type SsoConnectionCommand,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SuspendConnectionCommandData,
@@ -291,3 +300,27 @@ export const FinalizeMigrationCommand = connectionCommand({
   verb: "finalizeMigration",
 });
 export type FinalizeMigrationPayload = FinalizeMigrationCommandData;
+
+export const SetArrivalPolicyCommand = connectionCommand({
+  type: SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  schema: setArrivalPolicyCommandDataSchema,
+  description: "Choose what happens to a person this connection has never seen",
+  verb: "setArrivalPolicy",
+});
+export type SetArrivalPolicyPayload = SetArrivalPolicyCommandData;
+
+export const RecordDomainProofAbsentCommand = connectionCommand({
+  type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  schema: recordDomainProofAbsentCommandDataSchema,
+  description: "Record that a re-check found a domain's ownership proof gone",
+  verb: "recordDomainProofAbsent",
+});
+export type RecordDomainProofAbsentPayload = RecordDomainProofAbsentCommandData;
+
+export const RecordDomainProofPresentCommand = connectionCommand({
+  type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  schema: recordDomainProofPresentCommandDataSchema,
+  description: "Record that a re-check found a domain's ownership proof back",
+  verb: "recordDomainProofPresent",
+});
+export type RecordDomainProofPresentPayload = RecordDomainProofPresentCommandData;

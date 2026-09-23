@@ -281,6 +281,7 @@ describe("agent turn liveness subscriber", () => {
     });
 
     /** @scenario A turn that really stalled with nothing to revive it is failed */
+    /** @scenario "A stalled response with no answer to carry fails distinctly" */
     it("fails a turn that has recorded no activity past the stall window", async () => {
       const deps = makeDeps({
         conversation: makeRecord({

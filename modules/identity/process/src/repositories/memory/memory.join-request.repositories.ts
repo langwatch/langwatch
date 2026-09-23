@@ -51,8 +51,37 @@ export class MemoryJoinRequestReadRepository implements JoinRequestListReadRepos
     return this.pending((request) => request.organizationId === args.organizationId);
   }
 
+  async findAutomaticJoinsForOrganization(args: {
+    organizationId: string;
+    resolvedAfterMs: number;
+  }): Promise<JoinRequestAggregateState[]> {
+    return [...this.store.joinRequests.values()]
+      .filter(
+        (request) =>
+          request.state === "APPROVED" &&
+          request.resolvedByType === "policy" &&
+          request.organizationId === args.organizationId &&
+          (request.resolvedAtMs ?? 0) >= args.resolvedAfterMs,
+      )
+      .toSorted((left, right) => (right.resolvedAtMs ?? 0) - (left.resolvedAtMs ?? 0));
+  }
+
   async findPendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]> {
     return this.pending((request) => request.userId === args.userId);
+  }
+
+  async findApprovedForMembers(args: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<JoinRequestAggregateState[]> {
+    return [...this.store.joinRequests.values()]
+      .filter(
+        (request) =>
+          request.state === "APPROVED" &&
+          request.organizationId === args.organizationId &&
+          args.userIds.includes(request.userId),
+      )
+      .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
   }
 
   private pending(

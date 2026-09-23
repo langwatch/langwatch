@@ -1,14 +1,19 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { instantiateRepositories } from "@langwatch/kernel";
+import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
 
 /**
  * What a process composes billing's process-side work from: the
  * ClickHouse, Redis and Stripe substrates it already holds. Everything
  * behind these stays private — composition states substrates, never classes.
  */
+import { BillingApp } from "./app/billing.app.ts";
 import { BillableEventsMeterProjection } from "./eventing/billable-events-meter.projection.ts";
+import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
 import type { BillableEventsMeter } from "./repositories/billable-events-meter.repository.ts";
-import { billingClickhouseRepositories } from "./repositories/billing-repositories.registry.ts";
+import {
+  billingClickhouseRepositories,
+  billingRepositories,
+} from "./repositories/billing-repositories.registry.ts";
 import type { BillingOrganizationCache } from "./repositories/organization/billing-organization-cache.repository.ts";
 import {
   RedisBillingOrganizationCacheAdapter,
@@ -30,6 +35,17 @@ import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
+import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
+
+/**
+ * Billing as an installed module. Its three doors stay unmounted until the app
+ * implements the operations behind them; the factories below serve today's callers.
+ */
+export const billingServer = defineServerModule("billing")
+  .withRepositories(billingRepositories)
+  .withApp(BillingApp)
+  .withTransports(connectedBillingTrpcTransport)
+  .withEventing(connectedBillingEventing);
 
 /** The billable-events totals a reporting run reads, over the process's own endpoints. */
 export function createBillableEventsQuery(options: {

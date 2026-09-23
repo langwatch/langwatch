@@ -12,6 +12,7 @@ const ASSERTION: CallbackAssertion = {
   subject: "okta|000111",
   email: "Sam.J+news@Acme.com",
   emailVerified: true,
+  arrivalPolicy: "admit" as const,
   allowsJit: true,
 };
 
@@ -236,18 +237,37 @@ describe("the SSO callback's linking decision", () => {
         provider: "oidc",
         subject: "okta|000111",
         normalizedEmail: "sam.j+news@acme.com",
+        membership: "join",
       });
     });
 
     /** @scenario "No match provisions just-in-time only where the connection allows" */
-    it("refuses with jit_disabled on a connection that forbids it", async () => {
+    it("refuses with jit_disabled on a connection that turns them away", async () => {
       const { service, directory } = build();
 
       await expect(service.complete({ ...ASSERTION, allowsJit: false })).rejects.toMatchObject({
         code: "identity_jit_disabled",
       });
+      await expect(
+        service.complete({ ...ASSERTION, arrivalPolicy: "refuse" }),
+      ).rejects.toMatchObject({ code: "identity_jit_disabled" });
 
       expect(directory.provisionUser).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An arrival on a connection that asks keeps the account and waits" */
+    it("keeps the account and leaves them waiting when the connection asks", async () => {
+      const { service, directory } = build();
+
+      await expect(service.complete({ ...ASSERTION, arrivalPolicy: "request" })).resolves.toEqual({
+        kind: "awaiting_approval",
+        userId: "user_new",
+        linked: true,
+      });
+
+      expect(directory.provisionUser).toHaveBeenCalledWith(
+        expect.objectContaining({ membership: "request" }),
+      );
     });
   });
 });

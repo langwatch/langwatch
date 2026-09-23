@@ -30,6 +30,9 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../gateway/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
@@ -40,6 +43,9 @@
     },
     {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../ops/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"

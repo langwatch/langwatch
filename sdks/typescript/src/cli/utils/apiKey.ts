@@ -1,12 +1,27 @@
 import chalk from "chalk";
 import { config } from "dotenv";
-import { setResolvedApiKey, setResolvedProjectId } from "@/internal/credentialContext";
+
+import { isUserScopedApiKey } from "@/internal/api/auth";
+import {
+  claimProjectEnvIgnoredWarning,
+  requestedProject,
+  setResolvedApiKey,
+  setResolvedProjectId,
+} from "@/internal/credentialContext";
+import { normalizeEndpoint } from "@/internal/endpoint";
+
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
-import { maybePrintIdentityNotice } from "./identityNotice";
 import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./governance/config";
 import { fetchPersonalProject, SessionApiError } from "./governance/session-api";
-import { projectScopeErrorLines, ProjectScopeError, resolveProjectSelector } from "./projectScope";
+import { maybePrintIdentityNotice } from "./identityNotice";
+import {
+  type BoundKeySource,
+  projectScopeErrorLines,
+  projectScopeNotSupported,
+  ProjectScopeError,
+  resolveProjectSelector,
+} from "./projectScope";
 
 /**
  * Re-reads the caller's .env for LANGWATCH_* keys only: the daemon runs
@@ -52,7 +67,10 @@ export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
  * `process.env`, so concurrent daemon requests never cross identities.
  */
 export const resolveCredentials = async (
-  opts: { apiKey?: string; project?: string } = {},
+  opts: {
+    apiKey?: string;
+    project?: string;
+  } = {},
 ): Promise<ResolvedCredentials> => {
   // Load environment variables from .env file (scoped, see above)
   loadEnvFileScoped();
@@ -66,7 +84,11 @@ export const resolveCredentials = async (
   const flagKey = opts.apiKey?.trim();
   if (flagKey) {
     setResolvedApiKey(flagKey);
-    const projectId = await applyProjectScope({ project: opts.project });
+    const projectId = await applyProjectScope({
+      project: opts.project,
+      apiKey: flagKey,
+      keySource: "flag-key",
+    });
     setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
       mode: "api-key",
@@ -82,7 +104,11 @@ export const resolveCredentials = async (
   const envKey = process.env.LANGWATCH_API_KEY?.trim();
   if (envKey) {
     setResolvedApiKey(envKey);
-    const projectId = await applyProjectScope({ project: opts.project });
+    const projectId = await applyProjectScope({
+      project: opts.project,
+      apiKey: envKey,
+      keySource: "env-key",
+    });
     setResolvedProjectId(projectId);
     await maybePrintIdentityNotice({
       mode: "api-key",
@@ -92,6 +118,143 @@ export const resolveCredentials = async (
     return { apiKey: envKey, source: "env", endpoint, projectId };
   }
 
+  // A key given by flag or by LANGWATCH_API_KEY belongs to the address the
+  // command targets, so it was used above whatever the login says. The login's
+  // own key is different: see `loginMadeElsewhere`.
+  const elsewhere = loginMadeElsewhere();
+  if (elsewhere) return reportLoginMadeElsewhere(elsewhere);
+
+  const session = await resolveFromSession({
+    project: opts.project,
+    endpoint,
+    isLoginKeyRequired: false,
+  });
+  if (session) return session;
+
+  return reportMissingCredentials(endpoint);
+};
+
+/**
+ * The credentials of a command that acts as a person: the login key of the
+ * device session in ~/.langwatch/config.json, and nothing else.
+ *
+ * `LANGWATCH_API_KEY` is never the credential here, whether it comes from the
+ * folder's .env or from the shell. A project key carries no person, and
+ * nothing in a key tells the command line whether a person stands behind it,
+ * so the login is the only credential that is known to. The variable is left
+ * as it is for the app in the folder and for every other command.
+ *
+ * Resolves to nothing when the machine has no login, when the server refuses
+ * the one it has, when that login holds no login key, or when the login was
+ * made against another address than the one the command targets (see
+ * `loginMadeElsewhere`).
+ *
+ * Spec: specs/typescript-sdk/cli-langy-share-control.feature
+ */
+export const resolvePersonCredentials = async (): Promise<ResolvedCredentials | undefined> => {
+  // The folder's .env still names the endpoint the folder works against.
+  loadEnvFileScoped();
+  const endpoint = getEndpoint();
+  process.env.LANGWATCH_ENDPOINT ??= endpoint;
+  return resolveFromSession({ endpoint, isLoginKeyRequired: true });
+};
+
+/**
+ * An address as its origin: scheme, host in lower case and port, so a trailing
+ * slash, a capital letter or a spelled-out default port do not make two
+ * addresses out of one. `localhost` and `127.0.0.1` stay two addresses: what
+ * answers on each is for the machine to decide, not for a string comparison.
+ */
+const originOf = (endpoint: string): string | undefined => {
+  try {
+    return new URL(normalizeEndpoint(endpoint)).origin;
+  } catch {
+    return undefined;
+  }
+};
+
+export interface LoginElsewhere {
+  /** The address the login on this machine was made against. */
+  loginEndpoint: string;
+  /** The address the command targets. */
+  endpoint: string;
+}
+
+/**
+ * The two addresses, when the login in `cfg` was made against one and the
+ * command targets another. Nothing when there is no login, or when both are
+ * one address.
+ */
+const loginElsewhere = ({
+  cfg,
+  endpoint,
+}: {
+  cfg: GovernanceConfig | undefined;
+  endpoint: string;
+}): LoginElsewhere | undefined => {
+  if (!cfg || !isLoggedIn(cfg)) return undefined;
+  const loginEndpoint = normalizeEndpoint(cfg.control_plane_url);
+  const loginOrigin = originOf(loginEndpoint);
+  const isSameAddress = loginOrigin !== undefined && loginOrigin === originOf(endpoint);
+  return isSameAddress ? undefined : { loginEndpoint, endpoint };
+};
+
+/**
+ * The two addresses, when the login on this machine was made against one and
+ * the command targets another.
+ *
+ * `LANGWATCH_ENDPOINT` decides the target, and a folder's .env can set it. The
+ * device session's key, whether the login key or the personal project's, was
+ * issued by one address and is only ever sent there: a folder that names
+ * another address gets no key from the login, whoever wrote its .env. A key
+ * given by flag or in `LANGWATCH_API_KEY` is that address's own and is used
+ * as given.
+ */
+export const loginMadeElsewhere = (): LoginElsewhere | undefined => {
+  loadEnvFileScoped();
+  let cfg: GovernanceConfig | undefined;
+  try {
+    cfg = loadConfig();
+  } catch {
+    cfg = undefined;
+  }
+  return loginElsewhere({ cfg, endpoint: getEndpoint() });
+};
+
+/**
+ * What a command says when the login belongs to another address. `outcome`
+ * finishes the sentence about the key for a command with something of its own
+ * to say, and `canUseApiKey` is off for a command that acts as a person, where
+ * a project key is no way out.
+ */
+export const loginElsewhereMessage = ({
+  loginEndpoint,
+  endpoint,
+  outcome = "",
+  canUseApiKey = true,
+}: LoginElsewhere & { outcome?: string; canUseApiKey?: boolean }): string =>
+  [
+    `The login on this machine is for ${loginEndpoint}, and LANGWATCH_ENDPOINT (in the shell or in this folder's .env) points this command at ${endpoint}.`,
+    `A login's key is only sent to the address that issued it${outcome}.`,
+    `Run \`langwatch login --device\` here to sign in to ${endpoint}, or unset LANGWATCH_ENDPOINT to use the login you have.`,
+    ...(canUseApiKey ? [`A key of ${endpoint} in LANGWATCH_API_KEY or --api-key works too.`] : []),
+  ].join(" ");
+
+/**
+ * The device session's credential, published into the request-scoped store,
+ * or nothing when the machine holds no live session. `isLoginKeyRequired`
+ * accepts the user-scoped login key only, since the personal project's key
+ * carries no person.
+ */
+async function resolveFromSession({
+  project,
+  endpoint,
+  isLoginKeyRequired,
+}: {
+  project?: string;
+  endpoint: string;
+  isLoginKeyRequired: boolean;
+}): Promise<ResolvedCredentials | undefined> {
   // Stored state. Re-read from disk on every call, never cached in-process
   // (the daemon identity boundary again; loadConfig is built for this).
   let cfg: GovernanceConfig | undefined;
@@ -100,30 +263,74 @@ export const resolveCredentials = async (
   } catch {
     cfg = undefined;
   }
-  if (cfg && isLoggedIn(cfg)) {
-    const session = await resolveSessionCredential(cfg);
-    if (session) {
-      setResolvedApiKey(session.apiKey);
-      // `--project` decides the target BEFORE anything is published: the
-      // personal project is the default only when no flag says otherwise,
-      // and a flag that does not resolve must leave no target behind at all.
-      const projectId =
-        (await applyProjectScope({ project: opts.project, cfg })) ?? session.projectId;
-      setResolvedProjectId(projectId);
-      // An explicit --project names the identity on the command line, so
-      // there is nothing implicit left to warn about.
-      if (opts.project === undefined) {
-        await maybePrintIdentityNotice({
-          mode: session.isLoginKey ? "device-login-key" : "device",
-          apiKey: session.apiKey,
-          endpoint,
-        });
-      }
-      return { apiKey: session.apiKey, source: "session", endpoint, projectId };
-    }
-  }
+  if (!cfg || !isLoggedIn(cfg)) return undefined;
+  // Every key the session holds goes through here, so this is the one place
+  // that keeps it with the address that issued it.
+  if (loginElsewhere({ cfg, endpoint })) return undefined;
+  const session = await resolveSessionCredential(cfg);
+  if (!session) return undefined;
+  if (isLoginKeyRequired && !session.isLoginKey) return undefined;
 
-  return reportMissingCredentials(endpoint);
+  setResolvedApiKey(session.apiKey);
+  // `--project` decides the target BEFORE anything is published: the
+  // personal project is the default only when no flag says otherwise,
+  // and a flag that does not resolve must leave no target behind at all.
+  const projectId =
+    (await applyProjectScope({
+      project,
+      cfg,
+      apiKey: session.apiKey,
+      keySource: "personal-project-login",
+    })) ?? session.projectId;
+  setResolvedProjectId(projectId);
+  // A NAMED project puts the identity on the command line, so there is
+  // nothing implicit left to warn about. `LANGWATCH_PROJECT_ID` does not: it
+  // is ambient, and this path does not even read it (the personal project
+  // answers), so suppressing the notice for it would leave nothing on screen
+  // saying which project replied. A command that acts as the person reads no
+  // project either way, so the notice about which project it reads would be
+  // wrong; that command names its own login.
+  if (currentProjectSelector(project)?.source !== "named" && !isLoginKeyRequired) {
+    await maybePrintIdentityNotice({
+      mode: session.isLoginKey ? "device-login-key" : "device",
+      apiKey: session.apiKey,
+      endpoint,
+    });
+  }
+  return { apiKey: session.apiKey, source: "session", endpoint, projectId };
+}
+
+/** A project the command line or the environment asked this request to run against. */
+interface ProjectSelector {
+  value: string;
+  /**
+   * `named` is `--project`, on this command or any that inherited it: the user
+   * said it here and now, so a key that cannot honour it is an error. `env` is
+   * `LANGWATCH_PROJECT_ID`, which is ambient and outlives the shell it was set
+   * in, so the same key answers it with a warning instead of a failure.
+   */
+  source: "named" | "env";
+}
+
+/**
+ * The project this request was pointed at, whoever pointed it.
+ *
+ * `--project` wins over `LANGWATCH_PROJECT_ID` because it is the narrower
+ * statement. Either way the value is a selector, not an id: an id and a slug
+ * are both accepted and only the resolver can tell them apart.
+ *
+ * The variable used to reach `buildAuthHeaders` unresolved, where a
+ * user-scoped key put it in the Basic header and a project key dropped it
+ * without a word. Reading it HERE gives it one meaning on every path: it names
+ * a project, that name is looked up, and a name that resolves to nothing stops
+ * the command instead of quietly answering from somewhere else.
+ */
+const currentProjectSelector = (explicit: string | undefined): ProjectSelector | undefined => {
+  const named = (explicit ?? requestedProject())?.trim();
+  if (named) return { value: named, source: "named" };
+  const fromEnv = process.env.LANGWATCH_PROJECT_ID?.trim();
+  if (fromEnv) return { value: fromEnv, source: "env" };
+  return undefined;
 };
 
 /**
@@ -134,14 +341,53 @@ export const resolveCredentials = async (
 async function applyProjectScope({
   project,
   cfg,
+  apiKey,
+  keySource,
 }: {
   project?: string;
   cfg?: GovernanceConfig;
+  /** The key the request will authenticate with, which decides what it can honour. */
+  apiKey?: string;
+  /** Where that key came from, which decides what the refusal tells the user. */
+  keySource: BoundKeySource;
 }): Promise<string | undefined> {
-  if (project === undefined) return undefined;
+  const selector = currentProjectSelector(project);
+  if (!selector) return undefined;
+
+  // A legacy project key encodes its project in the token, so the server reads
+  // the project off the key and ignores the one the request names. There is no
+  // way to honour the selector, only a way to say so.
+  if (apiKey && !isUserScopedApiKey(apiKey)) {
+    const refusal = projectScopeNotSupported({
+      selector: selector.value,
+      keySource,
+    });
+    if (selector.source === "named") reportProjectScopeError(refusal);
+    // Once per request, not once per process: the daemon runs every command
+    // of a session in one process, and a warning said once there is one the
+    // next caller never sees.
+    if (claimProjectEnvIgnoredWarning()) {
+      console.error(
+        chalk.yellow(
+          `Warning: ${refusal.message} LANGWATCH_PROJECT_ID was ignored, and this command ran against the key's own project.`,
+        ),
+      );
+    }
+    return undefined;
+  }
+
+  // Only a NAMED project is resolved through the project listing.
+  // LANGWATCH_PROJECT_ID is an id by contract (it is what a personal access
+  // token is documented to need), and it reaches the auth header unresolved
+  // exactly as it always has: looking it up would put a project listing in
+  // front of every command, and would refuse a key that is allowed to read its
+  // own project but not to list the organization's. An id that matches nothing
+  // is answered by the platform, which is a refusal the caller can see.
+  if (selector.source === "env") return undefined;
+
   try {
     const projectId = await resolveProjectSelector({
-      selector: project,
+      selector: selector.value,
       cfg,
     });
     return projectId;
@@ -301,6 +547,29 @@ export const missingCredentialsLines = (authUrl: string): string[] => [
   "",
   "For agents: don't reuse keys outside the project folder, check more options with `langwatch login --help` to help the user",
 ];
+
+/**
+ * Ends the command when the login's key would go to another address than its
+ * own: structured on stdout for machine callers, prose on stderr for people.
+ */
+function reportLoginMadeElsewhere(elsewhere: LoginElsewhere): never {
+  const message = loginElsewhereMessage(elsewhere);
+  if (getOutputFormat() !== "text") {
+    console.log(
+      renderErrorAsJson({
+        code: "login_endpoint_mismatch",
+        kind: "login_endpoint_mismatch",
+        message,
+        httpStatus: 0,
+        meta: { ...elsewhere },
+        isHandled: true,
+        retryable: false,
+      }),
+    );
+  }
+  console.error(chalk.red(`Error: ${message}`));
+  process.exit(1);
+}
 
 function reportMissingCredentials(endpoint: string): never {
   const authUrl = `${endpoint}/authorize`;

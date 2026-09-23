@@ -216,8 +216,8 @@ Feature: LangWatchQL query workbench
       Then each state remains distinguishable, structured values are bounded on screen, and exact wire digits are copied without lossy numeric coercion
 
     @integration
-    Scenario: Duplicate columns, truncation, statistics, and diagnostics are honest
-      Given duplicate column names, a byte- or row-truncated result, statistics, and diagnostics
+    Scenario: Duplicate columns, statistics, and diagnostics are honest
+      Given duplicate column names, a result capped at the row ceiling, statistics, and diagnostics
       When the table and chart views render
       Then duplicates and actual returned-row counts are called out, rows returned/elapsed/rows read/bytes read are shown, and every diagnostic remains visible in both modes
 

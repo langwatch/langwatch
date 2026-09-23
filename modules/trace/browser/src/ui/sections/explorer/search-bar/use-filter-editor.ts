@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FilterHighlight } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useLatestRef } from "../../../../behavior/use-latest-ref.ts";
 import { handleKey } from "../../../../model/handle-key.ts";
+import { searchBarSuggestionState } from "../../../../model/search-bar-suggestion-state.ts";
 import { AutoUppercaseOperators } from "./auto-uppercase-operators.ts";
 import {
   applyAcceptToEditor,
@@ -30,7 +31,6 @@ const FILTER_CHIP_CONTROL_SELECTORS = [
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
-  getSuggestionState,
   highlightedRow,
   navigateSuggestion,
   type SuggestionState,
@@ -428,11 +428,11 @@ function suggestionStateFor({
   triggerPosRef: { current: number | null };
 }): SuggestionState {
   const trigger = triggerPosRef.current;
-  if (trigger === null) return getSuggestionState(text, cursorPos);
+  if (trigger === null) return searchBarSuggestionState(text, cursorPos);
   const fromTrigger = suggestionFromTrigger(text, cursorPos, trigger);
   if (fromTrigger !== null) return fromTrigger;
   triggerPosRef.current = null;
-  return getSuggestionState(text, cursorPos);
+  return searchBarSuggestionState(text, cursorPos);
 }
 
 /**
@@ -662,7 +662,7 @@ function handleEditorKeyDown({
 
   const trigger = ctx.triggerPosRef.current;
   const triggerState = trigger !== null ? suggestionFromTrigger(text, cursorPos, trigger) : null;
-  const liveState = triggerState ?? getSuggestionState(text, cursorPos);
+  const liveState = triggerState ?? searchBarSuggestionState(text, cursorPos);
   const dismissed = ctx.dismissedRef.current;
   const highlighted = dismissed ? null : highlightedRow(ctx.suggestionRef.current);
   const action = handleKey(

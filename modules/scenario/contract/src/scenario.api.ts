@@ -193,6 +193,15 @@ export interface QueueSimulationRunInput {
   resolvedModels?: ResolvedRunModels | null;
 }
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * scenario runs started, since `since` (epoch ms) where one is given, each
+ * run at its latest version and archived runs left out.
+ */
+export interface ScenarioUsageCount {
+  readonly runs: number;
+}
+
 /** The scenario application: what every scenario door calls, and what peer
  * features such as Suite reach it by. */
 export interface ScenarioApi {
@@ -366,6 +375,8 @@ export interface ScenarioApi {
     projectId: string;
     batchRunId: string;
   }): Promise<SimulationBatchSummary | null>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<ScenarioUsageCount>;
 }
 
 export const ScenarioApi = moduleApi<ScenarioApi>()("scenario");

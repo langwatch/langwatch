@@ -8,6 +8,7 @@ import type {
   PromptScope,
   SchemaVersion,
   VersionedPrompt,
+  PromptUsageCount,
 } from "@langwatch/prompt-contract";
 import type { TimeInput } from "@langwatch/time";
 
@@ -67,6 +68,12 @@ export abstract class LlmConfigRepository {
   abstract readonly versions: LlmConfigVersionsRepository;
 
   abstract findOrganizationIdForProject(projectId: string): Promise<string>;
+
+  /** The usage report's count; the caller never passes an empty project list. */
+  abstract countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<PromptUsageCount>;
 
   abstract isHandleUnique(params: {
     handle: string;

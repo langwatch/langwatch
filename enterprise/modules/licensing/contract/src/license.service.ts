@@ -13,9 +13,8 @@ export type { EntitlementSource, ResolvePlanInput } from "@langwatch/entitlement
 
 /** Application-facing capability supplied by the Enterprise license source. */
 export abstract class LicensingService {
-  abstract inspectPlatformAccess(input: {
-    instanceLicenseKey?: string | undefined;
-  }): Promise<PlatformLicenseAccess>;
+  /** Every license on this deployment, the instance key first, until one permits the platform. */
+  abstract inspectPlatformAccess(): Promise<PlatformLicenseAccess>;
   abstract getActivePlan(organizationId: string): Promise<PlanInfo>;
   abstract getSelfHostedPlan(organizationId: string): Promise<PlanInfo>;
   abstract validateAndStoreLicense(input: {

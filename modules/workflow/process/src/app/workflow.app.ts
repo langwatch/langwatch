@@ -58,6 +58,7 @@ import {
   type WorkflowWithVersion,
   workflowConfig,
   type WorkflowServerConfig,
+  type WorkflowUsageCount,
 } from "@langwatch/workflow-contract";
 import type { LanguageModel } from "ai";
 
@@ -999,6 +1000,13 @@ export class WorkflowApp implements WorkflowApi {
    * The platform's own address for one workflow resource. A deployment that
    * serves this family but named no public origin refuses by name.
    */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<WorkflowUsageCount> {
+    return this.#members.workflowRows.countUsage(input);
+  }
+
   platformUrl(input: { projectSlug: string; path: string }): string {
     if (this.#members.publicBaseUrl === undefined) {
       throw new Error(

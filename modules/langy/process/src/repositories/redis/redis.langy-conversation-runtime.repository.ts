@@ -20,6 +20,16 @@ import {
   createLangyTurnAdmissionLifecycleSubscriber,
   type LangyConversationUpdateChannel,
 } from "../../eventing/langy-conversation.subscriber.ts";
+import {
+  createGuidedOnboardingTurnFailedSubscriber,
+  type GuidedOnboardingAnalytics,
+  type GuidedOnboardingReader,
+} from "../../eventing/langy-guided-onboarding-turn-failed.subscriber.ts";
+import {
+  createLocalConnectTurnSubscriber,
+  type LocalConnectTurnPresence,
+} from "../../eventing/langy-local-connect-turn.subscriber.ts";
+import type { ControlTurnStarter } from "../../rules/langy-local-session-contract.rules.ts";
 import { LangyConversationPipelineAdapter } from "../../services/langy-conversation-pipeline.service.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import { RedisLangyEffectRepository } from "./redis.langy-effect.repository.ts";
@@ -63,6 +73,10 @@ export interface EventingLangyConversationAdapterOptions {
   worker: LangyWorker;
   titleGenerator: LangyTitleGenerator;
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;
+  /** The folder's owed connect turn (ADR-129); presence is read at handle time. */
+  localConnectTurn: { presence: () => LocalConnectTurnPresence; turns: ControlTurnStarter };
+  /** Onboarding's answer for a project, and the sink its failed turns are tracked to. */
+  guidedOnboarding: { reader: GuidedOnboardingReader; analytics: GuidedOnboardingAnalytics };
 }
 
 /**
@@ -153,6 +167,16 @@ export class EventingLangyConversationAdapter {
     const admissionLifecycleSubscriber = createLangyTurnAdmissionLifecycleSubscriber({
       admissions: options.admissions,
     });
+    const guidedOnboardingTurnFailedSubscriber = createGuidedOnboardingTurnFailedSubscriber({
+      guidedOnboarding: options.guidedOnboarding.reader,
+      conversations: conversationReader,
+      analytics: options.guidedOnboarding.analytics,
+    });
+    const localConnectTurnSubscriber = createLocalConnectTurnSubscriber({
+      presence: options.localConnectTurn.presence,
+      conversations: conversationReader,
+      turns: options.localConnectTurn.turns,
+    });
 
     return LangyConversationPipelineAdapter.create({
       langyConversationProjectionStore: conversationStore,
@@ -160,7 +184,13 @@ export class EventingLangyConversationAdapter {
       langyMessageProjectionStore: options.langyMessageProjectionStore,
       langyAnalyticsEventProjectionStore: options.langyAnalyticsEventProjectionStore,
       langyProcessPorts: effectPorts,
-      subscribers: [livenessSubscriber, broadcastSubscriber, admissionLifecycleSubscriber],
+      subscribers: [
+        livenessSubscriber,
+        broadcastSubscriber,
+        admissionLifecycleSubscriber,
+        guidedOnboardingTurnFailedSubscriber,
+        localConnectTurnSubscriber,
+      ],
     }).build();
   }
 

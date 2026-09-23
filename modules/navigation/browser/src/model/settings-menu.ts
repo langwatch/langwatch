@@ -5,6 +5,7 @@ import {
   Anvil,
   Archive,
   BadgeCheck,
+  Cloud,
   Blocks,
   Brain,
   Bug,
@@ -13,6 +14,8 @@ import {
   CreditCard,
   DatabaseZap,
   EyeOff,
+  FileBadge,
+  Server,
   Fingerprint,
   Flag,
   FolderKanban,
@@ -29,6 +32,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Stethoscope,
   UserCog,
   Users,
   UsersRound,
@@ -113,10 +117,22 @@ function organizationGroup({
       // came first and left a page most readers use at the bottom of a group
       // they cannot open.
       ...(!isLiteMember ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }] : []),
+      // Main's authentication rail: the overview, the identity provider and the connectors.
       {
         label: "Authentication",
         href: "/settings/authentication",
+        isExactMatch: true,
         icon: Fingerprint,
+      },
+      {
+        label: "Identity Provider",
+        href: "/settings/authentication/provider",
+        icon: ShieldCheck,
+      },
+      {
+        label: "Connectors",
+        href: "/settings/authentication/connectors",
+        icon: Network,
       },
       ...(showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view")
         ? [
@@ -141,7 +157,11 @@ function organizationGroup({
           ]
         : []),
       ...(!isLiteMember && !isSaaS
-        ? [{ label: "License", href: "/settings/license", icon: BadgeCheck }]
+        ? [
+            { label: "License", href: "/settings/license", icon: BadgeCheck },
+            { label: "Connect", href: "/settings/connect", icon: Cloud },
+            { label: "Checkup", href: "/settings/checkup", icon: Stethoscope },
+          ]
         : []),
     ],
   };
@@ -337,9 +357,24 @@ export function backofficeGroup(): SettingsMenuGroup {
         icon: ShieldCheck,
       },
       {
+        label: "Directory Sync",
+        href: "/ops/backoffice/directory-sync",
+        icon: RefreshCw,
+      },
+      {
         label: "Bug Reports",
         href: "/ops/backoffice/bug-reports",
         icon: Bug,
+      },
+      {
+        label: "Licenses",
+        href: "/ops/backoffice/licenses",
+        icon: FileBadge,
+      },
+      {
+        label: "Self-hosted Installs",
+        href: "/ops/backoffice/self-hosted-instances",
+        icon: Server,
       },
     ],
   };

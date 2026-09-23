@@ -2,7 +2,7 @@
  * What a routed page shows instead of itself.
  */
 
-import { Box, Center, Heading, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
+import { Box, Button, Center, Heading, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
 import type { ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { Lock } from "lucide-react";
 
@@ -69,12 +69,24 @@ export function UiPageForbidden({ permission }: { permission: string }) {
  * presentation registry, resolved by `resolveUiFailureCopy`; the trace id is
  * the only technical detail shown, and is what a reader quotes to support.
  */
-export function UiPageFailure({ copy }: { copy: ResolvedUiFailureCopy }) {
+export function UiPageFailure({
+  copy,
+  retry,
+}: {
+  copy: ResolvedUiFailureCopy;
+  /** A "Try again" for a failure a reload can clear: a transient fault, or a lapsed session. */
+  retry?: { onRetry: () => void; testId: string };
+}) {
   return (
     <Center minHeight="60vh" padding={8}>
       <Stack gap={3} align="center" maxWidth="480px" textAlign="center" role="alert">
         <Heading size="lg">{copy.title}</Heading>
         {copy.description && <Text color="fg.muted">{copy.description}</Text>}
+        {retry && (
+          <Button colorPalette="orange" onClick={retry.onRetry} data-testid={retry.testId}>
+            Try again
+          </Button>
+        )}
         <UiErrorActions
           {...(copy.docsUrl ? { docsUrl: copy.docsUrl } : {})}
           {...(copy.traceId ? { traceId: copy.traceId } : {})}

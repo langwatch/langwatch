@@ -79,6 +79,10 @@ describe.skipIf(!DB_URL)(
       sessions,
       grantCache,
       testArrivals: { standingFor: async () => ({ testing: false }) as const },
+      admissions: {
+        attachBindings: () => Promise.reject(new Error("no admission expected")),
+        completeAdmission: () => Promise.reject(new Error("no admission expected")),
+      },
     });
 
     const testNamespace = `pw-seat-${nanoid(8)}`;

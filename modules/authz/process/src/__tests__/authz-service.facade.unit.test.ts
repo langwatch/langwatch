@@ -127,8 +127,7 @@ describe("AuthzService portable facade", () => {
         findApiKeyOwner: vi.fn().mockResolvedValue({ userId: null }),
         findApiKeyBindings: vi.fn().mockResolvedValue([
           {
-            role: "ADMIN",
-            customRoleId: null,
+            roleKey: "admin",
             scopeType: "PROJECT",
             scopeId: PROJECT,
             viaGroupId: null,

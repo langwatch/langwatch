@@ -1,15 +1,15 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   createDataPrivacyTestProjects,
+  installableDataPrivacy,
   dataPrivacyTestInfrastructure,
   dataPrivacyTestGraph,
 } from "./data-privacy.fixture.ts";
@@ -17,9 +17,9 @@ import {
 const PROJECT_ID = dataPrivacyTestGraph.projectId;
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 
-function process(role: "api" | "worker") {
+function process(role: "api" | "worker", googleCredentials?: string) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(dataPrivacyServer)])
+    .withModules([installableDataPrivacy(googleCredentials)])
     .withMember("dataPrivacy", dataPrivacyTestInfrastructure())
     .provide({
       project: createDataPrivacyTestProjects(),
@@ -47,6 +47,25 @@ describe("data privacy app installation", () => {
       );
     } finally {
       await runtime.stop();
+    }
+  });
+
+  /** @scenario "A peer borrows the Google credential without the value leaving data privacy" */
+  it("lends the Google credential to a peer's closure, and undefined where none is set", async () => {
+    const configured = await process("api", "service-account-json").boot();
+    const unconfigured = await process("api").boot();
+
+    try {
+      const lend = (runtime: typeof configured) =>
+        runtime.service(DataPrivacyApi).intoGoogleApplicationCredentials((credential) => ({
+          credential,
+        }));
+
+      expect(lend(configured)).toEqual({ credential: "service-account-json" });
+      expect(lend(unconfigured)).toEqual({ credential: undefined });
+    } finally {
+      await configured.stop();
+      await unconfigured.stop();
     }
   });
 });

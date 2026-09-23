@@ -6,7 +6,14 @@ import type { UserApi } from "@langwatch/user-contract";
  * name.
  */
 export class TestUserApi implements UserApi {
+  countUsage(): Promise<{ emailDomains: Record<string, number> }> {
+    return Promise.resolve({ emailDomains: {} });
+  }
+
   constructor(private readonly overrides: Partial<UserApi> = {}) {}
+
+  hasAccountOnDomain: UserApi["hasAccountOnDomain"] = (input) =>
+    this.overrides.hasAccountOnDomain?.(input) ?? this.unimplemented("hasAccountOnDomain");
 
   findById: UserApi["findById"] = (input) =>
     this.overrides.findById?.(input) ?? this.unimplemented("findById");
@@ -88,6 +95,13 @@ export class TestUserApi implements UserApi {
 
   dismissPasskeyNudge: UserApi["dismissPasskeyNudge"] = (input) =>
     this.overrides.dismissPasskeyNudge?.(input) ?? this.unimplemented("dismissPasskeyNudge");
+
+  findJoinOfferDismissedDomains: UserApi["findJoinOfferDismissedDomains"] = (input) =>
+    this.overrides.findJoinOfferDismissedDomains?.(input) ??
+    this.unimplemented("findJoinOfferDismissedDomains");
+
+  dismissJoinOffer: UserApi["dismissJoinOffer"] = (input) =>
+    this.overrides.dismissJoinOffer?.(input) ?? this.unimplemented("dismissJoinOffer");
 
   rotatePassword: UserApi["rotatePassword"] = (input) =>
     this.overrides.rotatePassword?.(input) ?? this.unimplemented("rotatePassword");

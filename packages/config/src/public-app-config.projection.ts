@@ -18,6 +18,11 @@ const exactTrue = z
   .optional()
   .transform((value) => value === true || value === "true");
 
+const onOff = z
+  .enum(["0", "1", "false", "true"])
+  .optional()
+  .transform((value) => value === "1" || value === "true");
+
 const sampleRatio = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.coerce.number().min(0).max(1).default(DEFAULT_RUM_SAMPLE_RATIO).catch(DEFAULT_RUM_SAMPLE_RATIO),
@@ -36,6 +41,7 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
   demoProjectSlug: c.env("DEMO_PROJECT_SLUG", z.string().min(1).optional()),
   isSaas: c.env("IS_SAAS", exactTrue),
   authProvider: c.env("NEXTAUTH_PROVIDER", z.string().min(1).optional()),
+  authProviderName: c.env("AUTH_PROVIDER", z.string().min(1).optional()),
   gateway: {
     publicUrl: c.env("LW_GATEWAY_PUBLIC_URL", optionalUrl),
     legacyUrl: c.env("LW_GATEWAY_BASE_URL", optionalUrl),
@@ -63,6 +69,7 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
     ),
   },
   licensePaymentUrl: c.env("STRIPE_LICENSE_PAYMENT_LINK_URL", z.string().min(1).optional()),
+  hideDevIndicator: c.env("HIDE_DEV_INDICATOR", onOff),
 }));
 
 type PublicAppConfigValues = ConfigOf<typeof publicAppConfigProjectionDefinition>;
@@ -229,7 +236,8 @@ function projectPublicAppConfig(
     passkeys: config.identity.passkeys === "on",
     identityFrontDoor: config.identity.router === "enforce",
     licensePaymentUrl: config.licensePaymentUrl,
-    authProvider: config.authProvider,
+    authProvider: config.authProviderName ?? config.authProvider,
+    ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
   });
 }
 

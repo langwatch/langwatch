@@ -5,15 +5,43 @@ import {
   isPublicEmailDomain,
   type JoinCandidateOrganization,
   type JoinRequestAggregateState,
+  qualifySsoDomainOwnership,
+  ssoConnectionSourceSchema,
+  ssoDomainVerificationSchema,
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, type Instant } from "@langwatch/time";
+import { fromDate, type Instant, Temporal, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type {
   JoinCandidateRepository,
   JoinRequestListReadRepository,
 } from "../join-request.repository.ts";
 import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository.ts";
+
+/**
+ * One connection row, qualified on the looked-up domain (ADR-123). Both
+ * columns are parsed rather than asserted, and a column that does not parse
+ * reads as no proof: this is the decision that grants authority over a domain.
+ */
+function connectionHasQualifiedProof(
+  row: { source: string; verifiedDomains: string[]; domainVerifications: unknown },
+  domain: string,
+): boolean {
+  const verifications = z.array(ssoDomainVerificationSchema).safeParse(row.domainVerifications);
+  const source = ssoConnectionSourceSchema.safeParse(row.source);
+
+  return (
+    qualifySsoDomainOwnership({
+      state: {
+        source: source.success ? source.data : "self-serve",
+        verifiedDomains: row.verifiedDomains,
+        domainVerifications: verifications.success ? verifications.data : [],
+      },
+      domain,
+    }).status === "QUALIFIED"
+  );
+}
 
 /**
  * What the join-request guards and the matcher read, out of Postgres (D12). The whole file answers
@@ -87,10 +115,45 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
     return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
   }
 
+  /** Newest first, off the same projection the pending list reads. */
+  async findAutomaticJoinsForOrganization({
+    organizationId,
+    resolvedAfterMs,
+  }: {
+    organizationId: string;
+    resolvedAfterMs: number;
+  }): Promise<JoinRequestAggregateState[]> {
+    const rows = await this.prisma.joinRequest.findMany({
+      where: {
+        organizationId,
+        state: "APPROVED",
+        resolvedByType: "policy",
+        resolvedAt: { gte: toDate(Temporal.Instant.fromEpochMilliseconds(resolvedAfterMs)) },
+      },
+      orderBy: { resolvedAt: "desc" },
+    });
+    return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
+  }
+
   /** Everything one person is waiting on. */
   async findPendingForUser({ userId }: { userId: string }): Promise<JoinRequestAggregateState[]> {
     const rows = await this.prisma.joinRequest.findMany({
       where: { userId, state: "PENDING" },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
+  }
+
+  async findApprovedForMembers({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<JoinRequestAggregateState[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.joinRequest.findMany({
+      where: { organizationId, userId: { in: [...userIds] }, state: "APPROVED" },
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
@@ -185,21 +248,48 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
         _count: { userId: true },
       }),
       // An identity provider that already admits this domain is the way in,
-      // and joining is not offered beside it.
+      // and joining is not offered beside it. Every connection carrying the
+      // domain is read, not only the active ones: a lapsed or torn-down
+      // proof answers both questions below differently.
       this.prisma.ssoConnection.findMany({
         where: {
           organizationId: { in: organizationIds },
-          state: "ACTIVE",
           verifiedDomains: { has: domain },
         },
-        select: { organizationId: true },
+        select: {
+          organizationId: true,
+          source: true,
+          verifiedDomains: true,
+          domainVerifications: true,
+          state: true,
+        },
       }),
     ]);
 
     const memberCountByOrganization = new Map(
       memberCounts.map((row) => [row.organizationId, row._count.userId]),
     );
-    const admittedByConnection = new Set(connections.map((row) => row.organizationId));
+    // A connection whose proof on this domain LAPSED admits nobody new
+    // through it (ADR-123), so it no longer stands in the way of asking.
+    const admittedByConnection = new Set(
+      connections
+        .filter((row) => row.state === "ACTIVE" && connectionHasQualifiedProof(row, domain))
+        .map((row) => row.organizationId),
+    );
+    // A live proof on ANY connection that still exists. The terminal states
+    // matter here and nowhere else: the reducer keeps `verifiedDomains`
+    // through teardown, so without them an organization that proved a domain
+    // and then removed the connection would walk strangers in years later.
+    const provedByConnection = new Set(
+      connections
+        .filter(
+          (row) =>
+            connectionHasQualifiedProof(row, domain) &&
+            row.state !== "DISCARDED" &&
+            row.state !== "TORN_DOWN",
+        )
+        .map((row) => row.organizationId),
+    );
 
     return organizations.map((organization) => ({
       organizationId: organization.id,
@@ -214,6 +304,9 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
       verifiedMembersOnDomain: verifiedByOrganization.get(organization.id)?.size ?? 0,
       memberCount: memberCountByOrganization.get(organization.id) ?? 0,
       autoJoinDomains: organization.joinDomains,
+      // Authorizes walking straight in, and nothing else. Asking still runs
+      // on members plus a human who approves.
+      domainProved: provedByConnection.has(organization.id),
     }));
   }
 

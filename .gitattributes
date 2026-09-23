@@ -2,6 +2,7 @@
 **/pnpm-lock.yaml                       linguist-generated=true merge=ours
 **/uv.lock                              linguist-generated=true merge=ours
 **/go.sum                               linguist-generated=true merge=ours
+go.work.sum                            linguist-generated=true
 **/Chart.lock                           linguist-generated=true merge=ours
 sdks/python/src/langwatch/generated/**/* linguist-generated=true
 docs/api-reference/openapiLangWatch.json linguist-generated=true
@@ -22,3 +23,8 @@ modules/analytics/contract/src/visualization/vega-lite-schema-validator.generate
 modules/langy/browser/src/model/shared/langy/feature-map.generated.json linguist-generated=true
 skills/_compiled/native/**/SKILL.md linguist-generated=true
 apps/api/src/features/discovery/openapi-document.json linguist-generated=true
+**/*.generated.json                     linguist-generated=true
+**/*.generated.ts                       linguist-generated=true
+mcp/typescript/src/__tests__/fixtures/*.json linguist-generated=true
+# Unified diffs prefix upstream tab-indented context with a required space.
+patches/*.patch                        whitespace=-space-before-tab

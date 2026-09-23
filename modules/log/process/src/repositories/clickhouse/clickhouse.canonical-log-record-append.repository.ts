@@ -1,4 +1,5 @@
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { createLogger } from "@langwatch/observability";
@@ -33,6 +34,34 @@ export interface LogClickHouseClient {
 }
 
 export type LogClickHouseClientResolver = (tenantId: string) => Promise<LogClickHouseClient>;
+
+/**
+ * Adapts the process's routed `clickhouse` member to Log's tenant-resolved
+ * client, so the append/read repositories below keep their own shape.
+ */
+export function createLogClickHouseResolver(
+  clickhouse: ClickHouseQueryClient,
+): LogClickHouseClientResolver {
+  return (tenantId) =>
+    Promise.resolve<LogClickHouseClient>({
+      async insert(params) {
+        await clickhouse.insert({
+          tenantId,
+          table: params.table,
+          rows: params.values as readonly Record<string, unknown>[],
+        });
+        return undefined;
+      },
+      async query(params) {
+        const result = await clickhouse.query<Record<string, unknown>>({
+          tenantId,
+          sql: params.query,
+          ...(params.query_params ? { params: params.query_params } : {}),
+        });
+        return { json: async () => result.rows };
+      },
+    });
+}
 
 const logger = createLogger("langwatch:log:canonical-log-record-repository");
 const MAX_UINT64 = 18_446_744_073_709_551_615n;

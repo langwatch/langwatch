@@ -29,6 +29,38 @@ export const joinRequestFiledSchema = z
   .strict();
 export type JoinRequestFiled = z.infer<typeof joinRequestFiledSchema>;
 
+/**
+ * The organization somebody was just admitted to by its domain setting, or
+ * null when nothing admits their address — the ordinary case, not a failure.
+ * Identity's `JoinOffer`, restated so this contract carries no value import from it.
+ */
+export const joinRequestAdmittedSchema = z
+  .object({
+    organization: z
+      .object({
+        organizationId: z.string().min(1),
+        name: z.string(),
+        colleagueCount: z.number().int(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+export type JoinRequestAdmitted = z.infer<typeof joinRequestAdmittedSchema>;
+
+/** Who walked in on the domain setting lately, named for the members area. */
+export const joinRequestAutomaticJoinsSchema = z
+  .object({
+    joinRequestId: z.string().min(1),
+    userId: z.string().min(1),
+    name: z.string(),
+    domain: z.string(),
+    joinedAt: z.date().nullable(),
+  })
+  .strict()
+  .array();
+export type JoinRequestAutomaticJoins = z.infer<typeof joinRequestAutomaticJoinsSchema>;
+
 /** A write with nothing else to report. */
 export const joinRequestWriteAckSchema = z.object({ success: z.literal(true) }).strict();
 export type JoinRequestWriteAck = z.infer<typeof joinRequestWriteAckSchema>;
@@ -49,8 +81,13 @@ export const joinRequestJoiningSchema = z
   .strict();
 export type JoinRequestJoining = z.infer<typeof joinRequestJoiningSchema>;
 
-/** The setting changed; the caller reads back what it was and what it is now. */
+/** The setting changed; both values and both domain lists, as the audit row records them. */
 export const joinRequestJoiningChangedSchema = z
-  .object({ previous: domainJoinSettingSchema, next: domainJoinSettingSchema })
+  .object({
+    previous: domainJoinSettingSchema,
+    next: domainJoinSettingSchema,
+    previousDomains: z.array(z.string()),
+    nextDomains: z.array(z.string()),
+  })
   .strict();
 export type JoinRequestJoiningChanged = z.infer<typeof joinRequestJoiningChangedSchema>;

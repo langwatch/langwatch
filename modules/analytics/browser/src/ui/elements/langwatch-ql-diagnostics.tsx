@@ -1,16 +1,13 @@
 /**
  * The notes the backend attached to a result, rendered unfiltered and
  * unchanged: the API already under-reports, so shortening would drop
- * exactly the information that matters. Truncation is visually prominent.
+ * exactly the information that matters. A result is never cut, so none is a warning.
  * @see @langwatch/analytics-contract/diagnostics.ts
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { HStack, Stack, Text } from "@chakra-ui/react";
 import type { LangWatchQLDiagnostic } from "@langwatch/analytics-contract";
-
-/** The one code whose meaning is "what you are reading is incomplete". */
-const TRUNCATION_CODE = "RESULT_TRUNCATED";
 
 export interface LangWatchQLDiagnosticsProps {
   diagnostics: readonly LangWatchQLDiagnostic[];
@@ -22,7 +19,6 @@ export function LangWatchQLDiagnostics({ diagnostics }: LangWatchQLDiagnosticsPr
   return (
     <Stack gap={0} width="full" data-testid="lwql-diagnostics">
       {diagnostics.map((diagnostic, index) => {
-        const severity = diagnostic.code === TRUNCATION_CODE ? "warning" : "info";
         return (
           <HStack
             key={`${diagnostic.code}-${index}`}
@@ -35,9 +31,6 @@ export function LangWatchQLDiagnostics({ diagnostics }: LangWatchQLDiagnosticsPr
             background="bg.subtle"
             data-testid="lwql-diagnostic"
             data-diagnostic-code={diagnostic.code}
-            // One expression feeding both the label and this attribute, so the
-            // published severity cannot drift from the styling.
-            data-severity={severity}
           >
             <Text
               flexShrink={0}
@@ -45,10 +38,10 @@ export function LangWatchQLDiagnostics({ diagnostics }: LangWatchQLDiagnosticsPr
               fontWeight="700"
               letterSpacing="0.05em"
               textTransform="uppercase"
-              color={severity === "warning" ? "orange.fg" : "blue.fg"}
+              color="blue.fg"
               marginTop="1px"
             >
-              {severity === "warning" ? "Warning" : "Notice"}
+              Notice
             </Text>
             {/* Unchanged: each message already names the fact that made it
                 fire, and that is the part a shortened version would drop. */}

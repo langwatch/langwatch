@@ -1,16 +1,27 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+export type PrismaMigrationMembershipDatabase = {
+  user: {
+    findUnique(args: {
+      where: { id: string };
+      select: { orgMemberships: { select: { organizationId: true } } };
+    }): Promise<{ orgMemberships: { organizationId: string }[] } | null>;
+  };
+};
 
 /**
  * The user-rooted cohort's membership probe: does this person belong to any
- * organization enrolled in this migration. One indexed read per candidate
- * user, rather than materializing every enrolled organization's member list.
+ * organization enrolled in this migration. Reads the user's own memberships
+ * and intersects them in memory, so no statement grows with the enrolled set.
  */
 export class PrismaMigrationMembershipRepository {
-  static create({ prisma }: { prisma: PrismaClient }): PrismaMigrationMembershipRepository {
+  static create({
+    prisma,
+  }: {
+    prisma: PrismaMigrationMembershipDatabase;
+  }): PrismaMigrationMembershipRepository {
     return new PrismaMigrationMembershipRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly prisma: PrismaMigrationMembershipDatabase) {}
 
   async isMemberOfAny({
     userId,
@@ -20,10 +31,13 @@ export class PrismaMigrationMembershipRepository {
     organizationIds: readonly string[];
   }): Promise<boolean> {
     if (organizationIds.length === 0) return false;
-    const membership = await this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId: { in: [...organizationIds] } },
-      select: { userId: true },
+    const enrolled = new Set(organizationIds);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { orgMemberships: { select: { organizationId: true } } },
     });
-    return membership !== null;
+    return (user?.orgMemberships ?? []).some((membership) =>
+      enrolled.has(membership.organizationId),
+    );
   }
 }

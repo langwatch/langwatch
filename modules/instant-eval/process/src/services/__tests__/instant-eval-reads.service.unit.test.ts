@@ -24,6 +24,10 @@ const NOW = Temporal.Instant.from("2026-09-18T12:00:00Z");
 class RecordingJudgments implements InstantEvalJudgmentsRepository {
   readonly pages: InstantEvalJudgmentQuery[] = [];
 
+  async countUsage(): Promise<number> {
+    return 0;
+  }
+
   async insert(): Promise<void> {
     // Nothing is written by a read.
   }

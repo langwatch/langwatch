@@ -4,6 +4,8 @@
     // This package emits: `noEmit` from the shared base is turned back off
     // here so a `tsc -p` build still writes its declarations.
     "noEmit": false,
+    // An emitting project that imports `.ts` paths must rewrite them to `.js`.
+    "rewriteRelativeImportExtensions": true,
     // `target` governs EMIT and stays conservative: this package is published
     // and its output is downlevelled for whatever runtime a customer has.
     // `lib` describes the runtime the code may ASSUME, and this package's own

@@ -85,14 +85,6 @@ function resultChip({
       title: "The visible result belongs to the statement as it was when it ran",
     };
   }
-  const isTruncated = state.outcome.result.truncated;
-  if (isTruncated) {
-    return {
-      label: "Partial",
-      palette: "orange",
-      title: "The response ceiling cut this result short",
-    };
-  }
   return {
     label: "Current",
     palette: "green",
@@ -160,35 +152,6 @@ function StaleNotice({ onRun }: { onRun: () => void }) {
         run the new draft
       </Button>
     </Text>
-  );
-}
-
-/**
- * How much of the answer arrived, in the only number always true: rows
- * actually returned, never a row ceiling — a byte budget also caps
- * responses, so naming "10,000" would send a member looking for more.
- */
-function TruncationBanner({ result }: { result: LangWatchQLQueryResult }) {
-  return (
-    <HStack
-      gap={2}
-      align="flex-start"
-      role="status"
-      data-testid="lwql-truncation-banner"
-      background="orange.subtle"
-      borderBottomWidth="1px"
-      borderColor="border"
-      paddingX={4}
-      paddingY={2}
-    >
-      <Text fontSize="12px" fontWeight="700" color="orange.fg" flexShrink={0}>
-        Partial result
-      </Text>
-      <Text fontSize="12px" color="fg.muted" lineHeight="1.5">
-        Showing the first {formatNumber(result.statistics.rowsReturned)} rows. The rest of the
-        answer did not fit in the response. Aggregate or narrow the query to see it.
-      </Text>
-    </HStack>
   );
 }
 
@@ -512,8 +475,6 @@ function ResultBody({
 }) {
   return (
     <>
-      {result.truncated && <TruncationBanner result={result} />}
-
       <Box
         flex="1"
         minHeight={0}

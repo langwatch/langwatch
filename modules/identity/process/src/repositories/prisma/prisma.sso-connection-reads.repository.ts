@@ -7,8 +7,11 @@ import type {
 } from "../sso-connection.repository.ts";
 import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
 
-/** The one model the connection guards read, and no other. */
-export type PrismaSsoConnectionReadDatabase = Pick<PrismaClient, "ssoConnection">;
+/** The connection heads the guards read, and the ownership rows beside them. */
+export type PrismaSsoConnectionReadDatabase = Pick<
+  PrismaClient,
+  "ssoConnection" | "ssoVerifiedDomain"
+>;
 
 /** The identity heads a teardown's stranding check is answered from. */
 export type PrismaSsoConnectionStrandingDatabase = Pick<PrismaClient, "identifier">;
@@ -44,11 +47,24 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
   }: {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null> {
-    const row = await this.prisma.ssoConnection.findFirst({
-      where: { state: "ACTIVE", verifiedDomains: { has: domain } },
-      select: { id: true, organizationId: true },
+    // The ownership row, not the head's array: the row is what the database
+    // refuses a second organization on, so it is the only answer that cannot race.
+    const ownership = await this.prisma.ssoVerifiedDomain.findUnique({
+      where: { domain },
+      select: { organizationId: true, holders: { select: { connectionId: true } } },
     });
-    return row === null ? null : { connectionId: row.id, organizationId: row.organizationId };
+    if (ownership === null || ownership.holders.length === 0) return null;
+    const holders = await this.prisma.ssoConnection.findMany({
+      where: {
+        id: { in: ownership.holders.map((holder) => holder.connectionId) },
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+      },
+      select: { id: true, replacesConnectionId: true },
+    });
+    const owner = holders.find((holder) => holder.replacesConnectionId === null) ?? holders[0];
+    return owner === undefined
+      ? null
+      : { connectionId: owner.id, organizationId: ownership.organizationId };
   }
 
   async findForOrganization({

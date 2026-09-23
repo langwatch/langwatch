@@ -15,8 +15,6 @@
  * sides equally, and resumes with a fresh grace period so throttled misses never trigger a kill.
  */
 
-import { nowInstant } from "@langwatch/time";
-
 import type {
   ChartFrameDashboardContext,
   ChartFrameLogSource,
@@ -26,8 +24,12 @@ import type {
   ChartQueryResult,
   FrameToParentMessage,
   LwLogMessage,
-} from "../model/dashboard-widget/bridge-protocol.ts";
-import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "../model/dashboard-widget/bridge-protocol.ts";
+} from "@langwatch/analytics-contract/chart-frame-protocol";
+import {
+  CHART_FRAME_HEARTBEAT_TIMEOUT_MS,
+  CHART_FRAME_PATH,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
+import { nowInstant } from "@langwatch/time";
 
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
 const MAX_CONCURRENT_QUERIES = 8;
@@ -55,6 +57,14 @@ export interface CreateFrameBridgeOptions {
   readonly dashboardContext: ChartFrameDashboardContext;
   /** Author-declared parameter defaults, delivered once on `lw:init`. */
   readonly params?: ChartFrameParamsSnapshot;
+  /**
+   * The widget's React/TSX source, delivered once on `lw:init`. The frame
+   * document carries no author code, so this is how each frame receives its
+   * own widget.
+   */
+  readonly source: string;
+  /** The frame document URL, CHART_FRAME_PATH unless given; the bridge navigates to it. */
+  readonly src?: string;
   readonly onLog: (entry: ChartFrameLogEntry) => void;
   readonly onHeightChange: (px: number) => void;
   /**
@@ -80,7 +90,15 @@ export interface FrameBridge {
 // One factory wiring the iframe's postMessage handlers and lifecycle together;
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splitting scatters state.
 export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridge {
-  const { iframe, executeQuery, onLog, onHeightChange, onNavigate, onTeardown } = options;
+  const {
+    iframe,
+    executeQuery,
+    onLog,
+    onHeightChange,
+    onNavigate,
+    onTeardown,
+    src = CHART_FRAME_PATH,
+  } = options;
 
   let port: MessagePort | null = null;
   let initialized = false;
@@ -218,6 +236,7 @@ export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridg
         type: "lw:init",
         dashboardContext: options.dashboardContext,
         params: options.params ?? {},
+        source: options.source,
       },
       "*",
       [channel.port2],
@@ -241,11 +260,10 @@ export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridg
     }, CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 5);
   };
 
-  if (iframe.contentDocument?.readyState === "complete" && iframe.contentWindow) {
-    onFrameLoad();
-  } else {
-    iframe.addEventListener("load", onFrameLoad);
-  }
+  // The listener goes on before the frame navigates, so a fast load cannot
+  // miss lw:init; a sandboxed frame's document is unreadable, so no probe.
+  iframe.addEventListener("load", onFrameLoad);
+  iframe.src = src;
 
   return {
     postDashboardContextChange(dashboardContext: ChartFrameDashboardContext) {

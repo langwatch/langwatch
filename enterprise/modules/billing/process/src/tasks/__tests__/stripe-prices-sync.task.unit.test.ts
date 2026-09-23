@@ -81,9 +81,9 @@ const createPriceMapForEnvironment = (
 ): StripePriceMap => {
   const priceMap = {} as StripePriceMap;
   for (const key of STRIPE_PRICE_NAMES) {
-    const entry = mapping[key];
-    if (!entry) continue;
-    priceMap[key] = entry[environment];
+    const priceId = mapping[key]?.[environment];
+    if (!priceId) continue;
+    priceMap[key] = priceId;
   }
   return priceMap;
 };

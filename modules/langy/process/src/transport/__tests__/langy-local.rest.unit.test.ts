@@ -69,12 +69,13 @@ function projectDoor(granted: boolean) {
   return authenticate;
 }
 
-function buildApi(options: { granted: boolean }) {
+function buildApi(options: { granted: boolean; own?: boolean }) {
   const authenticate = projectDoor(options.granted);
   const tryFindVisible = vi.fn(async () => ({
     id: CONVERSATION_ID,
     title: "Instrument tracing",
     lastModel: "gpt-5-mini",
+    isOwn: options.own ?? true,
   }));
 
   const app = { findByIdVisible: tryFindVisible } as never;
@@ -137,6 +138,20 @@ describe("given a key held by someone with Langy access", () => {
 
       expect(response.status).toBe(200);
       expect(api.tryFindVisible).toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a teammate shared their conversation with the project", () => {
+  describe("when a Langy key of mine names that conversation", () => {
+    /** @scenario "A key never reaches the folder of a teammate's shared conversation" */
+    it("answers not found, as for a conversation that does not exist", async () => {
+      const api = buildApi({ granted: true, own: false });
+
+      const response = await api.workspace();
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "langy_conversation_not_found" });
     });
   });
 });

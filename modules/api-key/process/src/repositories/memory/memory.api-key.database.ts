@@ -1,4 +1,4 @@
-import type { StoredApiKey } from "../api-key.repository.ts";
+import type { ApiKeyRow } from "../api-key.repository.ts";
 
 /**
  * The rows the memory API-key repository reads. Held here rather than in the
@@ -6,18 +6,18 @@ import type { StoredApiKey } from "../api-key.repository.ts";
  * key row does not: which owners have been deactivated.
  */
 export class MemoryApiKeyDatabase {
-  #keys: StoredApiKey[] = [];
+  #keys: ApiKeyRow[] = [];
   #deactivatedUserIds = new Set<string>();
 
   static create(): MemoryApiKeyDatabase {
     return new MemoryApiKeyDatabase();
   }
 
-  keys(): StoredApiKey[] {
+  keys(): ApiKeyRow[] {
     return this.#keys;
   }
 
-  replaceKey(key: StoredApiKey): void {
+  replaceKey(key: ApiKeyRow): void {
     const index = this.#keys.findIndex((row) => row.id === key.id);
     if (index === -1) this.#keys.push(key);
     else this.#keys[index] = key;

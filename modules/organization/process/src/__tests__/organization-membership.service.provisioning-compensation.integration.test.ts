@@ -106,6 +106,10 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
         sessions,
         grantCache,
         testArrivals: { standingFor: async () => ({ testing: false }) as const },
+        admissions: {
+          attachBindings: () => Promise.reject(new Error("no admission expected")),
+          completeAdmission: () => Promise.reject(new Error("no admission expected")),
+        },
       });
 
       await expect(failing.createForProvisioning({ name, slug })).rejects.toThrow(SEEDING_FAILURE);
@@ -126,6 +130,10 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
         sessions,
         grantCache,
         testArrivals: { standingFor: async () => ({ testing: false }) as const },
+        admissions: {
+          attachBindings: () => Promise.reject(new Error("no admission expected")),
+          completeAdmission: () => Promise.reject(new Error("no admission expected")),
+        },
       }).createForProvisioning({ name, slug });
       retriedOrganizationId = retried.organization.id;
 

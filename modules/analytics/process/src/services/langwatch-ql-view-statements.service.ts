@@ -1,8 +1,9 @@
 /**
  * @see ./catalog/lwql-views.ts — the catalog these statements are built from
  * @see ./provisioning.ts — the access model applied over them
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
+import { LWQL_SOURCE_ALIAS } from "../rules/lwql-source-alias.rules.ts";
 import { TENANT_COLUMN } from "../rules/lwql-view-catalog.rules.ts";
 import { KEY_MAP_COLUMNS, type LangWatchQLNames } from "./langwatch-ql-access-model.service.ts";
 import {
@@ -26,7 +27,7 @@ export const SHIPPED_LWQL_DEDUP: LangWatchQLDedupStrategy = "final";
 /**
  * Alias every view body gives its source table. Load-bearing, not cosmetic.
  */
-const SOURCE_ALIAS = "src";
+const SOURCE_ALIAS = LWQL_SOURCE_ALIAS;
 
 /**
  * Alias the tenant-predicate subquery gives the key map. Needed because the key map and every
@@ -123,7 +124,11 @@ function dedupPredicate(view: LangWatchQLViewDefinition, relation: string): stri
     );
   }
 
-  const grain = catalogShapes.grainColumns(view);
+  // Grain is exposed names; the subquery runs against the source table, so map
+  // each to the physical column its view column reads (an alias renames it).
+  const grain = catalogShapes
+    .grainColumns(view)
+    .map((column) => catalogShapes.physicalColumn(view, column));
   const outerKeys = grain.map(sourceColumn);
   const innerKeys = grain.map((column) => sqlText.quotedColumn(column));
   const version = sqlText.quotedColumn(versionColumn);
@@ -151,6 +156,17 @@ function groupedColumnExpression(
     return catalogShapes.columnExpression({ column, source: sourceColumn });
   }
 
+  // An aggregate-function column carries its own combinator in its expression
+  // (`sumMerge`, `argMaxMerge`, a plain `max` for a SimpleAggregateFunction) —
+  // itself an aggregate, so it is well-defined under the group.
+  if (column.aggregate) {
+    return catalogShapes.columnExpression({
+      column,
+      source: sourceColumn,
+      joined: joinedColumnQualifier(view),
+    });
+  }
+
   if (!column.summed) {
     throw new Error(
       `LangWatchQL view ${view.name} groups by its grain, and column "${column.name}" is neither part of ` +
@@ -159,6 +175,109 @@ function groupedColumnExpression(
   }
 
   return catalogShapes.columnExpression({ column, source: sourceColumn, isAggregated: true });
+}
+
+/**
+ * One projection expression: an identity over a PostgreSQL engine table (the
+ * approved view already renamed), the grouped form under `GROUP BY`, else the
+ * column's own expression.
+ */
+function projectedExpression({
+  view,
+  column,
+  postgres,
+  grouped,
+  joinedColumn,
+}: {
+  view: LangWatchQLViewDefinition;
+  column: LangWatchQLViewColumn;
+  postgres: boolean;
+  grouped: boolean;
+  joinedColumn: ((name: string) => string) | undefined;
+}): string {
+  if (postgres) {
+    return sourceColumn(column.name);
+  }
+
+  if (grouped) {
+    return groupedColumnExpression(view, column);
+  }
+
+  return catalogShapes.columnExpression({ column, source: sourceColumn, joined: joinedColumn });
+}
+
+/**
+ * Qualifies a joined-table column, passed to a column's expression as its
+ * `joined` argument. `undefined` for a single-table view, so a column there
+ * cannot reference a table the view does not read.
+ */
+function joinedColumnQualifier(
+  view: LangWatchQLViewDefinition,
+): ((name: string) => string) | undefined {
+  const { join } = view;
+  if (!join) {
+    return undefined;
+  }
+
+  return (name: string) =>
+    `${sqlText.assertIdentifier(join.alias, "join alias")}.${sqlText.quotedColumn(name)}`;
+}
+
+/**
+ * The `<kind> JOIN <table> AS <alias> ON <predicate>` clause, or `""` for a
+ * single-table view — which is what keeps every existing view's SQL identical.
+ * The joined table lives in the same source database as the primary.
+ */
+function joinRelationClause(view: LangWatchQLViewDefinition, sourceDatabase: string): string {
+  const { join } = view;
+  if (!join) {
+    return "";
+  }
+
+  const relation = `${sqlText.assertIdentifier(sourceDatabase, "sourceDatabase")}.${sqlText.assertIdentifier(join.table, "join table")}`;
+
+  return (
+    `\n${join.kind ?? "INNER"} JOIN ${relation} ` +
+    `AS ${sqlText.assertIdentifier(join.alias, "join alias")} ON ${join.on}`
+  );
+}
+
+/**
+ * The pre-filter clause: ANDed onto whatever `where` the dedup or postgres shape
+ * already emitted, and opening the clause itself when there is none.
+ */
+function preFilterClause(view: LangWatchQLViewDefinition, where: string): string {
+  if (!view.where) {
+    return "";
+  }
+
+  return where ? `\n  AND (${view.where})` : `\nWHERE ${view.where}`;
+}
+
+/**
+ * Refuses a `where`/`on` predicate whose columns no grant covers. The columns
+ * are declared rather than parsed out of the SQL, so a predicate set without its
+ * column list would silently deny the restricted read at query time.
+ */
+function assertPredicateColumnsDeclared(view: LangWatchQLViewDefinition): void {
+  if (view.where && !view.whereSourceColumns?.length) {
+    throw new Error(
+      `LangWatchQL view ${view.name} sets a where predicate but no whereSourceColumns; ` +
+        `list the columns it reads so they are granted`,
+    );
+  }
+
+  if (!view.join) {
+    return;
+  }
+
+  const on = view.join.onSourceColumns;
+  if ((on?.primary?.length ?? 0) + (on?.joined?.length ?? 0) === 0) {
+    throw new Error(
+      `LangWatchQL view ${view.name} declares a join but no join.onSourceColumns; ` +
+        `list the columns its ON reads on each side so they are granted`,
+    );
+  }
 }
 
 /**
@@ -206,44 +325,48 @@ export class LangWatchQLViewStatementsService {
     // to collapse and neither dedup shape applies; what it needs instead is the
     // predicate that keeps the read off the primary from being a whole-table one.
     const postgres = catalogShapes.isPostgresResident(view);
+    // A join reaches a second fact table in the same source database. Refused for
+    // a PostgreSQL-resident dataset, whose only relation is its own engine table.
+    if (view.join && postgres) {
+      throw new Error(
+        `LangWatchQL view ${view.name} declares a join and is PostgreSQL-resident; ` +
+          `a join reads a second ClickHouse fact table and cannot apply here`,
+      );
+    }
+
+    assertPredicateColumnsDeclared(view);
+    const joinedColumn = joinedColumnQualifier(view);
     const strategy = dedupStrategyFor({ view, dedup });
     const grain = catalogShapes.grainColumns(view);
-    // An aggregating source whose published grain is narrower than the engine's
-    // key cannot be served by `FINAL`: the merge collapses to the key, and the
-    // surplus key columns would surface as extra rows per logical row. The view
-    // aggregates instead — `GROUP BY` the grain with every measure summed —
-    // which subsumes the merge, so `FINAL` is dropped rather than paid twice.
-    const grouped =
-      !postgres &&
-      view.dedup.aggregating === true &&
-      view.dedup.keyColumns.some((key) => !grain.includes(key));
+    // Any aggregating source renders as a `GROUP BY`, whether its published grain
+    // is narrower than the engine key (a rollup that groups away a breakdown
+    // column) or equal to it (a per-key rollup whose measures are aggregate
+    // states only a merge combinator can read). `FINAL` is not an option for the
+    // latter: after a merge the state column is still binary.
+    const grouped = !postgres && view.dedup.aggregating === true;
     const projection = view.columns
       .map((column) => {
-        // The engine table already carries the catalog's names and types — the
-        // approved PostgreSQL view did the renaming, one layer further down — so
-        // here the projection is an identity. Reading `sourceColumns` instead
-        // would name the *application's* columns, which the engine table does not
-        // have.
-        const engineExpression = grouped
-          ? groupedColumnExpression(view, column)
-          : catalogShapes.columnExpression({ column, source: sourceColumn });
-        const expression = postgres ? sourceColumn(column.name) : engineExpression;
+        const expression = projectedExpression({ view, column, postgres, grouped, joinedColumn });
 
         return `  ${expression} AS ${sqlText.quotedColumn(column.name)}`;
       })
       .join(",\n");
     const aliased = `${relation} AS ${SOURCE_ALIAS}`;
     const from = strategy === "final" && !postgres && !grouped ? `${aliased} FINAL` : aliased;
+    const joinClause = joinRelationClause(view, sourceDatabase);
     const enginePredicate = strategy === "in-tuple" ? `\n${dedupPredicate(view, relation)}` : "";
     const where = postgres ? `\n${postgresTenantPredicate({ names })}` : enginePredicate;
-    const groupBy = grouped ? `\nGROUP BY ${grain.map(sourceColumn).join(", ")}` : "";
+    const preFilter = preFilterClause(view, where);
+    const groupBy = grouped
+      ? `\nGROUP BY ${grain.map((column) => sourceColumn(catalogShapes.physicalColumn(view, column))).join(", ")}`
+      : "";
 
     return (
       `CREATE OR REPLACE VIEW ` +
       `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(view.name, "view")}\n` +
       `SQL SECURITY INVOKER\n` +
       `AS SELECT\n${projection}\n` +
-      `FROM ${from}${where}${groupBy}`
+      `FROM ${from}${joinClause}${where}${preFilter}${groupBy}`
     );
   }
 
@@ -267,6 +390,32 @@ export class LangWatchQLViewStatementsService {
 
     return (
       `GRANT SELECT(${columns}) ON ${sourceRelation({ names, sourceDatabase, view })} ` +
+      `TO ${sqlText.assertIdentifier(names.restrictedUser, "restrictedUser")}`
+    );
+  }
+
+  /** Column-scoped `SELECT` on a joined view's *second* source table. */
+  joinSourceColumnGrantStatement({
+    names,
+    sourceDatabase,
+    view,
+  }: {
+    names: LangWatchQLNames;
+    sourceDatabase: string;
+    view: LangWatchQLViewDefinition;
+  }): string | undefined {
+    const { join } = view;
+    if (!join) {
+      return undefined;
+    }
+
+    const columns = [...new Set([...join.sourceColumns, ...(join.onSourceColumns?.joined ?? [])])]
+      .map((column) => sqlText.quotedColumn(column))
+      .join(", ");
+    const relation = `${sqlText.assertIdentifier(sourceDatabase, "sourceDatabase")}.${sqlText.assertIdentifier(join.table, "join table")}`;
+
+    return (
+      `GRANT SELECT(${columns}) ON ${relation} ` +
       `TO ${sqlText.assertIdentifier(names.restrictedUser, "restrictedUser")}`
     );
   }

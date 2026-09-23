@@ -49,6 +49,12 @@ const TIMEOUT_EXCEEDED: ServerError = {
 const TOO_MANY_ROWS: ServerError = { code: "158", name: "TOO_MANY_ROWS" };
 const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 
+// `max_result_rows` / `max_result_bytes` under `result_overflow_mode = 'throw'` — the
+// *output* ceiling, distinct from the read ceilings above. Both settings raise this code.
+const TOO_MANY_ROWS_OR_BYTES: ServerError = { code: "396", name: "TOO_MANY_ROWS_OR_BYTES" };
+
+const UNKNOWN_FUNCTION: ServerError = { code: "46", name: "UNKNOWN_FUNCTION" };
+
 // The three server-error shapes are grouped deliberately: the two predicates below split
 // "object doesn't exist" (UNKNOWN_TABLE/UNKNOWN_DATABASE) from "grants incomplete"
 // (ACCESS_DENIED), matching the two distinct customer-facing errors
@@ -112,6 +118,26 @@ export function isClickHouseObjectMissingError(error: unknown): boolean {
 export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return raisedServerError({ error, variants: [UNKNOWN_IDENTIFIER] });
+}
+
+/**
+ * True when the finished result exceeded `max_result_rows` / `max_result_bytes`
+ * (TOO_MANY_ROWS_OR_BYTES, 396). Not mapped in {@link translateClickHouseQueryError}: only the
+ * LangWatchQL profile pins those settings, so only its executor can raise it.
+ */
+export function isClickHouseResultTooLargeError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [TOO_MANY_ROWS_OR_BYTES] });
+}
+
+/**
+ * True when the query called a function the server lacks (UNKNOWN_FUNCTION, 46). Not mapped in
+ * {@link translateClickHouseQueryError}: on our own connection it is a bug (ADR-045). Exported
+ * for the LangWatchQL executor, where it means the projection UDFs are missing.
+ */
+export function isClickHouseUnknownFunctionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: [UNKNOWN_FUNCTION] });
 }
 
 /**

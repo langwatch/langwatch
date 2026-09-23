@@ -23,6 +23,7 @@ import { ExportConfigDialog } from "../export-config-dialog.tsx";
 import { FilterSidebar } from "../filter-sidebar/filter-sidebar.tsx";
 import { FindBar } from "../find-bar/index.ts";
 import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
+import { useInstantEvalRunWatch } from "../hooks/use-instant-eval-run-watch.ts";
 import { useLensFilterDirtySync } from "../hooks/use-lens-filter-dirty-sync.ts";
 import { useLensSync } from "../hooks/use-lens-sync.ts";
 import { useResetSelectionOnViewChange } from "../hooks/use-reset-selection-on-view-change.ts";
@@ -32,6 +33,7 @@ import { useTraceFreshness } from "../hooks/use-trace-freshness.ts";
 import { useTraceListExport } from "../hooks/use-trace-list-export.ts";
 import { useTraceListQuery } from "../hooks/use-trace-list-query.ts";
 import { useURLSync } from "../hooks/use-url-sync.ts";
+import { InstantEvalProgressBanner } from "../instant-eval-progress-banner.tsx";
 import { useFirstTraceSpotlightTrigger } from "../onboarding/hooks/use-first-trace-spotlight-trigger.ts";
 import { OnboardingHost } from "../onboarding/index.ts";
 import { SpotlightOverlay } from "../onboarding/spotlights/spotlight-overlay.tsx";
@@ -77,6 +79,8 @@ export const TracesPage: React.FC = () => {
   useURLSync();
   useRollingTimeRange();
   useTraceFreshness();
+  // Every eval chip's run is read here, once for the page, until it settles.
+  useInstantEvalRunWatch();
   useTracesPresence();
   useDebouncedFilterCommit();
   useLensFilterDirtySync();
@@ -492,6 +496,7 @@ const ResultsPane: React.FC = React.memo(() => {
         <Box height="full" overflow="auto" bg={{ base: "bg.surface", _dark: "bg.muted" }}>
           <TraceTable />
         </Box>
+        <InstantEvalProgressBanner />
         {/* Aurora ribbon — plays once when the user enters sample-preview
             mode for a no-traces project. The aurora reads as "sample traces
             are arriving" — the same marquee moment as the legacy journey, now

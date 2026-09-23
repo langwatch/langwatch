@@ -97,10 +97,42 @@ export function backfillParityDiffs({
   return diffs;
 }
 
+const DERIVED_ACCOUNT_ID_PREFIX = "drvacct:";
+
+/**
+ * The account id a broker-derived identifier states. Stable, so every pass
+ * states the same id, and parseable back to its source, so the orphan
+ * compensation can follow the SOURCE row's liveness.
+ */
+export function derivedAccountId({
+  sourceAccountId,
+  providerId,
+}: {
+  sourceAccountId: string;
+  providerId: string;
+}): string {
+  return `${DERIVED_ACCOUNT_ID_PREFIX}${providerId}:${sourceAccountId}`;
+}
+
+/**
+ * The `Account` row id whose liveness keeps this identifier attached: its own
+ * for an ordinary account, and the broker row it was unfolded from for a
+ * derived one, which will never have an `Account` row of its own.
+ */
+export function accountLivenessKey(accountId: string): string {
+  if (!accountId.startsWith(DERIVED_ACCOUNT_ID_PREFIX)) return accountId;
+
+  const rest = accountId.slice(DERIVED_ACCOUNT_ID_PREFIX.length);
+  const separator = rest.indexOf(":");
+  if (separator <= 0 || separator === rest.length - 1) return accountId;
+
+  return rest.slice(separator + 1);
+}
+
 /**
  * The compensating half: identifiers adopted from an `Account` row that no
- * longer exists. Identifiers without an account (the email) are never the
- * backfill's to detach; tombstones are already detached.
+ * longer exists. Identifiers without an account are never the backfill's to
+ * detach, and tombstones are already detached.
  */
 export function orphanedIdentifierRows({
   rows,
@@ -112,7 +144,7 @@ export function orphanedIdentifierRows({
   return rows.filter(
     (row) =>
       row.accountId !== null &&
-      !liveAccountIds.has(row.accountId) &&
+      !liveAccountIds.has(accountLivenessKey(row.accountId)) &&
       isLiveIdentifierState(row.state),
   );
 }

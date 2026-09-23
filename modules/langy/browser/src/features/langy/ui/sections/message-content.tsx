@@ -46,6 +46,7 @@ import {
   stripReasoningTitles,
 } from "../../../../model/langy-reasoning-titles.ts";
 import { sayToolText } from "../../../../model/langy-say-tool.ts";
+import { secretSnippetCalls } from "../../../../model/langy-secret-snippet-tool.ts";
 import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
 import {
   langyRunText,
@@ -58,6 +59,7 @@ import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-gi
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
 import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
+import { LangySecretSnippetCard } from "../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
 import { useSpaLinkClick } from "../../behavior/logic/spa-link.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
@@ -246,6 +248,13 @@ function MessageContentImpl({
     [isPlainText, message.parts],
   );
 
+  // A secret shown once, where it can be copied. The card is the only place the value ever
+  // appears: it reads it on first render and the server refuses every later read.
+  const secretSnippets = useMemo(
+    () => (isPlainText ? [] : secretSnippetCalls(message.parts)),
+    [isPlainText, message.parts],
+  );
+
   // The connect card is NOT sniffed out of the assistant's prose any more.
 
   // The PR-flow progress card, derived from the message's tool parts, the same parts the tool
@@ -338,6 +347,7 @@ function MessageContentImpl({
     prs.length > 0 ||
     progressEvents.length > 0 ||
     questionCards.length > 0 ||
+    secretSnippets.length > 0 ||
     showsActivity ||
     plan,
   );
@@ -509,6 +519,11 @@ function MessageContentImpl({
             />
           </LangyCardBoundary>
         ) : null}
+        {secretSnippets.map((call) => (
+          <LangyCardBoundary key={call.callId} scope="the secret snippet card">
+            <LangySecretSnippetCard organizationId={organizationId ?? null} call={call} />
+          </LangyCardBoundary>
+        ))}
         {/* WHEN to ask is the backend's `shouldAskFeedback`, the agent's own directive, or
             /feedback. `showFeedback` is only the position + settled gate. Never mid-stream. */}
         {/* The reply the user cut short says so, whatever it managed to say

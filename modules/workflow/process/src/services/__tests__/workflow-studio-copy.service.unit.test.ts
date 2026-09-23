@@ -19,6 +19,10 @@ class RecordingRowRepository extends WorkflowRowRepository {
     this.created.push(input);
     return Promise.resolve();
   }
+
+  countUsage(): Promise<{ workflows: number }> {
+    return Promise.resolve({ workflows: this.created.length });
+  }
 }
 
 const copiedDataset = { id: "dataset-copy", name: "Copied set" } as Dataset;

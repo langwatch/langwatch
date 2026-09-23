@@ -84,15 +84,13 @@ describe("EventingAuthzReadRepository", () => {
       });
       expect(bindings).toEqual([
         {
-          role: "ADMIN",
-          customRoleId: null,
+          roleKey: "admin",
           scopeType: "TEAM",
           scopeId: "team-1",
           viaGroupId: null,
         },
         {
-          role: "CUSTOM",
-          customRoleId: "role-9",
+          roleKey: "custom:role-9",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
@@ -123,8 +121,8 @@ describe("EventingAuthzReadRepository", () => {
             userId: "alice",
             organizationId: "org-1",
           })
-        ).map((binding) => binding.role),
-      ).toEqual(["MEMBER", "VIEWER"]);
+        ).map((binding) => binding.roleKey),
+      ).toEqual(["member", "viewer"]);
     });
 
     describe("when the user has left the organization", () => {
@@ -185,8 +183,7 @@ describe("EventingAuthzReadRepository", () => {
           }),
         ).toEqual([
           {
-            role: "ADMIN",
-            customRoleId: null,
+            roleKey: "admin",
             scopeType: "TEAM",
             scopeId: "team-2",
             viaGroupId: null,
@@ -243,8 +240,7 @@ describe("EventingAuthzReadRepository", () => {
       });
       expect(bindings).toEqual([
         {
-          role: "MEMBER",
-          customRoleId: null,
+          roleKey: "member",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: "group-2",
@@ -300,8 +296,7 @@ describe("EventingAuthzReadRepository", () => {
       });
       expect(bindings).toEqual([
         {
-          role: "VIEWER",
-          customRoleId: null,
+          roleKey: "viewer",
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
@@ -310,58 +305,9 @@ describe("EventingAuthzReadRepository", () => {
     });
   });
 
-  describe("when findLegacyTeamMemberships reads the legacy team rows", () => {
-    it("reads the same TeamUser rows as the legacy repository, tenancy-fenced", async () => {
-      // Deliberately NOT empty for a cut-over organization: the rows live
-      // until contract deletes them, and the engine's org-level union quirk
-      // must keep inferring from them identically over both heads (the
-      // dormant-fact principle) - an empty answer here made the two readers
-      // disagree at organization scope for every ordinary member.
-      const findMany = vi.fn().mockResolvedValue([
-        {
-          teamId: "team-1",
-          role: "MEMBER",
-          assignedRoleId: null,
-          team: { isPersonal: false },
-        },
-      ]);
-      const repository = EventingAuthzReadRepository.create(clientFor({ teamUser: { findMany } }));
-
-      expect(
-        await repository.findLegacyTeamMemberships({
-          userId: "alice",
-          organizationId: "org-1",
-        }),
-      ).toEqual([
-        {
-          teamId: "team-1",
-          role: "MEMBER",
-          customRoleId: null,
-          isPersonal: false,
-        },
-      ]);
-      expect(findMany).toHaveBeenCalledWith({
-        where: {
-          userId: "alice",
-          team: {
-            organizationId: "org-1",
-            organization: {
-              members: { some: { userId: "alice", disabledAt: null } },
-            },
-          },
-        },
-        select: {
-          teamId: true,
-          role: true,
-          assignedRoleId: true,
-          team: { select: { isPersonal: true } },
-        },
-      });
-    });
-  });
-
   describe("when findCustomRolePermissions resolves a principal's role", () => {
     describe("when the principal is a user", () => {
+      /** @scenario "A poisoned cross-organization binding does not grant access" */
       it("fences on the organization and excludes every API-key system role", async () => {
         const findMany = vi.fn().mockResolvedValue([]);
         const repository = EventingAuthzReadRepository.create(clientFor({ role: { findMany } }));
@@ -456,6 +402,7 @@ describe("EventingAuthzReadRepository", () => {
         expect(rows).toEqual([{ id: "role-1", permissions: ["traces:view"] }]);
       });
 
+      /** @scenario "A poisoned cross-key binding does not inherit the other key's permissions" */
       it("excludes a system role another principal also holds", async () => {
         const repository = EventingAuthzReadRepository.create(
           clientFor({

@@ -1,17 +1,18 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract";
 /**
  * The app authorizes the caller's exact organizationId before every
  * guided-onboarding read and write. Binds the `@integration` scenarios over
  * a memory fixture of `OrganizationApi`, pending its process-side read/write.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { PermissionDeniedError, type AuthzApi } from "@langwatch/authz-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import {
   EMPTY_GUIDED_ONBOARDING_STATE,
   type GuidedOnboardingRecord,
-  type OnboardingServerConfig,
 } from "@langwatch/onboarding-contract";
+import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,18 +22,10 @@ import { OnboardingApp } from "../onboarding.app.ts";
 const ORGANIZATION_ID = "organization_1";
 const USER_ID = "user_1";
 
-function testConfig(overrides: Partial<OnboardingServerConfig> = {}): OnboardingServerConfig {
-  return {
-    productAnalytics: { key: undefined, host: undefined },
-    gateway: { publicUrl: undefined, baseUrl: undefined },
-    ...overrides,
-  };
-}
-
 function buildApp(
   options: {
     permitted?: boolean;
-    config?: OnboardingServerConfig;
+    publicGatewayUrl?: string;
     record?: GuidedOnboardingRecord;
   } = {},
 ) {
@@ -54,8 +47,16 @@ function buildApp(
         readGuidedOnboardingState,
         writeGuidedOnboardingState,
       }),
+      ops: createApiFixture<OpsApi>({ findProductAnalyticsTargets: () => [] }),
+      gateway: createApiFixture<GatewayApi>({
+        getDeploymentAddresses: () => ({
+          baseUrl: void 0,
+          publicUrl: options.publicGatewayUrl,
+          expectedControlPlaneUrl: void 0,
+        }),
+      }),
     },
-    config: options.config ?? testConfig(),
+    config: void 0,
     resources: new ResourceScope(),
     // No handle is ever resolved through it in these tests.
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -110,7 +111,7 @@ describe("OnboardingApp", () => {
 
   it("adds the instance's gateway URL when the deployment declares one", async () => {
     const { app } = buildApp({
-      config: testConfig({ gateway: { publicUrl: "https://gw.example.com", baseUrl: undefined } }),
+      publicGatewayUrl: "https://gw.example.com",
     });
 
     const state = await app.beginPath({

@@ -178,6 +178,10 @@ export class SimulationService extends SimulationServiceContract {
     return this.repository.countRunsForExport(input);
   }
 
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number> {
+    return this.repository.countUsage(input);
+  }
+
   async findRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }> {

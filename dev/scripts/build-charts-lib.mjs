@@ -9,17 +9,15 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { build } from "esbuild";
 
-const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const ENTRY = path.join(
-  APP,
-  "src/features/custom-chart-playground/bridge/chartsLib/index.ts",
+  ROOT,
+  "modules/analytics/browser/src/model/dashboard-widget/chartsLib/index.ts",
 );
-const OUT_FILE = path.join(
-  APP,
-  "src/features/custom-chart-playground/bridge/chartsLibSource.ts",
-);
+const OUT_FILE = path.join(ROOT, "modules/analytics/contract/src/chart-frame-charts-lib-source.ts");
 
 async function main() {
   const result = await build({
@@ -53,9 +51,7 @@ export function buildChartsLibScript(): string {
 `;
 
   writeFileSync(OUT_FILE, source);
-  console.log(
-    `Wrote ${path.relative(APP, OUT_FILE)} (${script.length} bytes bundled)`,
-  );
+  console.log(`Wrote ${path.relative(ROOT, OUT_FILE)} (${script.length} bytes bundled)`);
 }
 
 main().catch((error) => {

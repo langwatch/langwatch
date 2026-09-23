@@ -205,6 +205,17 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And its ingest key is revoked with cause "session"
     And the desktop's key still authorizes trace writes
 
+  @integration @ingest-api-key @revoke
+  Scenario: The first revocation's cause is the one recorded
+    Given a live key
+    When a person revokes it and the ingest-key cap retires it in the same moment
+    Then the key is revoked with cause "user"
+    And both callers read that cause back
+    # A "cap" written over a person's "user" is the one that matters: the CLI
+    # re-mints a key the cap retired and leaves a key a person revoked dead.
+    # The later revoke waits on the row lock and re-reads the row as the
+    # first left it, so it records nothing.
+
   @integration @ingest-api-key @session @revoke
   Scenario: Revoking a device from the devices tab retires its login key and its ingest keys
     Given jane's laptop and desktop each hold a device session and a "claude_code" key

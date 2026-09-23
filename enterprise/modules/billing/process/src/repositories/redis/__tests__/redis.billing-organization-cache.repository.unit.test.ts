@@ -15,6 +15,7 @@ const ORGANIZATION: BillingReportOrganizationLookup = {
     id: "organization_acme",
     stripeCustomerId: "cus_1",
     subscriptions: [{ id: "sub_1" }],
+    contract: "cloud",
   },
 };
 

@@ -24,3 +24,31 @@ export function connectionLabel({
 
   return protocol ? `${displayName} (${protocol})` : displayName;
 }
+
+/**
+ * How long ago something happened, coarser as the gap widens; past a month it
+ * hands over to the date itself. Absence is an answer: "Never".
+ */
+export function relativeTime({ atMs, nowMs }: { atMs: number | null; nowMs: number }): string {
+  if (!atMs) return "Never";
+
+  const seconds = Math.floor((nowMs - atMs) / 1000);
+  if (seconds < 60) return `${Math.max(seconds, 0)}s ago`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+
+  return readableDate(atMs).toLocaleDateString();
+}
+
+/** A moment as a date and a time, in the reader's locale. */
+export function readableDateTime(atMs: number): string {
+  const date = readableDate(atMs);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+}

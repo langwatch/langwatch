@@ -6,6 +6,7 @@
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -191,6 +192,7 @@ function mount({
     config: undefined,
     repositories: MemoryCodingAgentRepositories.create(),
     resources: new ResourceScope(),
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
   // The resolved credential, exactly as the process's own project
@@ -302,6 +304,12 @@ class TestCodingAgentSessionService implements CodingAgentSessionService {
     input: Parameters<CodingAgentSessionService["getForPersonalProject"]>[0],
   ): ReturnType<CodingAgentSessionService["getForPersonalProject"]> {
     return this.unimplemented("getForPersonalProject", input);
+  }
+
+  countUsage(
+    input: Parameters<CodingAgentSessionService["countUsage"]>[0],
+  ): ReturnType<CodingAgentSessionService["countUsage"]> {
+    return this.unimplemented("countUsage", input);
   }
 
   private unimplemented(operation: string, _input: unknown): Promise<never> {

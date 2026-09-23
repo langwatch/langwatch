@@ -82,6 +82,7 @@ export type Credential =
   | "browser"
   | "project"
   | "organization"
+  | "apiKey"
   | "scimToken"
   | "internalSecret"
   | "instance-admin"
@@ -314,6 +315,7 @@ export async function decide({
 export function securityRequirement(credential: Credential): readonly Record<string, never[]>[] {
   switch (credential) {
     case "project":
+    case "apiKey":
       return [{ project_api_key: [] }];
     case "organization":
       return [{ admin_api_key: [] }];

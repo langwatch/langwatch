@@ -100,6 +100,7 @@ describe("given a process that produces identity commands without consuming them
         "recordScimUserPush",
         "recordScimGroupMapping",
         "recordScimApplyFailure",
+        "redriveScimApply",
         "revokeScimSync",
       ]);
       expect(commandNamesOf(producer as never)).toEqual(commandNamesOf(consumer as never));

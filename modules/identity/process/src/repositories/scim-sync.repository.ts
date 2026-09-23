@@ -17,4 +17,14 @@ export abstract class ScimSyncReadRepository {
    * it pushed, identity owns where each connection's sync stands.
    */
   abstract findForOrganization(args: { organizationId: string }): Promise<ScimSyncState[]>;
+
+  /** The operator's cross-customer page (ADR-122), newest first. */
+  abstract findPageForOperator(args: {
+    page: number;
+    pageSize: number;
+    search?: string | undefined;
+  }): Promise<{ syncs: ScimSyncState[]; total: number }>;
+
+  /** One connection's sync, whichever organization holds it: none or one. */
+  abstract findByConnectionForOperator(args: { connectionId: string }): Promise<ScimSyncState[]>;
 }

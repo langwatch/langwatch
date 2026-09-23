@@ -253,6 +253,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       scopes,
       traceProjectId: input.trace_project_id,
       guardrailAttachments: input.config?.guardrailAttachments,
+      callerProjectId: scope.id,
     });
     const { virtualKey, secret } = await app.createVirtualKey({
       organizationId,

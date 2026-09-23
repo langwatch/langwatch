@@ -5,9 +5,10 @@
  */
 // @vitest-environment node
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { ScopedSecrets } from "@langwatch/secrets";
 import { Temporal } from "@langwatch/time";
 import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -53,6 +54,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
       stagingTtlSeconds: undefined,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories: {
       workflowRows: members.workflowRows,
       workflows: createApiFixture<WorkflowRepository>({}, "WorkflowRepository"),

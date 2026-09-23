@@ -900,6 +900,26 @@ export function codexHasGatewayBlock(filePath: string = defaultCodexConfigPath()
 }
 
 /**
+ * The gateway URL written inside the langwatch gateway block, or null when
+ * the file, the block or its `base_url` line is absent.
+ */
+export function codexGatewayBlockBaseUrl(
+	filePath: string = defaultCodexConfigPath(),
+): string | null {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return null;
+	}
+	const begin = content.indexOf(GW_BEGIN);
+	const end = content.indexOf(GW_END);
+	if (begin === -1 || end === -1 || end < begin) return null;
+	const match = /^\s*base_url\s*=\s*"([^"]*)"/m.exec(content.slice(begin, end));
+	return match?.[1] ?? null;
+}
+
+/**
  * Remove the langwatch `[otel]` (Path B) marker block from config.toml, if
  * present. User config outside the marker pair is preserved. Returns true
  * when a block was removed (idempotent — false when absent).

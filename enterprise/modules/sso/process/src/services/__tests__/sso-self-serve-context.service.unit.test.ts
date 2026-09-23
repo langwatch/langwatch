@@ -34,7 +34,6 @@ function resolverOver({
     }),
     licenseProof: InstanceLicenseProof.create({
       licensing: createApiFixture<LicensingApi>({ inspectPlatformAccess }),
-      instanceLicenseKey: void 0,
     }),
     optIn: { isOptedIn: async () => optedIn },
     isHosted,

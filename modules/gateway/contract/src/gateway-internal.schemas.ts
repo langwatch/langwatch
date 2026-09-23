@@ -10,6 +10,8 @@ import { spendUsageSchema } from "./gateway-spend.schemas.ts";
 /** The virtual key a data-plane node presents for exchange against a JWT. */
 export const gatewayInternalResolveKeySchema = z.object({
   key_presented: z.string().min(1),
+  /** The install presenting an `lwl_` license token; ignored for a virtual key. */
+  instance_id: z.string().optional(),
   /** Which node asked. Recorded on the auth decision log, never enforced. */
   gateway_node_id: z.string().optional(),
 });

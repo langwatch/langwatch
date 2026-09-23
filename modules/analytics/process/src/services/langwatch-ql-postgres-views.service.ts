@@ -11,6 +11,7 @@ import {
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,
+  POSTGRES_BASE_ALIAS,
 } from "./langwatch-ql-postgres-mapping.service.ts";
 
 const postgresMapping = LangWatchQLPostgresMappingService.create();
@@ -52,16 +53,32 @@ export class LangWatchQLPostgresViewsService {
   approvedViewStatements({
     schema,
     views = LWQL_VIEW_CATALOG,
+    readerRole,
   }: {
     /** PostgreSQL schema the application's tables live in. */
     schema: string;
     views?: readonly LangWatchQLViewDefinition[];
+    /**
+     * Re-granted `SELECT` by each statement's fallback branch, when the caller
+     * knows the reader role at this point. Omitted for a pure catalog
+     * derivation with no runtime reader identity.
+     */
+    readerRole?: string;
   }): string[] {
-    return catalogShapes.postgresViews(views).map((view) =>
-      postgresMapping.approvedViewStatement({
+    return catalogShapes.postgresViews(views).map((view) => {
+      const joins = view.postgres.tenantPath ?? [];
+      // The project column lives on the last hop's relation (the base itself
+      // when the path is empty), so the tenant column is read on that alias
+      // while every other column reads off the base.
+      const tenantAlias = joins[joins.length - 1]?.alias ?? POSTGRES_BASE_ALIAS;
+
+      return postgresMapping.approvedViewStatement({
         schema,
         view: view.postgres.approvedView,
         baseRelation: view.postgres.baseRelation,
+        joins,
+        ...(view.postgres.rowFilter !== undefined ? { rowFilter: view.postgres.rowFilter } : {}),
+        ...(readerRole !== undefined ? { readerRole } : {}),
         columns: view.columns.map((column) => ({
           exposed: column.name,
           // The tenant column is the one rename every mapping performs; the rest
@@ -70,9 +87,10 @@ export class LangWatchQLPostgresViewsService {
             column.name === TENANT_COLUMN
               ? view.postgres.tenantSourceColumn
               : singleSourceColumn(view, column.name),
+          ...(column.name === TENANT_COLUMN ? { alias: tenantAlias } : {}),
         })),
-      }),
-    );
+      });
+    });
   }
 
   /**

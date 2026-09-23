@@ -53,6 +53,9 @@
       "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]

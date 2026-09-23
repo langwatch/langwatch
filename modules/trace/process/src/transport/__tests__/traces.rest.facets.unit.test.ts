@@ -34,7 +34,7 @@ function mount(
     pending: false,
   }));
   const readFacetValues: TraceApi["readFacetValues"] = vi.fn(async () => ({
-    values: [{ value: "gpt-4o", count: 3 }],
+    values: [{ value: "gpt-5-mini", count: 3 }],
     totalDistinct: 1,
   }));
   const resolveApiKeyProtections: TraceApi["resolveApiKeyProtections"] =
@@ -102,7 +102,7 @@ describe("GET /api/v1/traces/facets", () => {
         expect.objectContaining({ tenantId: "project-1", facetKey: "model", limit: 1, offset: 0 }),
       );
       await expect(response.json()).resolves.toEqual({
-        values: [{ value: "gpt-4o", count: 3 }],
+        values: [{ value: "gpt-5-mini", count: 3 }],
         total: 1,
         hasMore: false,
       });

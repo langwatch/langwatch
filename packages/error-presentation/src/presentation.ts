@@ -222,7 +222,18 @@ const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_forbidden",
 ]);
 
-const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set(["upstream_rate_limited"]);
+/*
+ * The proxy's status fallback plus the providers' own body codes: OpenAI and
+ * Azure answer a 429 with `rate_limit_exceeded`, Anthropic with
+ * `rate_limit_error`, Google with `RESOURCE_EXHAUSTED`. The proxy carries the
+ * provider's code as the typed reason, so the fallback alone misses most.
+ */
+const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
+  "upstream_rate_limited",
+  "rate_limit_exceeded",
+  "rate_limit_error",
+  "RESOURCE_EXHAUSTED",
+]);
 
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
   "upstream_unavailable",
@@ -380,6 +391,11 @@ const presentations = {
     title: "The time window has to be a date and time",
     describe: () =>
       "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+  },
+  lwql_result_too_large: {
+    title: "This result is too large to return",
+    describe: () =>
+      "The answer is bigger than one response can carry. Select fewer columns, or use a smaller LIMIT, and run it again.",
   },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
@@ -1779,6 +1795,11 @@ const presentations = {
     describe: () =>
       "People on it sign in through single sign-on, so there is nothing for automatic joining to add.",
   },
+  join_policy_not_licensed: {
+    title: "Choosing who can join needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. You can still invite people by email, and you can stop colleagues joining at any time. Talk to your account team about upgrading.",
+  },
   team_not_in_organization: {
     title: "That team isn't in this organization",
     describe: () => "Pick a team that belongs to this organization.",
@@ -1932,6 +1953,16 @@ const presentations = {
     title: "Choose a connection for this token",
     describe: () =>
       "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
+  },
+  scim_apply_not_redrivable: {
+    title: "That operation cannot be sent through again",
+    describe: () =>
+      "Only a removal can be re-driven. For anything the directory adds or maps, its next push re-asserts what it still believes.",
+  },
+  scim_apply_not_retired: {
+    title: "That operation is still being retried",
+    describe: () =>
+      "Only an operation that has stopped being retried can be sent through again. Wait for it to be retired, then re-drive it.",
   },
   scim_connection_not_found: {
     // Reads the same for a connection that never existed and one belonging to
@@ -4109,6 +4140,90 @@ const presentations = {
     title: "The request was cancelled before the provider answered",
     describe: () => "Send it again if you still need the answer.",
   },
+  checkup_clickhouse_migrations_pending: {
+    title: "ClickHouse migrations are pending",
+    describe: () => "Run the ClickHouse migrations, then run the checkup again.",
+  },
+  checkup_clickhouse_not_configured: {
+    title: "ClickHouse is not configured",
+    describe: () => "Set CLICKHOUSE_URL on the app and worker deployments.",
+  },
+  checkup_clickhouse_unreachable: {
+    title: "ClickHouse did not answer",
+    describe: () => "Check CLICKHOUSE_URL and that ClickHouse accepts connections from the app.",
+  },
+  checkup_email_not_configured: {
+    title: "Email is not configured",
+    describe: () =>
+      "Set EMAIL_PROVIDER to smtp, ses, sendgrid or resend with its credentials, and restart.",
+  },
+  checkup_gateway_control_plane_mismatch: {
+    title: "The AI Gateway reports another control plane",
+    describe: () => "Point the gateway's control plane URL at this app.",
+  },
+  checkup_gateway_unreachable: {
+    title: "The AI Gateway did not answer",
+    describe: () => "Check that the gateway is running and that the app can reach it.",
+  },
+  checkup_license_corrupted: {
+    title: "The license could not be read",
+    describe: () => "Enter the activation code or license key again.",
+  },
+  checkup_license_expired: {
+    title: "The license has expired",
+    describe: () => "Renew it, then enter the new activation code on the License page.",
+  },
+  checkup_license_invalid: {
+    title: "The license does not verify",
+    describe: () => "Enter the activation code or license key again, or contact support.",
+  },
+  checkup_lwql_not_provisionable: {
+    title: "LWQL functions cannot be provisioned",
+    describe: () =>
+      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+  },
+  checkup_model_provider_refused: {
+    title: "A model provider refused the test call",
+    describe: () => "Check the provider's key and quota on the Model Providers page.",
+  },
+  checkup_no_model_provider: {
+    title: "No model provider is configured",
+    describe: () => "Add a model provider on the Model Providers page.",
+  },
+  checkup_not_self_hosted: {
+    title: "The checkup is for self-hosted installs",
+    describe: () =>
+      "LangWatch Cloud runs these checks itself. Nothing on this page needs your action.",
+  },
+  checkup_postgres_migration_failed: {
+    title: "A Postgres migration failed",
+    describe: () => "Resolve the failed migration, then run the migrations again.",
+  },
+  checkup_postgres_migrations_pending: {
+    title: "Postgres migrations are pending",
+    describe: () => "Run the Postgres migrations, then run the checkup again.",
+  },
+  checkup_postgres_unreachable: {
+    title: "Postgres did not answer",
+    describe: () => "Check DATABASE_URL and that the database accepts connections from the app.",
+  },
+  checkup_redis_not_configured: {
+    title: "Redis is not configured",
+    describe: () => "Set REDIS_URL on the app and worker deployments.",
+  },
+  checkup_redis_unreachable: {
+    title: "Redis did not answer",
+    describe: () => "Check REDIS_URL and that Redis accepts connections from the app.",
+  },
+  checkup_smtp_refused: {
+    title: "The SMTP server refused the connection",
+    describe: () => "Check the SMTP host, port and credentials.",
+  },
+  checkup_storage_write_failed: {
+    title: "Writing to storage failed",
+    describe: () =>
+      "Check the bucket or path exists and that the app's credentials allow put and delete.",
+  },
   chain_exhausted: {
     title: "Every provider failed",
     describe: () => "Check your provider settings, then try again.",
@@ -4530,7 +4645,7 @@ const presentations = {
         return "The model provider refused this key or its permissions. Check the credential configured for this model.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
-        return "The model provider is rate-limiting these calls. Wait a moment and try again.";
+        return "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
@@ -4552,15 +4667,12 @@ const presentations = {
       // rather than always saying "conversations": a trace or span cap
       // rejection that talks about conversations sends the reader looking in
       // the wrong place.
-      const kind = error.meta.keyKind;
-      const noun =
-        kind === "thread"
-          ? "conversations"
-          : kind === "span"
-            ? "model calls"
-            : kind === "trace"
-              ? "traces"
-              : "records";
+      const nouns: Record<string, string> = {
+        thread: "conversations",
+        span: "model calls",
+        trace: "traces",
+      };
+      const noun = nouns[String(error.meta.keyKind)] ?? "records";
       const cap = error.meta.cap;
       const capped =
         typeof cap === "number"
@@ -4803,6 +4915,32 @@ const presentations = {
     title: "Couldn't load an attachment",
     describe: () => "Check the file is still available, then run again.",
   },
+  connect_instance_required: {
+    title: "This install did not identify itself",
+    describe: () =>
+      "Hosted services need the install's instance id with every call. Upgrade LangWatch, then try again.",
+  },
+  connect_license_expired: {
+    title: "This license has expired",
+    describe: () => "Renew the license to use hosted services again.",
+  },
+  connect_license_not_registered: {
+    title: "This license is not set up for hosted services",
+    describe: () => "Contact LangWatch to have hosted services enabled for your license.",
+  },
+  connect_license_revoked: {
+    title: "This license is no longer active",
+    describe: () => "Hosted services are closed to it. Contact LangWatch for a new license.",
+  },
+  connect_service_not_entitled: {
+    title: "This hosted service is not part of your license",
+    describe: () => "Contact LangWatch to add it to your license.",
+  },
+  connect_wrong_instance: {
+    title: "This license is in use by another install",
+    describe: () =>
+      "A license works with one install. If you rebuilt or moved this one, ask LangWatch to reset the license binding.",
+  },
   context_canceled: {
     title: "The run was cancelled",
     describe: () => "Start it again when you're ready.",
@@ -4811,9 +4949,147 @@ const presentations = {
     title: "The run couldn't be set up",
     describe: () => "Check the workflow and its dataset, then try again.",
   },
+  hosted_service_unavailable: {
+    title: "The hosted service did not answer",
+    describe: () => "Nothing was judged and nothing was charged. Try again in a moment.",
+  },
+  secret_already_revealed: {
+    title: "This key was shown once and cannot be shown again",
+    describe: () => "Create a new key if you did not save it.",
+  },
+  secret_reveal_expired: {
+    title: "This key can no longer be shown",
+    describe: () => "Create a new key if you did not save it.",
+  },
   unsupported_parameter: {
     title: "That provider can't honor one of your parameters",
     describe: () => "Remove the parameter named in the message, or pick a model that supports it.",
+  },
+  connect_budget_above_contract_maximum: {
+    title: "Cap above the agreed maximum",
+    describe: () => "Choose a hosted usage cap at or below the maximum agreed for this license.",
+  },
+  connect_budget_not_set: {
+    title: "No hosted usage budget yet",
+    describe: () => "Agree a hosted usage budget for this license before using hosted services.",
+  },
+  connect_license_required: {
+    title: "A self-hosted license is required",
+    describe: () => "Only a self-hosted license can change its own hosted usage cap here.",
+  },
+  issued_license_not_active: {
+    title: "License is not active",
+    describe: () =>
+      "This license is no longer active. Issue a new one or reactivate it in the registry.",
+  },
+  issued_license_not_found: {
+    title: "License not found",
+    describe: () => "No license with that identity exists in the registry. Check the license id.",
+  },
+  license_already_registered: {
+    title: "License already registered",
+    describe: () => "This license is already in the registry, so it cannot be registered again.",
+  },
+  license_already_reissued: {
+    title: "License already reissued",
+    describe: () => "This license was already reissued. Reissue its replacement instead.",
+  },
+  license_overage_max_requires_overage: {
+    title: "Overage maximum needs overage enabled",
+    describe: () =>
+      "An overage maximum only applies when on-demand overage is enabled. Enable overage first.",
+  },
+  license_signing_not_configured: {
+    title: "License signing is not set up",
+    describe: () =>
+      "This deployment cannot sign licenses. Configure the license signing key first.",
+  },
+  identity_sign_in_locked_out: {
+    title: "Sign-in is temporarily held",
+    describe: () =>
+      "Too many failed attempts. Wait before trying again, or reset your password to prove you own the mailbox.",
+  },
+  identity_session_max_lifetime_too_short: {
+    title: "Session lifetime is too short",
+    describe: () => "Choose a maximum session lifetime that is at least the minimum allowed.",
+  },
+  connect_budget_exhausted: {
+    title: "Hosted usage budget is spent",
+    describe: () =>
+      "The hosted usage budget for this license is spent. An organization admin can raise the cap in Settings, Connect.",
+  },
+  connect_disabled: {
+    title: "Hosted services are switched off",
+    describe: () => "Hosted services are switched off for this deployment.",
+  },
+  connect_unreachable: {
+    title: "Hosted services were not reached",
+    describe: () =>
+      "LangWatch-hosted services could not be reached. Allow outbound access to the host and port named on this message.",
+  },
+  connected_billing_commit_mismatch: {
+    title: "That commit is not what the license says",
+    describe: () =>
+      "The prepaid commit must match the license terms. Change the commit on the license first, then onboard or renew with the same figure.",
+  },
+  connected_billing_not_onboarded: {
+    title: "This customer has no billing account",
+    describe: () =>
+      "Nothing has been invoiced for this customer yet. Onboard them first, or ask finance to invoice this by hand.",
+  },
+  connected_billing_unavailable: {
+    title: "Connected billing is not available here",
+    describe: () =>
+      "Invoicing a connected self-hosted customer runs on LangWatch Cloud only. Do this from the LangWatch Cloud backoffice.",
+  },
+  activation_code_already_redeemed: {
+    title: "Activation code already used",
+    describe: () => "This activation code has already been used on another installation.",
+  },
+  activation_code_expired: {
+    title: "Activation code expired",
+    describe: () => "This activation code has expired. Ask LangWatch for a new one.",
+  },
+  activation_code_malformed: {
+    title: "Not an activation code",
+    describe: () => "An activation code is LW followed by sixteen characters.",
+  },
+  activation_code_not_found: {
+    title: "Activation code not recognised",
+    describe: () =>
+      "This activation code is not one we issued. Check it with whoever sent it to you.",
+  },
+  activation_rate_limited: {
+    title: "Too many activation attempts",
+    describe: () => "Too many activation attempts. Try again shortly.",
+  },
+  self_hosted_instance_not_found: {
+    title: "Install not found",
+    describe: () => "We have not heard from a self-hosted install with that id.",
+  },
+  connect_license_token_malformed: {
+    title: "This license could not be read as a hosted-services credential",
+    describe: () => "Paste the license again from the email LangWatch sent, then try again.",
+  },
+  sso_domain_not_eligible: {
+    title: "That domain can't be used for single sign-on",
+    describe: () =>
+      "Use a domain your company owns, like the one in your work email addresses. Shared mail providers and domain endings can't be claimed by one company.",
+  },
+  sso_domain_claim_throttled: {
+    title: "You've claimed a lot of domains just now",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      const unaffected = "The domains you've already claimed are unaffected.";
+      if (seconds <= 0) return `Try that again shortly. ${unaffected}`;
+      const minutes = Math.ceil(seconds / 60);
+      return `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}. ${unaffected}`;
+    },
+  },
+  langwatch_cloud_only: {
+    title: "Only on LangWatch Cloud",
+    describe: () =>
+      "This is answered by LangWatch Cloud only. This installation does not receive it.",
   },
 } satisfies Record<AppErrorCode | GoErrorCode | NodeErrorCode, ErrorPresentation>;
 

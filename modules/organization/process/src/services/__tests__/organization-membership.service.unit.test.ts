@@ -36,11 +36,16 @@ describe("OrganizationMembershipService", () => {
     findUserOrgRoleByTeamId: vi.fn(),
     tryFindPrimaryIntentById: vi.fn(),
     findActiveAdministratorIds: vi.fn(),
+    findMemberUserIds: vi.fn(),
+    findInvitedMemberIds: vi.fn(),
     createAndAssign: mockCreateAndAssign,
     createForProvisioning: vi.fn(),
     findAllProvisioningSummaries: vi.fn(),
     tryFindProvisioningSummaryById: vi.fn(),
     deleteProvisionedOrganization: vi.fn(),
+    markSelfHostedCustomer: vi.fn(),
+    findSelfHostedCustomers: vi.fn(),
+    findRepresentatives: vi.fn(),
     getAllForUser: vi.fn(),
     findOrganizationWithMembers: vi.fn(),
     findMemberById: vi.fn(),
@@ -72,6 +77,18 @@ describe("OrganizationMembershipService", () => {
   /** Nobody here is mid-way through proving a connection; the one test that
    *  is says so itself. */
   const testArrivals = { standingFor: mockStandingFor };
+  const attached: unknown[] = [];
+  const completed: unknown[] = [];
+  const admissions = {
+    attachBindings: async (input: unknown) => {
+      attached.push(input);
+      return { attached: [], duplicates: [] };
+    },
+    completeAdmission: async (input: unknown) => {
+      completed.push(input);
+      return true;
+    },
+  };
 
   let service: OrganizationMembershipService;
 
@@ -90,7 +107,10 @@ describe("OrganizationMembershipService", () => {
       sessions,
       grantCache,
       testArrivals,
+      admissions,
     });
+    attached.length = 0;
+    completed.length = 0;
   });
 
   describe("createAndAssign()", () => {
@@ -118,6 +138,46 @@ describe("OrganizationMembershipService", () => {
       await service.createAndAssign({ userId: "user-456", orgName: "Acme" });
 
       expect(mockCreateAndAssign).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a join admits somebody", () => {
+    it("lands the organization grant audited to the approving admin, then clears the marker", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue("created");
+
+      await service.createMembership({
+        organizationId: "org-123",
+        userId: "user-456",
+        admittedBy: { actor: { type: "user", id: "admin-1" }, commandId: "approve:jr-1" },
+      });
+
+      const [row] = vi.mocked(mockRepo.createMembership).mock.calls;
+      const grantId = row?.[0].pendingAdmissionId;
+      expect(attached).toEqual([
+        expect.objectContaining({
+          organizationId: "org-123",
+          actor: { type: "user", id: "admin-1" },
+          source: "join-request",
+          commandId: "approve:jr-1",
+          bindings: [
+            expect.objectContaining({ bindingId: grantId, principal: { userId: "user-456" } }),
+          ],
+        }),
+      ]);
+      expect(completed).toEqual([{ organizationId: "org-123", userId: "user-456", grantId }]);
+    });
+
+    it("attaches nothing for somebody who was already a member", async () => {
+      vi.mocked(mockRepo.createMembership).mockResolvedValue("already-present");
+
+      await service.createMembership({
+        organizationId: "org-123",
+        userId: "user-456",
+        admittedBy: { actor: { type: "system", id: "system:join-requests" }, commandId: "c-1" },
+      });
+
+      expect(attached).toEqual([]);
+      expect(completed).toEqual([]);
     });
   });
 
@@ -434,6 +494,7 @@ describe("OrganizationMembershipService", () => {
           } as unknown as OrganizationSessionRevocation,
           grantCache,
           testArrivals,
+          admissions,
         });
         vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(activeMember);
 

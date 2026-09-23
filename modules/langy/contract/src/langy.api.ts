@@ -14,6 +14,17 @@ import type {
 import type { RelayTally } from "./langy-rest.schemas.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): turns
+ * taken and people active (by last activity), since `since` where one is
+ * given, and when the first turn was. Times are epoch milliseconds.
+ */
+export interface LangyUsageCount {
+  readonly turns: number;
+  readonly activeUsers: number;
+  readonly firstTurnAt?: number;
+}
+
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
   ingestInternalTurnResult(input: LangyTurnResultInput): Promise<{ status: "accepted" }>;
@@ -145,6 +156,8 @@ export interface LangyApi {
     turnId: string;
     items: { content: string; status: string }[];
   }): Promise<void>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

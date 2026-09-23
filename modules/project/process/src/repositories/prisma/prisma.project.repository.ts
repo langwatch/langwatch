@@ -25,6 +25,7 @@ import {
   traceDestinationProjectSchema,
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
+  type ProjectUsageCount,
 } from "@langwatch/project-contract";
 import { fromDate, toDate } from "@langwatch/time";
 
@@ -62,6 +63,40 @@ export class PrismaProjectRepository
   }
 
   static readonly create = this.factory((prisma) => new PrismaProjectRepository(prisma));
+
+  async countUsage({
+    organizationIds,
+    since,
+  }: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount> {
+    const inOrganizations = { team: { organizationId: { in: [...organizationIds] } } };
+    const teamScope = { organizationId: { in: [...organizationIds] } };
+    const after = since === undefined ? {} : { gte: new Date(since) };
+    const [projects, teams, updatedProjects, first] = await Promise.all([
+      this.prisma.project.count({
+        where: since === undefined ? inOrganizations : { ...inOrganizations, createdAt: after },
+      }),
+      this.prisma.team.count({
+        where: since === undefined ? teamScope : { ...teamScope, createdAt: after },
+      }),
+      this.prisma.project.count({
+        where: since === undefined ? inOrganizations : { ...inOrganizations, updatedAt: after },
+      }),
+      this.prisma.project.findFirst({
+        where: inOrganizations,
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    return {
+      projects,
+      teams,
+      updatedProjects,
+      ...(first ? { firstProjectAt: first.createdAt.getTime() } : {}),
+    };
+  }
 
   async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     return this.mapInternal(

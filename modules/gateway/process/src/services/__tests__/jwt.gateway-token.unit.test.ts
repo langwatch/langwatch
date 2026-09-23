@@ -97,5 +97,19 @@ describe("gateway JWT minting", () => {
         vk_expires_at: Math.floor(notAfter.epochMilliseconds / 1000),
       });
     });
+
+    it("carries a license's hosted services, and an empty list as empty", () => {
+      const entitled = adapter.sign({ ...identity, connect_services: ["managed_models"] });
+      const entitledToNothing = adapter.sign({ ...identity, connect_services: [] });
+
+      expect(adapter.verify(entitled.jwt).connect_services).toEqual(["managed_models"]);
+      expect(adapter.verify(entitledToNothing.jwt).connect_services).toEqual([]);
+    });
+
+    it("leaves the claim out for an ordinary key", () => {
+      const { jwt: token } = adapter.sign(identity);
+
+      expect(adapter.verify(token)).not.toHaveProperty("connect_services");
+    });
   });
 });

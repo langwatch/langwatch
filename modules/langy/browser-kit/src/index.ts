@@ -5,6 +5,7 @@ export * from "./behavior/langy-context-chips.ts";
 export * from "./behavior/use-langy-context-target.ts";
 export * from "./ui/sections/langy-context-target.tsx";
 export * from "./behavior/langy-context-target.store.ts";
+export * from "./behavior/langy-page-context.store.ts";
 export * from "./model/langy-panel-layout.ts";
 export * from "./ui/sections/langy-mark.tsx";
 export * from "./ui/elements/langy-theme.ts";

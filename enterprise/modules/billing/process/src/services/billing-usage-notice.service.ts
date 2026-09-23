@@ -2,6 +2,7 @@ import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
   ResourceLimitNotificationContext,
+  SelfHostedSignalNotificationPayload,
   SignupNotificationPayload,
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
@@ -80,6 +81,7 @@ type NotificationServiceOptions = {
     baseHost?: string;
     slackPlanLimitChannel?: string;
     slackSignupsChannel?: string;
+    slackSelfHostedChannel?: string;
     slackSubscriptionsChannel?: string;
     hubspotPortalId?: string;
     hubspotReachedLimitFormId?: string;
@@ -309,6 +311,43 @@ export class NotificationService {
         blocks: licensePurchaseBlocks({ payload, amountFormatted }),
       },
       errorLog: "Failed to send Slack license purchase notification",
+    });
+  }
+
+  /** A self-hosted lead signal; falls back to the signups channel when unset. */
+  async sendSlackSelfHostedSignal(payload: SelfHostedSignalNotificationPayload): Promise<void> {
+    const company = payload.organizationName ?? payload.leadingDomain ?? "Unknown";
+    const fields: { type: "mrkdwn"; text: string }[] = [
+      { type: "mrkdwn", text: `*Company:*\n${company}` },
+      { type: "mrkdwn", text: `*Release:*\n${payload.version ?? "unknown"}` },
+      { type: "mrkdwn", text: `*Users:*\n${NotificationService.formatNumber(payload.users)}` },
+      {
+        type: "mrkdwn",
+        text: `*Traces, last 28 days:*\n${NotificationService.formatNumber(payload.traces28d)}`,
+      },
+    ];
+
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSelfHostedChannel ?? this.config.slackSignupsChannel,
+      body: {
+        text: payload.headline,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: payload.headline } },
+          { type: "section", fields },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `<${payload.instanceUrl}|Open in backoffice> · instance \`${payload.instanceId}\``,
+              },
+            ],
+          },
+        ],
+      },
+      missingConfigLog:
+        "Neither SLACK_CHANNEL_SELF_HOSTED nor SLACK_CHANNEL_SIGNUPS is configured; skipping self-hosted signal",
+      errorLog: "Failed to send Slack self-hosted signal notification",
     });
   }
 

@@ -10,7 +10,18 @@
  * three places to live. It has one.
  */
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { ZodError } from "zod";
 
+import type {
+  DirectoryIdentityRow,
+  ListOversightSyncsInput,
+  OversightConnectionInput,
+  OversightSync,
+  OversightSyncList,
+  RedriveRetiredApplyInput,
+  RedriveRetiredApplyResult,
+  ScimOperator,
+} from "./scim-oversight.ts";
 import type { OrganizationReconciliation, ScimReconciliationScope } from "./scim-reconciliation.ts";
 import type { ScimConnectionRequestsInput, ScimRequestEntry } from "./scim-request-log.ts";
 import type {
@@ -129,6 +140,20 @@ export interface ScimApi {
    */
   getDirectoryReconciliation(input: ScimReconciliationScope): Promise<OrganizationReconciliation>;
 
+  // ── The platform operator's oversight (ADR-122) ─────────────────────────
+  // Staff-list gated: anyone else is answered as if the surface did not exist.
+
+  listOversightSyncs(input: ListOversightSyncsInput, by: ScimOperator): Promise<OversightSyncList>;
+  findOversightSync(input: OversightConnectionInput, by: ScimOperator): Promise<OversightSync[]>;
+  findDirectoryIdentities(
+    input: OversightConnectionInput,
+    by: ScimOperator,
+  ): Promise<DirectoryIdentityRow[]>;
+  redriveRetiredApply(
+    input: RedriveRetiredApplyInput,
+    by: ScimOperator,
+  ): Promise<RedriveRetiredApplyResult>;
+
   // ── SCIM 2.0 users ───────────────────────────────────────────────────────
 
   listUsers(input: {
@@ -143,6 +168,18 @@ export interface ScimApi {
     connectionId?: string | null | undefined;
     request: ScimCreateUserRequest;
   }): Promise<ScimUser>;
+  /**
+   * A request body refused before any handler ran — unreadable JSON, or a
+   * resource we would not accept — recorded on the connection's request log
+   * (ADR-126), then raised as the protocol's 400 naming only the fields.
+   */
+  refuseRequestBody(input: {
+    organizationId: string;
+    connectionId?: string | null | undefined;
+    method: string;
+    resource: string;
+    invalid?: ZodError | undefined;
+  }): Promise<never>;
   getUser(input: { organizationId: string; id: string }): Promise<ScimUser>;
   replaceUser(input: {
     organizationId: string;

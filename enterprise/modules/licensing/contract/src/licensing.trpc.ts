@@ -5,10 +5,9 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import { mintLicenseKeyInputSchema, storeLicenseInputSchema } from "./license.commands.ts";
+import { storeLicenseInputSchema } from "./license.commands.ts";
 import { licenseOrganizationQuerySchema } from "./license.queries.ts";
 import {
-  licenseGeneratedSchema,
   licenseRemovedSchema,
   licenseStatusSchema,
   licenseUploadedSchema,
@@ -31,11 +30,17 @@ export const licenseTrpc = defineTrpcContract("license")
   .withInput(storeLicenseInputSchema)
   .withOutput(licenseUploadedSchema)
 
+  .mutation("activate")
+  .withInput(
+    z.object({
+      organizationId: z.string().min(1),
+      code: z.string().min(1).max(200),
+    }),
+  )
+  .withOutput(licenseUploadedSchema)
+
   .mutation("remove")
   .withInput(licenseOrganizationQuerySchema)
   .withOutput(licenseRemovedSchema)
 
-  .mutation("generate")
-  .withInput(mintLicenseKeyInputSchema)
-  .withOutput(licenseGeneratedSchema)
   .build();

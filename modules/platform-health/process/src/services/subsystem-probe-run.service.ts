@@ -72,9 +72,14 @@ export class SubsystemProbeAdapter implements SubsystemProbe {
   ): Promise<SubsystemProbeResult> {
     const authToken = this.#credential.authToken;
 
-    if (this.name === "collector") return read(await this.#probes.runCollector({ authToken }));
-    if (this.name === "evaluations") return read(await this.#probes.runEvaluations({ authToken }));
-    if (this.name === "processor") return read(await this.#probes.runProcessor({ authToken }));
+    // Resolved once and forwarded on every canary: a key that self-scopes to
+    // one project cannot be re-resolved behind the public boundary.
+    if (this.name === "collector" || this.name === "evaluations" || this.name === "processor") {
+      const credential = { authToken, projectId: await this.#credential.resolveProjectId() };
+      if (this.name === "collector") return read(await this.#probes.runCollector(credential));
+      if (this.name === "evaluations") return read(await this.#probes.runEvaluations(credential));
+      return read(await this.#probes.runProcessor(credential));
+    }
 
     const target = this.name === "triggers" ? query.triggerId : query.workflowId;
     if (!target) {

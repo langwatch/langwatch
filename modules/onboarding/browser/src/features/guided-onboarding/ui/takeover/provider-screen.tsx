@@ -22,6 +22,7 @@ export function ProviderScreen({
   fading,
   onConnected,
   onSkip,
+  onSkipFailed,
 }: {
   picksCount: number;
   organizationId: string;
@@ -29,6 +30,8 @@ export function ProviderScreen({
   fading: boolean;
   onConnected: (connected: { provider: string; model: string }) => void;
   onSkip: () => void;
+  /** The skip could not be recorded; the reader stays on this screen. */
+  onSkipFailed?: (error: unknown) => void;
 }) {
   const { emit } = useAnalytics();
   const [typed, setTyped] = useState(false);
@@ -176,7 +179,7 @@ export function ProviderScreen({
                   onClick={() => {
                     emit("confirmed", "skip_tour");
                     setConfirmSkip(false);
-                    void skip().then(onSkip);
+                    skip().then(onSkip, (error: unknown) => onSkipFailed?.(error));
                   }}
                   fontSize="13px"
                   fontWeight="500"

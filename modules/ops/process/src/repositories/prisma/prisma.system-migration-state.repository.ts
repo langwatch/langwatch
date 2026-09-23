@@ -83,16 +83,22 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
    * operator's pin is never overwritten. */
   async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
+    const reportJson = record.report == null ? null : JSON.stringify(record.report);
     const occurredAt = new Date();
-    const updated = await this.prisma.systemMigrationTenantState.updateMany({
-      where: {
-        migrationName: record.migrationName,
-        tenantId: record.tenantId,
-        NOT: { status: "rolled_back" },
-      },
-      data: { status: record.status, report, occurredAt },
-    });
-    if (updated.count > 0) return true;
+    // SQL, because a write parked on the pin's row lock must re-check the
+    // guard against the row the pin committed; `updateMany` does not.
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: keyed by (migrationName, tenantId); the tenant is the key itself.
+      UPDATE "SystemMigrationTenantState"
+         SET "status" = ${record.status},
+             "report" = ${reportJson}::jsonb,
+             "occurredAt" = ${occurredAt},
+             "updatedAt" = now()
+       WHERE "migrationName" = ${record.migrationName}
+         AND "tenantId" = ${record.tenantId}
+         AND "status" <> 'rolled_back'
+    `;
+    if (updated > 0) return true;
     try {
       await this.prisma.systemMigrationTenantState.create({
         data: {

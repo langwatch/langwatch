@@ -41,6 +41,23 @@ describe("given a reader with no grants on a self-hosted deployment", () => {
   });
 });
 
+describe("given a self-hosted install", () => {
+  describe("when the menu is built", () => {
+    /** @scenario "The checkup page is listed beside License and Connect on a self-hosted install" */
+    it("lists Checkup with License and Connect, and none of them on LangWatch Cloud", () => {
+      const install = ["/settings/license", "/settings/connect", "/settings/checkup"];
+      const selfHosted = hrefsIn({});
+      expect(selfHosted.filter((href) => install.includes(href))).toEqual(install);
+      expect(hrefsIn({ isSaaS: true }).filter((href) => install.includes(href))).toEqual([]);
+    });
+
+    it("hides them from a lite member", () => {
+      const install = ["/settings/license", "/settings/connect", "/settings/checkup"];
+      expect(hrefsIn({ isLiteMember: true }).filter((href) => install.includes(href))).toEqual([]);
+    });
+  });
+});
+
 describe("given the hosted product", () => {
   describe("when the menu is built", () => {
     it("offers the subscription page rather than the license one", () => {

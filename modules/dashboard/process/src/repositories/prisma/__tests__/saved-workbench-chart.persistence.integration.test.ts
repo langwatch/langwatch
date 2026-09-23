@@ -2,8 +2,8 @@
  * What a saved workbench chart is once Postgres holds it: a definition
  * surviving a `Json` round trip, two chart kinds sharing one table without
  * becoming readable as each other, and every read fenced to its project.
- * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/lwql-langy-authoring.feature
+ * @see specs/lwql/saved-charts.feature
+ * @see specs/lwql/langy-authoring.feature
  */
 
 import { randomUUID } from "node:crypto";

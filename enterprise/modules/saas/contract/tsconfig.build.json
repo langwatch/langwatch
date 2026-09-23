@@ -6,13 +6,22 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
       "@langwatch/enterprise-saas-contract": ["./src/index.ts"]
-    },
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
       "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/ops/contract/tsconfig.build.json"
     }
   ]
 }

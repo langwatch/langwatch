@@ -1,5 +1,5 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
-import { fromDate } from "@langwatch/time";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
   AuthSessionRepository,
@@ -12,6 +12,9 @@ const sessionSelect = {
   userId: true,
   sessionToken: true,
   impersonating: true,
+  createdAt: true,
+  lastSeenAt: true,
+  updatedAt: true,
 } as const;
 
 /**
@@ -25,8 +28,40 @@ export class PrismaAuthSessionRepository
 {
   static readonly create = this.factory((prisma) => new PrismaAuthSessionRepository(prisma));
 
+  async countSignedInUsers({ at }: { at: number }): Promise<number> {
+    const rows = await this.prisma.session.findMany({
+      where: { expires: { gte: new Date(at) } },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    return rows.length;
+  }
+
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
-    return this.prisma.session.findUnique({ where: { id }, select: sessionSelect });
+    const row = await this.prisma.session.findUnique({ where: { id }, select: sessionSelect });
+    if (!row) return null;
+
+    return {
+      ...row,
+      createdAt: fromDate(row.createdAt),
+      lastSeenAt: row.lastSeenAt ? fromDate(row.lastSeenAt) : null,
+      updatedAt: fromDate(row.updatedAt),
+    };
+  }
+
+  async findStoredForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly StoredBrowserSession[]> {
+    const rows = await this.prisma.session.findMany({ where: { userId }, select: sessionSelect });
+
+    return rows.map((row) => ({
+      ...row,
+      createdAt: fromDate(row.createdAt),
+      lastSeenAt: row.lastSeenAt ? fromDate(row.lastSeenAt) : null,
+      updatedAt: fromDate(row.updatedAt),
+    }));
   }
 
   async findForUser({ userId }: { userId: string }): Promise<readonly BrowserSessionRecord[]> {
@@ -76,6 +111,15 @@ export class PrismaAuthSessionRepository
     const deleted = await this.prisma.session.deleteMany({ where: { id } });
 
     return deleted.count;
+  }
+
+  async touch({ sessionId, at }: { sessionId: string; at: Instant }): Promise<void> {
+    // `updateMany` rather than `update`: the session may have been revoked
+    // between the read and this write, and a stamp is not worth raising over.
+    await this.prisma.session.updateMany({
+      where: { id: sessionId },
+      data: { lastSeenAt: toDate(at) },
+    });
   }
 
   async deleteOthersForUser({

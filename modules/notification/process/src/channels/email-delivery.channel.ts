@@ -57,6 +57,9 @@ export type MailerConfiguration = Readonly<{
   resend: Readonly<{ apiKey?: string }>;
 }>;
 
+/** Which gateway is named and how each is reached: everything but the sender address. */
+export type MailGatewaySettings = Omit<MailerConfiguration, "defaultFrom">;
+
 /**
  * The proxy settings a vendor HTTPS gateway consults. Only HTTPS calls opt
  * in - an SMTP relay is usually reachable directly, so a globally-set proxy

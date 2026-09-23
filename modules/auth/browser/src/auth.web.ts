@@ -1,6 +1,6 @@
 /**
- * What a browser installs when it installs auth: the eight unauthenticated
- * front-door screens the product routes today, none scoped to a project.
+ * What a browser installs when it installs auth: the unauthenticated
+ * front-door screens, every one under the auth layout that mounts AuthHostApi.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -36,6 +36,10 @@ export const authWeb = defineWebModule("auth")
     "pages/auth/join": {
       path: "/auth/join",
       load: () => import("./ui/sections/join-screen.tsx"),
+    },
+    "pages/auth/sso-test-complete": {
+      path: "/auth/sso-test-complete",
+      load: () => import("./ui/sections/sso-test-complete-screen.tsx"),
     },
     "pages/invite/accept": {
       path: "/invite/accept",

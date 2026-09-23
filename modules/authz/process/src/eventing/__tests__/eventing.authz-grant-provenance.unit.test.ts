@@ -9,18 +9,17 @@ import { StubAuthzBindingRepository } from "../../repositories/__tests__/support
 import { StubAuthzEpoch } from "../../repositories/__tests__/support/authz-epoch.stub.ts";
 import { EventingAuthzGrantRepository } from "../../repositories/eventing/eventing.authz-grant.repository.ts";
 import { AuthzGrantsService } from "../../services/authz-grants.service.ts";
-import { ORG_ID, harness } from "./support/eventing.authz-ledger-fork.harness.ts";
+import { ORG_ID, harness, storedGrantRow } from "./support/eventing.authz-ledger-fork.harness.ts";
 
 const ADMIN = { userId: "user_admin" };
 const BINDING_ID = "rb_provenance";
 
 function service() {
-  const { writer, db, sent } = harness({ onLedger: true });
-  const repository = EventingAuthzGrantRepository.create({
-    database: db as never,
-    writer,
-    selectHead: async () => true,
-  });
+  const { writer, db, sent } = harness({});
+  // The attach's read-your-writes hold reads the canonical Grant head; these
+  // cases are about the fact the writer emits, not about the fold's lag.
+  db.grant.count.mockResolvedValue(1);
+  const repository = EventingAuthzGrantRepository.create({ database: db as never, writer });
   const grants = AuthzGrantsService.create({
     repository,
     ledger: writer,
@@ -61,6 +60,7 @@ beforeEach(() => {
 describe("given a grant attached through the grants service", () => {
   describe("when the caller states which surface authored it", () => {
     /** @scenario "A grant states which surface authored it" */
+    /** @scenario "An authorization write emits a grant command" */
     it("carries that source on the emitted fact", async () => {
       const { grants, sent } = service();
 
@@ -136,12 +136,14 @@ describe("given a grant revoked through the grants service", () => {
      *  @scenario "A revocation names the surface that made it without a source of its own" */
     it("carries the surface as the emitted revocation's actor", async () => {
       const { grants, db, sent } = service();
-      db.roleBinding.findFirst.mockResolvedValue({ id: BINDING_ID });
-      // The fork harness carries the writes this file is about; the ownership
-      // guard ahead of a revoke is the one read it does not already answer.
-      Object.assign(db.roleBinding, {
-        findUnique: vi.fn().mockResolvedValue({ id: BINDING_ID, organizationId: ORG_ID }),
+      const row = storedGrantRow({
+        id: BINDING_ID,
+        principalId: "user_alice",
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
       });
+      db.grant.findFirst.mockResolvedValue(row);
+      db.grant.findMany.mockResolvedValue([row]);
 
       await grants.revoke({
         actor: { type: "system", name: "scim" },

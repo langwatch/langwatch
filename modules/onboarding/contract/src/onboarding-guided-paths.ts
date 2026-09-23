@@ -29,7 +29,10 @@ export const GUIDED_PATH_DESCRIPTIONS: Record<GuidedPath, string> = {
   governance: "Control all AI subscriptions and usage across company departments",
 };
 
-/** Where a guided onboarding lands once the provider step is over. */
+/**
+ * Where a guided onboarding lands once the provider step is over. The project pages take the
+ * project slug; the organization pages resolve the ambient project on their own.
+ */
 export function guidedPathLanding({
   path,
   projectSlug,
@@ -41,9 +44,9 @@ export function guidedPathLanding({
     case "llmops":
       return `/${projectSlug}/traces`;
     case "coding":
-      return `/${projectSlug}/scenarios`;
+      return "/me";
     case "gateway":
-      return `/${projectSlug}/gateway`;
+      return "/gateway";
     case "governance":
       return "/governance";
   }

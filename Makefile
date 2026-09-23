@@ -44,9 +44,9 @@ help:
 	@echo "    make herrgen-check                  fail if those generated codes are stale (CI)"
 	@echo ""
 	@echo "  Lint (deterministic house rules — no AI involved):"
-	@echo "    make lint-rules                     ast-grep + semgrep over the whole repo"
-	@echo "    make lint-rules-changed             ...over this branch's changes only (what CI gates on)"
-	@echo "    make lint-rules-test                prove every rule still matches its fixture"
+	@echo "    make lint-rules                     semgrep over the whole repo (oxlint is pnpm lint)"
+	@echo "    make lint-rules-changed             ...over lines this branch changed (what CI reports)"
+	@echo "    make lint-rules-test                prove the semgrep ruleset parses"
 	@echo "    make go-lint                        golangci-lint at the pinned version CI uses"
 	@echo "    make go-lint-changed                ...new/changed lines only"
 	@echo ""
@@ -64,6 +64,7 @@ help:
 	@echo "  Dogfood applications (the customer application Langy works on):"
 	@echo "    make dogfood-langy-local lang=python      boot the ACME support demo (FastAPI)"
 	@echo "    make dogfood-langy-local lang=typescript  boot the ACME support demo (Hono)"
+	@echo "    make dogfood-langy-local lang=langgraph   boot the ACME checkout demo (LangGraph)"
 	@echo ""
 	@echo "  Per-worktree isolated stacks (for AI agents / parallel work):"
 	@echo "    make dev-up [PROFILE=full]            start isolated containers"
@@ -72,9 +73,14 @@ help:
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/runbooks/boxd-makefile.md"
 
-# The demo applications keep their own Makefile; this only forwards `lang`.
+# The demo applications keep their own Makefile; this only picks the folder
+# and forwards `lang`.
 dogfood-langy-local:
+ifeq ($(lang),langgraph)
+	@$(MAKE) -C dev/dogfood/acme-checkout dogfood-langy-local
+else
 	@$(MAKE) -C dev/dogfood/acme-support dogfood-langy-local $(if $(lang),lang=$(lang))
+endif
 
 include dev/boxd.mk
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
@@ -212,55 +218,32 @@ herrgen-check:
 	@go run ./cmd/herrgen -check
 # ── Deterministic house rules ──────────────────────────────────────────────
 #
-# The ast-grep and semgrep rulesets encode house rules that used to be
-# enforced only by the AI reviewer, once per PR, as a comment. They are
-# ordinary linters; these targets are how a human runs them.
+# Every JavaScript/TypeScript house rule is a langwatch oxlint rule (`pnpm
+# lint`). The semgrep ruleset holds the two that oxlint cannot: PII in logger
+# calls (CodeRabbit loads it) and hard-coded database names in ClickHouse
+# migrations. See dev/lint/README.md.
 #
-# Versions are PINNED to what .github/workflows/coderabbit-config-check.yml
+# SEMGREP_VERSION is PINNED to what .github/workflows/coderabbit-config-check.yml
 # uses — rule-matching behaviour is version-sensitive. Bump both together.
-AST_GREP_VERSION := 0.42.3
 SEMGREP_VERSION  := 1.164.0
 GOLANGCI_VERSION := v2.13.2
 
-# Resolve the pinned tools without caring how the developer installs Python
-# tools. `uv` is preferred (isolated, no venv juggling); an already-correct
-# binary on PATH is accepted; otherwise we say exactly what to run.
-define _need_astgrep
-	@if command -v ast-grep >/dev/null 2>&1 && \
-	    ast-grep --version 2>/dev/null | grep -q "$(AST_GREP_VERSION)"; then :; \
-	elif command -v uv >/dev/null 2>&1; then :; \
-	else \
-		echo "ERROR: ast-grep $(AST_GREP_VERSION) not found and uv is unavailable." >&2; \
-		echo "  brew install uv   # then re-run; uv fetches the pinned version" >&2; \
-		echo "  or: pipx install 'ast-grep-cli==$(AST_GREP_VERSION)'" >&2; \
-		exit 1; \
-	fi
-endef
-
 # uvx runs the pinned version without installing it globally, so a developer
-# with a different ast-grep on PATH still gets the CI behaviour.
-AST_GREP := $(shell if command -v ast-grep >/dev/null 2>&1 && ast-grep --version 2>/dev/null | grep -q "$(AST_GREP_VERSION)"; then echo ast-grep; else echo "uvx --from ast-grep-cli==$(AST_GREP_VERSION) ast-grep"; fi)
-SEMGREP  := $(shell if command -v semgrep >/dev/null 2>&1; then echo semgrep; else echo "uvx --from semgrep==$(SEMGREP_VERSION) semgrep"; fi)
+# with a different semgrep on PATH still gets the CI behaviour.
+SEMGREP := $(shell if command -v semgrep >/dev/null 2>&1 && semgrep --version 2>/dev/null | grep -q "$(SEMGREP_VERSION)"; then echo semgrep; else echo "uvx --from semgrep==$(SEMGREP_VERSION) semgrep"; fi)
 
 lint-rules:
-	$(call _need_astgrep)
-	@echo "==> ast-grep (dev/lint/ast-grep/rules)"
-	@$(AST_GREP) scan -c dev/lint/ast-grep/sgconfig.yml
 	@echo "==> semgrep (dev/lint/semgrep/langwatch.yml)"
-	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error .
+	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error --exclude platform .
 
-# What CI gates on. Scans only files this branch changed, so a large
-# pre-existing baseline never blocks work on an unrelated file.
+# What CI reports on: findings on lines this branch changed.
 lint-rules-changed:
-	$(call _need_astgrep)
-	@files=$$(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.ts' '*.tsx'); \
-	if [ -z "$$files" ]; then echo "No changed TS/TSX files."; exit 0; fi; \
-	echo "==> ast-grep over $$(echo "$$files" | wc -l | tr -d ' ') changed file(s)"; \
-	$(AST_GREP) scan -c dev/lint/ast-grep/sgconfig.yml $$files
+	@echo "==> semgrep over lines changed since origin/main"
+	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error \
+		--baseline-commit "$$(git merge-base HEAD origin/main)" .
 
 lint-rules-test:
-	$(call _need_astgrep)
-	@cd dev/lint/ast-grep && $(AST_GREP) test -c sgconfig.yml -t rule-tests
+	@$(SEMGREP) --validate --config dev/lint/semgrep/langwatch.yml
 
 # golangci-lint's config is version: "2"; a v1 binary refuses it outright,
 # which is why "run the Go checks before pushing" quietly stopped happening.

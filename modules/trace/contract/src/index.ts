@@ -17,6 +17,7 @@ export * from "./trace-explorer-url-state.ts";
 export * from "./explorer/actions/index.ts";
 export * from "./trace-instant-eval-chips.ts";
 export * from "./trace-instant-eval.schemas.ts";
+export * from "./trace-langwatch-ql-filter.ts";
 export * from "./trace-query-analysis.ts";
 export * from "./trace-query-ast.ts";
 export * from "./trace-query-evaluator-group.ts";
@@ -37,6 +38,7 @@ export {
   type TraceMessagesSide,
   type TraceRenderedSpanMessages,
   type TraceSuggestionTarget,
+  type TraceUsageCount,
 } from "./trace.api.ts";
 export * from "./trace-record.ts";
 export * from "./trace.errors.ts";

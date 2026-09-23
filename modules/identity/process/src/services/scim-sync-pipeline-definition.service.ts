@@ -23,6 +23,7 @@ import {
   RecordScimApplyFailureCommand,
   RecordScimGroupMappingCommand,
   RecordScimUserPushCommand,
+  RedriveScimApplyCommand,
   RevokeScimSyncCommand,
 } from "../eventing/scim-sync.intent.ts";
 import type { ScimSyncGuardsService } from "./scim-sync-guards.service.ts";
@@ -36,6 +37,7 @@ const SCIM_SYNC_COMMANDS = [
   ["recordScimUserPush", RecordScimUserPushCommand],
   ["recordScimGroupMapping", RecordScimGroupMappingCommand],
   ["recordScimApplyFailure", RecordScimApplyFailureCommand],
+  ["redriveScimApply", RedriveScimApplyCommand],
   ["revokeScimSync", RevokeScimSyncCommand],
 ] as const;
 

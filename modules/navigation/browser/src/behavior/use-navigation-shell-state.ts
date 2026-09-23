@@ -6,6 +6,7 @@
 import { useBreakpointValue } from "@chakra-ui/react";
 
 import {
+  showsDevelopmentIndicator,
   useNavigationHost,
   type NavigationProject,
   type NavigationUser,
@@ -32,7 +33,8 @@ export interface NavigationShellReadyState {
   /** Null on the settings detour, which is not a product. */
   activeProductId: ProductId | null;
   isSettingsRoute: boolean;
-  isDevelopment: boolean;
+  /** A development build, unless it asked to hide the badge. */
+  showDevelopmentIndicator: boolean;
   isCompactSidebar: boolean;
   /** Phone-width viewport: the mobile bar + menu replace the sidebar chrome. */
   isMobile: boolean;
@@ -90,7 +92,7 @@ export function useNavigationShellState({
     currentRoute: projectNavItemAt(toProjectRoutePattern({ pathname, projectSlug: project?.slug })),
     activeProductId: route.activeProductId,
     isSettingsRoute: route.isSettingsRoute,
-    isDevelopment: host.deployment().isDevelopment,
+    showDevelopmentIndicator: showsDevelopmentIndicator(host.deployment()),
     isCompactSidebar,
     isMobile,
     menuWidth: isCompactSidebar ? SHELL_SIDEBAR_WIDTH_COMPACT : SHELL_SIDEBAR_WIDTH_EXPANDED,

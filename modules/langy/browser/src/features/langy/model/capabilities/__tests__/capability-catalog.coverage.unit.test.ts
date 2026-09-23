@@ -35,6 +35,9 @@ const EXCLUDED_COMMANDS = new Set([
   // Opens a browser / prints local status — no result document to card.
   "open",
   "status",
+  // The checkup of a self-hosted install: prints its own verdicts and usage
+  // report, no platform resource to card. Mirrored in the CLI's PLUMBING_COMMANDS.
+  "doctor",
   // Agent-driven navigation: the relay intercepts it into a live navigate
   // frame and deliberately renders NO card (see
   // specs/langy/langy-agent-driven-navigation.feature).

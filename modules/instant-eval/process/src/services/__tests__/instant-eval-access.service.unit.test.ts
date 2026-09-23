@@ -110,3 +110,43 @@ describe("given a deployment with a judge configured", () => {
     });
   });
 });
+
+describe("given a judge that judges for some organizations and not others", () => {
+  const released: InstantEvalFlagReader = { isEnabled: async () => true };
+  const projects: InstantEvalProjectReader = { findOrganizationId: async () => "organization-1" };
+
+  describe("when the project's organization has not switched hosted judging on", () => {
+    /** @scenario "An install with the service off publishes eval functions as unavailable" */
+    it("answers no, so the eval functions read as unavailable rather than skipped", async () => {
+      const asked: string[] = [];
+      const access = InstantEvalAccessService.create({
+        flags: released,
+        projects,
+        isJudgeConfigured: () => true,
+        judge: {
+          isAvailableForOrganization: async (organizationId) => {
+            asked.push(organizationId);
+            return false;
+          },
+        },
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(false);
+      await expect(access.isReleased({ projectId: "project-1" })).resolves.toBe(true);
+      expect(asked).toEqual(["organization-1"]);
+    });
+  });
+
+  describe("when the organization has it on", () => {
+    it("goes on to the release flag", async () => {
+      const access = InstantEvalAccessService.create({
+        flags: released,
+        projects,
+        isJudgeConfigured: () => true,
+        judge: { isAvailableForOrganization: async () => true },
+      });
+
+      await expect(access.isEnabled({ projectId: "project-1" })).resolves.toBe(true);
+    });
+  });
+});

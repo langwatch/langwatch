@@ -1,6 +1,6 @@
 /**
  * `@langwatch/charts`, bundled into the sandboxed frame as `window.LWCharts` (see
- * `buildSrcdoc.ts`). Reads `window.React`/`window.Recharts` directly rather than importing
+ * `chart-frame-document.ts` in the contract). Reads `window.React`/`window.Recharts` directly rather than importing
  * them, so hooks share the author's own instance -- a bundled copy would break the rules of hooks.
  */
 
@@ -202,7 +202,7 @@ function projectionIndex(
 // ---------------------------------------------------------------------------
 // React / Recharts locals — resolved lazily inside each component so the
 // module itself has no load-order dependency beyond React/Recharts having
-// already run (guaranteed by buildSrcdoc.ts's script order).
+// already run (guaranteed by the frame document.s script order).
 // ---------------------------------------------------------------------------
 
 function react() {

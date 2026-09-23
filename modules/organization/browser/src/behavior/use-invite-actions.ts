@@ -1,5 +1,6 @@
 // The seat-quote modal is `@langwatch/workflow-browser`'s singleton store; see
 // `use-license-enforcement.ts` for why the address travels and the modal does not.
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useUpgradeModalStore } from "@langwatch/browser-host/upgrade-modal-store";
 import type { SubmitHandler } from "react-hook-form";
 
@@ -44,6 +45,7 @@ export function useInviteActions({
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
   const openSeats = useUpgradeModalStore((s) => s.openSeats);
+  const analytics = useUiAnalytics();
   const queryClient = api.useUtils();
 
   /** Invalidate license-limit cache so the next check uses fresh seat counts. */
@@ -164,6 +166,12 @@ export function useInviteActions({
     ) {
       // SEAT_EVENT with active subscription — proration modal
       const newSeats = limitInfo.current + newFullMemberInviteCount;
+      analytics.track({
+        boundary: "organization",
+        action: "shown",
+        name: "upgrade_modal",
+        attributes: { mode: "seats", current: limitInfo.max, max: newSeats },
+      });
       openSeats({
         organizationId,
         currentSeats: limitInfo.max,

@@ -108,10 +108,21 @@ export const resourceGrantSchema = z
   .strict();
 export type ResourceGrant = z.infer<typeof resourceGrantSchema>;
 
+/** Role keys currently enforced by organization, team and project grants. */
+export type BindingRoleKey = "admin" | "member" | "viewer" | `custom:${string}`;
+
+/** A template-literal union no Zod primitive expresses, so it is checked. */
+export const bindingRoleKeySchema = z.custom<BindingRoleKey>(
+  (value) =>
+    value === "admin" ||
+    value === "member" ||
+    value === "viewer" ||
+    (typeof value === "string" && value.startsWith("custom:") && value.length > "custom:".length),
+);
+
 export const collectedBindingSchema = z
   .object({
-    role: teamUserRoleSchema,
-    customRoleId: z.string().nullable(),
+    roleKey: bindingRoleKeySchema,
     scopeType: roleBindingScopeTypeSchema,
     scopeId: z.string(),
     viaGroupId: z.string().nullable().optional(),
@@ -119,15 +130,19 @@ export const collectedBindingSchema = z
   .strict();
 export type CollectedBinding = z.infer<typeof collectedBindingSchema>;
 
-export const legacyTeamMembershipSchema = z
-  .object({
-    teamId: z.string(),
-    role: teamUserRoleSchema,
-    customRoleId: z.string().nullable(),
-    isPersonal: z.boolean(),
-  })
-  .strict();
-export type LegacyTeamMembership = z.infer<typeof legacyTeamMembershipSchema>;
+/** The one place a stored `(role, customRoleId)` pair becomes a role key. */
+export function bindingRoleKeyOf({
+  role,
+  customRoleId,
+}: {
+  role: TeamUserRole;
+  customRoleId: string | null;
+}): BindingRoleKey {
+  if (customRoleId !== null && customRoleId.length > 0) return `custom:${customRoleId}`;
+  if (role === "ADMIN") return "admin";
+  if (role === "MEMBER") return "member";
+  return "viewer";
+}
 
 const customRolePermissionsSchema = z
   .map(z.string(), z.array(z.string()).readonly())
@@ -141,7 +156,6 @@ export const collectedGrantsSchema = z
     isOrgMember: z.boolean(),
     membershipDisabled: z.boolean().default(false),
     bindings: z.array(collectedBindingSchema),
-    legacyTeamMemberships: z.array(legacyTeamMembershipSchema),
     customRolePermissions: customRolePermissionsSchema,
   })
   .strict();
@@ -160,7 +174,6 @@ export const authzGrantViaSchema = z.enum([
   "binding",
   "org-role-floor",
   "demo-project",
-  "legacy-team-fallback",
   "resource-grant",
 ]);
 export type AuthzGrantVia = z.infer<typeof authzGrantViaSchema>;

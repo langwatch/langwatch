@@ -36,6 +36,10 @@ An experiment counts one event per step, not one for the whole run. A run over 1
 
 A scenario run produces one `started` event plus one snapshot per conversation turn, so a 10-turn simulation is about 11 events.
 
+## Priced separately
+
+Instant Evals are not events. A judged query or run is charged per input token sent to the judge, on its own meter, and shows up as a spend event with request type `instant_eval` on the [billing events](/ai-gateway/billing-events) ledger. The rate and the free budget are on [Pricing](/pricing#instant-evals).
+
 ## What is never billed
 
 - Reading your data: dashboards, the Trace Explorer, analytics queries, and search.

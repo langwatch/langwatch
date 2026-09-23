@@ -1,8 +1,8 @@
 import { createTenantId, type EventSourcing, type StateProjectionStore } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
-import type { JoinRequestMail } from "../../../app/identity.members.ts";
 import type { JoinRequestFoldState } from "../../../eventing/join-request-state.projection.ts";
+import type { JoinRequestNotifier } from "../../../rules/join-requests-contract.rules.ts";
 import type { JoinRequestPipeline } from "../../../services/join-request-pipeline-definition.service.ts";
 import {
   PostgresJoinRequestPipelineAdapter,
@@ -16,9 +16,13 @@ const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
 const REQUESTER = "user_ada";
 
-class SilentMail implements JoinRequestMail {
-  async sendStillWaiting(): Promise<void> {}
-  async sendExpired(): Promise<void> {}
+class SilentNotifier implements JoinRequestNotifier {
+  async requestArrived(): Promise<void> {}
+  async requestStillWaiting(): Promise<void> {}
+  async requestApproved(): Promise<void> {}
+  async requestRejected(): Promise<void> {}
+  async requestExpired(): Promise<void> {}
+  async joinedAutomatically(): Promise<void> {}
 }
 
 function recordingDatabase() {
@@ -40,7 +44,7 @@ function compose() {
   const pipeline: JoinRequestPipeline = PostgresJoinRequestPipelineAdapter.create({
     database: recording.database,
     eventSourcing,
-    mail: new SilentMail(),
+    notifier: new SilentNotifier(),
   }).build();
   return { ...recording, pipeline };
 }

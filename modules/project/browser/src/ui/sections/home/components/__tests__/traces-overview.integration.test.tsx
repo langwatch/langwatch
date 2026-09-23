@@ -20,10 +20,11 @@ vi.mock("@langwatch/analytics-browser/surfaces/custom-graph", () => ({
     input,
   }: {
     emptyState?: React.ReactNode;
-    input?: { graphType?: string };
+    input?: { graphType?: string; excludeOrigins?: string[] };
   }) => (
     <div
       data-testid={input?.graphType === "line" ? "traces-overview-trend" : "traces-overview-graph"}
+      data-exclude-origins={(input?.excludeOrigins ?? []).join(",")}
     >
       {emptyState}
     </div>
@@ -84,6 +85,15 @@ describe("<TracesOverview /> presentation", () => {
     cleanup();
     period.daysDifference = 1;
     setRelativePeriod.mockClear();
+  });
+
+  /** @scenario "The home figures leave out Langy's own turns" */
+  it("leaves Langy's own turns out of the figures", () => {
+    renderWithProviders(<TracesOverview />);
+
+    expect(screen.getByTestId("traces-overview-graph").getAttribute("data-exclude-origins")).toBe(
+      "langy",
+    );
   });
 
   describe("given too few readings to draw a shape", () => {

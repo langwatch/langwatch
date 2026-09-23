@@ -189,9 +189,10 @@ Anything else that wants to skip the filter should be a repository method taking
 
 ### Carve-out: organization-scoped billing ledgers
 
-A table whose whole purpose is to total usage _across_ an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. One table qualifies today:
+A table whose whole purpose is to total usage _across_ an organization's projects cannot lead with `TenantId` — the aggregate it exists to answer has no single tenant. Two tables qualify today:
 
 - `metric_usage_estimates` (`queryMetricUsageEstimates`, `metric-data-point.usage.ts`) — ORDER BY `(OrganizationId, TenantId, PointId)`.
+- `billable_events` (`enterprise/modules/billing/process/src/repositories/clickhouse/clickhouse.billable-events.repository.ts`, every organization read declaring `unscoped` with its reason) — ORDER BY `(OrganizationId, TenantId, DeduplicationKeyHash)`; the columns are identifiers, an event type and timestamps only. Open items against the conditions below, checked 2026-09-23 — see the note after them.
 
 It is allowed to lead with `OrganizationId` **only** because all of these hold:
 
@@ -202,7 +203,24 @@ It is allowed to lead with `OrganizationId` **only** because all of these hold:
 5. A test pins that the organization-wide path uses the organization-resolved client and filters on `OrganizationId`.
 6. The caller has already proven the requesting user belongs to `organizationId`. The repository asserts only that the string is non-empty — it authenticates nothing. `queryMetricUsageEstimates` has no callers yet, so this costs nothing today; whoever wires the first route owns the membership check, because with condition 1 the predicate is the boundary and an unchecked `organizationId` from a request hands the caller someone else's ledger.
 
+**`billable_events` open items (2026-09-23).** Conditions 1, 2 and 4 hold: the organization id is both the predicate and the client route (`organizationId` travels on every query request). Three do not yet:
+
+- **Condition 3** — the organization reads take no `tenantId` at all, so none is ever ANDed in; `TenantId` is only a selected grouping dimension (`findByProject`, `findByProjectApprox`).
+- **Condition 5** — only the memory twin's test pins organization separation (`memory.billable-events.repositories.unit.test.ts`); no test pins the ClickHouse SQL's `OrganizationId` predicate or its organization-routed client.
+- **Condition 6** — the one production caller is the worker's report-usage-for-month command, whose `organizationId` comes from the billing meter, not a request; there is no request caller whose membership check could be named. The first request path to reach these reads owns that check.
+
 A new table wanting this carve-out needs all six, plus a line here. Anything that merely _finds it convenient_ to skip `TenantId` does not qualify.
+
+### Carve-out: legacy id-only owner resolution
+
+An id-only `/api/files/:storedObjectId` URL (minted before issue #4947) names no project, so one read must find which project owns the object before any tenant-scoped read can run. `stored_objects` qualifies, through `ClickHouseStoredObjectOwnerRepository.findOwner` (`modules/stored-object/process/src/repositories/clickhouse/clickhouse.stored-object-owner.repository.ts`). The bar, all of which holds today:
+
+1. The unscoped read **SELECTs the owning `project_id` and nothing else** — no bytes, metadata or payload columns — and declares `unscoped` with its reason.
+2. The transport (`stored-object-file.rest.ts`) throttles the caller by its own identity **before** the lookup, then runs `authorizeFileRead` against the owner it found **before** any other read.
+3. Every read after that is project-scoped (`readById({ projectId, id })`) to the same pinned owner id the gate authorized.
+4. A bound integration scenario pins the order (`stored-object-files-route.integration.test.ts`: the owner is resolved from the row id before the membership check).
+
+Nothing else may use this carve-out: a new URL carries its project (`/api/files/:projectId/:id`) and never needs the lookup.
 
 ## Validate Rows at the Boundary with Zod
 

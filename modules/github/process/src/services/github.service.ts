@@ -12,6 +12,7 @@ import type {
   GithubWebhookEnvelope,
   GithubInstallStatePayload,
   GithubAppConfig,
+  GithubUsageCount,
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -304,6 +305,13 @@ export class GithubFeatureService implements GithubApi {
 
   recheckDueBranches(): Promise<number> {
     return this.mapping.recheckDueBranches();
+  }
+
+  countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<GithubUsageCount> {
+    return this.mapping.countUsage(input);
   }
 
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }> {

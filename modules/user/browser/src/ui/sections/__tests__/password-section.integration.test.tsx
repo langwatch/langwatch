@@ -14,6 +14,8 @@ import { PasswordSection } from "../password-section.tsx";
 const { state } = vi.hoisted(() => ({
   state: {
     authProvider: "email" as string | undefined,
+    emailPasswordEnabled: false,
+    accounts: [] as { provider: string; providerAccountId: string }[],
     hasPassword: true,
     changeRejectsWith: void 0 as unknown,
   },
@@ -39,6 +41,7 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
       hasPassword: {
         useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
       },
+      getLinkedAccounts: { useQuery: () => ({ data: state.accounts }) },
       changePassword: mutation((input) => {
         calls.changePassword(input);
         if (state.changeRejectsWith) throw state.changeRejectsWith;
@@ -55,6 +58,8 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
 
 beforeEach(() => {
   state.authProvider = "email";
+  state.emailPasswordEnabled = false;
+  state.accounts = [];
   state.hasPassword = true;
   state.changeRejectsWith = void 0;
   calls.changePassword.mockReset();
@@ -71,6 +76,7 @@ function renderSection(options: Parameters<typeof fakePersonalWorkspaceHost>[0] 
       appBaseUrl: "https://app.langwatch.ai",
       passkeysEnabled: false,
       authProvider: state.authProvider,
+      emailPasswordEnabled: state.emailPasswordEnabled,
       ...options.deployment,
     },
   });
@@ -201,5 +207,26 @@ describe("given a deployment on an identity provider the product cannot reach", 
       expect(screen.queryByRole("button", { name: /Change Password/i })).toBeNull();
       expect(screen.queryByTestId("password-section")).toBeNull();
     });
+  });
+});
+
+describe("given a self-hosted deployment behind an enterprise provider", () => {
+  /** @scenario A self-hosted passkey-only administrator can still set a password */
+  it("offers to set a password to a passkey-only account, though the provider is not email", () => {
+    // Self-hosted issues its own passwords even behind an enterprise IdP, so
+    // the deployment reports it; a passkey-only admin needs the offer.
+    state.authProvider = "auth0";
+    state.emailPasswordEnabled = true;
+    state.hasPassword = false;
+    renderSection();
+
+    expect(screen.getByTestId("password-action").textContent).toMatch(/Set a password/i);
+  });
+
+  it("offers nothing under Auth0 to an account holding no database identity there", () => {
+    state.authProvider = "auth0";
+    renderSection();
+
+    expect(screen.queryByTestId("password-section")).toBeNull();
   });
 });

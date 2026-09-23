@@ -6,6 +6,7 @@ import type { AuthApi } from "@langwatch/auth-contract";
 import { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   SignInMethodPolicyService,
+  routesToOrganizationConnection,
   sealedProviderConfigCipher,
   type IdentityApi,
   type RoutingDecision,
@@ -33,13 +34,16 @@ import {
   createBetterAuthTransport,
   isEmailPasswordEnabled,
   type BetterAuthTransport,
+  type SignInAttemptCounter,
 } from "../channels/http/http.better-auth.channel.ts";
+import { CredentialSessionGuard } from "../channels/http/http.credential-session-guard.channel.ts";
 import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
 import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
 import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
+import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { SsoRegisteredIssuersService } from "../services/sso-registered-issuers.service.ts";
 
 /** The deployment's browser-session identity: present whole, or not at all. */
@@ -88,6 +92,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
     authProvider: string | undefined;
     passkeysEnabled: boolean;
     isSaas: boolean;
+    localPasswords: boolean;
   }): ModuleBetterAuthFederation {
     return new ModuleBetterAuthFederation(options);
   }
@@ -97,6 +102,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
       authProvider: string | undefined;
       passkeysEnabled: boolean;
       isSaas: boolean;
+      localPasswords: boolean;
     },
   ) {
     super();
@@ -112,6 +118,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
       resolveAuthProvider: () => Promise.resolve(this.deployment.authProvider ?? "email"),
       federationLicensed: () => Promise.resolve(this.deployment.isSaas),
       offersPasskeys: () => this.deployment.passkeysEnabled,
+      issuesOwnPasswords: () => this.deployment.localPasswords,
       selfHosted: () => !this.deployment.isSaas,
     }).resolvePolicy();
   }
@@ -373,10 +380,21 @@ export type BuildBetterAuthOptions = Readonly<{
   users: UserApi;
   /** Whose connections decide what a federated sign-in arrives into. */
   identityApi: IdentityApi;
+  /** The consecutive-failure counter behind account lock-out (GAC-09). */
+  signInLockout: SignInAttemptCounter;
+  /** Where an address signs in, or `null` where this process composed no
+   *  routing directory - then no connection governs a credential sign-in. */
+  signInRouting:
+    | ((
+        input: Readonly<{ identifier: string | null; breakGlass: boolean }>,
+      ) => Promise<RoutingDecision>)
+    | null;
   /** `"email"`, or the federated provider id this deployment mounted. */
   authProvider: string | undefined;
   /** Whether this is the hosted product rather than a self-hosted install. */
   isSaas: boolean;
+  /** D09: whether this deployment issues its own passwords beside its provider. */
+  localPasswords: boolean;
   /** `SSO_TRUSTED_IDP_ORIGINS`, and the worktree simulator's URL: the two
    *  static ways an origin is trusted without a registered connection. */
   trustedIdpOrigins: string | undefined;
@@ -401,7 +419,7 @@ export function createSecondaryStorage(
  * namespace, and the second would be the one that happened to be asked.
  */
 export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTransport {
-  const { identity, logger } = options;
+  const { identity, logger, signInRouting } = options;
   const secondaryStorage = createSecondaryStorage(options.redis);
 
   logger.warn(
@@ -432,6 +450,7 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
       emailPasswordEnabled: isEmailPasswordEnabled({
         authProvider: options.authProvider,
         isSaas: options.isSaas,
+        localPasswords: options.localPasswords,
       }),
       mfaEnrollmentOpen: identity.mfaEnrollmentOpen,
       passkeysEnabled: identity.passkeysEnabled,
@@ -450,6 +469,7 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
       authProvider: options.authProvider,
       passkeysEnabled: identity.passkeysEnabled,
       isSaas: options.isSaas,
+      localPasswords: options.localPasswords,
     }),
     identity: AbsentBetterAuthIdentityCeremonies.create(),
     invites: AbsentBetterAuthPendingInvites.create(logger),
@@ -479,5 +499,20 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
     },
     signUpVerification: AbsentSignUpVerification.create(logger),
     sendResetPassword: () => unconfiguredPasswordResetMail(),
+    signInLockout: options.signInLockout,
+    addressRoutesToConnection: async ({ email }) =>
+      signInRouting !== null &&
+      routesToOrganizationConnection(await signInRouting({ identifier: email, breakGlass: false })),
+    credentialGuard: CredentialSessionGuard.create(
+      CredentialSignInPolicyService.create({
+        routing: signInRouting === null ? null : { route: signInRouting },
+        connections: {
+          getOrganization: (args) => options.identityApi.ssoConnectionReads().getOrganization(args),
+        },
+        recovery: {
+          findGrants: (args) => options.identityApi.ssoBreakGlass().findGrants(args),
+        },
+      }),
+    ),
   });
 }

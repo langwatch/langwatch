@@ -214,6 +214,7 @@ export class TestAuthzApi implements AuthzApi {
     "listUserAndGroupBindings",
   );
   listGroupBindings = unsupported<AuthzApi["listGroupBindings"]>("listGroupBindings");
+  listApiKeyBindings = unsupported<AuthzApi["listApiKeyBindings"]>("listApiKeyBindings");
   listBindingsForSynthesis = unsupported<AuthzApi["listBindingsForSynthesis"]>(
     "listBindingsForSynthesis",
   );

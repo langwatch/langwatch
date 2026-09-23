@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
 import {
   type ModelCost,
@@ -14,7 +15,6 @@ import {
 } from "@langwatch/model-provider-contract";
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -61,6 +61,10 @@ function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
 }
 
 class Providers implements ModelProviderRepository {
+  async countUsage(): Promise<{ providers: string[] }> {
+    return { providers: [] };
+  }
+
   rows = [provider()];
   created: ModelProvider[] = [];
   deleted: string[] = [];
@@ -139,6 +143,9 @@ class ConnectionRateLimiter extends ModelProviderConnectionRateLimiter {
 }
 class Authorization extends AuthzService {
   canWriteResult = true;
+  listApiKeyBindings(): Promise<never> {
+    return this.notUsed();
+  }
   writes: { actorId: string; scopeType: string; scopeId: string }[] = [];
 
   check(): Promise<never> {
@@ -369,6 +376,18 @@ class Projects extends TestProjectApi {
 class Organizations extends OrganizationService {
   private notUsed(): never {
     throw new Error("Organization method is not used by this test");
+  }
+
+  readGuidedOnboardingState() {
+    return this.notUsed();
+  }
+
+  writeGuidedOnboardingState() {
+    return this.notUsed();
+  }
+
+  organizationIdsForMember() {
+    return this.notUsed();
   }
 
   memberOrganizationIds() {

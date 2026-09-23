@@ -6,6 +6,7 @@ import {
   type ExposedSurface,
   type TransportPeers,
 } from "@langwatch/kernel";
+import { resourceAttributesFrom } from "@langwatch/observability/node";
 import {
   MEMBER_NAMES,
   hostedMembers,
@@ -136,6 +137,7 @@ export class ProcessServer implements ProcessBoot {
               // A process fact, not a module one: every module that links back
               // to the product reads it here rather than declaring `BASE_HOST`.
               publicBaseUrl: this.settings.baseHost,
+              serviceVersion: serviceVersionOf(this.config.observability),
               nodeEnvironment: this.settings.nodeEnvironment,
               isSaas: this.settings.isSaas ?? false,
               nlpServiceUrl: this.settings.nlpServiceUrl,
@@ -185,6 +187,24 @@ export class ProcessServer implements ProcessBoot {
   close(): Promise<void> {
     return this.server.close();
   }
+}
+
+const releaseSettings = z.object({
+  serviceVersion: z.string().optional(),
+  resourceAttributes: z.string().optional(),
+});
+
+/**
+ * The release this install runs, as the license sync, usage report and checkup
+ * name it: `SERVICE_VERSION`, then `service.version` in
+ * `OTEL_RESOURCE_ATTRIBUTES`, and `unknown` rather than a number made up here.
+ */
+export function serviceVersionOf(observability: unknown): string {
+  const settings = releaseSettings.parse(observability ?? {});
+  const explicit = settings.serviceVersion?.trim();
+  if (explicit) return explicit;
+  const attribute = resourceAttributesFrom(settings.resourceAttributes)["service.version"];
+  return attribute || "unknown";
 }
 
 const processSettings = z.object({

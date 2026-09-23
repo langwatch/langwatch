@@ -27,6 +27,10 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "incremental": true,
+    // One checker per project: each keeps its own type tables, so the default four
+    // re-derive the same types (130M instantiations vs 73M) for ~20% more CPU and
+    // ~0.2-1.7 GB more memory. See ADR-100's 2026-09-23 amendment.
+    "checkers": 1,
     // Node strips types rather than compiling, so a relative import must name
     // the file on disk. `rewriteRelativeImportExtensions` is what keeps the
     // emitting packages honest: their declarations still say `.js`.

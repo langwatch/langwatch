@@ -5,21 +5,23 @@
  */
 
 import { spawn } from "node:child_process";
+
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { createSpinner } from "../spinner";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import { getCliBootstrap } from "./cli-api";
+import { recordCliLocation } from "./cli-location";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
-import { recordCliLocation } from "./cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { copilotGatewayModelPreflight, copilotPrespawnWarnings } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
 import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import { maybeOfferIngestionShellRcPersist, SHELL_FUNCTION_TOOLS } from "./shell-rc";
 import { envForTool } from "./tool-env";
+import { aliasShellFor, infoRunKind, runInfoRun, toolNotFoundMessage } from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
   parseProjectScopeFlags,
@@ -265,6 +267,11 @@ export async function withTelemetrySetupSpinner<T>({
  * child's exit code (or 2 if the budget pre-check fired).
  */
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
+  // A help or version run starts no session: it goes to the tool before
+  // anything below reads the config, signs in, mints a key or writes wiring.
+  const infoRun = infoRunKind(args);
+  if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
   // Before the config is read, so every save below carries it. The Claude
   // Code plugin's hooks run the CLI through this record when PATH cannot
   // resolve it, which is the case for a Claude Code started from a desktop
@@ -596,13 +603,9 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // the rc, and the wrapper's env is re-applied *after* so the rc can't
   // clobber gateway/OTLP wiring. Args ride "$@" unquoted; `tool` is
   // whitelisted so the command string is safe from injection.
-  const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
-  const aliasShell =
-    process.platform !== "win32" && (shellName === "zsh" || shellName === "bash")
-      ? process.env.SHELL!
-      : null;
+  const aliasShell = aliasShellFor();
 
-  const notFoundMessage = `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
+  const notFoundMessage = toolNotFoundMessage(tool);
 
   // Stamp the session start so the codex rollout harvest only reads rollout
   // files this run produced (codex names them by start time + mtime).

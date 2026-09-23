@@ -1,58 +1,55 @@
-# Why `.oxlintrc.architecture.json` looks the way it does
+# Why the oxlint configs look the way they do
 
-The config itself is the rules. This is everything that is *history* about
-them: what was measured, what was rejected, what Biome used to do, and which
-lists are machine-written. A comment in the config that only records one of
-those belongs here instead, so the config stays readable as a list of decisions
-in force.
+The configs are the rules. This page holds what is *history* about them: what
+was measured, what was rejected, what Biome used to do. A comment in a config
+that only records one of those belongs here instead, so the config stays
+readable as a list of decisions in force.
 
 Companion documents: `dev/docs/lint-rules.md` (generated, one entry per
-`langwatch/*` rule) and ADR-135 / ADR-140 / ADR-141 / ADR-142 (the toolchain
-decisions).
+`langwatch/*` rule) and ADR-135 / ADR-137 to ADR-142 (the decisions, one row
+per rule).
 
-## The doctrine, in one paragraph
+## How the configs are built today
 
-Every rule in this config is `error`, and every one was measured before it was
-turned on. There is no warn tier: `pnpm lint:oxlint` runs with `--quiet`, and
-nothing here annotates a review, so a warning would block nothing and be seen
-by nobody. A rule earns its place by reaching a zero baseline — either the tree
-was already clean, or the change that added the rule made it clean — or by
-being held in a register that can only shrink. That is what keeps
-`pnpm lint` a gate rather than a report. The globs cover `apps/**`
-as well as `packages/**` on purpose: a file does not change its checks by
-moving.
+- **Two files.** `.oxlintrc.jsonc` is the entry point: the oxlint built-ins
+  enabled workspace-wide sit in its `rules`, and the scoped ones in its
+  `overrides`. It extends `packages/architecture-enforcer/oxlint.architecture.jsonc`,
+  which enables every `langwatch/*` rule and holds only threshold overrides
+  (cognitive complexity and condition shape by category of path).
+- **The plugin registry is one map.** `rules` in
+  `packages/oxlint-rules/src/index.mjs` keys each rule by the name its
+  `defineRule` declaration carries. Adding a rule is the rule file, its entry
+  there, and one `"langwatch/<name>": "error"` line in the architecture config,
+  plus its test, its `specs/tooling/lint-<name>.feature` and a decision row in
+  an ADR (the lint-rule-records guard fails without the last two).
+- **Every rule is `error` or absent.** Lint runs with `--quiet`, so a `warn`
+  reports nothing. The plugin-config guard
+  (`packages/oxlint-rules/tests/plugin-config.unit.test.mjs`) refuses a rule at
+  `warn`, a registered rule no config enables, and a configured rule the
+  registry does not hold.
+- **No baseline, no per-file exemption.** A rule the repository does not enforce
+  is off by name. An override names a category of path, never a list of files.
+- **`pnpm lint` is oxlint only.** architecture-enforcer runs as
+  `pnpm lint:architecture`, outside `pnpm lint` until the tree is clean; CI runs
+  the policies already at zero by id.
+- **The reference is generated.** `pnpm --filter @langwatch/architecture-enforcer docs`
+  rewrites `dev/docs/lint-rules.md`; CI runs `docs:check` and fails when it is
+  stale.
 
-The `langwatch/*` rules used to differ from the native ones here: a plugin rule
-consulted the suppression ledger itself while a native rule could not, which is
-why three generated overrides once sat at the bottom of the config. Ledger and
-overrides were both deleted on 2026-09-16, so plugin and native rules now behave
-the same way — every rule applies to every file it governs.
+## History
 
-## Registers still in force
+Everything below records measurements and decisions that led here. Rules it
+names may since have been deleted or merged; ADR-135's 2026-09-23 amendment
+lists what the lint review of that date removed.
 
-**`langwatch/boolean-wall`, `packages/architecture-lint/src` only.** Measured
-2026-09-06: 48 boolean walls over 9 files, mostly TS-AST predicate helpers
-(`isPropertyName`, `isBindingName`, `unwrap`) that return one long `&&` / `||`
-chain directly. Splitting each into named intermediate predicates is real
-refactoring, not a rename, so the 9 files are held rather than switching the
-rule off package-wide. `logical-statement-spacing`, the sibling rule enabled on
-the same paths, auto-fixes cleanly and carries no register.
+### The registers, before they were deleted
 
-**`max-depth`.** Four nested blocks inside one function is already where a
-reader has to hold the whole stack in their head. At max 4 the baseline was 35
-hits in 15 files; those 15 are pinned at 6 by the register and can only shrink.
+`langwatch/boolean-wall` (deleted 2026-09-23; `condition-shape` covers it) was
+held to 9 files of `packages/architecture-lint/src` predicate helpers.
+`max-depth`, `no-useless-assignment` and a scoped `no-shadow` carried the
+Biome-era registers; none of them is in either config today.
 
-**`no-useless-assignment`.** Two findings in two files, the whole of `apps/**`'s
-debt under the quality block.
-
-**`no-shadow` is scoped rather than baselined.** 99 hits across 45 files,
-concentrated in web components and test setup. It is on where the domain lives
-and where a shadowed identifier is most expensive: contract source (already
-clean) and server source (7 hits across 5 files, fixed when the rule landed).
-Narrowing the scope is the honest version of a baseline — everything inside it
-is clean and stays clean, instead of one number nobody reads.
-
-## There are no baselines any more
+### There are no baselines any more
 
 **`oxlint-baseline.json` was deleted on 2026-09-16 and nothing replaces it.**
 The rules below shipped at `error` with their findings seeded into it; they now
@@ -78,10 +75,11 @@ The table below is kept as the historical measurement that seeded it.
 | `langwatch/stand-in-cast` | 2026-09-10 | 328 reports across 178 files |
 | `langwatch/transport-imports-a-repository` | 2026-09-10 | 9 reports across 9 files |
 
-`langwatch/no-port-vocabulary` bans the word outright; its baseline is every
-file that still carries it.
+`dangling-barrel-export` is now `unresolved-relative-import`, `empty-catch` is
+native `no-empty`, and `transport-imports-a-repository` folded into
+`module-layers`.
 
-## Options that look like an accident and are not
+### Options that look like an accident and are not
 
 **`eqeqeq` carries `{ "null": "ignore" }`.** `x == null` is the idiomatic
 single check for null-or-undefined and this codebase uses it deliberately: 133
@@ -101,15 +99,15 @@ before a test callback does anything at all; at max 3 it reports 12,094
 findings that are the house structure. At 6 the test tree is clean, at 5 it is
 70 findings, and the rule still holds the shape it exists to hold.
 
-**`complexity` and `langwatch/cognitive-complexity` are 40 in test files**, 25
-and 15 elsewhere. A table-driven test or a fixture scanner legitimately
-branches more than a service method.
+**`langwatch/cognitive-complexity` is 40 in test files**, 25 in `.tsx` and 15
+elsewhere. A table-driven test or a fixture scanner legitimately branches more
+than a service method. Native `complexity` was switched off on 2026-09-23.
 
 **The test-quality rules are scoped to test files.** Biome scoped them for a
 reason it wrote down: unscoped, `no-focused-tests` matches any function called
 `fit(...)` and fires on a production zoom hook.
 
-## Measured and rejected, `apps/**` + `packages/**`
+### Measured and rejected, `apps/**` + `packages/**`
 
 So the next person does not spend an afternoon re-litigating them.
 
@@ -142,7 +140,7 @@ enough that a register would be the whole tree:
 | `vitest/no-disabled-tests` | 43 (`noSkippedTests`, Biome warn) |
 | `jest/no-standalone-expect` | 135 (`noMisplacedAssertion`, Biome warn) |
 
-## The Biome carry-over
+### The Biome carry-over
 
 The second quality block is the ruleset the deleted platform application's
 `biome.jsonc` carried. Biome was that application's general-purpose linter and
@@ -165,7 +163,7 @@ real debt, not a change of mind. `no-cond-assign: ["error", "always"]` is the
 narrow half of `noAssignInExpressions` — an assignment used as a condition, 19
 findings; oxlint has nothing for the general shape (`foo(a = 1)`).
 
-### Biome rules with no oxlint equivalent
+#### Biome rules with no oxlint equivalent
 
 None of these is retired because it stopped being desirable.
 
@@ -185,7 +183,7 @@ None of these is retired because it stopped being desirable.
 | `noExcessiveCognitiveComplexity` | 1194 | eslint's `complexity` is cyclomatic, not cognitive. Biome never blocked on this one either — its baseline was four figures |
 | Next.js rules | | `noHeadElement`, `noImgElement`, `noDocumentImportInPage`, `noHeadImportInDocument`, `noNextAsyncClientComponent`, `noUnwantedPolyfillio`, `useGoogleFontPreconnect`, `useGoogleFontDisplay`, `noSyncScripts`. The app is a Vite app; these had nothing to match before the move and have nothing now |
 
-## The class-A migration (ADR-135 / ADR-140)
+### The class-A migration (ADR-135 / ADR-140)
 
 It deleted `langwatch/nested-ternary`, `langwatch/runtime-undefined` and the
 ast-grep `no-explicit-any` / `no-empty-test` / `no-test-without-assertion`
@@ -200,14 +198,15 @@ trio in favour of oxlint built-ins, with three different outcomes.
   new). No baseline entries exist to re-key, and a register that size is
   exactly the hand-written override the baseline mechanism replaced. Left off
   pending a decision.
-- **`typescript/no-explicit-any` and `vitest/expect-expect` were not.** They
+- **`typescript/no-explicit-any` and `vitest/expect-expect` were not** (the first
+  was enabled for non-test source on 2026-09-23). They
   have no baseline rows either (ast-grep never wrote to that file), and
   `pnpm lint:oxlint` runs with `--quiet`, which makes `warn` invisible and an
   unbaselined `error` a hard failure on every finding. Either would be
   advisory-only noise or an immediate red build, neither of which is what
   "enabled" means. See ADR-141 / ADR-142.
 
-## The generated overrides are gone too
+### The generated overrides are gone too
 
 `max-depth`, `complexity` and `no-nested-ternary` are native oxlint rules that
 could not read the ledger, so their per-file exemptions were written out longhand
@@ -222,7 +221,7 @@ exemption, every rule is `error` tree-wide, and a rule is enabled or disabled
 only by name in the configuration, where a reader can see it — never for a
 list of individual files. Zero is the target for every governed rule.
 
-## The register that closed the file
+### The register that closed the file
 
 It is gone. Every entry named a file in the deleted platform application, so it
 pinned nothing, and a register that names no existing file reads as coverage

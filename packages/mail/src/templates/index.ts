@@ -1,5 +1,6 @@
 import { automationLimitEmailTemplate } from "./automation-limit-email.tsx";
 import { budgetIncreaseRequestEmailTemplate } from "./budget-increase-request-email.tsx";
+import { connectedStatementEmailTemplate } from "./connected-statement-email.tsx";
 import { inviteEmailTemplate } from "./invite-email.tsx";
 import { inviteReRequestEmailTemplate } from "./invite-re-request-email.tsx";
 import {
@@ -39,6 +40,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   ssoDomainProofWaveringTemplate,
   ssoDomainProofLapsedTemplate,
   licenseEmailTemplate,
+  connectedStatementEmailTemplate,
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,
   automationLimitEmailTemplate,

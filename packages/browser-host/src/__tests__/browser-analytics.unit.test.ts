@@ -179,3 +179,48 @@ describe("the browser analytics destinations", () => {
     });
   });
 });
+
+describe("who the events are about", () => {
+  function saasWithIdentity() {
+    const identify = vi.fn();
+    const group = vi.fn();
+    const reset = vi.fn();
+    const analytics = createBrowserUiAnalytics({
+      isSaaS: true,
+      posthogClient: fakePostHog({
+        capture: vi.fn(),
+        identify,
+        group,
+        reset,
+      } as Partial<PostHog>),
+      isGtagReady: false,
+      isDevelopment: false,
+    });
+    return { analytics, identify, group, reset };
+  }
+
+  it("identifies the reader to PostHog by id, with their address", () => {
+    const { analytics, identify } = saasWithIdentity();
+    analytics.identify({ id: "user_1", email: "ada@example.com" });
+    expect(identify).toHaveBeenCalledWith("user_1", { email: "ada@example.com" });
+  });
+
+  it("groups later events under the organization by id and name", () => {
+    const { analytics, group } = saasWithIdentity();
+    analytics.group({ id: "org_1", name: "Acme" });
+    expect(group).toHaveBeenCalledWith("organization", "org_1", { name: "Acme" });
+  });
+
+  it("forgets the reader on reset, and a destination without identity is left alone", () => {
+    const { analytics, reset } = saasWithIdentity();
+    analytics.reset();
+    expect(reset).toHaveBeenCalledOnce();
+    const consoleOnly = createBrowserUiAnalytics({
+      isSaaS: false,
+      posthogClient: undefined,
+      isGtagReady: false,
+      isDevelopment: true,
+    });
+    expect(() => consoleOnly.identify({ id: "user_1", email: null })).not.toThrow();
+  });
+});

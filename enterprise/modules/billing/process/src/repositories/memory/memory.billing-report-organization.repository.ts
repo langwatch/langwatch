@@ -30,7 +30,14 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
   ): Promise<BillingReportOrganizationLookup> {
     const organization = this.store.organizations.get(organizationId);
     if (!organization) return { outcome: "not_found" };
-    if (organization.pricingModel !== USAGE_BILLED) return { outcome: "not_usage_billed" };
+    if (organization.pricingModel !== USAGE_BILLED) {
+      // A connected self-hosted customer buys no Cloud plan, so it never
+      // reaches SEAT_EVENT pricing; its hosted usage rides the quarterly
+      // subscription its billing account names (ADR-156 section 7).
+      return organization.selfHostedCustomer
+        ? this.connectedOrganizationForBilling(organizationId)
+        : { outcome: "not_usage_billed" };
+    }
 
     const growthSeatPlans: readonly string[] = GROWTH_SEAT_PLAN_TYPES;
     const subscriptions = this.store.subscriptions
@@ -49,6 +56,24 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
         id: organization.id,
         stripeCustomerId: organization.stripeCustomerId,
         subscriptions,
+        contract: "cloud",
+      },
+    };
+  }
+
+  private connectedOrganizationForBilling(organizationId: string): BillingReportOrganizationLookup {
+    const account = this.store.connectedBillingAccounts.get(organizationId);
+    if (!account) return { outcome: "not_usage_billed" };
+
+    return {
+      outcome: "usage_billed",
+      organization: {
+        id: organizationId,
+        stripeCustomerId: account.stripeCustomerId,
+        // Onboarding that stopped before the subscription existed leaves this
+        // empty, and the caller skips the organization until it does.
+        subscriptions: account.usageSubscriptionId ? [{ id: account.usageSubscriptionId }] : [],
+        contract: "connected",
       },
     };
   }

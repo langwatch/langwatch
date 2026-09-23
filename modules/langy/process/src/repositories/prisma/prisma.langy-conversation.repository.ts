@@ -1,3 +1,4 @@
+import type { LangyUsageCount } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import { LangyConversationRepository } from "../langy-conversation-projection.repository.ts";
@@ -57,6 +58,43 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
 
   static create(database: LangyDatabase): PrismaLangyConversationRepository {
     return new PrismaLangyConversationRepository(database);
+  }
+
+  /** Turns by the day they were taken; people as distinct owners active in the window. */
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<LangyUsageCount> {
+    const scope = { projectId: { in: [...projectIds] } };
+    const [turns, owners, first] = await Promise.all([
+      this.prisma.langyConversationTurnProjection.count({
+        where: since === undefined ? scope : { ...scope, CreatedAt: { gte: since } },
+      }),
+      this.prisma.langyConversationProjection.groupBy({
+        by: ["UserId"],
+        where:
+          since === undefined
+            ? scope
+            : {
+                ...scope,
+                // Active when its last activity falls in the window, or it opened there unstamped.
+                OR: [{ LastActivityAt: { gte: since } }, { CreatedAt: { gte: since } }],
+              },
+      }),
+      this.prisma.langyConversationTurnProjection.findFirst({
+        where: scope,
+        orderBy: { CreatedAt: "asc" },
+        select: { CreatedAt: true },
+      }),
+    ]);
+    return {
+      turns,
+      activeUsers: owners.length,
+      ...(first ? { firstTurnAt: Number(first.CreatedAt) } : {}),
+    };
   }
 
   async tryFindVisibleById({
@@ -176,6 +214,22 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
       select: { RunToken: true },
     });
     return row?.RunToken ?? null;
+  }
+
+  async hasAdmittedTurn({
+    projectId,
+    conversationId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.langyTurnRequest.findFirst({
+      where: { projectId, conversationId, userId },
+      select: { id: true },
+    });
+    return row !== null;
   }
 
   async turnExists({

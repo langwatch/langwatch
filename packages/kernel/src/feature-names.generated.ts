@@ -4,6 +4,7 @@ export const FEATURE_NAMES = [
   "analytics",
   "annotation",
   "api-key",
+  "audit-log",
   "auth",
   "authz",
   "automation",
@@ -45,8 +46,8 @@ export const FEATURE_NAMES = [
   "topic",
   "trace",
   "user",
+  "webhook",
   "workflow",
-  "audit-log",
   "billing",
   "governance",
   "licensing",
@@ -54,5 +55,4 @@ export const FEATURE_NAMES = [
   "saas",
   "scim",
   "sso",
-  "webhook",
 ] as const;

@@ -5,6 +5,7 @@
  */
 
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
+import type { Instant } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
 
 import {
@@ -53,6 +54,93 @@ export class VirtualKeyStatusService {
 
   async revoke(input: RevokeVirtualKeyInput): Promise<VirtualKeyWithScopes> {
     const existing = await this.validation.ownedForMutation(input.id, input.organizationId);
+    return this.revokeExisting(existing, input);
+  }
+
+  /**
+   * A product-managed key, read for the feature that owns it. Customer-facing
+   * reads report these keys as absent.
+   */
+  async findManagedByIdInternal(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<VirtualKeyWithScopes | null> {
+    const vk = await this.repository.findById(input);
+    return vk && VirtualKeyValidationService.isProductManaged(vk) ? vk : null;
+  }
+
+  /**
+   * Ends a product-managed key for the feature that owns it; `revoke` refuses
+   * one to every customer-facing caller. A key already gone is left alone, so
+   * the call is safe to repeat.
+   */
+  async revokeManagedInternal(input: RevokeVirtualKeyInput): Promise<void> {
+    const existing = await this.findManagedByIdInternal({
+      id: input.id,
+      organizationId: input.organizationId,
+    });
+    if (!existing) return;
+    await this.revokeExisting(existing, input);
+  }
+
+  /**
+   * Tells every gateway to resolve a product-managed key again, without
+   * changing the key. For state the gateway caches that lives outside the key
+   * row, such as the install a license is bound to.
+   */
+  async invalidateManagedInternal(input: { id: string; organizationId: string }): Promise<void> {
+    await this.changeEvents.append({
+      organizationId: input.organizationId,
+      kind: "VK_CONFIG_UPDATED",
+      virtualKeyId: input.id,
+    });
+  }
+
+  /**
+   * Replaces the platform services a CONNECT key may serve, and tells every
+   * gateway to fetch its bundle again. A key that is not a CONNECT key of the
+   * organization is left alone, so the call is safe to repeat after a revoke.
+   */
+  async setConnectServicesInternal(input: {
+    id: string;
+    organizationId: string;
+    services: readonly string[];
+  }): Promise<void> {
+    await this.transactions.run(async (tx) => {
+      const written = await this.repository.setConnectServices(input, tx);
+      if (!written) return;
+      await this.changeEvents.append(
+        { organizationId: input.organizationId, kind: "VK_CONFIG_UPDATED", virtualKeyId: input.id },
+        tx,
+      );
+    });
+  }
+
+  /**
+   * Records the license a CONNECT key serves, and tells every gateway to resolve
+   * it again. A key that is not a CONNECT key of the organization is left alone.
+   */
+  async setLicenseFactsInternal(input: {
+    id: string;
+    organizationId: string;
+    tokenHash: string;
+    instanceId: string | null;
+    expiresAt: Instant | null;
+  }): Promise<void> {
+    await this.transactions.run(async (tx) => {
+      const written = await this.repository.setLicenseFacts(input, tx);
+      if (!written) return;
+      await this.changeEvents.append(
+        { organizationId: input.organizationId, kind: "VK_CONFIG_UPDATED", virtualKeyId: input.id },
+        tx,
+      );
+    });
+  }
+
+  private async revokeExisting(
+    existing: VirtualKeyWithScopes,
+    input: RevokeVirtualKeyInput,
+  ): Promise<VirtualKeyWithScopes> {
     if (existing.status === "REVOKED") {
       return existing;
     }

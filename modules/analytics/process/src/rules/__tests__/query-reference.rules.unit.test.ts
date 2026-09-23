@@ -11,7 +11,7 @@ import {
   type LangWatchQLSchema,
   type QueryReference,
 } from "@langwatch/analytics-contract";
-import { DYNAMIC_PREFIXES, SEARCH_FIELDS } from "@langwatch/trace-contract";
+import { DYNAMIC_PREFIXES, SEARCH_FIELDS, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { validateLangWatchQL } from "../../langwatch-ql/__tests__/lwql-validate.ts";
@@ -28,7 +28,8 @@ const EVERYTHING_HELD: LangWatchQLProtections = {
 
 const EMPTY_SCHEMA: LangWatchQLSchema = {
   database: LWQL_EXAMPLE_DATABASE,
-  datasets: [],
+  functions: [],
+  views: [],
   appFunctions: [],
 };
 
@@ -189,7 +190,7 @@ describe("the query reference", () => {
     const reference = build({ lwqlEnabled: false, schema: EMPTY_SCHEMA });
 
     expect(reference.traceFilter.fields.length).toBe(Object.keys(SEARCH_FIELDS).length);
-    expect(reference.lwql.schema.datasets).toEqual([]);
+    expect(reference.lwql.schema.views).toEqual([]);
     expect(reference.lwql.schema.appFunctions).toEqual([]);
     expect(reference.lwql.endpoints.length).toBeGreaterThan(0);
   });
@@ -207,4 +208,43 @@ describe("the query reference", () => {
   it("writes its examples against the database the deployment defaults to", () => {
     expect(LWQL_EXAMPLE_DATABASE).toBe(DEFAULT_LWQL_DATABASE);
   });
+
+  it("publishes no example calling an app-side function yet", () => {
+    for (const example of build({ traceFilterExamples: TRACE_FILTER_EXAMPLES }).examples) {
+      expect(example.requires.functions, example.id).toEqual([]);
+    }
+  });
+
+  it("withholds exactly the cost and content examples from a caller who holds neither", () => {
+    const withheld = build({
+      protections: { canSeeCosts: false, canSeeCapturedInput: false, canSeeCapturedOutput: false },
+    });
+
+    expect(withheld.examples.filter((example) => !example.available).map((e) => e.id)).toEqual([
+      "lwql.cost-by-model",
+      "lwql.keyset-export",
+    ]);
+  });
+
+  /** @scenario 'Examples name the database this deployment serves' */
+  it("leaves the filter examples alone, which name no database", () => {
+    const elsewhere = build({
+      database: "lwql_test_db",
+      traceFilterExamples: TRACE_FILTER_EXAMPLES,
+    });
+    const filters = elsewhere.examples.filter((example) => example.language === "trace-filter");
+
+    expect(filters.length).toBeGreaterThan(0);
+    for (const example of filters) expect(example.text).not.toContain("lwql_test_db");
+  });
+});
+
+describe("the published trace filter syntax document", () => {
+  /** @scenario 'The published syntax document names the canonical attribute prefixes' */
+  it.each(DYNAMIC_PREFIXES.map((entry) => entry.prefix))(
+    "names the canonical prefix %s",
+    (prefix) => {
+      expect(build().traceFilter.syntax).toContain(prefix);
+    },
+  );
 });

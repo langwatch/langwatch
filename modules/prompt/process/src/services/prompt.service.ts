@@ -6,6 +6,7 @@ import {
   type PromptScope,
   type PromptTag,
   type VersionedPrompt as VersionedPromptWire,
+  type PromptUsageCount,
 } from "@langwatch/prompt-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import { normalizeReasoningFromProviderFields } from "@langwatch/workflow-contract";
@@ -274,6 +275,10 @@ export class PromptService {
 
   async listTags(input: { organizationId: string }): Promise<PromptTag[]> {
     return this.tagService.getAll(input);
+  }
+
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<PromptUsageCount> {
+    return this.repository.countUsage(input);
   }
 
   seedTagsForOrganization(input: { organizationId: string }): Promise<void> {

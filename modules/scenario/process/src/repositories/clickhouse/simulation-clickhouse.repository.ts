@@ -1404,6 +1404,41 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return Number(rows[0]?.Total ?? "0");
   }
 
+  /** One project at a time, so each read routes to the tenant's server, and added up. */
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<number> {
+    const window = (column: string) =>
+      since === undefined
+        ? ""
+        : `AND ${column} >= fromUnixTimestamp64Milli(toUInt64({since:String}))`;
+    const totals = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const rows = await this.queryRows<{ Total: string }>(
+          `SELECT toString(count()) AS Total
+           FROM ${TABLE_NAME} AS t
+           WHERE t.TenantId = {tenantId:String}
+             ${window("t.StartedAt")}
+             AND t.ArchivedAt IS NULL
+             AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+               SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+               FROM ${TABLE_NAME}
+               WHERE TenantId = {tenantId:String}
+                 ${window("StartedAt")}
+               GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+             )`,
+          since === undefined ? { tenantId } : { tenantId, since: String(since) },
+        );
+        return Number(rows[0]?.Total ?? "0");
+      }),
+    );
+    return totals.reduce((sum, total) => sum + total, 0);
+  }
+
   /**
    * Forward-only CSV export via keyset pagination (not OFFSET) on (StartedAt, ScenarioRunId),
    * reading RUN_COLUMNS (not LIST_COLUMNS), unlike findRunDataForAllSuites which is capped.

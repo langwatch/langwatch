@@ -1,5 +1,5 @@
 /**
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ../../repositories/clickhouse/clickhouse.lwql-views.mapper.ts — the
  * @vitest-environment node
  */
@@ -284,13 +284,18 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           `SELECT partition_key AS value FROM system.tables ` +
             `WHERE database = '${facts}' AND name = '${view.sourceTable}'`,
         );
+        // A source with no partition key (a small index table) has no partition
+        // to prune, so a time column carries no pruning claim to check — the
+        // shape guard still requires it to be a real, filterable column.
+        if (partitionKey === "") {
+          continue;
+        }
+
+        const timeColumn = view.timeColumn ?? "";
+        expect(timeColumn, `${view.name} advertises no time column`).not.toBe("");
         expect(
-          partitionKey,
-          `${view.sourceTable} is not partitioned — pruning advice would be nonsense`,
-        ).not.toBe("");
-        expect(
-          partitionKey.includes(view.timeColumn),
-          `${view.name} advertises ${view.timeColumn} but ${view.sourceTable} partitions by ${partitionKey}`,
+          partitionKey.includes(timeColumn),
+          `${view.name} advertises ${timeColumn} but ${view.sourceTable} partitions by ${partitionKey}`,
         ).toBe(true);
       }
     });

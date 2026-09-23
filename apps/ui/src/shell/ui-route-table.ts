@@ -170,6 +170,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       // Join before create (ADR-117 §6): a new account passes through here on
       // its way to making an organization. Renders nothing until D12 fills it.
       { path: "/auth/join", page: "pages/auth/join" },
+      {
+        path: "/auth/sso-test-complete",
+        page: "pages/auth/sso-test-complete",
+      },
       // Auth's own screen, and it reads auth's host: accepting an invite is a
       // front-door act, done signed-out as often as signed-in.
       { path: "/invite/accept", page: "pages/invite/accept" },
@@ -271,12 +275,28 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/authentication",
           },
           {
+            path: "/settings/authentication/provider",
+            page: "pages/settings/authentication/provider",
+          },
+          {
+            path: "/settings/authentication/connectors",
+            page: "pages/settings/authentication/connectors",
+          },
+          {
             path: "/settings/security",
             page: "pages/settings/security",
           },
           {
             path: "/settings/groups",
             page: "pages/settings/groups",
+          },
+          {
+            path: "/settings/connect",
+            page: "pages/settings/connect",
+          },
+          {
+            path: "/settings/checkup",
+            page: "pages/settings/checkup",
           },
           {
             path: "/settings/license",
@@ -852,6 +872,14 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/ops/backoffice/bug-reports",
       },
       {
+        path: "/ops/backoffice/licenses",
+        page: "pages/ops/backoffice/licenses",
+      },
+      {
+        path: "/ops/backoffice/self-hosted-instances",
+        page: "pages/ops/backoffice/self-hosted-instances",
+      },
+      {
         path: "/ops/backoffice/users",
         page: "pages/ops/backoffice/users",
       },
@@ -870,6 +898,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       {
         path: "/ops/backoffice/sso-connections",
         page: "pages/ops/backoffice/sso-connections",
+      },
+      {
+        path: "/ops/backoffice/directory-sync",
+        page: "pages/ops/backoffice/directory-sync",
       },
     ],
   },

@@ -211,3 +211,19 @@ Feature: Change password from /settings/security
     Then the server updates the BetterAuth credential password in the database
     And the server revokes other sessions for the user
     And I see a "Password changed successfully" toast
+
+  # Which password a change targets is decided by where the password LIVES,
+  # not by what the deployment federates with. Those were the same question
+  # for as long as a brokered deployment could hold no password of its own —
+  # and stopped being one when a deployment could issue its own beside the
+  # broker (D09). Reading the provider alone then picks the wrong copy: it
+  # refuses a password we hold and it silently rewrites the broker's while
+  # leaving ours, which reports success for a change the person's next
+  # sign-in will not see.
+  @unit
+  Scenario: A change targets the password the person actually signs in with
+    Given my deployment brokers through Auth0 and issues its own passwords
+    And I hold a password of this deployment's own
+    When I submit a change of password
+    Then the deployment changes its own stored password
+    And somebody on that deployment holding only a brokered password still changes it at the broker

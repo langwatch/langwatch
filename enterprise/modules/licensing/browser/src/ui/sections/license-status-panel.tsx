@@ -13,21 +13,14 @@ import { LicenseDetailsCard } from "../../ui/elements/license-details-card.tsx";
 import { LicenseLoadError } from "../../ui/elements/license-load-error.tsx";
 import { LicenseLoadingSkeleton } from "../../ui/elements/license-loading-skeleton.tsx";
 import { OverSeatsCallout } from "../../ui/elements/over-seats-callout.tsx";
-import { LicenseGeneratorDrawer } from "./license-generator-drawer.tsx";
 import { NoLicenseCard } from "./no-license-card.tsx";
 import { useLicenseActions } from "./use-license-actions.ts";
 
 interface LicenseStatusPanelProps {
   organizationId: string;
-  isGeneratorOpen: boolean;
-  onGeneratorOpenChange: (open: boolean) => void;
 }
 
-export function LicenseStatusPanel({
-  organizationId,
-  isGeneratorOpen,
-  onGeneratorOpenChange,
-}: LicenseStatusPanelProps) {
+export function LicenseStatusPanel({ organizationId }: LicenseStatusPanelProps) {
   const [licenseKey, setLicenseKey] = useState("");
 
   const {
@@ -44,16 +37,19 @@ export function LicenseStatusPanel({
     },
   );
 
-  const { upload, remove, isUploading, isRemoving } = useLicenseActions({
-    organizationId,
-    onUploadSuccess: () => {
-      setLicenseKey("");
-      void refetch();
-    },
-    onRemoveSuccess: () => {
-      void refetch();
-    },
-  });
+  const [activationCode, setActivationCode] = useState("");
+  const { upload, activate, remove, refresh, isUploading, isRemoving, isRefreshing } =
+    useLicenseActions({
+      organizationId,
+      onUploadSuccess: () => {
+        setLicenseKey("");
+        setActivationCode("");
+        void refetch();
+      },
+      onRemoveSuccess: () => {
+        void refetch();
+      },
+    });
 
   const handleActivate = () => {
     const normalizedKey = normalizeKeyForActivation(licenseKey);
@@ -85,12 +81,10 @@ export function LicenseStatusPanel({
           onLicenseKeyChange={setLicenseKey}
           onActivate={handleActivate}
           onFileActivate={handleFileActivate}
+          activationCode={activationCode}
+          onActivationCodeChange={setActivationCode}
+          onCodeActivate={() => activate(activationCode.trim())}
           isActivating={isUploading}
-        />
-        <LicenseGeneratorDrawer
-          open={isGeneratorOpen}
-          onClose={() => onGeneratorOpenChange(false)}
-          organizationId={organizationId}
         />
       </VStack>
     );
@@ -101,11 +95,12 @@ export function LicenseStatusPanel({
       {licenseMetersSeats(status) && (
         <OverSeatsCallout currentMembers={status.currentMembers} maxMembers={status.maxMembers} />
       )}
-      <LicenseDetailsCard status={status} onRemove={remove} isRemoving={isRemoving} />
-      <LicenseGeneratorDrawer
-        open={isGeneratorOpen}
-        onClose={() => onGeneratorOpenChange(false)}
-        organizationId={organizationId}
+      <LicenseDetailsCard
+        status={status}
+        onRemove={remove}
+        isRemoving={isRemoving}
+        onRefresh={refresh}
+        isRefreshing={isRefreshing}
       />
     </VStack>
   );

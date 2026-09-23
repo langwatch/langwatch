@@ -3,7 +3,7 @@
  * one that's open and asks before deleting, since nothing here is
  * recoverable. Save reads "Save chart" and asks for a name when none is open.
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { Button, Input, Stack, Text } from "@chakra-ui/react";

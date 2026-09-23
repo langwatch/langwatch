@@ -42,6 +42,16 @@ export interface AutomationTestFireAuthor extends AutomationAuthor {
 /** Which unsubscribe affordance a confirmation arrived through. */
 export type UnsubscribeChannel = "link" | "one-click";
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many triggers were made, since `since` where one is given, and when the
+ * first was. Times are epoch milliseconds.
+ */
+export interface AutomationUsageCount {
+  readonly triggers: number;
+  readonly firstTriggerAt?: number;
+}
+
 /** Callable automation capability shared by transports and process peers. */
 export interface AutomationApi {
   getAllForProject(input: { projectId: string }): Promise<Trigger[]>;
@@ -149,6 +159,11 @@ export interface AutomationApi {
    * declaration has no request-scoped builder, so the app composes it.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AutomationUsageCount>;
 }
 
 export const AutomationApi = moduleApi<AutomationApi>()("automation");

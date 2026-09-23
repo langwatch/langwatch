@@ -29,6 +29,12 @@ export interface PreconditionTraceData {
   spanTypes?: string[] | null;
   spanModels?: string[] | null;
   customMetadata?: Record<string, string | null> | null;
+  /**
+   * Raw trace-summary attributes, unfiltered: `metadata.value` reads these so
+   * a bare OTEL resource attribute resolves the way it resolves in ClickHouse,
+   * which ORs the three attribute spellings of one metadata key.
+   */
+  attributes?: Record<string, string> | null;
   annotationIds?: string[];
   events?:
     | {
@@ -99,7 +105,29 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
     } else if (decoded.startsWith("langwatch.metadata.")) {
       resolved = decoded.slice("langwatch.metadata.".length);
     }
-    return resolved ? (data.customMetadata?.[resolved] ?? null) : null;
+    if (!resolved) {
+      return null;
+    }
+
+    // customMetadata alone cannot answer this: it drops standard resource
+    // prefixes and keeps only the highest-priority form of a key, while
+    // ClickHouse matches any of the three spellings.
+    const candidates = [
+      data.attributes?.[`metadata.${decoded}`],
+      data.attributes?.[`langwatch.metadata.${decoded}`],
+      data.attributes?.[decoded],
+      data.customMetadata?.[resolved],
+    ].filter((candidate): candidate is string => candidate != null);
+
+    // A lone value stays a plain string: `matches_regex` tests an array's JSON
+    // encoding alongside its elements, so a list would widen what an anchored
+    // pattern can hit.
+    const [first, ...rest] = [...new Set(candidates)];
+    if (first === void 0) {
+      return null;
+    }
+
+    return rest.length === 0 ? first : [first, ...rest];
   },
 
   // Span fields

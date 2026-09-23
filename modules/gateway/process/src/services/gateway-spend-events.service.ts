@@ -1,4 +1,4 @@
-import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
+import type { GatewayUsageCount, SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 
 import type {
   GatewaySpendEvents,
@@ -81,5 +81,10 @@ export class GatewaySpendEventsService {
     imageCount: number;
   }> {
     return this.repository.readEndUserSpend(input);
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount> {
+    return this.repository.countUsage(input);
   }
 }

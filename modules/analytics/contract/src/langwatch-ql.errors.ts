@@ -25,6 +25,26 @@ export class LangWatchQLNotEnabledError extends HandledError {
 }
 
 /**
+ * The result is larger than one response carries: refused outright, never cut. Raised from the
+ * profile's `max_result_rows` / `max_result_bytes` backstop (TOO_MANY_ROWS_OR_BYTES); the raw
+ * driver error rides in `reasons` for the logs only. `customer` fault, 413.
+ */
+export class LangWatchQLResultTooLargeError extends HandledError {
+  declare readonly code: "lwql_result_too_large";
+
+  constructor(maxResultBytes: number, options: { reasons?: readonly Error[] } = {}) {
+    super("lwql_result_too_large", "The result is larger than this API returns in one response.", {
+      httpStatus: 413,
+      fault: "customer",
+      meta: { maxResultBytes },
+      ...remediation("lwql_result_too_large"),
+      ...options,
+    });
+    this.name = "LangWatchQLResultTooLargeError";
+  }
+}
+
+/**
  * Executor not provisioned or catalog missing; ACCESS_DENIED is separate
  * ({@link LangWatchQLProvisioningIncompleteError}).
  */

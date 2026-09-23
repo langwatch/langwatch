@@ -27,16 +27,22 @@ import {
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  SsoConnectionAlreadyRegisteredError,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
 
+import type {
+  SsoConnectionRegistrationKind,
+  SsoConnectionRegistrationRepository,
+} from "../repositories/sso-connection-registration.repository.ts";
 import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
 } from "../repositories/sso-connection.repository.ts";
+import { isTerminalSsoConnection } from "../rules/sso-domain-ownership.rules.ts";
 
 /**
  * The checks every SSO connection verb runs before it states a fact, and the reads those checks
@@ -57,8 +63,11 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   [BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE]: ["ACTIVE"],
   [FINALIZE_MIGRATION_COMMAND_TYPE]: ["ACTIVE"],
   [CLAIM_DOMAIN_COMMAND_TYPE]: ["DRAFT", "REJECTED", "VERIFIED", "ACTIVE"],
-  [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
-  [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
+  // A second domain's progress is the domain's, not the connection's: a claim
+  // on a VERIFIED or ACTIVE connection leaves it there, so the per-domain
+  // verbs are commandable from those states and each checks the domain.
+  [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED", "VERIFIED", "ACTIVE"],
+  [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED", "VERIFIED", "ACTIVE"],
   // Every state before the connection decides a sign-in: a setup nobody
   // finished is abandoned outright, whatever step it reached. From ACTIVE
   // onwards removal is teardown's, which owes people a grace.
@@ -75,12 +84,17 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
   // states the approval and the verification together. From APPROVED for the
   // tiers an operator or a licence already decided, and from
   // VERIFICATION_PENDING so an expired record can be asked for again.
-  [REQUEST_VERIFICATION_COMMAND_TYPE]: ["CLAIMED", "APPROVED", "VERIFICATION_PENDING"],
-  // Attestation replaces the PROOF, never the approval: it is commandable
-  // from APPROVED and from nowhere else, which is what makes an attestation
-  // against an unapproved claim a refusal rather than a shortcut.
-  [ATTEST_DOMAIN_COMMAND_TYPE]: ["APPROVED"],
-  [VERIFY_DOMAIN_COMMAND_TYPE]: ["VERIFICATION_PENDING"],
+  [REQUEST_VERIFICATION_COMMAND_TYPE]: [
+    "CLAIMED",
+    "APPROVED",
+    "VERIFICATION_PENDING",
+    "VERIFIED",
+    "ACTIVE",
+  ],
+  // Attestation replaces the PROOF, never the approval: the verb refuses a
+  // domain with no approved claim, whatever state the connection is in.
+  [ATTEST_DOMAIN_COMMAND_TYPE]: ["APPROVED", "VERIFIED", "ACTIVE"],
+  [VERIFY_DOMAIN_COMMAND_TYPE]: ["VERIFICATION_PENDING", "VERIFIED", "ACTIVE"],
   // Any state a domain can be in. The verb's own guard narrows it further:
   // a VERIFIED domain on a routing connection is refused there.
   [WITHDRAW_DOMAIN_COMMAND_TYPE]: [
@@ -134,6 +148,7 @@ const ALLOWED_FROM: Record<SsoConnectionCommandType, readonly SsoConnectionLifec
 
 export interface SsoConnectionGuardsDeps {
   connections: SsoConnectionReadRepository;
+  registrationSlots: SsoConnectionRegistrationRepository;
   breakGlass: SsoBreakGlassBindingRepository;
   stranding: SsoConnectionStrandingRepository;
   platformOperators: SsoPlatformOperatorRepository;
@@ -145,15 +160,64 @@ export class SsoConnectionGuardChecksService {
   }
 
   private readonly connections: SsoConnectionReadRepository;
+  private readonly registrationSlots: SsoConnectionRegistrationRepository;
   private readonly breakGlass: SsoBreakGlassBindingRepository;
   private readonly stranding: SsoConnectionStrandingRepository;
   private readonly platformOperators: SsoPlatformOperatorRepository;
 
   private constructor(deps: SsoConnectionGuardsDeps) {
     this.connections = deps.connections;
+    this.registrationSlots = deps.registrationSlots;
     this.breakGlass = deps.breakGlass;
     this.stranding = deps.stranding;
     this.platformOperators = deps.platformOperators;
+  }
+
+  /**
+   * One live connection of each kind per organization. The early refusal is
+   * this read; the one that holds under concurrency is the slot claim.
+   */
+  async refuseCompetingConnection({
+    organizationId,
+    connectionId,
+    kind,
+    allowedConnectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    kind: SsoConnectionRegistrationKind;
+    allowedConnectionId?: string;
+  }): Promise<void> {
+    const held = await this.connections.findForOrganization({ organizationId });
+    const competing = held.find(
+      (connection) =>
+        !isTerminalSsoConnection(connection.state) &&
+        connection.connectionId !== connectionId &&
+        connection.connectionId !== allowedConnectionId,
+    );
+    if (competing === undefined) return;
+    throw new SsoConnectionAlreadyRegisteredError(
+      `organization ${organizationId} already holds ${kind} connection ${competing.connectionId} in ${competing.state}`,
+    );
+  }
+
+  async claimRegistrationSlot(slot: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    kind: SsoConnectionRegistrationKind;
+    replacesConnectionId: string | null;
+  }): Promise<void> {
+    const held = await this.registrationSlots.claim(slot);
+    if (
+      held.connectionId === slot.connectionId &&
+      held.replacesConnectionId === slot.replacesConnectionId
+    ) {
+      return;
+    }
+    throw new SsoConnectionAlreadyRegisteredError(
+      `organization ${slot.organizationId} already reserved its ${slot.kind} connection slot`,
+    );
   }
 
   /** The connection as the fold currently holds it, or nothing. */
@@ -166,9 +230,14 @@ export class SsoConnectionGuardChecksService {
     return this.connections.findForOrganization(input);
   }
 
-  /** Whether the organization has a live break-glass binding. */
-  hasLiveBinding(input: { organizationId: string }): Promise<boolean> {
-    return this.breakGlass.hasLiveBinding(input);
+  /** Holds a live break-glass binding for one activation or resume. */
+  reserveActivationRecovery(input: {
+    organizationId: string;
+    connectionId: string;
+    commandId: string;
+    nowMs: number;
+  }): Promise<boolean> {
+    return this.breakGlass.reserveActivationRecovery(input);
   }
 
   /** The users this connection's teardown would leave with no way in. */

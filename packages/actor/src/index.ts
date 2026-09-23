@@ -23,6 +23,9 @@ export const SYSTEM_ACTORS = {
   /** Policy-driven auto-approval of a join request. An approval a person
    *  made carries that person as a user actor instead. */
   joinRequests: "system:join-requests",
+  /** A self-hosted license resolving to its managed gateway key. No person
+   *  is present: the gateway asks on behalf of an install. */
+  connectLicense: "system:connect-license",
 } as const satisfies Record<string, `system:${string}`>;
 
 export type SystemActorName = keyof typeof SYSTEM_ACTORS;

@@ -1,6 +1,6 @@
 /**
  * Shape invariants of the LangWatchQL schema catalog.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import {
@@ -31,9 +31,12 @@ const MAP_KEY_ACCESS = /\[\s*'([^']+)'\s*\]/g;
 /** Stands in for the view's source-table alias when an expression is built. */
 const SOURCE = (name: string) => `SRC.\`${name}\``;
 
+/** Stands in for a join's alias, for the one view whose columns read one. */
+const JOINED = (name: string) => `JOINED.\`${name}\``;
+
 /** A column's SQL, with source references qualified the way the generator does. */
 const expressionOf = (column: Parameters<typeof catalogShapes.columnExpression>[0]["column"]) =>
-  catalogShapes.columnExpression({ column, source: SOURCE });
+  catalogShapes.columnExpression({ column, source: SOURCE, joined: JOINED });
 
 /** Which content category a span-attribute key belongs to, if any. */
 function contentCategoryOf(key: string): ContentCategory | null {
@@ -54,10 +57,12 @@ describe("given the LangWatchQL view catalog", () => {
 
         // Everything the entry promises a caller can filter or join on has to
         // be a column the view actually exposes, or the schema endpoint is
-        // telling callers to write queries that do not parse.
-        expect(columnNames, `${view.name} advertises a time column it does not expose`).toContain(
-          view.timeColumn,
-        );
+        // telling callers to write queries that do not parse. A view with no
+        // temporal column carries no time column at all — nothing to check.
+        expect(
+          [view.timeColumn ?? columnNames[0]],
+          `${view.name} advertises a time column it does not expose`,
+        ).toEqual([expect.toBeOneOf(columnNames)]);
         for (const key of view.joinKeys) {
           expect(columnNames, `${view.name} advertises a join key it does not expose`).toContain(
             key,
@@ -134,7 +139,9 @@ describe("given the LangWatchQL view catalog", () => {
         // nothing exposes them — or that subquery cannot be evaluated.
         const sourceColumns = catalogShapes.viewSourceColumns(view);
         for (const column of [
-          ...view.dedup.keyColumns,
+          // Key columns are exposed names; the grant (and the dedup subquery)
+          // names the physical source column an alias renames.
+          ...view.dedup.keyColumns.map((key) => catalogShapes.physicalColumn(view, key)),
           ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
         ]) {
           expect(
@@ -163,7 +170,7 @@ describe("given the LangWatchQL view catalog", () => {
             `${view.name}.${column.name} has no type`,
           ).toBeGreaterThan(0);
           expect(
-            column.sourceColumns.length,
+            column.sourceColumns.length + (column.joinedSourceColumns?.length ?? 0),
             `${view.name}.${column.name} reads no source column`,
           ).toBeGreaterThan(0);
         }
@@ -246,6 +253,37 @@ describe("given the LangWatchQL view catalog", () => {
       expect(lwqlViewByName("trace_summaries")).toBeUndefined();
     });
 
+    /**
+     * The validator gates a column by its lowercased bare name across the whole catalog, so two
+     * views cannot disagree about a name: gating `Output` on one view withholds `Output` on every
+     * view that exposes it.
+     */
+    it("gates a column name identically on every view that exposes it", () => {
+      const gatesByName = new Map<string, Map<string, string[]>>();
+      for (const view of LWQL_VIEW_CATALOG) {
+        for (const column of view.columns) {
+          const key = column.name.toLowerCase();
+          const gates = [...catalogShapes.columnGates({ view, column })].toSorted();
+          const perView = gatesByName.get(key) ?? new Map<string, string[]>();
+          perView.set(view.name, gates);
+          gatesByName.set(key, perView);
+        }
+      }
+
+      const conflicts: string[] = [];
+      for (const [name, perView] of gatesByName) {
+        const distinct = new Set([...perView.values()].map((gates) => gates.join("+") || "-"));
+        if (distinct.size > 1) {
+          const detail = [...perView]
+            .map(([view, gates]) => `${view}[${gates.join("+") || "-"}]`)
+            .join(", ");
+          conflicts.push(`${name}: ${detail}`);
+        }
+      }
+
+      expect(conflicts, conflicts.join("\n")).toEqual([]);
+    });
+
     it("qualifies allowed tables with the LangWatchQL database, never the physical one", () => {
       const allowed = catalogShapes.allowedTables({
         database: "analytics",
@@ -278,6 +316,13 @@ describe("given the LangWatchQL view catalog", () => {
             const category = contentCategoryOf(key);
             checked += 1;
             if (category === null) {
+              // A column that also reads a joined content column is gated for
+              // that joined content, not for this key — which it reads only to
+              // match a row. Its gate is justified elsewhere.
+              if ((column.joinedSourceColumns?.length ?? 0) > 0) {
+                continue;
+              }
+
               expect(
                 catalogShapes.isContentGated(column),
                 `${view.name}.${column.name} reads the non-content key ${key} but is content-gated`,
@@ -438,7 +483,7 @@ describe("given the LangWatchQL view catalog", () => {
         // so. Read against the grain rather than the engine key, because a grouped render
         // deliberately keeps engine-key breakdowns out of its columns.
         const measures = view.columns
-          .filter((column) => column.summed)
+          .filter((column) => column.summed || column.aggregate)
           .map((column) => column.name);
         expect(
           [...catalogShapes.grainColumns(view), ...measures].toSorted(),

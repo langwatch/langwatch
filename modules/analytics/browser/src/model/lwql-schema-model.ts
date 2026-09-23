@@ -29,13 +29,25 @@ export interface LangWatchQLSchemaColumnModel {
   readonly qualifiedName: string;
 }
 
+/** The completion-item documentation for one dataset. */
+function datasetDocumentation(dataset: {
+  description: string;
+  freshness: string;
+  timeColumn: string | null;
+}): string {
+  const timeColumn = dataset.timeColumn ? `\nTime column: ${dataset.timeColumn}` : "";
+
+  return `${dataset.description}\n\nFreshness: ${dataset.freshness}${timeColumn}`;
+}
+
 /** One dataset, with everything the browser shows when it is expanded. */
 export interface LangWatchQLSchemaDatasetModel {
   readonly name: string;
   readonly description: string;
   readonly grain: string;
   readonly joinKeys: readonly string[];
-  readonly timeColumn: string;
+  /** Filter on this to prune partitions; `null` for a dataset with no temporal column. */
+  readonly timeColumn: string | null;
   readonly freshness: string;
   readonly exampleSql: string;
   readonly columns: readonly LangWatchQLSchemaColumnModel[];
@@ -81,7 +93,7 @@ export function lwqlSchemaModel(schema: LangWatchQLSchema | undefined): LangWatc
 
   return {
     database: schema.database,
-    datasets: schema.datasets.map((dataset) => ({
+    datasets: schema.views.map((dataset) => ({
       name: dataset.name,
       description: dataset.description,
       grain: dataset.grain,
@@ -169,7 +181,7 @@ export function lwqlCompletionItems(
       kind: "dataset",
       insertText: dataset.name,
       detail: dataset.grain,
-      documentation: `${dataset.description}\n\nFreshness: ${dataset.freshness}\nTime column: ${dataset.timeColumn}`,
+      documentation: datasetDocumentation(dataset),
     });
 
     for (const column of dataset.columns) {
@@ -226,7 +238,7 @@ function hoverForDataset({
   return {
     title: dataset.name,
     detail: dataset.grain,
-    documentation: `${dataset.description}\n\nFreshness: ${dataset.freshness}\nTime column: ${dataset.timeColumn}`,
+    documentation: datasetDocumentation(dataset),
   };
 }
 

@@ -18,7 +18,8 @@
   },
   "scripts": {
     "typecheck": "tsc -b tsconfig.test.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
@@ -40,6 +41,8 @@
     "@langwatch/handled-error": "workspace:*"
   },
   "devDependencies": {
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

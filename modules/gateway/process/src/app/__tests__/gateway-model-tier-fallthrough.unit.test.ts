@@ -1,3 +1,5 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/admin-routing-policies.feature
@@ -10,7 +12,14 @@ import {
   MODEL_TIERS,
 } from "../gateway-config-assembly.composition.ts";
 
-const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
+const noPlatformProviders = createApiFixture<ModelProviderApi>({
+  platformProviderChain: () => Promise.resolve([]),
+});
+
+const assembly = GatewayConfigAssemblyAdapter.create({
+  prisma: {} as never,
+  platformProviders: noPlatformProviders,
+});
 
 describe("given a routing policy that names a target for a tier", () => {
   /** @scenario "A tier the policy points somewhere reaches that model" */

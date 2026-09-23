@@ -121,6 +121,12 @@ const registry = {
       "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
     ],
   },
+  lwql_result_too_large: {
+    tips: [
+      "Read `meta.maxResultBytes`; the response exceeded that byte ceiling",
+      "Select fewer columns, or a smaller LIMIT, so the result fits under the cap",
+    ],
+  },
   lwql_granularity_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the parameter whose declaration was refused",

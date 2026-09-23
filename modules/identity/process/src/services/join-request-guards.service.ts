@@ -101,6 +101,7 @@ export class JoinRequestGuardsService {
           domain,
           matchedVia: data.matchedVia,
           expiresAtMs: data.expiresAtMs,
+          notifyAdmins: data.notifyAdmins,
           actor: data.actor,
         },
       },

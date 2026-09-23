@@ -1,4 +1,8 @@
-import type { GithubPullRequest, GithubPullRequestEvent } from "@langwatch/github-contract";
+import type {
+  GithubPullRequest,
+  GithubPullRequestEvent,
+  GithubUsageCount,
+} from "@langwatch/github-contract";
 import { toDate } from "@langwatch/time";
 
 import type {
@@ -94,6 +98,13 @@ export class GithubPullRequestMappingService {
 
   recheckDueBranches(): Promise<number> {
     return this.maintenance.recheckDueBranches();
+  }
+
+  countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<GithubUsageCount> {
+    return this.repository.countUsage(input);
   }
 
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }> {

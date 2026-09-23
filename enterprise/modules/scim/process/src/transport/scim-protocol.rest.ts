@@ -337,17 +337,6 @@ function scimJson(data: unknown, status = 200): Response {
   });
 }
 
-function scimError(status: number, detail: string): Response {
-  return scimJson(
-    {
-      schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
-      status: String(status),
-      detail,
-    },
-    status,
-  );
-}
-
 function discoveryJson(data: unknown): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
@@ -493,11 +482,25 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .handle(async ({ app, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
-    if (body === null) return scimError(400, "Invalid JSON in request body");
+    if (body === null)
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "POST",
+        resource: "Users",
+      });
 
     const parsed = scimCreateUserRequestSchema.safeParse(body);
 
-    if (!parsed.success) return scimError(400, parsed.error.message);
+    if (!parsed.success) {
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "POST",
+        resource: "Users",
+        invalid: parsed.error,
+      });
+    }
 
     return scimJson(
       await app.createUser({ organizationId: scope.id, connectionId, request: parsed.data }),
@@ -538,11 +541,25 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
-    if (body === null) return scimError(400, "Invalid JSON in request body");
+    if (body === null)
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PUT",
+        resource: "Users/:id",
+      });
 
     const parsed = scimCreateUserRequestSchema.safeParse(body);
 
-    if (!parsed.success) return scimError(400, parsed.error.message);
+    if (!parsed.success) {
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PUT",
+        resource: "Users/:id",
+        invalid: parsed.error,
+      });
+    }
 
     return scimJson(
       await app.replaceUser({
@@ -570,11 +587,25 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
-    if (body === null) return scimError(400, "Invalid JSON in request body");
+    if (body === null)
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PATCH",
+        resource: "Users/:id",
+      });
 
     const parsed = scimPatchRequestSchema.safeParse(body);
 
-    if (!parsed.success) return scimError(400, parsed.error.message);
+    if (!parsed.success) {
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PATCH",
+        resource: "Users/:id",
+        invalid: parsed.error,
+      });
+    }
 
     return scimJson(
       await app.updateUser({
@@ -661,11 +692,25 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .handle(async ({ app, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
-    if (body === null) return scimError(400, "Invalid JSON");
+    if (body === null)
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "POST",
+        resource: "Groups",
+      });
 
     const parsed = scimCreateGroupRequestSchema.safeParse(body);
 
-    if (!parsed.success) return scimError(400, parsed.error.message);
+    if (!parsed.success) {
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "POST",
+        resource: "Groups",
+        invalid: parsed.error,
+      });
+    }
 
     return scimJson(
       await app.createGroup({ organizationId: scope.id, connectionId, request: parsed.data }),
@@ -714,11 +759,25 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
-    if (body === null) return scimError(400, "Invalid JSON");
+    if (body === null)
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PUT",
+        resource: "Groups/:id",
+      });
 
     const parsed = scimReplaceGroupRequestSchema.safeParse(body);
 
-    if (!parsed.success) return scimError(400, parsed.error.message);
+    if (!parsed.success) {
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PUT",
+        resource: "Groups/:id",
+        invalid: parsed.error,
+      });
+    }
 
     return scimJson(
       await app.replaceGroup({
@@ -746,11 +805,25 @@ export const scimProtocolRest = defineRestRouter(ScimApi)
   .handle(async ({ app, input, scope, request }, { connectionId }) => {
     const body = await posted(request);
 
-    if (body === null) return scimError(400, "Invalid JSON");
+    if (body === null)
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PATCH",
+        resource: "Groups/:id",
+      });
 
     const parsed = scimPatchRequestSchema.safeParse(body);
 
-    if (!parsed.success) return scimError(400, parsed.error.message);
+    if (!parsed.success) {
+      return app.refuseRequestBody({
+        organizationId: scope.id,
+        connectionId,
+        method: "PATCH",
+        resource: "Groups/:id",
+        invalid: parsed.error,
+      });
+    }
 
     return scimJson(
       await app.updateGroup({

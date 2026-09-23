@@ -86,7 +86,12 @@ export const setFirstUserPasswordResultSchema = z.enum(["set", "already_set"]);
 export type SetFirstUserPasswordResult = z.infer<typeof setFirstUserPasswordResultSchema>;
 
 export const userPasskeyNudgeStatusSchema = z
-  .object({ hasPasskey: z.boolean(), dismissedAt: z.date().nullable() })
+  .object({
+    hasPasskey: z.boolean(),
+    /** Two-step verification is set up and confirmed on the account. */
+    twoStepEnabled: z.boolean(),
+    dismissedAt: z.date().nullable(),
+  })
   .strict();
 export type UserPasskeyNudgeStatus = z.infer<typeof userPasskeyNudgeStatusSchema>;
 
@@ -298,9 +303,22 @@ export const setOwnAvatarInputSchema = z
   .strict();
 export type SetOwnAvatarInput = z.infer<typeof setOwnAvatarInputSchema>;
 
-/** Whether this deployment still owes the person a passkey offer today. */
-export const userPasskeyOfferSchema = z.object({ offer: z.boolean() }).strict();
-export type UserPasskeyOffer = z.infer<typeof userPasskeyOfferSchema>;
+/**
+ * The account-security offer (ADR-120, D06): whether to ask now, which halves
+ * to offer, and how this session signed in — the screen asks only after a password.
+ */
+export const userSecureAccountOfferSchema = z
+  .object({
+    offer: z.boolean(),
+    passkey: z.boolean(),
+    twoStep: z.boolean(),
+    signedInWith: z.enum(["password", "passkey", "federated", "unknown"]),
+  })
+  .strict();
+export type UserSecureAccountOffer = z.infer<typeof userSecureAccountOfferSchema>;
+
+/** A display name as the account accepts it: trimmed, then 1-120 characters. */
+export const userProfileNameSchema = z.string().trim().min(1).max(120);
 
 /** What one count of a caller's avatar reads answers. */
 export type UserAvatarReadAllowance = Readonly<{ allowed: boolean; resetAt: number }>;

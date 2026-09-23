@@ -7,6 +7,7 @@ import {
   type JoinOffer,
   type JoinRequestAggregateState,
   JoinRequestNotFoundError,
+  type JoinSettingChange,
   joinDomainOf,
   organizationAdmitsDomain,
   resolveJoinLookup,
@@ -20,7 +21,10 @@ import {
   newJoinRequestCommandId,
   newJoinRequestId,
 } from "../rules/join-request-id.rules.ts";
-import { type JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
+import {
+  AUTOMATIC_JOIN_NOTICE_WINDOW_MS,
+  type JoinRequestsServiceDeps,
+} from "../rules/join-requests-contract.rules.ts";
 import type { SsoArrivalJoinRequestRaised } from "../rules/sso-arrival-contract.rules.ts";
 import { JoinDomainSettingService } from "./join-domain-setting.service.ts";
 import { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
@@ -64,10 +68,6 @@ export class JoinRequestsService {
     userId: string;
     verifiedEmail: string | null;
   }): Promise<JoinLookupDecision> {
-    if (!(await this.deps.enabled({ userId }))) {
-      return { outcome: "none" };
-    }
-
     if (!verifiedEmail) {
       return { outcome: "none" };
     }
@@ -79,7 +79,17 @@ export class JoinRequestsService {
 
     await this.guards.assertNotLooking({ userId });
 
-    const organizations = await this.deps.candidates.findCandidateOrganizations({ domain });
+    const matched = await this.deps.candidates.findCandidateOrganizations({ domain });
+    // Never the ones they are already in: being offered the organization you
+    // are standing in reads as the product not knowing who you are.
+    const organizations = [];
+    for (const organization of matched) {
+      const already = await this.deps.membership.isMember({
+        userId,
+        organizationId: organization.organizationId,
+      });
+      if (!already) organizations.push(organization);
+    }
     const decision = resolveJoinLookup({
       email: verifiedEmail,
       verified: true,
@@ -99,6 +109,46 @@ export class JoinRequestsService {
   }
 
   /**
+   * The same lookup for somebody already signed in with an organization — the post-login offer.
+   * An offer they waved away stays waved away; sign-up's own lookup is untouched by that.
+   */
+  async offerForSignedInUser({
+    userId,
+    verifiedEmail,
+  }: {
+    userId: string;
+    verifiedEmail: string | null;
+  }): Promise<JoinLookupDecision> {
+    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    if (!domain) {
+      return { outcome: "none" };
+    }
+
+    const dismissed = await this.deps.dismissals.dismissedDomains({ userId });
+    if (dismissed.includes(domain)) {
+      return { outcome: "none" };
+    }
+
+    return this.lookup({ userId, verifiedEmail });
+  }
+
+  /** "No thanks", remembered for that domain and no other. */
+  async dismissOffer({
+    userId,
+    verifiedEmail,
+  }: {
+    userId: string;
+    verifiedEmail: string | null;
+  }): Promise<void> {
+    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    if (!domain) {
+      return;
+    }
+
+    await this.deps.dismissals.dismiss({ userId, domain });
+  }
+
+  /**
    * Ask one organization to let you in. The organization has to have been OFFERED — the service re-
    * derives that from the caller's verified address rather than trusting the client, so naming an
    * organization directly is refused exactly as an organization that does not exist is.
@@ -112,10 +162,6 @@ export class JoinRequestsService {
     verifiedEmail: string | null;
     organizationId: string;
   }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }> {
-    if (!(await this.deps.enabled({ userId }))) {
-      throw new JoinNotAvailableError("join requests are not enabled here");
-    }
-
     const domain = this.guards.provenDomainOrRefuse({ verifiedEmail });
     const candidate = await this.deps.candidates.tryFindCandidateOrganization({
       organizationId,
@@ -142,13 +188,7 @@ export class JoinRequestsService {
       domain,
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
-    });
-
-    await this.deps.notifier.requestArrived({
-      joinRequestId,
-      organizationId,
-      requesterUserId: userId,
-      domain,
+      notifyAdmins: true,
     });
 
     return { joinRequestId, state: "PENDING" };
@@ -185,13 +225,7 @@ export class JoinRequestsService {
       domain,
       matchedVia: "sso-connection-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
-    });
-
-    await this.deps.notifier.requestArrived({
-      joinRequestId,
-      organizationId,
-      requesterUserId: userId,
-      domain,
+      notifyAdmins: true,
     });
 
     return { raised: true, joinRequestId };
@@ -202,21 +236,21 @@ export class JoinRequestsService {
    * and the same audit trail — approved by policy the moment it is made instead of by a person
    * later.
    */
-  async tryJoinAutomaticallyIfAdmitted({
+  async joinAutomaticallyIfAdmitted({
     userId,
     verifiedEmail,
   }: {
     userId: string;
     verifiedEmail: string | null;
-  }): Promise<{ organization: JoinOffer } | null> {
+  }): Promise<{ organization: JoinOffer | null }> {
     const decision = await this.lookup({ userId, verifiedEmail });
     if (decision.outcome !== "auto") {
-      return null;
+      return { organization: null };
     }
 
     const domain = joinDomainOf(verifiedEmail ?? "");
     if (!domain) {
-      return null;
+      return { organization: null };
     }
 
     const organizationId = decision.organization.organizationId;
@@ -238,6 +272,7 @@ export class JoinRequestsService {
       domain,
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
+      notifyAdmins: false,
     });
 
     await this.resolveApproved({
@@ -248,16 +283,6 @@ export class JoinRequestsService {
       actor: policyActor,
       approvedByUserId: null,
       occurredAtMs,
-    });
-
-    // After the fact, straight away: a surprising join has to be visible the
-    // moment it happens, which is the whole price of admitting somebody with
-    // nobody in the loop.
-    await this.deps.notifier.joinedAutomatically({
-      joinRequestId,
-      organizationId,
-      requesterUserId: userId,
-      domain,
     });
 
     return { organization: decision.organization };
@@ -286,11 +311,6 @@ export class JoinRequestsService {
       approvedByUserId: adminUserId,
       occurredAtMs: this.now(),
     });
-    await this.deps.notifier.requestApproved({
-      joinRequestId,
-      organizationId,
-      requesterUserId: request.userId,
-    });
   }
 
   /** An admin says no, without being asked why. */
@@ -303,7 +323,7 @@ export class JoinRequestsService {
     organizationId: string;
     adminUserId: string;
   }): Promise<void> {
-    const request = await this.guards.ownedRequestOrRefuse({
+    await this.guards.ownedRequestOrRefuse({
       joinRequestId,
       organizationId,
     });
@@ -315,13 +335,6 @@ export class JoinRequestsService {
       occurredAtMs: this.now(),
       actor: { type: "user", id: adminUserId },
       resolvedBy: { type: "user", id: adminUserId },
-    });
-    // No reason, and no rejector named. The requester is told it was not
-    // approved and may ask again after the cool-down.
-    await this.deps.notifier.requestRejected({
-      joinRequestId,
-      organizationId,
-      requesterUserId: request.userId,
     });
   }
 
@@ -429,7 +442,7 @@ export class JoinRequestsService {
    */
   setJoining(
     ...args: Parameters<JoinDomainSettingService["setJoining"]>
-  ): ReturnType<JoinDomainSettingService["setJoining"]> {
+  ): Promise<JoinSettingChange> {
     return this.domainSetting.setJoining(...args);
   }
 
@@ -447,6 +460,21 @@ export class JoinRequestsService {
     organizationId: string;
   }): Promise<JoinRequestAggregateState[]> {
     return this.deps.reads.findPendingForOrganization({ organizationId });
+  }
+
+  /**
+   * Who walked in on this organization's domain setting lately — the in-product half of telling
+   * the admins after the fact, off the same projection the pending list reads.
+   */
+  async automaticJoinsForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<JoinRequestAggregateState[]> {
+    return this.deps.reads.findAutomaticJoinsForOrganization({
+      organizationId,
+      resolvedAfterMs: this.now() - AUTOMATIC_JOIN_NOTICE_WINDOW_MS,
+    });
   }
 
   /** What this person is waiting on. */
@@ -504,6 +532,12 @@ export class JoinRequestsService {
     await this.deps.membership.attachDefaultMembership({
       userId,
       organizationId,
+      joinRequestId,
+      commandId: approveJoinCommandId({
+        joinRequestId,
+        resolvedByType: resolvedBy.type,
+        resolvedById: resolvedBy.id,
+      }),
       approvedByUserId,
     });
   }

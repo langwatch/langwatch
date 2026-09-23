@@ -40,6 +40,7 @@ const service = (
   LangyNavigateFallbackService.create({
     projects: new FakeProjects(slugs),
     platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
+    organizationUrl: ({ path }) => `https://app.langwatch.test${path}`,
     ...(resources ? { resources } : {}),
   });
 
@@ -63,6 +64,18 @@ describe("LangyNavigateFallbackService", () => {
     });
   });
 
+  describe("when the agent asks for the governance sources page", () => {
+    /** @scenario "An organization page opens at the top level, outside the project" */
+    it("resolves the inventory page on its sources tab at the top level, with no project slug", async () => {
+      expect(
+        await service({}).tryResolveUrl({
+          projectId: "project-1",
+          resourceId: "governance-sources",
+        }),
+      ).toBe("https://app.langwatch.test/governance/inventory?tab=sources");
+    });
+  });
+
   describe("when the agent asks to open one resource by id", () => {
     it("looks the id up by the resource its prefix names and builds the address under the project", async () => {
       const resources = new FakeResources(() => "/prompts?promptId=prompt_abc");
@@ -74,6 +87,21 @@ describe("LangyNavigateFallbackService", () => {
         }),
       ).toBe("https://app.langwatch.test/acme/prompts?promptId=prompt_abc");
       expect(resources.lookups).toEqual([{ kind: "prompt", resourceId: "prompt_abc" }]);
+    });
+
+    /** @scenario "A scenario opens in its editor through the platform fallback" */
+    it("looks a scenario id up as a scenario, not as a scenario run", async () => {
+      const editor =
+        "/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1";
+      const resources = new FakeResources(() => editor);
+
+      expect(
+        await service({ "project-1": "acme" }, resources).tryResolveUrl({
+          projectId: "project-1",
+          resourceId: "scenario_1",
+        }),
+      ).toBe(`https://app.langwatch.test/acme${editor}`);
+      expect(resources.lookups).toEqual([{ kind: "scenario", resourceId: "scenario_1" }]);
     });
 
     it("drops the navigate and never reads the project when the id resolves to nothing", async () => {

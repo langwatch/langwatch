@@ -74,11 +74,11 @@ export type CreateVirtualKeyInput = {
   expiresAt?: Instant | null;
   config?: Partial<VirtualKeyConfig>;
   /**
-   * USER (default) for keys created via the gateway UI/API; LANGY when
-   * auto-provisioned by Langy. Anything other than USER marks the key
-   * product-managed (see `isProductManaged`).
+   * USER (default) from the gateway UI/API, LANGY when Langy provisions it,
+   * CONNECT for the key a self-hosted license resolves to. Anything but USER
+   * marks the key product-managed (see `isProductManaged`).
    */
-  purpose?: "USER" | "LANGY";
+  purpose?: "USER" | "LANGY" | "CONNECT";
 };
 
 export type UpdateVirtualKeyInput = {
@@ -135,9 +135,9 @@ type GuardrailPair = { direction: GuardrailDirection; guardrailId: string };
 
 export class VirtualKeyValidationService {
   /**
-   * Keys the product provisions and owns rather than the customer — today only
-   * the Langy VK. Absent from customer-facing reads; refuses customer-facing
-   * mutations (`rotate` would break Langy's own auth against the secret).
+   * Keys the product owns rather than the customer: the Langy VK and the key a
+   * license resolves to. Absent from customer-facing reads; refuses
+   * customer-facing mutations (`rotate` would break Langy's own auth).
    */
   static isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
     return vk.purpose !== "USER";

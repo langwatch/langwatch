@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
   LICENSE_ERRORS,
+  LicenseKeyInvalidError,
   LicenseSigningFailedError,
   LicenseSigningKeyEncryptedError,
   LicenseSigningKeyNotPemError,
@@ -12,6 +13,7 @@ import {
   type SignedLicense,
   type ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
+import { LICENSE_TOKEN_PREFIX } from "@langwatch/gateway-contract";
 import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 import { type LicenseCryptography } from "../app/licensing.members.ts";
@@ -183,4 +185,31 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
   generateLicenseId(): string {
     return `lic-${crypto.randomUUID()}`;
   }
+
+  /** ADR-156 section 6: a bare UUID, because it is what an install presents. */
+  generateInstanceId(): string {
+    return crypto.randomUUID();
+  }
+
+  /**
+   * The token is the SHA-256 of the canonical license: the parsed
+   * `{data, signature}` re-serialized, which is what `verifySignature` judges,
+   * so an install and Cloud derive the same token from the same paste.
+   */
+  getLicenseToken(licenseKey: string): string {
+    // Base64 decoding skips line breaks, but not the spaces a copied license
+    // picks up at its ends.
+    const signedLicense = this.parseLicenseKey(licenseKey.trim());
+    if (!signedLicense) throw new LicenseKeyInvalidError();
+
+    const canonical = JSON.stringify({
+      data: signedLicense.data,
+      signature: signedLicense.signature,
+    });
+    return `${LICENSE_TOKEN_PREFIX}${sha256Hex(canonical)}`;
+  }
+}
+
+function sha256Hex(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }

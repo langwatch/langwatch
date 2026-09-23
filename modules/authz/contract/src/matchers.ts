@@ -4,18 +4,15 @@ import type { AuthzScopeRef, CollectedBinding, CollectedGrants, ResourceGrant } 
  * permission? Walk decides which to consult and order (ADR-092 §2).
  */
 import { bindingScopeCanGrantPermission, permissionSatisfiedBy } from "./registry.ts";
-import { builtinRoleGrants, roleKeyForTeamRole } from "./roles.ts";
-import { audienceMatches, type ScopeChainLink } from "./scope.ts";
+import { builtinRoleGrants } from "./roles.ts";
+import { audienceMatches } from "./scope.ts";
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: flat ordered
-// sequence of legacy grant rules whose ORDER is the stage-A parity contract;
-// splitting would scatter the one place the rules read top to bottom.
 export function bindingGrants({
   binding,
   grants,
   permission,
 }: {
-  binding: Pick<CollectedBinding, "role" | "customRoleId" | "scopeType">;
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType">;
   grants: CollectedGrants;
   permission: string;
 }): boolean {
@@ -30,76 +27,38 @@ export function bindingGrants({
     return false;
   }
 
-  // Org-scoped non-CUSTOM bindings have their own semantics: ADMIN grants
-  // everything, anything else grants the org-member bag only.
-  // LEGACY-QUIRK(C): role meaning depends on binding scope until roleKey.
-  if (binding.scopeType === "ORGANIZATION" && binding.role !== "CUSTOM") {
-    // LEGACY-QUIRK(C): EXTERNAL users are never promoted through org-scoped
-    // bindings — OrganizationUser.role is authoritative for the restriction.
+  const { roleKey } = binding;
+  // A custom key is authoritative, including grants imported beside a legacy
+  // built-in role. Missing or empty role facts never restore that old role.
+  if (roleKey.startsWith("custom:")) {
+    const customRoleId = roleKey.slice("custom:".length);
+    if (customRoleId.length === 0) return false;
+    const customPermissions = grants.customRolePermissions.get(customRoleId);
+    if (!customPermissions || customPermissions.length === 0) return false;
+    return permissionSatisfiedBy({
+      granted: new Set(customPermissions),
+      requested: permission,
+    });
+  }
+
+  if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {
+    return false;
+  }
+
+  // Organization grants retain their existing scope-specific meaning:
+  // admin covers everything; member and viewer carry the organization floor.
+  if (binding.scopeType === "ORGANIZATION") {
     if (grants.organizationRole === "EXTERNAL") return false;
-    if (binding.role === "ADMIN") return true;
+    if (roleKey === "admin") return true;
     return builtinRoleGrants({ role: "org-member", permission });
   }
 
-  // Non-empty custom role is authoritative; empty/missing falls through.
-  if (binding.customRoleId) {
-    const customPermissions = grants.customRolePermissions.get(binding.customRoleId);
-    if (customPermissions && customPermissions.length > 0) {
-      return permissionSatisfiedBy({
-        granted: new Set(customPermissions),
-        requested: permission,
-      });
-    }
-  }
-
-  // LEGACY-QUIRK(C): EXTERNAL caps team/project bindings at the lite-member
-  // bag unless a non-empty custom role overrode it above.
+  // EXTERNAL membership caps built-in team/project grants, not custom roles.
   if (grants.organizationRole === "EXTERNAL") {
     return builtinRoleGrants({ role: "lite-member", permission });
   }
 
-  return builtinRoleGrants({
-    role: roleKeyForTeamRole(binding.role),
-    permission,
-  });
-}
-
-/**
- * LEGACY-QUIRK(B) — the TeamUser fallback step. Project/team checks consult
- * the team only with ZERO bindings (rbac.ts:765); org checks union every
- * non-personal membership on ANY denial (rbac.ts:1094-1110), both TEAM-scoped.
- */
-export function legacyTeamFallbackGrants({
-  grants,
-  scope,
-  chain,
-  chainBindingCount,
-  permission,
-}: {
-  grants: CollectedGrants;
-  scope: AuthzScopeRef;
-  chain: readonly ScopeChainLink[];
-  chainBindingCount: number;
-  permission: string;
-}): boolean {
-  if (scope.type !== "organization" && chainBindingCount > 0) return false;
-  const candidateTeams =
-    scope.type === "organization"
-      ? grants.legacyTeamMemberships.filter((row) => !row.isPersonal)
-      : grants.legacyTeamMemberships.filter((row) =>
-          chain.some((link) => link.scopeType === "TEAM" && link.scopeId === row.teamId),
-        );
-  return candidateTeams.some((row) =>
-    bindingGrants({
-      binding: {
-        role: row.role,
-        customRoleId: row.customRoleId,
-        scopeType: "TEAM",
-      },
-      grants,
-      permission,
-    }),
-  );
+  return builtinRoleGrants({ role: roleKey, permission });
 }
 
 /**

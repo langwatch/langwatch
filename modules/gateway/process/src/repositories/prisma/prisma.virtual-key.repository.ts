@@ -14,6 +14,7 @@ import {
   gatewayRoutingPolicySelect,
   GatewayVirtualKeyRepository,
   type CreateGatewayVirtualKeyInput,
+  type GatewayLicensedKey,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
 } from "../../repositories/gateway-virtual-key.repository.ts";
@@ -435,6 +436,60 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
         },
       }),
     );
+  }
+
+  async setConnectServices(
+    input: { id: string; organizationId: string; services: readonly string[] },
+    tx?: GatewayPersistenceTransaction,
+  ): Promise<boolean> {
+    const { count } = await this.client(tx).virtualKey.updateMany({
+      where: { id: input.id, organizationId: input.organizationId, purpose: "CONNECT" },
+      data: { connectServices: [...input.services], revision: { increment: 1n } },
+    });
+
+    return count > 0;
+  }
+
+  async setLicenseFacts(
+    input: {
+      id: string;
+      organizationId: string;
+      tokenHash: string;
+      instanceId: string | null;
+      expiresAt: Instant | null;
+    },
+    tx?: GatewayPersistenceTransaction,
+  ): Promise<boolean> {
+    const { count } = await this.client(tx).virtualKey.updateMany({
+      where: { id: input.id, organizationId: input.organizationId, purpose: "CONNECT" },
+      data: {
+        licenseTokenHash: input.tokenHash,
+        licenseInstanceId: input.instanceId,
+        licenseExpiresAt: input.expiresAt ? toDate(input.expiresAt) : null,
+        revision: { increment: 1n },
+      },
+    });
+
+    return count > 0;
+  }
+
+  async findByLicenseTokenHash(tokenHash: string): Promise<GatewayLicensedKey | null> {
+    const row = await this.client().virtualKey.findUnique({
+      where: { licenseTokenHash: tokenHash },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: { select: gatewayRoutingPolicySelect },
+      },
+    });
+    if (!row || row.purpose !== "CONNECT") return null;
+
+    return {
+      key: toVirtualKeyRecord(row),
+      instanceId: row.licenseInstanceId,
+      expiresAt: row.licenseExpiresAt ? fromDate(row.licenseExpiresAt) : null,
+      services: row.connectServices,
+    };
   }
 
   async recordUsage(id: string, at: Instant, tx?: GatewayPersistenceTransaction): Promise<void> {

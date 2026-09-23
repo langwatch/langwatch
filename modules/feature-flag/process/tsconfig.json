@@ -60,6 +60,9 @@
       "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {

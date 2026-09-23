@@ -117,6 +117,10 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: githubConnection.");
   }
 
+  countUsage(): never {
+    throw new Error("Not used by session group tests: countUsage.");
+  }
+
   asService(): TestCodingAgentApi & CodingAgentApi {
     return this;
   }

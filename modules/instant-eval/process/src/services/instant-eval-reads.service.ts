@@ -7,6 +7,7 @@
 
 import {
   type InstantEvalJudgmentStatus,
+  type InstantEvalUsageCount,
   InstantEvalRunNotFoundError,
   type InstantEvalRunProgress,
   type InstantEvalRunReference,
@@ -45,6 +46,18 @@ export class InstantEvalReadsService {
     now?: () => Instant;
   }): InstantEvalReadsService {
     return new InstantEvalReadsService(runs, judgments, now);
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  async countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<InstantEvalUsageCount> {
+    const [runs, judgments] = await Promise.all([
+      this.runs.countUsage(input),
+      this.judgments.countUsage(input),
+    ]);
+    return { ...runs, judgments };
   }
 
   /** The run, or the refusal naming the id that has none. */

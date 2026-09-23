@@ -24,41 +24,77 @@ export const JOIN_REQUEST_VERIFIED_MEMBER_THRESHOLD = 1;
  * Auto-join needs a second verified member as corroboration: one colleague at
  * a personal-looking address is not proof a company owns the domain.
  */
-export const JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD = 2;
 
 /** A maintained deny-list of consumer email providers to prevent public addresses from enabling org
  * matching or automatic joining. Prevents exposing who works where by matching strangers.
  */
 export const PUBLIC_EMAIL_DOMAINS: readonly string[] = [
+  "126.com",
+  "163.com",
   "aol.com",
   "duck.com",
   "fastmail.com",
+  "free.fr",
+  "freenet.de",
   "gmail.com",
+  "gmx.at",
+  "gmx.ch",
   "gmx.com",
   "gmx.de",
   "gmx.net",
   "googlemail.com",
   "hey.com",
+  "hotmail.be",
   "hotmail.co.uk",
   "hotmail.com",
+  "hotmail.de",
+  "hotmail.es",
   "hotmail.fr",
+  "hotmail.it",
+  "hotmail.nl",
   "icloud.com",
+  "laposte.net",
+  "libero.it",
+  "live.be",
   "live.co.uk",
   "live.com",
+  "live.de",
+  "live.fr",
+  "live.it",
+  "live.nl",
   "mac.com",
   "mail.com",
   "mail.ru",
   "me.com",
   "msn.com",
+  "naver.com",
+  "orange.fr",
   "outlook.com",
+  "outlook.de",
+  "outlook.es",
+  "outlook.fr",
+  "outlook.it",
   "pm.me",
-  "prontonmail.com",
   "proton.me",
   "protonmail.com",
   "qq.com",
+  "rediffmail.com",
+  "seznam.cz",
+  "sfr.fr",
+  "t-online.de",
+  "uol.com.br",
+  "wanadoo.fr",
+  "web.de",
+  "yahoo.ca",
   "yahoo.co.jp",
   "yahoo.co.uk",
   "yahoo.com",
+  "yahoo.com.au",
+  "yahoo.com.br",
+  "yahoo.de",
+  "yahoo.es",
+  "yahoo.fr",
+  "yahoo.it",
   "yandex.com",
   "yandex.ru",
   "ymail.com",
@@ -101,6 +137,12 @@ export interface JoinCandidateOrganization {
   /** The domains an administrator named when turning automatic joining on.
    *  Empty means automatic joining admits nobody, whatever the setting says. */
   autoJoinDomains: readonly string[];
+  /**
+   * A live proof this organization CONTROLS the domain (ADR-123), which is
+   * what authorizes walking straight in. Verified members are not that, and
+   * a lapsed proof reads as none.
+   */
+  domainProved: boolean;
 }
 
 /** What is safe to say about an organization to somebody who is not in it:
@@ -222,5 +264,8 @@ export function organizationAdmitsDomainAutomatically({
   if (!organizationAdmitsDomain({ organization, domain })) return false;
   if (organization.domainJoin !== "auto") return false;
   if (!organization.autoJoinDomains.includes(domain)) return false;
-  return organization.verifiedMembersOnDomain >= JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD;
+
+  // A lapsed proof reads as no proof: the domain stopped vouching for new
+  // people when its record stayed missing through the grace (ADR-123).
+  return organization.domainProved;
 }

@@ -21,6 +21,7 @@ import {
   type DashboardSummary,
   type Graph,
   type GraphLayout,
+  type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
 import { generate } from "@langwatch/ksuid";
 
@@ -52,6 +53,10 @@ export class DashboardService {
     workbenchAccess: WorkbenchAccess;
   }): DashboardService {
     return new DashboardService(options.repository, options.workbenchAccess);
+  }
+
+  countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCount> {
+    return this.#repository.countUsage(input);
   }
 
   async getAll(input: {

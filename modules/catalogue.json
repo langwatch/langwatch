@@ -26,6 +26,12 @@
       "subjects": ["api-key"]
     },
     {
+      "id": "audit-log",
+      "root": "modules/audit-log",
+      "classification": "core",
+      "subjects": ["audit-log"]
+    },
+    {
       "id": "auth",
       "root": "modules/auth",
       "classification": "core",
@@ -286,16 +292,16 @@
       "subjects": ["user", "user-avatar"]
     },
     {
+      "id": "webhook",
+      "root": "modules/webhook",
+      "classification": "core",
+      "subjects": ["webhook"]
+    },
+    {
       "id": "workflow",
       "root": "modules/workflow",
       "classification": "core",
       "subjects": ["workflow"]
-    },
-    {
-      "id": "audit-log",
-      "root": "modules/audit-log",
-      "classification": "core",
-      "subjects": ["audit-log"]
     },
     {
       "id": "billing",
@@ -361,12 +367,6 @@
       "root": "enterprise/modules/sso",
       "classification": "enterprise",
       "subjects": ["sso"]
-    },
-    {
-      "id": "webhook",
-      "root": "modules/webhook",
-      "classification": "core",
-      "subjects": ["webhook"]
     }
   ]
 }

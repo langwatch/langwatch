@@ -21,7 +21,9 @@ const otherOrgScope = { type: "organization", id: OTHER_ORG } as const;
  *  are read through a getter so a test can revoke mid-run. */
 function makeMemberReader(bindings: () => CollectedBinding[] = () => []) {
   const reader = makeReader({
-    findOrganizationMembership: vi.fn().mockResolvedValue({ role: "MEMBER", disabled: false }),
+    findOrganizationMembership: vi
+      .fn()
+      .mockResolvedValue({ role: "MEMBER", disabled: false }),
     findUserBindings: vi.fn(() => Promise.resolve(bindings())),
   });
   return {
@@ -127,8 +129,7 @@ describe("AuthzService epoch cache", () => {
     it("denies the permission the revoked binding carried", async () => {
       let bindings: CollectedBinding[] = [
         {
-          role: "ADMIN",
-          customRoleId: null,
+          roleKey: "admin",
           scopeType: "ORGANIZATION",
           scopeId: ORG,
           viaGroupId: null,

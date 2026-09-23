@@ -20,7 +20,10 @@ const POLICY = {
   defaultDatabase: "analytics",
 };
 
-const BASE_SQL = "SELECT TraceId FROM traces WHERE Cost > 1 UNION ALL SELECT TraceId FROM traces";
+// Each branch names its own LIMIT: a UNION branch without one is refused
+// (LIMIT_REQUIRED_PER_BRANCH), which is not the refusal these cases are about.
+const BASE_SQL =
+  "SELECT TraceId FROM traces WHERE Cost > 1 LIMIT 100 UNION ALL SELECT TraceId FROM traces LIMIT 100";
 
 /** A parser that hands back a tree someone else built. */
 function parserOf(statements: readonly SqlAstNode[]): LangWatchQLParser {

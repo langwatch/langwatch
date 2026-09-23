@@ -9,7 +9,6 @@ import {
   AuthzApi,
   grantsLedgerActorSchema,
   roleBindingRestCreateSchema,
-  roleBindingRestCreatedSchema,
   roleBindingRestDeletedSchema,
   roleBindingRestListQuerySchema,
   roleBindingRestListSchema,
@@ -120,7 +119,7 @@ export const authzRoleBindingRest: Readonly<{
   .post("/", "createRoleBinding")
   .withInput(roleBindingRestCreateSchema)
   .withPermission("organization:manage")
-  .withOutput(roleBindingRestCreatedSchema)
+  .withOutput(roleBindingRestSchema)
   .withStatus(201)
   .withDocs({
     tags: ["Role Bindings"],
@@ -130,9 +129,6 @@ export const authzRoleBindingRest: Readonly<{
   .withMiddleware(roleBindingRestFacts)
   .handle(async ({ app, input }, organization) => {
     const organizationId = organization.organizationId;
-    const hasLegacyAccessNotice = input.userId
-      ? await app.wouldFirstBindingDisableLegacyAccess({ organizationId, userId: input.userId })
-      : false;
 
     const created = await app.createBinding({
       organizationId,
@@ -156,7 +152,7 @@ export const authzRoleBindingRest: Readonly<{
         now: nowInstant,
       });
 
-    return { ...binding, ...(hasLegacyAccessNotice ? { hasLegacyAccessNotice: true } : {}) };
+    return binding;
   })
 
   .patch("/:roleBindingId", "updateRoleBinding")

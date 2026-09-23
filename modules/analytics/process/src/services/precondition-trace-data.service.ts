@@ -35,6 +35,7 @@ export class PreconditionTraceDataService {
       subTopicId: input.foldState.subTopicId ?? null,
       spanModels,
       customMetadata: extractCustomMetadata(attrs),
+      attributes: attrs,
       annotationIds: input.foldState.annotationIds,
       events: buildPreconditionEvents(input.events),
     };

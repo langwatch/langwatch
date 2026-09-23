@@ -23,6 +23,7 @@ import {
   type GatewayRealtimeSessionCollaborators,
 } from "../services/gateway-realtime-session.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
+import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 
@@ -309,6 +310,47 @@ describe.skipIf(!databaseUrl)("given a virtual key that brokers realtime voice s
     // second confirmation by its own per-step key; the trace has no such
     // gate, so the close is what makes this exactly once.
     expect(ingestedSpans).toHaveLength(1);
+  });
+
+  /** @scenario "Two settlements arriving together write one span" */
+  it("writes no span for a settlement that waited on the row while another closed it", async () => {
+    const vk = await keyWithCap(`vk-overlap-${nanoid(6)}`, null);
+    const sessionId = `ov-${nanoid(6)}`;
+    await realtimeSessions.reserveRealtimeSession(
+      reservation(vk, sessionId, `trace-${nanoid(10)}`),
+    );
+    const session = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    await raceOnOneRow<string>({
+      prisma,
+      table: "GatewayRealtimeSession",
+      first: async (tx) => {
+        await tx.gatewayRealtimeSession.updateMany({
+          where: { id: sessionId, projectId: PROJECT_ID },
+          data: { status: "CLOSED", closedAt: new Date(), closeReason: "first report" },
+        });
+        return "closed";
+      },
+      second: async () => {
+        await realtimeSessions.closeAndConfirmRealtimeSession({
+          session: toSessionRecord(session),
+          usage: { audio_ms: 4000 },
+          durationMs: 4000,
+          reason: "second report",
+          collaborators,
+        });
+        return "reported";
+      },
+    });
+
+    const row = await prisma.gatewayRealtimeSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+    expect(row.status).toBe("CLOSED");
+    expect(row.closeReason).toBe("first report");
+    expect(ingestedSpans).toHaveLength(0);
   });
 
   /** @scenario "A session minted without a trace writes no span" */

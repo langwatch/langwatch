@@ -12,6 +12,18 @@ import "@testing-library/jest-dom/vitest";
 // Enter on a sentence calls `traces.routeSearch`; the hook's own routing is
 // covered by use-submit-search.integration, so the submit is stubbed here
 // rather than mounting a tRPC provider.
+vi.mock("../use-instant-eval-route.ts", () => ({
+  useInstantEvalRoute: () => ({
+    onInstantEvalRoute: vi.fn(),
+    abandonPendingRun: vi.fn(),
+    confirmation: null,
+    confirmRun: vi.fn(),
+    searchWordsInstead: vi.fn(),
+    isEstimating: false,
+    isStarting: false,
+  }),
+}));
+
 vi.mock("../use-submit-search.ts", () => ({
   useSubmitSearch: () => ({ submitSearch: vi.fn(), isRouting: false }),
 }));

@@ -19,7 +19,7 @@ const chatSpan = ({ input, output }: { input: ChatMessage[]; output: ChatMessage
   trace_id: "trace-1",
   span_id: "llm-1",
   type: "llm",
-  model: "gpt-4o",
+  model: "gpt-5-mini",
   timestamps: { started_at: 1_700_000_000_000, finished_at: 1_700_000_001_000 },
   input: { type: "chat_messages", value: input },
   output: { type: "chat_messages", value: output },
@@ -94,6 +94,7 @@ describe("TraceApi.renderThreadTranscript", () => {
   });
 
   describe("given a budget smaller than the thread", () => {
+    /** @scenario "A bounded conversation keeps both ends and names what it dropped" */
     it("cuts the transcript and names what it dropped", async () => {
       const traces = Array.from({ length: 30 }, (_, index) =>
         trace({

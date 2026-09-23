@@ -1,4 +1,5 @@
 import {
+  type GatewayUsageCount,
   type SpendUsage,
   nanoUsdToDecimalString,
   parseSummedNanoUsd,
@@ -13,6 +14,7 @@ import {
  */
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
+import { z } from "zod";
 
 import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import {
@@ -38,6 +40,10 @@ import {
 import { GatewaySpendGroupingAdapter } from "../../rules/gateway-spend-grouping.rules.ts";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
+const NANO_PER_USD = 1_000_000_000;
+const usageRowsSchema = z.array(
+  z.object({ Total: z.string(), SpendNanoUsd: z.string(), FirstMs: z.string() }),
+);
 const TABLE = "gateway_spend" as const;
 
 /**
@@ -850,6 +856,60 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       input_image_tokens: quantity("TokensInputImage"),
       output_image_tokens: quantity("TokensOutputImage"),
       image_count: quantity("ImageCount"),
+    };
+  }
+
+  /** Per project, so each read routes to the tenant's server; the ledger keeps thirteen months. */
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<GatewayUsageCount> {
+    const window =
+      since === undefined ? "" : "AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})";
+    const perProject = await Promise.all(
+      [...new Set(projectIds)].map(async (tenantId) => {
+        const client = await this.resolveClient(tenantId);
+        const read = async (query: string) => {
+          const result = await client.query({
+            query,
+            query_params: since === undefined ? { tenantId } : { tenantId, since },
+            format: "JSONEachRow",
+          });
+          return usageRowsSchema.parse(await result.json())[0];
+        };
+        const [counted, earliest] = await Promise.all([
+          read(`
+            SELECT toString(count()) AS Total,
+                   toString(sum(CostNanoUSD)) AS SpendNanoUsd,
+                   '0' AS FirstMs
+            FROM ${TABLE} FINAL
+            WHERE TenantId = {tenantId:String}
+              ${window}`),
+          read(`
+            SELECT toString(count()) AS Total,
+                   '0' AS SpendNanoUsd,
+                   toString(toUnixTimestamp64Milli(min(OccurredAt))) AS FirstMs
+            FROM ${TABLE}
+            WHERE TenantId = {tenantId:String}`),
+        ]);
+        return {
+          requests: Number.parseInt(counted?.Total ?? "0", 10),
+          spendUsd: Number(counted?.SpendNanoUsd ?? "0") / NANO_PER_USD,
+          first:
+            Number.parseInt(earliest?.Total ?? "0", 10) === 0
+              ? []
+              : [Number(earliest?.FirstMs ?? "0")],
+        };
+      }),
+    );
+    const firsts = perProject.flatMap((project) => project.first);
+    return {
+      requests: perProject.reduce((sum, project) => sum + project.requests, 0),
+      spendUsd: perProject.reduce((sum, project) => sum + project.spendUsd, 0),
+      ...(firsts.length === 0 ? {} : { firstRequestAt: Math.min(...firsts) }),
     };
   }
 }

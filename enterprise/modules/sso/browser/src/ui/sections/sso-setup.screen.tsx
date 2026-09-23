@@ -4,7 +4,7 @@
  * move it. A step whose command identity does not answer yet is not mounted —
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
-import { HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { useEffect, useState } from "react";
 
@@ -45,7 +45,17 @@ export default function SsoSetupScreen() {
 
   if (!organizationId) return null;
 
-  return <SsoSetupPage organizationId={organizationId} />;
+  return (
+    <VStack align="stretch" gap={6} width="full">
+      <VStack align="start" gap={1}>
+        <Heading as="h2">Identity provider</Heading>
+        <Text color="fg.muted">
+          Where your people sign in, and everything it takes to put it in front of them.
+        </Text>
+      </VStack>
+      <SsoSetupPage organizationId={organizationId} />
+    </VStack>
+  );
 }
 
 function SsoSetupPage({ organizationId }: { organizationId: string }) {

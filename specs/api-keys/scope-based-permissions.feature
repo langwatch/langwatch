@@ -189,6 +189,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     Then the key gets MEMBER-level access, not ADMIN
     And the key cannot perform admin-only operations
 
+  @unit
+  Scenario: An API key's ceiling cannot be dropped by its caller
+    Given a personal API key has project access
+    When its stored owner loses that access
+    Then the key loses that access on its next permission check
+    And supplying a different or absent owner does not bypass the stored owner's ceiling
+
   @integration @unimplemented
   Scenario: Changing scope recalculates ceiling and resets out-of-bounds selections
     Given my role is Admin on "Project Alpha" and Viewer on "Team Beta"
@@ -327,16 +334,12 @@ Feature: API Key Scope and Fine-Grained Permissions
   # ── Backend validation ──────────────────────────────────────
 
   @unit
-  Scenario: A key minted from legacy membership works at request time
-    Given my access comes from team membership predating the permissions rebuild
-    And a key has been minted mirroring that access
-    When the key is used for something that access covers
-    Then the request is permitted
-    # Minting and using a key are two separate ceiling checks. Teaching only
-    # the first one about legacy membership moved the failure rather than
-    # fixing it: the key was issued and then every request made with it was
-    # refused, so an agent turn began, streamed, and then had every tool call
-    # denied — worse than being told up front.
+  Scenario: A key cannot regain access from legacy membership
+    Given a key still holds a grant but its owner has no live grant
+    And old membership rows may still contain a role
+    When the key is used
+    Then the request is refused
+    And neither old role rows nor migration status decide access
 
   @unit
   Scenario: Service rejects permissions above creator ceiling

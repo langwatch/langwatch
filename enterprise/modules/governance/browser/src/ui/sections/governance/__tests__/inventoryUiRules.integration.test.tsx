@@ -43,24 +43,25 @@ describe("given an admin on the Inventory page", () => {
       const sampleToggle = screen.getByRole("button", {
         name: "See sample data",
       });
-      const addTool = screen.getAllByRole("button", { name: /Add tool/ })[0]!;
+      const addSource = screen.getAllByRole("button", {
+        name: /Add source/,
+      })[0]!;
       expect(actions?.contains(sampleToggle)).toBe(true);
-      expect(actions?.contains(addTool)).toBe(true);
+      expect(actions?.contains(addSource)).toBe(true);
 
       const outlineSmall = screen.getByText("reference outline small").className;
       const ghostSmall = screen.getByText("reference ghost small").className;
       const subtleSmall = screen.getByText("reference subtle small").className;
       const solidSmall = screen.getByText("reference solid small").className;
       const solidSmallTrigger = screen.getByText("reference solid small trigger").className;
+      const outlineSmallTrigger = screen.getByText("reference outline small trigger").className;
 
-      // The old assertion here was `addTool.className !== sampleToggle.className`,
-      // which is satisfied by any two buttons that differ at all. A grey Add
-      // tool passed it exactly as happily as the solid orange one the page
-      // then rendered, so it could not catch the drift it was written for.
-      //
-      // The create action is now the house header button — outline, small,
-      // with a leading plus — and solid orange is gone from the section.
-      expect(addTool.className).toBe(outlineSmall);
+      // Asserted against the reference rather than as "differs from the
+      // toggle": any two buttons that differ at all would pass that, a grey
+      // create as happily as a solid orange one. The create action is the
+      // house header button, outline and small with a leading plus, and solid
+      // orange is gone from the section.
+      expect(addSource.className).toBe(outlineSmallTrigger);
       // Ghost rather than outline: the toggle changes what the page shows
       // rather than anything about the organization, and outline is what marks
       // the create action out now that nothing in the row is filled.
@@ -70,7 +71,11 @@ describe("given an admin on the Inventory page", () => {
       // Asserted as a count for the same reason it always was: a row where
       // nothing stands out reads as a row with no primary action.
       const headerButtons = actions ? Array.from(actions.querySelectorAll("button")) : [];
-      expect(headerButtons.filter((button) => button.className === outlineSmall)).toHaveLength(1);
+      expect(
+        headerButtons.filter(
+          (button) => button.className === outlineSmall || button.className === outlineSmallTrigger,
+        ),
+      ).toHaveLength(1);
       // And nothing in the row is solid, in either the branded or the plain
       // form. This is the half that fails if solid orange creeps back.
       expect(
@@ -100,11 +105,11 @@ describe("given an admin on the Inventory page", () => {
     // the second control was down in the sources table's own header, and every
     // assertion scoped to the page header agreed the page was fine.
     //
-    // Label AND weight, because the defect was both. A solid "Add tool" up top
-    // beside an outline "Add source" below gave one flow two names and two
-    // weights. Asserting only the count would forbid an empty state from
-    // repeating the header's own action, which the shared empty state is built
-    // to allow and which Agents does.
+    // Label AND weight, because the defect was both: a solid create up top
+    // beside an outline one below gave one flow two names and two weights.
+    // Asserting only the count would forbid an empty state from repeating the
+    // header's own action, which the shared empty state is built to allow and
+    // which Agents does.
     /** @scenario "A page offers one create flow, under one label, from its header" */
     it("gives the create flow one label and one weight on each pane, from the header", async () => {
       connectTools();
@@ -127,13 +132,35 @@ describe("given an admin on the Inventory page", () => {
         expect(controls.some((c) => headerRow?.contains(c))).toBe(true);
       };
 
-      assertOneDoor("Add tool");
+      assertOneDoor("Add source");
+
+      await openTab(/Environments/);
+      assertOneDoor("Add source");
 
       await openTab(/Sources/);
 
-      // The sources table used to add its own, differently-worded control, so
+      // The sources table repeats the header's control in its own header, so
       // this is the pane the rule exists for.
       assertOneDoor("Add source");
+    });
+
+    // A source is where what the inventory lists arrives from, so connecting
+    // one is the page's create wherever the reader is standing. The registry
+    // used to offer its own "Add tool" beside it on the catalog pane, which
+    // gave the page two creates and the reader a choice to make.
+    /** @scenario "The inventory header offers Add source on every tab and no Add tool" */
+    it("offers Add source in the header on every tab, and no Add tool anywhere", async () => {
+      connectTools();
+      renderScreen();
+
+      const header = () =>
+        screen.getByRole("heading", { name: "Inventory" }).closest("div")
+          ?.parentElement as HTMLElement;
+      for (const tab of [/Catalog/, /Environments/, /Sources/]) {
+        await openTab(tab);
+        expect(within(header()).getByRole("button", { name: /Add source/ })).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /Add tool/ })).toBeNull();
+      }
     });
 
     // The catalog with nothing in it, and the samples turned off, which is the
@@ -156,27 +183,18 @@ describe("given an admin on the Inventory page", () => {
       // Never the dashed box this replaced. Dashes read as a drop target or a
       // component that failed to arrive, which is what the owner reported.
       expect(empty).not.toHaveStyle({ borderStyle: "dashed" });
-      // The empty state offers the way out, and offers it under the HEADER'S
-      // label rather than a new one. The sentence used to name the button in
-      // prose instead ("with Add tool, above"), which pointed at a control by
-      // a name nothing checked: rename the header and the sentence lies, and
-      // no rule about controls can catch a stale sentence.
-      const inside = within(empty).getByRole("button", { name: /Add tool/ });
+      // No create of its own inside the empty state: the page's one create is
+      // Add source in the header, and a control here that registered a tool
+      // would be a second door under another name.
+      expect(within(empty).queryByRole("button")).toBeNull();
       const header = screen
         .getByRole("heading", { name: "Inventory" })
         .closest("div")?.parentElement;
-      const inHeader = within(header as HTMLElement).getByRole("button", {
-        name: /Add tool/,
-      });
-      expect(inside).not.toBe(inHeader);
-      // Same label and same weight.
-      expect(inside.className).toBe(inHeader.className);
-      // And same FLOW, which label and weight alone do not prove: two
-      // identically-drawn buttons can still lead to different places, and that
-      // would be the original defect wearing a matching coat. Followed all the
-      // way to the drawer the header's own button opens.
-      await userEvent.click(inside);
-      expect(await screen.findByRole("heading", { name: /Add tool/ })).toBeInTheDocument();
+      expect(
+        within(header as HTMLElement).getByRole("button", {
+          name: /Add source/,
+        }),
+      ).toBeInTheDocument();
     });
 
     // A reader without the registry grant must not be shown an empty catalog

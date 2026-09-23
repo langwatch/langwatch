@@ -142,11 +142,22 @@ function registerTools(server: McpServer): void {
 
   server.tool(
     "discover_schema",
-    "Discover available filter fields, metrics, aggregation types, group-by options, scenario schema, and evaluator types for LangWatch queries. Call this before using search_traces, get_analytics, scenario tools, or evaluator tools to understand available options.",
+    "Discover what LangWatch can be queried with: the trace filter fields and syntax, the analytics SQL views and columns, the analytics metrics, aggregation types, group-by options, scenario schema and evaluator types. Call this before using search_traces, run_query, get_analytics, scenario tools or evaluator tools, so you never guess a field, a column or a value.",
     {
       category: z
-        .enum(["filters", "metrics", "aggregations", "groups", "scenarios", "evaluators", "all"])
-        .describe("Which schema category to discover"),
+        .enum([
+          "filters",
+          "lwql",
+          "metrics",
+          "aggregations",
+          "groups",
+          "scenarios",
+          "evaluators",
+          "all",
+        ])
+        .describe(
+          "Which schema category to discover. 'filters' is the trace filter language, 'lwql' the analytics SQL views; both are read from the platform and need the API key",
+        ),
       evaluatorType: z
         .string()
         .optional()
@@ -154,7 +165,7 @@ function registerTools(server: McpServer): void {
           "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_boolean') to get its full schema details",
         ),
     },
-    async ({ category, evaluatorType }) => {
+    withToolLogging("discover_schema", async ({ category, evaluatorType }) => {
       if (category === "scenarios") {
         const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
         return {
@@ -167,8 +178,12 @@ function registerTools(server: McpServer): void {
           content: [{ type: "text", text: formatEvaluatorSchema(evaluatorType) }],
         };
       }
-      const { formatSchema } = await import("./tools/discover-schema.js");
-      let text = formatSchema(category);
+      const { formatSchema, needsQueryReference } = await import("./tools/discover-schema.js");
+      // The filter and analytics-SQL halves are the PLATFORM's registries, not
+      // copies of them, so those categories need the credential. The static
+      // ones still answer without it.
+      if (needsQueryReference(category)) requireApiKey();
+      let text = await formatSchema(category);
       if (category === "all") {
         const { formatScenarioSchema } = await import("./tools/discover-scenario-schema.js");
         text += "\n\n" + formatScenarioSchema();
@@ -176,7 +191,32 @@ function registerTools(server: McpServer): void {
         text += "\n\n" + formatEvaluatorSchema();
       }
       return { content: [{ type: "text", text }] };
+    }),
+  );
+
+  server.tool(
+    "run_query",
+    "Run one read-only analytics SQL statement (LangWatchQL) over this project's traces, spans, evaluations and metrics, and get the rows back as a table. This is the tool for a count, a rate, a sum, a percentile or any of them grouped or over time — questions search_traces would need many calls to answer. The statement runs exactly as written. Call discover_schema with category 'lwql' first for the views, columns and worked statements.",
+    {
+      sql: z
+        .string()
+        .describe(
+          "The SELECT to run. Filter on the dataset's time column so the read is bounded, and never select a whole attribute map",
+        ),
+      parameters: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+        .optional()
+        .describe(
+          'Values for the parameters the statement declares, e.g. {"days": 7} for {days:UInt32}',
+        ),
     },
+    withToolLogging("run_query", async (params) => {
+      requireApiKey();
+      const { handleRunQuery } = await import("./tools/run-query.js");
+      return {
+        content: [{ type: "text", text: await handleRunQuery(params) }],
+      };
+    }),
   );
 
   server.tool(
@@ -188,7 +228,13 @@ function registerTools(server: McpServer): void {
         .record(z.string(), z.array(z.string()))
         .optional()
         .describe(
-          'Filter traces. Format: {"field": ["value"]}. Use discover_schema for field names.',
+          'Filter traces by the older per-field map. Format: {"field": ["value"]}. Use discover_schema for field names.',
+        ),
+      filter: z
+        .string()
+        .optional()
+        .describe(
+          'Filter traces with the Trace Explorer\'s own query language: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail", a quoted phrase for free text. Reaches attribute keys, span events and evaluator verdicts that the `filters` map cannot. Combined with `filters` and `query` when you send more than one. Call discover_schema with category \'filters\' for every field and the syntax.',
         ),
       startDate: z
         .string()
@@ -805,17 +851,21 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       name: z.string().optional().describe("The new name. The slug is kept."),
       fields: suiteFieldsSchema
         .optional()
-        .describe("The full list of fields the suite declares. It replaces the list the suite holds."),
+        .describe(
+          "The full list of fields the suite declares. It replaces the list the suite holds.",
+        ),
       evaluators: evaluatorAttachmentsSchema
         .optional()
-        .describe("The full list of evaluators attached to the suite. It replaces the list the suite holds."),
+        .describe(
+          "The full list of evaluators attached to the suite. It replaces the list the suite holds.",
+        ),
     },
     withToolLogging("platform_update_test_suite", async (params) => {
       requireApiKey();
       return {
         content: [{ type: "text", text: await handleUpdateTestSuite(params) }],
       };
-    })
+    }),
   );
 
   server.tool(

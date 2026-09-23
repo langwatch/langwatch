@@ -1,6 +1,4 @@
-import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import type { Instant } from "@langwatch/time";
 import type {
   Topic,
@@ -21,21 +19,11 @@ export interface TopicClusteringScheduleReader {
   findNextWakeAt(input: { projectId: string }): Promise<Instant | null>;
 }
 
-type TopicSetup = FeatureSetup<
-  Record<never, never>,
-  MembersRead<typeof TopicApp.reads>,
-  undefined,
-  TopicRepositories
->;
+type TopicSetup = FeatureSetup<Record<never, never>, never, undefined, TopicRepositories>;
 
 export class TopicApp implements TopicApi {
   static readonly contract = TopicApiToken;
   static readonly dependencies = {};
-  /**
-   * Durable clustering wake: process-manager row in Postgres, shared across
-   * all processes that install Topic.
-   */
-  static readonly reads = reads("prisma");
 
   readonly #topics: TopicService;
 
@@ -48,7 +36,7 @@ export class TopicApp implements TopicApi {
       TopicService.create({
         repository: setup.repositories.topics,
         schedule: EventingTopicClusteringScheduleService.create({
-          processStore: PrismaProcessStore.create({ database: setup.members.prisma }),
+          processStore: setup.repositories.processStore,
         }),
       }),
     );

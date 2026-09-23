@@ -17,6 +17,7 @@ import {
   type ResolvedApiKeyCredential,
   type ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
+import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzPermission, PermissionDecision } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { classifyForLangy } from "@langwatch/langy-contract";
@@ -34,8 +35,14 @@ export type ApiOrganizationCredential = Readonly<{
   markUsed: () => void;
 }>;
 
+export type ApiKeyDoorCredential = Readonly<{
+  principal: RestKeyCredentialPrincipal;
+  organizationId: string;
+  markUsed: () => void;
+}>;
+
 export type ApiRestCredentialPeers = Readonly<{
-  apiKeys: ApiKeyApi;
+  apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "resolveOrganizationToken" | "markUsed">;
   authz: Pick<AuthzApi, "hasApiKeyPermission" | "getApiKeyProjectDecision">;
   organizations: Pick<OrganizationApi, "getSettings">;
   logger?: Pick<Logger, "error">;
@@ -52,7 +59,7 @@ export class ApiRestCredentials {
   }
 
   private constructor(
-    private readonly apiKeys: ApiKeyApi,
+    private readonly apiKeys: ApiRestCredentialPeers["apiKeys"],
     private readonly authz: ApiRestCredentialPeers["authz"],
     private readonly organizations: ApiRestCredentialPeers["organizations"],
     private readonly logger: Pick<Logger, "error">,
@@ -95,6 +102,48 @@ export class ApiRestCredentials {
       markUsed: () => {
         if (resolved.type === "apiKey") this.apiKeys.markUsed({ id: resolved.apiKeyId });
       },
+    };
+  }
+
+  /**
+   * Any API key, with no project demanded (#8085): a legacy key IS its project, a key that
+   * resolves a project still reaches its organization, and one naming no project resolves
+   * through its organization. Only a token that is neither is refused.
+   */
+  async identifyKey(input: { request: Request }): Promise<ApiKeyDoorCredential> {
+    const credentials = extractApiKeyRequestCredentials(input.request);
+    if (!credentials) throw new ProjectMissingCredentialsError();
+
+    const resolved = await this.apiKeys.findResolvedToken(credentials);
+    if (resolved?.type === "legacyProjectKey") {
+      return {
+        principal: { kind: "project", projectId: resolved.project.id },
+        organizationId: resolved.project.organizationId,
+        markUsed: () => {},
+      };
+    }
+    if (resolved) {
+      return {
+        principal: {
+          kind: "apiKey",
+          apiKeyId: resolved.apiKeyId,
+          userId: resolved.userId,
+          organizationId: resolved.organizationId,
+          resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
+        },
+        organizationId: resolved.organizationId,
+        markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
+      };
+    }
+
+    const organization = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
+    if (!organization.ok) throw new ProjectInvalidCredentialsError();
+    const { apiKeyId, userId, organizationId } = organization.resolved;
+
+    return {
+      principal: { kind: "apiKey", apiKeyId, userId, organizationId },
+      organizationId,
+      markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
     };
   }
 

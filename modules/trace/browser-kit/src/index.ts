@@ -26,6 +26,7 @@ export {
   computeOverrides,
   type FragmentState,
   isOverridesEmpty,
+  LANGY_TRACE_ORIGIN,
   parseFragment,
 } from "@langwatch/trace-contract";
 export * from "./view-context-chip.ts";

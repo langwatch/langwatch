@@ -1,6 +1,7 @@
 import { defineServerModule } from "@langwatch/kernel";
 
 import { IdentityApp } from "./app/identity.app.ts";
+import { identityEventing } from "./eventing/identity.pipeline.ts";
 import { identityRepositories } from "./repositories/identity-repositories.registry.ts";
 
 /**
@@ -10,4 +11,4 @@ import { identityRepositories } from "./repositories/identity-repositories.regis
 export const identityServer = defineServerModule("identity")
   .withRepositories(identityRepositories)
   .withApp(IdentityApp)
-  .build();
+  .withEventing(identityEventing);

@@ -27,6 +27,7 @@ import {
   questionToolCardParts,
 } from "../../../../model/langy-question-tool.ts";
 import { isSayToolPart } from "../../../../model/langy-say-tool.ts";
+import { isSecretSnippetToolPart } from "../../../../model/langy-secret-snippet-tool.ts";
 import { langyThinkingShimmerStyles } from "../../../../model/values/langy-shimmer.ts";
 import { LangyInterruptedNote } from "../../../../ui/elements/langy-interrupted-note.tsx";
 import {
@@ -418,6 +419,9 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
     // reason: it speaks to the person, not to the model, and the card carries
     // its whole life.
     if (isCodeAccessToolPart(part)) return;
+    // The `secret_snippet` tool is the secret snippet card, rendered by message-content: an
+    // activity row for it would only say a card was drawn.
+    if (isSecretSnippetToolPart(part)) return;
     const name = partToolName(part);
     if (!name) return;
 

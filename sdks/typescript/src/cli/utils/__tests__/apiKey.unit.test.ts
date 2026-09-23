@@ -52,7 +52,12 @@ import { ProjectScopeError, resolveProjectSelector } from "../projectScope";
 import { scopedProjectId } from "../../../internal/credentialContext";
 import { fetchPersonalProject, SessionApiError } from "../governance/session-api";
 import { maybePrintIdentityNotice } from "../identityNotice";
-import { resolveCredentials, SESSION_REVALIDATE_WINDOW_MS } from "../apiKey";
+import {
+  loginElsewhereMessage,
+  loginMadeElsewhere,
+  resolveCredentials,
+  SESSION_REVALIDATE_WINDOW_MS,
+} from "../apiKey";
 import { setOutputFormat } from "../errorOutput";
 
 const mockedDotenvConfig = vi.mocked(config);
@@ -494,6 +499,135 @@ describe("resolveCredentials()", () => {
         const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(readCliErrorDocument(stdout)?.kind).toBe("missing_api_key");
       });
+    });
+  });
+
+  describe("given a login made against another address than the command targets", () => {
+    const LOGIN_ADDRESS = "https://app.langwatch.ai";
+    const OTHER = "https://langwatch.other.test";
+    const stripAnsi = (text: string): string =>
+      // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+      text.replace(/\u001b\[[0-9;]*m/g, "");
+    const loginWithBothKeys = () =>
+      loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-login-key" });
+
+    /** @scenario the device session's key is never sent to another address than the one that issued it */
+    it("resolves no key of the session and ends naming both addresses", async () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      setOutputFormat(undefined);
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      const stderr = stripAnsi(
+        errorSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n"),
+      );
+      expect(stderr).toBe(
+        `Error: ${loginElsewhereMessage({ loginEndpoint: LOGIN_ADDRESS, endpoint: OTHER })}`,
+      );
+      expect(stderr).toContain(LOGIN_ADDRESS);
+      expect(stderr).toContain(OTHER);
+      expect(stderr).toContain("langwatch login --device");
+      expect(stderr).toContain("unset LANGWATCH_ENDPOINT");
+      expect(stderr).not.toContain("sk-lw-login-key");
+      expect(stderr).not.toContain("pkey_personal");
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(mockedFetchPersonalProject).not.toHaveBeenCalled();
+      expect(mockedSaveConfig).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+
+    /** @scenario the device session's key is never sent to another address than the one that issued it */
+    it("reads the other address from the folder's .env just the same", async () => {
+      mockedDotenvConfig.mockReturnValue({
+        parsed: { LANGWATCH_ENDPOINT: OTHER },
+      } as never);
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      expect(mockedFetchPersonalProject).not.toHaveBeenCalled();
+      expect(scopedProjectId()).toBeUndefined();
+    });
+
+    /** @scenario machine callers get a structured login_endpoint_mismatch document */
+    it("prints one structured document on stdout for a machine caller", async () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+      setOutputFormat("json");
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      const stdout = logSpy.mock.calls
+        .map((c: unknown[]) => String(c[0]))
+        .join("\n");
+      const domain = readCliErrorDocument(stdout);
+      expect(domain?.kind).toBe("login_endpoint_mismatch");
+      expect(domain?.isHandled).toBe(true);
+      expect(domain?.meta).toMatchObject({
+        loginEndpoint: LOGIN_ADDRESS,
+        endpoint: OTHER,
+      });
+      expect(stdout).not.toContain("sk-lw-login-key");
+    });
+
+    /** @scenario an API key given for the other address is used as given */
+    it("uses a key from LANGWATCH_API_KEY or the flag, paired with the other address", async () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+      process.env.LANGWATCH_API_KEY = "sk-of-the-other-address";
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+
+      const fromEnv = await resolveCredentials();
+      const fromFlag = await resolveCredentials({ apiKey: "sk-explicit" });
+
+      expect(fromEnv).toMatchObject({
+        apiKey: "sk-of-the-other-address",
+        source: "env",
+        endpoint: OTHER,
+      });
+      expect(fromFlag).toMatchObject({
+        apiKey: "sk-explicit",
+        source: "flag",
+        endpoint: OTHER,
+      });
+      expect(mockedFetchPersonalProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario two spellings of one address are one address */
+    it.each([
+      "https://APP.langwatch.ai/",
+      "https://app.langwatch.ai:443",
+      "https://app.langwatch.ai///",
+    ])("takes %s for the login's own address", async (spelling) => {
+      process.env.LANGWATCH_ENDPOINT = spelling;
+      mockedLoadConfig.mockReturnValue(loginWithBothKeys() as never);
+
+      const resolved = await resolveCredentials();
+
+      expect(resolved.source).toBe("session");
+      expect(resolved.apiKey).toBe("sk-lw-login-key");
+    });
+
+    /** @scenario localhost and 127.0.0.1 are two addresses */
+    it("does not take 127.0.0.1 for localhost", async () => {
+      process.env.LANGWATCH_ENDPOINT = "http://127.0.0.1:5560";
+      mockedLoadConfig.mockReturnValue({
+        ...loginWithBothKeys(),
+        control_plane_url: "http://localhost:5560",
+      } as never);
+
+      await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      expect(loginMadeElsewhere()).toEqual({
+        loginEndpoint: "http://localhost:5560",
+        endpoint: "http://127.0.0.1:5560",
+      });
+    });
+
+    it("has nothing to say with no login on the machine", () => {
+      process.env.LANGWATCH_ENDPOINT = OTHER;
+
+      expect(loginMadeElsewhere()).toBeUndefined();
     });
   });
 

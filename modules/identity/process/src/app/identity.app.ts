@@ -3,8 +3,12 @@
  * newborn sweep, join-request/SSO-connection/directory-sync guards — every
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
+import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import {
   IdentityApi,
   IdentityCapabilityUnavailableError,
@@ -14,10 +18,11 @@ import {
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import { LoggedSsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
 import {
   ssoDomainProofChannels,
   ssoDomainProofFileChannels,
@@ -26,6 +31,13 @@ import { SSO_DOMAIN_PROOF_PUBLIC_EGRESS } from "../channels/sso-domain-proof-fil
 import { ssoIssuerDiscoveryChannels } from "../channels/sso-issuer-discovery-channels.registry.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { breakGlassHolderEligibility } from "../rules/break-glass-eligibility.rules.ts";
+import type {
+  JoinMembership,
+  JoinOfferDismissals,
+  JoinRequestsServiceDeps,
+  JoinSetting,
+  JoinSettingAudit,
+} from "../rules/join-requests-contract.rules.ts";
 import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
 import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
@@ -39,8 +51,11 @@ import {
 } from "../services/identity-newborn-reconciliation.service.ts";
 import { IdentitySecretCarryService } from "../services/identity-secret-carry.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
+import { JoinAdmissionsService } from "../services/join-admissions.service.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
 import { JoinRequestNotificationService } from "../services/join-request-notification.service.ts";
+import { JoinRequestService } from "../services/join-request.service.ts";
+import { JoinRequestsService } from "../services/join-requests.service.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
@@ -51,7 +66,9 @@ import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.serv
 import { SsoArrivalService } from "../services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../services/sso-assertion.service.ts";
 import { SsoAuthenticationActivityService } from "../services/sso-authentication-activity.service.ts";
+import { SsoBreakGlassRecoveryService } from "../services/sso-break-glass-recovery.service.ts";
 import {
+  RequiresLocalDoorAndBinding,
   SsoBreakGlassService,
   type SsoBreakGlassDirectory,
 } from "../services/sso-break-glass.service.ts";
@@ -95,8 +112,10 @@ const RESERVATIONS_REAP_LIMIT_PER_PASS = 200;
  * produces the four identity pipelines — never a deployment's; unresolved,
  * see the handoff. Default preserves the deleted schema's producer-role default.
  */
-type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption"]> &
+type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption", "rateLimiter"]> &
   Readonly<{
+    /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
+    isSaas: boolean;
     producesPipelines: boolean;
     adminEmails: readonly string[];
     /** Where this deployment answers, which is what a SAML identity provider
@@ -134,6 +153,8 @@ type IdentityAppParts = {
   ssoAssertion: SsoAssertionService;
   ssoArrival: SsoArrivalService;
   ssoTestArrival: SsoTestArrivalService;
+  joinAdmissions: JoinAdmissionsService;
+  joinRequests: JoinRequestsService;
   ssoActivity: SsoAuthenticationActivityService;
   ssoMigrationCallbacks: SsoMigrationCallbackService;
   ssoBreakGlass: SsoBreakGlassService;
@@ -229,6 +250,73 @@ function legacySsoAccess(auth: AuthApi): SsoLegacyAccessRetirement {
   };
 }
 
+/** Membership is the organization's (ADR-129): a join lands through the arrival's door. */
+function joinMemberships(organizations: OrganizationApi): JoinMembership {
+  return {
+    isMember: (args) => organizations.isMember(args),
+    // The approving admin, or the policy that approved: the grant is audited to them.
+    attachDefaultMembership: async ({ userId, organizationId, commandId, approvedByUserId }) => {
+      await organizations.createMembership({
+        userId,
+        organizationId,
+        admittedBy: {
+          actor: approvedByUserId
+            ? { type: "user", id: approvedByUserId }
+            : { type: "system", id: SYSTEM_ACTORS.joinRequests },
+          commandId,
+        },
+      });
+    },
+  };
+}
+
+/** The joining setting lives in the organization's own columns; identity decides, it keeps. */
+function joinSettings(organizations: OrganizationApi): JoinSetting {
+  return {
+    read: (args) => organizations.getJoinSetting(args),
+    write: ({ organizationId, domainJoin, joinDomains }) =>
+      organizations.saveJoinSetting({ organizationId, setting: { domainJoin, joinDomains } }),
+  };
+}
+
+/** A "no thanks" is a preference on the person, which the user module keeps. */
+function joinOfferDismissals(users: UserApi): JoinOfferDismissals {
+  return {
+    dismissedDomains: ({ userId }) => users.findJoinOfferDismissedDomains({ id: userId }),
+    dismiss: ({ userId, domain }) => users.dismissJoinOffer({ id: userId, domain }),
+  };
+}
+
+/** The audit row main writes for a joining change: both values, and both domain lists. */
+function joinSettingAudit(auditLog: AuditLogApi): JoinSettingAudit {
+  return {
+    joiningChanged: ({ organizationId, actorUserId, change }) =>
+      auditLog.record({
+        userId: actorUserId,
+        organizationId,
+        action: "organization.joining.changed",
+        args: {
+          from: change.previous,
+          to: change.next,
+          fromDomains: [...change.previousDomains],
+          toDomains: [...change.nextDomains],
+        },
+        targetKind: "organization",
+        targetId: organizationId,
+      }),
+  };
+}
+
+/** The process's one counter, in the window and allowance the join throttles name. */
+function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit"] {
+  return async ({ key, windowSeconds, max }) => {
+    const decision = await limiter.check(key, { requests: max, seconds: windowSeconds });
+    const retryAfterMs = (decision.retryAfterSeconds ?? windowSeconds) * 1000;
+
+    return { allowed: decision.allowed, resetAt: nowInstant().epochMilliseconds + retryAfterMs };
+  };
+}
+
 export class IdentityApp implements IdentityApi {
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
@@ -242,11 +330,18 @@ export class IdentityApp implements IdentityApi {
     auth: AuthApi,
     /** Whether somebody holds a password is the module that owns it. */
     users: UserApi,
+    /** Whether an organization's plan carries the who-can-join control. */
+    entitlements: EntitlementApi,
+    /** Where a changed joining setting is recorded for the customer. */
+    auditLog: AuditLogApi,
+    /** Whether this deployment's licence allows automatic joining. */
+    licensing: LicensingApi,
   };
   /** `registersPipelines` is named raw so the process can answer it through
    * `withMember`/`withMembers` (see {@link IdentityMembers}). */
   static readonly reads = [
-    ...reads("prisma", "eventing", "encryption"),
+    ...reads("prisma", "eventing", "encryption", "rateLimiter"),
+    "isSaas",
     "producesPipelines",
     "adminEmails",
     "publicBaseUrl",
@@ -313,9 +408,13 @@ export class IdentityApp implements IdentityApi {
       : null;
     // One answer to "is there a way back in", shared: activation's second
     // precondition and the setup sign-in exemption must not disagree.
-    const breakGlass = LocalDoorBreakGlassBindingAdapter.create();
+    const breakGlass = RequiresLocalDoorAndBinding.create({
+      localDoor: LocalDoorBreakGlassBindingAdapter.create(),
+      bindings: SsoBreakGlassRecoveryService.create({ bindings: setup.repositories.ssoBreakGlass }),
+    });
     const ssoConnectionGuards = SsoConnectionGuardsService.create({
       connections: setup.repositories.ssoConnections,
+      registrationSlots: setup.repositories.ssoRegistrationSlots,
       breakGlass,
       stranding: setup.repositories.ssoStranding,
       platformOperators: infrastructure.ssoPlatformOperators,
@@ -379,10 +478,25 @@ export class IdentityApp implements IdentityApi {
       }),
       breakGlass,
     });
-    // `joinRequests` and `notifications` are unanswered here on purpose: both
-    // are the composition root's (see the handoff), and an arrival on a
-    // connection that ASKS admits nobody until they are supplied.
+    const joinRequests = JoinRequestsService.create({
+      requests: JoinRequestService.create(joinRequestGuards, infrastructure.joinRequestLedger),
+      reads: setup.repositories.joinRequests,
+      candidates: setup.repositories.joinCandidates,
+      membership: joinMemberships(setup.dependencies.organizations),
+      settings: joinSettings(setup.dependencies.organizations),
+      dismissals: joinOfferDismissals(setup.dependencies.users),
+      audit: joinSettingAudit(setup.dependencies.auditLog),
+      autoJoinLicensed: () => setup.dependencies.licensing.isPlatformSsoLicensed(),
+      joinPolicyEntitled: async ({ organizationId }) =>
+        isEnterpriseTier(
+          (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
+        ),
+      rateLimit: joinRateLimit(setup.members.rateLimiter),
+    });
+    // `notifications` is unanswered on purpose: an automatic admission's
+    // durable notice needs a mail this process does not compose.
     const ssoArrival = SsoArrivalService.create({
+      joinRequests,
       connections: setup.repositories.ssoConnections,
       memberships: arrivalMemberships(setup.dependencies.organizations),
       authz: setup.dependencies.permissions,
@@ -428,6 +542,9 @@ export class IdentityApp implements IdentityApi {
             // is a string an administrator typed.
             discovery: ssoIssuerDiscoveryChannels.live.create({
               policy: SSO_DOMAIN_PROOF_PUBLIC_EGRESS,
+              // Auth owns the operator's IdP allowlist; asked per discovery, not at boot.
+              dialableInternalOrigins: () =>
+                setup.dependencies.auth.findDialableIdentityProviderOrigins(),
             }),
           }),
           finalization: SsoMigrationFinalizationService.create({
@@ -443,10 +560,9 @@ export class IdentityApp implements IdentityApi {
           }),
         })
       : null;
-    // `warnings` is unanswered: where an expiry warning reaches somebody is
-    // the composition root's, and the sweep refuses by name until it is.
     const ssoBreakGlassGrants = SsoBreakGlassService.create({
       bindings: setup.repositories.ssoBreakGlass,
+      warnings: LoggedSsoBreakGlassWarningChannel.create(),
       newBindingId: newSsoBreakGlassBindingId,
       directory: breakGlassDirectory(setup.dependencies.organizations),
       holderIsEligible: breakGlassEligibility(
@@ -486,6 +602,8 @@ export class IdentityApp implements IdentityApi {
       ssoAssertion,
       ssoArrival,
       ssoTestArrival,
+      joinAdmissions: JoinAdmissionsService.create(setup.repositories.joinRequests),
+      joinRequests,
       ssoActivity,
       ssoMigrationCallbacks,
       ssoBreakGlass: ssoBreakGlassGrants,
@@ -634,6 +752,14 @@ export class IdentityApp implements IdentityApi {
 
   ssoTestArrival(): SsoTestArrivalService {
     return this.#parts.ssoTestArrival;
+  }
+
+  joinAdmissions(): JoinAdmissionsService {
+    return this.#parts.joinAdmissions;
+  }
+
+  joinRequests(): JoinRequestsService {
+    return this.#parts.joinRequests;
   }
 
   ssoActivity(): SsoAuthenticationActivityService {

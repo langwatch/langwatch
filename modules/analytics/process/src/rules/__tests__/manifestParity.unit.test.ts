@@ -33,7 +33,11 @@ const NAMES: LangWatchQLNames = {
   tenantSetting: "custom_api_key_hash",
 };
 
-function manifest(): { sourceTables: string[]; viewNames: string[] } {
+function manifest(): {
+  sourceTables: string[];
+  viewNames: string[];
+  tenantColumns?: Record<string, string>;
+} {
   return JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
 }
 
@@ -53,8 +57,22 @@ function catalogSourceTables(): string[] {
     .map((table) => table.table);
 }
 
+/**
+ * The catalog's non-default tenant columns, keyed by source table — the same
+ * sparse map the Go manifest carries, so the row filter the Go renderer applies
+ * and the row policy the app self-provisions name the same column.
+ */
+function catalogTenantColumns(): Record<string, string> {
+  return Object.fromEntries(
+    viewProvisioning
+      .sourceTables({ names: NAMES, sourceDatabase: NAMES.database })
+      .filter((table) => table.tenantColumn !== "TenantId")
+      .map((table) => [table.table, table.tenantColumn] as const),
+  );
+}
+
 describe("given the Go LWQL manifest and the application catalog", () => {
-  const { sourceTables, viewNames } = manifest();
+  const { sourceTables, viewNames, tenantColumns } = manifest();
 
   describe("when comparing view names", () => {
     it("the manifest's view names equal the catalog's in the same order", () => {
@@ -67,6 +85,15 @@ describe("given the Go LWQL manifest and the application catalog", () => {
     it("the manifest's source tables equal the catalog's in the same order", () => {
       const catalogTables = catalogSourceTables();
       expect(sourceTables).toEqual(catalogTables);
+    });
+  });
+
+  describe("when comparing tenant columns", () => {
+    it("the manifest's tenant-column overrides equal the catalog's", () => {
+      // Absent map is the backwards-compatible default: every source on
+      // `TenantId` and nothing to override, so `{}` and an omitted field are
+      // the same claim.
+      expect(tenantColumns ?? {}).toEqual(catalogTenantColumns());
     });
   });
 });

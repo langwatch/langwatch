@@ -11,6 +11,7 @@ import {
   MANAGEMENT_API_VERSION,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   approveControlRequestBodySchema,
   approveControlRequestResponseSchema,
@@ -28,6 +29,7 @@ import { z } from "zod";
 
 import type { LocalControlRuntime } from "#repositories/redis/redis.langy-local-control-runtime.repository";
 import { conversationUrl } from "#rules/langy-local-session-text.rules";
+import { ControlRequestAccessService } from "#services/langy-local-control-access.service";
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 
 import type { LocalControlLongPoll } from "./langy-local-control-long-poll.rest.ts";
@@ -40,6 +42,8 @@ export type LangyLocalControlRestMembers = Readonly<{
   longPoll: () => LocalControlLongPoll;
   /** This deployment's own origin, for the endpoint and the follow-along link. */
   baseHost: string | undefined;
+  /** Decides a permission on the request's own project, not the login's. */
+  permissions: () => Pick<AuthzApi, "getDecision">;
 }>;
 
 /** What the process supplies this family beyond `LangyApi` and its own door. */
@@ -53,11 +57,19 @@ export const langyLocalControlRestMembers = defineRestMiddleware(
  * refuses the same way an unknown request id does — the answer never
  * reveals which requests exist.
  */
-function controlUser(request: Request): { userId: string; projectId: string; projectSlug: string } {
+function controlUser(request: Request): string {
   const resolved = projectCredentialOfRequest(request);
   const userId = resolved.type === "apiKey" ? resolved.userId : null;
   if (!userId) throw new LangyLocalRequestInvalidError();
-  return { userId, projectId: resolved.project.id, projectSlug: resolved.project.slug };
+  return userId;
+}
+
+/** The person's reach over their requests, decided on each request's own project. */
+function accessOf(members: LangyLocalControlRestMembers): ControlRequestAccessService {
+  return ControlRequestAccessService.create({
+    requests: members.runtime().requests,
+    permissions: members.permissions(),
+  });
 }
 
 export const langyLocalControlRest = defineRestRouter(LangyApi)
@@ -191,17 +203,13 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   .withRawResponse({ produces: "application/json" })
   .withDocs({
     description:
-      "List the open requests Langy made for a folder of mine in this project. Only the " +
+      "List the open requests Langy made for a folder of mine, on every project I can read. Only the " +
       "person Langy asked ever sees a request, and each one expires fifteen minutes after " +
       "it was made.",
   })
   .withMiddleware(langyLocalControlRestMembers)
   .handle(async ({ request }, members) => {
-    const auth = controlUser(request);
-    const requests = await members.runtime().requests.listOpen({
-      projectId: auth.projectId,
-      userId: auth.userId,
-    });
+    const requests = await accessOf(members).listReadable({ userId: controlUser(request) });
     return Response.json(
       listControlRequestsResponseSchema.parse({
         requests: requests.map((r) => ControlRequestService.toWire(r)),
@@ -223,11 +231,15 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   })
   .withMiddleware(langyLocalControlRestMembers)
   .handle(async ({ input, request }, members) => {
-    const auth = controlUser(request);
-    const approved = await members.runtime().requests.approve({
+    const userId = controlUser(request);
+    const addressed = await accessOf(members).getAddressed({
       requestId: input.requestId,
-      userId: auth.userId,
-      projectId: auth.projectId,
+      userId,
+      permission: "langy:create",
+    });
+    const approved = await members.runtime().requests.approve({
+      requestId: addressed.id,
+      userId,
     });
     return Response.json(
       approveControlRequestResponseSchema.parse({
@@ -236,7 +248,11 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
         conversation: {
           id: approved.request.conversationId,
           title: approved.request.conversationTitle,
-          url: conversationUrl(approved.request.conversationId, members.baseHost, auth.projectSlug),
+          url: conversationUrl(
+            approved.request.conversationId,
+            members.baseHost,
+            approved.projectSlug,
+          ),
         },
       }),
       { status: 200 },
@@ -254,12 +270,13 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
   })
   .withMiddleware(langyLocalControlRestMembers)
   .handle(async ({ input, request }, members) => {
-    const auth = controlUser(request);
-    await members.runtime().requests.cancel({
+    const userId = controlUser(request);
+    const addressed = await accessOf(members).getAddressed({
       requestId: input.requestId,
-      userId: auth.userId,
-      projectId: auth.projectId,
+      userId,
+      permission: "langy:create",
     });
+    await members.runtime().requests.cancel({ requestId: addressed.id, userId });
     return Response.json(
       langyControlCancelResultSchema.parse({ id: input.requestId, cancelled: true }),
       {

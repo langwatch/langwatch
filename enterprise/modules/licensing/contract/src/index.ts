@@ -21,3 +21,18 @@ export * from "./license-enforcement.trpc.ts";
 export * from "./license-limit-labels.ts";
 export * from "./license-enforcement.errors.ts";
 export * from "./licensing.config.ts";
+
+/** The license registry and the hosted services it entitles (ADR-156). */
+export * from "./activation-code.ts";
+export * from "./activation.errors.ts";
+export * from "./connect-hosted.ts";
+export * from "./connect-install.ts";
+export * from "./connect-services.ts";
+export * from "./connect.trpc.ts";
+export * from "./connect.errors.ts";
+export * from "./license-sync.errors.ts";
+export * from "./issued-license.ts";
+export * from "./license-registry.errors.ts";
+export * from "./license-sync.ts";
+export * from "./self-hosted-instance.ts";
+export * from "./self-hosted-instance.errors.ts";

@@ -36,7 +36,6 @@ export class RecordingLangWatchQLExecutor extends LangWatchQLExecutor {
     return Promise.resolve({
       columns: [{ name: "value", type: "UInt64" }],
       rows: [{ value: 1 }],
-      truncated: false,
       statistics: {
         elapsedMs: 3,
         rowsRead: 10,

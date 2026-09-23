@@ -9,15 +9,22 @@ import {
   ScimHostApi,
   ScimHostProvider,
   type ScimFailureNotice,
+  type ScimRouteReading,
   type ScimSuccessNotice,
 } from "./model/scim-host.ts";
 
 export class FakeScimHost extends ScimHostApi {
   readonly successes: ScimSuccessNotice[] = [];
   readonly failures: ScimFailureNotice[] = [];
+  /** Every query string the screen asked for, in order. */
+  readonly queries: Readonly<Record<string, string | undefined>>[] = [];
 
   constructor(
-    private readonly options: { organizationId?: string | null; scimBaseUrl?: string } = {},
+    private readonly options: {
+      organizationId?: string | null;
+      scimBaseUrl?: string;
+      query?: Readonly<Record<string, string | undefined>>;
+    } = {},
   ) {
     super();
   }
@@ -37,6 +44,14 @@ export class FakeScimHost extends ScimHostApi {
 
   failed(failure: ScimFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  route(): ScimRouteReading {
+    return { query: this.queries.at(-1) ?? this.options.query ?? {} };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.queries.push(next);
   }
 }
 

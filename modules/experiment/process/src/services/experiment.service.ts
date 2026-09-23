@@ -52,6 +52,7 @@ import {
   type WorkbenchSaveResult,
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
+  type ExperimentUsageCount,
 } from "@langwatch/experiment-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -160,6 +161,13 @@ export class ExperimentService {
       references: this.workbenchReferences,
       draftNames: { findNextDraftName: (input) => this.findNextDraftName(input) },
     });
+  }
+
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<ExperimentUsageCount> {
+    return this.options.repository.countUsage(input);
   }
 
   async getById(input: ExperimentLookup): Promise<Experiment> {

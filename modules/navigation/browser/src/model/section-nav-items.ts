@@ -41,6 +41,8 @@ export interface SectionNavItemData {
    * affordance and lists grouped entries flat, in the same order.
    */
   group?: string;
+  /** The `data-tour` target the guided tour spotlights on this entry. */
+  tourId?: string;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -49,6 +51,7 @@ export const gatewayNavItems: readonly SectionNavItemData[] = [
     href: "/gateway/virtual-keys",
     includePath: "/gateway/virtual-keys",
     icon: KeyRound,
+    tourId: "nav-virtual-keys",
   },
   {
     label: "Model Providers",

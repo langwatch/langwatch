@@ -30,6 +30,7 @@ function host(browser?: RestIdentity) {
     identities: {
       project: closed,
       organization: closed,
+      apiKey: closed,
       scimToken: closed,
       "instance-admin": closed,
       browser: browser ?? closed,

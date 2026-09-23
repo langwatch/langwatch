@@ -11,7 +11,7 @@ export class NullAuditLog implements AuditLogApiContract {
 
   private constructor() {}
 
-  static create(): NullAuditLog {
+  static create(_setup: Readonly<{ config: undefined }>): NullAuditLog {
     return new NullAuditLog();
   }
 

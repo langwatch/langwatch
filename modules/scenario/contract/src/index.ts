@@ -32,6 +32,7 @@ export * from "./simulation.commands.ts";
 export * from "./simulation-event.constants.ts";
 export * from "./simulation-event.values.ts";
 export * from "./simulation.events.ts";
+export * from "./scenario-lifecycle.events.ts";
 export * from "./simulation.ts";
 export * from "./simulation.service.ts";
 export * from "./schemas/index.ts";

@@ -35,13 +35,13 @@ function record(overrides: Partial<ApiKeyCreateRecord> = {}): ApiKeyCreateRecord
 
 describe("given the memory API-key repository", () => {
   describe("when a key is created", () => {
-    it("reads it back live, with no bindings, as the Prisma create does", async () => {
+    it("reads it back live, carrying no bindings of its own, as the Prisma create does", async () => {
       const { repository: keys } = repository();
 
       const created = await keys.create(record({ name: "Personal key", userId: "user_1" }));
 
       expect(created.revokedAt).toBeNull();
-      expect(created.roleBindings).toEqual([]);
+      expect(created).not.toHaveProperty("roleBindings");
       expect(await keys.findById({ id: created.id })).toMatchObject({ name: "Personal key" });
     });
 

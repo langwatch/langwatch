@@ -106,11 +106,13 @@ export class ClickHouseTraceQueryTranslatorsRepository {
     return this.values.wrap(`${columnExpr} = {${p}:String}`, negated);
   }
 
-  private stringEqualityHandler(expression: string, name?: string): FieldHandler {
+  /** `expression = value`, bound; the value's parameter is minted from `name`. */
+  stringEqualityHandler(expression: string, name?: string): FieldHandler {
     return (tag, negated, ctx) => this.translateStringField(expression, tag, negated, ctx, name);
   }
 
-  private numericComparisonHandler(expression: string, name?: string): FieldHandler {
+  /** `expression <op> value` or an inclusive range, bound as Float64. */
+  numericComparisonHandler(expression: string, name?: string): FieldHandler {
     return (tag, negated, ctx) => this.translateNumericField(expression, tag, negated, ctx, name);
   }
 

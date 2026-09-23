@@ -8,6 +8,9 @@ The behaviour in this record remains in Enterprise `saas`. Its source is
 covered by the LangWatch Enterprise License even though SaaS deployment-mode
 activation is not itself an Enterprise entitlement check.
 
+**Server half added by:**
+[ADR-002: `saas` is the LangWatch Cloud module](./002-saas-is-the-cloud-module.md).
+
 **Behavioural contract:** [SaaS browser integrations](../specs/saas.feature)
 
 ## Context

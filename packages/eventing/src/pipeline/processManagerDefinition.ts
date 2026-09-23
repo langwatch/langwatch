@@ -67,6 +67,8 @@ export interface IntentContext {
   tenantId: string;
   messageKey: string;
   attempt: number;
+  /** When the delivery's outbox lease lapses; absent where no dispatcher leased it. */
+  leaseExpiresAt?: number;
 }
 
 export type IntentExecutor<Payload> = (payload: Payload, context: IntentContext) => Promise<void>;

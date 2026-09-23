@@ -144,8 +144,9 @@ async function resolveLocalCaller(input: {
 }
 
 /**
- * The conversation the caller named, proved against the key. Invisible
- * dies as not-found, not refusal, so a foreign id never confirms it exists.
+ * The conversation the caller named, proved against the key: it must be the key's own
+ * person's. A teammate's shared conversation gets the not-found a foreign id gets.
+ * @see specs/langy/langy-local-permissions.feature
  */
 async function conversation(input: {
   app: LangyApi;
@@ -158,7 +159,7 @@ async function conversation(input: {
     projectId: input.projectId,
     userId: input.userId,
   });
-  if (!conversation) throw new LangyConversationNotFoundError(input.conversationId);
+  if (!conversation?.isOwn) throw new LangyConversationNotFoundError(input.conversationId);
   return conversation;
 }
 

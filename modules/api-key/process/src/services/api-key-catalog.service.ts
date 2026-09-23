@@ -13,6 +13,7 @@ import {
 import type { AuthzCustomRole } from "@langwatch/authz-contract";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
+import { ApiKeyBindingsService } from "./api-key-bindings.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
@@ -45,15 +46,19 @@ export class ApiKeyCatalogService {
     return new ApiKeyCatalogService(options.repository, options);
   }
 
+  private readonly bindings: ApiKeyBindingsService;
+
   private constructor(
     private readonly repository: ApiKeyRepository,
     private readonly options: ApiKeyDependencies,
-  ) {}
+  ) {
+    this.bindings = ApiKeyBindingsService.create({ authz: options.authz });
+  }
 
   async findById({ id }: { id: string }): Promise<ApiKey | null> {
     const row = await this.repository.findById({ id });
 
-    return row ? publicApiKey(row) : null;
+    return row ? publicApiKey(await this.bindings.attachOne(row)) : null;
   }
 
   async getByIdForCaller(input: {
@@ -144,13 +149,13 @@ export class ApiKeyCatalogService {
   async list(input: { userId: string; organizationId: string }): Promise<ApiKey[]> {
     const rows = await this.repository.listForUser(input);
 
-    return rows.map(publicApiKey);
+    return (await this.bindings.attach(rows)).map(publicApiKey);
   }
 
   async listAll({ organizationId }: { organizationId: string }): Promise<ApiKey[]> {
     const rows = await this.repository.listForOrganization({ organizationId });
 
-    return rows.map(publicApiKey);
+    return (await this.bindings.attach(rows)).map(publicApiKey);
   }
 
   async findIngestionKey(input: {
@@ -158,24 +163,31 @@ export class ApiKeyCatalogService {
     projectId: string;
     sourceType: string;
   }): Promise<ApiKey | null> {
-    const row = await this.repository.findIngestKey(input);
+    const row = await this.repository.findIngestKey({
+      organizationId: input.organizationId,
+      sourceType: input.sourceType,
+      apiKeyIds: await this.bindings.findKeyIdsReachingProject(input),
+    });
 
-    return row ? publicApiKey(row) : null;
+    return row ? publicApiKey(await this.bindings.attachOne(row)) : null;
   }
 
   async findByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
     const row = await this.repository.findByLookupId(input);
 
-    return row ? publicApiKey(row) : null;
+    return row ? publicApiKey(await this.bindings.attachOne(row)) : null;
   }
 
   async listIngestionKeysForProject(input: {
     organizationId: string;
     projectId: string;
   }): Promise<ApiKey[]> {
-    const rows = await this.repository.findIngestKeysForProject(input);
+    const rows = await this.repository.findIngestKeys({
+      organizationId: input.organizationId,
+      apiKeyIds: await this.bindings.findKeyIdsReachingProject(input),
+    });
 
-    return rows.map(publicApiKey);
+    return (await this.bindings.attach(rows)).map(publicApiKey);
   }
 
   async customRoles(ids: string[], organizationId: string): Promise<ApiKeyRoleSummary[]> {
@@ -197,7 +209,7 @@ export class ApiKeyCatalogService {
       throw new ApiKeyNotFoundError(id);
     }
 
-    return row;
+    return this.bindings.attachOne(row);
   }
 
   private async customPermissions(row: StoredApiKey, organizationId: string): Promise<string[]> {

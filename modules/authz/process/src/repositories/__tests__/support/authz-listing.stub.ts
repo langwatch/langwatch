@@ -13,6 +13,7 @@ export class StubAuthzListingRepository extends AuthzListingRepository {
   );
   readonly findScopeBindings = vi.fn<AuthzListingRepository["findScopeBindings"]>(async () => []);
   readonly findGroupBindings = vi.fn<AuthzListingRepository["findGroupBindings"]>(async () => []);
+  readonly findApiKeyBindings = vi.fn<AuthzListingRepository["findApiKeyBindings"]>(async () => []);
   readonly findTeamMemberBindings = vi.fn<AuthzListingRepository["findTeamMemberBindings"]>(
     async () => new Map(),
   );

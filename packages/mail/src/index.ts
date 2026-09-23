@@ -61,6 +61,10 @@ export {
   sendAutomationLimitEmail,
   type AutomationLimitKind,
 } from "./templates/automation-limit-email.tsx";
+export {
+  sendConnectedStatementEmail,
+  type ConnectedStatementEmailProps,
+} from "./templates/connected-statement-email.tsx";
 export { sendLicenseEmail } from "./templates/license-email.tsx";
 export { sendResetPasswordEmail } from "./templates/reset-password-email.tsx";
 export { sendSignUpVerificationEmail } from "./templates/sign-up-verification-email.tsx";

@@ -13,6 +13,8 @@ type SidebarSectionProps = {
   children: React.ReactNode;
   showExpanded: boolean;
   defaultExpanded?: boolean;
+  /** The `data-tour` target the guided tour spotlights: the label and the items together. */
+  tourId?: string;
 };
 
 export const SidebarSection = ({
@@ -21,6 +23,7 @@ export const SidebarSection = ({
   children,
   showExpanded,
   defaultExpanded = true,
+  tourId,
 }: SidebarSectionProps) => {
   const { isExpanded, toggleSection } = useSidebarSectionState({
     id,
@@ -28,7 +31,7 @@ export const SidebarSection = ({
   });
 
   return (
-    <VStack width="full" gap={0.5} align="start">
+    <VStack width="full" gap={0.5} align="start" data-tour={tourId}>
       <SidebarSectionToggle
         isExpanded={isExpanded}
         label={label}

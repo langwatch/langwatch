@@ -175,6 +175,10 @@ import {
 } from "../../behavior/use-langy-turn-recovery.ts";
 import { useLangyWarmWorker } from "../../behavior/use-langy-warm-worker.ts";
 import {
+  shouldRefetchHistoryForAdoptedTurn,
+  shouldResumeAdoptedTurn,
+} from "../../model/logic/adopted-turn-resume.ts";
+import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
 } from "../../model/logic/langy-make-default-offer.ts";
@@ -768,6 +772,12 @@ function LangyPanel({
   // same per-turn reset, as the navigate dedup above.
   const uiActionSeenRef = useRef<Set<string>>(new Set());
 
+  // The turn this tab's own send started, and the adopted turn this tab already reattached to. A
+  // turn the durable record names that is neither has no stream open here; the resume effect
+  // below opens one.
+  const dispatchedTurnIdRef = useRef<string | null>(null);
+  const resumedTurnIdRef = useRef<string | null>(null);
+
   // The rollback lever for agent-driven page control: with the flag off this page
   // ignores `ui` stream entries, so switching it off during a live turn stops the page
   // changing under the user.
@@ -799,6 +809,7 @@ function LangyPanel({
           // The turn was dispatched: adopt the conversation + turn and enter the
           // `active` phase (which also clears the previous turn's live signals).
           useLangyStore.getState().beginTurn({ conversationId, turnId });
+          dispatchedTurnIdRef.current = turnId;
           // The words are a bubble on screen now, so they are no longer a
           // draft to hand back. Without this, a failure LATER in the turn put
           // the question the reader had already asked back in the composer,
@@ -807,6 +818,16 @@ function LangyPanel({
           // A fresh turn — clear the previous turn's navigate dedup too.
           navigatedInstructionsRef.current = new Set();
           uiActionSeenRef.current = new Set();
+        },
+        getResumeTarget: () => {
+          const resumeProjectId = turnContextRef.current?.projectId;
+          const store = useLangyStore.getState();
+          if (!resumeProjectId || !store.activeConversationId || !store.activeTurnId) return null;
+          return {
+            projectId: resumeProjectId,
+            conversationId: store.activeConversationId,
+            turnId: store.activeTurnId,
+          };
         },
         onNavigate: (entry) => {
           // Internal-target guard, mirroring MessageContent's isInternalHref:
@@ -1039,6 +1060,7 @@ function LangyPanel({
     status,
     error,
     regenerate,
+    resumeStream,
     applyHistoryToEngine,
     resetEngine,
     clearError,
@@ -1358,6 +1380,57 @@ function LangyPanel({
     messages.length,
     applyHistoryToEngine,
   ]);
+
+  // The fold adopted a turn the transcript snapshot has never seen. One transcript read per
+  // adopted turn lands its user message (readying the engine for the resume below) and re-arms
+  // the in-flight poll for the rest of the turn.
+  const refetchedForTurnRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !shouldRefetchHistoryForAdoptedTurn({
+        turnActive,
+        activeTurnId: localTurnId,
+        dispatchedTurnId: dispatchedTurnIdRef.current,
+        foldInFlightTurnId,
+        refetchedTurnId: refetchedForTurnRef.current,
+        hasHistory: historyMessages.length > 0,
+        isFetchingHistory,
+      })
+    ) {
+      return;
+    }
+    refetchedForTurnRef.current = localTurnId;
+    refetchHistory();
+  }, [
+    turnActive,
+    localTurnId,
+    foldInFlightTurnId,
+    historyMessages.length,
+    isFetchingHistory,
+    refetchHistory,
+  ]);
+
+  // Reattach to a turn this tab did not dispatch: its text as written and its live-only
+  // instructions (navigate, ui) reach a tab only through the turn stream, which the transport's
+  // `getResumeTarget` names and which replays what the turn already wrote.
+  const lastEngineRole = messages.at(-1)?.role ?? null;
+  useEffect(() => {
+    if (
+      !shouldResumeAdoptedTurn({
+        turnActive,
+        activeTurnId: localTurnId,
+        dispatchedTurnId: dispatchedTurnIdRef.current,
+        resumedTurnId: resumedTurnIdRef.current,
+        isStreaming: isBusy,
+        isHistoryLoadPending: historyLoadConversationId !== null,
+        lastEngineRole,
+      })
+    ) {
+      return;
+    }
+    resumedTurnIdRef.current = localTurnId;
+    void resumeStream();
+  }, [turnActive, localTurnId, isBusy, historyLoadConversationId, lastEngineRole, resumeStream]);
 
   // A failed recents list surfaces INSIDE the panel as a dismissable Langy
   // domain-error card — never a toast: the panel is open (a closed panel
@@ -2428,6 +2501,8 @@ function LangyPanel({
         aria-hidden={!isOpen && !peeking}
         role="complementary"
         aria-label="Langy assistant"
+        // The guided tour's handoff spotlight finds the panel by this.
+        data-tour="langy-panel"
         // The peek's identity for CSS (langy-theme.css): the phase drives the
         // seam's brightness, the mode picks which edge it runs along, and
         // `working` breathes it while a turn is still running underneath — so

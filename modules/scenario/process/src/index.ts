@@ -58,7 +58,6 @@ export {
 // shape, the raw client boundary), so the folded interfaces stay reachable
 // only through ScenarioAppInfrastructure to avoid a duplicate barrel export.
 export type { CancellationMessage } from "./app/scenario.app.ts";
-export * from "./services/scenario-activity.service.ts";
 export type {
   ScenarioChildEnvironment,
   ScenarioChildExecutionSession,

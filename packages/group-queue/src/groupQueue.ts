@@ -111,6 +111,7 @@ import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
+  type PreflightTargetsState,
   WORKER_LIVENESS_REFRESH_MS,
 } from "./scripts.ts";
 import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
@@ -152,6 +153,13 @@ async function withActiveSpan<T>(
  * derived from retry config to prevent fresh-delivery misreads on re-expire.
  */
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
+
+/** The groups a preflight refusal names, capped so one wide fan-out stays a log line. */
+function namedGroups({ groupIds, total }: { groupIds: readonly string[]; total: number }): string {
+  if (groupIds.length === 0) return `${total} group(s)`;
+  const undisclosed = total - groupIds.length;
+  return undisclosed > 0 ? `${groupIds.join(", ")} and ${undisclosed} more` : groupIds.join(", ");
+}
 
 /**
  * A field off an untrusted payload, when it is actually a usable string.
@@ -2404,11 +2412,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       );
     }
     const deadline = nowInstant().epochMilliseconds + this.preflightDrainTimeoutMs;
+    let reportedHeld = false;
     while (true) {
       const state = await this.scripts.inspectPreflightTargets(key);
-      const settled = state.pending === 0 && state.active === 0;
-      if (settled) this.assertPreflightTargetsSucceeded(state);
-      if (settled && this.processingQueue.idle()) return;
+      if (!reportedHeld && state.heldFromBefore > 0) {
+        reportedHeld = true;
+        this.logHeldFromBefore(state);
+      }
+      if (this.preflightHasSettled(state)) return;
       if (nowInstant().epochMilliseconds >= deadline) return this.settlePastDrainTimeout(state);
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
     }
@@ -2419,32 +2430,55 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
    * barrier starts past it; work that FAILED still refuses, because no later
    * pass clears a fault. specs/migration/system-migrations-runner.feature.
    */
-  private settlePastDrainTimeout(state: {
-    pending: number;
-    active: number;
-    failed: number;
-    blocked: number;
-    groups: number;
-  }): void {
+  private settlePastDrainTimeout(state: PreflightTargetsState): void {
     this.assertPreflightTargetsSucceeded(state);
     this.logger.warn(
       {
         queueName: this.queueName,
         pending: state.pending,
         active: state.active,
-        groups: state.groups,
+        stillWorking: namedGroups({ groupIds: state.pendingGroupIds, total: state.pendingGroups }),
         timeoutMs: this.preflightDrainTimeoutMs,
       },
-      "Migration preflight stopped waiting for work that had not drained and is starting anyway; the tenants it covers stay held for a later pass, and these counts are for operator triage",
+      "Migration preflight stopped waiting for work that had not drained and is starting anyway; the tenants it covers stay held for a later pass, and these groups are for operator triage",
     );
   }
 
-  private assertPreflightTargetsSucceeded(state: { failed: number; blocked: number }): void {
+  /** Throws on the way past when the settled work did not all succeed. */
+  private preflightHasSettled(state: PreflightTargetsState): boolean {
+    if (state.pending > 0 || state.active > 0) return false;
+    this.assertPreflightTargetsSucceeded(state);
+    return this.processingQueue.idle();
+  }
+
+  /** Groups blocked before the preflight adopted them: booted past, left blocked for triage. */
+  private logHeldFromBefore(state: PreflightTargetsState): void {
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        heldFromBefore: state.heldFromBefore,
+        heldFromBeforeGroupIds: state.heldFromBeforeGroupIds,
+      },
+      "Migration preflight is settling past groups that were already blocked before it started; their work is not migrated and they stay blocked for operator triage",
+    );
+  }
+
+  private assertPreflightTargetsSucceeded(state: PreflightTargetsState): void {
     if (state.failed === 0 && state.blocked === 0) return;
+    const faults: string[] = [];
+    if (state.failed > 0)
+      faults.push(
+        `failed: ${namedGroups({ groupIds: state.failedGroupIds, total: state.failed })}`,
+      );
+    if (state.blocked > 0) {
+      faults.push(
+        `blocked: ${namedGroups({ groupIds: state.blockedGroupIds, total: state.blocked })}`,
+      );
+    }
     throw new GroupQueueError(
       this.queueName,
       "waitUntilPreflightIdle",
-      `Preflight queue has ${state.failed} failed and ${state.blocked} blocked target groups`,
+      `Migration preflight work did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
     );
   }
 

@@ -1,9 +1,9 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { IdentityApi } from "@langwatch/identity-contract";
+import type { IdentityApi, RoutingDecision } from "@langwatch/identity-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { vi } from "vitest";
 
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
@@ -14,12 +14,37 @@ import type { UserAvatarStorage, UserInfrastructure } from "../user.members.ts";
 /** The issuer this deployment stores its credential account rows under. */
 export const TEST_CREDENTIAL_ISSUER = "local:credential";
 
-/** The auth peer a suite runs against; `provider` is what ADR-027 resolved. */
-export function createUserTestAuth(provider = "email") {
+/**
+ * The auth peer a suite runs against; `provider` is what ADR-027 resolved,
+ * `issuesOwnPasswords` the D09 switch, and `governedDomain` a domain an
+ * organization routes through its own connection.
+ */
+export function createUserTestAuth(
+  provider = "email",
+  {
+    issuesOwnPasswords = false,
+    governedDomain,
+  }: { issuesOwnPasswords?: boolean; governedDomain?: string } = {},
+) {
   return Object.assign(createApiFixture<AuthApi>(), {
     revokeOtherBrowserSessions: vi.fn(async () => undefined),
     revokeAllBrowserSessions: vi.fn(async () => undefined),
     resolveAuthProvider: vi.fn(async () => provider),
+    issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
+    route: vi.fn(async ({ identifier }: { identifier: string | null }): Promise<RoutingDecision> =>
+      governedDomain !== undefined && identifier?.endsWith(`@${governedDomain}`)
+        ? {
+            outcome: "redirect_to_connection",
+            connectionId: "conn-1",
+            methodSet: [{ id: "okta", kind: "federated", connectionId: "conn-1" }],
+            reasonCode: "domain_routed",
+          }
+        : {
+            outcome: "method_picker",
+            methodSet: [{ id: "password", kind: "password", connectionId: null }],
+            reasonCode: "no_domain_match",
+          },
+    ),
   });
 }
 

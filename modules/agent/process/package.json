@@ -50,6 +50,7 @@
   "devDependencies": {
     "@langwatch/actor": "workspace:*",
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@trpc/server": "catalog:",
     "@types/ws": "catalog:",
     "hono": "catalog:",

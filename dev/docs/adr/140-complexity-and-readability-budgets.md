@@ -2,18 +2,15 @@
 
 **Date:** 2026-09-09
 
-**Status:** Proposed
+**Status:** Proposed. Amended 2026-09-23: one complexity metric, one comment
+tier, no baseline, and `@lint-keep` is inert (see the last section).
 
 **Behavioural contract:**
 [The workspace complexity budget](../../../specs/tooling/lint-complexity-budgets.feature),
 [cognitive complexity](../../../specs/tooling/lint-cognitive-complexity.feature),
 [comment block size](../../../specs/tooling/lint-comment-block-size.feature),
-[the comment block warning tier](../../../specs/tooling/lint-comment-block-size-warning.feature),
-[the baseline](../../../specs/tooling/lint-baseline.feature),
-[unbounded loops](../../../specs/tooling/lint-unbounded-loop.feature),
-[logical statement spacing](../../../specs/tooling/lint-logical-statement-spacing.feature),
-[service member spacing](../../../specs/tooling/lint-service-member-spacing.feature),
-[statements per line](../../../specs/tooling/lint-max-statements-per-line.feature)
+[no suppression list](../../../specs/tooling/lint-baseline.feature),
+[unbounded loops](../../../specs/tooling/lint-unbounded-loop.feature)
 
 **Related:** [ADR-135: the toolchain](./135-lint-and-format-toolchain.md),
 [ADR-137: module source grammar](./137-module-source-grammar.md)
@@ -43,15 +40,10 @@ rewritten. Both go stale, and neither is read at the moment it matters.
 
 | Rule | Layer | Meaning |
 | --- | --- | --- |
-| `complexity` | oxlint built-in | Cyclomatic complexity of a function, maximum 25 workspace-wide. Raised to 40 in named directories, off in a few. |
-| `langwatch/cognitive-complexity` | plugin | SonarSource cognitive complexity, maximum 15; 40 where the config says so. Reads the baseline. |
-| `langwatch/comment-block-size` | plugin | The stated maximum is 5 lines. A block of 9 or more, or a comment line past 100 columns, errors. |
-| `langwatch/comment-block-size-warning` | plugin | The 6 to 8 line tier of the same analysis. Warns, and says to put the narrative in an ADR the comment points to. A 4 to 5 line block is queued for review and fails nothing. Only this tier can be silenced, by `@lint-keep` (amendment below). |
-| `no-nested-ternary` | oxlint built-in | A ternary inside another ternary's consequent or alternate. Enabled workspace-wide; does not read the baseline. |
+| `langwatch/cognitive-complexity` | plugin | SonarSource cognitive complexity, maximum 15; 25 in `.tsx`, 40 in tests. |
+| `langwatch/comment-block-size` | plugin | A comment block of more than 5 lines, or a comment line past 100 columns, errors. |
+| `no-nested-ternary` | oxlint built-in | A ternary inside another ternary's consequent or alternate. Enabled workspace-wide. |
 | `langwatch/unbounded-loop` | plugin | `for (;;)` and `while (true)` in strict server source: the exit belongs in the header. |
-| `langwatch/logical-statement-spacing` | plugin | One blank line around control flow, around a multi-line statement, and between chain groups. |
-| `langwatch/service-member-spacing` | plugin | One blank line between consecutive service methods, constructors and accessors. Fixable. Enabled nowhere today. |
-| `langwatch/max-statements-per-line` | plugin | Two statements on one line in a service module. Enabled nowhere today. |
 | `service-ceilings` | architecture-enforcer | A service module or method past its line, statement, complexity or line-length ceiling. |
 
 `max-depth` (maximum 4) is enabled the same way, scoped by an `overrides`
@@ -177,3 +169,21 @@ from that:
 
 The poll loop now reads: complexity 25, the if/else chain at line 345 carries 11
 of it — which is both true and actionable.
+
+## Amendment, 2026-09-23: one metric, one tier, nothing to keep
+
+The lint review of 2026-09-23 deleted the parts of this record that no longer
+describe the tree:
+
+- **Native `complexity` is off.** Cognitive complexity is the one score; the
+  branch counter's budget of 25 and its overrides are gone.
+- **The comment warning tier is gone.** `comment-block-size-warning` and the
+  4 to 5 line review tier were deleted; a block of 6 lines or more is an error.
+- **`@lint-keep` is inert.** Nothing in the plugin reads it, so the 2026-09-15
+  amendment above describes an annotation that silences nothing. A long block
+  is cut or moved to an ADR; there is no third answer.
+- **No rule reads a baseline.** The ledger, the generated overrides and the
+  `comment-block-root` allowlist are deleted (ADR-135).
+- **The spacing rules are deleted.** `logical-statement-spacing`,
+  `service-member-spacing` and `max-statements-per-line` were removed from the
+  plugin.

@@ -1,3 +1,5 @@
+import { PrismaProcessStore } from "@langwatch/eventing/server";
+
 import type { TopicRepositories } from "../topic.repositories.ts";
 import {
   PrismaTopicClusteringRepository,
@@ -17,6 +19,7 @@ export class PostgresTopicRepositories {
     return {
       topics: PrismaTopicRepository.create({ prisma: members.prisma }),
       clustering: PrismaTopicClusteringRepository.create({ database: members.prisma }),
+      processStore: PrismaProcessStore.create({ database: members.prisma }),
     };
   }
 }

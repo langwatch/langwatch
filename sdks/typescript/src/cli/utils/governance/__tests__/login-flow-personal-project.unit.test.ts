@@ -53,6 +53,7 @@ vi.mock("../config", () => ({
     gateway_url: "https://gateway.langwatch.ai",
   })),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
+  displayConfigPath: () => "~/.langwatch/config.json",
 }));
 
 vi.mock("../../identityNotice", () => ({

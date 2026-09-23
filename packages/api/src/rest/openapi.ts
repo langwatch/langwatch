@@ -358,6 +358,7 @@ export function documentedPathOf(honoPath: string): string {
 export const CREDENTIAL_CLASS_BY_DOOR = {
   project: "project_api_key",
   organization: "organization_api_key",
+  apiKey: "project_api_key",
   scimToken: "scim_token",
   "instance-admin": "instance_admin_api_key",
   browser: "session",

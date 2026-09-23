@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * `GatewayApp.budgetOverviewForUser`: delegates to `BudgetOverviewService`
@@ -8,6 +9,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -79,6 +81,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       monitors: peer("monitors"),
       organizations: organizationsStub({ isMember, tryFindPersonalWorkspace }),
       featureFlags: featureFlagsStub({ isEnabled }),
+      modelProviders: peer("modelProviders"),
     },
     members: {
       prisma: fakePrisma({
@@ -89,9 +92,14 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
       elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
+      encryption: createApiFixture<Encryption>(),
     },
     config: {
       spendSettlementGraceMs: void 0,
+      internalUrl: void 0,
+      controlPlaneUrl: void 0,
+      baseUrl: undefined,
+      publicUrl: undefined,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

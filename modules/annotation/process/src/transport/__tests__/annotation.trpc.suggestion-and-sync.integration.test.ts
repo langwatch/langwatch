@@ -115,6 +115,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
         scores: repositories.scores,
         queues: repositories.queues,
         queueItems: repositories.queueItems,
+        usage: repositories.usage,
       },
       dependencies: {
         projects: createAnnotationTestProjects(),

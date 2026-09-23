@@ -142,6 +142,22 @@ development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to refuse`). An explicit
 `ENVIRONMENT` names anything outside `local`, `dev`, `development` and `test`
 keeps today's fail-closed behaviour unchanged — the same allowlist the manager
 enforces, so an unknown name fails closed on both sides.
+## Amendment (2026-09-13): git runs without a card, the destructive forms still ask
+
+The decision above sent every git write to a permission card, so one run of a
+code change asked for the branch, the staging, the commit and the push in turn.
+The folder is the developer's own checkout, the commits carry their own git
+identity, and Langy only ever works on a `langy/*` branch of it, so those are
+the writes a person expects an agent in their repository to make. Git now runs
+with no card, reads and ordinary writes alike, from the allowlist in
+`ALLOWED_GIT_SUBCOMMANDS`. The destructive forms stay behind the card, decided
+by parsing and never by the model's opinion: a force push, a push that deletes a
+remote branch, `reset --hard`, `clean -f`, a checkout or restore that overwrites
+the working tree, `branch -D`, `stash drop` and `stash clear`, `filter-branch`,
+`filter-repo`, `reflog expire`, `gc --prune=now`, `worktree remove --force`,
+`rm -f`, `update-ref -d`, and `config` written to the global or system scope; a
+session grant for one of them names that form, so allowing a force push does not
+allow every push.
 
 ## References
 

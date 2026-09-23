@@ -88,6 +88,28 @@ describe("AuthzGrantProjection", () => {
     });
   });
 
+  /** @scenario "The insert is fenced on the lifetime the fact was stamped against" */
+  it("carries a USER membership lifetime into the guarded write", () => {
+    const write = projection.map(
+      event(
+        GRANT_ATTACHED_EVENT_TYPE,
+        {
+          grantId: "grant_1",
+          principal: { type: "user", id: "user_1" },
+          roleKey: "member",
+          scope: { type: "TEAM", id: "team_1" },
+          source: "grants-service",
+          actor: ACTOR,
+          membershipStamp: "membership_1",
+        },
+        "grant_1",
+        1,
+      ),
+    );
+
+    expect(write).toMatchObject({ membershipStamp: "membership_1" });
+  });
+
   it("maps every event to one deterministic state-setting write", () => {
     const writes = [
       projection.map(

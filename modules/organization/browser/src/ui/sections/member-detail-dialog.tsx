@@ -11,6 +11,7 @@ import {
   TeamUserRole,
 } from "../../model/prisma-types.ts";
 import { Link } from "../elements/link.tsx";
+import { ProvenanceExplanation } from "../elements/member-provenance.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
 import {
   BindingInputRow,
@@ -71,6 +72,11 @@ export function MemberDetailDialog({
   const [isSaving, setIsSaving] = useState(false);
 
   const bindingInputRef = useRef<BindingInputRowHandle>(null);
+  // Asked apart from the member: a failed read costs one sentence, never the dialog.
+  const provenance = api.organization.getMemberProvenance.useQuery(
+    { organizationId },
+    { enabled: open && canManage },
+  );
 
   const reset = () => {
     setPendingRole(member.role);
@@ -280,6 +286,21 @@ export function MemberDetailDialog({
         <Dialog.CloseTrigger />
         <Dialog.Body pb={6}>
           <VStack gap={5} align="stretch">
+            {canManage && (
+              <Box>
+                <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                  Why they are here
+                </Text>
+                {provenance.isError ? (
+                  <Text fontSize="sm" color="fg.muted">
+                    We couldn&apos;t work that out just now.
+                  </Text>
+                ) : (
+                  <ProvenanceExplanation provenance={provenance.data?.[member.userId]} />
+                )}
+              </Box>
+            )}
+
             {/* Organization role */}
             {canManage && (
               <Box>

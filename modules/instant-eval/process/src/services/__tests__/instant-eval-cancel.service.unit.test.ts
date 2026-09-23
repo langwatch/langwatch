@@ -23,6 +23,10 @@ const NOW = Temporal.Instant.from("2026-09-18T12:00:00Z");
 
 /** A judgements store no cancellation reads. */
 class UnreadJudgments implements InstantEvalJudgmentsRepository {
+  async countUsage(): Promise<number> {
+    return 0;
+  }
+
   async insert(): Promise<void> {
     // A cancellation writes no judgement.
   }

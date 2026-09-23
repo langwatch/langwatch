@@ -1,7 +1,6 @@
 /**
- * The seam between a module and the event-sourced half of a process. The
- * shapes below are structural on purpose: this file imports nothing from
- * `@langwatch/eventing`, because composition depends on none of it.
+ * The module/eventing seam, with structural shapes: composition depends on
+ * nothing from `@langwatch/eventing`, so neither does this file.
  * Spec: specs/server/declarative-process-composition.feature
  */
 import { describe, expect, it, vi } from "vitest";
@@ -222,6 +221,47 @@ describe("given a module that declares its event sourcing with withEventing", ()
         .boot();
 
       expect(declaration.built[0]!.participation).toBe("produce");
+    });
+  });
+
+  describe("when the module hosts several pipelines", () => {
+    /** @scenario "A module hosts several pipelines" */
+    it("registers each in the order declared and connects each to its own senders", async () => {
+      const connected: string[] = [];
+      const pipeline = (name: string): FeatureEventing<KeyRepositories, KeyApp> => ({
+        pipeline: name,
+        build: () => ({ name }),
+        connect: ({ commands }) => {
+          connected.push(`${name}:${String(commands.owner)}`);
+        },
+      });
+      const registered: string[] = [];
+      const host = {
+        participation: "consume" as const,
+        processStore: { pruned: [] as string[] },
+        register: (definition: unknown) => {
+          const { name } = definition as { name: string };
+          registered.push(name);
+          return { commands: { owner: name } };
+        },
+      };
+      const module = defineServerModule("api-key")
+        .withRepositories(keyRepositories)
+        .withApp(ComposedKeyApp)
+        .withEventing(pipeline("agent_sandbox_maintenance"))
+        .withEventing(pipeline("key_rotation"))
+        .withEventing(pipeline("key_audit"));
+
+      await createApp({ role: "worker", members: memberSourceOf({ eventing: host }) })
+        .withModules([module])
+        .boot();
+
+      expect(registered).toEqual(["agent_sandbox_maintenance", "key_rotation", "key_audit"]);
+      expect(connected).toEqual([
+        "agent_sandbox_maintenance:agent_sandbox_maintenance",
+        "key_rotation:key_rotation",
+        "key_audit:key_audit",
+      ]);
     });
   });
 

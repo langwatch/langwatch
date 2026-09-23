@@ -14,6 +14,7 @@ import type {
 import type { MfaEnrollmentRepository } from "./mfa-enrollment.repository.ts";
 import type { SsoBreakGlassRepository } from "./sso-break-glass.repository.ts";
 import type { SsoConnectionBackofficeRepository } from "./sso-connection-backoffice.repository.ts";
+import type { SsoConnectionRegistrationRepository } from "./sso-connection-registration.repository.ts";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -44,6 +45,8 @@ export interface IdentityRepositories {
   readonly joinCandidates: JoinCandidateRepository;
   readonly ssoConnections: SsoConnectionReadRepository;
   readonly ssoStranding: SsoConnectionStrandingRepository;
+  /** The per-organization registration slots a new connection claims first. */
+  readonly ssoRegistrationSlots: SsoConnectionRegistrationRepository;
   readonly ssoBackoffice: SsoConnectionBackofficeRepository;
   /** Which proved domains are due a re-read, and the look itself (ADR-123). */
   readonly ssoReproofTargets: SsoDomainReproofTargetRepository;

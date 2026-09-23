@@ -37,10 +37,19 @@ export default function ScimScreen() {
 
   if (!organizationId) return null;
 
-  return <ScimSettingsContent organizationId={organizationId} />;
+  return <ScimSettingsContent organizationId={organizationId} title="SCIM Provisioning" />;
 }
 
-function ScimSettingsContent({ organizationId }: { organizationId: string }) {
+export function ScimSettingsContent({
+  organizationId,
+  title,
+  lede,
+}: {
+  organizationId: string;
+  title: string;
+  /** One line under the title saying what the page is for. */
+  lede?: string;
+}) {
   const host = useScimHost();
   const tokens = scimApi.scimToken.list.useQuery({ organizationId });
   const connections = scimApi.scimToken.connections.useQuery({ organizationId });
@@ -107,10 +116,13 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
   return (
     <>
       <VStack gap={6} width="full" align="start">
-        <HStack width="full">
-          <Heading>SCIM Provisioning</Heading>
-          <Spacer />
-        </HStack>
+        <VStack align="start" gap={1} width="full">
+          <HStack width="full">
+            <Heading>{title}</Heading>
+            <Spacer />
+          </HStack>
+          {lede && <Text color="fg.muted">{lede}</Text>}
+        </VStack>
 
         <Card.Root width="full">
           <Card.Body>

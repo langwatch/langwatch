@@ -23,6 +23,7 @@ import type {
 } from "./trace-full-read.contract.ts";
 import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
 import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
+import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
@@ -78,6 +79,16 @@ export type TraceMessagesSide = "both" | "input" | "output";
 export interface TraceRenderedSpanMessages {
   readonly isSpanPresent: boolean;
   readonly json: string | null;
+}
+
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): the
+ * traces and spans ingested, since `since` (epoch ms) where one is given.
+ * A span re-ingested before its parts merged counts twice, as written.
+ */
+export interface TraceUsageCount {
+  readonly traces: number;
+  readonly spans: number;
 }
 
 /** Public Trace operations shared by process peers after boot composition. */
@@ -372,6 +383,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
     dateField?: TraceDateField;
   }): { sql: string; params: Record<string, unknown> };
   /**
+   * The filter compiled against the LangWatchQL trace view, for a statement a
+   * caller runs; throws `FilterParseError` on syntax the language cannot read.
+   */
+  compileLangWatchQLTraceFilter(input: { filter: string }): LangWatchQLTraceFilter;
+  /**
    * The trace ids a filter selects, newest first and capped: the predicate the
    * Explorer's table shows. What an Instant Eval run started from the Explorer
    * judges when its own dialect cannot compile the filter.
@@ -509,6 +525,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   /** The platform's own address for one trace resource, built from the
    * project's slug and the path the caller already resolved. */
   platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount>;
 }
 
 export const TraceApi = moduleApi<TraceApi>()("trace");

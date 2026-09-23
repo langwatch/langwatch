@@ -52,3 +52,37 @@ export class SecretDuplicateError extends HandledError {
     this.name = "SecretDuplicateError";
   }
 }
+
+/**
+ * A reveal id read twice. Told apart from an expired one deliberately: the
+ * customer's next move is the same either way, but an operator reading the
+ * log needs to know whether the secret was served or never arrived.
+ */
+export class SecretAlreadyRevealedError extends HandledError {
+  declare readonly code: "secret_already_revealed";
+
+  constructor(revealId: string) {
+    super(
+      "secret_already_revealed",
+      "This key was shown once and cannot be shown again. Create a new key if you did not save it.",
+      { meta: { revealId }, httpStatus: 410, fault: "customer" },
+    );
+    this.name = "SecretAlreadyRevealedError";
+  }
+}
+
+/** A reveal id with nothing behind it: it expired, or was never stashed. The
+ *  same refusal for both, because telling them apart would say whether an id
+ *  somebody guessed was ever real. */
+export class SecretRevealExpiredError extends HandledError {
+  declare readonly code: "secret_reveal_expired";
+
+  constructor(revealId: string) {
+    super(
+      "secret_reveal_expired",
+      "This key can no longer be shown. Create a new key if you did not save it.",
+      { meta: { revealId }, httpStatus: 410, fault: "customer" },
+    );
+    this.name = "SecretRevealExpiredError";
+  }
+}

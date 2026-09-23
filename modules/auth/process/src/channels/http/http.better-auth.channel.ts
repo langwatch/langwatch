@@ -19,14 +19,19 @@ import {
 import type { SignInMethodPolicy, SsoAssertionApi } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { fromDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import {
+  findSubmittedAddresses,
+  isLockoutCountedPath,
+} from "../../rules/sign-in-identifier-hash.rules.ts";
 import { resolveTrustedOrigins } from "../../rules/trusted-origins.rules.ts";
 import type {
   BetterAuthAnnouncements,
@@ -45,6 +50,7 @@ import {
   beforeUserCreate,
   type BetterAuthHookCollaborators,
 } from "./http.better-auth-hooks.channel.ts";
+import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import {
   passkeySignUpRegistration,
   type SignUpVerification,
@@ -100,7 +106,9 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
 export const isEmailPasswordEnabled = (deployment: {
   authProvider: string | undefined;
   isSaas: boolean;
-}): boolean => deployment.authProvider === "email" || !deployment.isSaas;
+  localPasswords: boolean;
+}): boolean =>
+  deployment.authProvider === "email" || !deployment.isSaas || deployment.localPasswords;
 
 /**
  * Seals better-auth's own sign-up route unconditionally, before any licence
@@ -128,23 +136,125 @@ function refusesCredentialRoute({
   policy: SignInMethodPolicy;
 }): boolean {
   if (!isResetPath && !isEmailAuthPath(pathname)) return false;
+  // D09: a deployment that offers a password answers the form it just drew.
+  if (policy.defaultMethods.some((method) => method.kind === "password")) return false;
 
   return policy.defaultMethods.some((method) => method.kind === "federated");
+}
+
+/** Whether an organization's own connection governs this address (D04). */
+export type AddressRoutesToConnection = (input: { email: string }) => Promise<boolean>;
+
+/**
+ * A password reset for an address an organization signs in through its own
+ * provider would mint the local password that connection exists to prevent,
+ * one email later - refused in every mode. An address-less request passes.
+ */
+async function refuseConnectionGovernedReset({
+  pathname,
+  body,
+  addressRoutesToConnection,
+}: {
+  pathname: string;
+  body: unknown;
+  addressRoutesToConnection: AddressRoutesToConnection;
+}): Promise<void> {
+  if (!isPasswordResetPath(pathname)) return;
+
+  const [email] = findSubmittedAddresses(body);
+  if (email === undefined) return;
+  if (!(await addressRoutesToConnection({ email }))) return;
+
+  throw APIError.from("BAD_REQUEST", {
+    code: "EMAIL_PASSWORD_DISABLED",
+    message:
+      "Credential management is disabled — your account is managed by your identity provider.",
+  });
+}
+
+/**
+ * The part of the lock-out service these hooks may reach (GAC-09). Narrower
+ * on purpose: a hook may refuse an attempt and record how it went, and may
+ * never release a hold - that is an administrator's act.
+ */
+export interface SignInAttemptCounter {
+  refuseIfLockedOut(input: { identifier: string }): Promise<void>;
+  recordFailure(input: { identifier: string }): Promise<void>;
+  recordSuccess(input: { identifier: string }): Promise<void>;
+}
+
+/**
+ * Records how a counted sign-in attempt went (GAC-09). Its failure is
+ * swallowed: the endpoint has answered, so nothing here changes the outcome.
+ */
+export async function countSignInAttempt({
+  ctx,
+  signInLockout,
+}: {
+  ctx: { request?: { url?: string }; body?: unknown; context?: { returned?: unknown } };
+  signInLockout: SignInAttemptCounter;
+}): Promise<void> {
+  const pathname = normalizedRequestPathname(ctx.request?.url ?? "");
+  if (!isLockoutCountedPath(pathname)) return;
+
+  const [identifier] = findSubmittedAddresses(ctx.body);
+  if (identifier === undefined) return;
+
+  const refused = ctx.context?.returned instanceof APIError;
+  try {
+    await (refused
+      ? signInLockout.recordFailure({ identifier })
+      : signInLockout.recordSuccess({ identifier }));
+  } catch (error) {
+    logger.warn(
+      { error, refused },
+      "could not record how a sign-in attempt went; the attempt itself already answered",
+    );
+  }
+}
+
+/**
+ * GAC-09, and asked FIRST: checking the password before the lock lets
+ * somebody keep testing passwords and simply not be told the answer, with the
+ * timing of the response telling them anyway.
+ */
+async function refuseLockedOutAddress({
+  pathname,
+  body,
+  signInLockout,
+}: {
+  pathname: string;
+  body: unknown;
+  signInLockout: SignInAttemptCounter;
+}): Promise<void> {
+  if (!isLockoutCountedPath(pathname)) return;
+
+  const [attempted] = findSubmittedAddresses(body);
+  if (attempted === undefined) return;
+
+  await signInLockout.refuseIfLockedOut({ identifier: attempted });
 }
 
 function createBeforeRequestHook({
   federation,
   shadow,
+  signInLockout,
+  addressRoutesToConnection,
 }: {
   federation: BetterAuthFederation;
   shadow: SignInRouterShadow;
+  signInLockout: SignInAttemptCounter;
+  addressRoutesToConnection: AddressRoutesToConnection;
 }): NonNullable<BetterAuthOptions["hooks"]>["before"] {
   return async (ctx) => {
     const url = ctx.request?.url ?? "";
     const pathname = normalizedRequestPathname(url);
 
+    await refuseLockedOutAddress({ pathname, body: ctx.body, signInLockout });
     refuseDirectEmailSignUp(pathname);
     await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
+
+    await refuseConnectionGovernedReset({ pathname, body: ctx.body, addressRoutesToConnection });
 
     if (!federation.federationCapable()) return;
 
@@ -197,6 +307,9 @@ export const createAuthOptions = ({
   shadow,
   hooks,
   ssoIssuers,
+  credentialGuard,
+  signInLockout,
+  addressRoutesToConnection,
 }: {
   repo: BetterAuthHooksRepository;
   deployment: BetterAuthDeploymentConfiguration;
@@ -206,6 +319,9 @@ export const createAuthOptions = ({
   shadow: SignInRouterShadow;
   hooks: BetterAuthHookCollaborators;
   ssoIssuers: BetterAuthSsoIssuers;
+  credentialGuard: CredentialSessionGuard;
+  signInLockout: SignInAttemptCounter;
+  addressRoutesToConnection: AddressRoutesToConnection;
 }): BetterAuthOptions & {
   // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
   // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
@@ -308,6 +424,9 @@ export const createAuthOptions = ({
   },
   verification: {
     modelName: "VerificationToken",
+    // SAML replay reservations are primary-key inserts: with Redis as secondary
+    // storage they must still reach Postgres, so a replayed assertion is refused.
+    storeInDatabase: true,
     fields: {
       identifier: "identifier",
       value: "token",
@@ -453,15 +572,30 @@ export const createAuthOptions = ({
         },
       },
     },
+    verification: {
+      create: {
+        // The ceremony companion a second factor is checked against, written
+        // beside better-auth's own 2FA challenge (sso-credential-enforcement).
+        before: async (verification, context) => {
+          await credentialGuard.beforeVerificationCreate({
+            verification: { ...verification, expiresAt: fromDate(verification.expiresAt) },
+            context,
+          });
+          return undefined;
+        },
+      },
+    },
     session: {
       create: {
-        before: async (session, context) =>
-          beforeSessionCreate({
+        before: async (session, context) => {
+          await credentialGuard.beforeSessionCreate({ userId: session.userId, context });
+          return beforeSessionCreate({
             repo,
             session: { userId: session.userId },
             path: context?.path,
             collaborators: hooks,
-          }),
+          });
+        },
         after: async (session) => {
           await afterSessionCreate({
             repo,
@@ -492,7 +626,19 @@ export const createAuthOptions = ({
    * In SSO mode, ADR-027 uses this same memoized gate: allow blocks email
    */
   hooks: {
-    before: createBeforeRequestHook({ federation, shadow }),
+    before: createBeforeRequestHook({
+      federation,
+      shadow,
+      signInLockout,
+      addressRoutesToConnection,
+    }),
+    /** `createAuthMiddleware` is load-bearing, not ceremony: the after-hook
+     *  runner reads `.headers` off whatever the hook returns, unguarded, so a
+     *  bare async resolving undefined fails EVERY auth request after its
+     *  endpoint has already answered. */
+    after: createAuthMiddleware(async (ctx) => {
+      await countSignInAttempt({ ctx, signInLockout });
+    }),
   },
 });
 
@@ -613,6 +759,13 @@ export type BetterAuthTransportOptions = Readonly<{
   redis: RedisConnection | null;
   signUpVerification: SignUpVerification;
   users: UserApi;
+  /** Whether an already proved password may open this deployment's local door
+   *  for the organization its address routes to. */
+  credentialGuard: CredentialSessionGuard;
+  /** The consecutive-failure counter behind account lock-out (GAC-09). */
+  signInLockout: SignInAttemptCounter;
+  /** Whether an organization's own connection governs an address (D04). */
+  addressRoutesToConnection: AddressRoutesToConnection;
 }>;
 
 /**
@@ -623,6 +776,7 @@ export const createBetterAuthTransport = ({
   arrivals,
   auth,
   authzGrants,
+  credentialGuard,
   database,
   deployment,
   federation,
@@ -636,6 +790,8 @@ export const createBetterAuthTransport = ({
   ssoActivity,
   ssoAssertions,
   ssoIssuers,
+  signInLockout,
+  addressRoutesToConnection,
   ssoMigration,
   storage,
   users,
@@ -648,6 +804,9 @@ export const createBetterAuthTransport = ({
     identity,
     shadow,
     ssoIssuers,
+    credentialGuard,
+    signInLockout,
+    addressRoutesToConnection,
     hooks: {
       federation,
       invites,

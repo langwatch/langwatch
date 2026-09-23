@@ -239,6 +239,7 @@ function SectionItemsNav({
           : pathname === item.href
       }
       showLabel={showExpanded}
+      tourId={item.tourId}
     />
   );
   return (
@@ -326,6 +327,7 @@ export function SidebarContent({
       <VStack
         ref={scrollRegionRef}
         data-testid="sidebar-scroll-region"
+        data-tour="sidebar"
         width="full"
         paddingX={3}
         paddingTop={surface === "settings" ? 1.5 : 0}

@@ -98,6 +98,34 @@ description = "Test RSA keypair the license fixtures are signed with; verifies n
 targetRules = ["private-key"]
 paths = ['''enterprise/modules/licensing/process/src/fixtures/license-keys\.fixture\.ts''']
 
+# The offline license compatibility fixture (ADR-139): one license minted with
+# the licensing code of main before connected self-hosted landed, so a test can
+# pin that it still verifies and enforces the same way. It was signed with a
+# keypair generated for that one mint whose private half was discarded, and the
+# file holds only public keys beside it. No deployment accepts it, because the
+# production verifier reads its key from `LANGWATCH_LICENSE_PUBLIC_KEY`.
+#
+# Scoped to `generic-api-key` and to this one file, so a real credential pasted
+# into it is still caught by every provider-specific rule.
+[[allowlists]]
+description = "Offline license compatibility fixture, signed by a discarded one-off keypair"
+targetRules = ["generic-api-key"]
+paths = ['''platform/app/ee/licensing/__tests__/fixtures/offline-license-from-main\.json''']
+
+# The stand-in license key in the audit redaction test. It is the base64 of
+# `{"data":{}}`, so it holds no signature and no license, and it cannot be a
+# credential. The test needs a value shaped like a license key to
+# prove that the audit trail drops it.
+#
+# Scoped by VALUE as well as path, matched with AND and anchored, so any other
+# high-entropy string in that test file is still reported.
+[[allowlists]]
+description = "Base64 of an empty license payload, used to prove audit redaction"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''platform/app/src/server/api/__tests__/redactAuditArgs\.unit\.test\.ts''']
+regexes = ['''^eyJkYXRhIjp7fX0=$''']
+
 # gitleaks scans the branch's whole commit range, not just its tip, so a value
 # removed in a later commit is still found in the commit that added it. This one
 # is the sequential-hex placeholder `0123456789abcdef...` that briefly stood in
@@ -340,6 +368,32 @@ description = "Documented `vk-lw-YOUR_VIRTUAL_KEY` placeholder in the AI Gateway
 targetRules = ["curl-auth-header"]
 regexes = ['''^vk-lw-YOUR_VIRTUAL_KEY$''']
 
+# `vk-lw-01HZX9NABCDEFGHJKMNPQRSTVW`, the one-time-reveal fixture secret shared
+# by the tests that cover the reveal store, the CLI's `--reveal-once` create,
+# the snippet projection and the two card components. It has to be shaped like
+# a real virtual key, because the tests assert on the display prefix cut from
+# it and on the snippet the card renders with it filled in, and that shape is
+# what makes `generic-api-key` fire.
+#
+# The two shorter values are that fixture's display prefix, `vk-lw-01HZX9N`,
+# and the masked snippet the card renders once the secret is gone,
+# `vk-lw-01HZX9N...`. A prefix is what the product shows in place of a secret,
+# so allowing it gives away nothing the UI does not already print.
+#
+# None of the three is minted by a gateway, hashed into a database or able to
+# authenticate anything, so there is nothing to revoke. Scoped by VALUE and
+# ANCHORED, for the reason given above the block before it: a substring
+# allowlist would also permit a real virtual key that merely starts with this
+# prefix.
+[[allowlists]]
+description = "One-time-reveal fixture secret and its display prefix in the virtual-key snippet tests"
+targetRules = ["generic-api-key"]
+regexes = [
+  '''^vk-lw-01HZX9NABCDEFGHJKMNPQRSTVW$''',
+  '''^vk-lw-01HZX9N$''',
+  '''^vk-lw-01HZX9N\.\.\.$''',
+]
+
 # `TOOL_CARD_ROWS` in the governance tool card names the rows a card prints —
 # seats, licence per month, tokens over thirty days, and so on. Every entry is a
 # plain string identifier the UI keys its labels off. Nobody issued any of them,
@@ -456,3 +510,18 @@ regexes = [
   '''^bc1qqv9pzxqlyckngw6zf9g9whn9dsaqaxas$''',
   '''^bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl$''',
 ]
+
+# One row of the self-hosted instance drawer's usage list, as it stood in commit
+# dece2163. The property was named `key` there and held the name of a field in a
+# usage report, which is the `key: "<value>"` shape `generic-api-key` fires on.
+# The property is called `field` now, so nothing in the tree matches, but the
+# commit stays in the branch's history and a range scan still reads it.
+#
+# Scoped by VALUE and ANCHORED as well as by path, matched with AND, so any
+# other high-entropy string in that file is still reported.
+[[allowlists]]
+description = "A usage-report field name in an instance drawer row list, before the property was renamed"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''platform/app/ee/admin/backoffice/resources/instances/types\.ts''']
+regexes = ['''^scenario_runs_28d$''']

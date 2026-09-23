@@ -36,7 +36,7 @@ describe("EventingAuthzLedgerAdapter unavailable dispatcher", () => {
   /** @scenario "Attaching a grant while the queue is unavailable fails loudly" */
   it("does not half-write and allows a later retry", async () => {
     const dispatcher = new RecoveringDispatcher();
-    const { writer, db } = harness({ onLedger: true, dispatcher });
+    const { writer, db } = harness({ dispatcher });
     const input = {
       organizationId: ORG_ID,
       bindings: [binding],
@@ -51,6 +51,9 @@ describe("EventingAuthzLedgerAdapter unavailable dispatcher", () => {
     expect(db.roleBinding.create).not.toHaveBeenCalled();
 
     dispatcher.recover();
+    // The retry's read-your-writes hold reads the canonical Grant head; this
+    // case is about the dispatcher coming back, not about the fold's lag.
+    db.grant.count.mockResolvedValue(1);
     await expect(writer.attachBindings(input)).resolves.toEqual({
       attached: [binding.bindingId],
       duplicates: [],

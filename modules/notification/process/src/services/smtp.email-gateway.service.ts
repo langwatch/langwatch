@@ -139,6 +139,15 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
     }
   }
 
+  /** Opens a connection to the relay and checks it answers; throws the relay's refusal. */
+  async verify(): Promise<void> {
+    if (this.closed) throw new Error("SMTP email provider is closed.");
+    const transporter = (this.transporter ??= nodemailer.createTransport(
+      SmtpEmailGatewayAdapter.buildTransportOptions(this.configuration),
+    ));
+    await transporter.verify();
+  }
+
   async close(): Promise<void> {
     this.closed = true;
     this.transporter?.close();

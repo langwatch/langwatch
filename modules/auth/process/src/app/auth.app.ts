@@ -1,4 +1,5 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
  * Auth module application: browser sessions and signed-out door. One application
  * for one person; reaches all state through member dependencies, not ambient.
@@ -16,14 +17,26 @@ import {
   type CliAccessSession,
   type InviteLanding,
   type LegacySsoAccessQuery,
+  type ReleaseHeldAccountResult,
+  type SaveSignInSecurityInput,
+  type SaveSignInSecurityResult,
+  SIGN_IN_SECURITY_ENTERPRISE_REFUSAL,
+  type SignInSecuritySettings,
   type SignUpVerificationResult,
   type VerifiedBrowserSession,
+  type AuthUsageCount,
 } from "@langwatch/auth-contract";
+import {
+  EnterprisePlanRequiredError,
+  EntitlementApi,
+  isEnterpriseTier,
+} from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   IdentityApi,
   type IdentityEmailService,
   type RoutingDecision,
+  type SignedInWith,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -38,6 +51,8 @@ import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
+import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
+import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CliDeviceSessionService } from "../services/cli-device-session.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
@@ -46,6 +61,17 @@ import {
   type LegacySsoAccessConnections,
   type LegacySsoAccessMemberships,
 } from "../services/legacy-sso-access.service.ts";
+import { SessionBoundService } from "../services/session-bound.service.ts";
+import {
+  SignInLockoutService,
+  type SignInLockoutEvidence,
+} from "../services/sign-in-lockout.service.ts";
+import {
+  SignInSecuritySettingsService,
+  type SignInSecurityMembers,
+  type SignInSecurityPlanGate,
+  type SignInSecurityReleaseEvidence,
+} from "../services/sign-in-security-settings.service.ts";
 import {
   SignUpVerificationService,
   type SignUpAccountDirectory,
@@ -165,6 +191,10 @@ export class AuthApp implements AuthApiContract {
     /** Who the members of an organization are, when a cutover asks auth what
      *  the retiring connection still holds open for them. */
     organizations: OrganizationApi,
+    /** Where a lock-out is appended so an auditor can still read it (GAC-09). */
+    auditLog: AuditLogApi,
+    /** Whether an organization's plan carries the sign-in security rules. */
+    entitlements: EntitlementApi,
   };
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
@@ -190,6 +220,8 @@ export class AuthApp implements AuthApiContract {
   readonly #legacySsoAccess: LegacySsoAccessService;
   /** The provider side of the same rows: which ways in somebody holds. */
   readonly #federatedAccounts: FederatedAccountReadsService;
+  /** The administrator's side of the two sign-in security rules. */
+  readonly #signInSecurity: SignInSecuritySettingsService;
   /**
    * The deployment's ONE Better Auth instance, or nothing where it named no
    * browser-session identity. Assigned once in {@link AuthApp.create}: it must
@@ -206,6 +238,31 @@ export class AuthApp implements AuthApiContract {
     return this.#offersPasskeys;
   }
 
+  /** This deployment's answer to {@link AuthApp.offersTwoStepVerification}. */
+  #offersTwoStepVerification = false;
+
+  offersTwoStepVerification(): boolean {
+    return this.#offersTwoStepVerification;
+  }
+
+  getSignedInWith(input: { userId: string; sessionId: string }): Promise<SignedInWith> {
+    return this.#sessions.getSignedInWith(input);
+  }
+
+  /** This deployment's answer to {@link AuthApp.issuesOwnPasswords} (D09). */
+  #issuesOwnPasswords = false;
+
+  issuesOwnPasswords(): boolean {
+    return this.#issuesOwnPasswords;
+  }
+
+  /** This deployment's answer to {@link AuthApp.findDialableIdentityProviderOrigins}. */
+  #dialableIdentityProviderOrigins: string[] = [];
+
+  findDialableIdentityProviderOrigins(): string[] {
+    return [...this.#dialableIdentityProviderOrigins];
+  }
+
   private constructor(
     sessions: BrowserSessionService,
     cliSessions: CliDeviceSessionService,
@@ -214,6 +271,7 @@ export class AuthApp implements AuthApiContract {
     dependencies: { apiKeys: ApiKeyApi; featureFlags: FeatureFlagApi },
     legacySsoAccess: LegacySsoAccessService,
     federatedAccounts: FederatedAccountReadsService,
+    signInSecurity: SignInSecuritySettingsService,
   ) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -222,6 +280,7 @@ export class AuthApp implements AuthApiContract {
     this.#dependencies = dependencies;
     this.#legacySsoAccess = legacySsoAccess;
     this.#federatedAccounts = federatedAccounts;
+    this.#signInSecurity = signInSecurity;
   }
 
   static create(setup: AuthSetup): Promise<AuthApp> {
@@ -229,14 +288,21 @@ export class AuthApp implements AuthApiContract {
     const now = members.now ?? nowInstant;
     const accountRows = PrismaBetterAuthHooksRepository.create(members.prisma);
 
-    const app = new AuthApp(
-      BrowserSessionService.create({
-        sessions: repositories.sessions,
-        cache: RedisAuthSessionCacheRepository.create({ redis: members.redis }),
-        identityEmails: members.identityEmails,
-        users: dependencies.users,
+    const sessions = BrowserSessionService.create({
+      sessions: repositories.sessions,
+      cache: RedisAuthSessionCacheRepository.create({ redis: members.redis }),
+      identityEmails: members.identityEmails,
+      users: dependencies.users,
+      sessionBound: SessionBoundService.create({
+        settings: repositories.signInSecurity,
+        activity: repositories.sessions,
         now,
       }),
+      now,
+    });
+
+    const app = new AuthApp(
+      sessions,
       CliDeviceSessionService.create({
         store: repositories.cliSessions,
       }),
@@ -249,9 +315,24 @@ export class AuthApp implements AuthApiContract {
         connections: legacyAccessConnections(dependencies.identity),
       }),
       FederatedAccountReadsService.create({ accounts: accountRows }),
+      SignInSecuritySettingsService.create({
+        settings: repositories.signInSecurity,
+        locks: repositories.signInLocks,
+        members: signInSecurityMembers(dependencies.organizations),
+        plan: signInSecurityPlanGate(dependencies.entitlements),
+        evidence: auditedReleaseEvidence(dependencies.auditLog),
+        sessions,
+      }),
     );
 
     app.#offersPasskeys = config.passkeysEnabled;
+    app.#offersTwoStepVerification = config.mfaEnrollmentOpen;
+    app.#issuesOwnPasswords = config.localPasswords;
+    app.#dialableIdentityProviderOrigins = resolveDialableIdentityProviderOrigins({
+      trustedIdpOrigins: config.trustedIdpOrigins,
+      idpSimulatorUrl: config.idpSimulatorUrl,
+      isProduction: members.nodeEnvironment === "production",
+    });
 
     return setup.secrets.into(AuthApp.secrets.session, (sessionSecret) => {
       assertAuthServerConfig(config, sessionSecret);
@@ -272,14 +353,27 @@ export class AuthApp implements AuthApiContract {
       if (identity) {
         app.#betterAuth = buildBetterAuth({
           identity,
+          signInLockout: SignInLockoutService.create({
+            locks: repositories.signInLocks,
+            settings: repositories.signInSecurity,
+            directory: {
+              findUserIdFor: async ({ identifier }) =>
+                (await dependencies.users.findByEmail({ email: identifier }))?.id ?? null,
+            },
+            evidence: auditedLockoutEvidence(dependencies.auditLog),
+            hashIdentifier: keyedIdentifierHasher(sessionSecret),
+            now,
+          }),
           prisma: members.prisma,
           encryption: members.encryption,
           redis: members.redis,
           auth: app,
           users: dependencies.users,
           identityApi: dependencies.identity,
+          signInRouting: members.route ?? null,
           authProvider: members.federatedProvider,
           isSaas: members.isSaas,
+          localPasswords: config.localPasswords,
           trustedIdpOrigins: config.trustedIdpOrigins,
           idpSimulatorUrl: config.idpSimulatorUrl,
           isProduction: members.nodeEnvironment === "production",
@@ -304,6 +398,22 @@ export class AuthApp implements AuthApiContract {
 
   countLegacySsoAccess(input: LegacySsoAccessQuery): Promise<number> {
     return this.#legacySsoAccess.count(input);
+  }
+
+  getSignInSecuritySettings(input: { organizationId: string }): Promise<SignInSecuritySettings> {
+    return this.#signInSecurity.get(input);
+  }
+
+  saveSignInSecuritySettings(input: SaveSignInSecurityInput): Promise<SaveSignInSecurityResult> {
+    return this.#signInSecurity.save(input);
+  }
+
+  releaseHeldAccount(input: {
+    organizationId: string;
+    userId: string;
+    actorUserId: string;
+  }): Promise<ReleaseHeldAccountResult> {
+    return this.#signInSecurity.release(input);
   }
 
   findFederatedAccountProviders(input: { userId: string }): Promise<string[]> {
@@ -445,6 +555,10 @@ export class AuthApp implements AuthApiContract {
       authHeader: input.authorization,
       userId: input.userId,
     });
+  }
+
+  async countUsage(input: { at: number }): Promise<AuthUsageCount> {
+    return { signedInUsers: await this.#sessions.countSignedInUsers(input) };
   }
 
   listBrowserSessions(input: {
@@ -611,5 +725,64 @@ function legacyAccessMemberships(organizations: OrganizationApi): LegacySsoAcces
 function legacyAccessConnections(identity: IdentityApi): LegacySsoAccessConnections {
   return {
     getProvider: (args) => identity.ssoConnectionReads().getProvider(args),
+  };
+}
+
+/**
+ * Where a lock is appended (GAC-09). An address with no account behind it
+ * still gets a row — those are precisely the rows an attack shows up in —
+ * and no row ever carries the address or the credential that was tried.
+ */
+function signInSecurityMembers(organizations: OrganizationApi): SignInSecurityMembers {
+  return {
+    findMemberUserIds: async ({ organizationId }) =>
+      (await organizations.getAllMembers({ organizationId })).map((member) => member.id),
+    isMember: (input) => organizations.isMember(input),
+  };
+}
+
+function signInSecurityPlanGate(entitlements: EntitlementApi): SignInSecurityPlanGate {
+  return {
+    assertEntitled: async ({ organizationId }) => {
+      const plan = await entitlements.getActivePlan({ organizationId });
+      if (!isEnterpriseTier(plan.type)) {
+        throw new EnterprisePlanRequiredError(SIGN_IN_SECURITY_ENTERPRISE_REFUSAL);
+      }
+    },
+  };
+}
+
+function auditedReleaseEvidence(auditLog: AuditLogApi): SignInSecurityReleaseEvidence {
+  return {
+    released: ({ organizationId, userId, actorUserId }) =>
+      auditLog.record({
+        userId: actorUserId,
+        organizationId,
+        action: "identity.sign_in.lock_released",
+        targetKind: "user",
+        targetId: userId,
+      }),
+  };
+}
+
+function auditedLockoutEvidence(auditLog: AuditLogApi): SignInLockoutEvidence {
+  return {
+    locked: async ({ userId, failedCount, consecutiveLockouts, lockedUntil }) =>
+      auditLog.record({
+        ...(userId === null ? {} : { userId }),
+        action: "identity.sign_in_locked_out",
+        metadata: {
+          failedCount,
+          consecutiveLockouts,
+          lockedUntil: lockedUntil.toString(),
+          addressHadAccount: userId !== null,
+        },
+      }),
+    escalated: async ({ userId, consecutiveLockouts }) =>
+      auditLog.record({
+        ...(userId === null ? {} : { userId }),
+        action: "identity.sign_in_lockout_escalated",
+        metadata: { consecutiveLockouts, addressHadAccount: userId !== null },
+      }),
   };
 }

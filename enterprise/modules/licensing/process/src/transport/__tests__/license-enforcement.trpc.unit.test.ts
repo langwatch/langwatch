@@ -22,7 +22,7 @@ const reportError = vi.fn();
 
 // The whole application, with everything the limit surface does not reach left
 // to the real implementation rather than a stub.
-const licensing = createTestLicensingApp(checkLimit, reportError, notifyLimitReached);
+const licensing = await createTestLicensingApp(checkLimit, reportError, notifyLimitReached);
 
 const trpc = initTRPC.context<LicensingTrpcTestContext>().create();
 const router = createTrpcRuntime<LicensingTrpcTestContext>({

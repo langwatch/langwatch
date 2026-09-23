@@ -3,7 +3,7 @@
  * them. The prefix is hardcoded here, not read from the catalog, so this
  * guard can disagree with it when a view is renamed without matching grants.
  * @see ../../services/langwatch-ql-view-provisioning.service.ts — the statements under test
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -25,11 +25,11 @@ const GRANTED_PREFIX = "lwql_";
 
 const SCHEMA = "public";
 
-/** Relation a `CREATE OR REPLACE VIEW` statement actually creates. */
+/** Relation an approved-view `DO` block creates. */
 function createdRelation(statement: string): string {
-  const match = /^CREATE OR REPLACE VIEW "[^"]+"\."([^"]+)"/.exec(statement);
+  const match = /CREATE VIEW "[^"]+"\."([^"]+)"/.exec(statement);
   if (!match?.[1]) {
-    throw new Error(`not an approved-view statement: ${statement.slice(0, 80)}`);
+    throw new Error(`not an approved-view DO block: ${statement.slice(0, 80)}`);
   }
   return match[1];
 }

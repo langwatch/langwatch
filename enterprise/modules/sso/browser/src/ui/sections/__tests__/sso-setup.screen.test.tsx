@@ -191,6 +191,19 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("the single sign-on setup page", () => {
+  describe("given any organization opening it", () => {
+    it("names the page and says what it is for, above the journey", () => {
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(screen.getByRole("heading", { name: "Identity provider" })).toBeTruthy();
+      expect(
+        screen.getByText(
+          "Where your people sign in, and everything it takes to put it in front of them.",
+        ),
+      ).toBeTruthy();
+    });
+  });
+
   describe("given a read that has not answered", () => {
     it("offers no journey, because a page that invents one invites a second provider", () => {
       state.isLoading = true;

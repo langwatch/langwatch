@@ -74,6 +74,7 @@ describe("given a run that judged rows", () => {
       expect(spend.priceUsd).toBeGreaterThan(spend.costUsd);
     });
 
+    /** @scenario "A hold is released when the run's spend lands" */
     it("drops the hold only after the spend is recorded", async () => {
       const { service, order, released } = finishing();
 
@@ -91,6 +92,7 @@ describe("given a run that judged rows", () => {
   });
 
   describe("when the spend cannot be recorded", () => {
+    /** @scenario "A spend that cannot be recorded is retried, not dropped" */
     it("raises, so the intent retries onto the same record rather than losing it", async () => {
       const { service, released } = finishing({ recorderFails: true });
 
@@ -110,6 +112,7 @@ describe("given a run that judged rows", () => {
 
 describe("given a run that judged nothing", () => {
   describe("when it finishes", () => {
+    /** @scenario "A run that judged nothing reports no spend" */
     it("records no spend, because a row of zero is one a customer has to dismiss", async () => {
       const { service, recorded, released } = finishing();
 

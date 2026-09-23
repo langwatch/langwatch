@@ -22,6 +22,8 @@ import {
 } from "@langwatch/navigation-browser/navigation";
 import type { ReactNode } from "react";
 
+import { joinOffer, startupNotice, teamAccessWaiting } from "./navigation-host-capabilities";
+
 /** Everything the shell has already read by the time the chrome draws. */
 export type BrowserNavigationReading = {
   organizations: NavigationOrganization[];
@@ -211,5 +213,18 @@ export class BrowserNavigationHost extends NavigationHost {
 
   openDrawer(drawer: string, params?: Record<string, string>): void {
     this.actions.openDrawer(drawer, params);
+  }
+
+  override startupNotice(): ReactNode {
+    return startupNotice();
+  }
+
+  override joinOffer(input: { currentOrganizationId: string | undefined }): ReactNode {
+    return joinOffer(input);
+  }
+
+  /** "Check again" reloads the page, so a membership granted meanwhile is read afresh. */
+  override teamAccessWaiting({ organizationName }: { organizationName: string }): ReactNode {
+    return teamAccessWaiting({ organizationName, onCheckAccess: () => window.location.reload() });
   }
 }

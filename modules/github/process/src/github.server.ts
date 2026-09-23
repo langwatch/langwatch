@@ -9,6 +9,7 @@ import {
   type GithubBranchDemandComposition,
 } from "./app/github.app.ts";
 import type { GithubBranchMaintenance, GithubBranchDemand } from "./app/github.members.ts";
+import { githubMaintenanceEventing } from "./eventing/github-maintenance.pipeline.ts";
 import { githubRepositories } from "./repositories/github-repositories.registry.ts";
 import type { GithubRepositories } from "./repositories/github.repositories.ts";
 import {
@@ -28,7 +29,8 @@ export type { GithubInfrastructure } from "./app/github.app.ts";
 export const githubServer = defineServerModule("github")
   .withRepositories(githubRepositories)
   .withApp(GithubApp)
-  .withTransports(githubInstallRest, githubTrpcTransport);
+  .withTransports(githubInstallRest, githubTrpcTransport)
+  .withEventing(githubMaintenanceEventing);
 
 /** The rows every ad-hoc GitHub composition below needs, from one Prisma client. */
 type GithubPrismaConnection = PrismaGithubInstallationsDatabase & PrismaGithubPullRequestsDatabase;

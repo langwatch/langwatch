@@ -1,7 +1,8 @@
 /** Host port for organization screens: sealed imports (ui, router, session) routed here. */
 
+import type { UiAuthenticationOverviewCardProps } from "@langwatch/browser-host/declarations";
 import { createContext, useContext } from "react";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 /** The organization and project the current page is about. */
 /** Who is signed in, as the members table and the team form need them. */
@@ -76,6 +77,13 @@ export type OrganizationDownload = {
   mediaType: string;
 };
 
+/** What a peer's card on the Authentication overview is handed. */
+/** A card another module declares for the Authentication overview (sso, scim). */
+export type AuthenticationOverviewCard = {
+  key: string;
+  Card: ComponentType<UiAuthenticationOverviewCardProps>;
+};
+
 /** The one thing a screen is handed. */
 export abstract class OrganizationHostApi {
   /** The organization and project this page is about. */
@@ -148,6 +156,15 @@ export abstract class OrganizationHostApi {
    */
   abstract download(file: OrganizationDownload): void;
 
+  /** Ends the session: the one way out offered to somebody waiting on an administrator. */
+  abstract signOut(): void;
+
+  /**
+   * How people sign in and how accounts arrive: the cards sso and scim declare
+   * through `withCapabilities`, in the order the overview draws them.
+   */
+  abstract authenticationOverviewCards(): readonly AuthenticationOverviewCard[];
+
   abstract failed(failure: OrganizationFailureNotice): void;
 }
 
@@ -176,6 +193,9 @@ export function useOrganizationHost(): OrganizationHostApi {
  * `withPermissionGuard`.
  */
 export const AUDIT_LOG_PAGE_PERMISSION = "organization:manage";
+
+/** The Authentication pages read on `sso:view`; changing a policy needs more. */
+export const AUTHENTICATION_PAGE_PERMISSION = "sso:view";
 
 /** The grant the platform page asked for, unchanged. */
 export const GROUPS_PAGE_PERMISSION = "organization:manage";

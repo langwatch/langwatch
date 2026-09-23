@@ -27,6 +27,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

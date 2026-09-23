@@ -1,8 +1,8 @@
 // Read repository for cut-over organizations; deliberately independent for parity verification.
 import type {
   AuthzPrincipalRef,
+  BindingRoleKey,
   CollectedBinding,
-  LegacyTeamMembership,
   RoleBindingScopeType,
   ShareableResourceKind,
 } from "@langwatch/authz-contract";
@@ -150,45 +150,6 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       select: { roleKey: true, scopeType: true, scopeId: true },
     })) as BindingGrantRow[];
     return this.collectBindings({ rows, viaGroupId: () => null });
-  };
-
-  // Reads dormant TeamUser rows until genesis-minted floor grant takes over.
-  findLegacyTeamMemberships = async ({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<LegacyTeamMembership[]> => {
-    const rows = (await this.database.teamUser.findMany({
-      // A stale cross-org TeamUser row must not confer access any more than a
-      // stale grant: the team belongs to the organization AND the user is a
-      // current member of it (legacy parity, rbac.ts's TeamUser fallback).
-      where: {
-        userId,
-        team: {
-          organizationId,
-          organization: { members: { some: { userId, disabledAt: null } } },
-        },
-      },
-      select: {
-        teamId: true,
-        role: true,
-        assignedRoleId: true,
-        team: { select: { isPersonal: true } },
-      },
-    })) as {
-      teamId: string;
-      role: LegacyTeamMembership["role"];
-      assignedRoleId: string | null;
-      team: { isPersonal: boolean };
-    }[];
-    return rows.map((row) => ({
-      teamId: row.teamId,
-      role: row.role,
-      customRoleId: row.assignedRoleId ?? null,
-      isPersonal: row.team.isPersonal,
-    }));
   };
 
   // Role head fenced on organization (poisoned grants) and API key (private roles).
@@ -400,9 +361,10 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     }[];
     const held = new Map<string, { isMine: boolean; isForeign: boolean }>();
     for (const holder of holders) {
-      const role = this.tryBindingRole(holder.roleKey);
-      if (role?.customRoleId == null) continue;
-      const entry = held.get(role.customRoleId) ?? {
+      const roleKey = this.bindingRoleKeyFrom(holder.roleKey);
+      if (roleKey === null || !roleKey.startsWith("custom:")) continue;
+      const customRoleId = roleKey.slice("custom:".length);
+      const entry = held.get(customRoleId) ?? {
         isMine: false,
         isForeign: false,
       };
@@ -411,7 +373,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       } else {
         entry.isForeign = true;
       }
-      held.set(role.customRoleId, entry);
+      held.set(customRoleId, entry);
     }
     return new Set(
       [...held.entries()]
@@ -427,8 +389,8 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return {};
   }
 
-  /** Maps the projection vocabulary back to legacy binding rows. Unknown and
-   * dormant keys are skipped instead of becoming permissions. */
+  /** Only the role keys a decision can represent. Dormant facts such as
+   * lite-member stay migration data instead of becoming permissions. */
   private collectBindings<
     TRow extends { roleKey: string | null; scopeType: string; scopeId: string },
   >({
@@ -441,11 +403,10 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     const bindings: CollectedBinding[] = [];
     for (const row of rows) {
       if (!this.isBindingScope(row.scopeType)) continue;
-      const role = this.tryBindingRole(row.roleKey);
-      if (!role) continue;
+      const roleKey = this.bindingRoleKeyFrom(row.roleKey);
+      if (roleKey === null) continue;
       bindings.push({
-        role: role.role,
-        customRoleId: role.customRoleId,
+        roleKey,
         scopeType: row.scopeType,
         scopeId: row.scopeId,
         viaGroupId: viaGroupId(row),
@@ -454,14 +415,10 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return bindings;
   }
 
-  private tryBindingRole(
-    roleKey: string | null,
-  ): { role: CollectedBinding["role"]; customRoleId: string | null } | null {
-    if (roleKey === "admin") return { role: "ADMIN", customRoleId: null };
-    if (roleKey === "member") return { role: "MEMBER", customRoleId: null };
-    if (roleKey === "viewer") return { role: "VIEWER", customRoleId: null };
-    if (roleKey?.startsWith("custom:")) {
-      return { role: "CUSTOM", customRoleId: roleKey.slice("custom:".length) };
+  private bindingRoleKeyFrom(roleKey: string | null): BindingRoleKey | null {
+    if (roleKey === "admin" || roleKey === "member" || roleKey === "viewer") return roleKey;
+    if (roleKey?.startsWith("custom:") && roleKey.length > "custom:".length) {
+      return `custom:${roleKey.slice("custom:".length)}`;
     }
     return null;
   }

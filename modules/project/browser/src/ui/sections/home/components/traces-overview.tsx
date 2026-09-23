@@ -5,6 +5,7 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "@langwatch/analytics-browser/surfaces/custom-graph";
+import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-browser-kit";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 
@@ -136,6 +137,10 @@ export function TracesOverview({
   const tracesOverviewGraph: CustomGraphInput = {
     graphId: "tracesOverview",
     graphType: "summary",
+    // Langy's own turns trace into the project (ADR-061) but the customer never
+    // sent them: a fresh project with one kickoff behind it still reads
+    // Traces 0, Users 0.
+    excludeOrigins: [LANGY_TRACE_ORIGIN],
     series: [
       {
         name: "Traces",

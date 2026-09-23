@@ -124,7 +124,7 @@ describe("given an admin on the Inventory page", () => {
       await userEvent.click(screen.getByRole("button", { name: "See sample data" }));
       await openTab(/Environments/);
       const table = await screen.findByTestId("environments-table");
-      expect(within(table).getByText("Production")).toBeInTheDocument();
+      expect(await within(table).findByText("Production")).toBeInTheDocument();
       expect(within(table).queryByText("example-env.crm.test")).toBeNull();
       await userEvent.click(screen.getByRole("button", { name: "Hide sample data" }));
       expect(within(table).getByText("example-env.crm.test")).toBeInTheDocument();

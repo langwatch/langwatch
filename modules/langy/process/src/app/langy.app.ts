@@ -27,17 +27,23 @@ import {
   langyConfig,
   langySecrets,
   type LangyServerConfig,
+  type LangyUsageCount,
 } from "@langwatch/langy-contract";
 import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 
 import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
+import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
+import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
+import { OtelLangySessionKeyMetricsAdapter } from "../services/langy-session-key-metrics-otel.service.ts";
+import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 import {
@@ -79,6 +85,8 @@ type LangyAppDependencies = {
   presence: PresenceApi;
   /** The per-project window every turn is counted against before it dispatches. */
   turnBounds: LangyTurnsBoundsService;
+  /** The maintenance sweep's own service: no aggregate, no commands, just the reap. */
+  sessionKeyReap: LangySessionKeyReapService;
 };
 
 /** The project's egress allow-list, told the way both egress procedures tell it. */
@@ -181,7 +189,25 @@ export class LangyApp implements LangyApiContract {
         projects: setup.dependencies.projects,
         rateLimiter: setup.members.rateLimiter,
       }),
+      sessionKeyReap: LangySessionKeyReapService.create({
+        repository: PrismaLangySessionKeyReapRepository.create(setup.members.prisma),
+        metrics: OtelLangySessionKeyMetricsAdapter.create(),
+      }),
     });
+  }
+
+  /**
+   * The pipeline `langy_maintenance` registers (ADR-144), ported from the
+   * deleted `LangyMaintenanceWorkerFeatureInstaller`. `deleteDispatchedBefore`
+   * is the installing process's own outbox prune, handed in by the seam.
+   */
+  maintenanceEventingPipeline(deps: Pick<LangySessionKeyReapDeps, "deleteDispatchedBefore">) {
+    return EventingLangyMaintenanceAdapter.create({
+      sessionKeyReap: {
+        reap: () => this.dependencies.sessionKeyReap.reap(),
+        deleteDispatchedBefore: deps.deleteDispatchedBefore,
+      },
+    }).buildProcessing();
   }
 
   get internalDoor(): RestIdentity {
@@ -248,6 +274,10 @@ export class LangyApp implements LangyApiContract {
 
   findByIdVisible(input: Parameters<LangyApiContract["findByIdVisible"]>[0]) {
     return this.dependencies.langy.findByIdVisible(input);
+  }
+
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
+    return this.dependencies.langy.countUsage(input);
   }
 
   getAllByConversation(input: Parameters<LangyApiContract["getAllByConversation"]>[0]) {

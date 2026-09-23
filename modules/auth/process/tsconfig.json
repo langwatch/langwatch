@@ -24,10 +24,19 @@
       "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
+      "path": "../../audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"

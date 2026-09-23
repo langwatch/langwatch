@@ -11,7 +11,7 @@ import { afterEach, beforeEach, vi } from "vitest";
 import type { GovernanceConfig } from "../config";
 import { buildOtelEnvBlock } from "../otel-env-block";
 
-export const CURRENT_ENDPOINT = "http://localhost:5580/api/otel";
+export const CURRENT_ENDPOINT = "https://langwatch.acme.test/api/otel";
 export const CURRENT_TOKEN = "ik-lw-newlogin00000000_freshsecret";
 export const STALE_ENDPOINT = "https://app.langwatch.ai/api/otel";
 export const STALE_TOKEN = "ik-lw-stalelogin000000_oldsecret";
@@ -21,8 +21,8 @@ export const currentClaudeVars = (): Record<string, string> =>
 
 export function baseCfg(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig {
   return {
-    gateway_url: "http://localhost:5563",
-    control_plane_url: "http://localhost:5580",
+    gateway_url: "https://gateway.acme.test",
+    control_plane_url: "https://langwatch.acme.test",
     access_token: "tok",
     organization: { id: "o1", slug: "acme" },
     ...overrides,
@@ -45,6 +45,7 @@ export function installTempHomeAndCwd(): TempHomeAndCwd {
   const origHome = process.env.HOME;
   const origUserprofile = process.env.USERPROFILE;
   const origCodexHome = process.env.CODEX_HOME;
+  const origCliConfig = process.env.LANGWATCH_CLI_CONFIG;
 
   beforeEach(() => {
     state.home = fs.mkdtempSync(path.join(os.tmpdir(), "lw-telemetry-refresh-"));
@@ -52,6 +53,9 @@ export function installTempHomeAndCwd(): TempHomeAndCwd {
     process.env.HOME = state.home;
     process.env.USERPROFILE = state.home;
     delete process.env.CODEX_HOME;
+    // A config of its own switches the login-time refresh off; the suites
+    // that want that set it themselves.
+    delete process.env.LANGWATCH_CLI_CONFIG;
   });
 
   afterEach(() => {
@@ -61,6 +65,8 @@ export function installTempHomeAndCwd(): TempHomeAndCwd {
     else process.env.USERPROFILE = origUserprofile;
     if (origCodexHome === undefined) delete process.env.CODEX_HOME;
     else process.env.CODEX_HOME = origCodexHome;
+    if (origCliConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+    else process.env.LANGWATCH_CLI_CONFIG = origCliConfig;
     fs.rmSync(state.home, { recursive: true, force: true });
     fs.rmSync(state.cwd, { recursive: true, force: true });
     vi.clearAllMocks();

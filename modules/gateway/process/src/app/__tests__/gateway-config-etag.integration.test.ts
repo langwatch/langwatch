@@ -1,4 +1,6 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * @vitest-environment node
@@ -11,6 +13,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayConfigAssemblyAdapter } from "../gateway-config-assembly.composition.ts";
+
+const noPlatformProviders = createApiFixture<ModelProviderApi>({
+  platformProviderChain: () => Promise.resolve([]),
+});
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
@@ -33,7 +39,10 @@ async function loadVk(): Promise<VirtualKeyWithScopes> {
 }
 
 async function etag() {
-  return GatewayConfigAssemblyAdapter.create({ prisma }).versionToken(await loadVk());
+  return GatewayConfigAssemblyAdapter.create({
+    prisma,
+    platformProviders: noPlatformProviders,
+  }).versionToken(await loadVk());
 }
 
 describe.skipIf(!databaseUrl)("provider credential rotation reaches the gateway", () => {

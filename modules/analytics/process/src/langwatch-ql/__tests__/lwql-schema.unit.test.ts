@@ -1,6 +1,6 @@
 /**
  * What the schema-discovery endpoint publishes.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
@@ -8,7 +8,10 @@ import { describe, expect, it } from "vitest";
 
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLSchemaService } from "../../services/langwatch-ql-schema.service.ts";
+import {
+  BOUNDABLE_TIME_COLUMN_TYPE,
+  LangWatchQLSchemaService,
+} from "../../services/langwatch-ql-schema.service.ts";
 
 const lwqlSchema = LangWatchQLSchemaService.create();
 import { GATED_DATASET, GATED_DATASET_QUALIFIED_NAME } from "./gatedDatasetFixture.ts";
@@ -37,9 +40,23 @@ function schemaFor(protections: LangWatchQLProtections) {
 }
 
 function columnsOf(protections: LangWatchQLProtections) {
-  return schemaFor(protections).datasets.flatMap((dataset) =>
+  return schemaFor(protections).views.flatMap((dataset) =>
     dataset.columns.map((column) => ({ dataset: dataset.name, ...column })),
   );
+}
+
+/**
+ * A dataset's time column can only bound an example query's lookback when it is
+ * temporal or numeric — a derived model with no `CreatedAt` and no `DateTime64`
+ * column falls back to an opaque key, which cannot be compared to a date.
+ */
+function hasBoundableTimeColumn(dataset: {
+  timeColumn: string | null;
+  columns: readonly { name: string; type: string }[];
+}) {
+  const timeColumn = dataset.columns.find((column) => column.name === dataset.timeColumn);
+
+  return !!timeColumn && BOUNDABLE_TIME_COLUMN_TYPE.test(timeColumn.type);
 }
 
 function policyFor(protections: LangWatchQLProtections) {
@@ -59,13 +76,13 @@ function policyFor(protections: LangWatchQLProtections) {
 describe("given the LangWatchQL schema catalog", () => {
   describe("when it is published for a caller", () => {
     it("names every dataset, qualified with the LangWatchQL database", () => {
-      expect(schemaFor(FULLY_PERMITTED).datasets.map((d) => d.name)).toEqual(
+      expect(schemaFor(FULLY_PERMITTED).views.map((d) => d.name)).toEqual(
         LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
       );
     });
 
     it("carries the grain, join keys, partition-pruning column and freshness of each dataset", () => {
-      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+      for (const dataset of schemaFor(FULLY_PERMITTED).views) {
         expect(dataset.grain, dataset.name).not.toBe("");
         expect(dataset.joinKeys.length, dataset.name).toBeGreaterThan(0);
         expect(dataset.timeColumn, dataset.name).not.toBe("");
@@ -205,7 +222,7 @@ describe("given the LangWatchQL schema catalog", () => {
      */
     it("is valid LangWatchQL for a caller with no permissions at all", () => {
       const policy = policyFor(WITHOUT_ANYTHING);
-      for (const dataset of schemaFor(WITHOUT_ANYTHING).datasets) {
+      for (const dataset of schemaFor(WITHOUT_ANYTHING).views) {
         const result = validateLangWatchQL({
           sql: dataset.exampleSql,
           ...policy,
@@ -218,8 +235,32 @@ describe("given the LangWatchQL schema catalog", () => {
     });
 
     it("filters on the column that prunes the dataset's partitions", () => {
-      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+      for (const dataset of schemaFor(FULLY_PERMITTED).views) {
+        if (!hasBoundableTimeColumn(dataset)) {
+          continue;
+        }
+
         expect(dataset.exampleSql, dataset.name).toContain(`WHERE ${dataset.timeColumn} >=`);
+      }
+    });
+
+    it("orders by the time column instead of filtering it, when it cannot be bounded", () => {
+      const unboundable = schemaFor(FULLY_PERMITTED).views.filter(
+        (dataset) => !hasBoundableTimeColumn(dataset),
+      );
+      // Guards against a vacuous pass: the shipped catalog must actually carry a
+      // dataset whose time column is an opaque key.
+      expect(
+        unboundable.length,
+        "expected at least one shipped dataset with an unboundable time column",
+      ).toBeGreaterThan(0);
+      for (const dataset of unboundable) {
+        expect(dataset.exampleSql, dataset.name).not.toContain("WHERE");
+        // No temporal column at all: a bare projection with a LIMIT rather than
+        // `ORDER BY null`; a present-but-unboundable one (an opaque key) still orders.
+        const orderBy = dataset.timeColumn === null ? "" : `ORDER BY ${dataset.timeColumn} DESC\n`;
+        expect(dataset.exampleSql.includes("ORDER BY"), dataset.name).toBe(orderBy !== "");
+        expect(dataset.exampleSql, dataset.name).toContain(`${orderBy}LIMIT`);
       }
     });
 
@@ -229,7 +270,7 @@ describe("given the LangWatchQL schema catalog", () => {
      * and selectable; only the example skips it.
      */
     it("never puts the tenant scope column in its projection", () => {
-      for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
+      for (const dataset of schemaFor(FULLY_PERMITTED).views) {
         const projection = /select\s+([\s\S]*?)\s+from\b/i.exec(dataset.exampleSql)?.[1];
         expect(projection, `${dataset.name}: no SELECT ... FROM found`).toBeDefined();
         expect(projection, dataset.name).not.toContain("TenantId");
@@ -248,25 +289,25 @@ describe("given the LangWatchQL schema catalog", () => {
       lwqlSchema.describe({ database: DATABASE, protections, views });
 
     it("leaves it out of the published schema entirely", () => {
-      expect(schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name)).not.toContain(
+      expect(schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name)).not.toContain(
         GATED_DATASET_QUALIFIED_NAME,
       );
     });
 
     it("publishes it to a caller who holds the permission, so absence is about the permission", () => {
-      expect(schemaWith(FULLY_PERMITTED).datasets.map((dataset) => dataset.name)).toContain(
+      expect(schemaWith(FULLY_PERMITTED).views.map((dataset) => dataset.name)).toContain(
         GATED_DATASET_QUALIFIED_NAME,
       );
     });
 
     it("keeps every other dataset, rather than hiding the schema", () => {
-      expect(schemaWith(WITHOUT_CONTENT).datasets.map((dataset) => dataset.name)).toEqual(
+      expect(schemaWith(WITHOUT_CONTENT).views.map((dataset) => dataset.name)).toEqual(
         LWQL_VIEW_CATALOG.map((view) => `${DATABASE}.${view.name}`),
       );
     });
 
     it("names the dataset's permission on each of its columns", () => {
-      const dataset = schemaWith(FULLY_PERMITTED).datasets.find(
+      const dataset = schemaWith(FULLY_PERMITTED).views.find(
         (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
       )!;
       expect(dataset.columns.map((column) => column.gates)).toEqual([
@@ -282,7 +323,7 @@ describe("given the LangWatchQL schema catalog", () => {
      * to `SELECT ` with nothing to select, published as "a runnable query over this dataset".
      */
     it("publishes a runnable example for the gated dataset", () => {
-      const dataset = schemaWith(FULLY_PERMITTED).datasets.find(
+      const dataset = schemaWith(FULLY_PERMITTED).views.find(
         (candidate) => candidate.name === GATED_DATASET_QUALIFIED_NAME,
       )!;
       const result = validateLangWatchQL({

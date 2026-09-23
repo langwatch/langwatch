@@ -27,6 +27,11 @@ export const prismaTableCatalogue = {
   "OrganizationUser": "OrganizationUser",
   "Team": "Team",
   "Organization": "Organization",
+  "IssuedLicense": "IssuedLicense",
+  "ActivationCode": "ActivationCode",
+  "ConnectedBillingAccount": "ConnectedBillingAccount",
+  "ConnectedCreditGrant": "ConnectedCreditGrant",
+  "ConnectedInvoice": "ConnectedInvoice",
   "ScimRequestLog": "ScimRequestLog",
   "ScimToken": "ScimToken",
   "ScimExternalId": "ScimExternalId",
@@ -118,6 +123,7 @@ export const prismaTableCatalogue = {
   "AiToolEntryTeam": "AiToolEntryTeam",
   "AiToolEntryDepartment": "AiToolEntryDepartment",
   "IngestionTemplate": "IngestionTemplate",
+  "GatewayConnectUpstream": "GatewayConnectUpstream",
   "GatewayBudget": "GatewayBudget",
   "GatewayBudgetBucketBoundary": "GatewayBudgetBucketBoundary",
   "GatewayBudgetLedger": "GatewayBudgetLedger",
@@ -145,7 +151,12 @@ export const prismaTableCatalogue = {
   "IdentityMatch": "IdentityMatch",
   "GovernanceTenantHistory": "GovernanceTenantHistory",
   "ErasedIdentifierSuppression": "ErasedIdentifierSuppression",
-  "IdentityMatchSuggestion": "IdentityMatchSuggestion"
+  "IdentityMatchSuggestion": "IdentityMatchSuggestion",
+  "ConnectedSeatChange": "ConnectedSeatChange",
+  "ConnectedStatement": "ConnectedStatement",
+  "InstanceIdentity": "InstanceIdentity",
+  "SelfHostedInstance": "SelfHostedInstance",
+  "SelfHostedInstanceReport": "SelfHostedInstanceReport"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -587,6 +598,12 @@ export const prismaModelFieldCatalogue = {
     "license",
     "licenseExpiresAt",
     "licenseLastValidatedAt",
+    "selfHostedCustomer",
+    "connectServicesDisabled",
+    "connectLastSyncAt",
+    "connectLastSyncError",
+    "issuedLicenses",
+    "connectedBilling",
     "gatewayChangeEvents",
     "routingPolicies",
     "ingestionSources",
@@ -597,6 +614,111 @@ export const prismaModelFieldCatalogue = {
     "githubInstallations",
     "githubPullRequests",
     "githubBranchPrChecks"
+  ],
+  "IssuedLicense": [
+    "id",
+    "licenseId",
+    "tokenHash",
+    "organizationId",
+    "organization",
+    "organizationName",
+    "email",
+    "planType",
+    "maxMembers",
+    "maxMembersLite",
+    "issuedAt",
+    "expiresAt",
+    "source",
+    "issuedById",
+    "revokedAt",
+    "revokedById",
+    "revokedReason",
+    "supersededAt",
+    "replacesId",
+    "pendingDeliveryLicense",
+    "services",
+    "seatRateCents",
+    "seatCurrency",
+    "commitUsdCents",
+    "overageEnabled",
+    "overageMaxUsdCents",
+    "instanceId",
+    "instanceBoundAt",
+    "lastSyncAt",
+    "lastSyncVersion",
+    "reportedMembers",
+    "reportedMembersLite",
+    "virtualKeyId",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ActivationCode": [
+    "id",
+    "codeHash",
+    "codeHint",
+    "organizationId",
+    "organizationName",
+    "email",
+    "planType",
+    "maxMembers",
+    "maxMembersLite",
+    "licenseTermDays",
+    "services",
+    "expiresAt",
+    "reusable",
+    "redeemedAt",
+    "redeemedByInstanceId",
+    "issuedLicenseId",
+    "redemptionCount",
+    "revokedAt",
+    "revokedById",
+    "createdById",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ConnectedBillingAccount": [
+    "id",
+    "organizationId",
+    "organization",
+    "stripeCustomerId",
+    "usageSubscriptionId",
+    "usageSubscriptionItemId",
+    "termStartsAt",
+    "termEndsAt",
+    "commitUsdCents",
+    "seatCurrency",
+    "seatRateCents",
+    "seats",
+    "bankTransferType",
+    "bankTransferCountry",
+    "billingEmail",
+    "pendingRenewal",
+    "createdById",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ConnectedCreditGrant": [
+    "id",
+    "accountId",
+    "stripeCreditGrantId",
+    "amountUsdCents",
+    "kind",
+    "termEndsAt",
+    "expiresAt",
+    "createdAt"
+  ],
+  "ConnectedInvoice": [
+    "id",
+    "accountId",
+    "stripeInvoiceId",
+    "kind",
+    "currency",
+    "amountCents",
+    "status",
+    "paidOutOfBandAt",
+    "termStartsAt",
+    "createdAt",
+    "updatedAt"
   ],
   "ScimRequestLog": [
     "id",
@@ -1882,7 +2004,11 @@ export const prismaModelFieldCatalogue = {
     "ledgerEntries",
     "routingPolicyId",
     "routingPolicy",
-    "routingMode"
+    "routingMode",
+    "connectServices",
+    "licenseTokenHash",
+    "licenseInstanceId",
+    "licenseExpiresAt"
   ],
   "VirtualKeyScope": [
     "id",
@@ -2060,6 +2186,13 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "createdById",
     "updatedById"
+  ],
+  "GatewayConnectUpstream": [
+    "organizationId",
+    "baseUrl",
+    "encryptedToken",
+    "instanceId",
+    "updatedAt"
   ],
   "GatewayBudget": [
     "id",
@@ -2466,6 +2599,70 @@ export const prismaModelFieldCatalogue = {
     "userId",
     "score",
     "computedAt"
+  ],
+  "ConnectedSeatChange": [
+    "id",
+    "licenseId",
+    "accountId",
+    "changedAt",
+    "addedSeats",
+    "unitAmountCents",
+    "amountCents",
+    "currency",
+    "stripeInvoiceId",
+    "state",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ConnectedStatement": [
+    "id",
+    "accountId",
+    "month",
+    "sentAt"
+  ],
+  "InstanceIdentity": [
+    "id",
+    "instanceId",
+    "createdAt",
+    "lastReportAt",
+    "lastReportError",
+    "optionalMetricsOptOut",
+    "hostnameOptOut",
+    "startupNoticeAcknowledgedSchemaVersion"
+  ],
+  "SelfHostedInstance": [
+    "id",
+    "instanceId",
+    "firstSeenAt",
+    "lastSeenAt",
+    "version",
+    "installMethod",
+    "chartVersion",
+    "hostname",
+    "environment",
+    "installedAt",
+    "reportSchemaVersion",
+    "organizationId",
+    "issuedLicenseId",
+    "userEmailDomains",
+    "userDomains",
+    "latestReport",
+    "optionalMetricsReported",
+    "hostnameReported",
+    "reportCount",
+    "lastUnknownFields",
+    "raisedSignals",
+    "createdAt",
+    "updatedAt"
+  ],
+  "SelfHostedInstanceReport": [
+    "id",
+    "instanceId",
+    "receivedAt",
+    "version",
+    "reportSchemaVersion",
+    "unknownFields",
+    "payload"
   ]
 } as const;
 
@@ -2585,6 +2782,8 @@ export const prismaRelationCatalogue = {
     "groups": "Group",
     "roleBindings": "RoleBinding",
     "apiKeys": "ApiKey",
+    "issuedLicenses": "IssuedLicense",
+    "connectedBilling": "ConnectedBillingAccount",
     "gatewayChangeEvents": "GatewayChangeEvent",
     "routingPolicies": "RoutingPolicy",
     "ingestionSources": "IngestionSource",
@@ -2596,6 +2795,15 @@ export const prismaRelationCatalogue = {
     "githubPullRequests": "GithubPullRequest",
     "githubBranchPrChecks": "GithubBranchPullRequestCheck"
   },
+  "IssuedLicense": {
+    "organization": "Organization"
+  },
+  "ActivationCode": {},
+  "ConnectedBillingAccount": {
+    "organization": "Organization"
+  },
+  "ConnectedCreditGrant": {},
+  "ConnectedInvoice": {},
   "ScimRequestLog": {
     "organization": "Organization"
   },
@@ -2977,6 +3185,7 @@ export const prismaRelationCatalogue = {
   "IngestionTemplate": {
     "organization": "Organization"
   },
+  "GatewayConnectUpstream": {},
   "GatewayBudget": {
     "createdBy": "User",
     "ledgerEntries": "GatewayBudgetLedger",
@@ -3020,7 +3229,12 @@ export const prismaRelationCatalogue = {
   "IdentityMatch": {},
   "GovernanceTenantHistory": {},
   "ErasedIdentifierSuppression": {},
-  "IdentityMatchSuggestion": {}
+  "IdentityMatchSuggestion": {},
+  "ConnectedSeatChange": {},
+  "ConnectedStatement": {},
+  "InstanceIdentity": {},
+  "SelfHostedInstance": {},
+  "SelfHostedInstanceReport": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

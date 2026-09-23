@@ -87,6 +87,8 @@ export const sharedFiltersInputSchema = z.object({
     .default({}),
   traceIds: z.array(z.string()).optional(),
   negateFilters: z.boolean().optional(),
+  /** Trace origins left out of the count, applied after the user's filters. */
+  excludeOrigins: z.array(z.string()).optional(),
 });
 
 export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;

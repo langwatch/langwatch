@@ -2,10 +2,12 @@ import { on, type EventEmitter } from "node:events";
 
 import { AgentApi } from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { Logger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { AgentAdapter } from "@langwatch/scenario";
@@ -78,6 +80,7 @@ import {
   type SimulationRunData,
   type SimulationScenarioRunInput,
   type SimulationScenarioSetRunsInput,
+  type ScenarioUsageCount,
   type SimulationService,
   type SimulationSetData,
   ScenarioSimulationsUnavailableError,
@@ -101,16 +104,16 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 
 import { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
+import {
+  buildScenarioLifecyclePipeline,
+  type ScenarioLifecyclePipeline,
+} from "../eventing/scenario-lifecycle.pipeline.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
 import { scenarioPlatformUrl } from "../rules/scenario-platform-url.rules.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
 import type { ResultAtomsService } from "../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../services/run-configurations.service.ts";
-import {
-  SilentScenarioActivity,
-  type ScenarioActivity,
-} from "../services/scenario-activity.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
@@ -119,6 +122,8 @@ import { ScenarioRunExportDownloadService } from "../services/scenario-run-expor
 import { ScenarioRunExportService } from "../services/scenario-run-export.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
+
+const lifecycleLogger = createLogger("langwatch:scenario:lifecycle");
 
 /**
  * The process's per-tenant fan-out, as this feature uses it: one emitter per project that relays
@@ -143,8 +148,6 @@ export interface ScenarioAppDependencies {
   resultAtoms: ResultAtomsService;
   /** The run dialog's configuration history. */
   runConfigurations: RunConfigurationsService;
-  /** Product analytics and lifecycle nurturing, both fire-and-forget. */
-  activity: ScenarioActivity;
   /** The author-assist door's tier-effective generation window. */
   generateBounds: ScenarioGenerateBoundsService;
   generation: ScenarioGenerationService;
@@ -169,11 +172,6 @@ export interface ScenarioAppInfrastructure {
   testSuiteIds: ScenarioTestSuiteId;
   clock: ScenarioClock;
   secretCipher: ScenarioSecretCipher;
-  /**
-   * Where a created scenario is reported to, for a process that composed
-   * product analytics and the lifecycle sender. Absent reports nothing.
-   */
-  activity?: ScenarioActivity;
 }
 
 /** The peer APIs this feature reads directly. */
@@ -188,6 +186,8 @@ export const scenarioAppDependencyTokens = {
   presence: PresenceApi,
   auditLog: AuditLogApi,
   traces: TraceApi,
+  /** Where a created scenario is announced, for product analytics and nurturing. */
+  billing: BillingApi,
 };
 
 /**
@@ -212,6 +212,7 @@ type ScenarioProcessMembers = Readonly<{
       limit?: { requests: number; seconds: number },
     ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
   }>;
+  idempotency: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -227,7 +228,13 @@ export class ScenarioApp implements ScenarioApi {
   static readonly contract = ScenarioApi;
   static readonly dependencies = scenarioAppDependencyTokens;
   /** Every name is from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["clickhouse", "encryption", "rateLimiter", "publicBaseUrl"] as const;
+  static readonly reads = [
+    "clickhouse",
+    "encryption",
+    "rateLimiter",
+    "idempotency",
+    "publicBaseUrl",
+  ] as const;
 
   static create(
     setup: FeatureSetup<
@@ -271,7 +278,6 @@ export class ScenarioApp implements ScenarioApi {
       broadcast: setup.members.broadcast,
       resultAtoms: setup.members.resultAtoms,
       runConfigurations: setup.members.runConfigurations,
-      activity: setup.members.activity ?? new SilentScenarioActivity(),
       generateBounds,
       generation: ScenarioGenerationService.create({
         bounds: generateBounds,
@@ -289,17 +295,27 @@ export class ScenarioApp implements ScenarioApi {
         traces: setup.dependencies.traces,
       }),
       publicBaseUrl: setup.members.publicBaseUrl,
+      lifecycle: buildScenarioLifecyclePipeline({
+        announce: (signal) => setup.dependencies.billing.recordScenarioCreated(signal),
+        claim: (key, ttlSeconds) => setup.members.idempotency.claim(key, ttlSeconds),
+      }),
     });
   }
 
   #dependencies: ScenarioAppDependencies;
   readonly #publicBaseUrl: string | undefined;
+  readonly #lifecycle: ScenarioLifecyclePipeline;
+  #lifecycleCommands: EventingCommands<ScenarioLifecyclePipeline> | undefined;
 
   private constructor(
-    dependencies: ScenarioAppDependencies & { publicBaseUrl: string | undefined },
+    dependencies: ScenarioAppDependencies & {
+      publicBaseUrl: string | undefined;
+      lifecycle: ScenarioLifecyclePipeline;
+    },
   ) {
-    const { publicBaseUrl, ...rest } = dependencies;
+    const { publicBaseUrl, lifecycle, ...rest } = dependencies;
     this.#publicBaseUrl = publicBaseUrl;
+    this.#lifecycle = lifecycle;
     this.#dependencies = rest;
   }
 
@@ -468,28 +484,43 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /**
-   * Reports the write to the process, without making the caller wait for it
-   * and without letting either report fail the create.
+   * Records the write on the scenario's own pipeline, without making the caller
+   * wait for it and without letting the report fail the create.
    */
   private reportScenarioCreated(input: {
     scenario: Scenario;
     projectId: string;
     userId: string;
   }): void {
-    const { activity } = this.#dependencies;
-    activity.trackScenarioCreated({ userId: input.userId, projectId: input.projectId });
-
+    const { scenario, projectId, userId } = input;
     void this.#dependencies.scenarios
-      .count({ projectId: input.projectId })
+      .count({ projectId })
       .then((scenarioCount) => {
-        activity.fireScenarioCreatedNurturing({
-          userId: input.userId,
+        if (!this.#lifecycleCommands) {
+          throw new Error("scenario_lifecycle pipeline senders are not connected yet");
+        }
+        return this.#lifecycleCommands.recordScenarioCreated.send({
+          tenantId: projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          scenarioId: scenario.id,
+          projectId,
+          userId,
           scenarioCount,
-          scenarioId: input.scenario.id,
-          projectId: input.projectId,
         });
       })
-      .catch((error: unknown) => activity.captureException(error as Error));
+      .catch((error: unknown) => {
+        lifecycleLogger.error({ error, projectId }, "failed to record a created scenario");
+      });
+  }
+
+  /** The scenario lifecycle pipeline this module registers, built once by {@link create}. */
+  lifecyclePipeline(): ScenarioLifecyclePipeline {
+    return this.#lifecycle;
+  }
+
+  /** Binds the built lifecycle pipeline's own senders. */
+  connectLifecycleCommands(commands: EventingCommands<ScenarioLifecyclePipeline>): void {
+    this.#lifecycleCommands = commands;
   }
 
   /**
@@ -867,6 +898,14 @@ export class ScenarioApp implements ScenarioApi {
     batchRunId: string;
   }): Promise<SimulationBatchSummary | null> {
     return this.#dependencies.simulations.findBatchSummary(input);
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  async countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<ScenarioUsageCount> {
+    return { runs: await this.#dependencies.simulations.countUsage(input) };
   }
 }
 

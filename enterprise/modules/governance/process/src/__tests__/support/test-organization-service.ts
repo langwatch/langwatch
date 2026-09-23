@@ -7,6 +7,9 @@ const unsupported = <Method>(): Method =>
 export class TestOrganizationService extends OrganizationService {
   getOrganizationMembers = unsupported<OrganizationService["getOrganizationMembers"]>();
   getSettings = unsupported<OrganizationService["getSettings"]>();
+  readGuidedOnboardingState = unsupported<OrganizationService["readGuidedOnboardingState"]>();
+  writeGuidedOnboardingState = unsupported<OrganizationService["writeGuidedOnboardingState"]>();
+  organizationIdsForMember = unsupported<OrganizationService["organizationIdsForMember"]>();
   updateSettings = unsupported<OrganizationService["updateSettings"]>();
   isMember = unsupported<OrganizationService["isMember"]>();
   getOldestTeamId = unsupported<OrganizationService["getOldestTeamId"]>();

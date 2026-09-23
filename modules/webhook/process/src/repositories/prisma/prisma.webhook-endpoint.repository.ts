@@ -87,8 +87,37 @@ const KEPT_SECRET = "__langwatch_kept_secret__";
  */
 export type WebhookEndpointDatabase = Pick<
   PrismaClient,
-  "webhookEndpoint" | "webhookEndpointDelivery" | "$queryRaw"
+  "webhookEndpoint" | "webhookEndpointDelivery" | "$queryRaw" | "$executeRaw"
 >;
+
+/**
+ * Flips an ACTIVE endpoint to DISABLED for its failure streak; true for the one
+ * caller that flipped it. As SQL so a write parked on the row lock re-checks the
+ * committed status, which `updateMany`'s subquery does not.
+ */
+export async function disableEndpointForFailureStreak({
+  prisma,
+  organizationId,
+  endpointId,
+  now,
+}: {
+  prisma: Pick<WebhookEndpointDatabase, "$executeRaw">;
+  organizationId: string;
+  endpointId: string;
+  now: Date;
+}): Promise<boolean> {
+  const flipped = await prisma.$executeRaw`
+    UPDATE "WebhookEndpoint"
+       SET "status" = 'DISABLED',
+           "disabledReason" = ${WEBHOOK_DISABLED_REASON_AUTO},
+           "disabledAt" = ${now},
+           "updatedAt" = now()
+     WHERE "id" = ${endpointId}
+       AND "organizationId" = ${organizationId}
+       AND "status" = 'ACTIVE'
+  `;
+  return flipped === 1;
+}
 
 /** The endpoint row's health stamps, on the one clock the seam above reads. */
 function statusSnapshotOf(row: {
@@ -655,19 +684,13 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
     if (failingDurationMs < WEBHOOK_AUTO_DISABLE_AFTER_MS) {
       return;
     }
-    const flipped = await this.prisma.webhookEndpoint.updateMany({
-      where: {
-        id: endpoint.id,
-        organizationId,
-        status: "ACTIVE",
-      },
-      data: {
-        status: "DISABLED",
-        disabledReason: WEBHOOK_DISABLED_REASON_AUTO,
-        disabledAt: now,
-      },
+    const flipped = await disableEndpointForFailureStreak({
+      prisma: this.prisma,
+      organizationId,
+      endpointId: endpoint.id,
+      now,
     });
-    if (flipped.count !== 1) return;
+    if (!flipped) return;
 
     logger.warn(
       {

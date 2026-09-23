@@ -119,6 +119,10 @@ export class TestSimulationService extends SimulationService {
     return 0;
   }
 
+  async countUsage(): Promise<number> {
+    return 0;
+  }
+
   async findRunsForExport(): Promise<{
     runs: SimulationExportRun[];
     nextCursor?: string;

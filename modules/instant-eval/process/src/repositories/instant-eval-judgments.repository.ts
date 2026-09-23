@@ -96,4 +96,6 @@ export interface InstantEvalJudgmentsRepository {
    * sort key, so a sample would only ever show one corner of the run.
    */
   findSample(query: InstantEvalJudgmentSampleQuery): Promise<readonly InstantEvalJudgment[]>;
+  /** The usage report's figure: judgements written since `since` (epoch ms). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
 }

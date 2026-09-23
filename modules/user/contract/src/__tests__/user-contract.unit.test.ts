@@ -46,8 +46,11 @@ describe("user contract", () => {
 
   it("keeps passkey-nudge status portable", () => {
     const dismissedAt = new Date(0);
-    expect(userPasskeyNudgeStatusSchema.parse({ hasPasskey: false, dismissedAt })).toEqual({
+    expect(
+      userPasskeyNudgeStatusSchema.parse({ hasPasskey: false, twoStepEnabled: false, dismissedAt }),
+    ).toEqual({
       hasPasskey: false,
+      twoStepEnabled: false,
       dismissedAt,
     });
   });

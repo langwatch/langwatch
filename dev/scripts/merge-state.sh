@@ -24,7 +24,7 @@ printf '  theirs %s\n' "${THEIRS:0:9}"
 printf '  base   %s\n' "${BASE:0:9}"
 
 unmerged=$(git diff --name-only --diff-filter=U | wc -l | tr -d ' ')
-markers=$(git grep -l '^<<<<<<< ' -- . 2>/dev/null | wc -l | tr -d ' ')
+markers=$({ git grep -l '^<<<<<<< ' -- . 2>/dev/null || true; } | wc -l | tr -d ' ')
 printf '\nunmerged %s   files with markers %s\n' "$unmerged" "$markers"
 
 printf '\nby class\n'
@@ -80,7 +80,7 @@ fi
 [ "${1:-}" = "--full" ] || exit 0
 
 printf '\nmarkers by area\n'
-git grep -l '^<<<<<<< ' -- . 2>/dev/null \
+{ git grep -l '^<<<<<<< ' -- . 2>/dev/null || true; } \
   | awk -F/ '{print $1"/"$2}' | sort | uniq -c | sort -rn \
   | awk '{printf "  %-34s %s\n", $2, $1}'
 

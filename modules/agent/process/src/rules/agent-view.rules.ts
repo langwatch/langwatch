@@ -26,8 +26,8 @@ export function agentWithResolvedFields(
   if (agent.type !== "workflow") {
     return {
       ...agent,
-      inputFields: agent.config.inputs ?? [],
-      outputFields: agent.config.outputs ?? [],
+      inputFields: "inputs" in agent.config ? (agent.config.inputs ?? []) : [],
+      outputFields: "outputs" in agent.config ? (agent.config.outputs ?? []) : [],
       fieldsResolved: true,
     };
   }

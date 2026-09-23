@@ -36,6 +36,7 @@ const parseInstantFlag = (value: string, flag: string): number => {
 export const searchTracesCommand = async (
   options: {
     query?: string;
+    filter?: string;
     startDate?: string;
     endDate?: string;
     limit?: string;
@@ -83,6 +84,10 @@ export const searchTracesCommand = async (
       pageSize,
       format: "json",
       ...(Object.keys(filters).length > 0 ? { filters } : {}),
+      // The filter language, sent as itself. `-q` stays free text: they are
+      // two different searches and the server combines them, so sending one
+      // as the other would silently change what was asked.
+      ...(options.filter ? { filter: options.filter } : {}),
     });
 
     const matched = result.pagination.totalHits;

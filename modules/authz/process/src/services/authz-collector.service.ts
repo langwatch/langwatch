@@ -6,6 +6,7 @@
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
+  BindingRoleKey,
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
@@ -155,7 +156,6 @@ export class AuthzCollectorService {
           isOrgMember: false,
           membershipDisabled: false,
           bindings: [],
-          legacyTeamMemberships: [],
           customRolePermissions: new Map(),
         };
       // One pass, one head. A collect is several reads and the reader in
@@ -273,11 +273,10 @@ export class AuthzCollectorService {
       // owner's own snapshot reports it.
       membershipDisabled: false,
       bindings,
-      legacyTeamMemberships: [],
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,
         organizationId,
-        customRoleIds: this.dedupeCustomRoleIds(bindings, []),
+        customRoleIds: this.dedupeCustomRoleIds(bindings),
         reader,
       }),
     };
@@ -292,22 +291,13 @@ export class AuthzCollectorService {
     organizationId: string;
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const [membership, directBindings, groupBindings, legacyRows] = await Promise.all([
+    const [membership, directBindings, groupBindings] = await Promise.all([
       reader.findOrganizationMembership({
         userId: principal.id,
         organizationId,
       }),
       reader.findUserBindings({ userId: principal.id, organizationId }),
       reader.findGroupBindings({
-        userId: principal.id,
-        organizationId,
-      }),
-      // LEGACY-QUIRK(B): TeamUser fallback rows. Always fetched because
-      // the org-scope path unions them on any denial even when bindings
-      // exist (the TeamUser union at the end of legacy
-      // hasOrganizationPermissionLegacy); the engine applies the
-      // per-scope gating rules.
-      reader.findLegacyTeamMemberships({
         userId: principal.id,
         organizationId,
       }),
@@ -328,11 +318,10 @@ export class AuthzCollectorService {
       isOrgMember,
       membershipDisabled: membership?.disabled ?? false,
       bindings,
-      legacyTeamMemberships: legacyRows,
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,
         organizationId,
-        customRoleIds: this.dedupeCustomRoleIds(bindings, legacyRows),
+        customRoleIds: this.dedupeCustomRoleIds(bindings),
         reader,
       }),
     };
@@ -440,16 +429,13 @@ export class AuthzCollectorService {
     }
   }
 
-  private dedupeCustomRoleIds(
-    bindings: readonly { customRoleId: string | null }[],
-    legacyRows: readonly { customRoleId: string | null }[],
-  ): string[] {
+  private dedupeCustomRoleIds(bindings: readonly { roleKey: BindingRoleKey }[]): string[] {
     return Array.from(
       new Set(
-        [
-          ...bindings.map((binding) => binding.customRoleId),
-          ...legacyRows.map((row) => row.customRoleId),
-        ].filter((id): id is string => id != null),
+        bindings
+          .filter((binding) => binding.roleKey.startsWith("custom:"))
+          .map((binding) => binding.roleKey.slice("custom:".length))
+          .filter((id) => id.length > 0),
       ),
     );
   }

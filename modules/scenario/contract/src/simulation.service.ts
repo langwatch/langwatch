@@ -152,6 +152,8 @@ export abstract class SimulationService {
   ): Promise<{ runIds: string[]; reachedCap: boolean }>;
   abstract getDistinctExternalSetIds(input: SimulationProjectIdsInput): Promise<Set<string>>;
   abstract countRunsForExport(input: SimulationExportFilterInput): Promise<number>;
+  /** The usage report's figure: scenario runs started since `since` (epoch ms). */
+  abstract countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<number>;
   abstract findRunsForExport(
     input: SimulationExportRunsInput,
   ): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;

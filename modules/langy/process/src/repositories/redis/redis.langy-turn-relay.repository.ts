@@ -700,6 +700,7 @@ export class RedisLangyTurnRelayRepository {
         ...(frame.output !== undefined ? { output: frame.output } : {}),
         ...(frame.isError !== undefined ? { isError: frame.isError } : {}),
         ...(frame.result !== undefined ? { result: frame.result } : {}),
+        ...(frame.local !== undefined ? { local: frame.local } : {}),
       },
     });
 
@@ -729,6 +730,7 @@ export class RedisLangyTurnRelayRepository {
       ...(call.isError !== undefined ? { isError: call.isError } : {}),
       ...(call.digest !== undefined ? { digest: call.digest } : {}),
       ...(call.result !== undefined ? { result: call.result } : {}),
+      ...(call.local !== undefined ? { local: call.local } : {}),
     });
     // A capability's present-continuous sub-status ("Searching traces…") for the
     // live status line — emitted AFTER the tool frame so the cold-start clear (it

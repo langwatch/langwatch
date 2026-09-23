@@ -2,7 +2,9 @@
 
 **Date:** 2026-09-19
 
-**Status:** Accepted
+**Status:** Accepted. Superseded in part 2026-09-23: `dev/nx/tags-plugin.mjs` and
+`pnpm check:boundaries` no longer exist, so the tags and the "40 violations"
+baseline below are history; see the last section.
 
 ## Context
 
@@ -129,3 +131,16 @@ at 7. The store already holds `@typescript-eslint/type-utils` built against
 
 Until then `pnpm check:boundaries` is the enforcement, and its blind spot to
 undeclared imports is a known gap rather than a hidden one.
+
+## Amendment, 2026-09-23: the graph check is gone
+
+`dev/nx/tags-plugin.mjs` is not in the tree, so no project carries a derived
+tag, and the lint review of 2026-09-23 deleted `pnpm check:boundaries`. The
+"40 violations" starting count above measured a check that no longer runs.
+`dev/nx/module-boundaries.json` remains, read by nothing.
+
+Package-level boundaries are enforced per import by `langwatch/package-boundaries`
+(ADR-137), which reads import statements and so does not share the
+declared-dependency blind spot described above, and per manifest by the
+`cycles`, `manifests` and `browser-package-closure` policies of
+`pnpm lint:architecture`.

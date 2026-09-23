@@ -10,6 +10,7 @@ import * as path from "node:path";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import {
+  codexGatewayBlockBaseUrl,
   codexHasGatewayBlock,
   codexHasOtelBlock,
   codexOtelBlockEndpoint,
@@ -29,24 +30,25 @@ import {
   removeAppEnvVars,
 } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
-import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import {
   extractLookupIdFromToken,
   isExpiredSession,
   listIngestionKeys,
   mintIngestionKey,
 } from "./cli-api";
-import type { GovernanceConfig } from "./config";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
+import { isIsolatedConfig, type GovernanceConfig } from "./config";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL, telemetryEnvVarNames } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { runningCodeRestartNotice } from "./running-code";
-import { assertCodexAgentGuidance } from "./codex-agents-md";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import {
   buildScopedToolFunction,
   type DetectedShell,
   assertCodexTurnHarvest,
   persistBlockToRc,
   rcHasLangwatchBlock,
+  rcLangwatchBlockUrls,
   rcPath,
   tildify,
   toolMarkers,
@@ -427,6 +429,44 @@ function scopedShellFunctionNeedsRefresh(tool: string, expectedEndpoint: string)
   );
 }
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/** True for an endpoint served from this machine. Unparseable reads as not. */
+export function isLoopbackEndpoint(endpoint: string | undefined): boolean {
+  if (!endpoint) return false;
+  try {
+    return LOOPBACK_HOSTS.has(new URL(endpoint).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether a tool's persisted wiring reports to an instance on this machine.
+ * A scoped shell function carries no parsed endpoint, so every address in
+ * its block is parsed and judged by its host.
+ */
+function toolWiringPointsAtLoopback(tool: string): boolean {
+  if (tool === "claude") {
+    const target = appSettingsTargetFor("claude");
+    if (!target) return false;
+    return isLoopbackEndpoint(appEnvValues(target).OTEL_EXPORTER_OTLP_ENDPOINT);
+  }
+  if (tool === "codex") {
+    return isLoopbackEndpoint(codexOtelBlockEndpoint(defaultCodexConfigPath()) ?? undefined);
+  }
+  const markers = toolMarkers(tool);
+  return REFRESH_SHELLS.some((shell) =>
+    rcLangwatchBlockUrls({ shell, markers }).some(isLoopbackEndpoint),
+  );
+}
+
+/** A tool whose wiring reports to another deployment, which a local login keeps. */
+function keepsWiringForLoopback(tool: string, expectedEndpoint: string): boolean {
+  if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) return false;
+  return !toolWiringPointsAtLoopback(tool);
+}
+
 function toolWiringNeedsLoginRefresh(tool: string, expectedEndpoint: string): boolean {
   if (tool === "claude") return claudeUserWiringNeedsRefresh(expectedEndpoint);
   if (tool === "codex") return codexOtelWiringNeedsRefresh(expectedEndpoint);
@@ -443,6 +483,12 @@ export interface LoginTelemetryRefreshResult {
   mintedAny: boolean;
   /** Restart advice when a live launcher predates successfully changed wiring. */
   warnings?: string[];
+  /**
+   * Tools whose wiring points at another instance and was left alone, with
+   * the reason: this login lives in a config of its own, or it is a login on
+   * this machine and the wiring reports to a deployment elsewhere.
+   */
+  kept?: { tools: string[]; reason: "isolated_config" | "loopback_login" };
 }
 
 /**
@@ -458,11 +504,36 @@ export async function refreshTelemetryWiringForLogin(
   const warnings: string[] = [];
   const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
 
+  if (isIsolatedConfig()) {
+    const tools = Object.keys(SOURCE_TYPE_BY_TOOL).filter((tool) => {
+      try {
+        return toolWiringNeedsLoginRefresh(tool, expectedEndpoint);
+      } catch {
+        return false;
+      }
+    });
+    return {
+      labels,
+      mintedAny,
+      ...(tools.length > 0 ? { kept: { tools, reason: "isolated_config" as const } } : {}),
+    };
+  }
+
+  const loopbackLogin = isLoopbackEndpoint(expectedEndpoint);
+  const keptForLoopback: string[] = [];
+
   for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
     try {
       if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
         // The new org forbids direct OTLP for this tool; the wrapper
         // surfaces that on the next run rather than login guessing.
+        continue;
+      }
+      // A login on this machine leaves a tool that reports elsewhere wholly
+      // alone: the hook names this CLI's own path, which is no business of a
+      // config file this login does not take over.
+      if (loopbackLogin && keepsWiringForLoopback(tool, expectedEndpoint)) {
+        keptForLoopback.push(tool);
         continue;
       }
       // codex's notify hook recovers the conversation, and its guidance tells a session to
@@ -530,7 +601,13 @@ export async function refreshTelemetryWiringForLogin(
   // when present - no ingest key involved.
   try {
     const codexConfigPath = defaultCodexConfigPath();
-    if (codexHasGatewayBlock(codexConfigPath)) {
+    const keepsGatewayBlock =
+      loopbackLogin && !isLoopbackEndpoint(codexGatewayBlockBaseUrl() ?? undefined);
+    if (!codexHasGatewayBlock(codexConfigPath)) {
+      // Nothing to re-sync.
+    } else if (keepsGatewayBlock) {
+      if (!keptForLoopback.includes("codex")) keptForLoopback.push("codex");
+    } else {
       const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
       if (result.action !== "unchanged") {
         labels.push(`codex gateway block (${displayCodexConfigPath()})`);
@@ -541,5 +618,27 @@ export async function refreshTelemetryWiringForLogin(
     void 0;
   }
 
-  return { labels, mintedAny, ...(warnings.length > 0 ? { warnings } : {}) };
+  return {
+    labels,
+    mintedAny,
+    ...(warnings.length > 0 ? { warnings } : {}),
+    ...(keptForLoopback.length > 0
+      ? { kept: { tools: keptForLoopback, reason: "loopback_login" as const } }
+      : {}),
+  };
+}
+
+/** The lines the login prints for wiring it left alone. Exported for tests. */
+export function keptWiringLines(kept: NonNullable<LoginTelemetryRefreshResult["kept"]>): string[] {
+  const tools = kept.tools.join(", ");
+  if (kept.reason === "isolated_config") {
+    return [
+      `Left the wiring of ${tools} as it is: this login lives in its own config file (LANGWATCH_CLI_CONFIG), so it is not this machine's login.`,
+    ];
+  }
+  const example = kept.tools[0] ?? "claude";
+  return [
+    `Left the wiring of ${tools} as it is: it reports to another LangWatch, and a login on this machine does not take it over.`,
+    `To report to this one instead, run the tool through it once: langwatch ${example}`,
+  ];
 }

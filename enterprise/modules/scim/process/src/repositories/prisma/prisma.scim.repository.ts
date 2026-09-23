@@ -1,5 +1,6 @@
 import {
   scimRefusalReasonSchema,
+  type DirectoryIdentityRow,
   type ScimDirectoryOwnership,
   type ScimRequestLogEntry,
   type ScimRequestRecord,
@@ -658,6 +659,31 @@ export class PrismaScimRepository extends ScimRepository {
       select: { connectionId: true },
     });
     return rows.map((row) => row.connectionId);
+  }
+
+  async findDirectoryIdentities(input: {
+    connectionId: string;
+    limit: number;
+  }): Promise<DirectoryIdentityRow[]> {
+    const rows = await this.prisma.scimExternalId.findMany({
+      where: { connectionId: input.connectionId },
+      orderBy: { updatedAt: "desc" },
+      take: input.limit,
+      select: {
+        connectionId: true,
+        externalId: true,
+        userId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      connectionId: row.connectionId,
+      externalId: row.externalId,
+      userId: row.userId,
+      createdAtMs: row.createdAt.getTime(),
+      updatedAtMs: row.updatedAt.getTime(),
+    }));
   }
 
   async findDirectoryOwnership(input: {

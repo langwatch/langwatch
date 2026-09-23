@@ -19,16 +19,24 @@ function serviceWith(options: {
   viewable?: string[];
 }) {
   const asked: Record<string, unknown>[] = [];
+  const key = options.key === undefined ? { id: "key-1", roleBindings: [] } : options.key;
   const service = ApiKeyVisibilityService.create({
     repository: {
       findByIdInOrganization: async (input: Record<string, unknown>) => {
         asked.push({ method: "findByIdInOrganization", ...input });
-        return options.key === undefined
-          ? { id: "key-1", roleBindings: [] as Binding[] }
-          : options.key;
+        return key && { id: key.id, organizationId: "organization-1" };
       },
     },
     authz: {
+      // The key's grants live on authz's grants head, not on its row.
+      listApiKeyBindings: async () =>
+        (key?.roleBindings ?? []).map((binding, index) => ({
+          ...binding,
+          id: `grant-${index}`,
+          apiKeyId: key?.id ?? null,
+          role: "VIEWER",
+          customRoleId: null,
+        })),
       can: async () => options.organizationWide ?? false,
       canBatchByIds: async () => ({
         projects: new Map((options.viewable ?? []).map((id) => [id, true])),

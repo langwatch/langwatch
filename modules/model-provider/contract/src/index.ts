@@ -3,6 +3,7 @@ export * from "./model-provider.errors.ts";
 export * from "./model-provider.api.ts";
 export * from "./model-provider-wire-format.ts";
 export * from "./model-provider-credential.ts";
+export * from "./model-provider-platform-chain.ts";
 export * from "./model-provider-registry.ts";
 export * from "./model-provider-routing-handle.ts";
 export * from "./model-provider-display-names.ts";

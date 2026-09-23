@@ -15,6 +15,7 @@ import {
   type GithubServerConfig,
   githubConfig,
   type GithubRepository,
+  type GithubUsageCount,
 } from "@langwatch/github-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -228,9 +229,11 @@ export class GithubApp implements GithubApiContract {
   } as const;
 
   readonly #service: GithubApiContract;
+  readonly #branchMaintenance: GithubBranchMaintenance;
 
-  private constructor(service: GithubApiContract) {
+  private constructor(service: GithubApiContract, branchMaintenance: GithubBranchMaintenance) {
     this.#service = service;
+    this.#branchMaintenance = branchMaintenance;
   }
 
   /**
@@ -361,6 +364,12 @@ export class GithubApp implements GithubApiContract {
   }
 
   static create({ repositories, members, config, dependencies }: GithubSetup): GithubApp {
+    const branchConfig = {
+      appId: config.appId ?? "",
+      privateKey: members.secrets.find("GITHUB_LANGY_PRIVATE_KEY") ?? "",
+    };
+    const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
+
     return new GithubApp(
       GithubApp.composeApi({
         repositories,
@@ -368,17 +377,30 @@ export class GithubApp implements GithubApiContract {
         organization: dependencies.organizations,
         project: dependencies.projects,
         config: {
-          appId: config.appId ?? "",
-          privateKey: members.secrets.find("GITHUB_LANGY_PRIVATE_KEY") ?? "",
+          ...branchConfig,
           appSlug: config.appSlug ?? "",
           webhookSecret: members.secrets.find("GITHUB_LANGY_WEBHOOK_SECRET") ?? "",
           // Shares the deployment's one CREDENTIALS_SECRET with the secret
           // module — both read it, neither owns it exclusively.
           signingKey: members.secrets.find("CREDENTIALS_SECRET") ?? "",
         },
-        ...(config.host === undefined ? {} : { hostConfig: { host: config.host } }),
+        ...hostConfig,
+      }),
+      // `github_maintenance` (ADR-144), ported from the deleted
+      // `GithubWorkerFeatureInstaller`: composed here, not received, so the
+      // sweep runs over this same graph's rows.
+      GithubApp.composeBranchMaintenance({
+        repositories,
+        redis: members.redis,
+        config: branchConfig,
+        ...hostConfig,
       }),
     );
+  }
+
+  /** The fleet-wide branch sweep `github_maintenance` schedules. */
+  branchMaintenance(): GithubBranchMaintenance {
+    return this.#branchMaintenance;
   }
 
   getAppConfig(): GithubAppConfig {
@@ -516,6 +538,13 @@ export class GithubApp implements GithubApiContract {
   recheckDueBranches(): Promise<number> {
     return this.#service.recheckDueBranches();
   }
+  countUsage(input: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<GithubUsageCount> {
+    return this.#service.countUsage(input);
+  }
+
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }> {
     return this.#service.pruneStaleBranchLinkage();
   }

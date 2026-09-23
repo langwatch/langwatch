@@ -165,6 +165,13 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "id-ref",
     noun: { singular: "run plan", plural: "run plans" },
   },
+  // An Instant Eval run judges one query across the project's history: an eval,
+  // addressed by its run id.
+  "instant-eval": {
+    surface: "evaluations",
+    digestStrategy: "id-ref",
+    noun: { singular: "instant eval run", plural: "instant eval runs" },
+  },
   prompt: {
     surface: "prompts",
     digestStrategy: "id-ref",
@@ -360,6 +367,14 @@ export const CAPABILITY_CATALOG = {
         health: "stats",
       },
     },
+  },
+  // `onboarding complete-path` is the panel's done marker: one line, drawn as
+  // text. `onboarding state` is the organization's picks, drawn as facts.
+  onboarding: {
+    surface: "platform",
+    digestStrategy: "reduced",
+    noun: { singular: "guided onboarding", plural: "guided onboarding" },
+    body: { byVerb: { "complete-path": "text" } },
   },
 } as const satisfies Record<string, CapabilityCatalogEntry>;
 

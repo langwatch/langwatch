@@ -8,6 +8,7 @@ import { apiKeyServer } from "@langwatch/api-key-process";
 import { authServer } from "@langwatch/auth-process";
 import { authzServer } from "@langwatch/authz-process";
 import { automationServer } from "@langwatch/automation-process";
+import { billingServer } from "@langwatch/enterprise-billing-process";
 import { codingAgentServer } from "@langwatch/coding-agent-process";
 import { dashboardServer } from "@langwatch/dashboard-process";
 import { dataPrivacyServer } from "@langwatch/data-privacy-process";
@@ -40,6 +41,7 @@ import { presenceServer } from "@langwatch/presence-process";
 import { projectServer } from "@langwatch/project-process";
 import { promptServer } from "@langwatch/prompt-process";
 import { roleServer } from "@langwatch/role-process";
+import { saasServer } from "@langwatch/enterprise-saas-process";
 import { scenarioServer } from "@langwatch/scenario-process";
 import { scimServer } from "@langwatch/enterprise-scim-process";
 import { secretServer } from "@langwatch/secret-process";
@@ -62,6 +64,7 @@ export const serverModules = [
   authServer,
   authzServer,
   automationServer,
+  billingServer,
   codingAgentServer,
   dashboardServer,
   dataPrivacyServer,
@@ -94,6 +97,7 @@ export const serverModules = [
   projectServer,
   promptServer,
   roleServer,
+  saasServer,
   scenarioServer,
   scimServer,
   secretServer,

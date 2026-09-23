@@ -18,20 +18,29 @@ export function useLangyChatEngine({
 }: {
   transport: ReturnType<typeof createLangyChatTransport>;
 }) {
-  const { messages, sendMessage, stop, status, setMessages, error, regenerate, clearError } =
-    useChat({
-      transport,
-      onError: (error) => {
-        // Global-handled errors (license / lite-member) are owned by their own
-        // handler — leave them to it.
-        if (isHandledByGlobalHandler(error)) return;
-        // Every live turn failure is already surfaced inline — as the recovering
-        // line, the GitHub connect card, or a <LangyError> card, which falls
-        // back to a generic card even for a non-structured error. A toast would
-        // double the same failure on a second surface, so we never raise one
-        // here: one calm surface only.
-      },
-    });
+  const {
+    messages,
+    sendMessage,
+    stop,
+    status,
+    setMessages,
+    error,
+    regenerate,
+    clearError,
+    resumeStream,
+  } = useChat({
+    transport,
+    onError: (error) => {
+      // Global-handled errors (license / lite-member) are owned by their own
+      // handler — leave them to it.
+      if (isHandledByGlobalHandler(error)) return;
+      // Every live turn failure is already surfaced inline — as the recovering
+      // line, the GitHub connect card, or a <LangyError> card, which falls
+      // back to a generic card even for a non-structured error. A toast would
+      // double the same failure on a second surface, so we never raise one
+      // here: one calm surface only.
+    },
+  });
 
   // Langy can mutate dashboard widgets mid-turn, read via dashboardWidgets.list
   // and graphs.getAll, so invalidate both once on the in-flight -> settled
@@ -93,6 +102,11 @@ export function useLangyChatEngine({
     status,
     error,
     regenerate,
+    /**
+     * Reattach to a turn this tab did not dispatch (the transport's `getResumeTarget` names it).
+     * The stream writes into a new assistant message, or the last one when it already is one.
+     */
+    resumeStream,
     applyHistoryToEngine,
     resetEngine,
     /**

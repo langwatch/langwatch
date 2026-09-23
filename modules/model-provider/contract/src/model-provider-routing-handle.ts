@@ -13,6 +13,9 @@ export const RESERVED_ROUTING_HANDLES: ReadonlySet<string> = new Set([
   "google_vertex",
   "google_gemini",
   "cloudflare",
+  // "langwatch" is the family a connected self-hosted install routes managed
+  // models through; it has no registry entry because no customer configures it.
+  "langwatch",
   "mp",
 ]);
 

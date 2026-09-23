@@ -1,12 +1,13 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The application a suite drives, over memory repositories and stand-ins
  * for what a deployment would supply: a registry with no managed providers,
  * a fixed id suffix, and a rate limiter that never refuses. No network, no DB.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
@@ -131,6 +132,7 @@ export function createModelProviderTestApp(
       projects: ProjectApi;
       organizations: OrganizationApi;
       permissions: AuthzApi;
+      dataPrivacy: DataPrivacyApi;
     }>;
   }> = {},
 ): ModelProviderApp {
@@ -143,7 +145,15 @@ export function createModelProviderTestApp(
       permissions:
         input.dependencies?.permissions ??
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+      dataPrivacy: input.dependencies?.dataPrivacy ?? createModelProviderTestDataPrivacy(),
     },
+  });
+}
+
+/** A deployment holding no Google credential: data privacy lends `undefined`. */
+export function createModelProviderTestDataPrivacy(credential?: string): DataPrivacyApi {
+  return createApiFixture<DataPrivacyApi>({
+    intoGoogleApplicationCredentials: (build) => build(credential),
   });
 }
 

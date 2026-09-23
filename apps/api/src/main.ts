@@ -1,4 +1,6 @@
 import "@langwatch/time/polyfill";
+import { buildChartFrameDocument } from "@langwatch/analytics-contract/chart-frame-document";
+import { CHART_FRAME_PATH } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
@@ -52,6 +54,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
     .withMember("queue", () => void 0)
     .withMember("content", () => void 0)
     .withMember("gatewayInternalProtocol", () => ({}))
+    .withMember("connectJudge", () => null)
     .withMember("monitor", () => void 0)
     // The api composes no clustering worker, so the claim is answered by
     // something that refuses loudly rather than by `undefined`.
@@ -59,7 +62,13 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
       requestClustering: () =>
         Promise.reject(new Error("langwatch-api composes no topic clustering worker")),
     }))
-    .exposeTransports((transports) => transports.trpc().rest().browserBundle())
+    .exposeTransports((transports) =>
+      transports
+        .trpc()
+        .rest()
+        .browserBundle()
+        .framedDocument({ path: CHART_FRAME_PATH, document: buildChartFrameDocument }),
+    )
     .withPipelines((pipelines) => pipelines.produce())
     .boot();
 

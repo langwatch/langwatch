@@ -182,6 +182,23 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     });
   };
 
+  /** A key's grants, for keys the caller already loaded from this
+   *  organization: decorated, never dropped, as main's credential read. */
+  findApiKeyBindings = async ({
+    organizationId,
+    apiKeyIds,
+  }: {
+    organizationId: string;
+    apiKeyIds: readonly string[];
+  }): Promise<AuthzAccessBinding[]> => {
+    if (apiKeyIds.length === 0) return [];
+    const rows = await this.findGrantRows({
+      organizationId,
+      where: { principalType: "API_KEY", principalId: { in: [...apiKeyIds] } },
+    });
+    return this.decorate({ organizationId, grants: this.listableGrants(rows) });
+  };
+
   findTeamMemberBindings = async ({
     organizationId,
     teamIds,

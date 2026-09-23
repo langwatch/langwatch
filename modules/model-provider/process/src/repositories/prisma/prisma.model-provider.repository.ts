@@ -4,6 +4,7 @@ import {
   type Model,
   type ModelDefaultScope,
   type ModelProvider,
+  type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
 import {
   type ModelProvider as PrismaModelProvider,
@@ -50,6 +51,28 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     }
 
     return new PrismaModelProviderRepository(database, credentials);
+  }
+
+  async countUsage({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<ModelProviderUsageCount> {
+    const perOrganization = await Promise.all(
+      organizationIds.map((organizationId) =>
+        this.database.modelProvider.findMany({
+          where: { organizationId },
+          select: { provider: true, createdAt: true },
+        }),
+      ),
+    );
+    const rows = perOrganization.flat();
+    return {
+      providers: [...new Set(rows.map((row) => row.provider))].sort(),
+      ...(rows.length === 0
+        ? {}
+        : { firstModelProviderAt: Math.min(...rows.map((row) => row.createdAt.getTime())) }),
+    };
   }
 
   async tryFindById(input: {

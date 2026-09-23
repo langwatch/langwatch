@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { CodexTokenKeys } from "./codex-account.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
+import type { PlatformProviderEntry } from "./model-provider-platform-chain.ts";
 import type {
   Model,
   ModelCost,
@@ -162,6 +163,16 @@ export interface ModelCostPreviewRequest {
   readonly cacheCreationCostPerToken?: number;
   readonly cacheCreation1hCostPerToken?: number;
 }
+/**
+ * What the install-wide usage report reads here (ADR-156, section 10): the
+ * providers configured, by name only (never a key, endpoint or deployment),
+ * and when the first was added, in epoch milliseconds.
+ */
+export interface ModelProviderUsageCount {
+  readonly providers: string[];
+  readonly firstModelProviderAt?: number;
+}
+
 /** Callable model-provider operations shared by process peers after composition. */
 export interface ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number;
@@ -270,6 +281,14 @@ export interface ModelProviderApi {
     input: { scopes: readonly ModelDefaultScope[] },
     by: ModelProviderCaller,
   ): Promise<void>;
+  /**
+   * The providers this deployment holds its own keys for, in dispatch order
+   * (ADR-156 section 8); empty where it holds none. Asked by a peer dispatching
+   * on LangWatch's behalf — the gateway, for a license's managed key.
+   */
+  platformProviderChain(): Promise<PlatformProviderEntry[]>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount>;
 }
 
 export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

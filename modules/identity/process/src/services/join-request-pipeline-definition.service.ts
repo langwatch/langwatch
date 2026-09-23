@@ -21,7 +21,11 @@ import {
   JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
-import { runExpireRequest, runRemindAdmins } from "../eventing/join-request-lifecycle.intent.ts";
+import {
+  runExpireRequest,
+  runPrepareNotification,
+  runRemindAdmins,
+} from "../eventing/join-request-lifecycle.intent.ts";
 import {
   expireRequestIntentSchema,
   JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
@@ -29,6 +33,10 @@ import {
   type JoinRequestLifecycle,
   type JoinRequestLifecycleState,
   joinRequestLifecycleWake,
+  joinRequestNotificationIntentSchema,
+  onJoinApproved,
+  onJoinExpired,
+  onJoinRejected,
   onJoinRequested,
   onJoinResolved,
   remindAdminsIntentSchema,
@@ -114,9 +122,9 @@ export class JoinRequestPipelineDefinitionAdapter {
 }
 
 /**
- * The two timers (D12): the day-7 reminder and the day-14 expiry, on ONE wake column. PENDING →
- * EXPIRED happens through this wake and nowhere else, and the reminder is the only nudge admins
- * ever get about a given request.
+ * The two timers (D12) on ONE wake column — PENDING → EXPIRED happens through this wake and
+ * nowhere else — and every notice, derived from the fact it announces rather than handed over by
+ * the service that recorded it, so the handoff cannot be lost between command and callback.
  */
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,
@@ -130,10 +138,15 @@ function mountRequestLifecycle(
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
     .intent("remindAdmins", remindAdminsIntentSchema, runRemindAdmins({ port: lifecycle }))
     .intent("expireRequest", expireRequestIntentSchema, runExpireRequest({ port: lifecycle }))
+    .intent(
+      "prepareNotification",
+      joinRequestNotificationIntentSchema,
+      runPrepareNotification({ port: lifecycle }),
+    )
     .on(JOIN_REQUESTED_EVENT_TYPE, onJoinRequested)
-    .on(JOIN_APPROVED_EVENT_TYPE, onJoinResolved)
-    .on(JOIN_REJECTED_EVENT_TYPE, onJoinResolved)
+    .on(JOIN_APPROVED_EVENT_TYPE, onJoinApproved)
+    .on(JOIN_REJECTED_EVENT_TYPE, onJoinRejected)
     .on(JOIN_WITHDRAWN_EVENT_TYPE, onJoinResolved)
-    .on(JOIN_EXPIRED_EVENT_TYPE, onJoinResolved)
+    .on(JOIN_EXPIRED_EVENT_TYPE, onJoinExpired)
     .onWake(joinRequestLifecycleWake);
 }

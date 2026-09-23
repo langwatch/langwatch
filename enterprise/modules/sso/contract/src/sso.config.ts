@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Deployment facts (ADR-132): which provider `NEXTAUTH_PROVIDER` names, and
+ * Deployment facts (ADR-132): which provider `AUTH_PROVIDER` names (the
+ * deprecated `NEXTAUTH_PROVIDER` still read beside it), and
  * the public half of each identity provider's OAuth registration — a client
- * id and an issuer are not credentials. Every `*ClientSecret` plus the
- * platform license key resolve through `ssoSecrets` instead.
+ * id and an issuer are not credentials. Every `*ClientSecret` resolves through
+ * `ssoSecrets`; the platform license key is licensing's, asked through its API.
  */
 import { Config, type ConfigOf } from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
@@ -12,7 +13,9 @@ import { z } from "zod";
 const publicField = z.string().min(1).optional();
 
 export const ssoConfig = Config.define((c) => ({
-  provider: c.env("NEXTAUTH_PROVIDER", z.string().min(1).default("email")),
+  authProvider: c.env("AUTH_PROVIDER", z.string().min(1).optional()),
+  /** The NextAuth-era name for `AUTH_PROVIDER`: deprecated, still applied. */
+  legacyProvider: c.env("NEXTAUTH_PROVIDER", z.string().min(1).optional()),
   googleClientId: c.env("GOOGLE_CLIENT_ID", publicField),
   githubClientId: c.env("GITHUB_CLIENT_ID", publicField),
   gitlabClientId: c.env("GITLAB_CLIENT_ID", publicField),
@@ -34,7 +37,6 @@ export type SsoConfig = ConfigOf<typeof ssoConfig>;
 
 /** Credentials. Never config fields — they resolve through the chain. */
 export const ssoSecrets = {
-  instanceLicenseKey: Secret.load("LANGWATCH_LICENSE_KEY", { optional: true }),
   googleClientSecret: Secret.load("GOOGLE_CLIENT_SECRET", { optional: true }),
   githubClientSecret: Secret.load("GITHUB_CLIENT_SECRET", { optional: true }),
   gitlabClientSecret: Secret.load("GITLAB_CLIENT_SECRET", { optional: true }),
@@ -61,7 +63,6 @@ export interface SsoConfiguration {
   isSaas: boolean;
   provider: string;
   baseUrl: string;
-  instanceLicenseKey?: string;
   googleClientId?: string;
   googleClientSecret?: string;
   githubClientId?: string;

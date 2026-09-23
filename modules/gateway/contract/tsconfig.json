@@ -6,6 +6,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
     "lib": ["es2023"],
+    "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 

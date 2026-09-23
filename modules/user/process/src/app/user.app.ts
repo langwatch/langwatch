@@ -5,6 +5,7 @@ import {
   IdentityApi,
   passwordProblem,
   type IdentityApi as IdentityApiContract,
+  routesToOrganizationConnection,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
@@ -56,7 +57,7 @@ import type {
   UserIdInput,
   UserLinkedAccount,
   UserPasskeyNudgeStatus,
-  UserPasskeyOffer,
+  UserSecureAccountOffer,
   UserPasswordRotationOutcome,
   UserPersonalBudget,
   UserPersonalContext,
@@ -67,6 +68,7 @@ import type {
   UserTourPreference,
   UserVerificationCompleted,
   UpdateUserProfileInput,
+  UserUsageCount,
 } from "@langwatch/user-contract";
 import {
   EmailAlreadyRegisteredError,
@@ -90,6 +92,7 @@ import {
 } from "@langwatch/user-contract";
 
 import type { UserRepositories } from "../repositories/user.repositories.ts";
+import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
 import { UserService } from "../services/user.service.ts";
@@ -366,9 +369,16 @@ export class UserApp implements UserApi {
     // typed is one sign-in can never find, no matter the password.
     const email = input.email.toLowerCase();
 
+    // D09: a deployment issuing its own passwords beside its provider passes
+    // too, except for an address an organization routes to its own connection.
     const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
 
-    if (!emailMode) throw new UserRegistrationNotAvailableError();
+    if (!emailMode && !this.#peers.auth.issuesOwnPasswords()) {
+      throw new UserRegistrationNotAvailableError();
+    }
+    if (!emailMode && (await this.#addressRoutesToConnection(email))) {
+      throw new UserRegistrationNotAvailableError();
+    }
 
     await this.#meter({
       key: `user.register:${input.callerAddress}`,
@@ -421,11 +431,18 @@ export class UserApp implements UserApi {
       throw new ValidationError(problem, { meta: { fieldErrors: { password: [problem] } } });
     }
 
-    // Email mode only. Under a federated provider the password lives in that
-    // tenant and this row is not where it would go.
+    // Under a broker the password lives in the broker's tenant - unless the
+    // deployment issues its own (D09). Either way an address an organization
+    // routes through its own provider may not take a local password.
     const emailMode = (await this.#peers.auth.resolveAuthProvider()) === "email";
 
-    if (!emailMode) throw new UserPasswordAuthUnavailableError();
+    if (!emailMode && !this.#peers.auth.issuesOwnPasswords()) {
+      throw new UserPasswordAuthUnavailableError();
+    }
+    const address = (await this.#users.findById({ id: input.userId }))?.email;
+    if (address && (await this.#addressRoutesToConnection(address))) {
+      throw new UserPasswordAuthUnavailableError();
+    }
 
     await this.#meter({
       key: `user.setPassword:${input.userId}`,
@@ -460,7 +477,9 @@ export class UserApp implements UserApi {
     // who recovered through the password-reset path owns a credential account
     // they must be able to change. `changeOwnPassword` demands the current
     // password, so this is no takeover vector.
-    if (provider !== "email" && provider !== "auth0") throw new UserPasswordAuthUnavailableError();
+    if (provider !== "email" && provider !== "auth0" && !this.#peers.auth.issuesOwnPasswords()) {
+      throw new UserPasswordAuthUnavailableError();
+    }
 
     await this.#meter({
       key: `user.changePassword:${input.userId}`,
@@ -468,7 +487,9 @@ export class UserApp implements UserApi {
       refuse: () => new UserPasswordAttemptsThrottledError(),
     });
 
-    if (provider === "auth0") {
+    const holdsOwnPassword = await this.#users.hasPassword({ id: input.userId });
+
+    if (changeTargetsBrokeredPassword({ provider, holdsOwnPassword })) {
       await this.#changeFederatedPassword(input);
       await this.#endOtherSessions(input);
 
@@ -489,35 +510,57 @@ export class UserApp implements UserApi {
     await this.#endOtherSessions(input);
   }
 
+  /**
+   * Whether an organization's own connection governs this address (D04). Left
+   * to throw: for an address a company signs in, "could not tell" must not
+   * become "here is a password".
+   */
+  async #addressRoutesToConnection(email: string): Promise<boolean> {
+    return routesToOrganizationConnection(
+      await this.#peers.auth.route({ identifier: email, breakGlass: false }),
+    );
+  }
+
   /** Whether this deployment still owes the user a passkey offer, and when. */
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
     return this.#users.getPasskeyNudgeStatus(input);
   }
 
   /**
-   * Whether to offer this person a passkey right now (ADR-120). Somebody who already
-   * HOLDS one is never asked, whatever they signed in with today — a member on a machine
-   * without theirs has a good reason, and asking for another is a nag with no upside.
+   * The account-security offer (ADR-120, D06): one question covering a passkey and
+   * two-step verification, each gated on its own deployment switch and never for a
+   * person who holds it. One dismissal covers both. specs/identity/passkeys.feature
    */
-  async getPasskeyOffer(input: UserIdInput): Promise<UserPasskeyOffer> {
-    const offersPasskeys = this.#facts.passkeysEnabled;
+  async getPasskeyOffer(
+    input: UserIdInput & { sessionId: string | null },
+  ): Promise<UserSecureAccountOffer> {
+    const auth = this.#peers.auth;
+    const signedInWith = input.sessionId
+      ? await auth.getSignedInWith({ userId: input.id, sessionId: input.sessionId })
+      : "unknown";
+    const nudge = await this.#users.getPasskeyNudgeStatus({ id: input.id });
+    const passkey = this.#facts.passkeysEnabled && !nudge.hasPasskey;
+    const twoStep = auth.offersTwoStepVerification() && !nudge.twoStepEnabled;
+    if (!passkey && !twoStep) return { offer: false, passkey, twoStep, signedInWith };
 
-    if (!offersPasskeys) return { offer: false };
+    const askAgainAfter = nudge.dismissedAt
+      ? nudge.dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000
+      : 0;
 
-    const nudge = await this.#users.getPasskeyNudgeStatus(input);
-
-    if (nudge.hasPasskey) return { offer: false };
-    if (!nudge.dismissedAt) return { offer: true };
-
-    const askAgainAfter =
-      nudge.dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
-
-    return { offer: this.#nowMs() >= askAgainAfter };
+    return { offer: this.#nowMs() >= askAgainAfter, passkey, twoStep, signedInWith };
   }
 
-  /** "Not now" on the passkey offer, dated rather than flagged. */
+  /** "Not now" to the whole offer, dated rather than flagged: it comes back. */
   dismissPasskeyNudge(input: UserIdInput): Promise<void> {
     return this.#users.dismissPasskeyNudge(input);
+  }
+
+  findJoinOfferDismissedDomains(input: UserIdInput): Promise<string[]> {
+    return this.#users.findJoinOfferDismissedDomains(input);
+  }
+
+  dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void> {
+    return this.#users.dismissJoinOffer(input);
   }
 
   /**
@@ -899,6 +942,14 @@ export class UserApp implements UserApi {
       slug: project.slug,
       isPersonal: project.isPersonal,
     };
+  }
+
+  countUsage(): Promise<UserUsageCount> {
+    return this.#users.countUsage();
+  }
+
+  hasAccountOnDomain(input: { domain: string }): Promise<boolean> {
+    return this.#users.hasAccountOnDomain(input);
   }
 
   /**

@@ -486,6 +486,40 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     });
   }
 
+  async markSelfHostedCustomer(organizationId: string): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { selfHostedCustomer: true },
+    });
+  }
+
+  async findSelfHostedCustomers(): Promise<{ organizationId: string; organizationName: string }[]> {
+    const rows = await this.prisma.organization.findMany({
+      where: { selfHostedCustomer: true },
+      select: { id: true, name: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((row) => ({ organizationId: row.id, organizationName: row.name }));
+  }
+
+  async findRepresentatives(
+    organizationId: string,
+  ): Promise<{ userId: string; organizationName: string }[]> {
+    const [organization, membership] = await Promise.all([
+      this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true },
+      }),
+      this.prisma.organizationUser.findFirst({
+        where: { organizationId },
+        orderBy: { createdAt: "asc" },
+        select: { userId: true },
+      }),
+    ]);
+    if (!organization || !membership) return [];
+    return [{ userId: membership.userId, organizationName: organization.name }];
+  }
+
   async deleteProvisionedOrganization(organizationId: string): Promise<void> {
     // Deliberately imperative, and it stays that way: this is a tenant purge, not a grant
     // write. The organization itself is going away, so there is no access left to describe and
@@ -678,6 +712,30 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         },
       },
     }) as Promise<OrganizationMemberWithUser | null>;
+  }
+
+  async findMemberUserIds({ organizationId }: { organizationId: string }): Promise<string[]> {
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    return rows.map((row) => row.userId);
+  }
+
+  /** Matched on who accepted, not the address: an address can change afterwards. */
+  async findInvitedMemberIds({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.organizationInvite.findMany({
+      where: { organizationId, acceptedByUserId: { in: [...userIds] } },
+      select: { acceptedByUserId: true },
+    });
+    return rows.flatMap((row) => (row.acceptedByUserId === null ? [] : [row.acceptedByUserId]));
   }
 
   async getAllMembers(organizationId: string): Promise<User[]> {

@@ -14,6 +14,14 @@ keywords: rbac, roles, permissions, custom roles, role bindings, groups, langwat
   [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
+Teams and the built-in Admin, Member and Viewer roles work on every plan.
+Creating or editing a custom role requires Enterprise.
+
+<Frame>
+  <img src="/images/access/roles-light.png" alt="Built-in roles and the New role action in LangWatch" className="block dark:hidden" />
+  <img src="/images/access/roles-dark.png" alt="Built-in roles and the New role action in LangWatch" className="hidden dark:block" />
+</Frame>
+
 ## How access is structured
 
 A permission is a `resource:action` pair, for example `traces:view` or `datasets:manage`. A role is a named set of permissions. A role binding gives a role to a person, a group or an API key at one scope: the organization, a team or a project.
@@ -30,7 +38,9 @@ Every member of the organization has an organization role. A role binding at the
 
 ## Organization roles
 
-Set the organization role per member at **Settings > Members**. The role decides what a person can do at the organization level and how their seat is counted.
+Set the organization role per member in **Settings > Directory > People**. The role
+decides what a person can do at the organization level and how their seat is
+counted.
 
 | Role            | What it grants                                                                                                                                                                                                                          |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -72,8 +82,9 @@ A team role applies to one team and, through inheritance, to every project in it
 | `gatewayGuardrails` | view   | view                         | manage                      |
 | `gatewayCacheRules` | view   | view                         | manage                      |
 | `gatewayUsage`      | view   | view                         | view                        |
+| `gatewayLogs`       | view   | view                         | view                        |
 
-In short: a Viewer reads. A Member creates and edits the work in the project, sees costs, and manages its own virtual keys. An Admin also manages the team, deletes projects, and manages the AI Gateway configuration.
+A Viewer reads. A Member creates and edits project work, sees costs, and manages its own virtual keys. An Admin also manages the team, deletes projects, and manages the AI Gateway configuration.
 
 ## Actions
 
@@ -100,6 +111,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | Resource       | Actions                              | Scope             |
 | -------------- | ------------------------------------ | ----------------- |
 | `organization` | view, manage, delete                 | organization only |
+| `sso`          | view, manage                         | organization only |
 | `team`         | view, manage                         | any               |
 | `project`      | view, create, update, delete, manage | any               |
 
@@ -139,6 +151,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | `gatewayGuardrails` | view, attach, detach, manage                                    | any               |
 | `gatewayCacheRules` | view, create, update, delete, manage                            | any               |
 | `gatewayUsage`      | view                                                            | any               |
+| `gatewayLogs`       | view                                                            | any               |
 | `gatewaySpend`      | view, manage                                                    | organization only |
 | `webhookEndpoints`  | view, manage                                                    | organization only |
 
@@ -147,6 +160,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | Resource           | Actions                              | Scope             |
 | ------------------ | ------------------------------------ | ----------------- |
 | `governance`       | view, manage                         | organization only |
+| `governanceCost`   | view                                 | organization only |
 | `ingestionSources` | view, create, update, delete, manage | organization only |
 | `anomalyRules`     | view, create, update, delete, manage | organization only |
 | `complianceExport` | view                                 | organization only |
@@ -172,7 +186,9 @@ A custom role has:
 | Description | Optional                                                 |
 | Permissions | One or more `resource:action` pairs                      |
 
-The permission selector groups the checkboxes by resource. Ticking `manage` ticks the actions it implies. Ticking `create`, `update` or `delete` also ticks `view`.
+Expand a permission category and choose **None**, **Read** or **Full access**
+for each resource. Some resources only support Read. The preview explains what
+the role permits at the selected scope. Select **Create role** to save it.
 
 <Frame>
   <img
@@ -181,13 +197,21 @@ The permission selector groups the checkboxes by resource. Ticking `manage` tick
   />
 </Frame>
 
-The selector offers these resources: traces, cost, scenarios, annotations, analytics, evaluations, datasets, triggers, workflows, experiments, prompts, secrets, audit log, team, project, governance, ingestion sources, anomaly rules, compliance export, activity monitor and AI tools. The [Roles API](/api-reference/roles/overview) accepts every resource and action in the tables above.
+The permission picker groups resources by product area. The [Roles API](/api-reference/roles/overview) accepts every resource and action in the tables above.
 
-To give a custom role to a person, pick it in the role select at **Settings > Teams & Projects** (a team member row, **Add to team** or **Add access to project**), in the member dialog at **Settings > Members**, in the team assignments of an invite, or bind it to a group. A custom role can be bound at organization, team or project scope. An organization Admin who also holds a custom team role keeps the Admin access.
+To assign a custom role directly, open **Settings > Directory > People** and edit the
+person's access, or open **Settings > Directory > Teams & projects** and add access to a team or
+project. You can also choose a role while creating an invite, or assign the
+role to a group in **Settings > Directory > Groups**. A custom role can be assigned at
+organization, team or project scope.
 
-## Role bindings
+An organization Admin who also holds a
+custom team role keeps the Admin access.
 
-A role binding is one row: who, which role, at which scope.
+## Role assignments
+
+The API calls this a role binding. In the product, a role assignment is one
+row: who, which role and which scope.
 
 | Part  | Options                                    |
 | ----- | ------------------------------------------ |
@@ -195,7 +219,11 @@ A role binding is one row: who, which role, at which scope.
 | Role  | Admin, Member, Viewer, or a custom role    |
 | Scope | The organization, one team, or one project |
 
-You create bindings for users from **Settings > Members** and **Settings > Teams & Projects**, and for groups from **Settings > Groups**. **Settings > Role Bindings** lists every binding in the organization per user and per group, filtered by organization, team or project scope. The page is read only.
+You create role assignments for users from **Settings > Directory > People** and
+**Settings > Directory > Teams & projects**, and for groups from **Settings > Directory > Groups**. Open
+**Roles**, then choose **Role assignments** to list every assignment in the
+organization. Filter it by organization, team or project scope. This tab is
+read only.
 
 <Frame>
   <img
@@ -210,7 +238,10 @@ An API key can hold bindings too. A key with restricted permissions stores its s
 
 ## Groups
 
-A group gives the same bindings to many people at once. Create a group at **Settings > Groups** (Enterprise), add members, and bind roles to the group at any scope. A binding on a group applies to every member of the group, and the members page shows it as "via" the group.
+A group gives the same assignments to many people at once. Create a group at
+**Settings > Directory > Groups** (Enterprise), add members, and assign roles at any
+scope. An assignment on a group applies to every member of the group, and the
+People tab shows it as "via" the group.
 
 A group synced from your identity provider through SCIM keeps its name and membership under the identity provider's control: you bind roles to it in LangWatch, and the identity provider decides who is in it.
 

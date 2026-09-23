@@ -7,29 +7,39 @@ import {
   type LangyNavigateProject,
   type LangyNavigateResourceLocator,
 } from "../app/langy.members.ts";
-import { navigatePagePathFor } from "../rules/langy-navigate-pages.rules.ts";
+import { navigatePageFor } from "../rules/langy-navigate-pages.rules.ts";
 import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules.ts";
 
 /** Builds a deep link into the product from a project slug and a path. */
 export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: string }) => string;
 
+/** Builds a deep link to an organization page, which sits at the top level. */
+export type LangyNavigateOrganizationUrl = (input: { path: string }) => string;
+
 export class LangyNavigateFallbackService {
   private constructor(
     private readonly projects: LangyNavigateProject,
     private readonly platformUrl: LangyNavigatePlatformUrl,
+    private readonly organizationUrl: LangyNavigateOrganizationUrl,
     private readonly resources: LangyNavigateResourceLocator | undefined,
   ) {}
 
   static create(deps: {
     projects: LangyNavigateProject;
     platformUrl: LangyNavigatePlatformUrl;
+    organizationUrl: LangyNavigateOrganizationUrl;
     /**
      * Absent where a process composed none of the eight features a resource id
      * names; only page names resolve then.
      */
     resources?: LangyNavigateResourceLocator;
   }): LangyNavigateFallbackService {
-    return new LangyNavigateFallbackService(deps.projects, deps.platformUrl, deps.resources);
+    return new LangyNavigateFallbackService(
+      deps.projects,
+      deps.platformUrl,
+      deps.organizationUrl,
+      deps.resources,
+    );
   }
 
   /**
@@ -37,7 +47,12 @@ export class LangyNavigateFallbackService {
    * answers to it.
    */
   async tryResolveUrl(input: { projectId: string; resourceId: string }): Promise<string | null> {
-    const path = await this.tryResolvePath(input);
+    const page = navigatePageFor(input.resourceId);
+    if (page?.scope === "organization") {
+      return this.organizationUrl({ path: page.path });
+    }
+
+    const path = page?.path ?? (await this.tryResolveResourcePath(input));
     if (!path) {
       return null;
     }
@@ -52,18 +67,13 @@ export class LangyNavigateFallbackService {
     return this.platformUrl({ projectSlug, path });
   }
 
-  private async tryResolvePath({
+  private async tryResolveResourcePath({
     projectId,
     resourceId,
   }: {
     projectId: string;
     resourceId: string;
   }): Promise<string | null> {
-    const pagePath = navigatePagePathFor(resourceId);
-    if (pagePath) {
-      return pagePath;
-    }
-
     const kind = navigateResourceKindFor(resourceId);
     if (!kind || !this.resources) {
       return null;

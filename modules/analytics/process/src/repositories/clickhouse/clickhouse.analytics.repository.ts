@@ -103,6 +103,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       timeZone: query.input.timeZone,
       traceIds: query.input.traceIds,
       negateFilters: query.input.negateFilters,
+      excludeOrigins: query.input.excludeOrigins,
     } as AnalyticsTimeseriesBuilderInput;
     const built = builderFor(query.table)(builderInput);
 

@@ -21,6 +21,7 @@ import {
   type UserProfile,
   type UserSsoStatus,
   type UserTourPreference,
+  type UserUsageCount,
 } from "@langwatch/user-contract";
 
 import type {
@@ -48,6 +49,21 @@ export class MemoryUserRepository implements UserRepository {
 
   static create(input: Readonly<{ database: MemoryUserDatabase }>): MemoryUserRepository {
     return new MemoryUserRepository(input.database);
+  }
+
+  async countUsage(): Promise<UserUsageCount> {
+    const emailDomains: Record<string, number> = {};
+    for (const row of this.#database.rows()) {
+      const domain = row.email?.trim().toLowerCase().split("@")[1];
+      if (domain) emailDomains[domain] = (emailDomains[domain] ?? 0) + 1;
+    }
+    return { emailDomains };
+  }
+
+  async hasAccountOnDomain(domain: string): Promise<boolean> {
+    return this.#database
+      .rows()
+      .some((row) => row.email?.trim().toLowerCase().split("@")[1] === domain);
   }
 
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
@@ -124,10 +140,12 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
-    const dismissedAt = this.#database.user(id)?.passkeyNudgeDismissedAt ?? null;
+    const user = this.#database.user(id);
+    const dismissedAt = user?.passkeyNudgeDismissedAt ?? null;
 
     return userPasskeyNudgeStatusSchema.parse({
       hasPasskey: this.#database.passkeyCount(id) > 0,
+      twoStepEnabled: user?.twoFactorEnabled ?? false,
       dismissedAt: dismissedAt ? toDate(dismissedAt) : null,
     });
   }
@@ -135,6 +153,18 @@ export class MemoryUserRepository implements UserRepository {
   async setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void> {
     const row = this.#require(input.id);
     this.#database.writeUser({ ...row, passkeyNudgeDismissedAt: input.dismissedAt });
+  }
+
+  async findJoinOfferDismissedDomains(id: string): Promise<string[]> {
+    return [...(this.#database.user(id)?.joinOfferDismissedDomains ?? [])];
+  }
+
+  async addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({
+      ...row,
+      joinOfferDismissedDomains: [...row.joinOfferDismissedDomains, input.domain],
+    });
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
@@ -251,6 +281,8 @@ export class MemoryUserRepository implements UserRepository {
       lastHomePath: null,
       tracesExplorerTourDismissedAt: null,
       passkeyNudgeDismissedAt: null,
+      twoFactorEnabled: false,
+      joinOfferDismissedDomains: [],
     };
     this.#database.writeUser(row);
 

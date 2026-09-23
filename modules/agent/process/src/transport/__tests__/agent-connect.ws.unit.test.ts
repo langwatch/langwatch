@@ -15,6 +15,7 @@ import WebSocket from "ws";
 
 import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fixture.ts";
 import { resultCapViolation } from "../../rules/connected-agent-caps.rules.ts";
+import { UNREADABLE_RESULT_MESSAGE } from "../../rules/connected-agent-frame.rules.ts";
 import type { AgentService } from "../../services/agent.service.ts";
 import type { ConnectedAgentCredentials } from "../../services/connected-agent-credential.service.ts";
 import { ConnectedAgentRuntimeService } from "../../services/connected-agent-runtime.service.ts";
@@ -337,6 +338,99 @@ describe("ConnectGateway socket lifecycle", () => {
       expect(gateway.sessionCount).toBe(0);
       await gateway.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+  });
+});
+
+/** One platform frame off the socket, however ws delivered its bytes. */
+function frameOf(raw: WebSocket.RawData): Record<string, unknown> {
+  if (Array.isArray(raw)) return JSON.parse(Buffer.concat(raw).toString("utf8"));
+  const bytes = raw instanceof ArrayBuffer ? Buffer.from(raw) : raw;
+  return JSON.parse(bytes.toString("utf8"));
+}
+
+/** One registered instance on a started pod, and a call dispatched at its agent. */
+async function dispatchToRegisteredInstance(pod: Awaited<ReturnType<typeof startPod>>) {
+  await pod.runtime.dispatcher.start();
+  const { socket, registered } = connectAndRegister(pod.url, registerFrame());
+  const frames: Record<string, unknown>[] = [];
+  const registeredFrame = await registered;
+  socket.on("message", (raw) => frames.push(frameOf(raw)));
+  const agents = registeredFrame.agents as { id: string }[];
+  const pending = pod.runtime.dispatcher.dispatch({
+    projectId: "proj_1",
+    agent: {
+      id: agents[0]?.id ?? "",
+      name: "support-agent",
+      environment: "production",
+      timeoutMs: 20_000,
+      isSticky: false,
+    },
+    call: {
+      threadId: "thread_1",
+      messages: [{ role: "user", content: "where is my order?" }],
+      newMessages: [{ role: "user", content: "where is my order?" }],
+      params: {},
+      session: undefined,
+      traceparent: null,
+      run: {},
+    },
+  });
+  await vi.waitFor(() => expect(frames.some((frame) => frame.type === "call")).toBe(true));
+  const callId = String(frames.find((frame) => frame.type === "call")?.callId);
+  const send = (frame: Record<string, unknown>) =>
+    socket.send(JSON.stringify({ protocol: PROTOCOL_VERSION, ...frame }));
+  send({ type: "ack", callId });
+  return { socket, pending, callId, send };
+}
+
+describe("ConnectGateway result frames", () => {
+  let pod: Awaited<ReturnType<typeof startPod>>;
+
+  afterEach(async () => {
+    await pod.runtime.dispatcher.close();
+    await stopPod(pod);
+  });
+
+  describe("when the instance answers with a result the platform cannot read", () => {
+    /** @scenario "A result the platform cannot read fails the call at once" */
+    it("fails the call with agent_call_failed naming the field, before the deadline", async () => {
+      pod = await startPod();
+      const { socket, pending, callId, send } = await dispatchToRegisteredInstance(pod);
+      const started = Date.now();
+
+      send({
+        type: "result",
+        callId,
+        output: { output: "Order 42 ships today", thread_id: "t1", order_number: null },
+      });
+
+      await expect(pending).rejects.toMatchObject({
+        code: "agent_call_failed",
+        meta: {
+          remoteCode: "agent_call_failed",
+          message: expect.stringMatching(
+            new RegExp(`^${UNREADABLE_RESULT_MESSAGE}: output\\.role: `),
+          ),
+        },
+      });
+      expect(Date.now() - started).toBeLessThan(5_000);
+      socket.close();
+    });
+  });
+
+  describe("when an unreadable result names a call the instance does not hold", () => {
+    /** @scenario "An unreadable result for a call the instance does not hold is dropped" */
+    it("leaves the held call waiting for its real answer", async () => {
+      pod = await startPod();
+      const { socket, pending, callId, send } = await dispatchToRegisteredInstance(pod);
+
+      send({ type: "result", callId: "call_nobody_asked_for", output: { output: "stray" } });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      send({ type: "result", callId, output: "the real answer" });
+
+      await expect(pending).resolves.toMatchObject({ output: "the real answer" });
+      socket.close();
     });
   });
 });

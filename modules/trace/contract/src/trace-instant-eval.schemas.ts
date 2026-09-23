@@ -3,7 +3,12 @@
  * reads back. It sends the search bar's vocabulary and the shorthand writes
  * the statement, so this is the run a CLI caller starts with `--target`.
  */
-import { INSTANT_EVAL_TARGETS, instantEvalRunSchema } from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_TARGETS,
+  instantEvalEstimateSchema,
+  instantEvalRunSchema,
+  isInstantEvalRunActive,
+} from "@langwatch/instant-eval-contract";
 import { z } from "zod";
 
 /**
@@ -83,3 +88,16 @@ export const explorerInstantEvalRunsSchema = z
   .optional();
 
 export type ExplorerInstantEvalRuns = z.infer<typeof explorerInstantEvalRunsSchema>;
+
+/** What an estimate tells the Explorer before a run starts. */
+export type ExplorerInstantEvalEstimate = z.infer<typeof instantEvalEstimateSchema>;
+
+/**
+ * Whether a run the Explorer is watching is still judging. Re-exported here so
+ * the Explorer reads one vocabulary: the counters' schema and their meaning.
+ */
+export function isExplorerInstantEvalRunActive(
+  status: ExplorerInstantEvalProgress["status"],
+): boolean {
+  return isInstantEvalRunActive(status);
+}

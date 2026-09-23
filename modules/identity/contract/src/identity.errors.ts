@@ -170,6 +170,33 @@ export class SsoConnectionDomainTakenError extends SsoConnectionCommandRefusedEr
   }
 }
 
+/** A domain no organization could own alone: a shared mail provider, a
+ *  registry suffix or a bare label. The copy lists nothing, so the refusal
+ *  cannot be used to read the deny-list back. */
+export class SsoDomainNotEligibleError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_domain_not_eligible", "sso_domain_not_eligible", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoDomainNotEligibleError";
+  }
+}
+
+/** More domains claimed in the window than a connection is allowed; the wait
+ *  rides in `meta` so the screen counts down from the guard's own answer. */
+export class SsoDomainClaimThrottledError extends SsoConnectionCommandRefusedError {
+  constructor(retryAfterSeconds: number) {
+    super("sso_domain_claim_throttled", "sso_domain_claim_throttled", {
+      httpStatus: 429,
+      fault: "customer",
+      meta: { retryAfterSeconds },
+    });
+    this.name = "SsoDomainClaimThrottledError";
+  }
+}
+
 /** Activation's preconditions are unmet: no verified domain, no live
  *  break-glass binding, or no recorded test login. */
 export class SsoConnectionActivationBlockedError extends SsoConnectionCommandRefusedError {
@@ -447,6 +474,22 @@ export class JoinAutoNotLicensedError extends JoinRequestRefusedError {
       reasons: [new Error(detail)],
     });
     this.name = "JoinAutoNotLicensedError";
+  }
+}
+
+/**
+ * Opening the door wider is a paid control of the organization's plan, refused
+ * here rather than by the screen. Closing it is never refused for this reason,
+ * or a lapsed plan would leave a door the organization cannot shut.
+ */
+export class JoinPolicyNotLicensedError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_policy_not_licensed", "join_policy_not_licensed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinPolicyNotLicensedError";
   }
 }
 

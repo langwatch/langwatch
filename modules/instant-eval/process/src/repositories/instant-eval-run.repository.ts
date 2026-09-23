@@ -79,4 +79,9 @@ export interface InstantEvalRunRepository {
    * failed. Scoped to a run still queued, so it cannot overtake one that ran.
    */
   fail(input: { projectId: string; runId: string; code: string }): Promise<void>;
+  /** The usage report's figures: runs since `since` (epoch ms), and the first run's day. */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<{ runs: number; firstRunAt?: number }>;
 }

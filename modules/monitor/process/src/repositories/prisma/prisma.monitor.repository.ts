@@ -16,6 +16,7 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
   MonitorNotFoundError,
+  type MonitorUsageCount,
 } from "@langwatch/monitor-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { isRecordNotFoundError } from "@langwatch/prisma-client/errors";
@@ -70,6 +71,27 @@ export class PrismaMonitorRepository
   implements MonitorRepository
 {
   static readonly create = this.factory((prisma) => new PrismaMonitorRepository(prisma));
+
+  async countUsage({
+    projectIds,
+    since,
+  }: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<MonitorUsageCount> {
+    const scope = { projectId: { in: [...projectIds] } };
+    const [monitors, first] = await Promise.all([
+      this.prisma.monitor.count({
+        where: since === undefined ? scope : { ...scope, createdAt: { gte: new Date(since) } },
+      }),
+      this.prisma.monitor.findFirst({
+        where: scope,
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    return { monitors, ...(first ? { firstMonitorAt: first.createdAt.getTime() } : {}) };
+  }
 
   async findAll(input: { projectId: string }): Promise<MonitorWithEvaluator[]> {
     const rows = await this.prisma.monitor.findMany({

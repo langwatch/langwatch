@@ -27,7 +27,10 @@ export type GatewayDecimal = {
 export type GatewayBudgetBreachAction = "BLOCK" | "WARN";
 export type GatewayProviderHealthStatus = "UNKNOWN" | "HEALTHY" | "DEGRADED" | "CIRCUIT_OPEN";
 export type GatewayProviderRotationPolicy = "MANUAL";
-export type VirtualKeyPurpose = "USER" | "LANGY";
+export type VirtualKeyPurpose = "USER" | "LANGY" | "CONNECT";
+
+/** The service a CONNECT key names when it may dispatch on the platform's own providers. */
+export const MANAGED_MODELS = "managed_models";
 export type VirtualKeyStatus = "ACTIVE" | "DISABLED" | "REVOKED";
 export type VirtualKeyRoutingMode = "NONE" | "FALLBACK_ALL" | "POLICY";
 export type GatewayRealtimeSessionStatus = "OPEN" | "CLOSED" | "FAILED" | "EXPIRED";

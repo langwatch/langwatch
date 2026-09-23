@@ -368,6 +368,10 @@ export class TestSessions extends CodingAgentSessionRepository {
     this.bySessionIdInputs.push(input);
     return this.bySessionIdRows;
   }
+
+  async countUsage(): Promise<{ sessions: number }> {
+    return { sessions: this.rows.length };
+  }
 }
 
 export class TestTraceSessions extends CodingAgentTraceSessionRepository {
@@ -512,6 +516,10 @@ export class TestBillingPolicy implements CodingAgentBillingPolicy {
 }
 
 export class TestGithubService implements GithubApi {
+  countUsage(): Promise<{ pullRequests: number }> {
+    return Promise.resolve({ pullRequests: 0 });
+  }
+
   branchQueries: { headBranches: readonly string[] }[] = [];
   readonly configured = true;
   pullRequests: GithubPullRequest[] = [];

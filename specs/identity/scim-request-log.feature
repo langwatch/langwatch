@@ -104,6 +104,13 @@ Feature: The SCIM request log - what the provider asked, and what we answered
     And requests inside the window are untouched
 
   @unit
+  Scenario: The worker runs the request log's retention sweep on a schedule
+    Given the SCIM module is installed on the worker
+    When its six-hourly schedule fires
+    Then the retention sweep runs once
+    And the sweep's own bookkeeping older than a week is pruned
+
+  @unit
   Scenario: An absent request is not evidence that it never happened
     Given a connection whose recorded requests have aged out
     When its requests are read

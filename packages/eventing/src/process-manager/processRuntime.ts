@@ -1,4 +1,5 @@
 import { createLogger, type Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 import type { Event } from "../domain/types.ts";
 import {
@@ -20,7 +21,6 @@ import type {
 import { ProcessManagerService, type SignalHandleResult } from "./processManagerService.ts";
 import type { ProcessStore } from "./stores/processStore.types.ts";
 import { ProcessWakeWorker, type ProcessWakeHandler } from "./wake/processWakeWorker.ts";
-import { nowInstant } from "@langwatch/time";
 
 const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
 
@@ -72,6 +72,7 @@ export function buildIntentHandlers(
         tenantId: message.tenantId,
         messageKey: message.messageKey,
         attempt: message.attempt,
+        leaseExpiresAt: message.leaseExpiresAt,
       });
     };
   }

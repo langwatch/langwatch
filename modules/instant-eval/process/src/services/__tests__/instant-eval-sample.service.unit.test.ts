@@ -35,6 +35,10 @@ class RecordingJudgments implements InstantEvalJudgmentsRepository {
 
   constructor(private readonly judged: readonly InstantEvalJudgment[]) {}
 
+  async countUsage(): Promise<number> {
+    return 0;
+  }
+
   async insert(): Promise<void> {
     // A sample writes no judgement.
   }

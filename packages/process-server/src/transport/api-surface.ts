@@ -11,6 +11,7 @@ import {
   composeApiApplication,
   HttpMux,
   BrowserBundle,
+  FramedDocument,
   type NodeHandler,
   type TransportSelection,
 } from "@langwatch/api/hosting";
@@ -21,6 +22,7 @@ import {
   defineRestMiddleware,
   IdempotencyLedger,
   projectRestFacts,
+  recordKeyCredential,
   recordOrganizationCredential,
   recordProjectCredential,
   recordScimCredential,
@@ -56,6 +58,7 @@ import { z } from "zod";
 import type { ApiUiBundle } from "./bundle-config.ts";
 import {
   ApiRestCredentials,
+  type ApiKeyDoorCredential,
   type ApiOrganizationCredential,
   type ApiProjectCredential,
 } from "./credentials.ts";
@@ -156,6 +159,7 @@ class ApiSurface {
       identities: {
         project: this.#projectDoor(),
         organization: this.#organizationDoor(),
+        apiKey: this.#keyDoor(),
         browser: this.#browserDoor(),
         scimToken: this.#directoryDoor(peers.find(ScimApi)),
         "instance-admin": this.composition.instanceAdmin,
@@ -200,11 +204,13 @@ class ApiSurface {
         : {}),
     });
     const api = composeApiApplication({ rest: this.#rest, trpc: this.#trpc }, selected);
-    return HttpMux.create({ reporter: composition.logger })
+    const mux = HttpMux.create({ reporter: composition.logger })
       .use(ClientAddress.fromTrustedProxies({ addresses: composition.trustedProxies }))
       .use(SecurityHeaders.strict({ production: composition.production }))
-      .route("/api", api, { onFailure: answerApiFailure })
-      .route("/", page).handler;
+      .route("/api", api, { onFailure: answerApiFailure });
+    for (const document of selected.documents)
+      mux.route(document.path, FramedDocument.create(document));
+    return mux.route("/", page).handler;
   }
 
   #projectDoor(): RestIdentity {
@@ -267,6 +273,31 @@ class ApiSurface {
     this.#callerCredentials.set(caller, credential.resolved);
 
     return caller;
+  }
+
+  /** Any API key, fanned out by the feature rather than pinned to a project here. */
+  #keyDoor(): RestIdentity {
+    return {
+      authenticate: () => {
+        throw new Error("The key door asks no permission: the feature decides what the key reads.");
+      },
+      identify: async ({ request }) =>
+        this.#keyCaller(request, await this.credentials.identifyKey({ request })),
+    };
+  }
+
+  #keyCaller(request: Request, credential: ApiKeyDoorCredential): RestCaller {
+    recordKeyCredential(request, credential.principal);
+    const { principal } = credential;
+
+    return {
+      actor:
+        principal.kind === "apiKey" && principal.userId
+          ? { type: "user", id: principal.userId }
+          : null,
+      scope: { tier: "organization", id: credential.organizationId },
+      markUsed: credential.markUsed,
+    };
   }
 
   #browserDoor(): RestIdentity {

@@ -92,10 +92,11 @@ export class TraceViewerProtectionService {
   async resolve(
     input: Readonly<{ projectId: string; userId: string | undefined; publiclyShared: boolean }>,
   ): Promise<Protections> {
-    const [canSeeCosts, isMember, isAdmin, visibilityCutoffMs] = await Promise.all([
+    const [canSeeCosts, isMember, isAdmin, isProjectOwner, visibilityCutoffMs] = await Promise.all([
       this.permitted(input, "cost:view"),
       this.permitted(input, "traces:view"),
       this.permitted(input, "project:update"),
+      this.isProjectOwner(input),
       this.visibilityCutoffMs(input.projectId),
     ]);
 
@@ -134,7 +135,7 @@ export class TraceViewerProtectionService {
                   isMember,
                   isMemberRole: isMember,
                   isViewer: isMember && !isAdmin,
-                  isProjectOwner: false,
+                  isProjectOwner,
                   groupIds: [],
                 }),
             restrictVisibleTo: restrictLabelFor(resolved),
@@ -169,6 +170,23 @@ export class TraceViewerProtectionService {
     const project = await this.options.projects.findWithTeam(input.projectId);
     if (!project) return null;
     return this.resolve({ ...input, publiclyShared: true });
+  }
+
+  /** Whether the viewer owns the project; unknown ownership is not ownership. */
+  private async isProjectOwner(
+    input: Readonly<{ projectId: string; userId: string | undefined }>,
+  ): Promise<boolean> {
+    if (input.userId === undefined) return false;
+    try {
+      const project = await this.options.projects.findWithTeam(input.projectId);
+      return project?.ownerUserId != null && project.ownerUserId === input.userId;
+    } catch (error) {
+      this.logger.error(
+        { projectId: input.projectId, error },
+        "project owner resolution failed; treating the viewer as not the owner (fail-closed)",
+      );
+      return false;
+    }
   }
 
   private permitted(

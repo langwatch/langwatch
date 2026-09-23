@@ -4,12 +4,14 @@ import {
   parseOnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import {
+  type JoinRequestJoining,
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
   type OrganizationBillingProfile,
   type PersonalFeatures,
   type PersonalWorkspace,
+  type OrganizationUsageCount,
 } from "@langwatch/organization-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -35,9 +37,56 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return new MemoryOrganizationRepository(options.memory);
   }
 
+  async findAllIds(): Promise<string[]> {
+    return [...this.memory.organizations.keys()];
+  }
+
+  /** The memory rows carry no legacy single sign-on column, so no provider is named here. */
+  async countUsage({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<OrganizationUsageCount> {
+    const joined = this.memory.organizationUsers
+      .filter((row) => organizationIds.includes(row.organizationId))
+      .map((row) => row.createdAt.getTime())
+      .toSorted((left, right) => left - right);
+    const second = joined[1];
+    return {
+      members: joined.length,
+      ssoProviders: [],
+      ...(second === undefined ? {} : { secondMemberJoinedAt: second }),
+    };
+  }
+
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
     const organization = this.memory.organizations.get(organizationId);
     return organization ? { ...organization } : null;
+  }
+
+  async getJoinSetting({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<JoinRequestJoining> {
+    const organization = this.requireOrganization(organizationId);
+
+    return {
+      domainJoin: organization.domainJoin ?? "request",
+      joinDomains: [...(organization.joinDomains ?? [])],
+    };
+  }
+
+  async saveJoinSetting({
+    organizationId,
+    setting,
+  }: {
+    organizationId: string;
+    setting: JoinRequestJoining;
+  }): Promise<void> {
+    const organization = this.requireOrganization(organizationId);
+    organization.domainJoin = setting.domainJoin;
+    organization.joinDomains = [...setting.joinDomains];
   }
 
   async getGuidedOnboarding({

@@ -88,6 +88,7 @@ Rules for the connect function:
 - Change nothing about how the service starts. The connect function runs on the startup path, and the start command stays the same.
 - **Turn fields** are what the platform sends on every call: `messages` (the whole conversation, OpenAI-style), `new_messages` (`newMessages`, the delta since the last turn), `thread_id` (`threadId`), `session`, `trace_id` (`traceId`). In Python, declare only the ones you use and the SDK passes exactly those. In TypeScript, they arrive as one object, so destructure what you need.
 - Return a string, one message, a list of messages, or `langwatch.AgentReply(output, session=...)` (`{ output, session }` in TypeScript).
+- The connect function is the adapter, and only it carries the decorator. Never place the decorator on a function the app already has when that function returns its own result, for example a dict with the output, a thread id and an order number: the SDK cannot turn that into a reply, and every turn of the run times out. Call that function from the connect function and return its reply text.
 - Do not change the agent's own code to fit the connect function. Map the turn onto the agent's existing call in the connect function instead.
 - Do NOT add a `traceparent` middleware. The SDK adopts the turn's trace context before it calls the function, so the agent's spans land in the turn's trace and the judge reads them.
 
@@ -194,7 +195,7 @@ langwatch scenario create 'Order status question' \
 langwatch test-suite run 'Smoke' --target connected:support-agent --wait
 ```
 
-- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id.
+- `--target connected:<name>` runs the agent in `development`, the environment a process registers under by default. When no process is connected there but one other environment is online, the run uses that one. `connected:<name>@<environment>` names the environment, and `connected:<agent-id>` works the same way; `langwatch agent list --format json` prints the id. A name with a space goes in double quotes, `--target "connected:ACME checkout"`, and so does `--wait-online "ACME checkout"`: passed bare, the shell splits it and the command refuses the stray word.
 - Write the situation and the criteria from the agent's real behavior in this codebase, not from the example. Include at least one criterion about a tool call or a lookup, which the judge verifies against the agent's own traces.
 - `--criteria` takes one comma-separated string, so a criterion cannot contain a comma. Rephrase instead.
 - `--test-suite` files the scenario into a test suite that exists. Create the test suite first.
@@ -229,7 +230,7 @@ Report failures as they happened. If a CLI command failed or the platform was un
 A change to the connect call is not live until the process that holds it starts again, so the registration you report has to come from a process you restarted in this conversation. Before you run `gh pr create`:
 
 1. Restart the service that holds the connect call, on the same port.
-2. Run `langwatch agent get <name>` and read the parameter list back.
+2. Run `langwatch agent get "<name>"` and read the parameter list back.
 3. Put that list in the pull request body, as the command printed it.
 
 When you could not restart the process, write in the body, in one line, that the restart is left to the user and that the parameters are not registered yet. A sentence such as "confirmed the connected agent registered both options" is false unless the `agent get` output in this conversation lists both options. Copy the pull request address that `gh pr create` prints into your reply as well, character for character.
@@ -360,6 +361,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
 ## Common Mistakes
 
 - Do NOT reimplement the agent inside the connect function, and do NOT point it at a simplified copy. It calls the agent the product already runs, so the simulation exercises the real code path.
+- Do NOT decorate a function the app already has when it returns its own result object instead of reply text. Write the connect function beside it, call it, and return the text.
 - Do NOT add a runner script or a second start command when the service already has one. The connect function goes on the existing startup path.
 - Do NOT add a `traceparent` middleware for a connected agent. The SDK adopts the trace context itself; the middleware belongs to the HTTP fallback only.
 - Do NOT hardcode an environment string, and do NOT write a fallback such as `process.env.APP_ENV ?? "development"`. It overrides `LANGWATCH_AGENT_ENVIRONMENT` and registers a production process under `development`. Let the SDK resolve the environment.

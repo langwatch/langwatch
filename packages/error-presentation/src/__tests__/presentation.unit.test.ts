@@ -420,6 +420,20 @@ describe("explainHandledError", () => {
       expect(description).toContain("rate-limiting");
     });
 
+    /** @scenario "A provider rate limit gets its own remediation copy" */
+    it.each([
+      "rate_limit_exceeded",
+      "rate_limit_error",
+      "RESOURCE_EXHAUSTED",
+    ])("explains the provider's own %s code as the same wait-and-retry", (code) => {
+      const { description } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(description).toContain("rate-limiting");
+      expect(description).toContain("pick a model with more room");
+    });
+
     /** @scenario "A provider outage gets its own remediation copy" */
     it.each(["upstream_unavailable", "upstream_timeout"])(
       "explains a %s reason as a provider outage",

@@ -268,8 +268,7 @@ function installNameEvidenceErased(module: NameEvidenceErasedModule) {
 }
 void installNameEvidenceErased;
 
-type BroadSchemaModule = Omit<typeof clockModule, "configSchema"> &
-  Pick<SupplyModule, "configSchema">;
+type BroadSchemaModule = Omit<typeof clockModule, "configType"> & Pick<SupplyModule, "configType">;
 function installBroadSchema(module: BroadSchemaModule) {
   // @ts-expect-error a broad schema cannot identify the module's own config slice
   return createApp({ role: "api" }).withModules([module]);

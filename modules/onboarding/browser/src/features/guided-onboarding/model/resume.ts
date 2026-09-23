@@ -35,12 +35,12 @@ export interface LandingResume extends ResumedOrganization {
 export type GuidedResume = TakeoverResume | LandingResume;
 
 interface ResumableOrganization {
-  id: string;
-  name: string;
-  signupData: unknown;
-  teams: {
-    isPersonal?: boolean;
-    projects: { id: string; slug: string }[];
+  readonly id: string;
+  readonly name: string;
+  readonly signupData?: unknown;
+  readonly teams: readonly {
+    readonly isPersonal?: boolean;
+    readonly projects: readonly { readonly id: string; readonly slug: string }[];
   }[];
 }
 
@@ -86,7 +86,7 @@ function resumeForOrganization(organization: ResumableOrganization): GuidedResum
 export function resolveGuidedResume({
   organizations,
 }: {
-  organizations: ResumableOrganization[] | undefined;
+  organizations: readonly ResumableOrganization[] | undefined;
 }): GuidedResume | null {
   for (const organization of organizations ?? []) {
     const resume = resumeForOrganization(organization);

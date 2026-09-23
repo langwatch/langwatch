@@ -4,6 +4,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   configPath,
+  defaultConfigPath,
+  displayConfigPath,
+  isIsolatedConfig,
   loadConfig,
   saveConfig,
   clearConfig,
@@ -266,6 +269,37 @@ describe("governance config persistence", () => {
 
   it("env var override changes the path", () => {
     expect(configPath()).toBe(p);
+  });
+
+  describe("when LANGWATCH_CLI_CONFIG names a file other than the home's default", () => {
+    it("is a config of its own", () => {
+      expect(isIsolatedConfig()).toBe(true);
+    });
+
+    /** @scenario "The login names the config file it writes" */
+    it("is shown by its own path, not as the home's default", () => {
+      expect(displayConfigPath()).toBe(p);
+    });
+  });
+
+  describe("when LANGWATCH_CLI_CONFIG names the home's default file", () => {
+    it("is the machine's own config, shown under ~", () => {
+      process.env.LANGWATCH_CLI_CONFIG = defaultConfigPath();
+
+      expect(isIsolatedConfig()).toBe(false);
+      expect(displayConfigPath()).toBe(
+        path.join("~", ".langwatch", "config.json"),
+      );
+    });
+  });
+
+  describe("when LANGWATCH_CLI_CONFIG is unset or blank", () => {
+    it.each([undefined, "", "  "])("is not a config of its own (%j)", (value) => {
+      if (value === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+      else process.env.LANGWATCH_CLI_CONFIG = value;
+
+      expect(isIsolatedConfig()).toBe(false);
+    });
   });
 
   it("clear removes the file (idempotent on missing)", () => {

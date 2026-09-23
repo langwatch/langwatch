@@ -64,7 +64,7 @@ function uiFeatureApiLinks({
   subscriptionUrl = subscriptionOrigin(),
   eventSource,
 }: UiFeatureApiClientOptions) {
-  const httpRouting = splitLink({
+  const batchRouting = splitLink({
     condition: (operation) => operation.context.skipBatch === true,
     true: httpLink({ url, ...(fetch ? { fetch } : {}) }),
     false: httpBatchLink({
@@ -72,6 +72,20 @@ function uiFeatureApiLinks({
       maxURLLength: MAX_BATCHED_URL_LENGTH,
       ...(fetch ? { fetch } : {}),
     }),
+  });
+  // A write sent moments before the document goes away ("Not now" on a
+  // dialog, then a navigation) opts in with `context: { keepalive: true }`:
+  // the browser would otherwise cancel it and the answer is lost. Unbatched,
+  // so one answer is never held behind an unrelated call; bodies are capped
+  // at 64 KB across keepalive requests, so this is for answers, not payloads.
+  const keepaliveRouting = httpLink({
+    url,
+    fetch: (input, init) => (fetch ?? globalThis.fetch)(input, { ...init, keepalive: true }),
+  });
+  const httpRouting = splitLink({
+    condition: (operation) => operation.context.keepalive === true,
+    true: keepaliveRouting,
+    false: batchRouting,
   });
 
   return [

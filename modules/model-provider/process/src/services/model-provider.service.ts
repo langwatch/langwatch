@@ -35,6 +35,7 @@ import {
   type ModelProviderWriteInput,
   type TranslateInput,
   type TranslateOutput,
+  type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -161,6 +162,10 @@ export class ModelProviderService {
 
   static create(options: ModelProviderServiceOptions): ModelProviderService {
     return new ModelProviderService(options);
+  }
+
+  countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {
+    return this.options.repository.countUsage(input);
   }
 
   estimateCost(input: ModelCostEstimateInput): number {

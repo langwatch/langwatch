@@ -9,6 +9,7 @@ import {
   SavedWorkbenchChartNotFoundError,
   type GraphLayout,
   type SavedWorkbenchChartDefinition,
+  type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
@@ -93,6 +94,17 @@ export class PrismaDashboardRepository
   implements DashboardRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDashboardRepository(prisma));
+
+  async countUsage({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<DashboardUsageCount> {
+    const builderCharts = await this.prisma.customGraph.count({
+      where: { projectId: { in: [...projectIds] }, kind: BUILDER_CHART_KIND },
+    });
+    return { builderCharts };
+  }
 
   async findAllDashboards(input: {
     projectId: string;

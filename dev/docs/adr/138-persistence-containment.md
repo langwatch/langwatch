@@ -2,12 +2,12 @@
 
 **Date:** 2026-09-09
 
-**Status:** Proposed
+**Status:** Proposed. Amended 2026-09-23: the three store rules and the service
+rule are one `store-containment` row, and two ClickHouse query rules join it.
 
 **Behavioural contract:**
-[Prisma containment](../../../specs/tooling/lint-prisma-containment.feature),
-[the typed seam](../../../specs/tooling/lint-typed-prisma-seam.feature),
-[service dependencies](../../../specs/tooling/lint-service-dependencies.feature),
+[store containment](../../../specs/tooling/lint-store-containment.feature),
+[the ClickHouse tenant predicate](../../../specs/tooling/lint-clickhouse-tenant-id.feature),
 [table ownership](../../../specs/server/prisma-table-ownership.feature)
 
 **Related:** [ADR-134: private Prisma table ownership](./134-private-prisma-table-ownership.md),
@@ -35,23 +35,24 @@ through costs nothing and removes the cast entirely.
 
 | Rule | Layer | Meaning |
 | --- | --- | --- |
-| `langwatch/prisma-containment` | plugin | Generated Prisma may be imported only by a repository under `server/src/repositories/prisma/` or by `server/src/adapters/postgres.<subject>.adapter.ts`; a module may not own Prisma connection or lifecycle services. |
-| `langwatch/typed-prisma-seam` | plugin | No `as PrismaClient`, and no `database: object` in a `.create(` argument list. |
-| `langwatch/service-dependencies` | plugin | A service may not import a database client, another subject's repository, or the global application graph. |
+| `langwatch/store-containment` | plugin | Prisma, ClickHouse and Redis are named only under the module's own `repositories/<store>/` (Redis also `channels/redis/`), and never in an application. Replaces `prisma-containment`, `clickhouse-containment` and `redis-containment` (2026-09-23); `typed-prisma-seam` was deleted. |
+| `langwatch/clickhouse-tenant-id` | plugin | Every table a ClickHouse repository queries carries a bound `TenantId` predicate in its own scope, or the query declares itself `unscoped` with a reason. |
+| `langwatch/clickhouse-no-version-order-limit` | plugin | No `ORDER BY <version> DESC LIMIT 1` over heavy columns; dedupe with the IN-tuple form. |
+| `langwatch/prisma-count-in-list-query` | plugin | No `_count` inside a `findMany`: Prisma builds it as an uncorrelated join over the whole related table. |
 | `prisma-table-ownership` | architecture-enforcer | Code outside a module's own Prisma repository may not reach that module's tables. |
 | `prisma-migration-access` | architecture-enforcer | The raw and scoped Prisma client capabilities are for a `SystemMigration` and its owning repository only. |
 | `clickhouse-table-ownership` | architecture-enforcer | One module writes a ClickHouse table; every other module reads it through that module's api. |
 
-The three plugin rules are per-import and per-signature, so one file is enough
+The plugin rules are per-import and per-query, so one file is enough
 to decide. The three policies need the schema and the whole catalogue at
 once: table ownership is a question about every module, including modules that
 are never installed together. `clickhouse-table-ownership` reads its table list
 from the goose migrations instead of a schema file, because ClickHouse has
 neither a schema file nor a generated client here.
 
-`prisma-containment` is expressible as `no-restricted-imports` with an
-`overrides` allowlist, and is one of the seven class B rules ADR-135 records.
-It stays in the plugin for now for the reasons that ADR gives.
+`prisma-containment`, `clickhouse-containment` and `redis-containment` were
+folded into `store-containment` on 2026-09-23: one row per store, one seam per
+store, one rule.
 
 ## Consequences
 

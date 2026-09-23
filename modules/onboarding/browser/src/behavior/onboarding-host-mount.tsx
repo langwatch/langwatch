@@ -5,8 +5,12 @@
  */
 
 import { useUiAddress } from "@langwatch/browser-host/address";
-import { useUiCapabilities, useUiScope } from "@langwatch/browser-host/capabilities";
-import { useMemo, type ReactNode } from "react";
+import {
+  useUiCapabilities,
+  useUiDeclarations,
+  useUiScope,
+} from "@langwatch/browser-host/capabilities";
+import { lazy, useMemo, type ReactNode } from "react";
 import { useLocation, useParams } from "react-router";
 
 import {
@@ -16,6 +20,7 @@ import {
   type OnboardingFailureNotice,
   type OnboardingFlagReading,
   type OnboardingGovernanceCapability,
+  type OnboardingJoinOffer,
   type OnboardingLangyCapability,
   type OnboardingRouteReading,
   type OnboardingScope,
@@ -84,6 +89,7 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
       langy: OnboardingLangyCapability;
       sidebar: OnboardingSidebarCapability;
       governance: OnboardingGovernanceCapability;
+      joinOffers: readonly OnboardingJoinOffer[];
     },
   ) {
     super();
@@ -171,6 +177,10 @@ class CapabilityOnboardingHost extends OnboardingHostApi {
   governance(): OnboardingGovernanceCapability {
     return this.deps.governance;
   }
+
+  joinOffers(): readonly OnboardingJoinOffer[] {
+    return this.deps.joinOffers;
+  }
 }
 
 export default function OnboardingHostMount({ children }: { children?: ReactNode }) {
@@ -185,6 +195,15 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
   });
   const sessionActor = session.currentUser();
   const reading = route.reading();
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so the offer is not remounted.
+  const joinOffers = useMemo(
+    () =>
+      declarations
+        .declared("joinOffer")
+        .map(({ module, capability }) => ({ key: module, JoinOffer: lazy(capability.load) })),
+    [declarations],
+  );
 
   const scope: OnboardingScope = useMemo(
     () => ({
@@ -221,6 +240,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         langy: INERT_LANGY,
         sidebar: INERT_SIDEBAR,
         governance: INERT_GOVERNANCE,
+        joinOffers,
       }),
     [
       scope,
@@ -234,6 +254,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
       route,
       graph,
       feedback,
+      joinOffers,
     ],
   );
 

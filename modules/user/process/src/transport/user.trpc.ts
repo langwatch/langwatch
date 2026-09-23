@@ -90,16 +90,29 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
     return { success: true as const };
   })
 
-  .procedure("passkeyNudge")
+  // The session travels as a fact: the offer follows how THIS sign-in happened.
+  .procedure("secureAccountNudge")
+  .withFacts(browserSessionFact)
   .noPermission({ reason: OWN_ACCOUNT })
-  .handle(({ app, actor }) => app.getPasskeyOffer({ id: actor.id }))
+  .handle(({ app, actor }, browserSession) =>
+    app.getPasskeyOffer({ id: actor.id, sessionId: browserSession ?? null }),
+  )
 
-  .procedure("dismissPasskeyNudge")
+  .procedure("dismissSecureAccountNudge")
   .noPermission({ reason: OWN_ACCOUNT })
   .handle(async ({ app, actor }) => {
     await app.dismissPasskeyNudge({ id: actor.id });
 
     return { success: true as const };
+  })
+
+  // Sessions are not revoked: a cosmetic edit is no reason to sign anybody out.
+  .procedure("updateName")
+  .noPermission({ reason: OWN_ACCOUNT })
+  .handle(async ({ app, actor, input }) => {
+    await app.updateProfile({ id: actor.id, name: input.name });
+
+    return { name: input.name };
   })
 
   // The session row travels as a fact so the list can say which entry is the

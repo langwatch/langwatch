@@ -1,3 +1,4 @@
+import type { GithubUsageCount } from "@langwatch/github-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import {
@@ -27,6 +28,21 @@ export class MemoryGithubPullRequestsRepository extends GithubPullRequestsReposi
     input: Readonly<{ memory: MemoryGithubDatabase }>,
   ): MemoryGithubPullRequestsRepository {
     return new MemoryGithubPullRequestsRepository(input.memory);
+  }
+
+  async countUsage({
+    organizationIds,
+    since,
+  }: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<GithubUsageCount> {
+    const pullRequests = [...this.#database.pullRequests.values()].filter(
+      (row) =>
+        organizationIds.includes(row.organizationId) &&
+        (since === undefined || row.prCreatedAt.epochMilliseconds >= since),
+    ).length;
+    return { pullRequests };
   }
 
   async upsertPullRequests({

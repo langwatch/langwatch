@@ -33,6 +33,7 @@ import {
   type RestTransportMiddlewareBinding,
 } from "../request.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { readFencedReceiptWrite } from "./support/fenced-receipt-write.ts";
 
 describe("defineRestRouter", () => {
   /** @scenario "A REST endpoint is one complete declaration in the server" */
@@ -800,6 +801,18 @@ describe("a create declared replayable under a caller's key", () => {
     let next = 0;
 
     return {
+      $executeRaw: async (sql, ...values) => {
+        const write = readFencedReceiptWrite(sql, values);
+        const row = [...rows.values()].find(
+          (candidate) => candidate.id === write.id && candidate.claimId === write.claimId,
+        );
+
+        if (!row) return 0;
+
+        Object.assign(row, write.data);
+
+        return 1;
+      },
       idempotencyReceipt: {
         create: async ({ data }) => {
           const at = `${data.scopeId} ${data.key}`;
@@ -819,19 +832,6 @@ describe("a create declared replayable under a caller's key", () => {
         },
         findUnique: async ({ where }) =>
           rows.get(`${where.scopeId_key.scopeId} ${where.scopeId_key.key}`) ?? null,
-        updateMany: async ({ where, data }) => {
-          const row = [...rows.values()].find(
-            (candidate) =>
-              candidate.id === where.id &&
-              (where.claimId === undefined || candidate.claimId === where.claimId),
-          );
-
-          if (!row) return { count: 0 };
-
-          Object.assign(row, data);
-
-          return { count: 1 };
-        },
         deleteMany: async ({ where }) => {
           for (const [at, row] of rows) {
             if (row.id !== where.id) continue;

@@ -77,6 +77,10 @@ class TestTraceCanonicalisationService extends TraceCanonicalisationService {
 const redis = new Redis({ lazyConnect: true });
 
 export class TestModelProviderService implements ModelProviderApi {
+  countUsage(): Promise<{ providers: string[] }> {
+    return Promise.resolve({ providers: [] });
+  }
+
   constructor(
     private readonly estimate: (input: ModelCostEstimateInput) => number = () => 0,
   ) {}
@@ -114,6 +118,14 @@ export class TestModelProviderService implements ModelProviderApi {
   }
 
   runPlaygroundCompletion(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
+  generateStructured(): Promise<never> {
+    throw new Error("Not used by Coding Agent tests.");
+  }
+
+  platformProviderChain(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");
   }
 

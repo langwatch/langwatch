@@ -5,6 +5,10 @@ import {
 } from "@langwatch/model-provider-contract";
 
 export class TestModelProviderService implements ModelProviderApi {
+  countUsage(): Promise<{ providers: string[] }> {
+    return Promise.resolve({ providers: [] });
+  }
+
   constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {}
 
   listForProject(): Promise<ModelProviderSummary[]> {
@@ -28,6 +32,14 @@ export class TestModelProviderService implements ModelProviderApi {
   }
 
   runPlaygroundCompletion(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
+  generateStructured(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
+  platformProviderChain(): Promise<never> {
     throw new Error("Not used by Workflow tests.");
   }
 

@@ -88,10 +88,8 @@ export type { IdentityUserGate } from "./rules/identity-user-gate.rules.ts";
 export type { IdentityUsersRepository } from "./repositories/identity-users.repository.ts";
 export type { IdentityVerificationRecord } from "./repositories/identity-verification.repository.ts";
 export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repository.ts";
-export {
-  SsoBreakGlassRepository,
-  SsoBreakGlassWarningChannel,
-} from "./repositories/sso-break-glass.repository.ts";
+export { SsoBreakGlassWarningChannel } from "./channels/sso-break-glass-warning.channel.ts";
+export { SsoBreakGlassRepository } from "./repositories/sso-break-glass.repository.ts";
 export { breakGlassHolderEligibility } from "./rules/break-glass-eligibility.rules.ts";
 export {
   SsoConnectionHistoryRepository,
@@ -249,6 +247,10 @@ export {
   IDENTITY_SECRET_HEAL_MIGRATION_NAME,
   IdentitySecretHealMigrationAdapter,
 } from "./services/system-migration-identity-secret-heal.service.ts";
+export {
+  PostgresIdentityOrganizationMigrationsAdapter,
+  type PostgresIdentityOrganizationMigrationsOptions,
+} from "./repositories/prisma/prisma.identity-organization-migrations.repository.ts";
 export {
   PostgresIdentityUserMigrationsAdapter,
   type PostgresIdentityUserMigrationsOptions,

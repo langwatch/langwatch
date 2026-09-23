@@ -80,6 +80,10 @@ export const joinRequestedPayloadSchema = z.object({
    *  than computed at fold time, so a redelivered event cannot drift the
    *  deadline the requester was actually promised. */
   expiresAtMs: z.number().int().nonnegative(),
+  /** Automatic policy approvals suppress the waiting notice; every other
+   *  request derives it from this event, so the handoff cannot be lost
+   *  between the command and a service-side callback. */
+  notifyAdmins: z.boolean().default(true),
   actor: identityActorSchema,
 });
 export type JoinRequestedPayload = z.infer<typeof joinRequestedPayloadSchema>;

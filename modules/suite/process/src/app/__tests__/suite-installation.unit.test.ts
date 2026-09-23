@@ -3,21 +3,21 @@
  * The installer over memory persistence, in both roles that boot it.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
 import { SuiteApi, SuiteNameTakenError } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { suiteServer } from "../../suite.server.ts";
 
 /**
- * The one member `SuiteApp` declares reading (`reads("clickhouse")`).
- * Installing on the memory tier never reaches a store, so boot needs the
- * member to EXIST — a stub that refuses on use proves it, naming the failure.
+ * The one store-backed member `SuiteApp` declares reading. Installing on
+ * the memory tier never reaches a store, so boot needs the member to
+ * EXIST — a stub that refuses on use proves it, naming the failure.
  */
 function analyticalWithoutStore(): ClickHouseQueryClient {
   const client: Partial<ClickHouseQueryClient> = {};
@@ -32,6 +32,7 @@ function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(suiteServer)])
     .withAnalytical(analyticalWithoutStore())
+    .withKeyvalue(null)
     .withMembers({ publicBaseUrl: undefined })
     .provide({
       scenario: createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),

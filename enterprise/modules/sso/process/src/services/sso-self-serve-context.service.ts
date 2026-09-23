@@ -43,7 +43,6 @@ export class LicenseDomainClaimAuthority {
 export class InstanceLicenseProof {
   static create(deps: {
     licensing: Pick<LicensingApi, "inspectPlatformAccess">;
-    instanceLicenseKey: string | undefined;
   }): InstanceLicenseProof {
     return new InstanceLicenseProof(deps);
   }
@@ -51,14 +50,11 @@ export class InstanceLicenseProof {
   private constructor(
     private readonly deps: {
       licensing: Pick<LicensingApi, "inspectPlatformAccess">;
-      instanceLicenseKey: string | undefined;
     },
   ) {}
 
   async holdsGenuineLicense(): Promise<boolean> {
-    const access = await this.deps.licensing.inspectPlatformAccess({
-      instanceLicenseKey: this.deps.instanceLicenseKey,
-    });
+    const access = await this.deps.licensing.inspectPlatformAccess();
 
     return access.allowed;
   }

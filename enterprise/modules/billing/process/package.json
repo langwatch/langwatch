@@ -24,6 +24,7 @@
   "dependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
@@ -33,6 +34,7 @@
     "@langwatch/entitlement-process": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
@@ -40,6 +42,7 @@
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -58,6 +61,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",

@@ -202,3 +202,18 @@ export type OrganizationAuditLogPage = z.infer<typeof organizationAuditLogPageSc
 export type OrganizationPendingInviteApplied =
   | Readonly<{ applied: true; inviteId: string }>
   | Readonly<{ applied: false }>;
+
+/** Why one member is in the organization; `unknown` renders as no chip rather than a guess. */
+export const organizationMemberProvenanceSchema = z.discriminatedUnion("source", [
+  z.object({ source: z.literal("directory"), providerId: z.string().nullable() }),
+  z.object({ source: z.literal("domain"), domain: z.string(), automatic: z.boolean() }),
+  z.object({ source: z.literal("invited") }),
+  z.object({ source: z.literal("unknown") }),
+]);
+export type OrganizationMemberProvenance = z.infer<typeof organizationMemberProvenanceSchema>;
+
+/** Every member's provenance, keyed by user id; everybody asked about has an answer. */
+export const organizationMemberProvenanceByUserSchema = z.record(
+  z.string(),
+  organizationMemberProvenanceSchema,
+);

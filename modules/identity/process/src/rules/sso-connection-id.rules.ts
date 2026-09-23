@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { generate } from "@langwatch/ksuid";
 
 /**
@@ -9,6 +11,35 @@ import { generate } from "@langwatch/ksuid";
 /** A connection a human registered — random, minted once. */
 export function newSsoConnectionId(): string {
   return generate("ssoc").toString();
+}
+
+/**
+ * The break-glass recovery reservation an activation or resume holds. Retries
+ * by the same actor against the same projected generation reuse it; another
+ * actor, or any state change in between, cannot adopt it.
+ */
+export function activationRecoveryReservationId({
+  organizationId,
+  connectionId,
+  actorType,
+  actorId,
+  connectionUpdatedAtMs,
+  transition,
+}: {
+  organizationId: string;
+  connectionId: string;
+  actorType: string;
+  actorId: string | null;
+  connectionUpdatedAtMs: number;
+  transition: "activate" | "resume";
+}): string {
+  const digest = createHash("sha256")
+    .update(
+      `${organizationId}\0${connectionId}\0${actorType}\0${actorId ?? "system"}\0${connectionUpdatedAtMs}\0${transition}`,
+    )
+    .digest("hex")
+    .slice(0, 32);
+  return `sso-recovery:${digest}`;
 }
 
 /** A live ops or self-service action's command id. */

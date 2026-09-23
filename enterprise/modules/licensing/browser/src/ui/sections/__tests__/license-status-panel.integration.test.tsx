@@ -36,13 +36,11 @@ vi.mock("../use-license-actions.ts", () => ({
   useLicenseActions: () => ({
     upload: vi.fn(),
     remove: vi.fn(),
+    refresh: vi.fn(),
     isUploading: false,
     isRemoving: false,
+    isRefreshing: false,
   }),
-}));
-
-vi.mock("../license-generator-drawer.tsx", () => ({
-  LicenseGeneratorDrawer: () => null,
 }));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -74,16 +72,21 @@ const unsignedStatus: LicenseStatusPayload = {
   expired: false,
 };
 
+const validStatus = ({ connected }: { connected: boolean }): LicenseStatusPayload => ({
+  hasLicense: true,
+  valid: true,
+  connected,
+  plan: "ENTERPRISE",
+  planName: "Enterprise",
+  expiresAt: "2099-01-01T00:00:00Z",
+  organizationName: "Acme Corp",
+  ...resourceCounts,
+  currentMembers: 3,
+});
+
 const renderWith = (status: LicenseStatusPayload) => {
   statusResult.current = status;
-  render(
-    <LicenseStatusPanel
-      organizationId="org-123"
-      isGeneratorOpen={false}
-      onGeneratorOpenChange={vi.fn()}
-    />,
-    { wrapper: Wrapper },
-  );
+  render(<LicenseStatusPanel organizationId="org-123" />, { wrapper: Wrapper });
 };
 
 describe("LicenseStatusPanel", () => {
@@ -120,6 +123,22 @@ describe("LicenseStatusPanel", () => {
       expect(screen.getByText(/Your license is invalid/i)).toBeDefined();
       expect(screen.queryByText(/Nothing was switched off/i)).toBeNull();
       expect(screen.queryByTestId("over-seats-callout")).toBeNull();
+    });
+  });
+
+  describe("given a valid license", () => {
+    /** @scenario Refresh is offered on a connected license only */
+    it("offers refresh when the license names a hosted service", () => {
+      renderWith(validStatus({ connected: true }));
+
+      expect(screen.getByTestId("refresh-license")).toBeDefined();
+    });
+
+    /** @scenario Refresh is offered on a connected license only */
+    it("offers no refresh on an offline license", () => {
+      renderWith(validStatus({ connected: false }));
+
+      expect(screen.queryByTestId("refresh-license")).toBeNull();
     });
   });
 });

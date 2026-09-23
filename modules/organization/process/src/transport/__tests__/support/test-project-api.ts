@@ -10,6 +10,10 @@ const unsupported = <Method>(name: string): Method =>
     Promise.reject(new Error(`ProjectApi.${name} is not reached by the teams family`))) as Method;
 
 export class TestProjectApi implements ProjectApi {
+  countUsage(): Promise<{ projects: number; teams: number; updatedProjects: number }> {
+    return Promise.resolve({ projects: 0, teams: 0, updatedProjects: 0 });
+  }
+
   readonly #byTeam: ReadonlyMap<string, readonly Project[]>;
 
   private constructor(byTeam: ReadonlyMap<string, readonly Project[]>) {

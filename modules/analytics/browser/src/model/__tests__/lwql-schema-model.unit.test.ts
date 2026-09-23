@@ -33,7 +33,7 @@ describe("mapping the LangWatchQL schema response", () => {
         ).toEqual(SCHEMA_COLUMN_NAMES);
 
         const first = model.datasets[0]!;
-        const source = SCHEMA_RESPONSE.datasets[0]!;
+        const source = SCHEMA_RESPONSE.views[0]!;
         expect(first.description).toBe(source.description);
         expect(first.grain).toBe(source.grain);
         expect(first.freshness).toBe(source.freshness);
@@ -55,8 +55,9 @@ describe("mapping the LangWatchQL schema response", () => {
       it("offers nothing at all for a response that carries nothing", () => {
         const model = lwqlSchemaModel({
           database: "analytics",
+          functions: [],
+          views: [],
           appFunctions: [],
-          datasets: [],
         });
 
         expect(model.datasets).toEqual([]);

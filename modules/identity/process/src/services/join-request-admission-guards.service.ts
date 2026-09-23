@@ -1,5 +1,4 @@
 import {
-  JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinNotAvailableError,
@@ -150,9 +149,9 @@ export class JoinRequestAdmissionGuardsService {
   }
 
   /**
-   * Automatic joining needs the administrator to have named the domain AND a
-   * second verified member on it. One colleague with a company-looking
-   * address at a small vendor is not evidence a company owns a domain.
+   * Automatic joining needs the administrator to have named the domain AND the
+   * organization to have PROVED it controls it. Members' verified addresses are
+   * not evidence: this is the one path with nobody in the loop to notice.
    */
   async assertDomainProven({
     organizationId,
@@ -180,10 +179,12 @@ export class JoinRequestAdmissionGuardsService {
       );
     }
 
-    const verified = candidate?.verifiedMembersOnDomain ?? 0;
-    if (verified < JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD) {
+    // A lapsed proof and a proof that never existed refuse identically, and
+    // for the same reason: what would authorize walking in is evidence the
+    // organization controls the domain, and right now there is none.
+    if (!candidate?.domainProved) {
       throw new JoinAutoDomainUnprovenError(
-        `${domain} is held by ${verified} verified member(s) of ${organizationId}; automatic joining needs ${JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD}`,
+        `${domain} is not proved for ${organizationId}; automatic joining needs a verified domain`,
       );
     }
   }

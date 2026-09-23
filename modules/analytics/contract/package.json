@@ -26,6 +26,14 @@
       "types": "./dist/visualization/__tests__/fixtures/index.d.ts",
       "default": "./src/visualization/__tests__/fixtures/index.ts"
     },
+    "./chart-frame-document": {
+      "types": "./dist/chart-frame-document.d.ts",
+      "default": "./src/chart-frame-document.ts"
+    },
+    "./chart-frame-protocol": {
+      "types": "./dist/chart-frame-protocol.d.ts",
+      "default": "./src/chart-frame-protocol.ts"
+    },
     "./chart-grid": {
       "types": "./dist/chart-grid.d.ts",
       "default": "./src/chart-grid.ts"

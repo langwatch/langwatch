@@ -7,7 +7,7 @@ import {
   type PrismaQueryExecutor,
   PrismaQueryGuard,
 } from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
@@ -20,6 +20,7 @@ import type {
   ProcessCommit,
 } from "../../../../process-manager/stores/processStore.types.ts";
 import { PrismaProcessStore } from "../prisma-process-store.ts";
+import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -40,6 +41,20 @@ function database(): PrismaClient {
     throw new Error("DATABASE_URL is required for PrismaProcessStore persistence tests");
   }
   return connection.client;
+}
+
+/**
+ * The store over one side of a race. The acknowledgements are plain writes, so the side's own
+ * transaction carries them; the store's guard asks for `$transaction`, which a side never opens.
+ */
+function storeOn(tx: Prisma.TransactionClient): PrismaProcessStore {
+  const database = new Proxy(tx, {
+    get: (target, key) =>
+      key === "$transaction"
+        ? () => Promise.reject(new Error("a race side opens no nested transaction"))
+        : Reflect.get(target, key),
+  });
+  return PrismaProcessStore.create({ database });
 }
 
 // Assigned in beforeAll, only for a suite that isn't skipped — see
@@ -386,6 +401,38 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
             attempts: 2,
             leaseToken: null,
           }),
+        ]);
+      });
+    });
+
+    describe("when two acknowledgements of one lease land at the same moment", () => {
+      /** @scenario "Two acknowledgements of one lease: the second is refused" */
+      it("applies the dispatch and refuses the failure, which waited on the row", async () => {
+        const identity = identityOf();
+        await store.commit(commit({ now: base }));
+        const leased = (
+          await store.leaseDueMessages({ now: base, limit: 1, leaseDurationMs: 100 })
+        )[0]!;
+
+        const acknowledgements = await raceOnOneRow({
+          prisma,
+          table: "ProcessManagerOutbox",
+          first: (tx) =>
+            storeOn(tx).markDispatched({ identity, leaseToken: leased.leaseToken, now: base + 10 }),
+          second: (tx) =>
+            storeOn(tx).markFailed({
+              identity,
+              leaseToken: leased.leaseToken,
+              now: base + 11,
+              nextAttemptAt: base + 1_000,
+              dead: true,
+            }),
+        });
+
+        expect(acknowledgements.first).toEqual({ applied: true });
+        expect(acknowledgements.second).toEqual({ applied: false });
+        expect(await store.findMessagesByRef({ ref: ref() })).toEqual([
+          expect.objectContaining({ status: "dispatched", leaseToken: null }),
         ]);
       });
     });

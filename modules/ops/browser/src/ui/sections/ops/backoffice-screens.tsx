@@ -29,3 +29,11 @@ export function BackofficeSsoConnectionsScreen() {
 export function BackofficeBugReportsScreen() {
   return <OpsBackofficeScreen resource="bug-reports" />;
 }
+
+export function BackofficeLicensesScreen() {
+  return <OpsBackofficeScreen resource="licenses" />;
+}
+
+export function BackofficeSelfHostedInstancesScreen() {
+  return <OpsBackofficeScreen resource="self-hosted-instances" />;
+}

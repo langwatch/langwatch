@@ -53,6 +53,16 @@ export type PromptUpdateInput = {
   data: { commitMessage: string } & PromptConfigFields;
 };
 
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many prompts were made, since `since` where one is given, and when the
+ * first was. Times are epoch milliseconds.
+ */
+export interface PromptUsageCount {
+  readonly prompts: number;
+  readonly firstPromptAt?: number;
+}
+
 /** Callable prompt operations shared by process peers after composition. */
 export interface PromptApi {
   /** Runs one browser playground request after transport authentication and authorization. */
@@ -205,6 +215,8 @@ export interface PromptApi {
    * this is the one operation on the interface no project scopes.
    */
   seedTagsForOrganization(input: { organizationId: string }): Promise<void>;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<PromptUsageCount>;
 }
 
 export const PromptApi = moduleApi<PromptApi>()("prompt");

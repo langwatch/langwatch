@@ -12,9 +12,10 @@ Don't write pointless comments. Good code explains itself. If it's vital, add it
 Everything in this file is a digest. The full truth lives in three places, in
 this order of precedence:
 
-1. **The linter.** `pnpm lint` runs the `langwatch` oxlint plugin (72 rules,
-   all but one enforced at `error`) plus the `@langwatch/architecture-enforcer`
-   policy registry. When a rule and any document disagree, **the rule is the
+1. **The linter.** `pnpm lint` runs oxlint with the `langwatch` plugin, every
+   rule at `error`. `pnpm lint:architecture` runs the
+   `@langwatch/architecture-enforcer` policy registry; CI gates the policies
+   already at zero. When a rule and any document disagree, **the rule is the
    truth** and the document is the defect. Every finding's message carries its
    own fix — read it and do what it says rather than working around it.
 2. **`dev/docs/ARCHITECTURE.md`** — the one architecture record. Read it before
@@ -72,10 +73,10 @@ hold them absolutely:
    pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc <paths you touched>
    ```
 
-   Fix what fires — each message carries its own fix — and never by adding a
-   baseline row or gaming a name. Once, at the end of the task, run the full
-   `pnpm lint` (it adds the architecture-enforcer's whole-tree policies,
-   which no scoped run can check).
+   Fix what fires — each message carries its own fix — and never by
+   gaming a name. Once, at the end of the task, run `pnpm lint`, and
+   `pnpm lint:architecture --policies <ids you touched>` for the
+   whole-tree policies no scoped run can check.
 
 ## The product
 
@@ -225,11 +226,12 @@ built; spell words out ("tokens", not "tok").
 
 ## Enforcement
 
-`pnpm lint` is two halves, and they are the only JavaScript/TypeScript
-linters:
+Two linters, and they are the only JavaScript/TypeScript ones:
 
-- **`langwatch` oxlint plugin** (`packages/oxlint-rules`) — per-file rules.
-  The generated reference is `dev/docs/lint-rules.md` (regenerate with
+- **`langwatch` oxlint plugin** (`packages/oxlint-rules`), run by
+  `pnpm lint` — per-file rules, registered in one `rules` map in
+  `src/index.mjs` and enabled at `error` in one config line each. The
+  generated reference is `dev/docs/lint-rules.md` (regenerate with
   `pnpm --filter @langwatch/architecture-enforcer docs`); the file grammar is
   `packages/oxlint-rules/grammar/feature-layout-policy.mjs`. Almost no rule
   has an autofixer, deliberately: the message's `fix` line tells you what to
@@ -237,10 +239,11 @@ linters:
 - **`@langwatch/architecture-enforcer`** — whole-tree policies (package
   boundaries, cycles, frontend/server graph separation, Prisma/ClickHouse
   table ownership, memory-twin drift, dead exports) folded from one registry
-  (`--list-policies` prints it). Policies ratchet against **baselines**: rows
-  only leave as debt is paid, and none may be added. Never add a baseline row
-  to get green; a rename orphans `rule|path` keys, so re-key AND re-sort, then
-  verify the counts returned.
+  (`--list-policies` prints it), run by `pnpm lint:architecture`. There are
+  no baselines: every finding is reported, a policy whose anchor file is
+  missing refuses the run by name, and `pnpm lint:architecture` is not part
+  of `pnpm lint` until the tree is clean; CI runs the zero-finding policies
+  by id.
 
 Feature/spec parity:
 `pnpm --filter @langwatch/architecture-enforcer check:feature-parity` — read
@@ -259,7 +262,8 @@ From the repo root (which proxies the common scripts — `cd` is rarely needed;
 ```bash
 pnpm typecheck                      # whole workspace, one tsc -b — end of work, once
 pnpm --filter <package> typecheck   # while iterating — seconds, not gigabytes
-pnpm lint                           # oxlint + architecture-enforcer — WHOLE REPO; once at end of task
+pnpm lint                           # oxlint — WHOLE REPO; once at end of task
+pnpm lint:architecture              # architecture-enforcer — WHOLE REPO, ~17 s
 pnpm format                         # oxfmt — WHOLE REPO; never while others share the checkout
                                     # scoped lint/format after each change: see Key rules above
 pnpm --filter <package> test <path> # scoped test run (see core/testing-rules.md)
@@ -316,13 +320,12 @@ there. haven injects its own resolved values (hostnames, ports, database URLs)
 into every process it starts — `eval "$(haven env)"` puts the same set in your
 shell.
 
-**Secrets** (`packages/secrets/keys.json`, ADR-132): every credential-carrying
+**Secrets** (`packages/secrets`, ADR-132): every credential-carrying
 env var is classified once, and each app's boot seam resolves classified keys
 through an ordered chain (env/.env → 1Password when `LANGWATCH_SECRETS_VAULT`
 is set → refusal by name) before its Zod parse. Never read `.env` to find a
-value and never print one — `langwatch/secrets-through-source` refuses
-`process.env.<SECRET_KEY>` outside the sanctioned seams, and `haven env` masks
-every classified key (`--reveal` for the shell form).
+value and never print one — `haven env` masks every classified key
+(`--reveal` for the shell form).
 
 ### haven / portless (recommended)
 

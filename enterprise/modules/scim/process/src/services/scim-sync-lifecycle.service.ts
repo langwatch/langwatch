@@ -33,11 +33,13 @@ import {
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
+  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
   type IssueScimTokenCommandData,
   type RecordScimApplyFailureCommandData,
   type RecordScimGroupMappingCommandData,
   type RecordScimUserPushCommandData,
+  type RedriveScimApplyCommandData,
   type RevokeScimSyncCommandData,
   type ScimApplyOp,
   type ScimRevokeCause,
@@ -60,6 +62,7 @@ export interface ScimSyncLifecycleGuards {
   recordScimUserPush(data: RecordScimUserPushCommandData): Promise<ScimSyncFactInput[]>;
   recordScimGroupMapping(data: RecordScimGroupMappingCommandData): Promise<ScimSyncFactInput[]>;
   recordScimApplyFailure(data: RecordScimApplyFailureCommandData): Promise<ScimSyncFactInput[]>;
+  redriveScimApply(data: RedriveScimApplyCommandData): Promise<ScimSyncFactInput[]>;
   revokeScimSync(data: RevokeScimSyncCommandData): Promise<ScimSyncFactInput[]>;
 }
 
@@ -203,6 +206,33 @@ export class ScimSyncLifecycleService implements ScimSyncLifecycle {
     await this.commit(
       { type: RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE, data },
       await this.guards.recordScimApplyFailure(data),
+    );
+  }
+
+  /**
+   * A platform operator sent a retired apply through again (ADR-122): the one
+   * verb whose actor is a person, because a re-drive crosses a tenant boundary
+   * and the tenant's own history is where that has to be readable.
+   */
+  async applyRedriven({
+    organizationId,
+    connectionId,
+    retiredAtMs,
+    operator,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    retiredAtMs: number;
+    operator: { userId: string };
+  }): Promise<void> {
+    const data = {
+      ...this.identity({ organizationId, connectionId }),
+      actor: { type: "user", id: operator.userId } as const,
+      retiredAtMs,
+    };
+    await this.commit(
+      { type: REDRIVE_SCIM_APPLY_COMMAND_TYPE, data },
+      await this.guards.redriveScimApply(data),
     );
   }
 

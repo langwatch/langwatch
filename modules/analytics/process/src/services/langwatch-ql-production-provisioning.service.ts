@@ -1,6 +1,6 @@
 /**
  * Production LangWatchQL provisioning — pure composition only.
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
@@ -159,14 +159,18 @@ export class LangWatchQLProductionProvisioningService {
   postgresApprovedViewStatements({
     schema = LWQL_POSTGRES_SCHEMA,
     views = LWQL_VIEW_CATALOG,
+    readerRole,
   }: {
     /** From {@link lwqlPostgresSchemaFromDatabaseUrl} in a real deploy. */
     schema?: string;
     views?: readonly LangWatchQLViewDefinition[];
+    /** Re-granted `SELECT` if a view's fallback drop-and-create path runs. */
+    readerRole?: string;
   } = {}): string[] {
     return postgresViews.approvedViewStatements({
       schema,
       views,
+      ...(readerRole !== undefined ? { readerRole } : {}),
     });
   }
 

@@ -1,6 +1,7 @@
 import type {
   CodingAgentSession,
   CodingAgentSessionBranchRecord,
+  CodingAgentUsageCount,
 } from "@langwatch/coding-agent-contract";
 
 import { CodingAgentSessionRepository } from "../coding-agent-session.repository.ts";
@@ -108,6 +109,21 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
       .filter((row) => input.sessionIds.includes(row.sessionId))
       .filter((row) => row.startedAtMs >= input.startedAtFromMs)
       .map(branchRecord);
+  }
+
+  async countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<CodingAgentUsageCount> {
+    const rows = this.rows().filter((row) => input.projectIds.includes(row.tenantId));
+    const counted = rows.filter(
+      (row) => input.since === undefined || row.startedAtMs >= input.since,
+    );
+    const first = Math.min(...rows.map((row) => row.startedAtMs));
+    return {
+      sessions: new Set(counted.map((row) => row.sessionId)).size,
+      ...(rows.length === 0 ? {} : { firstSessionAt: first }),
+    };
   }
 
   private rows(): CodingAgentSession[] {

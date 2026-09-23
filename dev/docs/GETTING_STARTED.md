@@ -94,9 +94,8 @@ environment Kubernetes gave it and holds no vault client.
 
 One rule, and it is not negotiable: never read `.env` to find a value, and never
 print one. `haven env` masks every classified key, `haven env --reveal` is the
-one you do not paste anywhere, and the `langwatch/secrets-through-source` lint
-rule refuses `process.env.<SECRET_KEY>` outside the secrets package. See
-[ADR-132](adr/132-secrets-are-not-config.md).
+one you do not paste anywhere, and module code never reads `process.env` at all
+(`node/no-process-env`). See [ADR-132](adr/132-secrets-are-not-config.md).
 
 ## Starting the stack
 
@@ -157,7 +156,8 @@ make down                    # stop all services
 ```bash
 pnpm typecheck                                  # every workspace package. What CI runs
 pnpm --filter @langwatch/trace-process typecheck # one package, seconds not minutes
-pnpm lint                                       # oxlint + architecture-enforcer
+pnpm lint                                       # oxlint
+pnpm lint:architecture                          # architecture-enforcer, whole tree
 pnpm format                                     # oxfmt
 pnpm --filter @langwatch/platform-api test      # one package's suite
 ```

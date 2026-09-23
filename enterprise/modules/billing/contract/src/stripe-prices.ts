@@ -26,6 +26,7 @@ export const STRIPE_PRICE_NAMES = [
   "GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026",
   "GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026",
   "GROWTH_INSTANT_EVAL_USD",
+  "CONNECTED_HOSTED_USAGE_QUARTERLY",
 ] as const;
 
 export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
@@ -35,7 +36,10 @@ export type StripePriceName = (typeof STRIPE_PRICE_NAMES)[number];
  * provisioned per mode by hand, so the feature stays off rather than the whole
  * deployment failing to boot; every other name is required.
  */
-export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = ["GROWTH_INSTANT_EVAL_USD"];
+export const OPTIONAL_STRIPE_PRICE_NAMES: readonly StripePriceName[] = [
+  "GROWTH_INSTANT_EVAL_USD",
+  "CONNECTED_HOSTED_USAGE_QUARTERLY",
+];
 
 export type StripeEnvironment = "test" | "live";
 
@@ -58,7 +62,7 @@ export type StripePriceDetail = {
 
 export type StripePriceMapping = Record<
   StripePriceName,
-  Record<StripeEnvironment, string> | undefined
+  Partial<Record<StripeEnvironment, string>> | undefined
 >;
 
 export const STRIPE_METER_NAMES = ["BILLABLE_EVENTS", "INSTANT_EVAL_USD"] as const;
@@ -84,7 +88,10 @@ export type StripePricesFile = {
 
 /** Resolved ids; an optional price is absent until its mode is provisioned. */
 export type StripePriceMap = Partial<Record<StripePriceName, string>> &
-  Record<Exclude<StripePriceName, "GROWTH_INSTANT_EVAL_USD">, string>;
+  Record<
+    Exclude<StripePriceName, "GROWTH_INSTANT_EVAL_USD" | "CONNECTED_HOSTED_USAGE_QUARTERLY">,
+    string
+  >;
 
 import { z } from "zod";
 
@@ -112,12 +119,18 @@ const stripeEnvironmentMappingSchema = z.object({
   live: z.string(),
 });
 
+/** An optional name may be provisioned in one mode and not the other. */
+const stripeOptionalEnvironmentMappingSchema = z.object({
+  test: z.string().optional(),
+  live: z.string().optional(),
+});
+
 export const stripePriceMappingSchema = z.object(
   Object.fromEntries(
     STRIPE_PRICE_NAMES.map((key) => [
       key,
       OPTIONAL_STRIPE_PRICE_NAMES.includes(key)
-        ? stripeEnvironmentMappingSchema.optional()
+        ? stripeOptionalEnvironmentMappingSchema.optional()
         : stripeEnvironmentMappingSchema,
     ]),
   ) as Record<StripePriceName, typeof stripeEnvironmentMappingSchema>,

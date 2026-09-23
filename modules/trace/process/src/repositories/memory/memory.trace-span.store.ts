@@ -31,6 +31,11 @@ export class MemoryTraceSpanStore {
       .toSorted((left, right) => left.startTimeUnixMs - right.startTimeUnixMs);
   }
 
+  /** Every span the named tenants wrote, for the usage report's counts. */
+  findByTenants(input: { tenantIds: readonly string[] }): SpanInsertData[] {
+    return [...this.#spans.values()].filter((span) => input.tenantIds.includes(span.tenantId));
+  }
+
   findTraceIds(input: { tenantId: string; traceIds: readonly string[] }): string[] {
     const held = new Set(
       [...this.#spans.values()]

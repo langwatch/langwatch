@@ -5,7 +5,15 @@
  */
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ChartFrameDashboardContext,
+  ChartFrameParamsSnapshot,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
+import {
+  CHART_FRAME_MAX_HEIGHT_PX,
+  CHART_FRAME_MIN_HEIGHT_PX,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ChartFrameExecuteQuery, ChartFrameLogEntry } from "../../behavior/frame-bridge.ts";
 import { createFrameBridge } from "../../behavior/frame-bridge.ts";
@@ -13,15 +21,6 @@ import {
   FRAME_RESTART_MAX_ATTEMPTS,
   useFrameAutoRestart,
 } from "../../behavior/use-frame-auto-restart.ts";
-import type {
-  ChartFrameDashboardContext,
-  ChartFrameParamsSnapshot,
-} from "../../model/dashboard-widget/bridge-protocol.ts";
-import {
-  CHART_FRAME_MAX_HEIGHT_PX,
-  CHART_FRAME_MIN_HEIGHT_PX,
-} from "../../model/dashboard-widget/bridge-protocol.ts";
-import { buildSrcdoc } from "../../model/dashboard-widget/build-srcdoc.ts";
 
 export interface SandboxedChartFrameProps {
   /** The widget's React/TSX source. The frame re-mounts whenever this changes. */
@@ -74,11 +73,22 @@ export function SandboxedChartFrame({
     setHeight(maxHeight);
   }, [maxHeight]);
 
-  const srcdoc = useMemo(() => buildSrcdoc(code), [code]);
+  // The document at CHART_FRAME_PATH is identical for every widget and every
+  // code change — the widget's source travels on lw:init — so a change to
+  // `code` cannot reload the iframe on its own. Bumping a generation counter
+  // during render (no extra commit) re-keys the frame for a fresh load.
+  const [codeGeneration, setCodeGeneration] = useState(0);
+  const [renderedCode, setRenderedCode] = useState(code);
+  if (code !== renderedCode) {
+    setRenderedCode(code);
+    setCodeGeneration((n) => n + 1);
+  }
 
   // Callbacks live in refs so the bridge effect does not restart per render.
   const executeQueryRef = useRef(executeQuery);
   executeQueryRef.current = executeQuery;
+  const codeRef = useRef(code);
+  codeRef.current = code;
   const onLogRef = useRef(onLog);
   onLogRef.current = onLog;
   const onNavigateRef = useRef(onNavigate);
@@ -88,7 +98,7 @@ export function SandboxedChartFrame({
   paramsRef.current = params;
   const bridgeRef = useRef<ReturnType<typeof createFrameBridge> | null>(null);
 
-  // generation and srcdoc re-key the frame; dashboardContext/params are
+  // generation and codeGeneration re-key the frame; dashboardContext/params are
   // deliberately not dependencies (initial values only — dashboardContext
   // updates travel as lw:dashboard-context-change; params has no live update
   // path yet).
@@ -100,6 +110,7 @@ export function SandboxedChartFrame({
       executeQuery: (args) => executeQueryRef.current(args),
       dashboardContext: initialDashboardContextRef.current,
       params: paramsRef.current,
+      source: codeRef.current,
       onLog: (entry) => onLogRef.current(entry),
       onHeightChange: setHeight,
       onNavigate: (args) => onNavigateRef.current?.(args),
@@ -111,7 +122,7 @@ export function SandboxedChartFrame({
       bridgeRef.current = null;
       bridge.dispose();
     };
-  }, [generation, srcdoc, noteTornDown, noteFrameMounted]);
+  }, [generation, codeGeneration, noteTornDown, noteFrameMounted]);
 
   // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
@@ -146,10 +157,9 @@ export function SandboxedChartFrame({
   return (
     <Box overflow="hidden">
       <iframe
-        key={generation}
+        key={`${generation}:${codeGeneration}`}
         ref={iframeRef}
         sandbox="allow-scripts"
-        srcDoc={srcdoc}
         title="Custom chart"
         style={{
           width: "100%",

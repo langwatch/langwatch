@@ -10,6 +10,12 @@ export type StoredBrowserSession = {
   userId: string;
   sessionToken: string;
   impersonating: unknown;
+  /** When the sign-in that minted this session happened (GAC-10). */
+  createdAt: Instant;
+  /** Our own activity stamp, null on any session never under a window. */
+  lastSeenAt: Instant | null;
+  /** better-auth's own roll, once a day; the stand-in when `lastSeenAt` is null. */
+  updatedAt: Instant;
 };
 
 /**
@@ -34,8 +40,14 @@ export interface AuthSessionRepository {
   findById(input: { id: string }): Promise<StoredBrowserSession | null>;
   /** This person's sessions, newest first. */
   findForUser(input: { userId: string }): Promise<readonly BrowserSessionRecord[]>;
+  /** Every session this person holds, in the shape a window is judged on. */
+  findStoredForUser(input: { userId: string }): Promise<readonly StoredBrowserSession[]>;
   listTokensForUser(input: { userId: string }): Promise<string[]>;
   deleteAllForUser(input: { userId: string }): Promise<number>;
   deleteById(input: { id: string }): Promise<number>;
   deleteOthersForUser(input: { userId: string; keepSessionId: string }): Promise<number>;
+  /** Records that a session was used, for the idle window (GAC-10). */
+  touch(input: { sessionId: string; at: Instant }): Promise<void>;
+  /** Distinct people holding an unexpired session at `at` (epoch ms), install-wide. */
+  countSignedInUsers(input: { at: number }): Promise<number>;
 }

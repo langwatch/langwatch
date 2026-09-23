@@ -37,3 +37,10 @@ Feature: Model Provider service
     Given a project's model providers
     When they are listed
     Then every entry carries disabledByDefault and extraHeaders
+
+  @unit
+  Scenario: The platform chain borrows the Google credential from data privacy
+    Given data privacy holds the deployment's Google application credential
+    When the platform provider chain is read
+    Then vertex_ai is in the chain under GOOGLE_APPLICATION_CREDENTIALS
+    And the credential is borrowed on the read, never while the module is constructing

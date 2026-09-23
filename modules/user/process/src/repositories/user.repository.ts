@@ -13,6 +13,7 @@ import type {
   UserProfile,
   UserSsoStatus,
   UserTourPreference,
+  UserUsageCount,
 } from "@langwatch/user-contract";
 
 /**
@@ -40,6 +41,8 @@ export interface UserRepository {
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
   findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
   setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void>;
+  findJoinOfferDismissedDomains(id: string): Promise<string[]>;
+  addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void>;
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
   findSsoStatus(id: string): Promise<UserSsoStatus>;
@@ -53,4 +56,8 @@ export interface UserRepository {
   setLastHomePath(input: { id: string; path: string | null }): Promise<void>;
   setDeactivatedAt(input: { id: string; deactivatedAt: Instant | null }): Promise<UserProfile>;
   setAvatar(input: { id: string; image: string | null }): Promise<void>;
+  /** The usage report's count, install-wide: the part after the `@`, never an address. */
+  countUsage(): Promise<UserUsageCount>;
+  /** Whether any account's address is on this domain, install-wide, case aside. */
+  hasAccountOnDomain(domain: string): Promise<boolean>;
 }

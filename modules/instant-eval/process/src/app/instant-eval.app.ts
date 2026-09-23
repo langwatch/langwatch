@@ -14,6 +14,7 @@ import {
   type InstantEvalResultsWire,
   type InstantEvalSampleWire,
   type InstantEvalRunProgress,
+  type InstantEvalUsageCount,
   type InstantEvalRunReference,
   type InstantEvalRunWindow,
   type InstantEvalRunWire,
@@ -21,6 +22,7 @@ import {
   instantEvalConfig,
 } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { createLogger } from "@langwatch/observability";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -72,6 +74,8 @@ import { InstantEvalSpendService } from "../services/instant-eval-spend.service.
 import { InstantEvalStatementService } from "../services/instant-eval-statement.service.ts";
 
 /** Seconds of refill a bucket holds as burst, at the sustained rate. */
+const logger = createLogger("langwatch:instant-eval:judge");
+
 const BUCKET_BURST_SECONDS = 2;
 
 /**
@@ -89,6 +93,8 @@ type InstantEvalRedis = InstantEvalRateLimiterRedis & {
 type InstantEvalMembers = Readonly<{
   /** The shared bucket, holds and cancel hints; absent in a memory process. */
   redis: InstantEvalRedis | null;
+  /** The hosted judge a Connect installation answers from licensing (ADR-156). */
+  connectJudge: InstantEvalJudgeChannel | null;
 }>;
 
 type InstantEvalDependencies = Readonly<{
@@ -127,7 +133,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
     classifierApiKey: Secret.load("JEV_API_KEY", { optional: true }),
   } as const;
   /** `redis` is the shared token bucket that paces the judge across every pod. */
-  static readonly reads = ["redis"] as const;
+  static readonly reads = ["redis", "connectJudge"] as const;
 
   private constructor(
     private readonly access: InstantEvalAccessService,
@@ -153,7 +159,9 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
-      isJudgeConfigured: () => judge instanceof HttpInstantEvalJudgeChannel,
+      isJudgeConfigured: () =>
+        judge instanceof HttpInstantEvalJudgeChannel || judge === setup.members.connectJudge,
+      judge,
     });
     const reads = InstantEvalReadsService.create({
       runs: repositories.runs,
@@ -170,6 +178,13 @@ export class InstantEvalApp implements InstantEvalApiContract {
     const cancellations = setup.members.redis
       ? RedisInstantEvalCancellationChannel.create(setup.members.redis)
       : MemoryInstantEvalCancellationChannel.create();
+    // A hold one process keeps to itself admits the same organization's runs
+    // on every other, so a bounded budget refuses a process-local store.
+    if (setup.config.isBounded && !setup.members.redis) {
+      throw new Error(
+        "Instant Evals with a bounded free budget (INSTANT_EVAL_BOUNDED) needs a Redis connection for the budget holds, and this process has none",
+      );
+    }
     const budget = InstantEvalFreeBudgetService.create({
       peers: {
         findOrganizationId: ({ projectId }) => projects.findOrganizationId(projectId),
@@ -219,6 +234,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
           budget,
         },
         peers: {
+          compileFilter: (input) => traces.compileLangWatchQLTraceFilter(input),
           selectTraceIds: (input) => traces.findTraceIdsForFilter(input),
           isEnabled: (input) => access.isEnabled(input),
           isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
@@ -342,7 +358,10 @@ export class InstantEvalApp implements InstantEvalApiContract {
     return {
       plan: (input) => plans.plan(input),
       judgePage: (input) => pages.judgePage(input),
-      finish: (input) => finishes.finish(input),
+      finish: (input) => {
+        pages.discardReadAhead({ runId: input.runId });
+        return finishes.finish(input);
+      },
     };
   }
 
@@ -357,15 +376,26 @@ export class InstantEvalApp implements InstantEvalApiContract {
   }
 
   /**
-   * Fail-safe rather than fail-closed: no key means the memory judge, which
-   * skips every question instead of refusing every query, so a self-hosted
-   * install sees the eval functions unavailable rather than broken.
+   * The install's own key always wins, so it sends nothing to LangWatch; the
+   * connect judge comes next; the memory judge skips every question rather
+   * than refusing every query. `null` overrides all three.
    */
   private static judgeOf(
     setup: InstantEvalSetup,
     apiKey: string | undefined,
   ): InstantEvalJudgeChannel {
-    if (setup.config.classifier === "null" || !apiKey) {
+    if (setup.config.classifier === "null") return MemoryInstantEvalJudgeChannel.create();
+    if (setup.config.classifier === "connect") {
+      if (!setup.members.connectJudge) {
+        throw new Error(
+          'INSTANT_EVAL_CLASSIFIER="connect" but this process composes no connect judge',
+        );
+      }
+      return setup.members.connectJudge;
+    }
+    if (!apiKey) {
+      if (setup.members.connectJudge) return setup.members.connectJudge;
+      logger.info("No Instant Evals classifier is configured; judged columns will be skipped");
       return MemoryInstantEvalJudgeChannel.create();
     }
     const tokensPerSecond = setup.config.globalTokensPerSecond;
@@ -458,6 +488,14 @@ export class InstantEvalApp implements InstantEvalApiContract {
       rows: [...sample.rows],
       judgments: sample.judgments.map(toInstantEvalJudgmentWire),
     };
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<InstantEvalUsageCount> {
+    return this.reads.countUsage(input);
   }
 
   async findRunProgress(input: {

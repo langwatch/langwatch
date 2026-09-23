@@ -184,6 +184,11 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
   }
 
+  /**
+   * The revoke and the acceptance claim meet on one row, so both are SQL with
+   * their conditions against the table: through `updateMany` a write parked on
+   * the row lock re-checks only the id, and would land over the other.
+   */
   async revokeOpenInvite({
     inviteId,
     organizationId,
@@ -191,12 +196,14 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     inviteId: string;
     organizationId: string;
   }): Promise<number> {
-    const { count } = await this.prisma.organizationInvite.updateMany({
-      where: { id: inviteId, organizationId, status: { in: ["PENDING", "PAYMENT_PENDING"] } },
-      data: { status: "REVOKED" },
-    });
-
-    return count;
+    return this.prisma.$executeRaw`
+      UPDATE "OrganizationInvite"
+         SET "status" = 'REVOKED',
+             "updatedAt" = now()
+       WHERE "id" = ${inviteId}
+         AND "organizationId" = ${organizationId}
+         AND "status" IN ('PENDING', 'PAYMENT_PENDING')
+    `;
   }
 
   tryFindInviteWithOrganization({
@@ -329,18 +336,19 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     acceptedByUserId: string;
     acceptedViaIdentifierId: string | null;
   }): Promise<number> {
-    const { count } = await this.prisma.organizationInvite.updateMany({
-      where: {
-        id: inviteId,
-        organizationId,
-        inviteCode,
-        status: "PENDING",
-        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
-      },
-      data: { status: "ACCEPTED", acceptedByUserId, acceptedViaIdentifierId },
-    });
-
-    return count;
+    // SQL for the reason given on `revokeOpenInvite`.
+    return this.prisma.$executeRaw`
+      UPDATE "OrganizationInvite"
+         SET "status" = 'ACCEPTED',
+             "acceptedByUserId" = ${acceptedByUserId},
+             "acceptedViaIdentifierId" = ${acceptedViaIdentifierId},
+             "updatedAt" = now()
+       WHERE "id" = ${inviteId}
+         AND "organizationId" = ${organizationId}
+         AND "inviteCode" = ${inviteCode}
+         AND "status" = 'PENDING'
+         AND ("expiration" IS NULL OR "expiration" > now())
+    `;
   }
 
   async addMembership({

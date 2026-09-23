@@ -105,10 +105,6 @@ export const runChartCommand = async (
             headers,
           });
         }
-        if (result.truncated) {
-          console.log();
-          console.log(chalk.yellow("The result was truncated."));
-        }
         for (const diagnostic of result.diagnostics) {
           console.log();
           console.log(chalk.yellow(`${diagnostic.code}: ${diagnostic.message}`));

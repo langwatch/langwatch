@@ -68,6 +68,7 @@ beforeEach(() => {
   connections = new InMemoryConnections();
   guards = SsoConnectionGuardsService.create({
     connections,
+    registrationSlots: connections,
     breakGlass: new StubBreakGlassBindings(true),
     stranding: new StubStranding(),
     platformOperators: new StubPlatformOperators(),
@@ -236,6 +237,7 @@ describe("given a domain no published proof ever proved", () => {
         connections = new InMemoryConnections();
         guards = SsoConnectionGuardsService.create({
           connections,
+          registrationSlots: connections,
           breakGlass: new StubBreakGlassBindings(true),
           stranding: new StubStranding(),
           platformOperators: new StubPlatformOperators(),

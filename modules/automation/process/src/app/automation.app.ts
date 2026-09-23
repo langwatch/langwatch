@@ -40,6 +40,7 @@ import {
   type UnsubscribeView,
   type UpdateTriggerCommand,
   type WebhookDeliveryRow,
+  type AutomationUsageCount,
 } from "@langwatch/automation-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -773,6 +774,13 @@ export class AutomationApp implements AutomationApi {
    * The platform's own address for one automation resource. A deployment that
    * serves this family but named no public origin refuses by name.
    */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AutomationUsageCount> {
+    return this.#automation.countUsage(input);
+  }
+
   platformUrl(input: { projectSlug: string; path: string }): string {
     if (this.#publicBaseUrl === undefined) {
       throw new Error(
