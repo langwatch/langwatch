@@ -4,7 +4,7 @@
 # Deploys the full stack (ClickHouse, PostgreSQL, Redis, app, workers) to a
 # Kind cluster and verifies each component is reachable and functional.
 #
-# Requirements: kind, helm, kubectl, docker
+# Requirements: kind, helm, kubectl, docker, jq
 # Environment:
 #   KEEP_CLUSTER=true  — skip Kind cluster deletion on exit (for debugging)
 #   CLUSTER_NAME       — Kind cluster name (default: lw-test)
@@ -24,6 +24,26 @@ TIMEOUT="${TIMEOUT:-480}"
 source "$(cd "$(dirname "$0")/../../lib" && pwd)/test-helpers.sh"
 
 trap cleanup_cluster EXIT
+
+# ─── Pod selection helper ────────────────────────────────────────────────────
+# Newest Ready, non-terminating pod matching a label selector. During a rolling
+# update two pods share the label — the old ReplicaSet's pod Terminating, the new
+# one Ready — and `jsonpath='{.items[0].metadata.name}'` sorts by name, so it can
+# hand back the pod the kubelet is about to SIGKILL (a following `kc exec` then
+# dies with exit 137). This returns the newest pod that is phase Running, carries
+# no metadata.deletionTimestamp, and reports Ready=True, so `kc exec` always lands
+# on the live replica. The deletionTimestamp exclusion matches wait_pod_ready.
+ready_pod() {
+  local selector="$1"
+  kc get pod -l "$selector" -o json | jq -r '
+    [ .items[]
+      | select(.metadata.deletionTimestamp == null)
+      | select(.status.phase == "Running")
+      | select(any(.status.conditions[]?; .type == "Ready" and .status == "True")) ]
+    | sort_by(.metadata.creationTimestamp)
+    | last
+    | .metadata.name // empty'
+}
 
 # ─── PostgreSQL helper ───────────────────────────────────────────────────────
 # Argv-embedded query — only safe for simple queries with no double quotes or
@@ -148,9 +168,7 @@ test_postgresql() {
   pass "PostgreSQL pod ready"
 
   local pod
-  pod=$(kc get pod \
-    -l "app.kubernetes.io/component=postgresql" \
-    -o jsonpath='{.items[0].metadata.name}')
+  pod=$(ready_pod "app.kubernetes.io/component=postgresql")
 
   local result
   result=$(pg_query "$pod" "SELECT 1")
@@ -175,9 +193,7 @@ test_redis() {
   pass "Redis pod ready"
 
   local pod
-  pod=$(kc get pod \
-    -l "app.kubernetes.io/component=redis" \
-    -o jsonpath='{.items[0].metadata.name}')
+  pod=$(ready_pod "app.kubernetes.io/component=redis")
 
   local pong
   pong=$(kc exec "$pod" -- redis-cli ping)
@@ -392,9 +408,7 @@ test_app() {
   pass "App pod ready"
 
   local pod
-  pod=$(kc get pod \
-    -l "app.kubernetes.io/name=${RELEASE}-app" \
-    -o jsonpath='{.items[0].metadata.name}')
+  pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
 
   # The /api/health endpoint returns 204
   local http_code
@@ -457,9 +471,7 @@ test_lwql() {
   assert_render_job_complete
 
   local app_pod
-  app_pod=$(kc get pod \
-    -l "app.kubernetes.io/name=${RELEASE}-app" \
-    -o jsonpath='{.items[0].metadata.name}')
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
 
   # Discover ClickHouse pods (may be multiple in clustered mode)
   local pods
@@ -641,8 +653,7 @@ $bridge_out"
   assert_eq "app deployment carries LWQL_ACCESS_MODEL_MODE=sql" \
     "$(kc get deploy "${RELEASE}-app" -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LWQL_ACCESS_MODEL_MODE")].value}')" \
     "sql"
-  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
-    -o jsonpath='{.items[0].metadata.name}')
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
 
   # Run the converge and capture its output. The e2e profile runs no workers pod
   # (values-e2e.yaml:49), which is what runs `lwql:provision` at boot in
@@ -721,8 +732,7 @@ test_lwql_replicas() {
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
 
   local app_pod pods p lwql_pw
-  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
-    -o jsonpath='{.items[0].metadata.name}')
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
   lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
@@ -813,8 +823,7 @@ test_lwql_replicas() {
   # (a) The app boots Ready despite the refusal — a fail-closed access model, not
   # a crashlooping deployment.
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
-  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
-    -o jsonpath='{.items[0].metadata.name}')
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
   pass "app pod Ready under sql mode on a multi-host cluster (refusal is non-fatal)"
 
   # (b) The refusal is logged, by name and/or its stable message, with its two
@@ -930,8 +939,7 @@ test_lwql_upgrade_from_main() {
   # model before the pods rolled onto it.
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
   local app_pod pods p lwql_pw
-  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" \
-    -o jsonpath='{.items[0].metadata.name}')
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
   lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
     -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
