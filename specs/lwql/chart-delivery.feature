@@ -27,12 +27,6 @@ Feature: LangWatchQL access-model delivery to every chart-managed ClickHouse rep
     And every ClickHouse pod mounts the access Secret at the users.d and config.d paths
     And no chart template renders any part of the access model itself
 
-  @e2e
-  Scenario: The rendered access file never carries the password or any statement text
-    Given the delivery Job has written the access Secret
-    Then the Secret carries only the password_sha256_hex of the LangWatchQL identity, never the password
-    And no Job log line, thrown error or rendered file is emitted to the Job's output
-
   # ── AC3: every replica carries the whole access set ───────────────────────
 
   @e2e

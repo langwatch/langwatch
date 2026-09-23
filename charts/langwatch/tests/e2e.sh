@@ -415,7 +415,6 @@ test_app() {
 # multi-replica and scale-up cases.
 # ─────────────────────────────────────────────────────────────────────────────
 # @scenario "A single-replica deployment provisions LangWatchQL unchanged"
-# @scenario "The access model is delivered by one Job into one Secret, mounted once per pod"
 test_lwql() {
   sep; info "Suite: LangWatchQL access model (app self-provisioned)"
 

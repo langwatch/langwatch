@@ -248,12 +248,61 @@ $(cat "$err")"
   fi
 }
 
+# @scenario "The access model is delivered by one Job into one Secret, mounted once per pod"
+# @scenario "A chart upgrade that changes the access model rolls every ClickHouse pod"
+test_render_delivery_topology() {
+  local out="${TMPDIR:-/tmp}/lwql-topology.yaml"
+  local err="${TMPDIR:-/tmp}/lwql-topology.err"
+  if ! render_to "$out" "$err" lw --set autogen.enabled=true; then
+    fail "topology-render" "default render failed:
+$(cat "$err")"
+    return
+  fi
+
+  # One render Job that runs the app image and renders the access files.
+  if ! grep -q "name: lw-lwql-access-render" "$out"; then
+    fail "topology-no-job" "no lw-lwql-access-render Job/ServiceAccount/Role rendered on chart-managed ClickHouse."
+  fi
+  if ! grep -q "renderLwqlAccessConfig" "$out"; then
+    fail "topology-no-render-cmd" "the access-render Job does not invoke renderLwqlAccessConfig."
+  fi
+  # It must be a pre-install AND pre-upgrade hook so the Secret exists before the
+  # StatefulSet mounts it, on both install and upgrade.
+  if ! grep -q 'helm.sh/hook: pre-install,pre-upgrade' "$out"; then
+    fail "topology-hook" "the access-render resources are not pre-install,pre-upgrade hooks."
+  fi
+  # The Role is scoped to the one Secret name for get/update/patch (create cannot
+  # be name-scoped in Kubernetes RBAC, so it is a separate namespaced rule).
+  if ! grep -q 'resourceNames: \["lw-lwql-clickhouse-access"\]' "$out"; then
+    fail "topology-role-scope" "the access-render Role is not resourceName-scoped to lw-lwql-clickhouse-access."
+  fi
+
+  # Every ClickHouse pod mounts the Secret at the two contract paths.
+  local mount_users mount_config
+  mount_users=$(grep -c "mountPath: /etc/clickhouse-server/users.d/lwql-access.yaml" "$out")
+  mount_config=$(grep -c "mountPath: /etc/clickhouse-server/config.d/lwql-named-collection.yaml" "$out")
+  if [[ "$mount_users" -lt 1 || "$mount_config" -lt 1 ]]; then
+    fail "topology-mount" "the ClickHouse pod does not mount the access Secret at both users.d and config.d paths."
+  fi
+  if ! grep -q "secretName: 'lw-lwql-clickhouse-access'" "$out" \
+     && ! grep -q 'secretName: lw-lwql-clickhouse-access' "$out"; then
+    fail "topology-volume" "the ClickHouse pod has no volume backed by the lw-lwql-clickhouse-access Secret."
+  fi
+
+  # Upgrade refresh: the ClickHouse pod template carries the catalog-version
+  # annotation that rolls the StatefulSet when the app catalog changes.
+  if ! grep -q "langwatch.com/lwql-access-catalog:" "$out"; then
+    fail "topology-annotation" "the ClickHouse pod template carries no langwatch.com/lwql-access-catalog annotation, so an upgrade would not re-mount a changed access Secret."
+  fi
+}
+
 test_chart_managed_two_passwords_only
 test_external_clickhouse_two_passwords_only
 test_external_postgres_two_passwords_only
 test_disabled_emits_nothing
 test_chart_managed_mode_is_rendered_default
 test_external_overlay_selects_sql_mode
+test_render_delivery_topology
 
 if [[ $failures -gt 0 ]]; then
   echo
@@ -261,4 +310,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: all 6 LangWatchQL connection/mode postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope"
+echo "PASS: all LangWatchQL connection/mode/delivery postures pinned — (1) chart-managed ClickHouse emits exactly the two passwords, each a secretKeyRef, on app and workers, and no CLICKHOUSE_LWQL_* config; (2) external ClickHouse emits the same two secretKeyRef vars only; (3) external PostgreSQL emits the same two secretKeyRef vars only and renders successfully; (4) lwql.enabled=false emits no LWQL env at all; (5) chart-managed ClickHouse leaves LWQL_ACCESS_MODEL_MODE unset (rendered default); (6) the clickhouse-external overlay selects sql mode and acknowledges single-node scope; (7) chart-managed ClickHouse renders one pre-install/pre-upgrade render Job with a name-scoped Role, mounts the access Secret on every pod at both paths, and carries the catalog-version roll annotation"
