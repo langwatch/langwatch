@@ -196,6 +196,14 @@ spec:
                 # cannot be gated on lwql.enabled (the ClickHouse subchart cannot
                 # read the umbrella-scoped flag), so an empty document keeps a
                 # disabled install from wedging on a missing Secret.
+                # Verified (AC4) against the pinned image
+                # clickhouse/clickhouse-server:25.10.2.65: with `{}` at both
+                # users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml
+                # the server boots, merges the config.d fragment, and `SELECT 1`
+                # returns 1 with zero <Error>/<Fatal>/DB::Exception; a malformed
+                # users.d fragment instead aborts boot with CANNOT_PARSE_YAML
+                # (585), confirming the empty mapping is genuinely parsed and
+                # accepted, not silently ignored. See commit body for the run.
                 printf '{}\n' > /render/users.d/lwql-access.yaml
                 printf '{}\n' > /render/config.d/lwql-named-collection.yaml
               fi
