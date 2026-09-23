@@ -3,11 +3,11 @@
  * columns.
  *
  * These bind the @unit scenarios of `specs/lwql/postgres-catalog.feature` that
- * are about the derivation itself — naming/type helpers move to
+ * are about the per-model build itself — naming/type helpers move to
  * `./derivePostgresCatalog.naming.unit.test.ts`, override handling (the six
- * formerly-hand-written views, re-admits, the skip-list guard) to
- * `./derivePostgresCatalog.overrides.unit.test.ts`, the coverage guard lives
- * in `./tenantModelCoverage.unit.test.ts`, and the content-gating and
+ * formerly-hand-written views, re-admits) to
+ * `./derivePostgresCatalog.overrides.unit.test.ts`, the opt-in negative case
+ * lives in `./catalogInclusion.unit.test.ts`, and the content-gating and
  * ground-truth scenarios bind elsewhere.
  *
  * @see ../derivePostgresCatalog.ts — the code under test
@@ -20,20 +20,15 @@ import {
   teamTenantPath,
 } from "../../provisioning/postgresMapping";
 import {
-  derivePostgresCatalog,
+  type DerivedPostgresView,
   isStrippedByDefault,
   resolveTenantScope,
   sanitizeDescription,
 } from "../derivePostgresCatalog";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "../postgresSkippedModels";
-import { LWQL_POSTGRES_ALL_OVERRIDES } from "../postgresViews";
+import { LWQL_POSTGRES_CATALOG } from "../postgresViews";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "../prismaManifest";
 
-const catalog = derivePostgresCatalog({
-  manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
-  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-});
+const catalog = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 const byModel = new Map(
   catalog.map((view) => [view.postgres!.baseRelation, view]),
 );
@@ -108,7 +103,8 @@ describe("given the derived Postgres catalog", () => {
       expect(view.postgres!.tenantPath?.slice(1)).toEqual(
         organizationTenantPath(),
       );
-      expect(LWQL_POSTGRES_SKIPPED_MODELS.GatewayBudgetLedger).toBeUndefined();
+      // Catalogued through its parent — no entry needed on any skip list.
+      expect(byName.has("gateway_budget_ledgers")).toBe(true);
     });
   });
 

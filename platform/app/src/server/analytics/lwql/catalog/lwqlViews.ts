@@ -73,11 +73,29 @@
  * @see specs/lwql/api.feature
  */
 
+import { CLICKHOUSE_OVERRIDES } from "./clickhouseOverrides";
 import { contentFilteredMapSql } from "./contentGating";
-import { LWQL_DERIVED_CATALOG } from "./derivedViews";
+import { defineCatalogTable } from "./defineDatasetFromTable";
 import { CODING_TOOL_RESULTS } from "./overrides/coding";
 import { LWQL_POSTGRES_CATALOG } from "./postgresViews";
 import type { LangWatchQLViewDefinition } from "./types";
+
+/**
+ * One ClickHouse catalog entry, opt-in: the table is queryable because this
+ * call names it. Its refinements come from {@link CLICKHOUSE_OVERRIDES}; its
+ * `joinKeys` — the foreign keys that reach another view — are stated here,
+ * because with no manifest loop there is no cross-table set to derive them from.
+ */
+function clickhouseView(
+  table: string,
+  joinKeys?: readonly string[],
+): LangWatchQLViewDefinition {
+  const override = CLICKHOUSE_OVERRIDES[table] ?? {};
+  return defineCatalogTable(
+    table,
+    joinKeys ? { ...override, joinKeys } : override,
+  );
+}
 
 /**
  * How long after a write a row can be missing from these views.
@@ -2914,7 +2932,128 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   CODING_AGENT_SESSION_EVENTS,
   CODING_TOOL_RESULTS,
   JUDGMENTS,
-  ...LWQL_DERIVED_CATALOG,
+  // ClickHouse derived views — opt-in, one explicit entry per source table.
+  clickhouseView("automation_audit", ["TenantId", "EventId", "TraceId"]),
+  clickhouseView("billable_events", ["TenantId", "OrganizationId", "EventId"]),
+  clickhouseView("coding_agent_trace_sessions", [
+    "TenantId",
+    "TraceId",
+    "SessionId",
+  ]),
+  clickhouseView("dspy_steps", [
+    "TenantId",
+    "ExperimentId",
+    "RunId",
+    "WorkflowVersionId",
+  ]),
+  clickhouseView("experiment_run_items", [
+    "TenantId",
+    "ProjectionId",
+    "RunId",
+    "ExperimentId",
+    "TraceId",
+  ]),
+  clickhouseView("experiment_runs", [
+    "TenantId",
+    "ProjectionId",
+    "RunId",
+    "ExperimentId",
+    "WorkflowVersionId",
+  ]),
+  clickhouseView("gateway_budget_ledger_events", [
+    "TenantId",
+    "BudgetId",
+    "ScopeId",
+    "VirtualKeyId",
+    "GatewayRequestId",
+  ]),
+  clickhouseView("gateway_budget_scope_totals", [
+    "TenantId",
+    "Scope",
+    "ScopeId",
+    "Window",
+    "PeriodStart",
+    "BudgetId",
+  ]),
+  clickhouseView("gateway_spend", [
+    "TenantId",
+    "GatewayRequestId",
+    "OrganizationId",
+    "VirtualKeyId",
+    "TraceId",
+  ]),
+  clickhouseView("governance_cost_rollup_restatement_index", [
+    "TenantId",
+    "IngestionSourceId",
+    "AgentId",
+    "RawActorId",
+  ]),
+  clickhouseView("governance_cost_rollup_1d", [
+    "TenantId",
+    "IngestionSourceId",
+    "AgentId",
+    "RawActorId",
+    "OrganizationId",
+  ]),
+  clickhouseView("governance_kpis", ["TenantId", "SourceId", "TraceId"]),
+  clickhouseView("governance_ocsf_events", [
+    "TenantId",
+    "EventId",
+    "TraceId",
+    "SourceId",
+  ]),
+  clickhouseView("langy_messages", ["TenantId"]),
+  clickhouseView("langy_analytics_events", [
+    "TenantId",
+    "EventId",
+    "AggregateId",
+  ]),
+  clickhouseView("event_log", ["TenantId", "AggregateId", "EventId"]),
+  clickhouseView("stored_log_records", [
+    "TenantId",
+    "ProjectionId",
+    "TraceId",
+    "SpanId",
+  ]),
+  clickhouseView("stored_metric_records", [
+    "TenantId",
+    "ProjectionId",
+    "TraceId",
+    "SpanId",
+  ]),
+  clickhouseView("log_usage_estimates", [
+    "TenantId",
+    "OrganizationId",
+    "RecordId",
+  ]),
+  clickhouseView("log_records", ["TenantId", "TraceId", "SpanId"]),
+  clickhouseView("metric_usage_estimates", [
+    "TenantId",
+    "OrganizationId",
+    "PointId",
+    "SeriesId",
+  ]),
+  clickhouseView("metric_data_points", ["TenantId", "PointId", "SeriesId"]),
+  clickhouseView("metric_time_rollups", ["TenantId", "SeriesId"]),
+  clickhouseView("metric_series", ["TenantId", "SeriesId"]),
+  clickhouseView("stored_objects", ["TenantId"]),
+  clickhouseView("session_metric_series", [
+    "TenantId",
+    "SessionId",
+    "SeriesId",
+  ]),
+  clickhouseView("simulation_run_metrics_rollup", [
+    "TenantId",
+    "ScenarioRunId",
+    "TraceId",
+  ]),
+  clickhouseView("simulation_run_metrics", [
+    "TenantId",
+    "ScenarioRunId",
+    "TraceId",
+    "EventId",
+  ]),
+  clickhouseView("suite_runs", ["TenantId", "ProjectionId"]),
   ...LWQL_POSTGRES_CATALOG,
 ];
 

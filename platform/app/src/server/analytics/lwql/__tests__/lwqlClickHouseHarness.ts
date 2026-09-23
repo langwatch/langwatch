@@ -74,10 +74,9 @@ import { expect } from "vitest";
 import { TEST_CLICKHOUSE_IMAGE } from "~/test-utils/clickhouseTestEndpoints";
 import { migrateUp } from "../../../clickhouse/goose";
 import { lwqlTenantCapability } from "../capability";
-import { derivePostgresCatalog } from "../catalog/derivePostgresCatalog";
+import type { DerivedPostgresView } from "../catalog/derivePostgresCatalog";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "../catalog/postgresSkippedModels";
-import { LWQL_POSTGRES_ALL_OVERRIDES } from "../catalog/postgresViews";
+import { LWQL_POSTGRES_CATALOG } from "../catalog/postgresViews";
 import { LWQL_PRISMA_MANIFEST } from "../catalog/prismaManifest";
 import {
   isPostgresResident,
@@ -2197,11 +2196,8 @@ export const LWQL_EXPLICITLY_SEEDED_MODELS = [
  * seed) and {@link startLangWatchQLPostgres} (the view/reader-role setup), so
  * the two never derive it separately and drift.
  */
-const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS = derivePostgresCatalog({
-  manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
-  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-});
+const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS =
+  LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 
 /**
  * One tenant's rows in every mapped base relation, followed by one row per
