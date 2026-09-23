@@ -200,8 +200,7 @@ jobs:
       # lower-weight hooks in the same phase, every pre-upgrade hook needs a
       # pre-rollback twin, no template reads an undeclared value, no subchart
       # mount rides parent extraVolumes. `helm template` sees all of it in
-      # seconds; a 35-minute e2e never did. (This script arrives in a separate
-      # commit; the step may fail until it lands — expected.)
+      # seconds; a 35-minute e2e never did.
       - name: "assert hook lifecycle invariants"
         if: "!cancelled()"
         run: bash tests/lifecycle.sh
@@ -385,10 +384,12 @@ jobs:
             script: make test-e2e E2E_SUITES="test_external_clickhouse test_lwql_external_postgres_secret_guard test_cold_storage_and_backup"
             cluster: lw-external
             needs_app: false
+            skip_app_build: "1"
           - name: overlays
             script: make test-e2e-overlays
             cluster: lw-overlay
             needs_app: false
+            skip_app_build: "1"
     defaults:
       run:
         working-directory: charts/langwatch
@@ -439,6 +440,7 @@ jobs:
       - run: ${{ matrix.script }}
         env:
           KEEP_CLUSTER: "true"
+          E2E_SKIP_APP_BUILD: ${{ matrix.skip_app_build }}
           CLUSTER_NAME: ${{ matrix.cluster }}
       - name: Show pod status on failure
         if: failure()

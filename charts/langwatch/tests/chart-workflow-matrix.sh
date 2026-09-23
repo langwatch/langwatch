@@ -91,6 +91,15 @@ e2e_docker_build = sum(
 )
 emit("e2e_docker_build_count", e2e_docker_build)
 
+# Every leg must either load the app image (needs_app) or declare it unneeded
+# (skip_app_build). A leg that does neither makes e2e.sh rebuild the app image,
+# the most expensive one, on every run.
+app_unprovisioned = sum(
+    1 for l in legs
+    if not l.get("needs_app") and not l.get("skip_app_build")
+)
+emit("app_unprovisioned_legs", app_unprovisioned)
+
 # The suites each leg runs, parsed from `E2E_SUITES="..."` in its script. Legs
 # without it (overlays) contribute none.
 import re
@@ -177,10 +186,11 @@ test_failing_leg_does_not_stop_the_others() {
 
 # @scenario "One build-images job builds each image once and the e2e legs load them (tasks#894)"
 test_images_are_built_once_and_reused() {
-  local uploads rebuilds needs
+  local uploads rebuilds needs unprovisioned
   uploads="$(fact build_images_upload_count)"
   rebuilds="$(fact e2e_docker_build_count)"
   needs="$(fact e2e_needs)"
+  unprovisioned="$(fact app_unprovisioned_legs)"
   if [ "$uploads" = "3" ]; then
     ok "image reuse" "build-images publishes 3 image artifacts"
   else
@@ -195,6 +205,11 @@ test_images_are_built_once_and_reused() {
     ok "image reuse" "e2e depends on build-images and render"
   else
     bad "image reuse" "e2e needs are '$needs', expected 'build-images render'"
+  fi
+  if [ "$unprovisioned" = "0" ]; then
+    ok "image reuse" "every leg loads the app image or sets skip_app_build"
+  else
+    bad "image reuse" "$unprovisioned leg(s) neither load the app image nor set skip_app_build"
   fi
 }
 

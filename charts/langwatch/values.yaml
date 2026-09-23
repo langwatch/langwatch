@@ -42,7 +42,7 @@ global:
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
 
-  ## @param global.podAnnotations [object] Annotations added to every pod this chart renders. Free-form pass-through map.
+  ## @param global.podAnnotations [object] Annotations added to every pod whose component does not set its own `pod.annotations`; a component map replaces this rather than merging.
   podAnnotations: {}
 
   # ServiceAccount for the first-party workloads that touch object storage
@@ -199,7 +199,8 @@ app:
   ## @param app.service.type [string, default: ClusterIP] Service type.
   ## @param app.service.port [default: 5560] Service port.
   ## @param app.service.annotations [object] Additional Service annotations. Required for cloud load-balancer configuration (AWS NLB scheme/subnets, GCP internal LB, ingress-controller hints) — those controllers are driven entirely by annotations, so without this a `type: LoadBalancer` install cannot be steered at all.
-  service: { type: ClusterIP, port: 5560, annotations: {}, nodePort: null } # nodePort: set an explicit NodePort when app.service.type is NodePort; null lets Kubernetes assign one
+  ## @param app.service.nodePort [default: null] Explicit NodePort when app.service.type is NodePort; null lets Kubernetes assign one.
+  service: { type: ClusterIP, port: 5560, annotations: {}, nodePort: null }
 
   # Resource requirements and limits for the application pods
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources

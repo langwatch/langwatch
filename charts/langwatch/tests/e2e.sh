@@ -174,7 +174,6 @@ test_postgresql() {
 # SUITE: Redis
 # ─────────────────────────────────────────────────────────────────────────────
 test_redis() {
-  exit 1 # tasks#894 AC3 scratch: force the core leg to fail; reverted next commit
   sep; info "Suite: Redis"
 
   wait_pod_ready "app.kubernetes.io/component=redis"
@@ -1033,12 +1032,16 @@ main() {
   local ch_values="${CHART_DIR}/../clickhouse-serverless/values.yaml"
   setup_kind "$ch_values"
 
-  # Build and load the app image into Kind
+  # Build and load the app image into Kind. Under the workflow the build-images
+  # job supplies every image and each leg loads only what it needs, so a leg
+  # that does not use the app image sets E2E_SKIP_APP_BUILD to keep this from
+  # rebuilding the most expensive image. A local run leaves it unset and builds
+  # on demand.
   local app_repo app_tag app_image
   app_repo=$(helm show values "$CHART_DIR" | grep -A20 "^images:" | grep -A2 "^  app:" | grep "repository:" | awk '{print $2}')
   app_tag=$(helm show values "$CHART_DIR" | grep -A20 "^images:" | grep -A2 "^  app:" | grep "tag:" | head -1 | awk '{print $2}')
   app_image="${app_repo}:${app_tag}"
-  if ! docker image inspect "$app_image" &>/dev/null 2>&1; then
+  if [[ -z "${E2E_SKIP_APP_BUILD:-}" ]] && ! docker image inspect "$app_image" &>/dev/null 2>&1; then
     local repo_root="${CHART_DIR}/../.."
     if [[ -f "$repo_root/infra/docker/Dockerfile" ]]; then
       info "Building app image: $app_image"
