@@ -107,3 +107,9 @@ Feature: Automation ownership
     When the author sends a test fire
     Then the composed AutomationService validates and renders the draft
     And provider delivery runs through the process-owned Automation delivery adapter
+
+  @unit
+  Scenario: A ceiling notice quotes the rung entitlement names next
+    Given a project whose organization buys from the tiered ladder
+    When the upgrade line of an automation ceiling notice is resolved
+    Then it links the checkout of the rung the entitlement capability names next

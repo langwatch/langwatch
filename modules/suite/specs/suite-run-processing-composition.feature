@@ -52,3 +52,10 @@ Feature: Composing durable suite-run processing
     Given a worker graph composed with no suite capability passed in
     When the graph is composed
     Then the suite feature is mounted anyway, built from this process's own substrate
+
+  @unit
+  Scenario: A suite reads the platform retention default from data retention
+    Given data retention owns the platform default retention
+    When the suite capability is composed
+    Then it reads no environment for the default
+    And it leaves data retention unasked until a run row is written, once peers are running

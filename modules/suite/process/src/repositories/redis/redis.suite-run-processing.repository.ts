@@ -1,12 +1,12 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { RedisCachedFoldStore, RepositoryFoldStore } from "@langwatch/eventing";
+import {
+  RedisCachedFoldStore,
+  RepositoryFoldStore,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
 import { SUITE_RUN_PROJECTION_VERSIONS, type SuiteRunStateData } from "@langwatch/suite-contract";
 import type { Cluster, Redis } from "ioredis";
 
-import {
-  SuiteRunProcessingPipelineAdapter,
-  type SuiteRunProcessingPipeline,
-} from "../../services/suite-run-processing.service.ts";
 import { ClickhouseSuiteEventingRepository } from "../clickhouse/clickhouse.suite-eventing.repository.ts";
 
 /**
@@ -20,7 +20,7 @@ export type ClickHouseSuiteRunProcessingAdapterOptions = {
   /** The process's one ClickHouse client, which routes each statement itself. */
   clickhouse: ClickHouseQueryClient;
   /** The fallback for rows whose tenant declares no retention override. */
-  defaultRetentionDays: number;
+  defaultRetentionDays: () => number;
   /**
    * The process's own Redis, required rather than optional.
    */
@@ -44,24 +44,22 @@ export class RedisSuiteRunProcessingRepository {
 
   private constructor(private readonly options: ClickHouseSuiteRunProcessingAdapterOptions) {}
 
-  buildProcessing(): SuiteRunProcessingPipeline {
-    return SuiteRunProcessingPipelineAdapter.create({
-      suiteRunStateFoldStore: new RedisCachedFoldStore<SuiteRunStateData>(
-        new RepositoryFoldStore<SuiteRunStateData>(
-          ClickhouseSuiteEventingRepository.create({
-            clickhouse: this.options.clickhouse,
-            defaultRetentionDays: this.options.defaultRetentionDays,
-          }).build().suiteRunState,
-          SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-        ),
-        this.options.redis,
-        {
-          keyPrefix: SUITE_RUN_FOLD_CACHE_KEY_PREFIX,
-          ...(this.options.foldCacheTtlSeconds === undefined
-            ? {}
-            : { ttlSeconds: this.options.foldCacheTtlSeconds }),
-        },
+  buildRunStateFoldStore(): FoldProjectionStore<SuiteRunStateData> {
+    return new RedisCachedFoldStore<SuiteRunStateData>(
+      new RepositoryFoldStore<SuiteRunStateData>(
+        ClickhouseSuiteEventingRepository.create({
+          clickhouse: this.options.clickhouse,
+          defaultRetentionDays: this.options.defaultRetentionDays,
+        }).build().suiteRunState,
+        SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
       ),
-    });
+      this.options.redis,
+      {
+        keyPrefix: SUITE_RUN_FOLD_CACHE_KEY_PREFIX,
+        ...(this.options.foldCacheTtlSeconds === undefined
+          ? {}
+          : { ttlSeconds: this.options.foldCacheTtlSeconds }),
+      },
+    );
   }
 }

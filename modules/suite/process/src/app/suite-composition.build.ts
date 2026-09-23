@@ -1,6 +1,5 @@
 // Build SuiteApp collaborators; `execution` field is deliberately refused.
 import type { AgentApi } from "@langwatch/agent-contract";
-import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import { SuiteExecutionUnavailableError } from "@langwatch/suite-contract";
 
 import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
@@ -21,7 +20,6 @@ class UnavailableSuiteExecution implements SuiteExecution {
 export interface SuiteAppInfrastructure {
   execution: SuiteExecution;
   connectedPresence: ConnectedPresenceReader;
-  defaultRetentionDays: number;
   publicBaseUrl: string | undefined;
 }
 
@@ -38,9 +36,6 @@ export function buildSuiteInfrastructure(input: {
     // The agent directory this App already depends on answers presence
     // directly; no member and no optional bag are needed to ask it.
     connectedPresence: (presenceInput) => input.agents.getPresence(presenceInput),
-    // The one platform default every retention-aware feature resolves the
-    // same way, off the same process environment (ADR-* data retention).
-    defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),
     publicBaseUrl: input.publicBaseUrl,
   };
 }

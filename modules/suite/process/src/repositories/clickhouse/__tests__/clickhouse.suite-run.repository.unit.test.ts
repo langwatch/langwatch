@@ -42,7 +42,7 @@ function setup(rows: unknown[] = [stateReadRow]) {
   const insert = vi.fn().mockResolvedValue(undefined);
   const repository = ClickHouseSuiteRunRepository.create({
     clickhouse: { query, insert } as unknown as ClickHouseQueryClient,
-    defaultRetentionDays: 30,
+    defaultRetentionDays: () => 30,
   });
   return { repository, query, insert };
 }
@@ -165,7 +165,7 @@ describe("ClickHouseSuiteRunRepository", () => {
         },
         insert: async () => {},
       } as unknown as ClickHouseQueryClient,
-      defaultRetentionDays: 30,
+      defaultRetentionDays: () => 30,
     });
     await expect(
       repository.findProjection("b", { tenantId: createTenantId("p") }),

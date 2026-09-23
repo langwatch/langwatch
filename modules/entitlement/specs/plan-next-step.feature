@@ -86,3 +86,9 @@ Feature: Where an organization can go next
     Given an organization on a plan type that is on no ladder we sell
     When its next step is resolved
     Then its account team is named instead of a plan
+
+  @unit
+  Scenario: A peer asks the entitlement capability for the next step
+    Given an organization on the Pro plan of the tiered ladder
+    When another module asks the entitlement capability where it goes next
+    Then the answer names the rung the self-serve catalogue sells above it

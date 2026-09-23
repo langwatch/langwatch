@@ -3,7 +3,10 @@ import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { RedisSuiteRunProcessingRepository } from "../../repositories/redis/redis.suite-run-processing.repository.ts";
-import type { SuiteRunProcessingPipeline } from "../suite-run-processing.service.ts";
+import {
+  SuiteRunProcessingPipelineAdapter,
+  type SuiteRunProcessingPipeline,
+} from "../suite-run-processing.service.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
@@ -48,14 +51,17 @@ function compose(
   const set = vi.fn(async (..._args: unknown[]) => "OK");
   const redis = { get: vi.fn(async () => null), set };
 
-  const pipeline: SuiteRunProcessingPipeline = RedisSuiteRunProcessingRepository.create({
+  const suiteRunStateFoldStore = RedisSuiteRunProcessingRepository.create({
     clickhouse: clickhouse as never,
-    defaultRetentionDays: 49,
+    defaultRetentionDays: () => 49,
     redis: redis as never,
     ...(options.foldCacheTtlSeconds === undefined
       ? {}
       : { foldCacheTtlSeconds: options.foldCacheTtlSeconds }),
-  }).buildProcessing();
+  }).buildRunStateFoldStore();
+  const pipeline: SuiteRunProcessingPipeline = SuiteRunProcessingPipelineAdapter.create({
+    suiteRunStateFoldStore,
+  });
 
   return { pipeline, insert, clickhouse, redis, set };
 }

@@ -12,6 +12,7 @@ import {
   type ListOrganizationSpendInput,
   type Plan,
   type PlanEnricher,
+  type PlanNextStep,
   type PlanProviderUser,
   type ProjectSpendRollup,
   type ResolvePlanInput,
@@ -32,6 +33,8 @@ import { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
+import { PlanNextStepService } from "../services/plan-next-step.service.ts";
+import { SelfServePlanCatalogueService } from "../services/self-serve-plan-catalogue.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
 import { buildEntitlementInfrastructure } from "./entitlement-composition.build.ts";
 import type { UsageCounter, UsageWarning } from "./entitlement.members.ts";
@@ -119,6 +122,7 @@ export class EntitlementApp implements EntitlementApiContract {
 
   #plans: EntitlementService;
   #usage: UsageStatsService;
+  #nextStep: PlanNextStepService;
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
   #users: UserApi;
@@ -135,6 +139,9 @@ export class EntitlementApp implements EntitlementApiContract {
       membership: repositories.membership,
       counter: members.counter,
       plans: this.#plans,
+    });
+    this.#nextStep = PlanNextStepService.create({
+      catalogue: SelfServePlanCatalogueService.create(),
     });
     this.#warnings = members.warnings;
     this.#spend = repositories.spend;
@@ -188,6 +195,12 @@ export class EntitlementApp implements EntitlementApiContract {
     const plan = await this.#plans.getActivePlan({ organizationId: input.organizationId });
 
     return resolveRequestBound(input.key, plan.type, this.#requestBoundOverrides);
+  }
+
+  resolvePlanNextStep(
+    input: Readonly<{ plan: Plan; pricingModel: PricingModel | null; currency?: "USD" | "EUR" }>,
+  ): Promise<PlanNextStep> {
+    return this.#nextStep.resolve(input);
   }
 
   async getUsage(input: GetUsageInput): Promise<UsageStats> {

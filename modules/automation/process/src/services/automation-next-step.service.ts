@@ -3,8 +3,7 @@
  * provides the hop from project to organization and the deployment's checkout address.
  */
 import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
-import type { PlanProvider, PricingModel } from "@langwatch/entitlement-contract";
-import type { PlanNextStepService } from "@langwatch/entitlement-process";
+import type { EntitlementApi, PlanProvider, PricingModel } from "@langwatch/entitlement-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -28,7 +27,7 @@ export class AutomationNextStepAdapter {
     projects: Pick<ProjectApi, "getOrganizationId">;
     plans: Pick<PlanProvider, "getActivePlan">;
     organizations: AutomationOrganizationPricing;
-    nextStep: PlanNextStepService;
+    nextStep: Pick<EntitlementApi, "resolvePlanNextStep">;
     baseHost: string;
     logger?: Logger;
   }): AutomationNextStepAdapter {
@@ -43,7 +42,7 @@ export class AutomationNextStepAdapter {
       projects: Pick<ProjectApi, "getOrganizationId">;
       plans: Pick<PlanProvider, "getActivePlan">;
       organizations: AutomationOrganizationPricing;
-      nextStep: PlanNextStepService;
+      nextStep: Pick<EntitlementApi, "resolvePlanNextStep">;
       baseHost: string;
     },
     private readonly logger: Logger,
@@ -61,7 +60,7 @@ export class AutomationNextStepAdapter {
       if (!pricing) return undefined;
 
       const plan = await this.options.plans.getActivePlan({ organizationId });
-      const resolved = await this.options.nextStep.resolve({
+      const resolved = await this.options.nextStep.resolvePlanNextStep({
         plan,
         pricingModel: pricing.pricingModel,
         currency: pricing.currency,

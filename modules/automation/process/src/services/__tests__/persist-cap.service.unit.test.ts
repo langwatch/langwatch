@@ -28,6 +28,7 @@ const persistCapDependencies = {
     sendUsageLimitWarning: vi.fn(),
     listOrganizationSpend: vi.fn(),
     requestBound: vi.fn(),
+    resolvePlanNextStep: vi.fn(),
   },
   config: {
     free: 100,

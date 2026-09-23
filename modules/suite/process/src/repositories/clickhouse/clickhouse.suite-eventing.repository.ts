@@ -6,7 +6,7 @@ import { ClickHouseSuiteRunRepository } from "./clickhouse.suite-run.repository.
 export type ClickHouseSuiteEventingAdapterOptions = {
   /** The process's one ClickHouse client, which routes each statement itself. */
   clickhouse: ClickHouseQueryClient;
-  defaultRetentionDays: number;
+  defaultRetentionDays: () => number;
 };
 
 /** Builds Suite's ClickHouse projection capability for replay processes. */

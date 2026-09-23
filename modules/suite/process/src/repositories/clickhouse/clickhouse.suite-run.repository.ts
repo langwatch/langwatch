@@ -28,7 +28,8 @@ export type SuiteRunClickHouseRepositoryOptions = {
    * client and cannot obtain an unscoped one.
    */
   clickhouse: ClickHouseQueryClient;
-  defaultRetentionDays: number;
+  /** Read at write time: the owner answers only once the process is running. */
+  defaultRetentionDays: () => number;
 };
 
 const TABLE_NAME = "suite_runs" as const;
@@ -109,7 +110,7 @@ export class ClickHouseSuiteRunRepository
           ClickHouseSuiteRunRepository.mapProjectionToRow(
             projection,
             context,
-            this.options.defaultRetentionDays,
+            this.options.defaultRetentionDays(),
           ),
         ],
         settings: { async_insert: 1, wait_for_async_insert: 0 },
@@ -154,7 +155,7 @@ export class ClickHouseSuiteRunRepository
           ClickHouseSuiteRunRepository.mapProjectionToRow(
             projection,
             context,
-            this.options.defaultRetentionDays,
+            this.options.defaultRetentionDays(),
           ),
         ),
         settings: { async_insert: 1, wait_for_async_insert: 1 },

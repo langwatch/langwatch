@@ -8,7 +8,8 @@ import type {
   SendUsageLimitWarningInput,
   UsageLimitWarning,
 } from "./entitlement.schemas.ts";
-import type { Plan } from "./plan.ts";
+import type { PlanNextStep } from "./plan-next-step.ts";
+import type { Plan, PricingModel } from "./plan.ts";
 import type { ResolvePlanInput } from "./provider.ts";
 import type { UsageStats } from "./usage.ts";
 
@@ -28,6 +29,10 @@ export interface EntitlementApi {
    * paid otherwise). `LANGWATCH_REQUEST_BOUNDS` overrides win over tier values.
    */
   requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number>;
+  /** Where this plan upgrades next, quoted in `currency` (USD when absent). */
+  resolvePlanNextStep(
+    input: Readonly<{ plan: Plan; pricingModel: PricingModel | null; currency?: "USD" | "EUR" }>,
+  ): Promise<PlanNextStep>;
 }
 
 export const EntitlementApi = moduleApi<EntitlementApi>()("entitlement");

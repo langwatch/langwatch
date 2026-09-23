@@ -5,6 +5,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -39,6 +40,9 @@ function process(role: "api" | "worker") {
       agent: createApiFixture<AgentApi>({}),
       prompt: createApiFixture<PromptApi>({}),
       project: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
+      "data-retention": createApiFixture<DataRetentionApi>({
+        getPlatformDefaultRetentionDays: () => 49,
+      }),
     });
 }
 

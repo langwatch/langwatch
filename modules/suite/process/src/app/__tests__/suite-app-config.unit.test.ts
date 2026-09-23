@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @vitest-environment node
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -27,7 +28,10 @@ function unreachableClickHouse(): ClickHouseQueryClient {
   ) as unknown as ClickHouseQueryClient;
 }
 
-function buildProductionApp(publicBaseUrl: string | undefined) {
+function buildProductionApp(
+  publicBaseUrl: string | undefined,
+  retention = createApiFixture<DataRetentionApi>({ getPlatformDefaultRetentionDays: () => 49 }),
+) {
   return SuiteApp.create({
     repositories: createSuiteTestRepositories(),
     dependencies: {
@@ -37,6 +41,7 @@ function buildProductionApp(publicBaseUrl: string | undefined) {
       projects: createApiFixture<ProjectApi>({
         findOrganizationId: async () => "organization-1",
       }),
+      retention,
     },
     members: { clickhouse: unreachableClickHouse(), publicBaseUrl, redis: null },
     config: undefined,
@@ -66,5 +71,22 @@ describe("SuiteApp built the way production composes it", () => {
         /named no public base URL/,
       );
     });
+  });
+});
+
+describe("SuiteApp's platform retention default", () => {
+  /** @scenario "A suite reads the platform retention default from data retention" */
+  it("leaves the data retention capability unasked while the process is constructing", () => {
+    let asks = 0;
+    const retention = createApiFixture<DataRetentionApi>({
+      getPlatformDefaultRetentionDays: () => {
+        asks += 1;
+        return 49;
+      },
+    });
+
+    buildProductionApp(undefined, retention);
+
+    expect(asks).toBe(0);
   });
 });

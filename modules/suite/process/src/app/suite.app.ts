@@ -3,6 +3,7 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
  * The suite feature's application: what both of its doors call.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { RepositoryFoldStore, type FoldProjectionStore } from "@langwatch/eventing";
 import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -107,6 +108,8 @@ export class SuiteApp implements SuiteApi {
     agents: AgentApi,
     prompts: PromptApi,
     projects: ProjectApi,
+    /** Owns `LANGWATCH_DEFAULT_RETENTION_DAYS`; a suite run is stamped with its default. */
+    retention: DataRetentionApi,
   };
   /** Every name is from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["clickhouse", "publicBaseUrl", "redis"] as const;
@@ -117,9 +120,10 @@ export class SuiteApp implements SuiteApi {
       agents: dependencies.agents,
       publicBaseUrl: members.publicBaseUrl,
     });
+    const defaultRetentionDays = () => dependencies.retention.getPlatformDefaultRetentionDays();
     const runRepository = ClickHouseSuiteRunRepository.create({
       clickhouse: members.clickhouse,
-      defaultRetentionDays: infrastructure.defaultRetentionDays,
+      defaultRetentionDays,
     });
 
     const suites = SuiteService.create({
@@ -139,7 +143,7 @@ export class SuiteApp implements SuiteApi {
       pipeline: SuiteApp.buildEventingPipeline({
         clickhouse: members.clickhouse,
         redis: members.redis,
-        defaultRetentionDays: infrastructure.defaultRetentionDays,
+        defaultRetentionDays,
       }),
     });
   }
@@ -152,23 +156,21 @@ export class SuiteApp implements SuiteApi {
   private static buildEventingPipeline(options: {
     clickhouse: ClickHouseQueryClient;
     redis: Redis | Cluster | null;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }) {
-    if (options.redis) {
-      return RedisSuiteRunProcessingRepository.create({
-        clickhouse: options.clickhouse,
-        defaultRetentionDays: options.defaultRetentionDays,
-        redis: options.redis,
-      }).buildProcessing();
-    }
-
-    const suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData> = new RepositoryFoldStore(
-      ClickhouseSuiteEventingRepository.create({
-        clickhouse: options.clickhouse,
-        defaultRetentionDays: options.defaultRetentionDays,
-      }).build().suiteRunState,
-      SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
-    );
+    const suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData> = options.redis
+      ? RedisSuiteRunProcessingRepository.create({
+          clickhouse: options.clickhouse,
+          defaultRetentionDays: options.defaultRetentionDays,
+          redis: options.redis,
+        }).buildRunStateFoldStore()
+      : new RepositoryFoldStore(
+          ClickhouseSuiteEventingRepository.create({
+            clickhouse: options.clickhouse,
+            defaultRetentionDays: options.defaultRetentionDays,
+          }).build().suiteRunState,
+          SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
+        );
 
     return SuiteRunProcessingPipelineAdapter.create({ suiteRunStateFoldStore });
   }

@@ -309,6 +309,7 @@ const makeService = (
         sendUsageLimitWarning: vi.fn(),
         listOrganizationSpend: vi.fn(),
         requestBound: vi.fn(),
+        resolvePlanNextStep: vi.fn(),
       },
       config: { free: 100, paid: 1_000, enterprise: 10_000 },
       redis: null,

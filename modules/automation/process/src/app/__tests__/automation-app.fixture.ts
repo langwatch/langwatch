@@ -1,4 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -6,7 +7,6 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { vi } from "vitest";
 
@@ -213,6 +213,7 @@ export function createCanonicalAutomationApp(): {
           sendUsageLimitWarning: vi.fn<EntitlementApiContract["sendUsageLimitWarning"]>(),
           listOrganizationSpend: vi.fn<EntitlementApiContract["listOrganizationSpend"]>(),
           requestBound: vi.fn<EntitlementApiContract["requestBound"]>(),
+          resolvePlanNextStep: vi.fn<EntitlementApiContract["resolvePlanNextStep"]>(),
         },
         auditLog,
       },
