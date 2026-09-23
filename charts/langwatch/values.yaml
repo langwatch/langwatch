@@ -42,7 +42,7 @@ global:
   ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
 
-  ## @param global.podAnnotations [object] Annotations added to every pod whose component does not set its own `pod.annotations`; a component map replaces this rather than merging.
+  ## @param global.podAnnotations [object] Annotations added to the app, workers, langwatch_nlp and langevals Deployment pods when that Deployment does not set its own `pod.annotations`; a component map replaces this rather than merging.
   podAnnotations: {}
 
   # ServiceAccount for the first-party workloads that touch object storage

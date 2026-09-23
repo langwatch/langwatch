@@ -203,7 +203,7 @@ jobs:
       # seconds; a 35-minute e2e never did.
       - name: "assert hook lifecycle invariants"
         if: "!cancelled()"
-        run: bash tests/lifecycle.sh
+        run: ./tests/lifecycle.sh
 
       # Design C rests on one Secret name resolving identically on both sides:
       # the app reads the langwatch_lwql password from exactly the Secret the
@@ -299,16 +299,21 @@ jobs:
     defaults:
       run:
         working-directory: charts/langwatch
+    # The e2e legs resolve the app image name from this instead of repeating
+    # the `helm show values` parse, so one source of truth builds and loads it.
+    outputs:
+      app_image: ${{ steps.resolve-app.outputs.app_image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
       - name: Resolve app image
+        id: resolve-app
         run: |
-          APP_REPO=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'repository:' | awk '{print $2}')
-          APP_TAG=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'tag:' | head -1 | awk '{print $2}')
-          echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
+          APP_IMAGE=$(./tests/app-image.sh .)
+          echo "app_image=${APP_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "APP_IMAGE=${APP_IMAGE}" >> "$GITHUB_ENV"
       - name: Build app image
         run: docker build -t "$APP_IMAGE" -f ../../infra/docker/Dockerfile ../..
       # The gateway image isn't published to ghcr yet — build it locally so
@@ -421,16 +426,12 @@ jobs:
           if [ "${{ matrix.needs_app }}" = "true" ]; then
             docker load -i "${RUNNER_TEMP}/images/app.tar"
           fi
-      - name: Resolve app image
-        if: matrix.needs_app
-        run: |
-          APP_REPO=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'repository:' | awk '{print $2}')
-          APP_TAG=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'tag:' | head -1 | awk '{print $2}')
-          echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
       - uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1
         with:
           cluster_name: ${{ matrix.cluster }}
       - name: Load images into Kind
+        env:
+          APP_IMAGE: ${{ needs.build-images.outputs.app_image }}
         run: |
           kind load docker-image langwatch/clickhouse-serverless:next --name ${{ matrix.cluster }}
           kind load docker-image langwatch/ai-gateway:e2e --name ${{ matrix.cluster }}

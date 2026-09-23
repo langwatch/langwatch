@@ -9,6 +9,8 @@
 #   KEEP_CLUSTER=true  — skip Kind cluster deletion on exit (for debugging)
 #   CLUSTER_NAME       — Kind cluster name (default: lw-test)
 #   TIMEOUT            — helm --wait timeout in seconds (default: 480)
+#   E2E_SKIP_APP_BUILD — if set, skip building/loading the app image (a leg that
+#                        does not deploy the app; the workflow sets it per-leg)
 #   KEEP_CLUSTER and CLUSTER_NAME are passed through to test-helpers.sh
 #
 # Usage:
@@ -1037,10 +1039,8 @@ main() {
   # that does not use the app image sets E2E_SKIP_APP_BUILD to keep this from
   # rebuilding the most expensive image. A local run leaves it unset and builds
   # on demand.
-  local app_repo app_tag app_image
-  app_repo=$(helm show values "$CHART_DIR" | grep -A20 "^images:" | grep -A2 "^  app:" | grep "repository:" | awk '{print $2}')
-  app_tag=$(helm show values "$CHART_DIR" | grep -A20 "^images:" | grep -A2 "^  app:" | grep "tag:" | head -1 | awk '{print $2}')
-  app_image="${app_repo}:${app_tag}"
+  local app_image
+  app_image="$("$(dirname "$0")/app-image.sh" "$CHART_DIR")"
   if [[ -z "${E2E_SKIP_APP_BUILD:-}" ]] && ! docker image inspect "$app_image" &>/dev/null 2>&1; then
     local repo_root="${CHART_DIR}/../.."
     if [[ -f "$repo_root/infra/docker/Dockerfile" ]]; then

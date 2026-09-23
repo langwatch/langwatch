@@ -100,6 +100,17 @@ app_unprovisioned = sum(
 )
 emit("app_unprovisioned_legs", app_unprovisioned)
 
+# The suite step (the one that runs matrix.script / e2e.sh, where every suite
+# executes) must run unconditionally. An `if:` on it would silently drop a
+# whole leg's suites — the same "optional suite" failure continue-on-error
+# causes. Counted on the e2e job's suite steps only; the job-level draft gate
+# `if:` is not a step and is not counted.
+suite_step_if = sum(
+    1 for s in e2e["steps"]
+    if isinstance(s.get("run"), str) and "matrix.script" in s["run"] and "if" in s
+)
+emit("suite_step_if_count", suite_step_if)
+
 # The suites each leg runs, parsed from `E2E_SUITES="..."` in its script. Legs
 # without it (overlays) contribute none.
 import re
@@ -241,6 +252,14 @@ test_no_suite_is_optional() {
     ok "no optional suite" "the workflow has no continue-on-error"
   else
     bad "no optional suite" "$coe continue-on-error key(s) in the workflow, expected 0"
+  fi
+
+  local suite_if
+  suite_if="$(fact suite_step_if_count)"
+  if [ "$suite_if" = "0" ]; then
+    ok "no optional suite" "the suite step runs unconditionally (no if:)"
+  else
+    bad "no optional suite" "$suite_if if: key(s) on the e2e suite step, expected 0"
   fi
 }
 

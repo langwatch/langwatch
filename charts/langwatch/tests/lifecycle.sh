@@ -7,25 +7,29 @@
 # The five shapes this pins, each a P0/P2 finding that shipped and was caught
 # only in review:
 #
-#   1. A hook Job's ServiceAccount, and every Secret it reads through a
-#      secretKeyRef / envFrom.secretRef / volume, must itself be a hook that
-#      runs in EVERY phase the Job runs in, at a STRICTLY LOWER hook-weight. A
-#      main-phase dependency does not exist yet when the hook fires: Helm
-#      applies hooks before the release, so the Job starts with no
-#      ServiceAccount (falls back to `default`, wrong permissions) or a
-#      secretKeyRef that resolves to nothing and the pod wedges in
-#      CreateContainerConfigError. Invisible in the template source; visible
-#      only in the rendered annotations.
-#   2. Every hook resource that runs on `pre-upgrade` must also run on
+#   1. A hook Job's ServiceAccount must itself be a hook that runs in EVERY
+#      phase the Job runs in, at a STRICTLY LOWER hook-weight. A main-phase
+#      dependency does not exist yet when the hook fires: Helm applies hooks
+#      before the release, so the Job starts with no ServiceAccount (falls back
+#      to `default`, wrong permissions). Invisible in the template source;
+#      visible only in the rendered annotations.
+#   2. Every Secret a hook Job reads through a secretKeyRef / envFrom.secretRef
+#      / volume must, likewise, be a lower-weight hook that runs in every phase
+#      the Job does — otherwise the secretKeyRef resolves to nothing and the
+#      pod wedges in CreateContainerConfigError. On the chart as shipped this
+#      arm checks ZERO dependencies (no hook Job reads a Secret today); it
+#      exists as a forward guard so the invariant holds the day one does. Proof
+#      that it fires lives in the scratch repro cited in the PR body.
+#   3. Every hook resource that runs on `pre-upgrade` must also run on
 #      `pre-rollback`. A rollback moves the release the same way an upgrade
 #      does and Helm fires its own event pair for it; a hook registered for the
 #      upgrade event alone simply does not run during a rollback, silently,
 #      exactly when the operator is already recovering from a bad release.
-#   3. No template may reference a `.Values.<path>` that `values.yaml` does not
+#   4. No template may reference a `.Values.<path>` that `values.yaml` does not
 #      declare. An undeclared path renders empty, so a Job reading
 #      `.Values.global.imagePullSecrets` (never declared) pulls nothing and the
 #      private image fails — and the source reads as if the value were wired.
-#   4. No subchart mount may be delivered through a PARENT `extraVolumes` /
+#   5. No subchart mount may be delivered through a PARENT `extraVolumes` /
 #      `extraVolumeMounts` list. Those lists belong to the parent's own
 #      workloads; a subchart declares its own mounts from a typed value, and a
 #      volume pushed onto the parent list never reaches the subchart's pod.
