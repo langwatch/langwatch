@@ -53,6 +53,13 @@ export abstract class ExperimentWorkflowDsl {
   }): Promise<{ id: string; version: string; dsl: unknown } | null>;
 }
 
+/** The column type a parameter value writes into the dataset. */
+function parameterColumnType(value: string | number | boolean): string {
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  return "string";
+}
+
 // Column types that store JSON and need parsing
 const JSON_COLUMN_TYPES = ["chat_messages", "json", "list", "spans", "rag_contexts"] as const;
 
@@ -262,7 +269,7 @@ export class ExperimentExecutionDataService {
 
       // Parse JSON columns
       const jsonColumns = new Set(
-        columns.filter((c) => JSON_COLUMN_TYPES.includes(c.type as any)).map((c) => c.name),
+        columns.filter((c) => JSON_COLUMN_TYPES.some((type) => type === c.type)).map((c) => c.name),
       );
       rows = parseJsonColumns(rows, jsonColumns);
     } else if (dataset.type === "saved" && dataset.datasetId) {
@@ -281,7 +288,7 @@ export class ExperimentExecutionDataService {
 
       // Parse JSON columns (saved datasets already use names as keys)
       const jsonColumns = new Set(
-        columns.filter((c) => JSON_COLUMN_TYPES.includes(c.type as any)).map((c) => c.name),
+        columns.filter((c) => JSON_COLUMN_TYPES.some((type) => type === c.type)).map((c) => c.name),
       );
       rows = parseJsonColumns(rows, jsonColumns);
     } else {
@@ -311,8 +318,6 @@ export class ExperimentExecutionDataService {
     }
 
     const existingNames = new Set(columns.map((c) => c.name));
-    const parameterColumnType = (value: string | number | boolean): string =>
-      typeof value === "number" ? "number" : typeof value === "boolean" ? "boolean" : "string";
     // A parameter overriding an existing column rewrites every row's value below,
     // so the column's declared type must follow the parameter or the rows and the
     // column metadata would disagree (e.g. a number written into a "string" column).

@@ -160,6 +160,23 @@ function isInActiveEvaluationFlow(): boolean {
   );
 }
 
+/** Workflow evaluators check as "workflow", code ones by id, built-ins by configured type. */
+function monitorCheckType({
+  isWorkflowEvaluator,
+  evaluatorKind,
+  evaluatorId,
+  configuredEvaluatorType,
+}: {
+  isWorkflowEvaluator: boolean;
+  evaluatorKind: string;
+  evaluatorId: string;
+  configuredEvaluatorType: string | undefined;
+}): string {
+  if (isWorkflowEvaluator) return "workflow";
+  if (evaluatorKind === "code") return `code/${evaluatorId}`;
+  return configuredEvaluatorType ?? "langevals/basic";
+}
+
 /**
  * Drawer for creating/editing online evaluations (monitors).
  * Allows selecting an evaluator, configuring sampling, preconditions, and mappings.
@@ -898,13 +915,12 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       settings?: Record<string, unknown>;
     } | null;
 
-    // Workflow evaluators use "workflow" as checkType, code evaluators route
-    // by id, and built-in evaluators use the evaluatorType from config
-    const checkType = isWorkflowEvaluator
-      ? "workflow"
-      : selectedEvaluator.type === "code"
-        ? `code/${selectedEvaluator.id}`
-        : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
+    const checkType = monitorCheckType({
+      isWorkflowEvaluator,
+      evaluatorKind: selectedEvaluator.type,
+      evaluatorId: selectedEvaluator.id,
+      configuredEvaluatorType: evaluatorConfig?.evaluatorType,
+    });
     const settings = evaluatorSettingsSchema.parse(evaluatorConfig?.settings ?? {});
 
     // Convert UIFieldMapping to MappingState format

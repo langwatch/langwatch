@@ -103,20 +103,20 @@ export const buildConnectedCall = ({
   return { messages: messagesOf(inputs[CONNECTED_INPUT_FIELD]), params };
 };
 
+/** The text of one content part: a string, or a part carrying `text`. */
+const partText = (part: unknown): string => {
+  if (typeof part === "string") return part;
+  if (typeof (part as { text?: unknown })?.text === "string")
+    return (part as { text: string }).text;
+  return "";
+};
+
 /** The text of one message, whatever shape its content has. */
 const contentText = (message: ProtocolMessage): string => {
   const content = (message as { content?: unknown }).content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
-    return content
-      .map((part) =>
-        typeof part === "string"
-          ? part
-          : typeof (part as { text?: unknown })?.text === "string"
-            ? (part as { text: string }).text
-            : "",
-      )
-      .join("");
+    return content.map(partText).join("");
   }
   return content === undefined ? "" : JSON.stringify(content);
 };

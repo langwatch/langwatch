@@ -397,50 +397,78 @@ export class PrismaExperimentRepository extends ExperimentRepository {
         select: { id: true },
         orderBy: { counterVersion: "desc" },
       });
-      const autoSaved = input.actor.label === "user" && !input.commitMessage;
-      if (autoSaved && rolling) {
-        await transaction.experimentVersion.update({
-          where: { id: rolling.id, projectId: input.projectId },
-          data: {
-            version: nextVersion,
-            counterVersion: nextVersion,
-            state: input.snapshot as Prisma.InputJsonValue,
-            authorId: input.actor.userId ?? null,
-            authorLabel: input.actor.label,
-            runId: input.actor.runId ?? null,
-            commitMessage: null,
-            schemaVersion: "1",
-          },
-        });
-      } else {
-        if (rolling) {
-          await transaction.experimentVersion.update({
-            where: { id: rolling.id, projectId: input.projectId },
-            data: { version: nextVersion },
-          });
-        }
-        const highest = await transaction.experimentVersion.findFirst({
-          where: { projectId: input.projectId, experimentId: row.id, autoSaved: false },
-          select: { version: true },
-          orderBy: { version: "desc" },
-        });
-        await transaction.experimentVersion.create({
-          data: {
-            projectId: input.projectId,
-            experimentId: row.id,
-            version: autoSaved ? nextVersion : (highest?.version ?? 0) + 1,
-            counterVersion: nextVersion,
-            autoSaved,
-            commitMessage: input.commitMessage ?? null,
-            authorId: input.actor.userId ?? null,
-            authorLabel: input.actor.label,
-            runId: input.actor.runId ?? null,
-            state: input.snapshot as Prisma.InputJsonValue,
-            schemaVersion: "1",
-          },
-        });
-      }
+      await this.recordWorkbenchVersion({
+        transaction,
+        input,
+        experimentId: row.id,
+        nextVersion,
+        rollingId: rolling?.id,
+      });
       return { kind: "saved" as const, experimentId: row.id, slug: row.slug, version: nextVersion };
+    });
+  }
+
+  /** Rolls the auto-saved version forward, or writes a new version row beside it. */
+  private async recordWorkbenchVersion({
+    transaction,
+    input,
+    experimentId,
+    nextVersion,
+    rollingId,
+  }: {
+    transaction: Prisma.TransactionClient;
+    input: {
+      projectId: string;
+      snapshot: unknown;
+      actor: WorkbenchActor;
+      commitMessage?: string;
+    };
+    experimentId: string;
+    nextVersion: number;
+    rollingId: string | undefined;
+  }): Promise<void> {
+    const autoSaved = input.actor.label === "user" && !input.commitMessage;
+    if (autoSaved && rollingId) {
+      await transaction.experimentVersion.update({
+        where: { id: rollingId, projectId: input.projectId },
+        data: {
+          version: nextVersion,
+          counterVersion: nextVersion,
+          state: input.snapshot as Prisma.InputJsonValue,
+          authorId: input.actor.userId ?? null,
+          authorLabel: input.actor.label,
+          runId: input.actor.runId ?? null,
+          commitMessage: null,
+          schemaVersion: "1",
+        },
+      });
+      return;
+    }
+    if (rollingId) {
+      await transaction.experimentVersion.update({
+        where: { id: rollingId, projectId: input.projectId },
+        data: { version: nextVersion },
+      });
+    }
+    const highest = await transaction.experimentVersion.findFirst({
+      where: { projectId: input.projectId, experimentId, autoSaved: false },
+      select: { version: true },
+      orderBy: { version: "desc" },
+    });
+    await transaction.experimentVersion.create({
+      data: {
+        projectId: input.projectId,
+        experimentId,
+        version: autoSaved ? nextVersion : (highest?.version ?? 0) + 1,
+        counterVersion: nextVersion,
+        autoSaved,
+        commitMessage: input.commitMessage ?? null,
+        authorId: input.actor.userId ?? null,
+        authorLabel: input.actor.label,
+        runId: input.actor.runId ?? null,
+        state: input.snapshot as Prisma.InputJsonValue,
+        schemaVersion: "1",
+      },
     });
   }
 

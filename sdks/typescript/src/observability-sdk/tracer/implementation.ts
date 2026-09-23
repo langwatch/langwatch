@@ -126,7 +126,7 @@ export function getLangWatchTracerFromProvider(
           };
 
         default: {
-          const value = (target as any)[prop];
+          const value = Reflect.get(target, prop);
 
           return typeof value === "function" ? value.bind(target) : value;
         }
