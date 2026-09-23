@@ -36,6 +36,18 @@ export type AnnotationScoreEditorProps = {
   submitLabel: string;
 };
 
+function scoreTypeHelper({
+  isOption,
+  isCheckbox,
+}: {
+  isOption: boolean;
+  isCheckbox: boolean;
+}): string {
+  if (isOption) return "Single selection from multiple options";
+  if (isCheckbox) return "Allow multiple selections with checkboxes";
+  return "Select the score type for the score metric";
+}
+
 /**
  * Controlled score-metric fields. The API form, mutation and error mapping
  * stay in the app container; this view owns only score editor interaction.
@@ -84,13 +96,7 @@ export function AnnotationScoreEditor({
       </EditorField>
       <EditorField
         label="Score Type"
-        helper={
-          isOption
-            ? "Single selection from multiple options"
-            : isCheckbox
-              ? "Allow multiple selections with checkboxes"
-              : "Select the score type for the score metric"
-        }
+        helper={scoreTypeHelper({ isOption, isCheckbox })}
         invalid={!!dataTypeError}
       >
         <HStack width="full">

@@ -50,6 +50,76 @@ function applyCachedViewById(
   }
 }
 
+const filterEmptyAndConverScalarToArray = (obj: FilterParam, filter: boolean): FilterParam => {
+  if (Array.isArray(obj)) {
+    return obj.filter((x) => x !== "");
+  }
+
+  return Object.fromEntries(
+    Object.entries(obj).flatMap(([key, value]): [string, FilterParam][] => {
+      if (Array.isArray(value)) {
+        const value_ = value.filter((x) => x !== "");
+        if (filter && value_.length === 0) {
+          return [];
+        }
+        return [[key, value_]];
+      } else if (value && typeof value === "object") {
+        const value_ = filterEmptyAndConverScalarToArray(value, filter);
+        if (filter && Object.keys(value_).length === 0) {
+          return [];
+        }
+        return [[key, value_]];
+      }
+      return [[key, [value]]];
+    }),
+  ) as FilterParam;
+};
+
+function readUrlFilters(
+  queryParams: Record<string, unknown>,
+): Partial<Record<FilterField, FilterParam>> {
+  const filters: Partial<Record<FilterField, FilterParam>> = {};
+  for (const [filterKey, filter] of Object.entries(availableFilters)) {
+    const param = queryParams[filter.urlKey];
+    if (param) {
+      const filterParam = typeof param === "string" ? [param] : (param as FilterParam);
+      const filterParam_ = filterEmptyAndConverScalarToArray(filterParam, false);
+      filters[filterKey as FilterField] = filterParam_;
+    }
+  }
+  return filters;
+}
+
+/**
+ * Saved view fallback: when the URL has no filter/date/query params, use the stored view's
+ * filters so the first query is already correct. Layout params (project, view, group_by) are
+ * fine — only filter keys, dates and search prevent the fallback.
+ */
+function applySavedViewFallback(
+  filters: Partial<Record<FilterField, FilterParam>>,
+  queryParams: Record<string, unknown>,
+  projectId: string | undefined,
+): void {
+  const hasUrlFilterOrDateParams =
+    Object.values(availableFilters).some((f) => queryParams[f.urlKey] !== undefined) ||
+    !!queryParams.query ||
+    !!queryParams.startDate ||
+    !!queryParams.endDate;
+
+  if (hasUrlFilterOrDateParams || !projectId) return;
+  try {
+    const viewId =
+      readUiStorage(`langwatch-saved-views-selected-${projectId}`) ??
+      readUiStorage(`langwatch-selected-view-${projectId}`);
+
+    if (viewId && viewId !== "all-traces") {
+      applyCachedViewById(filters, projectId, viewId);
+    }
+  } catch {
+    // localStorage unavailable or corrupt — ignore
+  }
+}
+
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -58,72 +128,11 @@ export const useFilterParams = () => {
     period: { startDate, endDate },
   } = usePeriodSelector();
 
-  const filters: Partial<Record<FilterField, FilterParam>> = {};
-
   const queryString = router.asPath.split("?")[1] ?? "";
   const queryParams = qs.parse(queryString.replaceAll("%2C", ","), URL_QS_PARSE_OPTIONS);
 
-  for (const [filterKey, filter] of Object.entries(availableFilters)) {
-    const param = queryParams[filter.urlKey];
-    if (param) {
-      const filterParam = typeof param === "string" ? [param] : (param as FilterParam);
-
-      const filterEmptyAndConverScalarToArray = (
-        obj: FilterParam,
-        filter: boolean,
-      ): FilterParam => {
-        if (Array.isArray(obj)) {
-          return obj.filter((x) => x !== "");
-        }
-
-        return Object.fromEntries(
-          Object.entries(obj).flatMap(([key, value]): [string, FilterParam][] => {
-            if (Array.isArray(value)) {
-              const value_ = value.filter((x) => x !== "");
-              if (filter && value_.length === 0) {
-                return [];
-              }
-              return [[key, value_]];
-            } else if (value && typeof value === "object") {
-              const value_ = filterEmptyAndConverScalarToArray(value, filter);
-              if (filter && Object.keys(value_).length === 0) {
-                return [];
-              }
-              return [[key, value_]];
-            }
-            return [[key, [value]]];
-          }),
-        ) as FilterParam;
-      };
-
-      const filterParam_ = filterEmptyAndConverScalarToArray(filterParam, false);
-      filters[filterKey as FilterField] = filterParam_;
-    }
-  }
-
-  // Saved view fallback: when the URL has no filter/date/query params and a
-  // saved view is stored in localStorage, use the view's filters so the first
-  // query already has the correct filters. Layout params like project, view,
-  // group_by are fine — only filter keys, dates, and search prevent fallback.
-  const hasUrlFilterOrDateParams =
-    Object.values(availableFilters).some((f) => queryParams[f.urlKey] !== undefined) ||
-    !!queryParams.query ||
-    !!queryParams.startDate ||
-    !!queryParams.endDate;
-
-  if (!hasUrlFilterOrDateParams && project?.id) {
-    try {
-      const viewId =
-        readUiStorage(`langwatch-saved-views-selected-${project.id}`) ??
-        readUiStorage(`langwatch-selected-view-${project.id}`);
-
-      if (viewId && viewId !== "all-traces") {
-        applyCachedViewById(filters, project.id, viewId);
-      }
-    } catch {
-      // localStorage unavailable or corrupt — ignore
-    }
-  }
+  const filters = readUrlFilters(queryParams);
+  applySavedViewFallback(filters, queryParams, project?.id);
 
   // Shallow-push helper that works on every page, including those with dynamic route params
   // beyond [project] (e.g. /[project]/analytics/custom/[id]). The string form router.push("?" +
