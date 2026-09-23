@@ -193,12 +193,12 @@ function serviceWith({
   const appTokens = new TestAppTokens(getPullRequest);
   const installationRepository = new TestInstallationRepository();
   const access = GithubInstallationAccessService.create(installationRepository, appTokens);
-  const installations = GithubInstallationsService.create(
-    installationRepository,
+  const installations = GithubInstallationsService.create({
+    repository: installationRepository,
     appTokens,
-    new TestOrganizationService().api,
+    organization: new TestOrganizationService().api,
     access,
-  );
+  });
   const service = GithubPullRequestStatusService.create({
     repository,
     installations,

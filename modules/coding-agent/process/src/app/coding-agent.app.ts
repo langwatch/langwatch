@@ -27,6 +27,7 @@ import {
   type CodingAgentUsageCount,
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
+  type CodingAgentTracePullRequestInput,
   type CodingAgentTracePullRequestLink,
   type CodingAgentTranscript,
 } from "@langwatch/coding-agent-contract";
@@ -260,7 +261,7 @@ export class CodingAgentApp implements CodingAgentApi {
   }
 
   linkTraceSessionsToPullRequests(
-    input: Parameters<CodingAgentSessionService["linkTraceSessionsToPullRequests"]>[0],
+    input: CodingAgentTracePullRequestInput,
   ): Promise<CodingAgentTracePullRequestLink[]> {
     return this.#codingAgents.linkTraceSessionsToPullRequests(input);
   }

@@ -28,12 +28,17 @@ const LIVENESS_FAILURE_BACKOFF_SEC = 60;
 
 /** This process's shared token cache in front of the raw GitHub App client. */
 export class RedisGithubAppTokenCache implements GithubAppTokenCache {
-  static create(
-    appId: string,
-    privateKey: string,
-    redis: GithubRedis | null,
-    host: GithubHost = GithubHostService.create(),
-  ): RedisGithubAppTokenCache {
+  static create({
+    appId,
+    privateKey,
+    redis,
+    host = GithubHostService.create(),
+  }: {
+    appId: string;
+    privateKey: string;
+    redis: GithubRedis | null;
+    host?: GithubHost;
+  }): RedisGithubAppTokenCache {
     const api = githubApiChannels.live.create(appId, privateKey, host);
     const cache = GithubTokenCacheRedisRepository.create({ redis, host });
     return new RedisGithubAppTokenCache(api, cache);

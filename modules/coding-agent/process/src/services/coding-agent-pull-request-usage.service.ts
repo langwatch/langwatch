@@ -96,12 +96,17 @@ export class CodingAgentPullRequestUsageService {
     return row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheCreationTokens;
   }
 
-  groupedRows(
-    sessions: readonly CodingAgentSessionBranchRecord[],
-    costProjects: ReadonlySet<string>,
-    nonBillableAgents: ReadonlySet<string>,
-    projects: Record<string, CodingAgentContributorProject>,
-  ): CodingAgentUsageRow[] {
+  groupedRows({
+    sessions,
+    costProjects,
+    nonBillableAgents,
+    projects,
+  }: {
+    sessions: readonly CodingAgentSessionBranchRecord[];
+    costProjects: ReadonlySet<string>;
+    nonBillableAgents: ReadonlySet<string>;
+    projects: Record<string, CodingAgentContributorProject>;
+  }): CodingAgentUsageRow[] {
     const grouped = new Map<string, CodingAgentUsageRow & { modelSet: Set<string> }>();
     for (const session of sessions) {
       const key = `${session.tenantId}\0${session.agent}`;

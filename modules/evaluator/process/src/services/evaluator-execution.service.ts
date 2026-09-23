@@ -41,13 +41,13 @@ export class EvaluatorExecutionService {
     const settings = config.success ? config.data.settings : void 0;
 
     if (evaluator.type === "workflow" && evaluator.workflowId) {
-      return this.resolveWorkflow(
+      return this.resolveWorkflow({
         input,
-        evaluator.id,
-        evaluator.name,
-        evaluator.workflowId,
+        evaluatorId: evaluator.id,
+        name: evaluator.name,
+        workflowId: evaluator.workflowId,
         settings,
-      );
+      });
     }
 
     if (evaluator.type === "code") {
@@ -75,13 +75,19 @@ export class EvaluatorExecutionService {
     });
   }
 
-  private async resolveWorkflow(
-    input: EvaluatorIdOrSlugInput,
-    evaluatorId: string,
-    name: string,
-    workflowId: string,
-    settings: Record<string, unknown> | undefined,
-  ): Promise<ResolvedEvaluatorExecution> {
+  private async resolveWorkflow({
+    input,
+    evaluatorId,
+    name,
+    workflowId,
+    settings,
+  }: {
+    input: EvaluatorIdOrSlugInput;
+    evaluatorId: string;
+    name: string;
+    workflowId: string;
+    settings: Record<string, unknown> | undefined;
+  }): Promise<ResolvedEvaluatorExecution> {
     try {
       const workflow = await this.options.workflows.getById({
         id: workflowId,

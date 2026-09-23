@@ -128,12 +128,17 @@ export class EntitlementApp implements EntitlementApiContract {
   #users: UserApi;
   #requestBoundOverrides: RequestBoundsOverrides;
 
-  private constructor(
-    repositories: EntitlementRepositories,
-    members: EntitlementInfrastructure,
-    dependencies: EntitlementCallerLookup,
-    config: EntitlementConfig,
-  ) {
+  private constructor({
+    repositories,
+    members,
+    dependencies,
+    config,
+  }: {
+    repositories: EntitlementRepositories;
+    members: EntitlementInfrastructure;
+    dependencies: EntitlementCallerLookup;
+    config: EntitlementConfig;
+  }) {
     this.#plans = EntitlementService.create(members);
     this.#usage = UsageStatsService.create({
       membership: repositories.membership,
@@ -157,7 +162,7 @@ export class EntitlementApp implements EntitlementApiContract {
       license: dependencies.license,
     });
 
-    return new EntitlementApp(repositories, infrastructure, dependencies, config);
+    return new EntitlementApp({ repositories, members: infrastructure, dependencies, config });
   }
 
   /**
@@ -171,8 +176,11 @@ export class EntitlementApp implements EntitlementApiContract {
     dependencies: EntitlementCallerLookup;
     config?: EntitlementConfig;
   }): EntitlementApp {
-    return new EntitlementApp(setup.repositories, setup.members, setup.dependencies, {
-      requestBounds: setup.config?.requestBounds,
+    return new EntitlementApp({
+      repositories: setup.repositories,
+      members: setup.members,
+      dependencies: setup.dependencies,
+      config: { requestBounds: setup.config?.requestBounds },
     });
   }
 

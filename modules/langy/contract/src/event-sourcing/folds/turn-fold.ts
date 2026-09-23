@@ -336,12 +336,17 @@ function withIdentity<S extends LangyConversationTurnFoldState>(
  * Resolve a tool call in place, or append when missing — a terminal arriving
  * before its `initiated` must still land (defensive; common path re-folds).
  */
-function upsertToolCall(
-  state: LangyConversationTurnFoldState,
-  toolCallId: string,
-  make: () => LangyTurnToolCall,
-  patch: (existing: LangyTurnToolCall) => LangyTurnToolCall,
-): LangyTurnToolCall[] {
+function upsertToolCall({
+  state,
+  toolCallId,
+  make,
+  patch,
+}: {
+  state: LangyConversationTurnFoldState;
+  toolCallId: string;
+  make: () => LangyTurnToolCall;
+  patch: (existing: LangyTurnToolCall) => LangyTurnToolCall;
+}): LangyTurnToolCall[] {
   const idx = state.ToolCalls.findIndex((t) => t.toolCallId === toolCallId);
   if (idx === -1) return [...state.ToolCalls, patch(make())];
   const next = [...state.ToolCalls];
@@ -375,15 +380,15 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED: {
       const { toolCallId, toolName, command, input } = event.data;
-      const ToolCalls = upsertToolCall(
+      const ToolCalls = upsertToolCall({
         state,
         toolCallId,
-        () => ({
+        make: () => ({
           toolCallId,
           toolName,
           status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
         }),
-        (existing) => ({
+        patch: (existing) => ({
           ...existing,
           toolName: existing.toolName || toolName,
           // Only fill from the initiate frame; never regress a resolved status.
@@ -391,20 +396,20 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
           ...(command !== undefined ? { command } : {}),
           ...(input !== undefined ? { input } : {}),
         }),
-      );
+      });
       return { ...withIdentity(event, state), ToolCalls };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED: {
       const { toolCallId, toolName, command, input, durationMs } = event.data;
-      const ToolCalls = upsertToolCall(
+      const ToolCalls = upsertToolCall({
         state,
         toolCallId,
-        () => ({
+        make: () => ({
           toolCallId,
           toolName,
           status: LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
         }),
-        (existing) => ({
+        patch: (existing) => ({
           ...existing,
           toolName: existing.toolName || toolName,
           status: LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
@@ -412,20 +417,20 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
           ...(input !== undefined ? { input } : {}),
           ...(durationMs !== undefined ? { durationMs } : {}),
         }),
-      );
+      });
       return { ...withIdentity(event, state), ToolCalls };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED: {
       const { toolCallId, toolName, command, input, durationMs, errorText } = event.data;
-      const ToolCalls = upsertToolCall(
+      const ToolCalls = upsertToolCall({
         state,
         toolCallId,
-        () => ({
+        make: () => ({
           toolCallId,
           toolName,
           status: LANGY_TURN_TOOL_CALL_STATUS.FAILED,
         }),
-        (existing) => ({
+        patch: (existing) => ({
           ...existing,
           toolName: existing.toolName || toolName,
           status: LANGY_TURN_TOOL_CALL_STATUS.FAILED,
@@ -434,7 +439,7 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
           ...(durationMs !== undefined ? { durationMs } : {}),
           ...(errorText !== undefined ? { errorText } : {}),
         }),
-      );
+      });
       return { ...withIdentity(event, state), ToolCalls };
     }
     // Fold a plan snapshot onto the turn. Whole-list, last-write-wins: callers
@@ -452,21 +457,21 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
     case LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED: {
       const started = pendingWait(event.data);
       const key = event.data.toolCallId ?? started.waitId;
-      const ToolCalls = upsertToolCall(
+      const ToolCalls = upsertToolCall({
         state,
-        key,
-        () => ({
+        toolCallId: key,
+        make: () => ({
           toolCallId: key,
           toolName: waitToolName(started.kind),
           status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
           wait: started,
         }),
-        (existing) => {
+        patch: (existing) => {
           const current = existing.wait;
           const settled = current?.waitId === started.waitId && current.status !== "pending";
           return { ...existing, wait: settled ? current : started };
         },
-      );
+      });
       return { ...withIdentity(event, state), ToolCalls };
     }
     // The card reached its one terminal. A second end never overwrites the
@@ -481,16 +486,16 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
         kind: data.kind,
         expiresAt: 0,
       });
-      const ToolCalls = upsertToolCall(
+      const ToolCalls = upsertToolCall({
         state,
-        key,
-        () => ({
+        toolCallId: key,
+        make: () => ({
           toolCallId: key,
           toolName: waitToolName(data.kind),
           status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
           wait: endedWait(blank, data, event.occurredAt),
         }),
-        (existing) => {
+        patch: (existing) => {
           const current = existing.wait;
           if (!current || current.waitId !== data.waitId) return existing;
           if (current.status !== "pending") return existing;
@@ -499,7 +504,7 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
             wait: endedWait(current, data, event.occurredAt),
           };
         },
-      );
+      });
       return { ...withIdentity(event, state), ToolCalls };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED: {

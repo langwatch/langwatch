@@ -303,12 +303,12 @@ export class CodingAgentPullRequestReadService {
     return {
       target,
       sessions: attached,
-      rows: this.dependencies.usage.groupedRows(
-        attached,
+      rows: this.dependencies.usage.groupedRows({
+        sessions: attached,
         costProjects,
         nonBillableAgents,
-        query.projects,
-      ),
+        projects: query.projects,
+      }),
       modelBreakdown: this.dependencies.usage.modelUsage(
         attached,
         attribution.modelTotals,
@@ -423,12 +423,12 @@ export class CodingAgentPullRequestReadService {
         modelTotals,
       });
       const attached = attribution.sessions;
-      const rows = this.dependencies.usage.groupedRows(
-        attached,
+      const rows = this.dependencies.usage.groupedRows({
+        sessions: attached,
         costProjects,
         nonBillableAgents,
-        input.query.projects,
-      );
+        projects: input.query.projects,
+      });
 
       return {
         ...pullRequestIdentity(pullRequest),

@@ -25,13 +25,27 @@ import {
 } from "../model/evaluator-host.ts";
 
 class CapabilityEvaluatorHost extends EvaluatorHostApi {
-  constructor(
-    private readonly hostScope: EvaluatorScope,
-    private readonly session: UiSession,
-    private readonly uiRoute: UiRoute,
-    private readonly feedback: UiFeedback,
-  ) {
+  private readonly hostScope: EvaluatorScope;
+  private readonly session: UiSession;
+  private readonly uiRoute: UiRoute;
+  private readonly feedback: UiFeedback;
+
+  constructor({
+    hostScope,
+    session,
+    uiRoute,
+    feedback,
+  }: {
+    hostScope: EvaluatorScope;
+    session: UiSession;
+    uiRoute: UiRoute;
+    feedback: UiFeedback;
+  }) {
     super();
+    this.hostScope = hostScope;
+    this.session = session;
+    this.uiRoute = uiRoute;
+    this.feedback = feedback;
   }
 
   scope(): EvaluatorScope {
@@ -94,7 +108,7 @@ export default function EvaluatorHostMount({ children }: { children?: ReactNode 
   );
 
   const host = useMemo(
-    () => new CapabilityEvaluatorHost(hostScope, session, route, feedback),
+    () => new CapabilityEvaluatorHost({ hostScope, session, uiRoute: route, feedback }),
     [hostScope, session, route, feedback],
   );
 

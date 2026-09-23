@@ -91,7 +91,11 @@ function makeAppTokens(
     listInstallationRepositories: (installationId: string) => Promise<GithubRepository[]>;
   }> = {},
 ): RedisGithubAppTokenCache {
-  const tokens = RedisGithubAppTokenCache.create("app-1", "test-private-key", null);
+  const tokens = RedisGithubAppTokenCache.create({
+    appId: "app-1",
+    privateKey: "test-private-key",
+    redis: null,
+  });
 
   vi.spyOn(tokens, "configured", "get").mockReturnValue(over.configured ?? true);
   vi.spyOn(tokens, "getInstallation").mockImplementation(
@@ -121,7 +125,12 @@ function service(
   appTokens: RedisGithubAppTokenCache,
 ): GithubInstallationsService {
   const access = GithubInstallationAccessService.create(repo, appTokens);
-  return GithubInstallationsService.create(repo, appTokens, organizations.api, access);
+  return GithubInstallationsService.create({
+    repository: repo,
+    appTokens,
+    organization: organizations.api,
+    access,
+  });
 }
 
 describe("recordInstallation", () => {

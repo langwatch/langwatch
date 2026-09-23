@@ -107,12 +107,17 @@ export const fieldType = (fieldName: string): string =>
     conversation: "list",
   })[fieldName] ?? "str";
 
-function evaluatorSettingDefault(
-  key: string,
-  setting: { readonly default: unknown },
-  resolved: { defaultModel?: string | null; embeddingsModel?: string | null },
-  fallback: { defaultModel: string; embeddingsModel: string },
-): unknown {
+function evaluatorSettingDefault({
+  key,
+  setting,
+  resolved,
+  fallback,
+}: {
+  key: string;
+  setting: { readonly default: unknown };
+  resolved: { defaultModel?: string | null; embeddingsModel?: string | null };
+  fallback: { defaultModel: string; embeddingsModel: string };
+}): unknown {
   if (key === "model") return resolved.defaultModel ?? fallback.defaultModel;
   if (key === "embeddings_model") return resolved.embeddingsModel ?? fallback.embeddingsModel;
 
@@ -131,7 +136,7 @@ export function getEvaluatorDefaultSettings(
   return Object.fromEntries(
     Object.entries(definition.settings).map(([key, setting]) => [
       key,
-      evaluatorSettingDefault(key, setting, resolved, fallback),
+      evaluatorSettingDefault({ key, setting, resolved, fallback }),
     ]),
   );
 }

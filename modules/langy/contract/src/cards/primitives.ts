@@ -94,8 +94,9 @@ export const textValueSchema = z
 /**
  * Row or truncation marker: oversized outputs have in-band "… N more" strings in the array.
  */
-export const rowOrTruncationMarker = <Row extends z.ZodType>(row: Row) =>
-  z.union([row, z.string()]);
+export const rowOrTruncationMarker = <Row extends z.ZodType>(
+  row: Row,
+): z.ZodUnion<[Row, z.ZodString]> => z.union([row, z.string()]);
 
 /**
  * Build a collection card: key differs per endpoint/resource, shape is declared once.
@@ -106,7 +107,10 @@ export const collectionSchema = <Key extends string, Row extends z.ZodType>({
 }: {
   key: Key;
   row: Row;
-}) =>
+}): z.ZodObject<
+  Record<Key, z.ZodType> & { pagination: z.ZodOptional<typeof paginationSchema> },
+  z.core.$loose
+> =>
   z.looseObject({
     [key]: z.array(rowOrTruncationMarker(row)),
     pagination: paginationSchema.optional(),

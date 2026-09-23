@@ -207,12 +207,17 @@ function finalize(prefix: string, header: EnvelopeHeader, body: string): string 
  * wins (mutates `header.e` to `"gz"`). The codec itself is sniffed from magic
  * bytes on decode, not named in the header, so header and bytes can't disagree.
  */
-async function inlineBody(
-  json: string,
-  jsonBytes: number,
-  header: EnvelopeHeader,
-  compression: CompressionCodec,
-): Promise<string> {
+async function inlineBody({
+  json,
+  jsonBytes,
+  header,
+  compression,
+}: {
+  json: string;
+  jsonBytes: number;
+  header: EnvelopeHeader;
+  compression: CompressionCodec;
+}): Promise<string> {
   if (jsonBytes > COMPRESSION_THRESHOLD_BYTES) {
     const compressed = (await compress(json, compression)).toString("base64");
     // High-entropy payloads (inline base64-ish data) can come out LARGER after
@@ -375,7 +380,12 @@ export async function encodeJobEnvelope({
   return finalize(
     ENVELOPE_PREFIX_V2,
     header,
-    await inlineBody(payloadJson ?? bytes.toString("utf-8"), payloadBytes, header, compression),
+    await inlineBody({
+      json: payloadJson ?? bytes.toString("utf-8"),
+      jsonBytes: payloadBytes,
+      header,
+      compression,
+    }),
   );
 }
 

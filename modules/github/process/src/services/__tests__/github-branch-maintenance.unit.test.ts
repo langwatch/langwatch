@@ -46,7 +46,11 @@ class MaintenanceRepository extends NullGithubPullRequestsRepository {
  * that is the point — the sweep spans every tenant and has neither in hand.
  */
 function service(repository: MaintenanceRepository) {
-  const appTokens = RedisGithubAppTokenCache.create("app", "test-key", null);
+  const appTokens = RedisGithubAppTokenCache.create({
+    appId: "app",
+    privateKey: "test-key",
+    redis: null,
+  });
   const access = GithubInstallationAccessService.create(
     new NullGithubInstallationsRepository(),
     appTokens,

@@ -235,24 +235,24 @@ export class GithubApp implements GithubApiContract {
   static composeApi(parts: GithubComposition): GithubFeatureService {
     const host = GithubHostService.create(parts.hostConfig);
     const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-    const appTokens = RedisGithubAppTokenCache.create(
-      parts.config.appId,
-      parts.config.privateKey,
+    const appTokens = RedisGithubAppTokenCache.create({
+      appId: parts.config.appId,
+      privateKey: parts.config.privateKey,
       redis,
       host,
-    );
+    });
     const { installations: installationsRepository, pullRequests: pullRequestsRepository } =
       parts.repositories;
     const installationAccess = GithubInstallationAccessService.create(
       installationsRepository,
       appTokens,
     );
-    const installations = GithubInstallationsService.create(
-      installationsRepository,
+    const installations = GithubInstallationsService.create({
+      repository: installationsRepository,
       appTokens,
-      parts.organization,
-      installationAccess,
-    );
+      organization: parts.organization,
+      access: installationAccess,
+    });
     const branchMapping = GithubBranchMappingService.create({
       repository: pullRequestsRepository,
       installations: installationAccess,
@@ -309,12 +309,12 @@ export class GithubApp implements GithubApiContract {
   ): GithubBranchMaintenance {
     const host = GithubHostService.create(parts.hostConfig);
     const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-    const appTokens = RedisGithubAppTokenCache.create(
-      parts.config.appId,
-      parts.config.privateKey,
+    const appTokens = RedisGithubAppTokenCache.create({
+      appId: parts.config.appId,
+      privateKey: parts.config.privateKey,
       redis,
       host,
-    );
+    });
     const { installations, pullRequests } = parts.repositories;
     const installationAccess = GithubInstallationAccessService.create(installations, appTokens);
     const mapping = GithubBranchMappingService.create({
@@ -335,12 +335,12 @@ export class GithubApp implements GithubApiContract {
   static composeBranchDemand(parts: GithubBranchDemandComposition): GithubBranchDemand {
     const host = GithubHostService.create(parts.hostConfig);
     const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-    const appTokens = RedisGithubAppTokenCache.create(
-      parts.config.appId,
-      parts.config.privateKey,
+    const appTokens = RedisGithubAppTokenCache.create({
+      appId: parts.config.appId,
+      privateKey: parts.config.privateKey,
       redis,
       host,
-    );
+    });
     const { installations, pullRequests } = parts.repositories;
     const installationAccess = GithubInstallationAccessService.create(installations, appTokens);
     const mapping = GithubBranchMappingService.create({

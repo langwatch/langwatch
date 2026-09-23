@@ -66,7 +66,7 @@ export class EvaluatorNativeService {
       return input.result;
     }
 
-    return this.reFailed(input, markerHits, droppedFail, kind);
+    return this.reFailed({ input, markerHits, droppedFail, kind });
   }
 
   /**
@@ -98,12 +98,17 @@ export class EvaluatorNativeService {
   }
 
   /** The failing result, with the original's own details kept in front. */
-  private reFailed(
-    input: EvaluatorResultAugmentationInput,
-    markerHits: number,
-    droppedFail: boolean,
-    kind: AugmentKind,
-  ): SingleEvaluationResult {
+  private reFailed({
+    input,
+    markerHits,
+    droppedFail,
+    kind,
+  }: {
+    input: EvaluatorResultAugmentationInput;
+    markerHits: number;
+    droppedFail: boolean;
+    kind: AugmentKind;
+  }): SingleEvaluationResult {
     const processed = input.result.status === "processed" ? input.result : null;
     const baseScore = typeof processed?.score === "number" ? processed.score : 0;
     const prior = processed?.details ? `${processed.details} ` : "";

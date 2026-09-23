@@ -28,12 +28,17 @@ export type GithubWebhookAction =
   | "removed";
 
 export class GithubInstallationsService {
-  static create(
-    repository: GithubInstallationsRepository,
-    appTokens: GithubAppTokenCache,
-    organization: OrganizationApi,
-    access: GithubInstallationAccessService,
-  ): GithubInstallationsService {
+  static create({
+    repository,
+    appTokens,
+    organization,
+    access,
+  }: {
+    repository: GithubInstallationsRepository;
+    appTokens: GithubAppTokenCache;
+    organization: OrganizationApi;
+    access: GithubInstallationAccessService;
+  }): GithubInstallationsService {
     return new GithubInstallationsService({ repository, appTokens, organization, access });
   }
 
