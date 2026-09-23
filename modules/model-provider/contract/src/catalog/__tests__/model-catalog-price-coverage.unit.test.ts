@@ -62,18 +62,21 @@ const ONE_OF_EVERYTHING = {
 };
 
 /** The unit an entry's rates bill in, from the rate fields it carries. */
+const TOKEN_RATE_FIELDS: readonly (keyof NonNullable<LLMModelEntry["pricing"]>)[] = [
+  "inputCostPerToken",
+  "outputCostPerToken",
+  "audioCostPerToken",
+  "imageCostPerToken",
+  "imageOutputCostPerToken",
+  "inputCacheReadPerToken",
+  "inputCacheWritePerToken",
+];
+
 function pricedUnits(entry: LLMModelEntry): Set<string> {
-  const p = entry.pricing ?? {};
+  const p: Partial<NonNullable<LLMModelEntry["pricing"]>> = entry.pricing ?? {};
   const units = new Set<string>();
-  if (
-    (p.inputCostPerToken ?? 0) > 0 ||
-    (p.outputCostPerToken ?? 0) > 0 ||
-    (p.audioCostPerToken ?? 0) > 0 ||
-    (p.imageCostPerToken ?? 0) > 0 ||
-    (p.imageOutputCostPerToken ?? 0) > 0 ||
-    (p.inputCacheReadPerToken ?? 0) > 0 ||
-    (p.inputCacheWritePerToken ?? 0) > 0
-  ) {
+  const pricesTokens = TOKEN_RATE_FIELDS.some((field) => (p[field] ?? 0) > 0);
+  if (pricesTokens) {
     units.add("token");
   }
   if ((p.inputCostPerCharacter ?? 0) > 0) units.add("character");
@@ -103,6 +106,53 @@ const BILLING_UNITS: Record<string, "token" | "character" | "second"> = {
 const KNOWN_UNIT_MISMATCH: Record<string, string> = {};
 
 const catalogEntries = Object.entries(llmModels.models);
+
+function findZeroRatedModels(costs: readonly ModelCostRate[]): string[] {
+  const zeroRated: string[] = [];
+  for (const [id] of catalogEntries) {
+    if (isPricedElsewhere(id) || id in KNOWN_UNPRICED) continue;
+
+    const matched = matchModelCostWithFallbacks(id, costs);
+    if (!matched) {
+      zeroRated.push(`${id} (no cost rule matched)`);
+      continue;
+    }
+    const cost = estimateCost({
+      rate: matched,
+      ...ONE_OF_EVERYTHING,
+    });
+    if (!cost || cost <= 0) {
+      zeroRated.push(`${id} (matched ${matched.model}, rated ${cost ?? 0})`);
+    }
+  }
+  return zeroRated;
+}
+
+function findMisroutedAudioModels(costs: readonly ModelCostRate[]): string[] {
+  const misrouted: string[] = [];
+  for (const [id, entry] of catalogEntries) {
+    if (entry.mode !== "audio") continue;
+    const matched = matchModelCostWithFallbacks(id, costs);
+    if (matched?.model !== id) {
+      misrouted.push(`${id} -> ${matched?.model ?? "no match"}`);
+    }
+  }
+  return misrouted;
+}
+
+function findUnitMismatches(): string[] {
+  const wrong: string[] = [];
+  for (const [id, unit] of Object.entries(BILLING_UNITS)) {
+    if (id in KNOWN_UNIT_MISMATCH) continue;
+    const entry = llmModels.models[id];
+    if (!entry) continue; // covered by the coverage tests above
+    const units = pricedUnits(entry);
+    if (!units.has(unit)) {
+      wrong.push(`${id} prices ${[...units].join("+") || "nothing"}, bills ${unit}`);
+    }
+  }
+  return wrong;
+}
 
 describe("catalog price coverage", () => {
   describe("given the merged model catalog", () => {
@@ -139,25 +189,7 @@ describe("catalog price coverage", () => {
 
     describe("when every billable quantity is one", () => {
       it("rates a cost above zero for every priced model", () => {
-        const costs = getStaticModelCosts();
-        const zeroRated: string[] = [];
-
-        for (const [id] of catalogEntries) {
-          if (isPricedElsewhere(id) || id in KNOWN_UNPRICED) continue;
-
-          const matched = matchModelCostWithFallbacks(id, costs);
-          if (!matched) {
-            zeroRated.push(`${id} (no cost rule matched)`);
-            continue;
-          }
-          const cost = estimateCost({
-            rate: matched,
-            ...ONE_OF_EVERYTHING,
-          });
-          if (!cost || cost <= 0) {
-            zeroRated.push(`${id} (matched ${matched.model}, rated ${cost ?? 0})`);
-          }
-        }
+        const zeroRated = findZeroRatedModels(getStaticModelCosts());
 
         expect(
           zeroRated,
@@ -173,16 +205,7 @@ describe("catalog price coverage", () => {
         // `openai/gpt-4o-transcribe` prefix-matches `openai/gpt-4o` unless it
         // has its own entry, which is how a transcription request came to be
         // priced with chat token rates.
-        const costs = getStaticModelCosts();
-        const misrouted: string[] = [];
-
-        for (const [id, entry] of catalogEntries) {
-          if (entry.mode !== "audio") continue;
-          const matched = matchModelCostWithFallbacks(id, costs);
-          if (matched?.model !== id) {
-            misrouted.push(`${id} -> ${matched?.model ?? "no match"}`);
-          }
-        }
+        const misrouted = findMisroutedAudioModels(getStaticModelCosts());
 
         expect(
           misrouted,
@@ -197,16 +220,7 @@ describe("catalog price coverage", () => {
         // that bills per token needs tokens. An entry carrying only the unit
         // the API does not return rates every request at zero, and still
         // looks like a complete entry.
-        const wrong: string[] = [];
-        for (const [id, unit] of Object.entries(BILLING_UNITS)) {
-          if (id in KNOWN_UNIT_MISMATCH) continue;
-          const entry = llmModels.models[id];
-          if (!entry) continue; // covered by the coverage tests above
-          const units = pricedUnits(entry);
-          if (!units.has(unit)) {
-            wrong.push(`${id} prices ${[...units].join("+") || "nothing"}, bills ${unit}`);
-          }
-        }
+        const wrong = findUnitMismatches();
         expect(
           wrong,
           "A rate in the wrong unit rates every request at zero. Fix the rate, or add the id to KNOWN_UNIT_MISMATCH with where the fix lands.",

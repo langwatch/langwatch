@@ -289,10 +289,10 @@ export const estimateModelCost = (
     outputAudioTokens > 0 ||
     inputImageTokens > 0 ||
     outputImageTokens > 0;
-  if (resolvedModel && hasUsage) {
-    const matched = matchModelCost(resolvedModel, staticCosts);
-    if (matched) {
-      const computed = estimateCost({
+  const matched =
+    resolvedModel && hasUsage ? matchModelCost(resolvedModel, staticCosts) : undefined;
+  const computed = matched
+    ? (estimateCost({
         rate: matched,
         inputTokens,
         outputTokens,
@@ -305,25 +305,24 @@ export const estimateModelCost = (
         outputImageTokens,
         inputCharacters,
         audioSeconds,
-      });
-      if (computed !== undefined && computed > 0) return computed;
-    }
-  }
+      }) ?? 0)
+    : 0;
+  if (computed > 0) return computed;
 
-  if (attrs[ATTR.spanType] === "guardrail") {
-    const output = attrs[ATTR.output];
-    if (isRecord(output)) {
-      const value = output.cost;
-      if (isRecord(value)) {
-        const amount = value.amount;
-        const currency = value.currency;
-        if (currency === "USD" && typeof amount === "number" && amount > 0) return amount;
-      }
-    }
-  }
+  if (attrs[ATTR.spanType] === "guardrail") return guardrailReportedCost(attrs[ATTR.output]);
 
   return 0;
 };
+
+function guardrailReportedCost(output: unknown): number {
+  if (!isRecord(output)) return 0;
+  const value = output.cost;
+  if (!isRecord(value)) return 0;
+  const amount = value.amount;
+  const currency = value.currency;
+  if (currency === "USD" && typeof amount === "number" && amount > 0) return amount;
+  return 0;
+}
 
 /**
  * Whether a customer-written cost-rule pattern is safe to run: it compiles and

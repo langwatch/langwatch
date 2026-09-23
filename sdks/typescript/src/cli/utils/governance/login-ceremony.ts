@@ -149,42 +149,26 @@ function formatBudgetLine(line: LoginCeremonyBudgetLine): string {
   return `${formatUsedUsd(line.spentUsd)} used of ${formatUsedUsd(line.limitUsd)} ${windowPhrase(line.window)} (${line.scopePhrase}${provider})${resets}`;
 }
 
-export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
+function formatProviderSection(providers: LoginCeremonyProvider[]): string[] {
   const lines: string[] = [];
-
-  const orgSuffix = input.organizationName ? ` @ ${input.organizationName}` : "";
-  lines.push(`✓ Logged in as ${input.email}${orgSuffix}`);
-
-  // AI tools (coding assistants). Fall back to the built-in wrappers when the
-  // org published none, so the user always gets a runnable next-step.
-  const tools = input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
   lines.push("");
-  lines.push("Your AI tools (run any of these):");
-  const cmdWidth = Math.max(...tools.map((t) => `langwatch ${t.slug}`.length));
-  for (const tool of tools) {
-    const cmd = `langwatch ${tool.slug}`;
-    const labelSuffix = tool.displayName ? `  # ${tool.displayName}` : "";
-    lines.push(`  $ ${padRight(cmd, cmdWidth)}${labelSuffix}`);
-  }
-
-  // Model providers the user can mint a virtual key for — a different concept
-  // from the tools above. Only shown when the org published provider tiles.
-  if (input.providers && input.providers.length > 0) {
-    lines.push("");
-    lines.push("Model providers you can issue a virtual key for:");
-    const nameWidth = Math.max(...input.providers.map((p) => p.name.length));
-    for (const p of input.providers) {
-      const padded = padRight(p.name, nameWidth);
-      const annotations: string[] = [];
-      if (p.displayName && p.displayName !== p.name) {
-        annotations.push(p.displayName);
-      }
-      if (p.configured === false) annotations.push("(not configured yet)");
-      const suffix = annotations.length > 0 ? `  ${annotations.join("  ")}` : "";
-      lines.push(`  • ${padded}${suffix}`);
+  lines.push("Model providers you can issue a virtual key for:");
+  const nameWidth = Math.max(...providers.map((p) => p.name.length));
+  for (const p of providers) {
+    const padded = padRight(p.name, nameWidth);
+    const annotations: string[] = [];
+    if (p.displayName && p.displayName !== p.name) {
+      annotations.push(p.displayName);
     }
+    if (p.configured === false) annotations.push("(not configured yet)");
+    const suffix = annotations.length > 0 ? `  ${annotations.join("  ")}` : "";
+    lines.push(`  • ${padded}${suffix}`);
   }
+  return lines;
+}
 
+function formatBudgetSection(input: LoginCeremonyInput): string[] {
+  const lines: string[] = [];
   if (input.budgets !== undefined) {
     if (input.budgets.length > 0) {
       lines.push("");
@@ -208,6 +192,34 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
       `${period} budget: ${formatUsd(input.budget.limitUsd)}   |   Used: ${formatUsedUsd(input.budget.usedUsd)}`,
     );
   }
+  return lines;
+}
+
+export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
+  const lines: string[] = [];
+
+  const orgSuffix = input.organizationName ? ` @ ${input.organizationName}` : "";
+  lines.push(`✓ Logged in as ${input.email}${orgSuffix}`);
+
+  // AI tools (coding assistants). Fall back to the built-in wrappers when the
+  // org published none, so the user always gets a runnable next-step.
+  const tools = input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
+  lines.push("");
+  lines.push("Your AI tools (run any of these):");
+  const cmdWidth = Math.max(...tools.map((t) => `langwatch ${t.slug}`.length));
+  for (const tool of tools) {
+    const cmd = `langwatch ${tool.slug}`;
+    const labelSuffix = tool.displayName ? `  # ${tool.displayName}` : "";
+    lines.push(`  $ ${padRight(cmd, cmdWidth)}${labelSuffix}`);
+  }
+
+  // Model providers the user can mint a virtual key for — a different concept
+  // from the tools above. Only shown when the org published provider tiles.
+  if (input.providers && input.providers.length > 0) {
+    lines.push(...formatProviderSection(input.providers));
+  }
+
+  lines.push(...formatBudgetSection(input));
 
   if (input.openCommand !== false) {
     lines.push("");

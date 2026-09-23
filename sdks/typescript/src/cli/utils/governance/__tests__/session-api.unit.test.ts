@@ -29,6 +29,12 @@ const jsonResponse = (status: number, body: unknown): Response =>
     headers: { "Content-Type": "application/json" },
   });
 
+function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
 describe("session-api request bounds", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -58,8 +64,7 @@ describe("session-api request bounds", () => {
 
       const seen: string[] = [];
       const fetchImpl: typeof fetch = async (input, init) => {
-        const url =
-          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const url = requestUrl(input);
         if (url.endsWith("/api/auth/cli/refresh")) {
           const sent = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as {
             refresh_token?: string;

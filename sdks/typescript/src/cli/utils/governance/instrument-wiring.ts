@@ -15,6 +15,7 @@ import { buildOtelEnvBlock } from "./otel-env-block";
 import { runningCodeRestartNotice } from "./running-code";
 import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import {
+  type DetectedShell,
   assertCodexTurnHarvest,
   buildScopedToolFunction,
   detectShell,
@@ -40,6 +41,87 @@ export interface WiringInstallResult {
   requiredFailures: string[];
 }
 
+function installClaudeWiring(vars: Record<string, string>): WiringInstallResult {
+  const labels: string[] = [];
+  const warnings: string[] = [];
+  const target = appSettingsTargetFor("claude");
+  if (target) {
+    try {
+      installAppEnv(target, vars);
+      labels.push(target.displayPath);
+    } catch (err) {
+      warnings.push(`could not write ${target.displayPath}: ${(err as Error).message}`);
+    }
+    // The session context seam reports repository identity; it rides
+    // in the same file. Quiet and idempotent; devices carrying the
+    // Claude Code plugin get it from the plugin instead.
+    try {
+      if (readClaudePluginState().pluginInstalled) {
+        removeSessionContextHooks({ tool: "claude_code" });
+      } else {
+        installSessionContextHooks({ tool: "claude_code" });
+      }
+    } catch {
+      // The env is the wiring that matters; the seam is best-effort.
+      void 0;
+    }
+  }
+  return { labels, warnings, requiredFailures: [] };
+}
+
+// opencode only emits spans when `experimental.openTelemetry` is on
+// in its own config; the env vars alone are accepted and ignored, so
+// reporting a wired tool here would be reporting a tool that sends
+// nothing.
+function enableOpencodeTelemetryFlag(): string[] {
+  const failures: string[] = [];
+  try {
+    const flag = setOpencodeOpenTelemetryFlag();
+    if (flag.action === "disabled-by-user") {
+      // The writer leaves an explicit `false` alone rather than
+      // overruling the user, and returns instead of throwing, so the
+      // result has to be read for the tool to be reported honestly.
+      failures.push(
+        `opencode's config sets experimental.openTelemetry to false, so it emits no spans. Remove that line from ${tildify(flag.path)} and run this again.`,
+      );
+    }
+  } catch (err) {
+    failures.push(`could not enable opencode's OpenTelemetry flag: ${(err as Error).message}`);
+  }
+  return failures;
+}
+
+function clearCodeTerminalEnv({
+  shell,
+  vars,
+}: {
+  shell: DetectedShell;
+  vars: Record<string, string>;
+}): string[] {
+  // The scoped function injects the bearer into a long-lived editor
+  // whose integrated terminals inherit it; the terminal clear keeps
+  // the token out of them.
+  const platform = process.platform;
+  if (platform !== "darwin" && platform !== "linux" && platform !== "win32") return [];
+  try {
+    clearVscodeTerminalOtelEnv({
+      platform,
+      home: os.homedir(),
+      keys: Object.keys(vars),
+    });
+    return [];
+  } catch (err) {
+    // The scoped function puts the bearer where a long-lived editor's
+    // integrated terminals inherit it, and the clear is what keeps it
+    // out of them. With the clear unwritten the function is unsafe, so
+    // it comes back out and the install reports a failure.
+    removeBlockFromRc(shell, toolMarkers("code"));
+    return [
+      `could not apply the VS Code terminal telemetry clear, so the scoped \`code\` function was removed again: ${(err as Error).message}`,
+    ];
+  }
+}
+
 /**
  * Install the persistent wiring for one tool with the given credential.
  * Returns the targets written so the caller can report them. Never
@@ -62,31 +144,7 @@ export function installTelemetryWiring({
   const warnings: string[] = [];
   const requiredFailures: string[] = [];
 
-  if (tool === "claude") {
-    const target = appSettingsTargetFor("claude");
-    if (target) {
-      try {
-        installAppEnv(target, vars);
-        labels.push(target.displayPath);
-      } catch (err) {
-        warnings.push(`could not write ${target.displayPath}: ${(err as Error).message}`);
-      }
-      // The session context seam reports repository identity; it rides
-      // in the same file. Quiet and idempotent; devices carrying the
-      // Claude Code plugin get it from the plugin instead.
-      try {
-        if (readClaudePluginState().pluginInstalled) {
-          removeSessionContextHooks({ tool: "claude_code" });
-        } else {
-          installSessionContextHooks({ tool: "claude_code" });
-        }
-      } catch {
-        // The env is the wiring that matters; the seam is best-effort.
-        void 0;
-      }
-    }
-    return { labels, warnings, requiredFailures };
-  }
+  if (tool === "claude") return installClaudeWiring(vars);
 
   if (tool === "codex") {
     try {
@@ -130,49 +188,13 @@ export function installTelemetryWiring({
     warnings.push(`could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`);
   }
   if (tool === "opencode") {
-    // opencode only emits spans when `experimental.openTelemetry` is on
-    // in its own config; the env vars alone are accepted and ignored, so
-    // reporting a wired tool here would be reporting a tool that sends
-    // nothing.
-    try {
-      const flag = setOpencodeOpenTelemetryFlag();
-      if (flag.action === "disabled-by-user") {
-        // The writer leaves an explicit `false` alone rather than
-        // overruling the user, and returns instead of throwing, so the
-        // result has to be read for the tool to be reported honestly.
-        requiredFailures.push(
-          `opencode's config sets experimental.openTelemetry to false, so it emits no spans. Remove that line from ${tildify(flag.path)} and run this again.`,
-        );
-      }
-    } catch (err) {
-      requiredFailures.push(
-        `could not enable opencode's OpenTelemetry flag: ${(err as Error).message}`,
-      );
-    }
+    requiredFailures.push(...enableOpencodeTelemetryFlag());
   }
   if (tool === "code") {
-    // The scoped function injects the bearer into a long-lived editor
-    // whose integrated terminals inherit it; the terminal clear keeps
-    // the token out of them.
-    const platform = process.platform;
-    if (platform === "darwin" || platform === "linux" || platform === "win32") {
-      try {
-        clearVscodeTerminalOtelEnv({
-          platform,
-          home: os.homedir(),
-          keys: Object.keys(vars),
-        });
-      } catch (err) {
-        // The scoped function puts the bearer where a long-lived editor's
-        // integrated terminals inherit it, and the clear is what keeps it
-        // out of them. With the clear unwritten the function is unsafe, so
-        // it comes back out and the install reports a failure.
-        removeBlockFromRc(shell, toolMarkers(tool));
-        labels.length = 0;
-        requiredFailures.push(
-          `could not apply the VS Code terminal telemetry clear, so the scoped \`code\` function was removed again: ${(err as Error).message}`,
-        );
-      }
+    const failures = clearCodeTerminalEnv({ shell, vars });
+    if (failures.length > 0) {
+      labels.length = 0;
+      requiredFailures.push(...failures);
     }
   }
   if (codeWiringChanged && labels.length > 0 && requiredFailures.length === 0) {
