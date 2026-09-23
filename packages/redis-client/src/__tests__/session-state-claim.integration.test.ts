@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { Redis } from "ioredis";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { SessionStateStoreFactory } from "../session-state.factory.ts";
 
@@ -83,11 +83,18 @@ describe("Redis session state claims", () => {
     return [first, second];
   }
 
-  it("admits exactly one principal when two independent clients compete", async () => {
-    const [firstClient, secondClient] = clients();
-    const first = SessionStateStoreFactory.redis(firstClient);
-    const second = SessionStateStoreFactory.redis(secondClient);
+  let firstClient: Redis;
+  let secondClient: Redis;
+  let first: ReturnType<typeof SessionStateStoreFactory.redis>;
+  let second: ReturnType<typeof SessionStateStoreFactory.redis>;
 
+  beforeEach(() => {
+    [firstClient, secondClient] = clients();
+    first = SessionStateStoreFactory.redis(firstClient);
+    second = SessionStateStoreFactory.redis(secondClient);
+  });
+
+  it("admits exactly one principal when two independent clients compete", async () => {
     const claims = await Promise.all([
       first.setIfAbsentOrEqual("competing", "alice", 600),
       second.setIfAbsentOrEqual("competing", "bob", 600),
@@ -100,9 +107,6 @@ describe("Redis session state claims", () => {
   });
 
   it("renews only the owner and permits a new owner after expiration", async () => {
-    const [firstClient, secondClient] = clients();
-    const first = SessionStateStoreFactory.redis(firstClient);
-    const second = SessionStateStoreFactory.redis(secondClient);
     expect(await first.setIfAbsentOrEqual("renewable", "alice", 600)).toBe(true);
 
     await firstClient.pexpire("renewable", 120_000);

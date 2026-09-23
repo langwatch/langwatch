@@ -178,8 +178,12 @@ describe("elevenLabsConvaiTransport.mintSession", () => {
         });
 
         expect(result).toEqual({ signedUrl: "wss://api.elevenlabs.io/abc" });
-        const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-        expect((init.headers as Record<string, string>)["xi-api-key"]).toBe(CREDENTIAL.apiKey);
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            headers: expect.objectContaining({ "xi-api-key": CREDENTIAL.apiKey }),
+          }),
+        );
       });
     });
 

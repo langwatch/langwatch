@@ -215,13 +215,13 @@ describe("runScenarioEvaluations", () => {
     const toolAttachment = attachment({
       mappings: { output: toolMapping, expected_output: goldenMapping },
     });
-    const otherSpan = {
+    const otherSpan: Span = {
       span_id: "s1",
       trace_id: "trace-1",
       type: "llm",
       name: "chat",
       timestamps: { started_at: 1, finished_at: 2, first_token_at: null },
-    } as unknown as Span;
+    };
 
     /** @scenario "A tool call the trace does not hold fails the evaluator with a reason" */
     it("records a failed result on the last attempt", async () => {
@@ -289,7 +289,7 @@ describe("runScenarioEvaluations", () => {
       mappings: { output: toolMapping, expected_output: goldenMapping },
     });
     const toolEvaluator = evaluator({ id: "eval-tool", name: "SQL check" });
-    const runSqlSpan = {
+    const runSqlSpan: Span = {
       span_id: "s-tool",
       trace_id: "trace-1",
       type: "tool",
@@ -298,7 +298,7 @@ describe("runScenarioEvaluations", () => {
       input: { type: "text", value: "SELECT 1" },
       output: { type: "text", value: "1" },
       timestamps: { started_at: 1, finished_at: 2, first_token_at: null },
-    } as unknown as Span;
+    };
     const twoAttachments = () =>
       makeDeps({
         attachments: [conversationAttachment, toolAttachment],

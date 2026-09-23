@@ -1289,17 +1289,20 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Security: session re-auth ---
 
   describe("when an existing session request omits the Authorization header", () => {
-    it("returns 401 on POST", async () => {
+    let sessionId: string;
+
+    beforeEach(async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
-      // Initialize a session
       const initRes = await sendRequest({
         server,
         body: mcpInitializeBody(),
         headers: { authorization: `Bearer ${VALID_API_KEY}` },
       });
-      const sessionId = initRes.headers["mcp-session-id"]!;
+      sessionId = initRes.headers["mcp-session-id"]!;
+    });
 
+    it("returns 401 on POST", async () => {
       // Send a request WITHOUT Authorization header
       const res = await sendRequest({
         server,
@@ -1311,15 +1314,6 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
 
     it("returns 401 on GET", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue(validProject());
-
-      const initRes = await sendRequest({
-        server,
-        body: mcpInitializeBody(),
-        headers: { authorization: `Bearer ${VALID_API_KEY}` },
-      });
-      const sessionId = initRes.headers["mcp-session-id"]!;
-
       const res = await sendRequest({
         server,
         method: "GET",
@@ -1331,15 +1325,6 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
 
     it("returns 401 on DELETE", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue(validProject());
-
-      const initRes = await sendRequest({
-        server,
-        body: mcpInitializeBody(),
-        headers: { authorization: `Bearer ${VALID_API_KEY}` },
-      });
-      const sessionId = initRes.headers["mcp-session-id"]!;
-
       const res = await sendRequest({
         server,
         method: "DELETE",

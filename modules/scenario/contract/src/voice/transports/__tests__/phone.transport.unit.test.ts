@@ -608,7 +608,13 @@ describe("phoneTransport", () => {
       it("the default factory ends the callee's turn on a phone-length pause and leaves the speech gate at the SDK default", () => {
         expect(PHONE_RESPONSE_TAIL_SILENCE_SECONDS).toBeGreaterThan(0.6);
 
-        const sdkAdapter = {
+        const sdkAdapter: {
+          role: AgentRole;
+          connect: () => Promise<void>;
+          disconnect: () => Promise<void>;
+          placeCall: () => Promise<void>;
+          responseTailSilence?: number;
+        } = {
           role: AgentRole.AGENT,
           connect: vi.fn(async () => {}),
           disconnect: vi.fn(async () => {}),
@@ -625,9 +631,7 @@ describe("phoneTransport", () => {
           maxCallSeconds: 120,
         });
 
-        expect((sdkAdapter as unknown as { responseTailSilence: number }).responseTailSilence).toBe(
-          PHONE_RESPONSE_TAIL_SILENCE_SECONDS,
-        );
+        expect(sdkAdapter.responseTailSilence).toBe(PHONE_RESPONSE_TAIL_SILENCE_SECONDS);
         const opts = twilioAgentMock.mock.calls[0]?.[0];
         expect(opts).not.toHaveProperty("speechGate");
       });
