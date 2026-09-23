@@ -69,13 +69,25 @@ export type LangyCredentialComposition = {
 
 /** Generic capabilities needed before the Langy command pipeline is bound. */
 export class LangyEventingMembers {
-  constructor(
-    readonly langyConversationState: StateProjectionStore<LangyConversationStateData>,
-    readonly langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>,
-    readonly langyMessageStorage: AppendStore<LangyMessageProjectionRecord>,
-    readonly langyTurnAdmission: LangyTurnAdmissionCapability,
-    readonly trustedMessages: LangyTrustedMessage,
-  ) {}
+  readonly langyConversationState: StateProjectionStore<LangyConversationStateData>;
+  readonly langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+  readonly langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
+  readonly langyTurnAdmission: LangyTurnAdmissionCapability;
+  readonly trustedMessages: LangyTrustedMessage;
+
+  constructor(input: {
+    langyConversationState: StateProjectionStore<LangyConversationStateData>;
+    langyConversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+    langyMessageStorage: AppendStore<LangyMessageProjectionRecord>;
+    langyTurnAdmission: LangyTurnAdmissionCapability;
+    trustedMessages: LangyTrustedMessage;
+  }) {
+    this.langyConversationState = input.langyConversationState;
+    this.langyConversationTurnState = input.langyConversationTurnState;
+    this.langyMessageStorage = input.langyMessageStorage;
+    this.langyTurnAdmission = input.langyTurnAdmission;
+    this.trustedMessages = input.trustedMessages;
+  }
 }
 
 /** How this process's Langy relay reaches Redis, and what it resolves for the agent. */
@@ -137,13 +149,13 @@ export class PostgresLangyAdapter {
       messageStorage: PrismaLangyMessageProjectionRepository.create(options.database),
       sessionKeys: PrismaLangySessionKeyRepository.create(options.database),
     };
-    this.eventingCapabilities = new LangyEventingMembers(
-      this.repositories.conversationState,
-      this.repositories.conversationTurnState,
-      this.repositories.messageStorage,
-      this.repositories.admission,
-      LangyMessageService.createTrustedMessageReader(this.repositories.messages),
-    );
+    this.eventingCapabilities = new LangyEventingMembers({
+      langyConversationState: this.repositories.conversationState,
+      langyConversationTurnState: this.repositories.conversationTurnState,
+      langyMessageStorage: this.repositories.messageStorage,
+      langyTurnAdmission: this.repositories.admission,
+      trustedMessages: LangyMessageService.createTrustedMessageReader(this.repositories.messages),
+    });
   }
 
   static create(options: PostgresLangyAdapterOptions): PostgresLangyAdapter {
@@ -180,16 +192,16 @@ export class PostgresLangyAdapter {
   build(options: LangyServiceCompositionOptions): LangyService {
     if (this.service) return this.service;
 
-    const conversations = LangyConversationService.create(
-      options.commands,
-      this.repositories.conversations,
-      this.repositories.messages,
-      options.events,
-      LangyFinalPartsService.create(
+    const conversations = LangyConversationService.create({
+      commands: options.commands,
+      repository: this.repositories.conversations,
+      messages: this.repositories.messages,
+      events: options.events,
+      finalParts: LangyFinalPartsService.create(
         (options.blockMetrics ?? NullLangyBlockMetricsAdapter.create()).blockCounter(),
       ),
-      options.runtime,
-    );
+      runtime: options.runtime,
+    });
     const messages = LangyMessageService.create(
       this.repositories.messages,
       this.repositories.conversations,

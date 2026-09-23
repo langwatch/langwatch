@@ -35,7 +35,7 @@ export const hasDSLChanged = (
   dslCurrent: StudioWorkflow,
   dslPrevious: StudioWorkflow,
   includeExecutionStates: boolean,
-) => {
+): boolean => {
   return (
     JSON.stringify(
       recursiveAlphabeticallySortedKeys(clearDsl(dslCurrent, includeExecutionStates)),

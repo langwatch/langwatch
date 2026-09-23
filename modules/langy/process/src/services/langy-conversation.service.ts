@@ -272,15 +272,23 @@ export class LangyConversationService {
     return this.lifecycle.clearAllForUser(input);
   }
 
-  static create(
-    commands: LangyConversationCommands,
-    repository: LangyConversationRepository,
-    messages?: LangyMessageRepository,
-    events?: LangyConversationEventsReader | null,
-    finalParts?: LangyFinalPartsService,
-    runtime?: LangyConversationRuntime,
-    turnOrder?: LangyTurnOrderReader | null,
-  ): LangyConversationService {
+  static create({
+    commands,
+    repository,
+    messages,
+    events,
+    finalParts,
+    runtime,
+    turnOrder,
+  }: {
+    commands: LangyConversationCommands;
+    repository: LangyConversationRepository;
+    messages?: LangyMessageRepository;
+    events?: LangyConversationEventsReader | null;
+    finalParts?: LangyFinalPartsService;
+    runtime?: LangyConversationRuntime;
+    turnOrder?: LangyTurnOrderReader | null;
+  }): LangyConversationService {
     return new LangyConversationService({
       repository,
       commands,

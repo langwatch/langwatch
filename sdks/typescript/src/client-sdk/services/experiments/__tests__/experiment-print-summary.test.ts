@@ -6,10 +6,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 
 import { Experiment } from "../experiment";
-import type { BatchEntry, EvaluationResult } from "../types";
+import type { BatchEntry, ExperimentEvaluationResult } from "../types";
 
 function buildExperimentFixture(init: {
-  evaluations?: EvaluationResult[];
+  evaluations?: ExperimentEvaluationResult[];
   entries?: BatchEntry[];
   runUrl?: string;
   runId?: string;
@@ -30,7 +30,7 @@ function buildExperimentFixture(init: {
   return exp;
 }
 
-function evaluation(overrides: Partial<EvaluationResult>): EvaluationResult {
+function evaluation(overrides: Partial<ExperimentEvaluationResult>): ExperimentEvaluationResult {
   return {
     name: "faithfulness",
     evaluator: "ragas/faithfulness",

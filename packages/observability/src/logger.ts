@@ -162,7 +162,7 @@ export function createLoggerFactory(configuration: LoggerConfiguration = {}): Lo
     if (cached) return cached;
 
     const logger = isNodeRuntime
-      ? createNodeLogger(name, options, resolved, getSharedTransport)
+      ? createNodeLogger({ name, options, configuration: resolved, getSharedTransport })
       : createBrowserLogger(
           name,
           configuration.level ?? (resolved.environment === "test" ? "error" : "info"),
@@ -226,12 +226,17 @@ export function serviceVersionField(
   return configuration.serviceVersion ? { "service.version": configuration.serviceVersion } : {};
 }
 
-function createNodeLogger(
-  name: string,
-  options: CreateLoggerOptions | undefined,
-  configuration: ResolvedLoggerConfiguration,
-  getSharedTransport: () => DestinationStream | null,
-): PinoLogger {
+function createNodeLogger({
+  name,
+  options,
+  configuration,
+  getSharedTransport,
+}: {
+  name: string;
+  options: CreateLoggerOptions | undefined;
+  configuration: ResolvedLoggerConfiguration;
+  getSharedTransport: () => DestinationStream | null;
+}): PinoLogger {
   const pinoOptions: LoggerOptions = {
     name,
     level: configuration.level,

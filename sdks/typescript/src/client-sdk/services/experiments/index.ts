@@ -26,11 +26,11 @@ export { mapRunResultsToRows } from "./mapResults";
 
 // SDK-defined experiment types
 export type {
-  EvaluationStatus,
+  ExperimentEvaluationStatus,
   TargetType,
   TargetMetadata,
   TargetInfo,
-  EvaluationResult,
+  ExperimentEvaluationResult,
   BatchEntry,
   Batch,
   ComparisonMetric,
@@ -39,7 +39,7 @@ export type {
   ComparisonVerdict,
   ExperimentInitOptions,
   LogOptions,
-  EvaluateOptions,
+  ExperimentEvaluateOptions,
   RunOptions,
   RunCallback,
   RunContext,

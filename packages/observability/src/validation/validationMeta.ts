@@ -178,19 +178,25 @@ function unionBranches(issue: RawIssue): RawIssue[][] {
  * Flatten a Zod error into issues: follows invalid_union branches and counts
  * all issues but only materializes kept ones.
  */
-function collectIssues(
-  issues: RawIssue[],
-  into: ValidationIssueMeta[],
-  counter: { total: number },
-  maxIssues: number,
-  schemaOnly: boolean,
-): void {
+function collectIssues({
+  issues,
+  into,
+  counter,
+  maxIssues,
+  schemaOnly,
+}: {
+  issues: RawIssue[];
+  into: ValidationIssueMeta[];
+  counter: { total: number };
+  maxIssues: number;
+  schemaOnly: boolean;
+}): void {
   for (const issue of issues) {
     counter.total += 1;
     if (into.length < maxIssues) into.push(metaForIssue(issue, schemaOnly));
 
     for (const branch of unionBranches(issue)) {
-      collectIssues(branch, into, counter, maxIssues, schemaOnly);
+      collectIssues({ issues: branch, into, counter, maxIssues, schemaOnly });
     }
   }
 }
@@ -211,7 +217,13 @@ export function validationMeta(
 
   const issues: ValidationIssueMeta[] = [];
   const counter = { total: 0 };
-  collectIssues(error.issues, issues, counter, maxIssues, privacy === "schema-only");
+  collectIssues({
+    issues: error.issues,
+    into: issues,
+    counter,
+    maxIssues,
+    schemaOnly: privacy === "schema-only",
+  });
 
   const meta: ValidationMeta = { issueCount: counter.total, issues };
   if (counter.total > issues.length) meta.truncated = true;

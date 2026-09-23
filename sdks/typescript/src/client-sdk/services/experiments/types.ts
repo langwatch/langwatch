@@ -13,7 +13,7 @@ import type { LangWatchSpan } from "@/observability-sdk/span/types";
 /**
  * Status of an evaluation result
  */
-export type EvaluationStatus = "processed" | "error" | "skipped";
+export type ExperimentEvaluationStatus = "processed" | "error" | "skipped";
 
 /**
  * Target types for batch evaluations
@@ -86,7 +86,7 @@ export type TargetInfo = z.infer<typeof targetInfoSchema>;
 /**
  * Result of an evaluation
  */
-export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
+export type ExperimentEvaluationResult = z.infer<typeof evaluationResultSchema>;
 
 /**
  * Entry in the batch dataset
@@ -98,7 +98,7 @@ export type BatchEntry = z.infer<typeof batchEntrySchema>;
  */
 export type Batch = {
   dataset: BatchEntry[];
-  evaluations: EvaluationResult[];
+  evaluations: ExperimentEvaluationResult[];
   targets: TargetInfo[];
 };
 
@@ -136,7 +136,7 @@ export type LogResultsRequest = {
     name: string;
     evaluator: string;
     trace_id: string | null; // null when no tracer configured (no-op)
-    status: EvaluationStatus;
+    status: ExperimentEvaluationStatus;
     inputs?: Record<string, unknown> | null;
     score?: number | null;
     passed?: boolean | null;
@@ -173,7 +173,7 @@ export type RunEvaluatorRequest = {
  * Response from /api/v1/evaluations/:slug/evaluate
  */
 export type RunEvaluatorResponse = {
-  status: EvaluationStatus;
+  status: ExperimentEvaluationStatus;
   passed?: boolean | null;
   score?: number | null;
   details?: string | null;
@@ -215,7 +215,7 @@ export type LogOptions = {
   /** Human-readable description of the result */
   details?: string;
   /** Status of the evaluation */
-  status?: EvaluationStatus;
+  status?: ExperimentEvaluationStatus;
   /** Duration in milliseconds */
   duration?: number;
   /** Cost amount in USD */
@@ -234,7 +234,7 @@ export type LogOptions = {
 /**
  * Options for the evaluate() method (built-in evaluators)
  */
-export type EvaluateOptions = {
+export type ExperimentEvaluateOptions = {
   /**
    * Row index in the dataset.
    * Optional when called inside withTarget() - will be auto-inferred from context.

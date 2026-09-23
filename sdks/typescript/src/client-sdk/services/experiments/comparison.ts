@@ -9,7 +9,7 @@ import type {
   ComparisonOptions,
   ComparisonStatus,
   ComparisonVerdict,
-  EvaluationStatus,
+  ExperimentEvaluationStatus,
   RunEvaluatorResponse,
 } from "./types";
 
@@ -187,7 +187,7 @@ export const toComparisonVerdict = ({
  * three statuses to the verdict's five, so this mapping lives here alone --
  * what the row records and what the caller reads are one decision, not two.
  */
-export const comparisonEntryStatus = (status: ComparisonStatus): EvaluationStatus => {
+export const comparisonEntryStatus = (status: ComparisonStatus): ExperimentEvaluationStatus => {
   switch (status) {
     case "decided":
     case "tie":

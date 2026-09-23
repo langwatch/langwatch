@@ -52,7 +52,7 @@ export const validateNodeName = ({
   return { valid: true };
 };
 
-export const nameToId = (name: string) => {
+export const nameToId = (name: string): string => {
   return camelCaseToSnakeCase(name)
     .replace(/[()]/g, "")
     .normalize("NFD")
@@ -60,7 +60,10 @@ export const nameToId = (name: string) => {
     .replace(/[^a-zA-Z0-9_]/g, "_");
 };
 
-export const findLowestAvailableName = (nodesIds: string[], prefix: string) => {
+export const findLowestAvailableName = (
+  nodesIds: string[],
+  prefix: string,
+): { name: string; id: string } => {
   const findNode = (id: string) => {
     return nodesIds.find((nodeId) => nodeId === id);
   };
@@ -167,6 +170,6 @@ export const getInputsOutputs = (edges: StudioEdge[], nodes: StudioNode[]) => {
   return { inputs, outputs };
 };
 
-export const checkIsEvaluator = (node: StudioNode) => {
+export const checkIsEvaluator = (node: StudioNode): boolean => {
   return node.type === "evaluator" || node.data.behave_as === "evaluator";
 };

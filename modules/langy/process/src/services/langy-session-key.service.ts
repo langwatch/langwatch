@@ -22,13 +22,22 @@ export const LANGY_CANDIDATE_PERMISSIONS = Object.freeze(langyCandidatePermissio
 export type LangySessionKeyRevocation = "revoked" | "already_revoked" | "not_found" | "refused";
 
 export class LangySessionKeyService extends LangySessionKey {
-  private constructor(
-    private readonly repository: LangySessionKeyRepository,
-    private readonly apiKeys: ApiKeyApi,
-    private readonly authz: AuthzService,
-    private readonly metrics: LangySessionKeyMetrics,
-  ) {
+  private readonly repository: LangySessionKeyRepository;
+  private readonly apiKeys: ApiKeyApi;
+  private readonly authz: AuthzService;
+  private readonly metrics: LangySessionKeyMetrics;
+
+  private constructor(input: {
+    repository: LangySessionKeyRepository;
+    apiKeys: ApiKeyApi;
+    authz: AuthzService;
+    metrics: LangySessionKeyMetrics;
+  }) {
     super();
+    this.repository = input.repository;
+    this.apiKeys = input.apiKeys;
+    this.authz = input.authz;
+    this.metrics = input.metrics;
   }
 
   static create(input: {
@@ -37,7 +46,7 @@ export class LangySessionKeyService extends LangySessionKey {
     authz: AuthzService;
     metrics: LangySessionKeyMetrics;
   }): LangySessionKeyService {
-    return new LangySessionKeyService(input.repository, input.apiKeys, input.authz, input.metrics);
+    return new LangySessionKeyService(input);
   }
 
   async mint(input: {

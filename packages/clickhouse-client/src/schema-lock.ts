@@ -69,13 +69,13 @@ export type ClickHouseSchemaLockOptions = {
  */
 export class ClickHouseSchemaLock {
   static create(options: ClickHouseSchemaLockOptions = {}): ClickHouseSchemaLock {
-    return new ClickHouseSchemaLock(
-      options.lockPath ?? DEFAULT_CLICKHOUSE_SCHEMA_LOCK_PATH,
-      options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
-      options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
-      options.abandonedAfterMs ?? DEFAULT_ABANDONED_AFTER_MS,
-      options.onBeforeClaim,
-    );
+    return new ClickHouseSchemaLock({
+      path: options.lockPath ?? DEFAULT_CLICKHOUSE_SCHEMA_LOCK_PATH,
+      waitTimeoutMs: options.waitTimeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS,
+      pollIntervalMs: options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS,
+      abandonedAfterMs: options.abandonedAfterMs ?? DEFAULT_ABANDONED_AFTER_MS,
+      onBeforeClaim: options.onBeforeClaim,
+    });
   }
 
   private depth = 0;
@@ -84,14 +84,26 @@ export class ClickHouseSchemaLock {
     if (this.heldToken !== undefined) this.unlinkOwnLock();
   };
 
-  private constructor(
-    /** Where the lock lives, for error messages and tests. */
-    readonly path: string,
-    private readonly waitTimeoutMs: number,
-    private readonly pollIntervalMs: number,
-    private readonly abandonedAfterMs: number,
-    private readonly onBeforeClaim: (() => void) | undefined,
-  ) {}
+  /** Where the lock lives, for error messages and tests. */
+  readonly path: string;
+  private readonly waitTimeoutMs: number;
+  private readonly pollIntervalMs: number;
+  private readonly abandonedAfterMs: number;
+  private readonly onBeforeClaim: (() => void) | undefined;
+
+  private constructor(input: {
+    path: string;
+    waitTimeoutMs: number;
+    pollIntervalMs: number;
+    abandonedAfterMs: number;
+    onBeforeClaim: (() => void) | undefined;
+  }) {
+    this.path = input.path;
+    this.waitTimeoutMs = input.waitTimeoutMs;
+    this.pollIntervalMs = input.pollIntervalMs;
+    this.abandonedAfterMs = input.abandonedAfterMs;
+    this.onBeforeClaim = input.onBeforeClaim;
+  }
 
   /**
    * Waits for the lock and returns its release. Re-entrant within one

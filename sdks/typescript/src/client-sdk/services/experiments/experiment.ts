@@ -41,12 +41,12 @@ import type {
   BatchEntry,
   ComparisonOptions,
   ComparisonVerdict,
-  EvaluationResult,
+  ExperimentEvaluationResult,
   TargetInfo,
   TargetMetadata,
   ExperimentInitOptions,
   LogOptions,
-  EvaluateOptions,
+  ExperimentEvaluateOptions,
   RunOptions,
   RunCallback,
   RunContext,
@@ -76,7 +76,7 @@ export const EVALUATOR_TIMEOUT_MS = 900_000;
 // printSummary() — deliberately excludes large fields (inputs, tracebacks,
 // outputs) so running thousands of items doesn't unbound memory.
 type SummaryEvaluation = Pick<
-  EvaluationResult,
+  ExperimentEvaluationResult,
   "name" | "evaluator" | "status" | "passed" | "score" | "cost" | "target_id"
 >;
 type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id">;
@@ -456,7 +456,7 @@ export class Experiment {
       iterationContextStorage.getStore()?.traceId ??
       this.getTraceIdFromContext();
 
-    const result: EvaluationResult = {
+    const result: ExperimentEvaluationResult = {
       name: metric,
       evaluator: metric,
       trace_id: traceId,
@@ -480,7 +480,7 @@ export class Experiment {
   /**
    * Queue an evaluation result for the next batch
    */
-  private pushEvaluation(result: EvaluationResult): void {
+  private pushEvaluation(result: ExperimentEvaluationResult): void {
     this.batch.evaluations.push(result);
     this.cumulativeEvaluations.push({
       name: result.name,
@@ -499,7 +499,7 @@ export class Experiment {
    * @param options - Evaluator options including data and settings
    * @example
    */
-  async evaluate(evaluatorSlug: string, options: EvaluateOptions): Promise<void> {
+  async evaluate(evaluatorSlug: string, options: ExperimentEvaluateOptions): Promise<void> {
     // Get context from AsyncLocalStorage (if inside withTarget)
     const targetContext = targetContextStorage.getStore();
 
