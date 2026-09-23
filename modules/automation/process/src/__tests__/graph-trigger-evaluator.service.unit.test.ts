@@ -1,10 +1,10 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CustomGraph,
   GraphTriggerEvaluationReason,
   Trigger,
 } from "@langwatch/automation-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,6 +53,7 @@ function makeTrigger(overrides: Partial<Trigger> = {}): Trigger {
     projectId: PROJECT_ID,
     name: "My Alert",
     action: TriggerAction.SEND_EMAIL,
+    triggerKind: "ALERT",
     actionParams: {
       threshold: 10,
       operator: "gt",
@@ -61,22 +62,27 @@ function makeTrigger(overrides: Partial<Trigger> = {}): Trigger {
       members: ["a@example.com"],
     },
     filters: {},
+    filterQuery: null,
     active: true,
     deleted: false,
+    pausedReason: null,
+    pausedAt: null,
     alertType: null,
     message: null,
     customGraphId: GRAPH_ID,
     notificationCadence: "immediate",
     traceDebounceMs: 30_000,
-    slackTemplateType: null,
-    slackTemplate: null,
-    emailSubjectTemplate: null,
-    emailBodyTemplate: null,
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+    },
     lastRunAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
-  } as unknown as Trigger;
+  };
 }
 
 function makeGraph(overrides: Partial<CustomGraph> = {}): CustomGraph {
@@ -98,10 +104,8 @@ function makeGraph(overrides: Partial<CustomGraph> = {}): CustomGraph {
       timeScale: 60,
     },
     filters: {},
-    createdAt: new Date(),
-    updatedAt: new Date(),
     ...overrides,
-  } as unknown as CustomGraph;
+  };
 }
 
 function makeProject(): ProjectIdentity {
@@ -124,7 +128,7 @@ function timeseries(value: number | null): TimeseriesResult {
       },
     ],
     previousPeriod: [],
-  } as unknown as TimeseriesResult;
+  };
 }
 
 class FakeTriggerSentRepo implements GraphTriggerSentRepository {
@@ -266,10 +270,10 @@ function makeHarness({
     customGraphs: { findById: loadCustomGraph } as never,
     projects: {
       findById: async () => project,
-    } as unknown as ProjectApi,
-    analytics: {
+    },
+    analytics: createApiFixture<AnalyticsService>({
       getTimeseries,
-    } as unknown as AnalyticsService,
+    }),
     triggerSent,
     notifier: { dispatch } as never,
     logger: {
@@ -434,7 +438,7 @@ describe("evaluateGraphTrigger", () => {
             },
           ],
           previousPeriod: [],
-        } as unknown as TimeseriesResult,
+        },
       });
 
       const result = await evaluateGraphTrigger({
@@ -496,6 +500,9 @@ describe("evaluateGraphTrigger", () => {
             timePeriodLabel: string;
           };
           currentValue: number;
+          previousValue: number | null;
+          history: unknown;
+          sparkline: string;
           occurredAt: string;
           reason: string;
           project: { id: string; name: string; slug: string; url: string };
@@ -528,11 +535,9 @@ describe("evaluateGraphTrigger", () => {
       // Graph data for templates: the buckets the threshold read, plus the
       // prebuilt sparkline; previousValue is null (harness has no previous
       // period).
-      expect((arg.context as unknown as { history: unknown }).history).toEqual([
-        { timestamp: "2026-06-20T11:00:00Z", value: 15 },
-      ]);
-      expect((arg.context as unknown as { sparkline: string }).sparkline).toHaveLength(1);
-      expect((arg.context as unknown as { previousValue: number | null }).previousValue).toBeNull();
+      expect(arg.context.history).toEqual([{ timestamp: "2026-06-20T11:00:00Z", value: 15 }]);
+      expect(arg.context.sparkline).toHaveLength(1);
+      expect(arg.context.previousValue).toBeNull();
       expect(arg.context.project.url).toBe("https://app.langwatch.test/demo");
       expect(arg.recipients).toEqual(["a@example.com"]);
       expect(arg.slackWebhook).toBeNull();
@@ -589,7 +594,7 @@ describe("evaluateGraphTrigger", () => {
               "0/metadata.trace_id/cardinality": 7,
             },
           ],
-        } as unknown as TimeseriesResult,
+        },
       });
 
       const result = await evaluateGraphTrigger({
@@ -658,7 +663,7 @@ describe("evaluateGraphTrigger", () => {
             },
           ],
           previousPeriod: [],
-        } as unknown as TimeseriesResult,
+        },
       });
 
       const result = await evaluateGraphTrigger({

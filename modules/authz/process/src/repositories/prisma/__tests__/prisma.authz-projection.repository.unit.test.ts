@@ -11,6 +11,8 @@ import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz
 import type { GrantProjectionWrite } from "../../authz-grant-projection.repository.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 
+type ExecuteRaw = (strings: readonly string[], ...values: unknown[]) => Promise<number>;
+
 const ORG = "org_acme";
 
 function grantRow(overrides: Record<string, unknown> = {}) {
@@ -37,7 +39,7 @@ function grantRow(overrides: Record<string, unknown> = {}) {
 }
 
 function build() {
-  const executeRaw = vi.fn().mockResolvedValue(1);
+  const executeRaw = vi.fn<ExecuteRaw>().mockResolvedValue(1);
   const prisma = {
     grant: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -76,8 +78,8 @@ function build() {
 }
 
 /** The SQL the raw upserts emit, flattened to one comparable string. */
-function sqlFrom(executeRaw: Mock): string {
-  const strings = executeRaw.mock.calls[0]?.[0] as unknown as string[];
+function sqlFrom(executeRaw: Mock<ExecuteRaw>): string {
+  const strings = executeRaw.mock.calls[0]?.[0] ?? [];
   return strings.join("?").replace(/\s+/g, " ");
 }
 
