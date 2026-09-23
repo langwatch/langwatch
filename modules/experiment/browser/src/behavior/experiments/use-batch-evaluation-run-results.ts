@@ -10,6 +10,23 @@ import { useEffect, useRef, useState } from "react";
 
 import { getEvaluationColumns } from "../../model/experiments/BatchEvaluationV2/utils.ts";
 
+const collectPredictedColumns = (
+  entriesPredictions: Record<string, unknown>[],
+): Record<string, Set<string>> => {
+  const predictedColumns: Record<string, Set<string>> = {};
+  for (const entry of entriesPredictions) {
+    for (const [node, value] of Object.entries(entry)) {
+      for (const key of Object.keys(value as Record<string, unknown>)) {
+        if (!predictedColumns[node]) {
+          predictedColumns[node] = new Set();
+        }
+        predictedColumns[node]!.add(key);
+      }
+    }
+  }
+  return predictedColumns;
+};
+
 /**
  * A batch evaluation run and its results, shaped for the results table.
  * Moved out of `BatchEvaluationV2EvaluationResults` (Record 10: elements
@@ -85,17 +102,7 @@ export const useBatchEvaluationResults = ({
     }));
   }
 
-  let predictedColumns: Record<string, Set<string>> = {};
-  for (const entry of entriesPredictions) {
-    for (const [node, value] of Object.entries(entry)) {
-      for (const key of Object.keys(value as Record<string, unknown>)) {
-        if (!predictedColumns[node]) {
-          predictedColumns[node] = new Set();
-        }
-        predictedColumns[node]!.add(key);
-      }
-    }
-  }
+  let predictedColumns = collectPredictedColumns(entriesPredictions);
 
   const hasErrors = Object.values(datasetByIndex ?? {}).some((value: any) => value.error);
   if (Object.keys(predictedColumns).length === 0 && hasErrors) {

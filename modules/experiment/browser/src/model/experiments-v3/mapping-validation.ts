@@ -495,10 +495,43 @@ export const getEvaluatorMissingMappings = (
   const requiredFieldsSet = new Set<string>(requiredFieldsArr);
   const optionalFieldsSet = new Set<string>(optionalFieldsArr);
 
+  const { hasAnyMapping, missingRequiredCount } = collectInputMappingGaps({
+    inputs: evaluator.inputs,
+    targetMappings,
+    requiredFieldsSet,
+    optionalFieldsSet,
+    missingMappings,
+  });
+
+  // Invalid if:
+  // 1. Any required field is missing, OR
+  // 2. ALL fields are empty (must have at least one mapping)
+  const allFieldsCount = evaluator.inputs.length;
+  const isValid = missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
+
+  return {
+    isValid,
+    missingMappings,
+  };
+};
+
+const collectInputMappingGaps = ({
+  inputs,
+  targetMappings,
+  requiredFieldsSet,
+  optionalFieldsSet,
+  missingMappings,
+}: {
+  inputs: EvaluatorConfig["inputs"];
+  targetMappings: Record<string, unknown>;
+  requiredFieldsSet: Set<string>;
+  optionalFieldsSet: Set<string>;
+  missingMappings: MissingMapping[];
+}): { hasAnyMapping: boolean; missingRequiredCount: number } => {
   let hasAnyMapping = false;
   let missingRequiredCount = 0;
 
-  for (const input of evaluator.inputs) {
+  for (const input of inputs) {
     const hasMapping = targetMappings[input.identifier] !== undefined;
 
     if (hasMapping) {
@@ -530,16 +563,7 @@ export const getEvaluatorMissingMappings = (
     }
   }
 
-  // Invalid if:
-  // 1. Any required field is missing, OR
-  // 2. ALL fields are empty (must have at least one mapping)
-  const allFieldsCount = evaluator.inputs.length;
-  const isValid = missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
-
-  return {
-    isValid,
-    missingMappings,
-  };
+  return { hasAnyMapping, missingRequiredCount };
 };
 
 /**

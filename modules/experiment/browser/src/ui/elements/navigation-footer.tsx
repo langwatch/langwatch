@@ -378,14 +378,15 @@ export function MessagesNavigationFooter({
 
       <HStack gap={3} paddingRight={3}>
         <Text flexShrink={0}>
-          {isCursorMode && isPastFirstPage
-            ? isPositionUnknown
-              ? `Resumed from a link, in about ${estimatedTotalPages} pages (${totalHits} total items)`
-              : `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`
-            : `${pageOffset + 1}-${Math.min(
-                pageOffset + pageSize,
-                totalHits,
-              )} of ${totalHits} items`}
+          {pageRangeLabel({
+            isCursorPage: isCursorMode && isPastFirstPage,
+            isPositionUnknown,
+            estimatedTotalPages,
+            cursorPageNumber,
+            totalHits,
+            pageOffset,
+            pageSize,
+          })}
         </Text>
         <HStack gap={0}>
           <Button
@@ -415,5 +416,31 @@ export function MessagesNavigationFooter({
 }
 
 // Backward compatibility exports
+function pageRangeLabel({
+  isCursorPage,
+  isPositionUnknown,
+  estimatedTotalPages,
+  cursorPageNumber,
+  totalHits,
+  pageOffset,
+  pageSize,
+}: {
+  isCursorPage: boolean;
+  isPositionUnknown: boolean;
+  estimatedTotalPages: number;
+  cursorPageNumber: number;
+  totalHits: number;
+  pageOffset: number;
+  pageSize: number;
+}): string {
+  if (!isCursorPage) {
+    return `${pageOffset + 1}-${Math.min(pageOffset + pageSize, totalHits)} of ${totalHits} items`;
+  }
+  if (isPositionUnknown) {
+    return `Resumed from a link, in about ${estimatedTotalPages} pages (${totalHits} total items)`;
+  }
+  return `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`;
+}
+
 export const useNavigationFooter = useMessagesNavigationFooter;
 export const NavigationFooter = MessagesNavigationFooter;
