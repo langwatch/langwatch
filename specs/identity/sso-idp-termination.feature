@@ -448,6 +448,76 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And finalization can be retried when its checks pass
     And after finalization no migration action is offered
 
+  @unit @regression
+  Scenario: Finishing is refused by the tenancy guard when a member's memberships are read across organizations
+    Given a member of the organization also belongs to another organization
+    When finishing asks whether that member's legacy identity is shared with another organization's provider
+    Then the other organizations are found through the member, not by reading memberships outside the tenant
+    And a membership read bounded only by "not this organization" is refused before it reaches the database
+
+  @unit @integration
+  Scenario: Finishing moves the previous connection's directory sync across
+    Given the previous connection's directory sync was set up by LangWatch, so the customer never held its token
+    When the update finishes
+    Then the tokens the identity provider already presents belong to the new connection, and whatever pushes today keeps pushing
+    And the people and external ids the previous connection provisioned are the new connection's, without duplicating anyone it provisioned itself
+    And the new connection's sync history starts, and the previous connection's ends
+    And before finishing, the update says the directory sync moves across when it finishes rather than asking anyone to repoint it
+
+  @integration @regression
+  Scenario: A person the previous connection's sync provisioned can sign in through the replacement before the update finishes
+    Given the previous connection's directory sync provisioned a member who has never signed in, so their address was never verified
+    And the update has switched sign-in over to the replacement
+    When they sign in through the replacement
+    Then they are recognised as the person the directory means, on the previous connection's word
+    And the update's link policy lets them through although their address was never verified
+
+  # Finishing never waits for members. An organization with hundreds of people
+  # will not get everyone to sign in again, and does not need to: the
+  # replacement recognises them by address at their next sign-in, before or
+  # after the update finishes. The update lists the few it will not recognise,
+  # so an administrator knows who will need a hand.
+
+  @unit @integration
+  Scenario: The new connection recognises members by address on a domain it proved, confirmed or not
+    Given the update has switched sign-in over to the replacement
+    And a member's address is on a domain the replacement proved, and no other account holds it
+    When they sign in through the replacement
+    Then they are linked to their existing account, whether or not their address was ever confirmed
+    But an address on a domain the replacement has not proved, or one another account also holds, is refused
+
+  @integration
+  Scenario: Members never hold the update
+    Given members have not signed in through the replacement
+    When the administrator opens the update
+    Then each is listed as moving across at their next sign-in, or with the reason the new connection will not recognise them
+    And none of them stops the update from finishing
+
+  @integration @regression
+  Scenario: Finishing leaves a member whose only way in is the previous provider on it rather than stopping
+    Given a member, active or deactivated, holds no verified way in other than the previous provider
+    When the update finishes
+    Then their previous identity is left in place, and stops working when the previous connection is torn down
+    And every other member's previous identity is taken away
+    And the update still counts access through the previous provider as retired
+
+
+  @unit @integration
+  Scenario: The quiet period counts from the switch-over and the last sign-in through the previous provider
+    Given the update has switched sign-in over to the replacement
+    When nobody signs in through the previous provider afterwards
+    Then the update can finish two days after the switch-over
+    But a sign-in through the previous provider after the switch-over moves that to seven days after the sign-in
+    And sign-ins through the previous provider before the switch-over do not count
+    And the update shows the time finishing opens
+
+  @integration @regression
+  Scenario: A revoked legacy directory sync is not one left to repoint
+    Given tearing the previous connection down has revoked its directory sync
+    When finishing re-reads what is outstanding
+    Then directory sync is not among the conditions, since a revoked sync pushes nobody
+    And finishing completes instead of asking for a repoint it has just made impossible
+
   @integration
   Scenario: Reading migration progress does not grant permission to change it
     Given a reader may see single sign-on but may not manage it
@@ -629,10 +699,10 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     But a similarly named sibling provider does not count
 
   @integration @regression
-  Scenario: Native legacy retirement requires a usable replacement in the same organization
+  Scenario: Native legacy retirement leaves every member a way in
     Given a legacy identifier was adopted without a connection annotation
     When its legacy access is retired
-    Then retirement requires a verified replacement identifier for that user
+    Then it is taken away from a user who keeps a verified replacement identifier or another verified way in, which becomes primary where the legacy one was
     And accounts belonging only to another organization remain untouched
 
   @unit @regression

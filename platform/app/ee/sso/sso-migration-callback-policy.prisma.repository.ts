@@ -8,6 +8,9 @@ import {
 } from "@langwatch/identity";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import type { DatabaseHookSsoMigrationPort } from "~/server/better-auth/hooks";
+import { arrivalMatchOf, replacementProvesDomain } from "./sso-migration.rules";
+import { countAccountsHoldingAddresses } from "./sso-migration-user-lookups.prisma";
+import type { SsoMigrationMemberMove } from "./sso-self-serve.types";
 
 const DIRECT_CALLBACK_MARKERS = ["/sso/callback/", "/sso/saml2/sp/acs/"];
 
@@ -147,42 +150,17 @@ export function migrationAuthenticationDecision({
   });
 }
 
-/**
- * Whether the replacement's own evidence proves this email domain.
- *
- * Verification rows that do not parse are dropped rather than trusted: a proof
- * we cannot read is not a proof, and reading it as one would qualify a domain
- * on the strength of a malformed row.
- */
-function replacementProvesDomain({
-  replacement,
-  domain,
-}: {
-  replacement: {
-    id: string;
-    organizationId: string;
-    replacesConnectionId: string | null;
-    verifiedDomains: string[];
-    domainVerifications: unknown;
-  };
-  domain: string;
-}): boolean {
-  const parsed = ssoDomainVerificationSchema
-    .array()
-    .safeParse(replacement.domainVerifications);
-  return (
-    qualifySsoDomainOwnership({
-      state: {
-        connectionId: replacement.id,
-        organizationId: replacement.organizationId,
-        replacesConnectionId: replacement.replacesConnectionId,
-        verifiedDomains: replacement.verifiedDomains,
-        domainVerifications: parsed.success ? parsed.data : [],
-      },
-      domain,
-    }).status === "QUALIFIED"
-  );
-}
+/** What the link policy refuses with when the replacement cannot match a person. */
+const LINK_REFUSALS = {
+  "no-address": "SSO_MIGRATION_LINK_UNVERIFIED",
+  "shared-address": "SSO_MIGRATION_LINK_AMBIGUOUS",
+  "unproved-domain": "SSO_MIGRATION_LINK_NOT_ALLOWED",
+} as const satisfies Record<Exclude<SsoMigrationMemberMove, "matched">, string>;
+
+const NOT_MIGRATING = {
+  kind: "not_migrating",
+  decision: { kind: "not_migrating" } as const,
+} as const;
 
 /** Better Auth's migration callback policy, backed only by persisted facts. */
 export class PrismaSsoMigrationCallbackPolicy
@@ -452,81 +430,45 @@ export class PrismaSsoMigrationCallbackPolicy
       where: { id: userId },
       select: {
         email: true,
-        emailVerified: true,
         orgMemberships: { select: { organizationId: true } },
       },
     });
-    if (!user) {
-      return {
-        kind: "not_migrating",
-        decision: { kind: "not_migrating" } as const,
-      } as const;
-    }
+    if (!user) return NOT_MIGRATING;
     const pairs = await this.loadPairs({
       reads,
       organizationIds: user.orgMemberships.map(
         ({ organizationId }) => organizationId,
       ),
     });
-    if (pairs.length === 0) {
-      return {
-        kind: "not_migrating",
-        decision: { kind: "not_migrating" } as const,
-      } as const;
-    }
-    if (!user.email || !user.emailVerified) {
-      return {
-        kind: "unverified",
-        pairs,
-        decision: {
-          kind: "reject",
-          code: "SSO_MIGRATION_LINK_UNVERIFIED",
-        } as const,
-      } as const;
-    }
-    const matchingUsers = await reads.user.count({
-      where: { email: { equals: user.email, mode: "insensitive" } },
+    if (pairs.length === 0) return NOT_MIGRATING;
+    const qualifiedPairs = (domain: string) =>
+      pairs.filter(({ replacement }) =>
+        replacementProvesDomain({ replacement, domain }),
+      );
+    const match = arrivalMatchOf({
+      email: user.email,
+      accountsHoldingAddress: user.email
+        ? ((
+            await countAccountsHoldingAddresses({
+              prisma: reads,
+              addresses: [user.email],
+            })
+          ).get(user.email.toLowerCase()) ?? 0)
+        : 0,
+      provesDomain: (domain) => qualifiedPairs(domain).length > 0,
     });
-    if (matchingUsers !== 1) {
+    if (match !== "matched") {
       return {
-        kind: "ambiguous",
+        kind: match,
         pairs,
-        decision: {
-          kind: "reject",
-          code: "SSO_MIGRATION_LINK_AMBIGUOUS",
-        } as const,
-      } as const;
-    }
-    const rawDomain = extractEmailDomain(user.email);
-    if (!rawDomain) {
-      return {
-        kind: "unproved",
-        pairs,
-        decision: {
-          kind: "reject",
-          code: "SSO_MIGRATION_LINK_NOT_ALLOWED",
-        } as const,
-      } as const;
-    }
-    const qualifiedPairs = pairs.filter(({ replacement }) =>
-      replacementProvesDomain({
-        replacement,
-        domain: normalizeDomain(rawDomain),
-      }),
-    );
-    if (qualifiedPairs.length === 0) {
-      return {
-        kind: "unproved",
-        pairs,
-        decision: {
-          kind: "reject",
-          code: "SSO_MIGRATION_LINK_NOT_ALLOWED",
-        } as const,
+        decision: { kind: "reject", code: LINK_REFUSALS[match] } as const,
       } as const;
     }
     return {
       kind: "ready",
-      pairs: qualifiedPairs,
+      pairs: qualifiedPairs(
+        normalizeDomain(extractEmailDomain(user.email) ?? ""),
+      ),
       authenticationPairs: pairs,
     } as const;
   }

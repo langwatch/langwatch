@@ -74,11 +74,24 @@ export interface SelfServeGoLiveView {
   activated: boolean;
 }
 
+/**
+ * Whether the replacement recognises a member by address. `matched` members
+ * move across at their next sign-in, before or after the update finishes;
+ * every other value names why the replacement will not recognise them. None
+ * of them holds the update.
+ */
+export type SsoMigrationMemberMove =
+  | "matched"
+  | "no-address"
+  | "shared-address"
+  | "unproved-domain";
+
 export interface SsoMigrationStragglerView {
   userId: string;
   name: string | null;
   email: string | null;
   lastLegacyAuthenticationAtMs: number | null;
+  move: SsoMigrationMemberMove;
 }
 
 export interface SsoMigrationBlockerView {
@@ -88,7 +101,7 @@ export interface SsoMigrationBlockerView {
 
 export type SsoMigrationScimStatus =
   | "not-applicable"
-  | "needs-repointing"
+  | "moves-with-finish"
   | "ready";
 
 export interface SelfServeMigrationView {
@@ -114,12 +127,17 @@ export interface SelfServeMigrationView {
   testSignIn: { done: boolean; atMs: number | null };
   members: {
     activeCount: number;
+    /** Members holding a verified sign-in on the replacement. */
     linkedCount: number;
+    /** Members the replacement will match at their next sign-in. */
+    nextSignInCount: number;
     stragglers: SsoMigrationStragglerView[];
     nextCursor: string | null;
   };
   quietPeriod: {
     lastLegacyAuthenticationAtMs: number | null;
+    /** When finishing opens, or null before sign-in is switched over. */
+    clearsAtMs: number | null;
     complete: boolean;
   };
   scim: {

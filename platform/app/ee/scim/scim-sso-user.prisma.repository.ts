@@ -58,15 +58,9 @@ export class PrismaScimSsoUsers {
       return this.#resolveVerifiedSamlUser(database, input, user);
     }
 
-    const ownership = await database.scimDirectoryUser.findUnique({
-      where: {
-        connectionId_userId: {
-          connectionId: input.providerId,
-          userId: user.id,
-        },
-      },
-    });
-    if (!ownership) return CONTINUE;
+    if (!(await this.#directoryOwns(database, input.providerId, user.id))) {
+      return CONTINUE;
+    }
 
     if (
       user.deactivatedAt ||
@@ -151,6 +145,44 @@ export class PrismaScimSsoUsers {
     // Native linking rechecks the exact issuer/subject owner and provider.
     // A signed SAML attribute proves this assertion, not local email status.
     return { action: "link", userId, profile: "preserve" };
+  }
+
+  /**
+   * Whether this connection's directory sync provisioned the user, or the
+   * sync of the connection it is replacing did.
+   *
+   * A person the previous connection's sync pushed, who has never signed in,
+   * has no verified address and no account; the directory row is what says
+   * the identity provider means them. That row moves to the replacement when
+   * the update finishes, and until then the previous connection's ownership
+   * is honoured, so they are recognised the same way before and after; both
+   * connections belong to the same organization.
+   */
+  async #directoryOwns(
+    database: Prisma.TransactionClient,
+    connectionId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const owned = await database.scimDirectoryUser.findUnique({
+      where: { connectionId_userId: { connectionId, userId } },
+      select: { userId: true },
+    });
+    if (owned) return true;
+    const connection = await database.ssoConnection.findUnique({
+      where: { id: connectionId },
+      select: { replacesConnectionId: true },
+    });
+    if (!connection?.replacesConnectionId) return false;
+    const inherited = await database.scimDirectoryUser.findUnique({
+      where: {
+        connectionId_userId: {
+          connectionId: connection.replacesConnectionId,
+          userId,
+        },
+      },
+      select: { userId: true },
+    });
+    return inherited !== null;
   }
 
   async #hasActiveMembership(

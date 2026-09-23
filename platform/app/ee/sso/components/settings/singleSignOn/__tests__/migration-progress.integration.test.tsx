@@ -64,10 +64,15 @@ function migrationWith(
     members: {
       activeCount: 1,
       linkedCount: 0,
+      nextSignInCount: 1,
       stragglers: [person(0)],
       nextCursor: null,
     },
-    quietPeriod: { lastLegacyAuthenticationAtMs: null, complete: true },
+    quietPeriod: {
+      lastLegacyAuthenticationAtMs: null,
+      clearsAtMs: null,
+      complete: true,
+    },
     scim: { status: "not-applicable" },
     blockers: [],
     canFinalize: false,
@@ -83,6 +88,7 @@ function person(
     name: `Member ${index}`,
     email: `member${index}@acme.test`,
     lastLegacyAuthenticationAtMs: null,
+    move: "matched",
   };
 }
 
@@ -228,6 +234,7 @@ describe("given more than one page of members still using the legacy provider", 
   const firstMembers: SelfServeMigrationView["members"] = {
     activeCount: 51,
     linkedCount: 0,
+    nextSignInCount: 51,
     stragglers: Array.from({ length: 25 }, (_, index) => person(index)),
     nextCursor: "user_024",
   };
@@ -315,9 +322,7 @@ describe("given more than one page of members still using the legacy provider", 
       fireEvent.click(screen.getByRole("button", { name: "Next members" }));
 
       expect(
-        screen.getByText(
-          /We could not load the members still using the previous provider/,
-        ),
+        screen.getByText(/We could not load the members not moved across yet/),
       ).toBeDefined();
       expect(screen.queryByText("Member 0")).toBeNull();
       expect(
@@ -382,21 +387,17 @@ describe("given an update under way", () => {
         migrationScreen({
           migration: migrationWith({
             members: {
-              activeCount: 3,
+              activeCount: 4,
               linkedCount: 1,
+              nextSignInCount: 1,
               stragglers: [],
               nextCursor: null,
             },
             blockers: [
               {
-                code: "members-not-linked",
-                message:
-                  "2 active members are not linked to the replacement yet.",
-              },
-              {
                 code: "legacy-activity-not-quiet",
                 message:
-                  "Wait for seven days without a successful legacy sign-in.",
+                  "Wait two days after the switch-over, and seven after the last legacy sign-in since then.",
               },
             ],
           }),
@@ -404,15 +405,75 @@ describe("given an update under way", () => {
       );
 
       expect(container.textContent).toContain(
-        "2 members have not signed in through the new connection yet.",
-      );
-      expect(container.textContent).toContain(
-        "Wait for seven days with nobody signing in through Auth0.",
+        "You can finish two days after switching over, or seven days after the last sign-in through Auth0 since then, whichever is later.",
       );
       // The server's own sentences are written in the ledger's vocabulary,
       // and the code-keyed copy is what replaces them.
       expect(container.textContent).not.toContain("the replacement");
       expect(container.textContent).not.toContain("legacy sign-in");
+    });
+
+    /** @scenario "The quiet period counts from the switch-over and the last sign-in through the previous provider" */
+    it("shows the time finishing opens once sign-in is switched over", () => {
+      const clearsAtMs = Date.parse("2026-09-03T09:30:00.000Z");
+      const { container } = render(
+        migrationScreen({
+          migration: migrationWith({
+            phase: "GRACE_DIRECT",
+            selectedRoute: "direct",
+            quietPeriod: {
+              lastLegacyAuthenticationAtMs: null,
+              clearsAtMs,
+              complete: false,
+            },
+            blockers: [{ code: "legacy-activity-not-quiet", message: "x" }],
+          }),
+        }),
+      );
+
+      expect(container.textContent).toContain(
+        `You can finish from ${new Date(clearsAtMs).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}. A sign-in through Auth0 moves this to seven days after it.`,
+      );
+    });
+
+    /** @scenario "Members never hold the update" */
+    it("says beside each member whether the new connection will recognise them", () => {
+      const moves = [
+        "matched",
+        "no-address",
+        "shared-address",
+        "unproved-domain",
+      ] as const;
+      render(
+        migrationScreen({
+          migration: migrationWith({
+            members: {
+              activeCount: 5,
+              linkedCount: 1,
+              nextSignInCount: 1,
+              stragglers: moves.map((move, index) => ({
+                ...person(index),
+                move,
+              })),
+              nextCursor: null,
+            },
+          }),
+        }),
+      );
+
+      expect(
+        screen
+          .getAllByTestId("sso-update-member")
+          .map((row) => row.textContent),
+      ).toEqual([
+        "Member 0 · Moves across at their next sign-in",
+        "Member 1 · Will not be recognized: their account has no email address",
+        "Member 2 · Will not be recognized: another account has the same address",
+        "Member 3 · Will not be recognized: their address is not on a domain you proved",
+      ]);
+      expect(
+        screen.getByText("1 of 5, 1 more at their next sign-in"),
+      ).toBeDefined();
     });
 
     /** @scenario "The update reports where it stands and what is outstanding" */
@@ -440,10 +501,7 @@ describe("given an update under way", () => {
           selectedRoute: "legacy",
           testSignInDone: false,
           liveRecoveryCount: 0,
-          linkedCount: 0,
-          activeCount: 2,
           quietComplete: false,
-          scimStatus: "needs-repointing",
           sharedLegacyIdentifiers: true,
         }).map((blocker) => blocker.code),
         ...finalizationBlockers([], {
@@ -454,7 +512,6 @@ describe("given an update under way", () => {
             remaining: 1,
             unassociated: 1,
             ambiguous: true,
-            unverifiedDirectMembers: 1,
           },
         }).map((blocker) => blocker.code),
       ]);
