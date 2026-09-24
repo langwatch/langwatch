@@ -10,7 +10,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
-import type { AdminWorkspaceViewOcsfChannel } from "../app/governance.members.ts";
+import type { GovernanceOcsfEventWriter } from "../app/governance.members.ts";
 import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 
@@ -28,10 +28,10 @@ const PERSONAL_TEAM_ID = `team-awva-personal-${suffix}`;
 const SHARED_TEAM_ID = `team-awva-shared-${suffix}`;
 
 /** The mirror the service writes best-effort, as a spy. */
-type MirrorInput = Parameters<AdminWorkspaceViewOcsfChannel["mirror"]>[0];
+type MirrorInput = Parameters<GovernanceOcsfEventWriter["insertEvent"]>[0];
 const mirror = vi.fn(async (_input: MirrorInput): Promise<void> => undefined);
-class SpyOcsf implements AdminWorkspaceViewOcsfChannel {
-  mirror(input: MirrorInput): Promise<void> {
+class SpyOcsf implements GovernanceOcsfEventWriter {
+  insertEvent(input: MirrorInput): Promise<void> {
     return mirror(input);
   }
 }
@@ -53,7 +53,7 @@ describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
     DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository: PrismaAdminWorkspaceViewAuditRepository.create(prisma),
       projects,
-      ocsf: new SpyOcsf(),
+      events: new SpyOcsf(),
     });
 
   beforeAll(async () => {
@@ -326,8 +326,10 @@ describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
         expect(mirror).toHaveBeenCalledTimes(1);
         expect(mirror.mock.calls[0]![0]).toMatchObject({
           tenantId: GOV_PROJECT_ID,
-          auditLogId: result.auditLogId,
-          view: { actorUserId: ADMIN_ID, targetTeamId: teamId, kind: "personal" },
+          eventId: result.auditLogId,
+          actorUserId: ADMIN_ID,
+          sourceId: teamId,
+          sourceType: "personal_workspace",
         });
       });
     });

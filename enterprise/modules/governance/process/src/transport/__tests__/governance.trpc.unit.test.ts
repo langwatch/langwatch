@@ -23,22 +23,88 @@ const workspace = {
   projectSlug: "ada-personal",
 };
 
+const setupState = {
+  hasPersonalVKs: false,
+  hasRoutingPolicies: false,
+  hasIngestionSources: true,
+  hasAnomalyRules: false,
+  hasRecentActivity: false,
+  hasApplicationTraces: false,
+  governanceActive: true,
+};
+const emptyPage = { events: [], nextCursor: null, nextCursorCompound: null };
+
 function mount(answer: typeof workspace | null) {
   const asked: string[] = [];
-  const app = createApiFixture<GovernanceRestApi>({ findActorWorkspace: async () => answer });
+  const calls: unknown[] = [];
+  const app = createApiFixture<GovernanceRestApi>({
+    findActorWorkspace: async () => answer,
+    governanceSetupState: async (input) => {
+      calls.push(input);
+      return setupState;
+    },
+    governanceOcsfExport: async (input, by) => {
+      calls.push([input, by]);
+      return emptyPage;
+    },
+    governanceRecordWorkspaceView: async (input) => {
+      calls.push(input);
+      return { recorded: true, auditLogId: "audit_1" };
+    },
+    governanceQuarantineFillStats: async (input) => {
+      calls.push(input);
+      return {
+        windowSeconds: 60,
+        threshold: 100,
+        spanCount: 0,
+        rate: 0,
+        exceeded: false,
+        perSource: [],
+      };
+    },
+  });
   const router = governanceTrpcRuntime(governanceTrpcMembers({ permits: () => true, asked })).mount(
     governanceTrpcTransport,
     () => app,
   );
 
-  return { router, asked, caller: router.createCaller({ actor: { id: "user_1" } }) };
+  return { router, asked, calls, caller: router.createCaller({ actor: { id: "user_1" } }) };
 }
 
 describe("the governance tRPC namespace", () => {
-  it("serves resolveActorPersonalProject as a query", () => {
+  it("serves main's procedures as queries", () => {
     expect(procedureKinds(mount(null).router._def.procedures)).toEqual({
       resolveActorPersonalProject: "query",
+      setupState: "query",
+      ocsfExport: "query",
+      quarantineFillStats: "query",
+      recordWorkspaceView: "mutation",
     });
+  });
+
+  it("answers the setup state under governance:view", async () => {
+    const { caller, asked, calls } = mount(null);
+
+    await expect(caller.setupState({ organizationId: "org_1" })).resolves.toEqual(setupState);
+    expect(asked).toEqual(["governance:view"]);
+    expect(calls).toEqual([{ organizationId: "org_1" }]);
+  });
+
+  it("pages the OCSF export under complianceExport:view from main's defaults", async () => {
+    const { caller, asked, calls } = mount(null);
+
+    await expect(caller.ocsfExport({ organizationId: "org_1" })).resolves.toEqual(emptyPage);
+    expect(asked).toEqual(["complianceExport:view"]);
+    expect(calls).toMatchObject([
+      [{ organizationId: "org_1", sinceMs: 0, limit: 500 }, { id: "user_1" }],
+    ]);
+  });
+
+  it("evaluates quarantine fill with main's default window and threshold", async () => {
+    const { caller, calls } = mount(null);
+
+    await caller.quarantineFillStats({ organizationId: "org_1" });
+    expect(calls).toEqual([{ organizationId: "org_1", windowSeconds: 60, threshold: 100 }]);
   });
 
   it("answers the actor's personal workspace under governance:view", async () => {
@@ -56,5 +122,17 @@ describe("the governance tRPC namespace", () => {
     await expect(
       caller.resolveActorPersonalProject({ organizationId: "org_1", actor: "nobody" }),
     ).resolves.toBeNull();
+  });
+
+  it("records the admin's workspace view as the caller under governance:view", async () => {
+    const { caller, asked, calls } = mount(null);
+
+    await expect(
+      caller.recordWorkspaceView({ organizationId: "org_1", targetTeamId: "team_2", kind: "team" }),
+    ).resolves.toEqual({ recorded: true, auditLogId: "audit_1" });
+    expect(asked).toEqual(["governance:view"]);
+    expect(calls).toEqual([
+      { organizationId: "org_1", targetTeamId: "team_2", kind: "team", actorUserId: "user_1" },
+    ]);
   });
 });

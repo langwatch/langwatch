@@ -1,4 +1,5 @@
 import {
+  ADMIN_WORKSPACE_VIEW_ACTION,
   ADMIN_WORKSPACE_VIEW_DEDUP_MS,
   type AdminWorkspaceKind,
   type RecordWorkspaceViewInput,
@@ -6,10 +7,13 @@ import {
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
+import { Temporal } from "@langwatch/time";
 
-import type {
-  GovernanceDiagnosticsSink,
-  AdminWorkspaceViewOcsfChannel,
+import {
+  type GovernanceDiagnosticsSink,
+  type GovernanceOcsfEventWriter,
+  OCSF_ACTIVITY,
+  OCSF_SEVERITY,
 } from "../app/governance.members.ts";
 import type { AdminWorkspaceViewAuditRepository } from "../repositories/admin-workspace-view-audit.repository.ts";
 
@@ -22,8 +26,8 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
   private constructor(
     private readonly repository: AdminWorkspaceViewAuditRepository,
     private readonly options: {
-      projects?: ProjectApi;
-      ocsf?: AdminWorkspaceViewOcsfChannel;
+      projects?: Pick<ProjectApi, "ensureInternal">;
+      events?: GovernanceOcsfEventWriter;
       diagnostics?: GovernanceDiagnosticsSink;
       clock: () => number;
     },
@@ -31,8 +35,8 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
 
   static create(options: {
     repository: AdminWorkspaceViewAuditRepository;
-    projects?: ProjectApi;
-    ocsf?: AdminWorkspaceViewOcsfChannel;
+    projects?: Pick<ProjectApi, "ensureInternal">;
+    events?: GovernanceOcsfEventWriter;
     diagnostics?: GovernanceDiagnosticsSink;
     clock?: () => number;
   }): DefaultGovernanceAdminWorkspaceViewAuditService {
@@ -85,7 +89,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     label: string,
     row: { id: string; createdAtMs: number },
   ): Promise<void> {
-    if (!this.options.ocsf || !this.options.projects) {
+    if (!this.options.events || !this.options.projects) {
       return;
     }
 
@@ -94,12 +98,27 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
         organizationId: input.organizationId,
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
       });
-      await this.options.ocsf.mirror({
+      await this.options.events.insertEvent({
         tenantId: project.id,
-        auditLogId: row.id,
-        createdAtMs: row.createdAtMs,
-        view: input,
-        label,
+        eventId: row.id,
+        traceId: "",
+        sourceId: input.targetTeamId,
+        sourceType: this.targetKind(input.kind),
+        activityId: OCSF_ACTIVITY.READ,
+        severityId: OCSF_SEVERITY.INFO,
+        eventTime: Temporal.Instant.fromEpochMilliseconds(row.createdAtMs),
+        actorUserId: input.actorUserId,
+        actorEmail: "",
+        actorEnduserId: "",
+        actionName: ADMIN_WORKSPACE_VIEW_ACTION,
+        targetName: label || input.targetTeamId,
+        anomalyAlertId: "",
+        rawOcsfJson: JSON.stringify({
+          action: ADMIN_WORKSPACE_VIEW_ACTION,
+          actor: { user_uid: input.actorUserId },
+          target: { uid: input.targetTeamId, name: label, type: input.kind },
+          organization_id: input.organizationId,
+        }),
       });
     } catch (error) {
       this.options.diagnostics?.warn(

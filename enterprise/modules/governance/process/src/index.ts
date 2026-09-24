@@ -27,13 +27,7 @@ export type { GovernanceInstallationOptions } from "./app/governance-installatio
  * Every door reaches the same object, so a rule written on it is the rule
  * every door gets.
  */
-export type {
-  GovernanceActorDirectory,
-  GovernanceActorUser,
-  GovernanceAppDependencies,
-  GovernanceBespokeMembers,
-  GovernancePersonalVirtualKeyMembers,
-} from "./app/governance.app.ts";
+export type { GovernanceAppDependencies, GovernanceBespokeMembers } from "./app/governance.app.ts";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
@@ -82,7 +76,6 @@ export {
   createDepartmentDirectory,
   createGovernanceEventsPipeline,
   createGovernanceInstallation,
-  createGovernanceMemberInfrastructure,
   createGovernanceSignals,
   createIngestionPullEventing,
   createIngestionPullExecution,

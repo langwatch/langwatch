@@ -4,9 +4,9 @@
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
-  buildGenericOAuthConfigs,
-  buildSocialProviders,
+  isNamedProviderMounted,
   type SignInProviderConfiguration,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import {
@@ -49,6 +49,10 @@ import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.
 import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
+import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+} from "../rules/sign-in-providers.rules.ts";
 import { openingSsoProviderConfigs } from "../rules/sso-provider-config.rules.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { SsoRegisteredIssuersService } from "../services/sso-registered-issuers.service.ts";
@@ -90,13 +94,15 @@ export class PrismaBetterAuthStorage extends BetterAuthStorage {
 }
 
 /**
- * ADR-027's licence questions. The hosted product is licensed by definition;
- * a self-hosted install reports unlicensed here, since this module reads no
- * licence — matching what the deleted composition answered.
+ * ADR-027's licence questions, answered by licensing as main's
+ * `platformSSOAllowed` did. The configured provider applies only when licensed
+ * AND mounted; otherwise the door is email mode (main's `resolveAuthProvider`).
  */
 export class ModuleBetterAuthFederation extends BetterAuthFederation {
   static create(options: {
     authProvider: string | undefined;
+    providerMounted: boolean;
+    licensing: Pick<LicensingApi, "isPlatformSsoLicensed">;
     passkeysEnabled: boolean;
     isSaas: boolean;
     localPasswords: boolean;
@@ -107,6 +113,8 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
   private constructor(
     private readonly deployment: {
       authProvider: string | undefined;
+      providerMounted: boolean;
+      licensing: Pick<LicensingApi, "isPlatformSsoLicensed">;
       passkeysEnabled: boolean;
       isSaas: boolean;
       localPasswords: boolean;
@@ -122,8 +130,8 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
 
   resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
     return SignInMethodPolicyService.create({
-      resolveAuthProvider: () => Promise.resolve(this.deployment.authProvider ?? "email"),
-      federationLicensed: () => Promise.resolve(this.deployment.isSaas),
+      resolveAuthProvider: () => this.resolveAuthProvider(),
+      federationLicensed: () => this.platformSsoAllowed(),
       offersPasskeys: () => this.deployment.passkeysEnabled,
       issuesOwnPasswords: () => this.deployment.localPasswords,
       selfHosted: () => !this.deployment.isSaas,
@@ -131,7 +139,14 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
   }
 
   platformSsoAllowed(): Promise<boolean> {
-    return Promise.resolve(false);
+    return this.deployment.licensing.isPlatformSsoLicensed();
+  }
+
+  private async resolveAuthProvider(): Promise<string> {
+    const provider = this.deployment.authProvider ?? "email";
+    if (provider === "email") return "email";
+    if (!(await this.platformSsoAllowed())) return "email";
+    return this.deployment.providerMounted ? provider : "email";
   }
 }
 
@@ -400,6 +415,8 @@ export type BuildBetterAuthOptions = Readonly<{
   authProvider: string | undefined;
   /** Every provider's registration, from which the ones this deployment names mount. */
   signInProviders: SignInProviderConfiguration;
+  /** Whether a signed license permits platform single sign-on (ADR-027). */
+  licensing: Pick<LicensingApi, "isPlatformSsoLicensed">;
   /** Whether this is the hosted product rather than a self-hosted install. */
   isSaas: boolean;
   /** D09: whether this deployment issues its own passwords beside its provider. */
@@ -434,15 +451,22 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
   logger.warn(
     {
       absent: [
-        "enterprise-licensing",
         "identity-pipeline",
         "password-reset-mail",
         "pending-invitations",
         "sign-in-router-shadow",
       ],
     },
-    "Better Auth composed by the auth module: federation reports unlicensed, it runs the stock Prisma storage engine, it cannot send a password-reset link, it applies no pending invitation on a domain auto-join and it runs no sign-in router shadow",
+    "Better Auth composed by the auth module: it runs the stock Prisma storage engine, it cannot send a password-reset link, it applies no pending invitation on a domain auto-join and it runs no sign-in router shadow",
   );
+
+  const providerMounted = isNamedProviderMounted(options.signInProviders);
+  if (options.signInProviders.provider !== "email" && !providerMounted) {
+    logger.warn(
+      { provider: options.signInProviders.provider },
+      "AUTH_PROVIDER names a provider this deployment cannot mount — starting in email mode; check the provider id against the self-hosting SSO docs and that its client credentials are set",
+    );
+  }
 
   return createBetterAuthTransport({
     auth: options.auth,
@@ -471,6 +495,8 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
     },
     federation: ModuleBetterAuthFederation.create({
       authProvider: options.authProvider,
+      providerMounted,
+      licensing: options.licensing,
       passkeysEnabled: identity.passkeysEnabled,
       isSaas: options.isSaas,
       localPasswords: options.localPasswords,

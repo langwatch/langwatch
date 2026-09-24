@@ -3,9 +3,10 @@ import { randomBytes } from "node:crypto";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   NoEligibleProvidersError,
-  PersonalSourceTypeNotAllowedError,
+  IngestionKeySessionRevokedError,
+  IngestionKeySourceNotAllowedError,
+  IngestionKeyWorkspaceMissingError,
   PersonalVirtualKeyAlreadyExistsError,
-  PersonalWorkspaceMissingError,
   PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
   RoutingPolicyHasNoProvidersError,
   type GovernanceApi,
@@ -124,6 +125,7 @@ export type GovernanceCliIngestionKeyOutcome =
   | Readonly<{ outcome: "forbidden" }>
   | Readonly<{ outcome: "source-type-not-personal"; sourceType: string }>
   | Readonly<{ outcome: "personal-workspace-missing" }>
+  | Readonly<{ outcome: "session-signed-out" }>
   | Readonly<{ outcome: "failed" }>;
 
 /** Everything the credential operations reach that they do not own. */
@@ -511,7 +513,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
   /**
    * The caller's own workspace, one key per device. Create-only, because the
    * other devices under this login are still exporting with theirs; the
-   * service's cap is what keeps the list bounded.
+   * key lives and dies with this device's session (its login key).
    */
   private async mintPersonalIngestionKey(input: {
     caller: GovernanceCliCaller;
@@ -522,6 +524,8 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
         userId: input.caller.user_id,
         organizationId: input.caller.organization_id,
         sourceType: input.sourceType,
+        fromCliSession: true,
+        parentApiKeyId: input.caller.cli_api_key_id ?? null,
         // Snapshot which device minted the key so the API-keys settings page
         // can attribute it; null for CLIs that predate device metadata.
         createdByDeviceLabel:
@@ -538,12 +542,16 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
       // A source type no wrapped tool stamps and a missing workspace are the
       // two failures the caller can act on, so they are the only ones that
       // report as such. Everything else is a server fault.
-      if (err instanceof PersonalSourceTypeNotAllowedError) {
+      if (IngestionKeySourceNotAllowedError.is(err)) {
         return { outcome: "source-type-not-personal", sourceType: input.sourceType };
       }
 
-      if (err instanceof PersonalWorkspaceMissingError) {
+      if (IngestionKeyWorkspaceMissingError.is(err)) {
         return { outcome: "personal-workspace-missing" };
+      }
+
+      if (IngestionKeySessionRevokedError.is(err)) {
+        return { outcome: "session-signed-out" };
       }
 
       logger.error(

@@ -1,7 +1,3 @@
-import {
-  buildGenericOAuthConfigs,
-  isSamlSub,
-} from "@langwatch/enterprise-sso-contract/sign-in-providers";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * SAML sign-ins through Auth0 count as verified emails (ADR-096).
@@ -18,6 +14,8 @@ import {
  * untouched.
  */
 import { describe, expect, it } from "vitest";
+
+import { buildGenericOAuthConfigs, isSamlSub } from "../sign-in-providers.rules.ts";
 
 describe("isSamlSub", () => {
   it("matches an Auth0 SAML sub", () => {

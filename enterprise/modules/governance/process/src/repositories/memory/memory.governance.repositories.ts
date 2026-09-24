@@ -25,6 +25,7 @@ import { MemoryOrganizationSessionPolicyRepository } from "./memory.organization
 import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
 import { MemoryRollupErasureRepository } from "./memory.rollup-erasure.repository.ts";
 import { MemorySpendSpikeAnomalyRepository } from "./memory.spend-spike-anomaly.repository.ts";
+import { MemoryTraceActivityRepository } from "./memory.trace-activity.repository.ts";
 
 /** The "memory" tier: every governance repository, with no database behind it. */
 export class MemoryGovernanceRepositories {
@@ -52,6 +53,7 @@ export class MemoryGovernanceRepositories {
       ingestionSources: MemoryIngestionSourceRepository.create(),
       ingestionTemplates: MemoryIngestionTemplateRepository.create(store),
       ocsfEvents: MemoryOcsfEventsRepository.create(),
+      traceActivity: MemoryTraceActivityRepository.create(),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       rollupErasure: MemoryRollupErasureRepository.create(),
       routingPolicies: MemoryRoutingPolicyRepository.create(store),

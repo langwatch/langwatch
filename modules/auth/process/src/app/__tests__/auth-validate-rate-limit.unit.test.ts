@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 /**
  * The token check counts its callers: past the registry's per-minute ceiling
  * the answer is the handled 429, not another probe of the token store.
@@ -65,6 +66,7 @@ async function appFor(
       identity: createApiFixture<IdentityApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
+      licensing: createApiFixture<LicensingApi>(),
       auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
     },
     members: {

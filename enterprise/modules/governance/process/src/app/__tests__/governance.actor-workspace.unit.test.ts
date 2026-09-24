@@ -21,17 +21,12 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
-import type { UserApi } from "@langwatch/user-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
-import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
-import { GovernanceApp, type GovernanceActorUser } from "../governance.app.ts";
-
-/** A dependency this operation never reaches; calling one is the test's bug. */
-const unreachable = <Method>(): Method =>
-  (() => Promise.reject(new Error("not reachable from this operation"))) as Method;
+import { GovernanceApp } from "../governance.app.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -51,26 +46,37 @@ const workspace: PersonalWorkspace = {
   },
 };
 
+type ActorUser = Pick<UserProfile, "id" | "name" | "email">;
+
+function profileOf(user: ActorUser): UserProfile {
+  const at = new Date(1_700_000_000_000);
+  return {
+    ...user,
+    emailVerified: true,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: at,
+    updatedAt: at,
+    lastLoginAt: null,
+    deactivatedAt: null,
+  };
+}
+
 async function buildApp(options: {
-  user?: GovernanceActorUser | null;
+  user?: ActorUser | null;
   isMember?: boolean;
   workspace?: PersonalWorkspace | null;
 }) {
-  const tryFindUser = vi.fn(async () => options.user ?? null);
-  const isOrganizationMember = vi.fn(async () =>
-    options.isMember ? { userId: "member-1" } : null,
+  const user = options.user ? profileOf(options.user) : null;
+  const findById = vi.fn(async ({ id }: { id: string }) => (user?.id === id ? user : null));
+  const findByEmail = vi.fn(async ({ email }: { email: string }) =>
+    user?.email === email ? user : null,
   );
+  const isOrganizationMember = vi.fn(async () => options.isMember === true);
   const getPersonalWorkspace = vi.fn(async () => {
     if (!options.workspace) throw new TeamNotFoundError();
     return options.workspace;
   });
-
-  // The two Prisma reads `createGovernanceMemberInfrastructure` wraps: `findFirst`
-  // is the only method either port calls, so the rest of each delegate is unreachable.
-  const prisma = {
-    user: { findFirst: tryFindUser },
-    organizationUser: { findFirst: isOrganizationMember },
-  } as unknown as GovernanceMemberDatabase;
 
   const app = await GovernanceApp.create({
     config: void 0,
@@ -79,7 +85,10 @@ async function buildApp(options: {
       projects: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
-      organizations: createApiFixture<OrganizationApi>({ getPersonalWorkspace }),
+      organizations: createApiFixture<OrganizationApi>({
+        getPersonalWorkspace,
+        isMember: isOrganizationMember,
+      }),
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -87,20 +96,20 @@ async function buildApp(options: {
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
-      users: createApiFixture<UserApi>(),
+      users: createApiFixture<UserApi>({ findById, findByEmail }),
     },
-    members: { prisma, encryption: createApiFixture<GovernanceEncryptor>(), isSaas: false },
+    members: { encryption: createApiFixture<GovernanceEncryptor>(), isSaas: false },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, tryFindUser, isOrganizationMember, getPersonalWorkspace };
+  return { app, findByEmail, isOrganizationMember, getPersonalWorkspace };
 }
 
 describe("GovernanceApp.tryResolveActorWorkspace", () => {
   describe("given an actor token that names a member with a personal workspace", () => {
     it("answers where that workspace lives", async () => {
-      const { app, tryFindUser } = await buildApp({
+      const { app, findByEmail } = await buildApp({
         user: { id: "user-1", name: "Ariana", email: "ariana@acme.com" },
         isMember: true,
         workspace,
@@ -118,10 +127,7 @@ describe("GovernanceApp.tryResolveActorWorkspace", () => {
         projectId: "project-personal-1",
         projectSlug: "ariana-personal",
       });
-      expect(tryFindUser).toHaveBeenCalledWith({
-        where: { OR: [{ id: "ariana@acme.com" }, { email: "ariana@acme.com" }] },
-        select: { id: true, name: true, email: true },
-      });
+      expect(findByEmail).toHaveBeenCalledWith({ email: "ariana@acme.com" });
     });
 
     it("falls back to the email, then the id, for a person with no name", async () => {

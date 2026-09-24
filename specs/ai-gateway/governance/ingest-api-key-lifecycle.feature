@@ -180,7 +180,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     # Resolution refuses any key whose login key is revoked or expired, so a
     # key that slipped in during the retirement cascade is dead on arrival.
 
-  @unit @ingest-api-key @issue @personal @session @unimplemented
+  @unit @ingest-api-key @issue @personal @session
   Scenario: A mint that races its session's retirement cleans up the key it wrote
     Given a login key that is live when the mint checks it
     When the session is retired while that mint is still writing its key
@@ -348,7 +348,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And a key with no machine label is named "unknown device"
     And the rotate button says how many keys it revokes
 
-  @unit @ingest-api-key @rotate @unimplemented
+  @unit @ingest-api-key @rotate
   Scenario: A rotation that cannot kill every prior key mints nothing
     Given a rotation over several live keys
     When one of them cannot be revoked

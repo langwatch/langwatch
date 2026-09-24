@@ -85,4 +85,4 @@ export {
   type SsoConnectionTarget,
   type SsoDomainTarget,
 } from "./sso.contract.ts";
-export { ssoConfig, ssoSecrets, type SsoConfig, type SsoConfiguration } from "./sso.config.ts";
+export { ssoConfig, type SsoConfig, type SsoConfiguration } from "./sso.config.ts";

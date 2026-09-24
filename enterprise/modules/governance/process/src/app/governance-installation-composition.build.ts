@@ -34,17 +34,16 @@ import { DefaultGovernanceRoutingPolicyService } from "../services/governance-ro
 import { GovernanceRulesOperationsService } from "../services/governance-rules-operations.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
-import { IngestionKeyService } from "../services/ingestion-source-key.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
 } from "../services/ingestion-source-secret.service.ts";
+import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
 import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.service.ts";
 import { PostgresGovernanceAdapter } from "./governance-policy-composition.build.ts";
 import type {
-  AdminWorkspaceViewOcsfChannel,
   CliAdminContactReader,
   PersonalBudgetOverviewReader,
   GovernanceDiagnosticsSink,
@@ -55,8 +54,6 @@ import type {
   GovernanceClickHouseResolver,
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-  IngestionKeyIssuer,
-  IngestionKeyRepository,
   PersonalUsageReader,
   PersonalVirtualKeyIssuer,
   QuarantineTenantResolver,
@@ -88,19 +85,24 @@ export type GovernanceInstallationOptions = {
   aiToolProviders: AiToolProviderCatalog;
   cliContacts: CliAdminContactReader;
   auth: Pick<AuthApi, "findCliTokenRecordsForUser" | "revokeCliTokens">;
-  apiKeys: Pick<ApiKeyApi, "revokeCliSessionKey">;
+  apiKeys: Pick<
+    ApiKeyApi,
+    | "revokeCliSessionKey"
+    | "create"
+    | "revoke"
+    | "findById"
+    | "findByLookupId"
+    | "findIngestionKeysForUser"
+  >;
   gateway: Pick<GatewayApi, "findPersonalVirtualKeys" | "findVirtualKeyById">;
   modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
   diagnostics?: GovernanceDiagnosticsSink;
-  adminWorkspaceOcsf?: AdminWorkspaceViewOcsfChannel;
   adminWorkspaceDiagnostics?: GovernanceDiagnosticsSink;
   quarantineTenant: QuarantineTenantResolver;
   quarantineTraceActivity?: QuarantineTraceActivityReader;
   quarantineDiagnostics?: GovernanceDiagnosticsSink;
   setupActivity?: GovernanceSetupActivityReader;
   ocsfEvents?: GovernanceOcsfEventsReader;
-  ingestionKeyRepository: IngestionKeyRepository;
-  ingestionKeyIssuer: IngestionKeyIssuer;
   ottl: GovernanceOttlGateway;
 };
 
@@ -185,14 +187,13 @@ export class GovernanceInstallationComposition {
     const policy = PostgresGovernanceAdapter.create({
       database: this.options.database,
     }).build().policy;
-    const ingestionKeys = IngestionKeyService.create({
-      repository: this.options.ingestionKeyRepository,
-      issuer: this.options.ingestionKeyIssuer,
+    const templateRepository = PrismaIngestionTemplateRepository.create(this.options.database);
+    const ingestionKeys = PersonalIngestionKeyService.create({
+      apiKeys: this.options.apiKeys,
       organizations: this.options.organizations,
+      templates: templateRepository,
     });
-    const templates = IngestionTemplateService.create({
-      repository: PrismaIngestionTemplateRepository.create(this.options.database),
-    });
+    const templates = IngestionTemplateService.create({ repository: templateRepository });
     const ocsf = DefaultGovernanceOcsfExportService.create({
       repository: PrismaGovernanceOcsfExportRepository.create(this.options.database),
       events: this.options.ocsfEvents,
@@ -213,7 +214,6 @@ export class GovernanceInstallationComposition {
     const adminWorkspaceViewAudit = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository: PrismaAdminWorkspaceViewAuditRepository.create(this.options.database),
       projects: this.options.projects,
-      ocsf: this.options.adminWorkspaceOcsf,
       diagnostics: this.options.adminWorkspaceDiagnostics,
     });
     const quarantineFill = QuarantineFillEvaluatorService.create({

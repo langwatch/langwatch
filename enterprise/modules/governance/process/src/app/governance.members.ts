@@ -1,4 +1,3 @@
-import type { ApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorPagedWindowQuery,
@@ -11,9 +10,7 @@ import type {
   GovernanceBudgetOverviewForUser,
   GovernanceIngestionSource,
   GovernanceOcsfExportRow,
-  IngestionKeyMintCommand,
   IngestionSourceHealthRow,
-  IssuedIngestionKey,
   PersonalUsageBreakdown,
   PersonalUsageBucket,
   PersonalUsageWindow,
@@ -25,7 +22,6 @@ import type {
   RecordIngestionPullRunFailedCommand,
   RecordPulledUsageCommand,
   RecordVkLifecycleCommandData,
-  RecordWorkspaceViewInput,
   SourceHealthMetrics,
   SpendByDepartmentRow,
   SpendByTeamRow,
@@ -248,16 +244,6 @@ export interface GovernanceOcsfEventsReader {
     sinceEventId: string;
     limit: number;
   }): Promise<GovernanceOcsfExportRow[]>;
-}
-
-export interface AdminWorkspaceViewOcsfChannel {
-  mirror(input: {
-    tenantId: string;
-    auditLogId: string;
-    createdAtMs: number;
-    view: RecordWorkspaceViewInput;
-    label: string;
-  }): Promise<void>;
 }
 
 export interface GovernanceSetupActivityReader {
@@ -738,69 +724,6 @@ export interface GovernanceClickHouseClient {
 
 export interface GovernanceClickHouseResolver {
   getClient(organizationId: string): Promise<GovernanceClickHouseClient>;
-}
-
-export type StoredIngestionKey = {
-  id: string;
-  lookupId: string;
-  ingestSourceType: string | null;
-  ingestionTemplateId: string | null;
-  /** When the key last authenticated; nothing when it never has. */
-  lastUsedAt?: Instant | null;
-  createdAt?: Instant;
-};
-
-/** One key as `getPersonalKeyState` reads it, ownership included. */
-export type StoredIngestionKeyOwnership = StoredIngestionKey & {
-  organizationId: string;
-  userId: string | null;
-  revokedAt: Instant | null;
-  revocationCause: string | null;
-};
-
-export interface IngestionKeyRepository {
-  findIngestKey(input: {
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-  }): Promise<StoredIngestionKey | null>;
-
-  findIngestKeysForProject(input: {
-    organizationId: string;
-    projectId: string;
-  }): Promise<StoredIngestionKey[]>;
-
-  /** One key by the lookup id embedded in its token, whether live or not. */
-  findByLookupId(input: { lookupId: string }): Promise<StoredIngestionKeyOwnership | null>;
-}
-
-export interface IngestionKeyIssuer {
-  create(input: {
-    name: string;
-    userId: string | null;
-    createdByUserId: string;
-    organizationId: string;
-    permissionMode: "restricted";
-    permissions: readonly ["traces:create"];
-    bindings: readonly [{ role: "CUSTOM"; scopeType: "PROJECT"; scopeId: string }];
-    ingestSourceType: string;
-    ingestionTemplateId: string | null;
-    createdByDeviceLabel: string | null;
-  }): Promise<{ token: string; apiKey: { id: string } }>;
-
-  revoke(input: {
-    id: string;
-    callerUserId: string;
-    callerIsAdmin: boolean;
-    organizationId: string;
-    awaitProjection: false;
-    /** Why the key dies, so the CLI can tell a re-mintable key from a dead one. */
-    cause?: ApiKeyRevocationCause;
-  }): Promise<void>;
-}
-
-export interface IngestionKeyCapability {
-  ensureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
 }
 
 /**

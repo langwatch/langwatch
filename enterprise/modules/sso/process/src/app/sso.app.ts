@@ -13,7 +13,6 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   ssoConfig,
-  ssoSecrets,
   SsoApi,
   type SsoApi as SsoApiContract,
   type ActivateSsoConnectionInput,
@@ -58,9 +57,8 @@ import {
   type SsoSetupStartMigrationInput,
 } from "@langwatch/enterprise-sso-contract";
 import {
-  buildGenericOAuthConfigs,
-  buildSocialProviders,
   configuredAuthProvider,
+  isNamedProviderMounted,
   resolveSignInProviders,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import {
@@ -71,6 +69,7 @@ import {
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
+import { signInProviderSecrets } from "@langwatch/secrets";
 import { UserApi } from "@langwatch/user-contract";
 
 import { ssoServiceProviderAddresses } from "../rules/sso-service-provider.rules.ts";
@@ -94,17 +93,14 @@ import type {
   SsoSetupReads,
 } from "./sso.members.ts";
 
-/** Whether the configured provider can actually be mounted by BetterAuth. */
+/** Whether the NAMED provider mounts on Better Auth (main's `authProviderIsMounted`). */
 class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
   static create(): BetterAuthSsoProviderMount {
     return new BetterAuthSsoProviderMount();
   }
 
   isMounted(configuration: SsoConfiguration): boolean {
-    return (
-      Object.keys(buildSocialProviders(configuration)).length > 0 ||
-      buildGenericOAuthConfigs(configuration).length > 0
-    );
+    return isNamedProviderMounted(configuration);
   }
 }
 
@@ -177,7 +173,7 @@ export class SsoApp implements SsoApiContract {
     entitlements: EntitlementApi,
   };
   static readonly config = ssoConfig;
-  static readonly secrets = ssoSecrets;
+  static readonly secrets = signInProviderSecrets;
   /** `publicBaseUrl` is not one of the closed `reads()` members. */
   static readonly reads = ["logger", "publicBaseUrl", "isSaas"] as const;
 

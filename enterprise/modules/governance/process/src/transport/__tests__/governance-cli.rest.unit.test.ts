@@ -2,7 +2,7 @@ import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   IngestionKeyNotFoundError,
-  PersonalSourceTypeNotAllowedError,
+  IngestionKeySourceNotAllowedError,
   type GovernanceRestApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -170,6 +170,10 @@ function mountCli(world: World = {}) {
     ingestionKeyInstall: unavailable,
     ingestionKeyRotate: unavailable,
     ingestionKeyRevoke: unavailable,
+    governanceSetupState: unavailable,
+    governanceRecordWorkspaceView: unavailable,
+    governanceOcsfExport: unavailable,
+    governanceQuarantineFillStats: unavailable,
     cliSessionListForUser: unavailable,
     cliSessionRevoke: unavailable,
     cliSessionRevokeAll: unavailable,
@@ -359,7 +363,7 @@ describe("the CLI governance plane", () => {
     it("answers 400 for a source type no wrapped tool stamps, and mints nothing", async () => {
       const ingestionKeyIssueForPersonalProject = vi
         .fn()
-        .mockRejectedValue(new PersonalSourceTypeNotAllowedError("spreadsheet"));
+        .mockRejectedValue(new IngestionKeySourceNotAllowedError("spreadsheet"));
       const api = mountCli({ governance: { ingestionKeyIssueForPersonalProject } });
 
       const response = await api.post("/api/auth/cli/governance/ingestion-key", {
@@ -379,10 +383,7 @@ describe("the CLI governance plane", () => {
       const ingestionKeyIssueForPersonalProject = vi
         .fn()
         .mockResolvedValue({ token: "ik-lw-abc_secret", prefix: "ik-lw-abc" });
-      const ingestionKeyEnsureForPersonalProject = vi.fn();
-      const api = mountCli({
-        governance: { ingestionKeyIssueForPersonalProject, ingestionKeyEnsureForPersonalProject },
-      });
+      const api = mountCli({ governance: { ingestionKeyIssueForPersonalProject } });
 
       const response = await api.post("/api/auth/cli/governance/ingestion-key", {
         source_type: "internal_codex",
@@ -394,9 +395,8 @@ describe("the CLI governance plane", () => {
         prefix: "ik-lw-abc",
         endpoint: "https://app.test/api/otel",
       });
-      expect(ingestionKeyEnsureForPersonalProject).not.toHaveBeenCalled();
       expect(ingestionKeyIssueForPersonalProject).toHaveBeenCalledWith(
-        expect.objectContaining({ createdByDeviceLabel: "laptop" }),
+        expect.objectContaining({ createdByDeviceLabel: "laptop", fromCliSession: true }),
       );
     });
   });

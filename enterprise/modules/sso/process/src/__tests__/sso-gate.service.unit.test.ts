@@ -4,7 +4,7 @@ import {
   type PlatformLicenseAccess,
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
-import * as BetterAuthSsoAdapter from "@langwatch/enterprise-sso-contract/sign-in-providers";
+import { isNamedProviderMounted } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SsoGateLogger } from "../app/sso.members.ts";
@@ -17,10 +17,7 @@ class FakeLogger implements SsoGateLogger {
 
 class FakeProviderMountInspector extends SsoProviderMountInspector {
   isMounted(configuration: SsoConfiguration): boolean {
-    return (
-      Object.keys(BetterAuthSsoAdapter.buildSocialProviders(configuration)).length > 0 ||
-      BetterAuthSsoAdapter.buildGenericOAuthConfigs(configuration).length > 0
-    );
+    return isNamedProviderMounted(configuration);
   }
 }
 

@@ -21,10 +21,6 @@ import {
   type GovernanceInstallationOptions,
 } from "./app/governance-installation-composition.build.ts";
 import {
-  createGovernanceMemberInfrastructure,
-  type GovernanceMemberDatabase,
-} from "./app/governance-member-infrastructure.ts";
-import {
   PostgresGovernanceAdapter,
   type PostgresGovernanceAdapterOptions,
   type PostgresGovernanceServices,
@@ -273,8 +269,6 @@ export function createGovernanceServices(
 ): PostgresGovernanceServices {
   return PostgresGovernanceAdapter.create(options).build();
 }
-
-export { createGovernanceMemberInfrastructure, type GovernanceMemberDatabase };
 
 /** The Governance events pipeline a process registers on its event sourcing. */
 export function createGovernanceEventsPipeline(

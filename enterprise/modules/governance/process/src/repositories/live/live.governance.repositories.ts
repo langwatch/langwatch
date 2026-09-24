@@ -5,6 +5,7 @@ import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { memberClickHouseResolver } from "../clickhouse/clickhouse.governance-clickhouse.repositories.ts";
 import { ClickHouseOcsfEventsRepository } from "../clickhouse/clickhouse.ocsf-events.repository.ts";
 import { ClickHouseRollupErasureRepository } from "../clickhouse/clickhouse.rollup-erasure.repository.ts";
+import { ClickHouseTraceActivityRepository } from "../clickhouse/clickhouse.trace-activity.repository.ts";
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { PostgresGovernanceRepositories } from "../prisma/prisma.governance.repositories.ts";
 
@@ -20,6 +21,7 @@ export class LiveGovernanceRepositories {
       ...PostgresGovernanceRepositories.create({ prisma }),
       ocsfEvents: ClickHouseOcsfEventsRepository.create(memberClickHouseResolver(clickhouse)),
       rollupErasure: ClickHouseRollupErasureRepository.create(clickhouse),
+      traceActivity: ClickHouseTraceActivityRepository.create(memberClickHouseResolver(clickhouse)),
     };
   }
 }

@@ -36,7 +36,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { GovernanceApp } from "../../app/governance.app.ts";
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
-import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { governanceRest, governanceRestCaller, governanceRestSurface } from "../governance.rest.ts";
@@ -57,8 +56,6 @@ const USER_ID = "user-1";
 /** The two credential classes this family authenticates, as bearer values. */
 const USER_BOUND_TOKEN = "user-bound-token";
 const LEGACY_PROJECT_TOKEN = "legacy-project-token";
-
-const unreachablePrisma = createApiFixture<GovernanceMemberDatabase>();
 
 type RequestOptions = {
   method?: string;
@@ -144,7 +141,6 @@ async function buildApi(
       users: createApiFixture<UserApi>(),
     },
     members: {
-      prisma: unreachablePrisma,
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
     },

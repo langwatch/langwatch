@@ -1,10 +1,4 @@
-import {
-  buildGenericOAuthConfigs,
-  LEGACY_CALLBACK_PROVIDER_IDS,
-  legacyCallbackUrl,
-  PLAIN_OIDC_PROVIDERS,
-} from "@langwatch/enterprise-sso-contract/sign-in-providers";
-import * as ssoServer from "@langwatch/enterprise-sso-process";
+import { PLAIN_OIDC_PROVIDERS } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Every generic-OAuth provider pins its `redirectURI` to the legacy
@@ -21,6 +15,13 @@ import * as ssoServer from "@langwatch/enterprise-sso-process";
  * So this asserts the two halves agree, both ways.
  */
 import { describe, expect, it } from "vitest";
+
+import * as authProcess from "../../index.ts";
+import {
+  buildGenericOAuthConfigs,
+  LEGACY_CALLBACK_PROVIDER_IDS,
+  legacyCallbackUrl,
+} from "../sign-in-providers.rules.ts";
 
 const BASE_URL = "https://langwatch.acme.test";
 
@@ -97,7 +98,7 @@ describe("legacy callback rewrites", () => {
      * mounted by a process is that process's own regression test to write.
      */
     it("ships no callback rewrite of its own, which is what would break the pin", () => {
-      expect(Object.keys(ssoServer).filter((name) => /rewrite/i.test(name))).toEqual([]);
+      expect(Object.keys(authProcess).filter((name) => /rewrite/i.test(name))).toEqual([]);
     });
   });
 

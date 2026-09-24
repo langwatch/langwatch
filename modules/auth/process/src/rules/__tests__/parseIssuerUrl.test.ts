@@ -1,4 +1,3 @@
-import { parseIssuerUrl } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Regression test for iter-22 bug 18: malformed `auth0Issuer` /
@@ -9,6 +8,8 @@ import { parseIssuerUrl } from "@langwatch/enterprise-sso-contract/sign-in-provi
  * clear error message for genuinely unparseable input.
  */
 import { describe, expect, it } from "vitest";
+
+import { parseIssuerUrl } from "../sign-in-providers.rules.ts";
 
 describe("parseIssuerUrl", () => {
   describe("when given a URL with https scheme", () => {

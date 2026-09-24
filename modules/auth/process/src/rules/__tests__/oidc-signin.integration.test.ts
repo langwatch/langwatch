@@ -1,4 +1,3 @@
-import { buildGenericOAuthConfigs } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Starting sign-in against a real OpenID Connect provider. The only stand-in
@@ -12,6 +11,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { genericOAuth } from "better-auth/plugins";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { buildGenericOAuthConfigs } from "../sign-in-providers.rules.ts";
 import { startFakeOidcProvider, type FakeOidcProvider } from "./support/fake-oidc-provider.ts";
 
 const BASE_URL = "http://localhost:5624";

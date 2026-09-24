@@ -9,3 +9,16 @@ export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
 
 /** The platform's own OpenAI key: model-provider dispatches on it, evaluation reads it. */
 export const openAiApiKey = Secret.load("OPENAI_API_KEY", { optional: true });
+
+/** Each sign-in provider's client secret: auth mounts them, sso reports whether one mounted. */
+export const signInProviderSecrets = {
+  googleClientSecret: Secret.load("GOOGLE_CLIENT_SECRET", { optional: true }),
+  githubClientSecret: Secret.load("GITHUB_CLIENT_SECRET", { optional: true }),
+  gitlabClientSecret: Secret.load("GITLAB_CLIENT_SECRET", { optional: true }),
+  azureAdClientSecret: Secret.load("AZURE_AD_CLIENT_SECRET", { optional: true }),
+  auth0ClientSecret: Secret.load("AUTH0_CLIENT_SECRET", { optional: true }),
+  oktaClientSecret: Secret.load("OKTA_CLIENT_SECRET", { optional: true }),
+  cognitoClientSecret: Secret.load("COGNITO_CLIENT_SECRET", { optional: true }),
+  oneLoginClientSecret: Secret.load("ONELOGIN_CLIENT_SECRET", { optional: true }),
+  oidcClientSecret: Secret.load("OIDC_CLIENT_SECRET", { optional: true }),
+} as const;

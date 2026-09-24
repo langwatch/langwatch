@@ -21,7 +21,6 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { GovernanceApp } from "../governance.app.ts";
 import type { GovernanceEncryptor } from "../governance.members.ts";
@@ -67,7 +66,6 @@ async function buildApp(planType: string) {
       users: createApiFixture<UserApi>(),
     },
     members: {
-      prisma: createApiFixture<GovernanceMemberDatabase>(),
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
     },
@@ -145,5 +143,23 @@ describe("anomaly rules from the console", () => {
         code: "enterprise_plan_required",
       });
     });
+  });
+});
+
+describe("the OCSF export, an Enterprise feature refused per organization", () => {
+  const page = { organizationId: "org-1", sinceMs: 0, limit: 500 };
+
+  it("refuses an organization not on the Enterprise plan by the plan code", async () => {
+    const { app } = await buildApp("FREE");
+
+    await expect(app.governanceOcsfExport(page, ADMIN)).rejects.toMatchObject({
+      code: "enterprise_plan_required",
+    });
+  });
+
+  it("pages the events of an Enterprise organization", async () => {
+    const { app } = await buildApp("ENTERPRISE");
+
+    await expect(app.governanceOcsfExport(page, ADMIN)).resolves.toMatchObject({ events: [] });
   });
 });

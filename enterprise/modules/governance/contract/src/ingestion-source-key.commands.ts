@@ -24,20 +24,10 @@ export const issuedIngestionKeySchema = z
   .strict();
 export type IssuedIngestionKey = z.infer<typeof issuedIngestionKeySchema>;
 
-export const personalIngestionKeySchema = z
-  .object({
-    apiKeyId: z.string(),
-    sourceType: z.string(),
-    lookupId: z.string(),
-    ingestionTemplateId: z.string().nullable(),
-  })
-  .strict();
-export type PersonalIngestionKey = z.infer<typeof personalIngestionKeySchema>;
-
 /**
- * The source types a personal key may be minted for, each stamped as
- * `langwatch.source`. Capped per type — an open set would let a device
- * mint past the cap under every value it invents.
+ * The source types the CLI wraps, each stamped as `langwatch.source`. A
+ * personal key for one comes only from the CLI session on the machine that
+ * runs the tool; the /me tile and MCP mint template-named sources instead.
  */
 export const PERSONAL_INGEST_SOURCE_TYPES = [
   "claude_code",
@@ -48,13 +38,6 @@ export const PERSONAL_INGEST_SOURCE_TYPES = [
   "copilot_vscode",
   "copilot_app",
 ] as const;
-
-/**
- * Live personal ingest keys one workspace may hold per (sourceType, template).
- * Sized for real machines with room to spare — laptops, cloud machines, and
- * golden-image forks that share their parent's key rather than mint one.
- */
-export const PERSONAL_INGEST_KEYS_PER_TOOL_CAP = 32;
 
 /** What became of one of the caller's own personal ingest keys. */
 export const personalIngestionKeyStateSchema = z

@@ -53,6 +53,13 @@ import {
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceApi,
+  type RecordWorkspaceViewResult,
+  type RecordWorkspaceViewInput,
+  type QuarantineFillStats,
+  type QuarantineFillInput,
+  type GovernanceOcsfExportPage,
+  type GovernanceOcsfExportInput,
+  type GovernanceSetupState,
   type IssuedIngestionKey,
   type PersonalIngestionKeyListing,
   type PersonalIngestionKeyMint,
@@ -124,6 +131,7 @@ import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   OrganizationApi,
   type OrganizationService,
@@ -143,6 +151,7 @@ import type { GovernanceRepositories } from "../repositories/governance.reposito
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
 import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
+import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
@@ -180,6 +189,7 @@ import {
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
+import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
@@ -194,6 +204,7 @@ import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.
 import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "../services/ingestion-pull.service.ts";
 import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
+import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
 import { OpenAiAdminPullerAdapter } from "../services/openai-admin-puller.service.ts";
 import { OpenAiComplianceReferencePullerService } from "../services/openai-compliance-puller.service.ts";
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
@@ -208,14 +219,12 @@ import { GatewayPersonalVirtualKeyIssuerService } from "../services/personal-vir
 import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../services/puller-registry.service.ts";
+import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.service.ts";
+import { ProjectQuarantineTenantResolverService } from "../services/quarantine-tenant.service.ts";
 import { S3PollingPullerService } from "../services/s3-puller.service.ts";
 import { SourceCredentialAccessService } from "../services/source-credential-access.service.ts";
 import { ssrfSafeFetch } from "../services/ssrf-safe-fetch.ts";
 import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
-import {
-  createGovernanceMemberInfrastructure,
-  type GovernanceMemberDatabase,
-} from "./governance-member-infrastructure.ts";
 import type {
   GovernanceEncryptor,
   GovernanceHttpClient,
@@ -223,38 +232,9 @@ import type {
   GovernanceProjectDirectory,
 } from "./governance.members.ts";
 
-/**
- * The two questions personal virtual keys ask of the process's database.
- *
- * They are ports rather than service calls because both are single-row
- * existence checks the Governance service does not own: one reads organization
- * membership, the other the virtual-key uniqueness tuple.
- */
+const logger = createLogger("langwatch:governance");
+
 type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
-
-export interface GovernancePersonalVirtualKeyMembers {
-  /** Whether the caller belongs to this organization at all. */
-  isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
-}
-
-/**
- * The user an actor token names.
- *
- * A port rather than a service call because the token is whatever the span
- * carried as `langwatch.user_id` — an email address on most SDKs, occasionally
- * the User id itself — and matching either against the process's user table is
- * a single-row lookup the Governance service does not own.
- */
-export interface GovernanceActorDirectory {
-  findUser(input: { token: string }): Promise<GovernanceActorUser | null>;
-}
-
-/** The identity columns an actor drill-in reads. */
-export interface GovernanceActorUser {
-  id: string;
-  name: string | null;
-  email: string | null;
-}
 
 /** Where an actor's own workspace lives, for the admin's drill-in link. */
 /**
@@ -341,14 +321,19 @@ export interface GovernanceAppDependencies {
   traces: Pick<TraceApi, "otlpTraces">;
   apiKeys: Pick<
     ApiKeyApi,
-    "revokeCliSessionKey" | "create" | "revoke" | "findById" | "findIngestionKeysForUser"
+    | "revokeCliSessionKey"
+    | "create"
+    | "revoke"
+    | "findById"
+    | "findByLookupId"
+    | "findIngestionKeysForUser"
   >;
   gateway: Pick<
     GatewayApi,
     "createVirtualKey" | "revokeVirtualKey" | "findPersonalVirtualKeys" | "findVirtualKeyById"
   >;
   modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
-  users: Pick<UserApi, "findById">;
+  users: Pick<UserApi, "findById" | "findByEmail">;
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<
     AuthApi,
@@ -366,6 +351,7 @@ export interface GovernanceAppDependencies {
   organizations: Pick<OrganizationService, "ensurePersonalWorkspace" | "getPersonalWorkspace"> &
     Pick<
       OrganizationApi,
+      | "isMember"
       | "findMembersIncludingDeactivated"
       | "findMemberDepartments"
       | "findMembersWithDepartments"
@@ -383,9 +369,6 @@ export interface GovernanceAppDependencies {
    * else's personal keys — is a plain decision at the organization scope.
    */
   permissions: Pick<AuthzService, "getDecision">;
-  personalVirtualKeys: GovernancePersonalVirtualKeyMembers;
-  /** Resolves the actor token stamped on a span to the person who owns it. */
-  actors: GovernanceActorDirectory;
   /**
    * What the CLI governance plane reaches beyond this feature. Optional for
    * the same reason as {@link governance} — supplied only alongside it.
@@ -435,7 +418,6 @@ type GovernanceSetup = Readonly<{
   resources: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["resources"];
   secrets: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["secrets"];
   members: Readonly<{
-    prisma: GovernanceMemberDatabase;
     encryption: GovernanceEncryptor;
     isSaas: boolean;
   }> &
@@ -445,7 +427,7 @@ type GovernanceSetup = Readonly<{
 
 export class GovernanceApp implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = ["prisma", "encryption", "isSaas"] as const;
+  static readonly reads = ["encryption", "isSaas"] as const;
   /**
    * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -476,7 +458,6 @@ export class GovernanceApp implements GovernanceRestApi {
     repositories,
     secrets,
   }: GovernanceSetup): Promise<GovernanceApp> {
-    const { personalVirtualKeys, actors } = createGovernanceMemberInfrastructure(members.prisma);
     const erasureSuppression = await secrets.into(
       governanceSecrets.erasurePseudonymSecret,
       (erasureSecret) =>
@@ -488,8 +469,6 @@ export class GovernanceApp implements GovernanceRestApi {
     );
     return new GovernanceApp({
       dependencies: {
-        personalVirtualKeys,
-        actors,
         governance: members.governance,
         cli: members.cli,
         ingest: members.ingest,
@@ -575,6 +554,24 @@ export class GovernanceApp implements GovernanceRestApi {
       apiKeys: dependencies.apiKeys,
       organizations: dependencies.organizations,
       templates: repositories.ingestionTemplates,
+    });
+    this.setupState = DefaultGovernanceSetupStateService.create({
+      repository: repositories.setupState,
+      activity: repositories.traceActivity,
+    });
+    this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
+      repository: repositories.adminWorkspaceViewAudit,
+      projects: dependencies.projects,
+      events: repositories.ocsfEvents,
+      diagnostics: { warn: (message, context) => logger.warn(context, message) },
+    });
+    this.ocsfExport = DefaultGovernanceOcsfExportService.create({
+      repository: repositories.ocsfExports,
+      events: repositories.ocsfEvents,
+    });
+    this.quarantineFill = QuarantineFillEvaluatorService.create({
+      tenant: ProjectQuarantineTenantResolverService.create(dependencies.projects),
+      traceActivity: repositories.traceActivity,
     });
     // Stored credentials seal under the process's CREDENTIALS_SECRET, the key main sealed them with.
     const sourceCredentials = SourceCredentialAccessService.create({
@@ -672,6 +669,10 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly personListing: PersonListingService;
   private readonly templates: IngestionTemplateService;
   private readonly ingestionKeys: PersonalIngestionKeyService;
+  private readonly setupState: DefaultGovernanceSetupStateService;
+  private readonly workspaceViews: DefaultGovernanceAdminWorkspaceViewAuditService;
+  private readonly ocsfExport: DefaultGovernanceOcsfExportService;
+  private readonly quarantineFill: QuarantineFillEvaluatorService;
   private readonly erasureSuppression: ErasureSuppressionService;
   private readonly suppressionSnapshot: SuppressionSnapshotService;
   private readonly identityMatches: IdentityMatchService;
@@ -1088,6 +1089,34 @@ export class GovernanceApp implements GovernanceRestApi {
     });
   }
 
+  // ── The governance overview: setup state, OCSF export (Enterprise), quarantine fill ──
+
+  async governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState> {
+    return this.setupState.resolve(input.organizationId);
+  }
+
+  async governanceOcsfExport(
+    input: GovernanceOcsfExportInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceOcsfExportPage> {
+    await this.assertEnterprise({
+      organizationId: input.organizationId,
+      by,
+      feature: "OCSF_EXPORT",
+    });
+    return this.ocsfExport.list(input);
+  }
+
+  async governanceQuarantineFillStats(input: QuarantineFillInput): Promise<QuarantineFillStats> {
+    return this.quarantineFill.evaluate(input);
+  }
+
+  async governanceRecordWorkspaceView(
+    input: RecordWorkspaceViewInput,
+  ): Promise<RecordWorkspaceViewResult> {
+    return this.workspaceViews.recordView(input);
+  }
+
   // ── Personal ingestion keys: the caller's own /me trace-ingest keys ──
 
   async ingestionKeyList(input: {
@@ -1438,7 +1467,7 @@ export class GovernanceApp implements GovernanceRestApi {
    * theirs, which is what keeps a personal rollup inside their own tenant.
    */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean> {
-    return this.dependencies.personalVirtualKeys.isOrganizationMember(input);
+    return this.dependencies.organizations.isMember(input);
   }
 
   /**
@@ -1513,7 +1542,11 @@ export class GovernanceApp implements GovernanceRestApi {
     organizationId: string;
     actor: string;
   }): Promise<GovernanceActorWorkspace | null> {
-    const user = await this.dependencies.actors.findUser({ token: input.actor });
+    const user =
+      (await this.dependencies.users.findById({ id: input.actor })) ??
+      (input.actor.includes("@")
+        ? await this.dependencies.users.findByEmail({ email: input.actor })
+        : null);
     if (!user) return null;
 
     const member = await this.isOrganizationMember({
@@ -1613,7 +1646,7 @@ export class GovernanceApp implements GovernanceRestApi {
     organizationId: string;
     userId: string;
   }): Promise<void> {
-    if (await this.dependencies.personalVirtualKeys.isOrganizationMember(input)) return;
+    if (await this.dependencies.organizations.isMember(input)) return;
     throw new PermissionDeniedError({
       permission: "organization:view",
       scope: { type: "organization", id: input.organizationId },
@@ -1677,6 +1710,7 @@ function toGovernanceCliCaller(session: CliAccessSession) {
   return {
     user_id: session.userId,
     organization_id: session.organizationId,
+    ...(session.cliApiKeyId ? { cli_api_key_id: session.cliApiKeyId } : {}),
     ...(session.clientInfo
       ? {
           client_info: {

@@ -51,10 +51,14 @@ export const ingestionKeyTrpc = defineTrpcContract("ingestionKey")
   .withOutput(z.object({ success: z.literal(true) }))
   .build();
 
-/** A personal mint as the ops take it: the caller named, the template resolved to null. */
+/** A personal mint: from the /me tile or MCP (template-gated), or from a CLI session. */
 export type PersonalIngestionKeyMint = {
   userId: string;
   organizationId: string;
   sourceType: string;
-  ingestionTemplateId: string | null;
+  ingestionTemplateId?: string | null;
+  /** The session's CLI login key; the minted key lives and dies with it. */
+  parentApiKeyId?: string | null;
+  createdByDeviceLabel?: string | null;
+  fromCliSession?: boolean;
 };

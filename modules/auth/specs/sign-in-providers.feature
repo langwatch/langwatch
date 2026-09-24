@@ -3,6 +3,9 @@ Feature: The deployment's sign-in providers mount on Better Auth
   The provider a deployment names (AUTH_PROVIDER, or the deprecated
   NEXTAUTH_PROVIDER) mounts on the one Better Auth instance when its client id,
   secret and, for an enterprise provider, its issuer are set, as on main.
+  Outside email mode every social provider whose credentials are set mounts
+  beside it (main's D09), and federation is offered only where a signed
+  license permits platform single sign-on (ADR-027).
 
   @unit
   Scenario: A deployment that names no provider mounts none
@@ -22,3 +25,39 @@ Feature: The deployment's sign-in providers mount on Better Auth
     Given AUTH_PROVIDER is "google" with a client id but no client secret
     When the auth module composes Better Auth
     Then no provider is mounted
+
+  @unit
+  Scenario: Every social provider with credentials mounts outside email mode
+    Given AUTH_PROVIDER is "auth0" with its registration set
+    And google and github client ids and secrets are set too
+    When the auth module composes Better Auth
+    Then google, github and auth0 are all mounted
+
+  @unit
+  Scenario: Email mode mounts no social provider whatever credentials linger
+    Given AUTH_PROVIDER is "email"
+    And a google client id and secret are set
+    When the auth module composes Better Auth
+    Then no provider is mounted
+
+  @unit
+  Scenario: A licensed self-hosted install reports federation licensed
+    Given a self-hosted install that names auth0 and mounted it
+    And a signed license permits platform single sign-on
+    When the sign-in method policy is resolved
+    Then federation is licensed and auth0 is offered
+
+  @unit
+  Scenario: An unlicensed install that names a provider signs in by email
+    Given a self-hosted install that names auth0
+    And no signed license permits platform single sign-on
+    When the sign-in method policy is resolved
+    Then federation is unlicensed and no federated method is offered
+
+  @unit
+  Scenario: A licensed install whose named provider did not mount signs in by email
+    Given a licensed self-hosted install that names auth0
+    And auth0 did not mount
+    When the sign-in method policy is resolved
+    Then no federated method is offered
+

@@ -38,7 +38,11 @@ function apiKey(overrides: Partial<ApiKey>): ApiKey {
   };
 }
 
-async function setup(keys: ApiKey[], revoke?: ApiKeyApi["revoke"]) {
+async function setup(
+  keys: ApiKey[],
+  revoke?: ApiKeyApi["revoke"],
+  findById?: ApiKeyApi["findById"],
+) {
   const templates = MemoryIngestionTemplateRepository.create(MemoryGovernanceStore.create());
   const template = await templates.createWithAudit({
     template: {
@@ -69,7 +73,7 @@ async function setup(keys: ApiKey[], revoke?: ApiKeyApi["revoke"]) {
     }),
     apiKeys: createApiFixture<ApiKeyApi>({
       findIngestionKeysForUser: async () => live,
-      findById: async ({ id }) => live.find((key) => key.id === id) ?? null,
+      findById: findById ?? (async ({ id }) => live.find((key) => key.id === id) ?? null),
       create: async (input) => {
         created.push(input);
         return { token: "ik-lw-0123456789ab", apiKey: apiKey({ id: "ak_new" }) };
@@ -152,6 +156,17 @@ describe("PersonalIngestionKeyService", () => {
       ).rejects.toMatchObject({ code: "ingestion_key_not_found" });
     });
 
+    it("revokes the caller's own key with cause user", async () => {
+      const causes: unknown[] = [];
+      const { service } = await setup([apiKey({})], async (input) => {
+        causes.push([input.id, input.cause]);
+        return apiKey({ id: input.id });
+      });
+
+      await service.revoke({ userId: "user_1", organizationId: "org_1", apiKeyId: "ak_1" });
+      expect(causes).toEqual([["ak_1", "user"]]);
+    });
+
     it("succeeds when the key was already revoked underneath", async () => {
       const { service } = await setup([apiKey({})], async ({ id }) => {
         throw new ApiKeyAlreadyRevokedError(id);
@@ -160,6 +175,108 @@ describe("PersonalIngestionKeyService", () => {
       await expect(
         service.revoke({ userId: "user_1", organizationId: "org_1", apiKeyId: "ak_1" }),
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when a CLI session mints a key for a tool it wraps", () => {
+    const session = { userId: "user_1", organizationId: "org_1", sourceType: "claude_code" };
+    const login = apiKey({ id: "login_1", ingestSourceType: null, ingestionTemplateId: null });
+
+    it("parents the key to the session's login key and labels it with the device", async () => {
+      const { service, created } = await setup([login]);
+
+      await service.mint({ ...session, parentApiKeyId: "login_1", createdByDeviceLabel: "mbp" });
+      expect(created).toMatchObject([
+        {
+          parentApiKeyId: "login_1",
+          createdByDeviceLabel: "mbp",
+          name: "Ingestion key (claude_code, mbp)",
+        },
+      ]);
+    });
+
+    it("refuses a session whose login key is revoked as signed out, creating nothing", async () => {
+      const { service, created } = await setup([{ ...login, revokedAt: new Date(2_000) }]);
+
+      await expect(service.mint({ ...session, parentApiKeyId: "login_1" })).rejects.toMatchObject({
+        code: "ingestion_key_session_revoked",
+      });
+      expect(created).toEqual([]);
+    });
+
+    it("mints an unparented key for a session from before login keys", async () => {
+      const { service, created } = await setup([]);
+
+      await service.mint({ ...session, fromCliSession: true });
+      expect(created).toMatchObject([{ parentApiKeyId: null }]);
+    });
+
+    it("refuses a source no wrapped tool stamps", async () => {
+      const { service } = await setup([]);
+
+      await expect(
+        service.mint({ ...session, sourceType: "cursor", fromCliSession: true }),
+      ).rejects.toMatchObject({ code: "ingestion_key_source_not_allowed" });
+    });
+
+    /** @scenario "A mint that races its session's retirement cleans up the key it wrote" */
+    it("revokes the key it wrote with cause session when the session died mid-mint", async () => {
+      const reads = [login, { ...login, revokedAt: new Date(2_000) }];
+      const causes: unknown[] = [];
+      const { service } = await setup(
+        [login],
+        async (input) => {
+          causes.push([input.id, input.cause]);
+          return apiKey({ id: input.id });
+        },
+        async () => reads.shift() ?? null,
+      );
+
+      await expect(service.mint({ ...session, parentApiKeyId: "login_1" })).rejects.toMatchObject({
+        code: "ingestion_key_session_revoked",
+      });
+      expect(causes).toEqual([["ak_new", "session"]]);
+    });
+  });
+
+  describe("when a rotation cannot kill every prior key", () => {
+    /** @scenario "A rotation that cannot kill every prior key mints nothing" */
+    it("attempts every prior key, mints nothing and names the survivors", async () => {
+      const attempted: string[] = [];
+      const { service, created, mint } = await setup(
+        [apiKey({ id: "ak_a", createdByDeviceLabel: "laptop" }), apiKey({ id: "ak_b" })],
+        async ({ id }) => {
+          attempted.push(id);
+          if (id === "ak_a") throw new Error("database unavailable");
+          return apiKey({ id });
+        },
+      );
+
+      await expect(service.rotate(mint)).rejects.toMatchObject({
+        code: "ingestion_key_revoke_incomplete",
+      });
+      expect(attempted).toEqual(["ak_a", "ak_b"]);
+      expect(created).toEqual([]);
+    });
+  });
+
+  describe("when the CLI pins a project", () => {
+    it("creates a key without revoking any other machine's", async () => {
+      const { service, created, revoked } = await setup([apiKey({})]);
+
+      await service.issueForProject({
+        callerUserId: "user_1",
+        ownerUserId: null,
+        organizationId: "org_1",
+        projectId: "project_shared",
+        sourceType: "claude_code",
+        ingestionTemplateId: null,
+        createdByDeviceLabel: "desktop",
+      });
+      expect(revoked).toEqual([]);
+      expect(created).toMatchObject([
+        { userId: null, name: "Ingestion key (claude_code, desktop)" },
+      ]);
     });
   });
 });

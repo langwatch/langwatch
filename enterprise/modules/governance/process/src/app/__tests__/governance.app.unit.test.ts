@@ -26,7 +26,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { governanceServer } from "../../governance.server.ts";
-import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import {
@@ -39,14 +38,6 @@ import { TestGovernanceService } from "./support/test-governance-service.ts";
 /** A dependency these operations never reach; calling one is the test's bug. */
 const unreachable = <Method>(): Method =>
   (() => Promise.reject(new Error("not reachable from this operation"))) as Method;
-
-/** The two Prisma reads behind `personalVirtualKeys`/`actors`, unreached by these tests. */
-const unreachablePrisma = {
-  user: { findFirst: unreachable<GovernanceMemberDatabase["user"]["findFirst"]>() },
-  organizationUser: {
-    findFirst: unreachable<GovernanceMemberDatabase["organizationUser"]["findFirst"]>(),
-  },
-} as unknown as GovernanceMemberDatabase;
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-1";
@@ -73,7 +64,6 @@ async function buildApp() {
       users: createApiFixture<UserApi>(),
     },
     members: {
-      prisma: unreachablePrisma,
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
     },
@@ -118,7 +108,6 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       users: createApiFixture<UserApi>(),
     },
     members: {
-      prisma: unreachablePrisma,
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
       governance,

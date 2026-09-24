@@ -29,7 +29,7 @@ import {
   type VerifiedBrowserSession,
   type AuthUsageCount,
 } from "@langwatch/auth-contract";
-import { ssoSecrets } from "@langwatch/enterprise-sso-contract";
+import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   configuredAuthProvider,
   resolveSignInProviders,
@@ -51,7 +51,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { sessionSecret } from "@langwatch/secrets";
+import { sessionSecret, signInProviderSecrets } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -201,6 +201,8 @@ export class AuthApp implements AuthApiContract {
     auditLog: AuditLogApi,
     /** Whether an organization's plan carries the sign-in security rules. */
     entitlements: EntitlementApi,
+    /** Whether a signed license permits platform single sign-on (ADR-027). */
+    licensing: LicensingApi,
   };
   static readonly config = authServerConfig;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
@@ -214,7 +216,7 @@ export class AuthApp implements AuthApiContract {
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
     session: sessionSecret,
-    ...ssoSecrets,
+    ...signInProviderSecrets,
   } as const;
 
   readonly #sessions: BrowserSessionService;
@@ -395,6 +397,7 @@ export class AuthApp implements AuthApiContract {
           signInRouting: members.route ?? null,
           authProvider: configuredAuthProvider(config.signInProviders).provider,
           signInProviders,
+          licensing: dependencies.licensing,
           isSaas: members.isSaas,
           localPasswords: config.localPasswords,
           trustedIdpOrigins: config.trustedIdpOrigins,

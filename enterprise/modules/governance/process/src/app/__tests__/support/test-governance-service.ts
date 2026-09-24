@@ -59,9 +59,6 @@ export class TestGovernanceService implements GovernanceApi {
   extractCanonicalCostEvents = unsupported<GovernanceApi["extractCanonicalCostEvents"]>();
   ingestionConfigure = unsupported<GovernanceApi["ingestionConfigure"]>();
   ingestionDisable = unsupported<GovernanceApi["ingestionDisable"]>();
-  ingestionKeyEnsureForPersonalProject =
-    unsupported<GovernanceApi["ingestionKeyEnsureForPersonalProject"]>();
-  ingestionKeyEnsureForProject = unsupported<GovernanceApi["ingestionKeyEnsureForProject"]>();
   ingestionKeyIssueForProject = unsupported<GovernanceApi["ingestionKeyIssueForProject"]>();
   ingestionKeyIssueForPersonalProject =
     unsupported<GovernanceApi["ingestionKeyIssueForPersonalProject"]>();

@@ -518,6 +518,12 @@ function renderIngestionKey(
         "Sign in to a personal workspace before issuing an ingestion key.",
         412,
       );
+    case "session-signed-out":
+      return refuse(
+        "unauthorized",
+        "This device session is signed out. Run `langwatch login` to start a new session.",
+        401,
+      );
     case "failed":
       return refuse("server_error", "Could not mint an ingestion key", 500);
   }

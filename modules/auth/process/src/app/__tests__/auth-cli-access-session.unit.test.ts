@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { cliAccessTokenKey } from "@langwatch/auth-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
@@ -48,6 +49,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       identity: createApiFixture<IdentityApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
+      licensing: createApiFixture<LicensingApi>(),
       auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
     },
     members: {
@@ -73,7 +75,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
 }
 
 describe("the Auth CLI access-session peer", () => {
-  it("resolves the caller facts without exposing the token record", async () => {
+  it("resolves the caller facts and the session's login key id, without exposing the token record", async () => {
     const repositories = MemoryAuthRepositories.create();
     await repositories.cliSessions.set({
       key: cliAccessTokenKey(ACCESS_TOKEN),
@@ -83,7 +85,7 @@ describe("the Auth CLI access-session peer", () => {
         issued_at: 0,
         expires_at: Date.now() + 60_000,
         client_info: { device_label: "Work laptop", hostname: "laptop" },
-        cli_api_key_id: "key-secret-must-not-cross-the-peer-boundary",
+        cli_api_key_id: "cli-login-key-1",
       }),
       ttlSeconds: 60,
     });
@@ -93,6 +95,7 @@ describe("the Auth CLI access-session peer", () => {
       userId: "user-1",
       organizationId: "organization-1",
       clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
+      cliApiKeyId: "cli-login-key-1",
     });
   });
 

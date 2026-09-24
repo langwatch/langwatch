@@ -144,27 +144,6 @@ export class IngestionSourceCapReachedError extends HandledError {
   }
 }
 
-export class PersonalWorkspaceMissingError extends Error {
-  constructor() {
-    super(
-      "No personal project for caller. Sign in to a personal workspace before issuing an ingestion key.",
-    );
-    this.name = "PersonalWorkspaceMissingError";
-  }
-}
-
-/**
- * The personal mint was asked for a source type no wrapped tool stamps. Named
- * so the route can answer with the request as the cause and keep every other
- * failure a server fault.
- */
-export class PersonalSourceTypeNotAllowedError extends Error {
-  constructor(sourceType: string) {
-    super(`No personal ingestion key is minted for source type ${sourceType}.`);
-    this.name = "PersonalSourceTypeNotAllowedError";
-  }
-}
-
 /**
  * A legacy project API key reached a route that administers org governance
  * templates. Those keys bypass the `aiTools:manage` ceiling, so the route

@@ -2,7 +2,7 @@ import type { InternalProject, InternalProjectQuery } from "@langwatch/project-c
 import { describe, expect, it, vi } from "vitest";
 
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
-import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.members.ts";
+import type { GovernanceOcsfEventWriter } from "../../app/governance.members.ts";
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceTarget,
@@ -39,8 +39,8 @@ class StubProjects extends TestProjectApi {
     });
 }
 
-class StubOcsf implements AdminWorkspaceViewOcsfChannel {
-  readonly mirror = vi.fn(async () => undefined);
+class StubOcsf implements GovernanceOcsfEventWriter {
+  readonly insertEvent = vi.fn(async () => undefined);
 }
 
 const input = {
@@ -57,7 +57,7 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository,
       projects: new StubProjects(),
-      ocsf,
+      events: ocsf,
     });
 
     await expect(service.recordView(input)).resolves.toEqual({
@@ -71,13 +71,16 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
       targetId: "team",
       metadata: { kind: "personal", workspaceLabel: "Owner workspace" },
     });
-    expect(ocsf.mirror).toHaveBeenCalledWith({
-      tenantId: "governance-project",
-      auditLogId: "audit",
-      createdAtMs: 1_700_000_000_000,
-      view: input,
-      label: "Owner workspace",
-    });
+    expect(ocsf.insertEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: "governance-project",
+        eventId: "audit",
+        sourceId: "team",
+        sourceType: "personal_workspace",
+        actionName: "governance.viewWorkspaceAs",
+        targetName: "Owner workspace",
+      }),
+    );
   });
 
   it("silently collapses cross-tenant and self-view probes", async () => {
@@ -155,12 +158,12 @@ describe("DefaultGovernanceAdminWorkspaceViewAuditService", () => {
   it("keeps the authoritative audit when the OCSF mirror fails", async () => {
     const repository = new MemoryAuditRepository();
     const ocsf = new StubOcsf();
-    ocsf.mirror.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
+    ocsf.insertEvent.mockRejectedValueOnce(new Error("ClickHouse unavailable"));
     const diagnostics = { warn: vi.fn() };
     const service = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository,
       projects: new StubProjects(),
-      ocsf,
+      events: ocsf,
       diagnostics,
     });
 

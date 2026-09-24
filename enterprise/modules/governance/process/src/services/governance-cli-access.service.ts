@@ -18,6 +18,8 @@ const logger = createLogger("langwatch:governance-cli");
 export type GovernanceCliCaller = Readonly<{
   user_id: string;
   organization_id: string;
+  /** The session's login key, parent of every personal key it mints. */
+  cli_api_key_id?: string | undefined;
   client_info?:
     | Readonly<{ device_label?: string | undefined; hostname?: string | undefined }>
     | undefined;

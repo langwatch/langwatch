@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 /**
  * The module composes the deployment's ONE Better Auth instance, and the
  * session verification every door on the process reads runs through it.
@@ -65,6 +66,7 @@ async function appFor(
       identity: createApiFixture<IdentityApi>(),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
+      licensing: createApiFixture<LicensingApi>(),
       auditLog: createApiFixture<AuditLogApi>({ record: async () => {} }),
     },
     members: {
@@ -229,6 +231,40 @@ describe("given a deployment that names a provider and supplies its registration
   it("mounts nothing when the named provider's secret is missing", async () => {
     const app = await appFor(true, {
       config: { authProvider: "google", googleClientId: "google-id" },
+    });
+
+    expect(mountedProviderIds(app)).toEqual([]);
+  });
+});
+
+describe("given a deployment outside email mode with several providers' credentials set", () => {
+  /** @scenario "Every social provider with credentials mounts outside email mode" */
+  it("mounts every social provider beside the named one", async () => {
+    const app = await appFor(true, {
+      config: {
+        authProvider: "auth0",
+        auth0ClientId: "auth0-id",
+        auth0Issuer: "https://tenant.auth0.test/",
+        googleClientId: "google-id",
+        githubClientId: "github-id",
+      },
+      secrets: {
+        AUTH0_CLIENT_SECRET: "auth0-secret",
+        GOOGLE_CLIENT_SECRET: "google-secret",
+        GITHUB_CLIENT_SECRET: "github-secret",
+      },
+    });
+
+    expect(mountedProviderIds(app)).toEqual(["google", "github", "auth0"]);
+  });
+});
+
+describe("given a deployment in email mode with social credentials lingering", () => {
+  /** @scenario "Email mode mounts no social provider whatever credentials linger" */
+  it("mounts none of them", async () => {
+    const app = await appFor(true, {
+      config: { authProvider: "email", googleClientId: "google-id" },
+      secrets: { GOOGLE_CLIENT_SECRET: "google-secret" },
     });
 
     expect(mountedProviderIds(app)).toEqual([]);

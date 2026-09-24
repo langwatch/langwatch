@@ -90,7 +90,6 @@ import type {
 import type {
   IngestionKeyMintCommand,
   IssuedIngestionKey,
-  PersonalIngestionKey,
   PersonalIngestionKeyState,
 } from "./ingestion-source-key.commands.ts";
 import type {
@@ -233,26 +232,12 @@ export interface GovernanceApi {
     sourceId: string;
   }): Promise<SourceHealthMetrics>;
 
-  ingestionKeyEnsureForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
   ingestionKeyIssueForProject(input: IngestionKeyMintCommand): Promise<IssuedIngestionKey>;
-  ingestionKeyEnsureForPersonalProject(input: {
-    userId: string;
-    organizationId: string;
-    sourceType: string;
-    ingestionTemplateId?: string | null;
-    createdByDeviceLabel?: string | null;
-  }): Promise<IssuedIngestionKey>;
-  ingestionKeyIssueForPersonalProject(input: {
-    userId: string;
-    organizationId: string;
-    sourceType: string;
-    ingestionTemplateId?: string | null;
-    createdByDeviceLabel?: string | null;
-  }): Promise<IssuedIngestionKey>;
+  ingestionKeyIssueForPersonalProject(input: PersonalIngestionKeyMint): Promise<IssuedIngestionKey>;
   ingestionKeyListForPersonalProject(input: {
     userId: string;
     organizationId: string;
-  }): Promise<PersonalIngestionKey[]>;
+  }): Promise<PersonalIngestionKeyListing[]>;
   getPersonalIngestionKeyState(input: {
     userId: string;
     organizationId: string;
@@ -515,6 +500,15 @@ export interface GovernanceRestApi {
   cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
   cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;
+  governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState>;
+  governanceOcsfExport(
+    input: GovernanceOcsfExportInput,
+    by: EntitlementOperator,
+  ): Promise<GovernanceOcsfExportPage>;
+  governanceQuarantineFillStats(input: QuarantineFillInput): Promise<QuarantineFillStats>;
+  governanceRecordWorkspaceView(
+    input: RecordWorkspaceViewInput,
+  ): Promise<RecordWorkspaceViewResult>;
   findActorWorkspace(input: {
     organizationId: string;
     actor: string;

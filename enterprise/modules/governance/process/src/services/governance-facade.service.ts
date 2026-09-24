@@ -185,15 +185,8 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly usageRecord: GovernanceApi["usageRecord"] = (...args) =>
     this.ingestion.usageRecord(...args);
 
-  readonly ingestionKeyEnsureForProject: GovernanceApi["ingestionKeyEnsureForProject"] = (
-    ...args
-  ) => this.ingestion.ingestionKeyEnsureForProject(...args);
-
   readonly ingestionKeyIssueForProject: GovernanceApi["ingestionKeyIssueForProject"] = (...args) =>
     this.ingestion.ingestionKeyIssueForProject(...args);
-
-  readonly ingestionKeyEnsureForPersonalProject: GovernanceApi["ingestionKeyEnsureForPersonalProject"] =
-    (...args) => this.ingestion.ingestionKeyEnsureForPersonalProject(...args);
 
   readonly ingestionKeyIssueForPersonalProject: GovernanceApi["ingestionKeyIssueForPersonalProject"] =
     (...args) => this.ingestion.ingestionKeyIssueForPersonalProject(...args);

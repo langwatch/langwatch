@@ -72,6 +72,7 @@ export interface GovernanceRepositories {
   readonly spendSpikeAnomalies: SpendSpikeAnomalyRepository;
   readonly supportContacts: OrganizationSupportContactRepository;
   readonly tenantHistory: GovernanceTenantHistoryRepository;
+  readonly traceActivity: GovernanceClickHouseRepositories["traceActivity"];
 }
 
 /**

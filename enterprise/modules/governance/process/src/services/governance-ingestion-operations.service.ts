@@ -7,16 +7,16 @@ import type {
 
 import type { GovernanceEventingChannel } from "../app/governance.members.ts";
 import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
-import type { IngestionKeyService } from "./ingestion-source-key.service.ts";
 import type { IngestionSourceService } from "./ingestion-source.service.ts";
 import type { IngestionTemplateService } from "./ingestion-template.service.ts";
 import type { DefaultGovernanceOcsfExportService } from "./ocsf-export.service.ts";
+import type { PersonalIngestionKeyService } from "./personal-ingestion-key.service.ts";
 
 /** Private cohesive collaborator for the ingestion operation set. */
 export class GovernanceIngestionOperationsService {
   private readonly canonicalCost: CanonicalCostExtractorService;
   private readonly eventing: GovernanceEventingChannel;
-  private readonly ingestionKeys: IngestionKeyService;
+  private readonly ingestionKeys: PersonalIngestionKeyService;
   private readonly ingestionSources: IngestionSourceService;
   private readonly templates: IngestionTemplateService;
   private readonly ocsf: DefaultGovernanceOcsfExportService;
@@ -33,7 +33,7 @@ export class GovernanceIngestionOperationsService {
   }: {
     canonicalCost: CanonicalCostExtractorService;
     eventing: GovernanceEventingChannel;
-    ingestionKeys: IngestionKeyService;
+    ingestionKeys: PersonalIngestionKeyService;
     ingestionSources: IngestionSourceService;
     templates: IngestionTemplateService;
     ocsf: DefaultGovernanceOcsfExportService;
@@ -59,7 +59,7 @@ export class GovernanceIngestionOperationsService {
   }: {
     canonicalCost: CanonicalCostExtractorService;
     eventing: GovernanceEventingChannel;
-    ingestionKeys: IngestionKeyService;
+    ingestionKeys: PersonalIngestionKeyService;
     ingestionSources: IngestionSourceService;
     templates: IngestionTemplateService;
     ocsf: DefaultGovernanceOcsfExportService;
@@ -94,21 +94,14 @@ export class GovernanceIngestionOperationsService {
   readonly usageRecord: GovernanceApi["usageRecord"] = (...args) =>
     this.eventing.recordPulledUsage(...args);
 
-  readonly ingestionKeyEnsureForProject: GovernanceApi["ingestionKeyEnsureForProject"] = (
-    ...args
-  ) => this.ingestionKeys.ensureForProject(...args);
-
   readonly ingestionKeyIssueForProject: GovernanceApi["ingestionKeyIssueForProject"] = (...args) =>
     this.ingestionKeys.issueForProject(...args);
 
-  readonly ingestionKeyEnsureForPersonalProject: GovernanceApi["ingestionKeyEnsureForPersonalProject"] =
-    (...args) => this.ingestionKeys.ensureForPersonalProject(...args);
-
   readonly ingestionKeyIssueForPersonalProject: GovernanceApi["ingestionKeyIssueForPersonalProject"] =
-    (...args) => this.ingestionKeys.issueForPersonalProject(...args);
+    (...args) => this.ingestionKeys.mint(...args);
 
   readonly ingestionKeyListForPersonalProject: GovernanceApi["ingestionKeyListForPersonalProject"] =
-    (...args) => this.ingestionKeys.listForPersonalProject(...args);
+    (...args) => this.ingestionKeys.list(...args);
 
   readonly getPersonalIngestionKeyState: GovernanceApi["getPersonalIngestionKeyState"] = (
     ...args

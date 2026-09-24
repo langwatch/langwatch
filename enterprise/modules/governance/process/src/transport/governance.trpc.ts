@@ -10,4 +10,32 @@ export const governanceTrpcTransport = defineTrpcRouter(GovernanceRestApi, gover
   .procedure("resolveActorPersonalProject")
   .withPermission("governance:view")
   .handle(({ app, input }) => app.findActorWorkspace(input))
+
+  .procedure("setupState")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.governanceSetupState(input))
+
+  .procedure("ocsfExport")
+  .withPermission("complianceExport:view")
+  .handle(({ app, input, actor }) =>
+    app.governanceOcsfExport(
+      {
+        organizationId: input.organizationId,
+        sinceMs: input.sinceMs ?? 0,
+        sinceEventId: input.sinceEventId,
+        limit: input.limit,
+      },
+      actor,
+    ),
+  )
+
+  .procedure("quarantineFillStats")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.governanceQuarantineFillStats(input))
+
+  .procedure("recordWorkspaceView")
+  .withPermission("governance:view")
+  .handle(({ app, input, actor }) =>
+    app.governanceRecordWorkspaceView({ ...input, actorUserId: actor.id }),
+  )
   .build();

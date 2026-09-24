@@ -2,7 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import { ssoSecrets, type SsoConfig } from "@langwatch/enterprise-sso-contract";
+import { type SsoConfig } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import {
   ssoDomainRecordLocation,
@@ -16,6 +16,7 @@ import {
 } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OpsApi } from "@langwatch/ops-contract";
+import { signInProviderSecrets } from "@langwatch/secrets";
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
@@ -50,14 +51,14 @@ export function createSsoTestConfig(overrides: Partial<SsoConfig> = {}): SsoConf
 }
 
 type SsoSecretOverrides = Partial<{
-  [Key in keyof typeof ssoSecrets]: string | undefined;
+  [Key in keyof typeof signInProviderSecrets]: string | undefined;
 }>;
 
 /** A scoped secrets double: resolves configured overrides, `undefined` otherwise. */
 export function createSsoTestSecrets(overrides: SsoSecretOverrides = {}): ScopedSecrets {
   const byId = new Map<string, string | undefined>(
-    (Object.keys(ssoSecrets) as (keyof typeof ssoSecrets)[]).map((key) => [
-      ssoSecrets[key].id,
+    (Object.keys(signInProviderSecrets) as (keyof typeof signInProviderSecrets)[]).map((key) => [
+      signInProviderSecrets[key].id,
       overrides[key],
     ]),
   );
