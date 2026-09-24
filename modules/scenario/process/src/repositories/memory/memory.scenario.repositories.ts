@@ -8,10 +8,12 @@ export class MemoryScenarioRepositories {
   static readonly requires = [] as const;
 
   static create(): ScenarioRepositories {
+    const cancellations = MemoryCancellationChannelRepository.create();
     return {
       scenarios: MemoryScenarioRepository.create(),
       simulationRunProcessing: MemorySimulationRunProcessingRepository.create(),
-      cancellations: MemoryCancellationChannelRepository.create(),
+      cancellations,
+      cancellationSubscriptions: cancellations,
     };
   }
 }

@@ -27,6 +27,11 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  scenarioExecutorPeers,
+  scenarioHostMembers,
+  scenarioTestConfig,
+} from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
@@ -57,14 +62,16 @@ function harness() {
       billing: createApiFixture<BillingApi>(),
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
+      ...scenarioExecutorPeers(),
     },
-    config: undefined,
+    config: scenarioTestConfig,
     resources: {} as ResourceOwnership,
     secrets: {} as never,
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the
     // missing property, which is the loud failure we want.
     members: {
+      ...scenarioHostMembers,
       publicBaseUrl: "https://langwatch.test",
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       agentTesting: createApiFixture<AgentTestService>(),
@@ -358,11 +365,13 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           billing: createApiFixture<BillingApi>(),
           retention: createApiFixture<DataRetentionApi>(),
           suites: createApiFixture<SuiteApi>(),
+          ...scenarioExecutorPeers(),
         },
-        config: undefined,
+        config: scenarioTestConfig,
         resources: {} as ResourceOwnership,
         secrets: {} as never,
         members: {
+          ...scenarioHostMembers,
           publicBaseUrl: undefined,
           // No ClickHouse either: the refusal is what a deployment that
           // composed neither the member nor the store it derives from owes.
@@ -411,11 +420,13 @@ describe("given a process that supplies no simulations member but does read Clic
         billing: createApiFixture<BillingApi>(),
         retention: createApiFixture<DataRetentionApi>(),
         suites: createApiFixture<SuiteApi>(),
+        ...scenarioExecutorPeers(),
       },
-      config: undefined,
+      config: scenarioTestConfig,
       resources: {} as ResourceOwnership,
       secrets: {} as never,
       members: {
+        ...scenarioHostMembers,
         publicBaseUrl: undefined,
         clickhouse: {
           query: <Row>(input: { tenantId: string }) => {

@@ -162,7 +162,11 @@ export class SimulationProcessingPipelineAdapter {
 /** simulation_processing, built by the app in both roles; its senders carry every run write. */
 export const simulationProcessingEventing = defineEventingModule({
   pipeline: "simulation_processing",
-  build: ({ app, participation, priorEvents }: EventingSetup<never, ScenarioApp>) =>
-    app.simulationPipeline({ participation, ...(priorEvents ? { priorEvents } : {}) }),
+  build: ({ app, participation, priorEvents, resources }: EventingSetup<never, ScenarioApp>) =>
+    app.simulationPipeline({
+      participation,
+      ...(priorEvents ? { priorEvents } : {}),
+      ...(resources ? { resources } : {}),
+    }),
   connect: ({ app, commands }) => app.connectSimulationCommands(commands),
 });

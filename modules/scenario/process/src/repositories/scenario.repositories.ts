@@ -1,4 +1,4 @@
-import type { CancellationPublisher } from "../app/scenario.app.ts";
+import type { CancellationPublisher, CancellationSubscriber } from "../app/scenario.app.ts";
 import type { ScenarioRepository } from "./scenario.repository.ts";
 import type { SimulationRunProcessingRepository } from "./simulation-run-processing.repository.ts";
 
@@ -11,4 +11,6 @@ export interface ScenarioRepositories {
   readonly scenarios: ScenarioRepository;
   readonly simulationRunProcessing: SimulationRunProcessingRepository;
   readonly cancellations: CancellationPublisher;
+  /** The same signal, received: only a consuming executor subscribes. */
+  readonly cancellationSubscriptions: CancellationSubscriber;
 }

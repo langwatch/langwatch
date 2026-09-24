@@ -1,7 +1,11 @@
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
 import { PostgresScenarioRepositories } from "../prisma/prisma.scenario.repositories.ts";
-import { RedisCancellationPublisherAdapter } from "../redis/redis.cancellation-channel.repository.ts";
+import {
+  DuplicatedCancellationConnection,
+  RedisCancellationPublisherAdapter,
+  RedisCancellationSubscriberAdapter,
+} from "../redis/redis.cancellation-channel.repository.ts";
 import { RedisSimulationRunProcessingRepository } from "../redis/redis.simulation-run-processing.repository.ts";
 import type { ScenarioRepositories } from "../scenario.repositories.ts";
 
@@ -18,6 +22,9 @@ export class LiveScenarioRepositories {
       ...PostgresScenarioRepositories.create({ prisma }),
       simulationRunProcessing: RedisSimulationRunProcessingRepository.create({ clickhouse, redis }),
       cancellations: RedisCancellationPublisherAdapter.create(redis),
+      cancellationSubscriptions: RedisCancellationSubscriberAdapter.create(
+        DuplicatedCancellationConnection.over(redis),
+      ),
     };
   }
 }

@@ -35,3 +35,16 @@ Feature: Isolated Scenario execution
     Given the simulation run execution process derives an execute or cancel intent
     When the intent worker invokes Scenario execution
     Then the existing process name, key, wake, retry and terminal event semantics remain unchanged
+
+  @unit
+  Scenario: A consuming worker connects the executor to its pool
+    Given the deployment names a telemetry endpoint and an NLP engine
+    When the worker builds simulation processing
+    Then the pool's runner is connected and cancellations reach it
+    And the executor's drain is owned by the process
+
+  @unit
+  Scenario: A worker without a telemetry endpoint composes no executor
+    Given the deployment names no telemetry endpoint
+    When the worker builds simulation processing
+    Then no executor is connected and a queued run stays in the outbox

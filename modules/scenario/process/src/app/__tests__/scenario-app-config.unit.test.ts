@@ -26,6 +26,11 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  scenarioExecutorPeers,
+  scenarioHostMembers,
+  scenarioTestConfig,
+} from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
@@ -47,11 +52,13 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       billing: createApiFixture<BillingApi>(),
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
+      ...scenarioExecutorPeers(),
     },
-    config: undefined,
+    config: scenarioTestConfig,
     resources: createApiFixture<ResourceOwnership>(),
     secrets: {} as never,
     members: {
+      ...scenarioHostMembers,
       publicBaseUrl,
       encryption: createApiFixture<Encryption>({
         encrypt: (value: string) => value,

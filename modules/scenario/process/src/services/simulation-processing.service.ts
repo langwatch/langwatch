@@ -1,5 +1,5 @@
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EventingParticipation, PriorEventsRead } from "@langwatch/kernel";
+import type { EventingParticipation, PriorEventsRead, ResourceOwnership } from "@langwatch/kernel";
 import {
   SCENARIO_WORKER,
   type SimulationProcessingEvent,
@@ -24,6 +24,7 @@ import type { SuiteRunSyncSubscriberDeps } from "../eventing/suite-run-sync.subs
 import type { SimulationRunProcessingRepository } from "../repositories/simulation-run-processing.repository.ts";
 import { isSimulationProcessingEvent } from "../rules/simulation-run-event.rules.ts";
 import { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
+import type { ScenarioExecutorService } from "./scenario-executor.service.ts";
 import { ScenarioRunDispatchService } from "./scenario-run-dispatch.service.ts";
 import type { SimulationCommandDispatcherService } from "./simulation-command-dispatcher.service.ts";
 
@@ -33,6 +34,8 @@ export type SimulationTraceReads = Pick<TraceApi, "findSummary" | "deriveScenari
 export interface SimulationPipelineSetup {
   readonly participation: EventingParticipation;
   readonly priorEvents?: PriorEventsRead;
+  /** Where the consuming executor registers its drain. */
+  readonly resources?: Pick<ResourceOwnership, "own">;
 }
 
 /**
@@ -51,6 +54,7 @@ export class SimulationProcessingService {
       simulations: SimulationService;
       suiteRuns: SuiteRunSyncSubscriberDeps;
       snapshotUpdates: SnapshotUpdateBroadcastSubscriberDeps;
+      executor: ScenarioExecutorService;
     },
   ) {}
 
@@ -63,6 +67,7 @@ export class SimulationProcessingService {
     simulations: SimulationService;
     suiteRuns: SuiteRunSyncSubscriberDeps;
     snapshotUpdates: SnapshotUpdateBroadcastSubscriberDeps;
+    executor: ScenarioExecutorService;
   }): SimulationProcessingService {
     return new SimulationProcessingService(input);
   }
@@ -74,6 +79,7 @@ export class SimulationProcessingService {
       setup.participation === "consume"
         ? ScenarioExecutionPoolService.create({ concurrency: SCENARIO_WORKER.CONCURRENCY })
         : void 0;
+    if (pool) this.input.executor.connect({ pool, resources: setup.resources });
 
     return SimulationProcessingPipelineAdapter.create({
       simulationRunStore: runs.runStateStore({

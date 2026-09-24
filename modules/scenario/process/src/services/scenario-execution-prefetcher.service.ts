@@ -56,7 +56,7 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   modelProviders: ModelProviderApi;
   secrets: SecretApi;
   traces: TraceApi;
-  voiceTargets: VoiceTargetReader;
+  voiceTargets: VoiceTargetReader | null;
 };
 
 type DecryptedRunSecrets =

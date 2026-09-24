@@ -49,7 +49,7 @@ export interface ScenarioChildProcessConfig {
   packageRoot: string;
   sourcePath: string;
   sourceRoots: string[];
-  nodeEnv: string;
+  nodeEnv: string | undefined;
   isSaas: boolean;
   /** The worker media listener's public origin, forwarded only to voice children. */
   voicePublicBaseUrl?: string;

@@ -29,6 +29,11 @@ import type { UserApi } from "@langwatch/user-contract";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import {
+  scenarioExecutorPeers,
+  scenarioHostMembers,
+  scenarioTestConfig,
+} from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import type { ScenarioBroadcast, ScenarioReadOnlyClickHouse } from "../../app/scenario.app.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
@@ -78,8 +83,10 @@ export function createScenarioRestTestApp(
       billing: createApiFixture<BillingApi>(options.billing ?? {}, "Billing API"),
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
+      ...scenarioExecutorPeers(),
     },
     members: {
+      ...scenarioHostMembers,
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       agentTesting: createApiFixture<AgentTestService>(),
       simulations,
@@ -94,7 +101,7 @@ export function createScenarioRestTestApp(
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: createApiFixture<ResourceOwnership>(),
-    config: undefined,
+    config: scenarioTestConfig,
     secrets: {} as never,
   });
 

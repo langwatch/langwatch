@@ -15,6 +15,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
 import type { AgentAdapter } from "@langwatch/scenario";
 import {
   DEFAULT_SET_ID,
@@ -103,7 +104,10 @@ import {
   type TargetAdapterData,
   type LiteLLMParams,
   type TakenPendingNavigate,
+  scenarioConfig,
+  type ScenarioServerConfig,
 } from "@langwatch/scenario-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { SuiteApi } from "@langwatch/suite-contract";
 /**
  * The scenario feature's application: what all of its doors call.
@@ -111,6 +115,7 @@ import { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
 import {
@@ -126,6 +131,7 @@ import type { ResultAtomsService } from "../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../services/run-configurations.service.ts";
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
 import { ScenarioRunExportDownloadService } from "../services/scenario-run-export-download.service.ts";
@@ -210,6 +216,10 @@ export const scenarioAppDependencyTokens = {
   retention: DataRetentionApi,
   /** Where a suite set's scenario runs are recorded against their suite run. */
   suites: SuiteApi,
+  /** A run's prompt, secret and workflow targets, resolved before its child starts. */
+  prompts: PromptApi,
+  secrets: SecretApi,
+  workflows: WorkflowApi,
 };
 
 /**
@@ -236,6 +246,9 @@ type ScenarioProcessMembers = Readonly<{
   }>;
   idempotency: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
   publicBaseUrl: string | undefined;
+  nlpServiceUrl: string | undefined;
+  isSaas: boolean;
+  nodeEnvironment: string | undefined;
 }>;
 
 /**
@@ -256,13 +269,17 @@ export class ScenarioApp implements ScenarioApi {
     "rateLimiter",
     "idempotency",
     "publicBaseUrl",
+    "nlpServiceUrl",
+    "isSaas",
+    "nodeEnvironment",
   ] as const;
+  static readonly config = scenarioConfig;
 
   static create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
       ScenarioAppMembers,
-      undefined,
+      ScenarioServerConfig,
       ScenarioRepositories
     >,
   ): ScenarioApp {
@@ -338,6 +355,21 @@ export class ScenarioApp implements ScenarioApi {
           regradeSuiteRunItem: (data) => setup.dependencies.suites.regradeSuiteRunItem(data),
         },
         snapshotUpdates: undeliveredSnapshotUpdates(),
+        executor: ScenarioExecutorService.create({
+          peers: setup.dependencies,
+          scenarios,
+          simulations,
+          secretCipher,
+          cancellations: setup.repositories.cancellations,
+          cancellationSubscriptions: setup.repositories.cancellationSubscriptions,
+          config: setup.config,
+          host: {
+            nlpServiceUrl: setup.members.nlpServiceUrl,
+            isSaas: setup.members.isSaas,
+            nodeEnvironment: setup.members.nodeEnvironment,
+            publicBaseUrl: setup.members.publicBaseUrl,
+          },
+        }),
       }),
     });
   }

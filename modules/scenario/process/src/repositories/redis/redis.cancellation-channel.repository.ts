@@ -99,3 +99,34 @@ export class RedisCancellationSubscriberAdapter implements CancellationSubscribe
     );
   }
 }
+
+/**
+ * A dedicated connection, opened on first subscribe: a client in subscribe mode
+ * can issue nothing else, and a process that never consumes never opens one.
+ */
+export class DuplicatedCancellationConnection implements CancellationSubscriber {
+  #connection: CancellationSubscriber | undefined;
+
+  private constructor(private readonly source: { duplicate(): CancellationSubscriber }) {}
+
+  static over(source: { duplicate(): CancellationSubscriber }): DuplicatedCancellationConnection {
+    return new DuplicatedCancellationConnection(source);
+  }
+
+  subscribe(channel: string): Promise<unknown> {
+    return this.#opened().subscribe(channel);
+  }
+
+  on(event: "message", handler: (channel: string, message: string) => void): void {
+    this.#opened().on(event, handler);
+  }
+
+  async quit(): Promise<unknown> {
+    return this.#connection?.quit();
+  }
+
+  #opened(): CancellationSubscriber {
+    this.#connection ??= this.source.duplicate();
+    return this.#connection;
+  }
+}
