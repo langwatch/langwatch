@@ -12986,6 +12986,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -13127,6 +13130,9 @@ importers:
       papaparse:
         specifier: 'catalog:'
         version: 5.5.4
+      tiktoken:
+        specifier: ^1.0.22
+        version: 1.0.22
       ts-pattern:
         specifier: 'catalog:'
         version: 5.9.0

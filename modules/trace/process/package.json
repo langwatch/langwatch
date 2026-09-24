@@ -73,6 +73,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/csv": "workspace:*",
@@ -120,6 +121,7 @@
     "hono-openapi": "catalog:",
     "langwatch": "workspace:*",
     "papaparse": "catalog:",
+    "tiktoken": "^1.0.22",
     "ts-pattern": "catalog:",
     "zod": "catalog:",
     "zod-validation-error": "catalog:"
