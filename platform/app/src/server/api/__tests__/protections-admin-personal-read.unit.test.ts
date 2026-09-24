@@ -46,11 +46,11 @@ const prisma = mockPrisma as unknown as {
   groupMembership: { findMany: ReturnType<typeof vi.fn> };
 };
 
-function givenProject({ personal }: { personal: boolean }) {
+function givenProject({ isPersonal }: { isPersonal: boolean }) {
   prisma.project.findUniqueOrThrow.mockResolvedValue({
     teamId: "team-1",
-    ownerUserId: personal ? OWNER : null,
-    team: { organizationId: "org-1", isPersonal: personal },
+    ownerUserId: isPersonal ? OWNER : null,
+    team: { organizationId: "org-1", isPersonal },
   });
 }
 
@@ -95,7 +95,7 @@ describe("getUserProtectionsForProject", () => {
   });
 
   describe("given another member's personal workspace", () => {
-    beforeEach(() => givenProject({ personal: true }));
+    beforeEach(() => givenProject({ isPersonal: true }));
 
     describe("when an admin reads it through their organization role alone", () => {
       beforeEach(() =>
@@ -130,9 +130,7 @@ describe("getUserProtectionsForProject", () => {
     });
 
     describe("when the owner reads it", () => {
-      beforeEach(() =>
-        givenViewerGrants(OWNER, [{ scopeType: "TEAM", roleKey: "admin" }]),
-      );
+      beforeEach(() => givenViewerGrants(OWNER, []));
 
       /** @scenario "The owner reading their own personal workspace is not recorded" */
       it("does not record the read and shows the content", async () => {
@@ -160,7 +158,7 @@ describe("getUserProtectionsForProject", () => {
   });
 
   describe("given a team project", () => {
-    beforeEach(() => givenProject({ personal: false }));
+    beforeEach(() => givenProject({ isPersonal: false }));
 
     describe("when an admin reads it through their organization role alone", () => {
       beforeEach(() =>

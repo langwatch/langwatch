@@ -231,7 +231,7 @@ async function admitPersonalWorkspaceRead({
   teamId,
   isPersonal,
   facts,
-  holdsWorkspaceRole,
+  hasWorkspaceRole,
 }: {
   prisma: PrismaClient;
   userId: string;
@@ -239,14 +239,11 @@ async function admitPersonalWorkspaceRead({
   teamId: string;
   isPersonal: boolean;
   facts: ViewerFacts;
-  holdsWorkspaceRole: boolean;
+  hasWorkspaceRole: boolean;
 }): Promise<boolean> {
-  const readsAsAdmin =
-    isPersonal &&
-    facts.isMember &&
-    !facts.isProjectOwner &&
-    !holdsWorkspaceRole;
-  if (!readsAsAdmin) return true;
+  const isAdminRead =
+    isPersonal && facts.isMember && !facts.isProjectOwner && !hasWorkspaceRole;
+  if (!isAdminRead) return true;
   return recordAdminPersonalWorkspaceRead({
     prisma,
     actorUserId: userId,
@@ -468,7 +465,7 @@ export async function getUserProtectionsForProject(
     teamId: project.teamId,
     isPersonal: project.team.isPersonal,
     facts,
-    holdsWorkspaceRole: heldGrants.some(
+    hasWorkspaceRole: heldGrants.some(
       (grant) => grant.scopeType !== "ORGANIZATION",
     ),
   }))
