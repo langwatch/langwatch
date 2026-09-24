@@ -2,7 +2,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { APICallError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
 
-import { isAbortLikeError, nlpgoHandledErrorFrom } from "../scenario-generate-nlpgo-error.rules.ts";
+import {
+  isAbortLikeError,
+  extractNlpgoHandledError,
+} from "../scenario-generate-nlpgo-error.rules.ts";
 
 /** The exact envelope nlpgo returned for an unroutable provider prefix. */
 const MISSING_PROVIDER_BODY = JSON.stringify({
@@ -30,10 +33,10 @@ function makeAPICallError({
   });
 }
 
-describe("nlpgoHandledErrorFrom", () => {
+describe("extractNlpgoHandledError", () => {
   describe("given an APICallError carrying nlpgo's handled-error envelope", () => {
     it("maps it to a HandledError keyed by meta.reason", () => {
-      const error = nlpgoHandledErrorFrom(
+      const error = extractNlpgoHandledError(
         makeAPICallError({ responseBody: MISSING_PROVIDER_BODY }),
       );
 
@@ -45,7 +48,7 @@ describe("nlpgoHandledErrorFrom", () => {
     });
 
     it("falls back to the envelope type when meta.reason is absent", () => {
-      const error = nlpgoHandledErrorFrom(
+      const error = extractNlpgoHandledError(
         makeAPICallError({
           responseBody: JSON.stringify({
             error: { type: "upstream_timeout", message: "upstream_timeout" },
@@ -68,20 +71,22 @@ describe("nlpgoHandledErrorFrom", () => {
         errors: [inner],
       });
 
-      expect(nlpgoHandledErrorFrom(retry)?.code).toBe("missing_provider");
+      expect(extractNlpgoHandledError(retry)?.code).toBe("missing_provider");
     });
   });
 
   describe("given errors without a handled envelope", () => {
     it("returns null for a non-JSON provider error body", () => {
       expect(
-        nlpgoHandledErrorFrom(makeAPICallError({ responseBody: "<html>502 Bad Gateway</html>" })),
+        extractNlpgoHandledError(
+          makeAPICallError({ responseBody: "<html>502 Bad Gateway</html>" }),
+        ),
       ).toBeNull();
     });
 
     it("returns null for JSON that is not envelope-shaped", () => {
       expect(
-        nlpgoHandledErrorFrom(
+        extractNlpgoHandledError(
           makeAPICallError({
             responseBody: JSON.stringify({ error: "invalid model ID" }),
           }),
@@ -90,7 +95,7 @@ describe("nlpgoHandledErrorFrom", () => {
     });
 
     it("returns null for a plain Error", () => {
-      expect(nlpgoHandledErrorFrom(new Error("boom"))).toBeNull();
+      expect(extractNlpgoHandledError(new Error("boom"))).toBeNull();
     });
   });
 });

@@ -13,7 +13,7 @@ import type { z } from "zod";
 
 import {
   isAbortLikeError,
-  nlpgoHandledErrorFrom,
+  extractNlpgoHandledError,
 } from "../rules/scenario-generate-nlpgo-error.rules.ts";
 import type { ScenarioGenerateBoundsService } from "./scenario-generate-bounds.service.ts";
 
@@ -88,7 +88,7 @@ export class ScenarioGenerationService {
 
       return { scenario: scenarioGenerateResultSchema.parse(generated) };
     } catch (error) {
-      const handled = nlpgoHandledErrorFrom(error);
+      const handled = extractNlpgoHandledError(error);
       if (handled) throw handled;
       if (isAbortLikeError(error)) throw new ScenarioGenerationTimedOutError();
 

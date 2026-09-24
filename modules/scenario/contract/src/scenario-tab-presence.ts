@@ -12,6 +12,9 @@ export interface ScenarioTabRegistration {
   now?: number;
 }
 
+/** A parked handoff is consumed by the read that finds it. */
+export type TakenPendingNavigate = { taken: true; url: string } | { taken: false };
+
 export interface ScenarioTabPresence {
   /**
    * A run handed to this tab while it was between subscriptions, ready to be
@@ -41,7 +44,7 @@ export abstract class ScenarioTabRegistry {
     projectId: string;
     tabKey: string;
     now?: number;
-  }): Promise<string | null>;
+  }): Promise<TakenPendingNavigate>;
 }
 
 /**
@@ -70,11 +73,11 @@ export async function startScenarioTabPresence({
   });
 
   return {
-    parkedNavigate: pending
+    parkedNavigate: pending.taken
       ? {
           event: SCENARIO_TAB_NAVIGATE_EVENT,
           tabKey: registration.tabKey,
-          url: pending,
+          url: pending.url,
         }
       : null,
     async stop() {

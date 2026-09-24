@@ -61,7 +61,7 @@ type FetchLike = (
 ) => Promise<{
   ok: boolean;
   status: number;
-  headers: { get(name: string): string | null };
+  headers: Pick<Headers, "get">;
   json(): Promise<unknown>;
   text(): Promise<string>;
 }>;

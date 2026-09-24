@@ -118,7 +118,7 @@ describe("secret references", () => {
   describe("given an auth config", () => {
     it("resolves a bearer token", () => {
       expect(
-        ScenarioSecretReferenceAdapter.resolveAuth({
+        ScenarioSecretReferenceAdapter.renderAuth({
           auth: { type: "bearer", token: "{{ secrets.AGENT_TOKEN }}" },
           secrets: SECRETS,
         }),
@@ -127,7 +127,7 @@ describe("secret references", () => {
 
     it("resolves an api key value and leaves the header name alone", () => {
       expect(
-        ScenarioSecretReferenceAdapter.resolveAuth({
+        ScenarioSecretReferenceAdapter.renderAuth({
           auth: {
             type: "api_key",
             header: "X-{{ secrets.AGENT_TOKEN }}",
@@ -144,7 +144,7 @@ describe("secret references", () => {
 
     it("resolves a basic username and password", () => {
       expect(
-        ScenarioSecretReferenceAdapter.resolveAuth({
+        ScenarioSecretReferenceAdapter.renderAuth({
           auth: {
             type: "basic",
             username: "{{ secrets.OTHER }}",
@@ -165,7 +165,7 @@ describe("secret references", () => {
         token: "{{ secrets.AGENT_TOKEN }}",
       };
 
-      ScenarioSecretReferenceAdapter.resolveAuth({ auth, secrets: SECRETS });
+      ScenarioSecretReferenceAdapter.renderAuth({ auth, secrets: SECRETS });
 
       expect(auth.token).toBe("{{ secrets.AGENT_TOKEN }}");
     });

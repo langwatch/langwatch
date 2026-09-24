@@ -32,7 +32,7 @@ export interface ScenarioEvaluationsSubscriberDeps {
  * its results already carry evaluations, its status has no conversation to
  * grade, or it names no scenario.
  */
-function scenarioIdToEvaluate(params: {
+function pickScenarioIdToEvaluate(params: {
   tenantId: string;
   scenarioRunId: string;
   scenarioId: string | undefined;
@@ -105,7 +105,7 @@ export function createScenarioEvaluationsSubscriber(
       const scenarioRunId = event.aggregateId;
       const { scenarioId, scenarioSetId, status, results } = event.data;
 
-      const evaluatedScenarioId = scenarioIdToEvaluate({
+      const evaluatedScenarioId = pickScenarioIdToEvaluate({
         tenantId,
         scenarioRunId,
         scenarioId,

@@ -22,9 +22,9 @@ import {
   planFor,
   type PlanIndex,
   type PlanRecord,
-  rate,
+  computePassRate,
   runKey,
-  targetParametersOf,
+  parseTargetParameters,
   toAtom,
   toCost,
   toGroup,
@@ -139,7 +139,7 @@ export class ResultAtomsService {
     return rows.map((row) => ({
       key: row.TargetKey,
       referenceId: row.ReferenceId === "" ? null : row.ReferenceId,
-      parameters: targetParametersOf(row.TargetParameters),
+      parameters: parseTargetParameters(row.TargetParameters),
       name: row.Name !== "" ? row.Name : row.TargetKey,
     }));
   }
@@ -181,14 +181,14 @@ export class ResultAtomsService {
 
     return {
       totals: {
-        executions: Number(totalsRow?.Atoms ?? 0),
-        runCount: Number(totalsRow?.RunCount ?? 0),
-        passRate: rate(Number(totalsRow?.Passed ?? 0), Number(totalsRow?.Settled ?? 0)),
-        failingScenarios: Number(totalsRow?.FailingScenarios ?? 0),
+        executions: Number(totalsRow.Atoms),
+        runCount: Number(totalsRow.RunCount),
+        passRate: computePassRate(Number(totalsRow.Passed), Number(totalsRow.Settled)),
+        failingScenarios: Number(totalsRow.FailingScenarios),
         cost: toCost({
-          totalUsd: Number(totalsRow?.CostTotal ?? 0),
-          atoms: Number(totalsRow?.Atoms ?? 0),
-          unknown: Number(totalsRow?.CostUnknown ?? 0),
+          totalUsd: Number(totalsRow.CostTotal),
+          atoms: Number(totalsRow.Atoms),
+          unknown: Number(totalsRow.CostUnknown),
         }),
         series: fillSeries({
           labelFor: (at) =>
@@ -288,7 +288,7 @@ export const __testing = {
   foldTrend,
   fillSeries,
   extractSuiteId,
-  rate,
+  computePassRate,
   bucketSecondsFor: (
     ...args: Parameters<typeof ResultAtomsService.bucketSecondsFor>
   ): ReturnType<typeof ResultAtomsService.bucketSecondsFor> =>

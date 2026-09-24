@@ -47,7 +47,7 @@ export const runKey = (setId: string, batchRunId: string): string => `${setId}\0
  * target with no overrides, and every run recorded before targets carried
  * any, reads as.
  */
-export function targetParametersOf(raw: string): RunParameterValues | null {
+export function parseTargetParameters(raw: string): RunParameterValues | null {
   if (raw === "") {
     return null;
   }
@@ -100,7 +100,7 @@ export function toAtom({
     scenarioKey: row.ScenarioKey,
     scenarioName: row.ScenarioName === "" ? null : row.ScenarioName,
     targetKey: row.TargetKey,
-    targetParameters: targetParametersOf(row.TargetParameters),
+    targetParameters: parseTargetParameters(row.TargetParameters),
     targetName: row.TargetName === "" ? null : row.TargetName,
     status: row.Status,
     outcome: row.Outcome as AtomOutcome,
@@ -110,7 +110,7 @@ export function toAtom({
       name: row.EvaluationNames[index] ?? "",
       status: evaluationStatusOf(row.EvaluationStatuses[index]),
       required: row.EvaluationRequired[index] === 1,
-      passed: evaluationPassedOf(row.EvaluationPassed[index]),
+      passed: toEvaluationPassed(row.EvaluationPassed[index]),
       score: row.EvaluationScores[index] ?? null,
       label: row.EvaluationLabels[index] === "" ? null : (row.EvaluationLabels[index] ?? null),
     })),
@@ -131,7 +131,7 @@ function evaluationStatusOf(status: string | undefined): AtomEvaluation["status"
   return known.find((candidate) => candidate === status) ?? "error";
 }
 
-function evaluationPassedOf(value: number | null | undefined): boolean | null {
+function toEvaluationPassed(value: number | null | undefined): boolean | null {
   return value === undefined || value === null ? null : value === 1;
 }
 
@@ -153,7 +153,7 @@ export function toGroup({
     key,
     title,
     subtitle,
-    passRate: rate(Number(row.Passed), Number(row.Settled)),
+    passRate: computePassRate(Number(row.Passed), Number(row.Settled)),
     runCount: Number(row.RunCount),
     scenarioCount: Number(row.ScenarioCount),
     lastRunAt: row.LastRunAt === "0" ? null : Number(row.LastRunAt),
@@ -161,7 +161,7 @@ export function toGroup({
     // Only a target group names one target. Any other grouping folds runs of
     // several targets, and the overrides of one of them would name the group
     // after a target it does not stand for.
-    targetParameters: groupBy === "target" ? targetParametersOf(row.TargetParameters) : null,
+    targetParameters: groupBy === "target" ? parseTargetParameters(row.TargetParameters) : null,
     trend,
     cost: toCost({ totalUsd: Number(row.CostTotal), atoms, unknown: Number(row.CostUnknown) }),
   };
@@ -225,7 +225,7 @@ export function headline({
  * are different colours: a run still in flight is not a run that failed,
  * and coercing one to the other paints an unfinished plan red.
  */
-export function rate(passed: number, settled: number): number | null {
+export function computePassRate(passed: number, settled: number): number | null {
   if (settled <= 0) {
     return null;
   }
@@ -277,7 +277,7 @@ export function foldTrend({
       groupKey,
       kept.map((row) => ({
         key: row.TrendKey,
-        passRate: rate(Number(row.Passed), Number(row.Settled)),
+        passRate: computePassRate(Number(row.Passed), Number(row.Settled)),
       })),
     );
   }
@@ -313,7 +313,7 @@ export function fillSeries({
     const settled = found ? Number(found.Settled) : 0;
     buckets.push({
       label: labelFor(at),
-      passRate: found ? rate(Number(found.Passed), settled) : null,
+      passRate: found ? computePassRate(Number(found.Passed), settled) : null,
       isEmpty: !found,
     });
   }

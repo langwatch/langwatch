@@ -724,9 +724,9 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
 
       const totals = await repo.aggregateTotals(baseFilter({ scenarioSetIds: [setId] }));
 
-      expect(Number(totals?.CostTotal)).toBeCloseTo(0.5, 6);
-      expect(Number(totals?.CostUnknown)).toBe(1);
-      expect(Number(totals?.Atoms)).toBe(2);
+      expect(Number(totals.CostTotal)).toBeCloseTo(0.5, 6);
+      expect(Number(totals.CostUnknown)).toBe(1);
+      expect(Number(totals.Atoms)).toBe(2);
     });
   });
 });
@@ -1434,11 +1434,11 @@ describe.skipIf(databaseUrl === null)("aggregateGroups", () => {
         baseFilter({ scenarioSetIds: [setId], outcome: "failed" }),
       );
 
-      expect(Number(all?.Atoms)).toBe(2);
-      expect(Number(all?.Passed)).toBe(1);
-      expect(Number(failedOnly?.Atoms)).toBe(1);
-      expect(Number(failedOnly?.Passed)).toBe(0);
-      expect(Number(failedOnly?.FailingScenarios)).toBe(1);
+      expect(Number(all.Atoms)).toBe(2);
+      expect(Number(all.Passed)).toBe(1);
+      expect(Number(failedOnly.Atoms)).toBe(1);
+      expect(Number(failedOnly.Passed)).toBe(0);
+      expect(Number(failedOnly.FailingScenarios)).toBe(1);
     });
   });
 });

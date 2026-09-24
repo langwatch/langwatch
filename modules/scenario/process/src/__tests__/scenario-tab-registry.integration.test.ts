@@ -327,8 +327,11 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
         url: "https://app.langwatch.test/p/simulations/s/batch-1",
       });
 
-      await expect(scenarioTabRegistry.takePendingNavigate({ projectId, tabKey })).resolves.toBe(
-        "https://app.langwatch.test/p/simulations/s/batch-1",
+      await expect(scenarioTabRegistry.takePendingNavigate({ projectId, tabKey })).resolves.toEqual(
+        {
+          taken: true,
+          url: "https://app.langwatch.test/p/simulations/s/batch-1",
+        },
       );
     });
 
@@ -343,9 +346,9 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
       });
       await scenarioTabRegistry.takePendingNavigate({ projectId, tabKey });
 
-      await expect(
-        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
-      ).resolves.toBeNull();
+      await expect(scenarioTabRegistry.takePendingNavigate({ projectId, tabKey })).resolves.toEqual(
+        { taken: false },
+      );
     });
 
     it("expires a parked run so a tab opening much later does not jump to it", async () => {
@@ -365,9 +368,9 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
       expect(ttl).toBeLessThanOrEqual(SCENARIO_TAB_PENDING_TTL_SECONDS);
 
       await connection!.del(key);
-      await expect(
-        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
-      ).resolves.toBeNull();
+      await expect(scenarioTabRegistry.takePendingNavigate({ projectId, tabKey })).resolves.toEqual(
+        { taken: false },
+      );
     });
 
     it("keeps parked handoffs apart per machine", async () => {
@@ -383,7 +386,7 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
 
       await expect(
         scenarioTabRegistry.takePendingNavigate({ projectId, tabKey: theirs }),
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ taken: false });
     });
   });
 });

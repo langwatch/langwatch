@@ -101,6 +101,7 @@ import {
   type TestAgentTurnInput,
   type TargetAdapterData,
   type LiteLLMParams,
+  type TakenPendingNavigate,
 } from "@langwatch/scenario-contract";
 /**
  * The scenario feature's application: what all of its doors call.
@@ -992,7 +993,7 @@ export interface ScenarioHttpResponse {
   ok: boolean;
   status: number;
   statusText: string;
-  headers: { get(name: string): string | null };
+  headers: Pick<Headers, "get">;
   json(): Promise<unknown>;
   text(): Promise<string>;
 }
@@ -1041,5 +1042,5 @@ export interface ScenarioTabStore {
 
   setPending(input: { key: string; url: string; ttlSeconds: number }): Promise<void>;
 
-  takePending(key: string): Promise<string | null>;
+  takePending(key: string): Promise<TakenPendingNavigate>;
 }

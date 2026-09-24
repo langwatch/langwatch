@@ -120,7 +120,7 @@ function redactHeaders(headers: Record<string, string>): Record<string, string> 
  * Pick the upstream request id (first match wins). Different upstreams use
  * different header conventions — surface whichever the target chose.
  */
-function pickUpstreamRequestId(headers: { get(name: string): string | null }): string | undefined {
+function pickUpstreamRequestId(headers: Pick<Headers, "get">): string | undefined {
   return (
     headers.get("x-request-id") ??
     headers.get("x-amzn-requestid") ??
@@ -261,7 +261,7 @@ export class SerializedHttpAgentAdapter extends SerializedAgent {
     const resolved = {
       ...headers,
       ...applyAuthentication(
-        ScenarioSecretReferenceAdapter.resolveAuth({
+        ScenarioSecretReferenceAdapter.renderAuth({
           auth: this.config.auth,
           secrets: this.secrets,
         }),

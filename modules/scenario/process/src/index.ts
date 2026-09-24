@@ -151,7 +151,7 @@ export {
 // ---------------------------------------------------------------------------
 export {
   isAbortLikeError,
-  nlpgoHandledErrorFrom,
+  extractNlpgoHandledError,
 } from "./rules/scenario-generate-nlpgo-error.rules.ts";
 export { ScenarioRunExportCsvService } from "./services/scenario-run-export-csv.service.ts";
 export { ScenarioRunExportDownloadService } from "./services/scenario-run-export-download.service.ts";

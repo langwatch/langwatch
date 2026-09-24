@@ -234,7 +234,7 @@ function stableFilterParts(filter: ResultsFilter): FilterParts {
 }
 
 /** The `Status` predicate a verdict filter asks for, if it asks for one. */
-function outcomePart(outcome: ResultsFilter["outcome"]): string | null {
+function buildOutcomePart(outcome: ResultsFilter["outcome"]): string | null {
   if (outcome === "passed") {
     return `Status IN (${quoted(PASSED_STATUS_VALUES)})`;
   }
@@ -264,7 +264,7 @@ function volatileFilterParts(filter: ResultsFilter): FilterParts {
     parts.push("StartedAt <= fromUnixTimestamp64Milli(toUInt64({atomEndMs:String}))");
   }
 
-  const outcome = outcomePart(filter.outcome);
+  const outcome = buildOutcomePart(filter.outcome);
   if (outcome !== null) {
     parts.push(outcome);
   }
@@ -329,6 +329,17 @@ function decodeCursor(cursor: string): AtomCursor | null {
     return null;
   }
 }
+
+/** What an aggregate over no atoms counts. */
+const EMPTY_TOTALS: RawTotalsRow = {
+  Atoms: "0",
+  Passed: "0",
+  Settled: "0",
+  RunCount: "0",
+  FailingScenarios: "0",
+  CostTotal: "0",
+  CostUnknown: "0",
+};
 
 /**
  * An empty requested set means "none of them", not "all" — turning it into
@@ -564,8 +575,8 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
   }
 
   /** The stat strip counts, over every atom in scope. */
-  async aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null> {
-    if (isEmptyScope(filter)) return null;
+  async aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow> {
+    if (isEmptyScope(filter)) return EMPTY_TOTALS;
     const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
     const rows = await this.queryRows<RawTotalsRow>(
       `SELECT
@@ -587,7 +598,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
        )`,
       { tenantId: filter.projectId, ...filters.params },
     );
-    return rows[0] ?? null;
+    return rows[0] ?? EMPTY_TOTALS;
   }
 
   /**
