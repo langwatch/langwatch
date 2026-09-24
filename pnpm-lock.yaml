@@ -6314,6 +6314,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -6323,9 +6326,15 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
@@ -6736,13 +6745,13 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -6755,6 +6764,9 @@ importers:
 
   modules/evaluator/process:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -6797,6 +6809,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../trace/contract
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
@@ -6812,6 +6827,9 @@ importers:
       hono-openapi:
         specifier: 'catalog:'
         version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+      safe-regex2:
+        specifier: 'catalog:'
+        version: 5.1.1
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -13037,6 +13055,9 @@ importers:
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

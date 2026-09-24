@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../../analytics/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -64,6 +67,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"

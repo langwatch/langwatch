@@ -59,6 +59,9 @@
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
+      "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
