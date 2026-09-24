@@ -165,3 +165,35 @@ Feature: Evaluation service boundary
     Given topic clustering's deadline has already fired
     When it asks evaluation for a batch clustering
     Then the call rejects with the abort and nothing is posted
+
+  @unit
+  Scenario: PII detection sends nothing when the deployment names no langevals endpoint
+    Given a deployment with no langevals endpoint configured
+    When data privacy asks evaluation to detect PII in a batch of texts
+    Then the answer is not configured
+    And nothing is posted to langevals
+
+  @unit
+  Scenario: PII detection posts a batch to langevals' Presidio evaluator and returns one result per text
+    Given a deployment with a langevals endpoint
+    When data privacy asks evaluation to detect PII in two texts for a set of entities
+    Then the texts are posted to the Presidio PII detection route with each entity lowercased and switched on
+    And the answer carries one result per text
+
+  @unit
+  Scenario: An empty PII batch reaches no langevals
+    Given a deployment with a langevals endpoint
+    When data privacy asks evaluation to detect PII in no texts
+    Then the answer carries no results and nothing is posted
+
+  @unit
+  Scenario: A langevals PII detection failure is refused with the answer's body
+    Given langevals answers a PII batch with a server error
+    When data privacy asks evaluation to detect PII
+    Then it is refused carrying the body langevals answered
+
+  @unit
+  Scenario: A PII answer that is not one result per text is refused
+    Given langevals answers a PII batch of two texts with one result
+    When data privacy asks evaluation to detect PII
+    Then it is refused naming the expected and received result counts

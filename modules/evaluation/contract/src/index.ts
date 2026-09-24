@@ -18,3 +18,4 @@ export * from "./evaluation.trpc.ts";
 export * from "./evaluation-execution.errors.ts";
 export * from "./evaluation.config.ts";
 export * from "./langevals-clustering.ts";
+export * from "./langevals-pii-detection.ts";

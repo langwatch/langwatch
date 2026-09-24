@@ -47,6 +47,7 @@ import type {
   TraceEvaluationData,
 } from "./evaluation.ts";
 import type { TopicClusteringOutcome, TopicClusteringRequest } from "./langevals-clustering.ts";
+import type { PiiDetectionOutcome, PiiDetectionRequest } from "./langevals-pii-detection.ts";
 
 /** The complete callable Evaluation capability shared by process peers. */
 export interface EvaluationApi {
@@ -108,6 +109,8 @@ export interface EvaluationApi {
   }): boolean;
   /** One topic-clustering call to langevals, staging an oversized body; aborts with the signal. */
   requestTopicClustering(input: TopicClusteringRequest): Promise<TopicClusteringOutcome>;
+  /** One Presidio batch through langevals: main's `/presidio/pii_detection/evaluate` call. */
+  detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 }
 
 export const EvaluationApi = moduleApi<EvaluationApi>()("evaluation");

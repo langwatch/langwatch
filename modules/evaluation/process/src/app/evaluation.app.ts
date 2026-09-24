@@ -92,6 +92,7 @@ import { EvaluatorEnvironmentService } from "../services/evaluator-environment.s
 import { EvaluatorModelEnvService } from "../services/evaluator-model-env.service.ts";
 import { HttpLangevalsEvaluatorAdapter } from "../services/http.langevals-evaluator.service.ts";
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
+import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
 import { OtelEvaluationExecutionMetricsAdapter } from "../services/otel.evaluation-execution-metrics.service.ts";
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
 import type {
@@ -280,6 +281,7 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #runner: EvaluationRunner;
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
+  readonly #piiDetection: LangevalsPiiDetectionService;
   readonly #executionIntent: EvaluationExecutionIntent;
   readonly #eventing: EvaluationEventingService;
   readonly #automations: EvaluationAutomationReactions;
@@ -290,6 +292,7 @@ export class EvaluationApp implements EvaluationApiContract {
     members,
     commands,
     clustering,
+    piiDetection,
     executionIntent,
     eventing,
   }: {
@@ -298,11 +301,13 @@ export class EvaluationApp implements EvaluationApiContract {
     members: EvaluationInfrastructure;
     commands: EvaluationCommandDispatcherService | undefined;
     clustering: LangevalsClusteringService;
+    piiDetection: LangevalsPiiDetectionService;
     executionIntent: EvaluationExecutionIntent;
     eventing: EvaluationEventingService;
   }) {
     this.#service = service;
     this.#clustering = clustering;
+    this.#piiDetection = piiDetection;
     this.#executionIntent = executionIntent;
     this.#eventing = eventing;
     this.#automations = dependencies.automations;
@@ -405,6 +410,10 @@ export class EvaluationApp implements EvaluationApiContract {
         endpoint: config.langevalsEndpoint,
         langevals,
       }),
+      piiDetection: LangevalsPiiDetectionService.create({
+        endpoint: config.langevalsEndpoint,
+        langevals,
+      }),
       executionIntent: EvaluationExecutionIntentService.create({
         monitors: dependencies.monitors,
         traces: dependencies.traces,
@@ -437,6 +446,7 @@ export class EvaluationApp implements EvaluationApiContract {
     repositories: Pick<EvaluationRepositories, "runs" | "monitorPerformance">;
     commands?: EvaluationCommandDispatcherService;
     clustering: LangevalsClusteringService;
+    piiDetection: LangevalsPiiDetectionService;
     executionIntent: EvaluationExecutionIntent;
     eventing: EvaluationEventingService;
   }): EvaluationApp {
@@ -446,6 +456,7 @@ export class EvaluationApp implements EvaluationApiContract {
       repositories,
       commands,
       clustering,
+      piiDetection,
       executionIntent,
       eventing,
     } = setup;
@@ -463,6 +474,7 @@ export class EvaluationApp implements EvaluationApiContract {
       members,
       commands,
       clustering,
+      piiDetection,
       executionIntent,
       eventing,
     });
@@ -525,6 +537,7 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#filterMatching.matchesEvaluationFilters(input);
   requestTopicClustering: EvaluationApiContract["requestTopicClustering"] = (input) =>
     this.#clustering.request(input);
+  detectPii: EvaluationApiContract["detectPii"] = (input) => this.#piiDetection.detect(input);
 
   async reportEvaluation(data: ReportEvaluationCommandData): Promise<void> {
     await this.#report.reportEvaluation(data);

@@ -33,6 +33,7 @@ import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.e
 import { EvaluationEventingService } from "../../services/evaluation-eventing.service.ts";
 import { EvaluationRunProjectionService } from "../../services/evaluation-run-projection.service.ts";
 import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
+import { LangevalsPiiDetectionService } from "../../services/langevals-pii-detection.service.ts";
 import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 import type {
   EvaluationExecution,
@@ -226,6 +227,10 @@ export function createEvaluationTestApp(
         endpoint: undefined,
         langevals: MemoryLangevalsChannel.create(),
       }),
+    piiDetection: LangevalsPiiDetectionService.create({
+      endpoint: undefined,
+      langevals: MemoryLangevalsChannel.create(),
+    }),
     executionIntent: {
       execute: () => Promise.reject(new Error("this test composed no evaluation execution intent")),
     },
