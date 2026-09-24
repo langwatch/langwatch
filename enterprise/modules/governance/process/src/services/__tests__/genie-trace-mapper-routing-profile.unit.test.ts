@@ -107,7 +107,7 @@ describe("given a source mapping its own conversations", () => {
       const spans = (request as any).resourceSpans[0].scopeSpans[0].spans;
       expect(spans.length).toBeGreaterThan(0);
       for (const span of spans) {
-        expect(spanSchema.safeParse(span).success).toBe(true);
+        expect(spanSchema.validate(span)).toBe(true);
       }
     });
 

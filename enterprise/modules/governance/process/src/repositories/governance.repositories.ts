@@ -28,6 +28,7 @@ import type {
 import type { GovernanceTenantHistoryRepository } from "./governance-tenant-history.repository.ts";
 import type { IdentityMatchSuggestionRepository } from "./identity-match-suggestion.repository.ts";
 import type { IdentityMatchRepository } from "./identity-match.repository.ts";
+import type { IngestionSourceRepository } from "./ingestion-source.repository.ts";
 import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type { PersonalVirtualKeyRepository } from "./personal-virtual-key.repository.ts";
@@ -57,9 +58,11 @@ export interface GovernanceRepositories {
   readonly erasedIdentifierSuppressions: ErasedIdentifierSuppressionRepository;
   readonly identityMatches: IdentityMatchRepository;
   readonly identityMatchSuggestions: IdentityMatchSuggestionRepository;
+  readonly ingestionSources: IngestionSourceRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly personalVirtualKeys: PersonalVirtualKeyRepository;
+  readonly rollupErasure: RollupErasureRepository;
   readonly routingPolicies: RoutingPolicyRepository;
   readonly sessionPolicies: OrganizationSessionPolicyRepository;
   readonly setupState: GovernanceSetupStateRepository;
@@ -90,7 +93,6 @@ export interface GovernanceClickHouseRepositories {
   readonly traceActivity: GovernanceSetupActivityReader & QuarantineTraceActivityReader;
   readonly personalUsage: PersonalUsageReader;
   readonly gatewaySpend: GatewaySpendRepository;
-  readonly rollupErasure: RollupErasureRepository;
 }
 
 /**

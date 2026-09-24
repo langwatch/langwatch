@@ -158,7 +158,7 @@ describe("given a completed Genie message from the capture shape", () => {
   it("emits one llm root span and one tool step span that both pass the OTLP schema", () => {
     expect(spans).toHaveLength(2);
     for (const span of spans) {
-      expect(spanSchema.safeParse(span).success).toBe(true);
+      expect(spanSchema.validate(span)).toBe(true);
     }
     expect(rootAttrs["langwatch.span.type"]).toBe("llm");
     expect(attrsOf(step)["langwatch.span.type"]).toBe("tool");
@@ -329,7 +329,7 @@ describe("given a message with no usable timestamp anywhere", () => {
       // NaN would serialize as "NaN000000" and fail the trace-door schema.
       expect(Number(span.startTimeUnixNano)).toBeGreaterThan(0);
       expect(Number(span.endTimeUnixNano)).toBeGreaterThan(0);
-      expect(spanSchema.safeParse(span).success).toBe(true);
+      expect(spanSchema.validate(span)).toBe(true);
     }
   });
 });

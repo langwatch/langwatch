@@ -62,6 +62,7 @@ const listGenieAgents = (input: Parameters<HttpGenieSpacesChannel["listAgents"]>
 const reply = (params: { ok: boolean; status: number; body?: unknown }): SsrfSafeResponse => ({
   ok: params.ok,
   status: params.status,
+  statusText: "",
   json: async () => params.body ?? {},
   headers: { get: () => null },
   body: null,

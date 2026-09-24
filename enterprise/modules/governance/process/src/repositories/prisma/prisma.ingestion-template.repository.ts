@@ -1,5 +1,4 @@
 import {
-  ingestionTemplateSchema,
   type GovernanceCallSurface,
   type IngestionTemplate,
   type PlatformIngestionTemplateSeed,
@@ -282,7 +281,7 @@ function toIngestionTemplate(row: {
   enabled: boolean;
   organizationId: string | null;
 }): IngestionTemplate {
-  return ingestionTemplateSchema.parse({
+  return {
     id: row.id,
     slug: row.slug,
     sourceType: row.sourceType,
@@ -294,5 +293,5 @@ function toIngestionTemplate(row: {
     platformPublished: row.platformPublished,
     enabled: row.enabled,
     organizationId: row.organizationId,
-  });
+  };
 }

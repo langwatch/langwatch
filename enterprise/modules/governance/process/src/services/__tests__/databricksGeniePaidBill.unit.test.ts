@@ -75,6 +75,7 @@ const MAX_HOLD_MS = 7 * ONE_DAY_MS;
 
 const reply = (body: unknown, status = 200): SsrfSafeResponse => ({
   ok: status >= 200 && status < 300,
+  statusText: "",
   status,
   json: async () => body,
   headers: { get: () => null },

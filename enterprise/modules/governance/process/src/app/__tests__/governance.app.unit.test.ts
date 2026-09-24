@@ -18,6 +18,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it, vi } from "vitest";
 
+import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { governanceServer } from "../../governance.server.ts";
 import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
@@ -60,7 +61,7 @@ async function buildApp() {
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
     },
-    members: { prisma: unreachablePrisma },
+    members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
@@ -97,6 +98,7 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
     },
     members: {
       prisma: unreachablePrisma,
+      encryption: createApiFixture<GovernanceEncryptor>(),
       governance,
       cli: {
         members: unreachable<GovernanceCliMembers["members"]>(),

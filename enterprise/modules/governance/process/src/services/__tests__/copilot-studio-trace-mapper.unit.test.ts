@@ -209,7 +209,7 @@ describe("given a Copilot conversation stored in one row", () => {
     const threadIds = new Set(turns.map((s) => attrsOf(s)["langwatch.thread.id"]));
     expect(threadIds.size).toBe(1);
     for (const span of spans) {
-      expect(spanSchema.safeParse(span).success).toBe(true);
+      expect(spanSchema.validate(span)).toBe(true);
     }
     const rendered = JSON.stringify(spans);
     expect(rendered).toContain("How do I reset my laptop?");
@@ -805,7 +805,7 @@ describe("given a tool call the agent ran", () => {
     expect(unfinished).toHaveLength(1);
     for (const tool of tools) {
       expect(attrsOf(tool).tool_name).toBe("search-before-answer");
-      expect(spanSchema.safeParse(tool).success).toBe(true);
+      expect(spanSchema.validate(tool)).toBe(true);
     }
   });
 

@@ -35,6 +35,7 @@ const HOUR_MS = 60 * 60 * 1000;
 
 const reply = (body: unknown, status = 200): SsrfSafeResponse => ({
   ok: status >= 200 && status < 300,
+  statusText: "",
   status,
   json: async () => body,
   headers: { get: () => null },

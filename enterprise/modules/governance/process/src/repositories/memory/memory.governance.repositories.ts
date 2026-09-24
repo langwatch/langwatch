@@ -17,9 +17,11 @@ import { MemoryGovernanceTenantHistoryRepository } from "./memory.governance-ten
 import { MemoryGovernanceStore } from "./memory.governance.store.ts";
 import { MemoryIdentityMatchSuggestionRepository } from "./memory.identity-match-suggestion.repository.ts";
 import { MemoryIdentityMatchRepository } from "./memory.identity-match.repository.ts";
+import { MemoryIngestionSourceRepository } from "./memory.ingestion-source.repository.ts";
 import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
 import { MemoryOrganizationSessionPolicyRepository } from "./memory.organization-session-policy.repository.ts";
 import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
+import { MemoryRollupErasureRepository } from "./memory.rollup-erasure.repository.ts";
 import { MemorySpendSpikeAnomalyRepository } from "./memory.spend-spike-anomaly.repository.ts";
 
 /** The "memory" tier: every governance repository, with no database behind it. */
@@ -43,9 +45,11 @@ export class MemoryGovernanceRepositories {
       erasedIdentifierSuppressions: MemoryErasedIdentifierSuppressionRepository.create(people),
       identityMatches: MemoryIdentityMatchRepository.create(people),
       identityMatchSuggestions: MemoryIdentityMatchSuggestionRepository.create(people),
+      ingestionSources: MemoryIngestionSourceRepository.create(),
       ingestionTemplates: MemoryIngestionTemplateRepository.create(store),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       personalVirtualKeys: MemoryPersonalVirtualKeyRepository.create(store),
+      rollupErasure: MemoryRollupErasureRepository.create(),
       routingPolicies: MemoryRoutingPolicyRepository.create(store),
       sessionPolicies: MemoryOrganizationSessionPolicyRepository.create(),
       setupState: MemoryGovernanceSetupStateRepository.create(),

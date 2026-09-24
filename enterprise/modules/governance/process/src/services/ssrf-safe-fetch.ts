@@ -26,6 +26,7 @@ const validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
 export interface SsrfSafeResponse {
   readonly ok: boolean;
   readonly status: number;
+  readonly statusText: string;
   readonly headers: Pick<Headers, "get">;
   readonly body: { cancel(): Promise<void> } | null;
   json(): Promise<unknown>;

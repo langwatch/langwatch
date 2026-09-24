@@ -29,6 +29,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
 import { GovernanceApp } from "../../app/governance.app.ts";
+import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import type { GovernanceMemberDatabase } from "../../governance.server.ts";
 import type { NewIngestionTemplate } from "../../repositories/ingestion-template.repository.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
@@ -130,7 +131,7 @@ async function buildApi(
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
     },
-    members: { prisma: unreachablePrisma },
+    members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });

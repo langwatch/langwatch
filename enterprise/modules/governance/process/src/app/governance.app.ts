@@ -100,7 +100,9 @@ import {
 import { reads } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 
+import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
 import {
@@ -132,18 +134,27 @@ import {
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
+import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
+import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
+import { PersonListingService } from "../services/person-listing.service.ts";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
 } from "../services/personal-usage-dashboard.service.ts";
+import { SourceCredentialAccessService } from "../services/source-credential-access.service.ts";
+import { ssrfSafeFetch } from "../services/ssrf-safe-fetch.ts";
 import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
 import {
   createGovernanceMemberInfrastructure,
   type GovernanceMemberDatabase,
 } from "./governance-member-infrastructure.ts";
-import type { GovernanceProjectDirectory } from "./governance.members.ts";
+import type {
+  GovernanceEncryptor,
+  GovernanceHttpClient,
+  GovernanceProjectDirectory,
+} from "./governance.members.ts";
 
 /**
  * The two questions personal virtual keys ask of the process's database.
@@ -328,14 +339,14 @@ type GovernanceSetup = Readonly<{
   config: undefined;
   resources: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["resources"];
   secrets: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["secrets"];
-  members: Readonly<{ prisma: GovernanceMemberDatabase }> &
+  members: Readonly<{ prisma: GovernanceMemberDatabase; encryption: GovernanceEncryptor }> &
     Pick<GovernanceBespokeMembers, "governance" | "cli" | "ingest">;
   repositories: GovernanceRepositories;
 }>;
 
 export class GovernanceApp implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = reads("prisma");
+  static readonly reads = reads("prisma", "encryption");
   /**
    * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -368,8 +379,8 @@ export class GovernanceApp implements GovernanceRestApi {
           erasureSecret,
         }),
     );
-    return new GovernanceApp(
-      {
+    return new GovernanceApp({
+      dependencies: {
         personalVirtualKeys,
         actors,
         governance: members.governance,
@@ -384,14 +395,22 @@ export class GovernanceApp implements GovernanceRestApi {
       },
       repositories,
       erasureSuppression,
-    );
+      encryption: members.encryption,
+    });
   }
 
-  private constructor(
-    private readonly dependencies: GovernanceAppDependencies,
-    repositories: GovernanceRepositories,
-    erasureSuppression: ErasureSuppressionService,
-  ) {
+  private constructor({
+    dependencies,
+    repositories,
+    erasureSuppression,
+    encryption,
+  }: {
+    dependencies: GovernanceAppDependencies;
+    repositories: GovernanceRepositories;
+    erasureSuppression: ErasureSuppressionService;
+    encryption: GovernanceEncryptor;
+  }) {
+    this.dependencies = dependencies;
     this.departments = DepartmentService.create({ repository: repositories.departments });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
@@ -413,6 +432,30 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     this.templates = IngestionTemplateService.create({
       repository: repositories.ingestionTemplates,
+    });
+    // Stored credentials seal under the process's CREDENTIALS_SECRET, the key main sealed them with.
+    const sourceCredentials = SourceCredentialAccessService.create({
+      sources: repositories.ingestionSources,
+      credentials: IngestionCredentialsService.create(encryption),
+    });
+    const http: GovernanceHttpClient = { fetch: ssrfSafeFetch };
+    const channels = governanceListingChannels.live;
+    const signIn = channels.providerSignIn.create({ http });
+    this.agentDiscovery = AgentDiscoveryService.create({
+      agents: repositories.discoveredAgents,
+      sourceCredentials,
+      signIn,
+      genieSpaces: channels.genieSpaces.create({ http }),
+      copilotBots: channels.copilotBots.create({ http }),
+    });
+    this.personListing = PersonListingService.create({
+      sourceCredentials,
+      suppression: erasureSuppression,
+      discovery: PersonDiscoveryService.create({ people: repositories.discoveredPeople }),
+      signIn,
+      adminApiUsers: channels.adminApiUsers.create({ http }),
+      microsoftDirectory: channels.microsoftDirectory.create({ http }),
+      databricksScimUsers: channels.databricksScimUsers.create({ http }),
     });
 
     // In a real deployment all three arrive together, from the one call that
@@ -475,7 +518,10 @@ export class GovernanceApp implements GovernanceRestApi {
     }
   }
 
+  private readonly dependencies: GovernanceAppDependencies;
   private readonly departments: DepartmentService;
+  private readonly agentDiscovery: AgentDiscoveryService;
+  private readonly personListing: PersonListingService;
   private readonly templates: IngestionTemplateService;
   private readonly erasureSuppression: ErasureSuppressionService;
   private readonly suppressionSnapshot: SuppressionSnapshotService;

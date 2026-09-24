@@ -45,6 +45,7 @@ const workspaceUrl = "https://adb-1.azuredatabricks.net";
 const reply = (body: unknown): SsrfSafeResponse => ({
   ok: true,
   status: 200,
+  statusText: "",
   json: async () => body,
   headers: { get: () => null },
   body: null,

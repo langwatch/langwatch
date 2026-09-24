@@ -3,12 +3,12 @@
 import { defineRepositories } from "@langwatch/kernel";
 
 import { ClickHouseGovernanceRepositories } from "./clickhouse/clickhouse.governance-clickhouse.repositories.ts";
+import { LiveGovernanceRepositories } from "./live/live.governance.repositories.ts";
 import { MemoryGovernanceClickHouseRepositories } from "./memory/memory.governance-clickhouse.repositories.ts";
 import { MemoryGovernanceRepositories } from "./memory/memory.governance.repositories.ts";
-import { PostgresGovernanceRepositories } from "./prisma/prisma.governance.repositories.ts";
 
 export const governanceRepositories = defineRepositories({
-  live: PostgresGovernanceRepositories,
+  live: LiveGovernanceRepositories,
   memory: MemoryGovernanceRepositories,
 });
 

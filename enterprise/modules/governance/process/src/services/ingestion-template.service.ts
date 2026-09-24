@@ -67,7 +67,7 @@ export class IngestionTemplateService {
 
   async createOrgTemplate(input: CreateIngestionTemplateInput): Promise<IngestionTemplate> {
     const parsed = createIngestionTemplateInputSchema.parse(input);
-    if (!ingestionTemplateSourceTypeSchema.safeParse(parsed.sourceType).success) {
+    if (!ingestionTemplateSourceTypeSchema.validate(parsed.sourceType)) {
       throw new InvalidSourceTypeError();
     }
 
