@@ -80,8 +80,8 @@ what it answers, and `langwatch/banned-verb-prefix` says so (it absorbed
 
 - `fallible-result-naming` falls by about 22 immediately, and by up to 103 more
   as `resolve*`/`read*` are decided individually.
-- The ~1,217 existing nullable `find*` methods stay exactly as they are. That
-  ruling is unchanged and this ADR does not reopen it.
+- Superseded 2026-09-23 (Alex, "no dropping"): the existing nullable `find*` and
+  `try*` methods are converted to this vocabulary, callers included (lint wave W6).
 - A new verb belongs in one of the three groups above or it does not belong.
   Adding one means editing this ADR, the exemption list in
   `packages/oxlint-rules/src/rules/fallible-result-naming.rule.mjs`, and the
