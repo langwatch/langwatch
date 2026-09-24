@@ -18,8 +18,14 @@ export const departmentAssignableEntitySchema = z.object({
 });
 export type DepartmentAssignableEntity = z.infer<typeof departmentAssignableEntitySchema>;
 
+export const departmentAssignableUserSchema = z.object({
+  ...departmentAssignableEntitySchema.shape,
+  email: z.string().nullable(),
+});
+export type DepartmentAssignableUser = z.infer<typeof departmentAssignableUserSchema>;
+
 export const departmentAssignmentsSchema = z.object({
-  users: z.array(departmentAssignableEntitySchema),
+  users: z.array(departmentAssignableUserSchema),
   teams: z.array(departmentAssignableEntitySchema),
   projects: z.array(departmentAssignableEntitySchema),
 });

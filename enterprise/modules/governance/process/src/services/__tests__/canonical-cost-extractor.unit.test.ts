@@ -172,7 +172,7 @@ describe("extractCanonicalCostEvents", () => {
         }),
       );
 
-      expect(events[0]?.occurredAt).toEqual(new Date(Number(nanos / 1_000_000n)));
+      expect(events[0]?.occurredAt.epochMilliseconds).toBe(Number(nanos / 1_000_000n));
     });
   });
 

@@ -334,7 +334,9 @@ function usePeopleTableRows({
                 departments: reads.departments.data,
               }),
             memberNameForActor: (actor) =>
-              reads.assignments.data?.users.find((user) => user.id === actor)?.name ?? null,
+              reads.assignments.data?.users.find(
+                (user) => user.email === actor || user.id === actor,
+              )?.name ?? null,
           }),
     [
       sampleActive,

@@ -99,13 +99,13 @@ describe("DepartmentService", () => {
     ).rejects.toBeInstanceOf(DepartmentNotFoundError);
   });
 
-  it("lists members by display name, falling back to email, beside teams and projects", async () => {
+  it("lists members with their email, named by display name or else email, beside teams and projects", async () => {
     const { service, department } = await harness();
 
     expect(await service.getAssignments({ organizationId: ORG })).toEqual({
       users: [
-        { id: "user-1", name: "Ada", departmentId: department.id },
-        { id: "user-2", name: "zed@acme.com", departmentId: null },
+        { id: "user-1", name: "Ada", email: "ada@acme.com", departmentId: department.id },
+        { id: "user-2", name: "zed@acme.com", email: "zed@acme.com", departmentId: null },
       ],
       teams: [{ id: "team-1", name: "Web", departmentId: null }],
       projects: [{ id: "project-1", name: "Chat", departmentId: department.id }],

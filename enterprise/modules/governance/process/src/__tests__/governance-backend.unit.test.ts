@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { PostgresGovernanceAdapter } from "../app/governance-policy-composition.build.ts";
@@ -139,7 +140,7 @@ describe("governance backend services", () => {
         requestId: "request",
         model: "gpt-5",
         costUsd: "0.000000001",
-        occurredAt: new Date(1),
+        occurredAt: Temporal.Instant.fromEpochMilliseconds(1),
       }),
     ]);
   });

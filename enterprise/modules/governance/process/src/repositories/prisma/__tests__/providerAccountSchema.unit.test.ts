@@ -27,7 +27,7 @@ import { describe, expect, it } from "vitest";
 
 const SCHEMA = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../../prisma/schema.prisma",
+  "../../../../../../../../packages/prisma-client/prisma/schema.prisma",
 );
 
 /** Every scalar field of one model, as `name` → `type`. */

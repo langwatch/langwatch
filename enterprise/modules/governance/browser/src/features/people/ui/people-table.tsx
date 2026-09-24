@@ -45,17 +45,7 @@ export function describePerson(actor: string): {
   return { primary: actor, secondary: null, avatarName: actor };
 }
 
-/**
- * The department a spend row rolls up to: the actor matched against a
- * member's id. No match means no department is known, never a guess.
- *
- * DROPPED FROM MAIN: main also matched a member by email
- * (`user.email === actor`), because most actors are the address the gateway
- * saw. `DepartmentAssignableEntity` (the contract's own shape for
- * `departments.assignments`) carries `id`, `name` and `departmentId` only —
- * no email — so that branch has nothing to match against here. Flagged in
- * the merge handoff as a shared-file request against the contract.
- */
+/** The department a spend row rolls up to: the actor matched against a member's email or id. */
 export function departmentNameForActor({
   actor,
   assignments,
@@ -66,7 +56,7 @@ export function departmentNameForActor({
   departments: readonly Pick<Department, "id" | "name">[] | undefined;
 }): string | null {
   if (!assignments || !departments) return null;
-  const member = assignments.users.find((user) => user.id === actor);
+  const member = assignments.users.find((user) => user.email === actor || user.id === actor);
   if (!member?.departmentId) return null;
   return departments.find((department) => department.id === member.departmentId)?.name ?? null;
 }

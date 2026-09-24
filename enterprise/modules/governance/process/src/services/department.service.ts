@@ -62,6 +62,7 @@ export class DepartmentService {
         .map((member) => ({
           id: member.userId,
           name: member.user.name ?? member.user.email ?? member.userId,
+          email: member.user.email,
           departmentId: member.departmentId,
         }))
         .toSorted((left, right) => left.name.localeCompare(right.name)),
