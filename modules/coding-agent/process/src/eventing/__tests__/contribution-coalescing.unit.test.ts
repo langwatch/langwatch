@@ -28,7 +28,7 @@ function buildPipeline() {
 }
 
 function commandNamed(name: string) {
-  return buildPipeline().commands.find((candidate) => candidate.name === name);
+  return buildPipeline().commands.find((candidate) => candidate.definition.name === name);
 }
 
 /** One api_request log contribution — the shape that folds as a model call. */
@@ -109,7 +109,7 @@ describe("coding-agent contribution append coalescing", () => {
       /** @scenario "a busy session's contributions are written together" */
       it("gives every contribution command an append-coalescing bound", () => {
         for (const name of ["contributeSpanFacts", "contributeLogFacts", "contributeMetricFacts"]) {
-          expect(commandNamed(name)?.options?.coalesceMaxBatch).toBe(
+          expect(commandNamed(name)?.definition.options?.coalesceMaxBatch).toBe(
             CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
           );
         }
@@ -119,7 +119,7 @@ describe("coding-agent contribution append coalescing", () => {
       // order; the fold's model-call chain cannot take that. The test below
       // this one is why.
       it("leaves the session key unsharded so one session stays one ordered lane", () => {
-        expect(commandNamed("contributeLogFacts")?.options?.getGroupKey).toBeUndefined();
+        expect(commandNamed("contributeLogFacts")?.definition.options?.getGroupKey).toBeUndefined();
       });
     });
   });

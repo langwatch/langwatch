@@ -38,7 +38,10 @@ function batchParamsFor({
     events: MetricDataPointReceivedEvent[],
     context: EventStoreReadContext<MetricDataPointReceivedEvent>,
   ) => Promise<void>;
-}): ProcessCommandBatchParams<MetricDataPointReceivedEvent> {
+}): ProcessCommandBatchParams<
+  MetricDataPointReceivedEvent,
+  Parameters<typeof RecordMetricDataPointCommand.getAggregateId>[0]
+> {
   return {
     payloads: payloads.map((payload) => ({ ...payload })),
     commandType: RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
@@ -68,11 +71,13 @@ describe("metric command append coalescing", () => {
       /** @scenario 'many items for one aggregate become one insert' */
       it("carries an append-coalescing bound alongside its shard routing", () => {
         const command = buildPipeline().commands.find(
-          (candidate) => candidate.name === "recordDataPoint",
+          (candidate) => candidate.definition.name === "recordDataPoint",
         );
 
-        expect(command?.options?.coalesceMaxBatch).toBe(METRIC_COMMAND_COALESCE_MAX_BATCH);
-        expect(command?.options?.getGroupKey).toBeDefined();
+        expect(command?.definition.options?.coalesceMaxBatch).toBe(
+          METRIC_COMMAND_COALESCE_MAX_BATCH,
+        );
+        expect(command?.definition.options?.getGroupKey).toBeDefined();
       });
     });
   });

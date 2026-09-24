@@ -28,19 +28,6 @@ import {
 } from "../eventing/scim-sync.intent.ts";
 import type { ScimSyncGuardsService } from "./scim-sync-guards.service.ts";
 
-/**
- * Every verb the aggregate has, and the name its queue sender is resolved by
- * (the ledger writer maps a command type to one of these strings).
- */
-const SCIM_SYNC_COMMANDS = [
-  ["issueScimToken", IssueScimTokenCommand],
-  ["recordScimUserPush", RecordScimUserPushCommand],
-  ["recordScimGroupMapping", RecordScimGroupMappingCommand],
-  ["recordScimApplyFailure", RecordScimApplyFailureCommand],
-  ["redriveScimApply", RedriveScimApplyCommand],
-  ["revokeScimSync", RevokeScimSyncCommand],
-] as const;
-
 export interface ScimSyncPipelineDeps {
   scimSyncProjectionStore: StateProjectionStore<ScimSyncFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-process`'s
@@ -60,30 +47,48 @@ export class ScimSyncPipelineDefinitionAdapter {
   static create(
     deps: ScimSyncPipelineDeps,
   ): StaticPipelineDefinition<ScimSyncEvent, Record<string, Projection>, RegisteredCommand> {
-    let builder = definePipeline<ScimSyncEvent>({
+    const builder = definePipeline<ScimSyncEvent>({
       name: SCIM_SYNC_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: SCIM_SYNC_AGGREGATE_TYPE,
         events: defineEvents(SCIM_SYNC_EVENT_TYPES),
       }),
-    }).withPostgresProjection(
-      new ScimSyncStateFoldProjection({
-        store: deps.scimSyncProjectionStore,
-      }),
-    );
-
-    for (const [name, Command] of SCIM_SYNC_COMMANDS) {
-      // The builder mutates and returns ITSELF; what narrows per call is only
-      // its type, and what that type carries is the command-name registry —
-      // which nothing downstream reads, because the ledger resolves senders by
-      // string. So the loop holds one builder type and the table above stays
-      // the readable list of verbs.
-      builder = builder.withCommandInstance(
-        name,
-        Command,
-        new Command(deps.scimSyncGuards),
-      ) as typeof builder;
-    }
+    })
+      .withPostgresProjection(
+        new ScimSyncStateFoldProjection({
+          store: deps.scimSyncProjectionStore,
+        }),
+      )
+      .withCommandInstance(
+        "issueScimToken",
+        IssueScimTokenCommand,
+        new IssueScimTokenCommand(deps.scimSyncGuards),
+      )
+      .withCommandInstance(
+        "recordScimUserPush",
+        RecordScimUserPushCommand,
+        new RecordScimUserPushCommand(deps.scimSyncGuards),
+      )
+      .withCommandInstance(
+        "recordScimGroupMapping",
+        RecordScimGroupMappingCommand,
+        new RecordScimGroupMappingCommand(deps.scimSyncGuards),
+      )
+      .withCommandInstance(
+        "recordScimApplyFailure",
+        RecordScimApplyFailureCommand,
+        new RecordScimApplyFailureCommand(deps.scimSyncGuards),
+      )
+      .withCommandInstance(
+        "redriveScimApply",
+        RedriveScimApplyCommand,
+        new RedriveScimApplyCommand(deps.scimSyncGuards),
+      )
+      .withCommandInstance(
+        "revokeScimSync",
+        RevokeScimSyncCommand,
+        new RevokeScimSyncCommand(deps.scimSyncGuards),
+      );
 
     return builder.build();
   }

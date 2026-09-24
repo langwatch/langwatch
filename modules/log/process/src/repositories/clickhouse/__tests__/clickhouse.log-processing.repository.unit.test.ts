@@ -78,7 +78,9 @@ describe("ClickHouseLogProcessingAdapter", () => {
       }).build();
 
       expect(pipeline.metadata.name).toBe("log_processing");
-      expect(pipeline.commands.map((command) => command.name)).toEqual(["recordLogRecord"]);
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
+        "recordLogRecord",
+      ]);
       expect([...pipeline.mapProjections.keys()]).toEqual(["canonicalLogStorage"]);
     });
 

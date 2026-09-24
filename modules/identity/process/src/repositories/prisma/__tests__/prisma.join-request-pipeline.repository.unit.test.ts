@@ -12,6 +12,13 @@ import {
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
  */
+/** One property of a value the test only knows as an object. */
+function propertyOf(value: unknown, key: string): unknown {
+  return typeof value === "object" && value !== null && key in value
+    ? Reflect.get(value, key)
+    : undefined;
+}
+
 const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
 const REQUESTER = "user_ada";
@@ -95,7 +102,7 @@ describe("given a process holding one typed Prisma client", () => {
       const { pipeline } = compose();
 
       expect(pipeline.metadata.name).toBe("join-requests");
-      expect(pipeline.commands.map((command) => command.name)).toEqual([
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "requestJoin",
         "approveJoin",
         "rejectJoin",
@@ -155,15 +162,14 @@ describe("given a composed join-request pipeline", () => {
     /** @scenario "Split JoinRequest repositories share one Prisma client" */
     it("reads the rows the fold writes, through the same Prisma client", async () => {
       const { pipeline, findUnique, findFirst, database } = compose();
-      const withdraw = pipeline.commands.find((command) => command.name === "withdrawJoin");
-      expect(
-        withdraw?.handlerInstance,
-        "withdrawJoin was registered without a guard",
-      ).toBeDefined();
+      const withdraw = pipeline.commands.find(
+        (command) => command.definition.name === "withdrawJoin",
+      );
+      expect(withdraw, "withdrawJoin was not registered").toBeDefined();
 
-      await (withdraw!.handlerInstance as { handle(command: unknown): Promise<unknown> })
-        .handle({
-          data: {
+      await withdraw!
+        .open(async ({ handlerClass, createHandler }) => {
+          const parsed = handlerClass.schema.validate({
             tenantId: ORGANIZATION,
             organizationId: ORGANIZATION,
             joinRequestId: REQUEST,
@@ -171,8 +177,15 @@ describe("given a composed join-request pipeline", () => {
             occurredAtMs: 1_700_000_000_000,
             actor: { type: "user", id: REQUESTER },
             userId: REQUESTER,
-            cause: "REQUESTER",
-          },
+            cause: "user",
+          });
+          if (!parsed.success) throw parsed.error;
+          return createHandler().handle({
+            tenantId: createTenantId(ORGANIZATION),
+            aggregateId: REQUEST,
+            type: handlerClass.schema.type,
+            data: parsed.data,
+          });
         })
         .catch(() => void 0);
 
@@ -182,13 +195,10 @@ describe("given a composed join-request pipeline", () => {
       // fold's write-side store — not the same object, but the same typed
       // Prisma client underneath, so both sides route every key to the one
       // table.
-      const guards = (
-        withdraw!.handlerInstance as unknown as {
-          guards: { requests: { prisma: unknown } };
-        }
-      ).guards;
-      expect(guards.requests).not.toBe(requestStore(pipeline));
-      expect(guards.requests.prisma).toBe(database);
+      const handler = withdraw!.open(({ createHandler }): object => createHandler());
+      const requests = propertyOf(propertyOf(handler, "guards"), "requests");
+      expect(requests).not.toBe(requestStore(pipeline));
+      expect(propertyOf(requests, "prisma")).toBe(database);
     });
   });
 });

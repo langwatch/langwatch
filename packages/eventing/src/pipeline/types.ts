@@ -1,4 +1,4 @@
-import type { CommandHandlerClass } from "../commands/commandHandlerClass.ts";
+import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type { KillSwitch } from "../kill-switch/index.ts";
@@ -14,7 +14,6 @@ import type {
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
-import type { CommandHandlerOptions } from "../services/commands/commandDispatcher.ts";
 import type { EventSourcingService } from "../services/eventSourcingService.ts";
 import type { JobRegistryEntry } from "../services/queues/queueManager.ts";
 import type { EventStore } from "../stores/eventStore.types.ts";
@@ -74,11 +73,7 @@ export interface EventSourcingPipelineDefinition<
   subscribers?: EventSubscriberDefinition<EventType>[];
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   globalJobRegistry?: Map<string, JobRegistryEntry>;
-  commandRegistrations?: {
-    name: string;
-    handlerClass: CommandHandlerClass<any, any, EventType>;
-    options?: CommandHandlerOptions<unknown>;
-  }[];
+  commandRegistrations?: readonly SealedCommand<EventType>[];
   globalRegistry?: ProjectionRegistry<Event>;
   executionTarget?: ExecutionTarget;
   replayMarkerChecker?: ReplayMarkerChecker;

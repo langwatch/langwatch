@@ -74,7 +74,7 @@ describe("PostgresScimSyncPipelineAdapter", () => {
       const { pipeline } = compose();
 
       expect(pipeline.metadata.name).toBe("scim-sync");
-      expect(pipeline.commands.map((command) => command.name)).toEqual([
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "issueScimToken",
         "recordScimUserPush",
         "recordScimGroupMapping",
@@ -130,16 +130,13 @@ describe("PostgresScimSyncPipelineAdapter", () => {
     /** @scenario "One ScimSyncState repository serves the fold and its guards" */
     it("runs the guards' read over the same client the fold writes", async () => {
       const { pipeline, findFirst } = compose();
-      const revoke = pipeline.commands.find((command) => command.name === "revokeScimSync");
-      expect(
-        revoke?.handlerInstance,
-        "revokeScimSync was registered without a guard",
-      ).toBeDefined();
+      const revoke = pipeline.commands.find(
+        (command) => command.definition.name === "revokeScimSync",
+      );
+      expect(revoke, "revokeScimSync was not registered").toBeDefined();
 
-      const facts = await (
-        revoke!.handlerInstance as { handle(command: unknown): Promise<{ type: string }[]> }
-      ).handle({
-        data: {
+      const facts = await revoke!.open(async ({ handlerClass, createHandler }) => {
+        const parsed = handlerClass.schema.validate({
           tenantId: ORGANIZATION,
           organizationId: ORGANIZATION,
           scimSyncId: SYNC,
@@ -149,7 +146,14 @@ describe("PostgresScimSyncPipelineAdapter", () => {
           actor: { type: "system", id: null },
           tokenId: null,
           cause: "teardown",
-        },
+        });
+        if (!parsed.success) throw parsed.error;
+        return createHandler().handle({
+          tenantId: createTenantId(ORGANIZATION),
+          aggregateId: SYNC,
+          type: handlerClass.schema.type,
+          data: parsed.data,
+        });
       });
 
       expect(facts.map((fact) => fact.type)).toEqual([SCIM_TOKEN_REVOKED_EVENT_TYPE]);

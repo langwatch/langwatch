@@ -5,6 +5,7 @@ import type { createLogger } from "@langwatch/observability";
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { createCommand } from "../../commands/command.ts";
 import type { CommandSchema } from "../../commands/commandSchema.ts";
+import type { TenantScopedPayload } from "../../commands/sealedCommand.ts";
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { CommandType } from "../../domain/commandType.ts";
 import type { TenantId } from "../../domain/tenantId.ts";
@@ -23,9 +24,6 @@ import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
 import { mapValidationIssues } from "../../utils/errors.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
 import { ValidationError } from "../errorHandling.ts";
-
-/** Every command payload names its tenant; the dispatcher scopes the command by it. */
-export type TenantScopedPayload = { readonly tenantId: unknown };
 
 /**
  * Parameters for the extracted processCommand function.

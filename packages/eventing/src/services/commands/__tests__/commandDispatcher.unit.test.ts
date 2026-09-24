@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CommandHandler } from "../../../commands/command.ts";
 import type { CommandSchema } from "../../../commands/commandSchema.ts";
+import type { TenantScopedPayload } from "../../../commands/sealedCommand.ts";
 import type { AggregateType } from "../../../domain/aggregateType.ts";
 import type { CommandType } from "../../../domain/commandType.ts";
 import { createTenantId } from "../../../domain/tenantId.ts";
@@ -13,11 +14,7 @@ import {
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers.ts";
 import { ValidationError } from "../../errorHandling.ts";
-import type {
-  ProcessCommandBatchParams,
-  ProcessCommandParams,
-  TenantScopedPayload,
-} from "../commandDispatcher.ts";
+import type { ProcessCommandBatchParams, ProcessCommandParams } from "../commandDispatcher.ts";
 import { processCommand, processCommandBatch } from "../commandDispatcher.ts";
 
 describe("processCommand", () => {

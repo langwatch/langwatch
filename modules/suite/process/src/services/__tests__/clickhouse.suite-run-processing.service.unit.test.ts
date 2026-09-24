@@ -88,7 +88,7 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
       const { pipeline } = compose();
 
       expect(pipeline.metadata.name).toBe("suite_run_processing");
-      expect(pipeline.commands.map((command) => command.name)).toEqual([
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "startSuiteRun",
         "recordSuiteRunItemStarted",
         "completeSuiteRunItem",
@@ -100,11 +100,9 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
     it("keeps every command deduplicated, because the fold accumulates by addition", () => {
       const { pipeline } = compose();
 
-      expect(pipeline.commands.map((command) => Boolean(command.options?.deduplication))).toEqual([
-        true,
-        true,
-        true,
-      ]);
+      expect(
+        pipeline.commands.map((command) => Boolean(command.definition.options?.deduplication)),
+      ).toEqual([true, true, true]);
     });
   });
 

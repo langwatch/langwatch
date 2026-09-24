@@ -9,7 +9,7 @@ export { stripEnvelope, withCommandEnvelope } from "./commands/commandEnvelope.t
 export type { CommandHandlerClass } from "./commands/commandHandlerClass.ts";
 export type { CommandSchema } from "./commands/commandSchema.ts";
 export { defineCommandSchema } from "./commands/commandSchema.ts";
-export type { DefinedCommandClass } from "./commands/defineCommand.ts";
+export type { DefinedCommandClass, DefinedCommandEvent } from "./commands/defineCommand.ts";
 export { defineCommand } from "./commands/defineCommand.ts";
 export { eventIdempotencyKey } from "./commands/idempotency-key.ts";
 // Domain types
@@ -86,6 +86,12 @@ export type {
   MapProjectionOptions,
 } from "./projections/mapProjection.types.ts";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";
+export type {
+  SealedCommand,
+  SealedCommandDefinition,
+  TenantScopedPayload,
+} from "./commands/sealedCommand.ts";
+export { sealCommandClass } from "./commands/sealedCommand.ts";
 export type {
   SealedFoldProjection,
   SealedMapProjection,

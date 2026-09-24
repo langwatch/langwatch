@@ -147,7 +147,7 @@ describe("PostgresIdentityPipelineAdapter", () => {
       const { pipeline } = compose();
 
       expect(pipeline.metadata.name).toBe("identity");
-      expect(pipeline.commands.map((command) => command.name)).toEqual([
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "attachIdentifier",
         "verifyIdentifier",
         "markPrimary",
@@ -222,22 +222,28 @@ describe("PostgresIdentityPipelineAdapter", () => {
     /** @scenario "The worker builds the identity ledger from its own client" */
     it("runs the guards' reads over the same client the fold writes", async () => {
       const { pipeline, identifierFindMany } = compose();
-      const markPrimary = pipeline.commands.find((command) => command.name === "markPrimary");
-      expect(
-        markPrimary?.handlerInstance,
-        "markPrimary was registered without a guard",
-      ).toBeDefined();
+      const markPrimary = pipeline.commands.find(
+        (command) => command.definition.name === "markPrimary",
+      );
+      expect(markPrimary, "markPrimary was not registered").toBeDefined();
 
       await expect(
-        (markPrimary!.handlerInstance as { handle(command: unknown): Promise<unknown> }).handle({
-          data: {
+        markPrimary!.open(async ({ handlerClass, createHandler }) => {
+          const parsed = handlerClass.schema.validate({
             tenantId: USER,
             userId: USER,
             commandId: "cmd_1",
             identifierId: IDENTIFIER,
             occurredAtMs: 1_700_000_000_000,
             actor: { type: "user", id: USER },
-          },
+          });
+          if (!parsed.success) throw parsed.error;
+          return createHandler().handle({
+            tenantId: createTenantId(USER),
+            aggregateId: USER,
+            type: handlerClass.schema.type,
+            data: parsed.data,
+          });
         }),
       ).rejects.toBeInstanceOf(IdentityIdentifierNotFoundError);
 

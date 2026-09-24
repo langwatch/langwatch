@@ -43,7 +43,7 @@ function pipeline(): InstantEvalProcessingPipelineDefinition {
 }
 
 function commandNamed(name: string) {
-  const registered = pipeline().commands.find((command) => command.name === name);
+  const registered = pipeline().commands.find((command) => command.definition.name === name);
   expect(registered, `the pipeline registered no ${name} command`).toBeDefined();
 
   return registered!;
@@ -51,13 +51,19 @@ function commandNamed(name: string) {
 
 /** The event one command mints from its payload, as the worker appends it. */
 async function eventOf(name: string, data: Record<string, unknown>): Promise<Event> {
-  const registered = commandNamed(name);
-  const handler = new registered.handlerClass();
-  const events = await handler.handle({
-    tenantId: createTenantId(PROJECT_ID),
-    aggregateId: RUN_ID,
-    type: registered.handlerClass.schema.type,
-    data: { tenantId: PROJECT_ID, occurredAt: OCCURRED_AT, ...data },
+  const events = await commandNamed(name).open(async ({ handlerClass, createHandler }) => {
+    const parsed = handlerClass.schema.validate({
+      tenantId: PROJECT_ID,
+      occurredAt: OCCURRED_AT,
+      ...data,
+    });
+    if (!parsed.success) throw parsed.error;
+    return createHandler().handle({
+      tenantId: createTenantId(PROJECT_ID),
+      aggregateId: RUN_ID,
+      type: handlerClass.schema.type,
+      data: parsed.data,
+    });
   });
   const event = events[0];
   expect(event, `${name} minted no event`).toBeDefined();
@@ -112,6 +118,15 @@ const finished = {
   priceUsd: 0.013,
 };
 
+/** One complete payload per command, so each parses against its own schema. */
+const payloadOf: Record<string, Record<string, unknown>> = {
+  requestRun: requestedEvent().data,
+  recordPlanned: { runId: RUN_ID, total: 1_000, pageSize: 500, isCapped: false, keyColumns: [] },
+  recordPageJudged: page(),
+  requestCancel: { runId: RUN_ID, requestedByUserId: null },
+  recordFinished: finished,
+};
+
 describe("given the pipeline the worker registers", () => {
   describe("when it is built", () => {
     /** @scenario "The worker mounts one run projection, five commands and the process manager" */
@@ -120,7 +135,7 @@ describe("given the pipeline the worker registers", () => {
 
       expect(built.metadata.name).toBe(INSTANT_EVAL_PIPELINE_NAME);
       expect(built.aggregate.type).toBe(INSTANT_EVAL_AGGREGATE_TYPE);
-      expect(built.commands.map((command) => command.name)).toEqual([
+      expect(built.commands.map((command) => command.definition.name)).toEqual([
         "requestRun",
         "recordPlanned",
         "recordPageJudged",
@@ -167,16 +182,23 @@ describe("given a run whose events arrive more than once", () => {
     });
 
     it("dedups the redelivery at the queue as well, inside the page's own window", async () => {
-      const { deduplication } = commandNamed("recordPageJudged").options ?? {};
       const appended = await eventOf("recordPageJudged", page());
-      if (deduplication === undefined || deduplication === "aggregate") {
-        throw new Error("the page command dedups by aggregate, which collapses different pages");
-      }
+      const queued = commandNamed("recordPageJudged").open(({ handlerClass, options }) => {
+        const deduplication = options?.deduplication;
+        if (deduplication === undefined || deduplication === "aggregate") {
+          throw new Error("the page command dedups by aggregate, which collapses different pages");
+        }
+        const parsed = handlerClass.schema.validate({
+          tenantId: PROJECT_ID,
+          occurredAt: OCCURRED_AT,
+          ...page(),
+        });
+        if (!parsed.success) throw parsed.error;
+        return { id: deduplication.makeId(parsed.data), ttlMs: deduplication.ttlMs };
+      });
 
-      expect(deduplication.makeId({ tenantId: PROJECT_ID, runId: RUN_ID, page: 2 })).toBe(
-        appended.idempotencyKey,
-      );
-      expect(deduplication.ttlMs).toBe(60_000);
+      expect(queued.id).toBe(appended.idempotencyKey);
+      expect(queued.ttlMs).toBe(60_000);
     });
   });
 
@@ -197,11 +219,14 @@ describe("given two runs of one project judging at the same time", () => {
     /** @scenario "Every event of a run is keyed by the run, so its pages fold in order" */
     it("puts every event of a run on the run's own aggregate, so its pages fold in order", () => {
       const aggregateIds = pipeline().commands.map((command) =>
-        command.handlerClass.getAggregateId({
-          tenantId: PROJECT_ID,
-          occurredAt: OCCURRED_AT,
-          runId: RUN_ID,
-          page: 2,
+        command.open(({ handlerClass }) => {
+          const parsed = handlerClass.schema.validate({
+            tenantId: PROJECT_ID,
+            occurredAt: OCCURRED_AT,
+            ...payloadOf[command.definition.name],
+          });
+          if (!parsed.success) throw parsed.error;
+          return handlerClass.getAggregateId(parsed.data);
         }),
       );
 
@@ -210,10 +235,14 @@ describe("given two runs of one project judging at the same time", () => {
 
     it("gives the project one queue lane, so a run's pages never overtake each other", () => {
       const groupKeys = pipeline().commands.map((command) =>
-        command.handlerClass.getGroupKey?.({
-          tenantId: PROJECT_ID,
-          occurredAt: OCCURRED_AT,
-          runId: RUN_ID,
+        command.open(({ handlerClass }) => {
+          const parsed = handlerClass.schema.validate({
+            tenantId: PROJECT_ID,
+            occurredAt: OCCURRED_AT,
+            ...payloadOf[command.definition.name],
+          });
+          if (!parsed.success) throw parsed.error;
+          return handlerClass.getGroupKey?.(parsed.data);
         }),
       );
 

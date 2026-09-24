@@ -20,7 +20,7 @@ function buildPipeline() {
 }
 
 function commandNamed(name: string) {
-  const entry = buildPipeline().commands.find((command) => command.name === name);
+  const entry = buildPipeline().commands.find((command) => command.definition.name === name);
   if (!entry) throw new Error(`no command registered as "${name}"`);
   return entry;
 }
@@ -35,7 +35,7 @@ describe("given the grants pipeline", () => {
   describe("when the commands that change a grant are registered", () => {
     /** @scenario "Every command about one grant rides one lane" */
     it.each(GRANT_COMMANDS)("%s serializes on the grant", (name) => {
-      expect(commandNamed(name).options?.serializeByAggregate).toBe(true);
+      expect(commandNamed(name).definition.options?.serializeByAggregate).toBe(true);
     });
 
     /** @scenario "Every command about one grant rides one lane" */
@@ -43,7 +43,7 @@ describe("given the grants pipeline", () => {
       // `queueManager` IGNORES `getGroupKey` once `serializeByAggregate` is
       // set. One left here would read as an active lane choice while doing
       // nothing at all — the failure this assertion exists to prevent.
-      expect(commandNamed(name).options?.getGroupKey).toBeUndefined();
+      expect(commandNamed(name).definition.options?.getGroupKey).toBeUndefined();
     });
 
     /** @scenario "A grant's attach and its revoke share one lane" */
@@ -72,7 +72,9 @@ describe("given the grants pipeline", () => {
 
     /** @scenario "A grant's queued commands fold into one insert" */
     it.each(GRANT_COMMANDS)("%s bounds the batch with a number", (name) => {
-      expect(commandNamed(name).options?.coalesceMaxBatch).toBe(GRANT_COALESCE_MAX_BATCH);
+      expect(commandNamed(name).definition.options?.coalesceMaxBatch).toBe(
+        GRANT_COALESCE_MAX_BATCH,
+      );
       expect(typeof GRANT_COALESCE_MAX_BATCH).toBe("number");
     });
   });
@@ -80,12 +82,12 @@ describe("given the grants pipeline", () => {
   describe("when the role commands are registered", () => {
     /** @scenario "Role commands keep the default lane" */
     it.each(ROLE_COMMANDS)("%s declares no serialization", (name) => {
-      expect(commandNamed(name).options?.serializeByAggregate).toBeUndefined();
+      expect(commandNamed(name).definition.options?.serializeByAggregate).toBeUndefined();
     });
 
     /** @scenario "Role commands keep the default lane" */
     it.each(ROLE_COMMANDS)("%s declares no batch bound", (name) => {
-      expect(commandNamed(name).options?.coalesceMaxBatch).toBeUndefined();
+      expect(commandNamed(name).definition.options?.coalesceMaxBatch).toBeUndefined();
     });
   });
 });

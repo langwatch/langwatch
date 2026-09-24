@@ -183,7 +183,7 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("registers every expected command exactly once", () => {
         const { pipeline } = buildPipeline();
 
-        const names = pipeline.commands.map((c) => c.name).toSorted();
+        const names = pipeline.commands.map((c) => c.definition.name).toSorted();
         expect(names).toEqual([...EXPECTED_COMMANDS].toSorted());
         // One handler per durable command in the vocabulary.
         expect(pipeline.commands).toHaveLength(LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES.length);

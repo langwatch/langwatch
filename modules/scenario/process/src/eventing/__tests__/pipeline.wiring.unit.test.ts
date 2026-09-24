@@ -59,7 +59,7 @@ describe("the simulation processing pipeline", () => {
         traceMetricsSync: {} as never,
       });
 
-      const names = pipeline.commands.map((command) => command.name);
+      const names = pipeline.commands.map((command) => command.definition.name);
 
       expect(names).toContain("queueRun");
       expect(names).toContain("finishRun");

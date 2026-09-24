@@ -1,9 +1,14 @@
-import type { CommandHandler } from "../commands/command.ts";
-import type {
-  CommandHandlerClass,
-  CommandHandlerClassStatic,
-  ExtractCommandHandlerPayload,
-} from "../commands/commandHandlerClass.ts";
+import type { Command, CommandHandler } from "../commands/command.ts";
+import type { CommandHandlerClassStatic } from "../commands/commandHandlerClass.ts";
+import type { CommandSchema } from "../commands/commandSchema.ts";
+import {
+  type SchemaTypedCommandClass,
+  type SealedCommand,
+  sealCommand,
+  sealCommandClass,
+  type TenantScopedPayload,
+} from "../commands/sealedCommand.ts";
+import type { CommandType } from "../domain/commandType.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type {
@@ -75,12 +80,7 @@ export class PipelineBuilder<
     SealedMapProjection<EventType> & { options?: MapProjectionOptions }
   >();
   private stateProjections = new Map<string, SealedStateProjection<EventType>>();
-  private commands: {
-    name: string;
-    handlerClass: CommandHandlerClass<any, any, any>;
-    handlerInstance?: any;
-    options?: CommandHandlerOptions;
-  }[] = [];
+  private commands: SealedCommand<EventType>[] = [];
   private foldSubscribers = new Map<
     string,
     {
@@ -415,75 +415,65 @@ export class PipelineBuilder<
   }
 
   /** Register a command handler class with zero-arg constructor instantiation. */
-  withCommand<handlerClass extends CommandHandlerClass<any, any, any>, Name extends string>(
+  withCommand<Payload extends TenantScopedPayload, Type extends CommandType, Name extends string>(
     name: Name,
-    handlerClass: handlerClass,
-    options?: CommandHandlerOptions,
+    handlerClass: SchemaTypedCommandClass<Payload, Type, EventType>,
+    options?: CommandHandlerOptions<Payload>,
   ): PipelineBuilder<
     EventType,
     RegisteredProjections,
-    RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> },
+    RegisteredCommands | { name: Name; payload: Payload },
     FoldNames,
     MapNames,
     RegisteredFoldStates
   > {
-    if (this.commands.some((c) => c.name === name)) {
-      throw new ConfigurationError(
-        "PipelineBuilder",
-        `Command handler with name "${name}" already exists`,
-        { commandHandlerName: name },
-      );
-    }
-
-    this.commands.push({ name, handlerClass: handlerClass, options });
-    return this as PipelineBuilder<
-      EventType,
-      RegisteredProjections,
-      RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> },
-      FoldNames,
-      MapNames,
-      RegisteredFoldStates
-    >;
+    this.assertCommandNameFree(name);
+    this.commands.push(sealCommandClass({ name, handlerClass, options }));
+    return this;
   }
 
   /** Register a pre-constructed command handler instance with constructor DI. */
-  withCommandInstance<TStatic extends CommandHandlerClassStatic<any, any>, Name extends string>(
+  withCommandInstance<
+    Payload extends TenantScopedPayload,
+    Type extends CommandType,
+    Name extends string,
+  >(
     name: Name,
-    handlerClass: TStatic,
-    instance: CommandHandler<any, any>,
-    options?: CommandHandlerOptions,
+    handlerClass: { readonly schema: CommandSchema<Payload, Type> } & CommandHandlerClassStatic<
+      NoInfer<Payload>,
+      NoInfer<Type>
+    >,
+    instance: CommandHandler<Command<NoInfer<Payload>>, EventType>,
+    options?: CommandHandlerOptions<Payload>,
   ): PipelineBuilder<
     EventType,
     RegisteredProjections,
-    RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
+    RegisteredCommands | { name: Name; payload: Payload },
     FoldNames,
     MapNames,
     RegisteredFoldStates
   > {
-    if (this.commands.some((c) => c.name === name)) {
+    this.assertCommandNameFree(name);
+    this.commands.push(
+      sealCommand({
+        name,
+        handlerClassName: instance.constructor.name,
+        handlerClass,
+        createHandler: () => instance,
+        options,
+      }),
+    );
+    return this;
+  }
+
+  private assertCommandNameFree(name: string): void {
+    if (this.commands.some((c) => c.definition.name === name)) {
       throw new ConfigurationError(
         "PipelineBuilder",
         `Command handler with name "${name}" already exists`,
         { commandHandlerName: name },
       );
     }
-
-    // Cast TStatic to CommandHandlerClass for storage — the static properties match,
-    // and the zero-arg constructor won't be called since handlerInstance is provided.
-    this.commands.push({
-      name,
-      handlerClass: handlerClass as unknown as CommandHandlerClass<any, any, any>,
-      handlerInstance: instance,
-      options,
-    });
-    return this as PipelineBuilder<
-      EventType,
-      RegisteredProjections,
-      RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<TStatic> },
-      FoldNames,
-      MapNames,
-      RegisteredFoldStates
-    >;
   }
 
   /** Build the static pipeline definition. */
@@ -513,9 +503,9 @@ export class PipelineBuilder<
         name: subscriber.name,
         eventTypes: [...subscriber.eventTypes],
       })),
-      commands: this.commands.map((cmd) => ({
-        name: cmd.name,
-        handlerClassName: cmd.handlerClass.name,
+      commands: this.commands.map(({ definition }) => ({
+        name: definition.name,
+        handlerClassName: definition.handlerClassName,
       })),
     };
 

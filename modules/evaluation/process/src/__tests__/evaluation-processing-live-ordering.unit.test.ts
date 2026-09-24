@@ -13,6 +13,7 @@ import {
   type FoldProjectionStore,
   type JobRegistryEntry,
   sealFoldProjection,
+  sealCommandClass,
 } from "@langwatch/eventing";
 import { EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
@@ -193,16 +194,16 @@ describe("evaluation processing live FIFO", () => {
 
     manager.initializeCommandQueues(
       [
-        {
+        sealCommandClass({
           name: "startEvaluation",
           handlerClass: commands.start,
           options: { serializeByAggregate: true },
-        },
-        {
+        }),
+        sealCommandClass({
           name: "completeEvaluation",
           handlerClass: commands.complete,
           options: { serializeByAggregate: true },
-        },
+        }),
       ],
       vi.fn(),
       "evaluation_processing",
@@ -253,7 +254,10 @@ describe("evaluation processing live FIFO", () => {
     });
 
     expect(
-      pipeline.commands.map(({ name, options }) => [name, options?.serializeByAggregate]),
+      pipeline.commands.map(({ definition: { name, options } }) => [
+        name,
+        options?.serializeByAggregate,
+      ]),
     ).toEqual([
       ["executeEvaluation", true],
       ["startEvaluation", true],

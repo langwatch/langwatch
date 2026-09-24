@@ -362,7 +362,7 @@ export const annotationAddedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_ADDED_EVENT_TYPE),
   data: annotationAddedEventDataSchema,
-  metadata: annotationAddedEventMetadataSchema,
+  metadata: annotationAddedEventMetadataSchema.optional(),
 });
 
 export type AnnotationAddedEventData = z.infer<typeof annotationAddedEventDataSchema>;
@@ -396,7 +396,7 @@ export const annotationRemovedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ANNOTATION_REMOVED_EVENT_TYPE),
   data: annotationRemovedEventDataSchema,
-  metadata: annotationRemovedEventMetadataSchema,
+  metadata: annotationRemovedEventMetadataSchema.optional(),
 });
 
 export type AnnotationRemovedEventData = z.infer<typeof annotationRemovedEventDataSchema>;
@@ -432,7 +432,7 @@ export const annotationsBulkSyncedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(ANNOTATIONS_BULK_SYNCED_EVENT_TYPE),
   data: annotationsBulkSyncedEventDataSchema,
-  metadata: annotationsBulkSyncedEventMetadataSchema,
+  metadata: annotationsBulkSyncedEventMetadataSchema.optional(),
 });
 
 export type AnnotationsBulkSyncedEventData = z.infer<typeof annotationsBulkSyncedEventDataSchema>;
@@ -473,7 +473,7 @@ export const traceNameChangedEventSchema = z.object({
   ...traceEventSchema.shape,
   type: z.literal(TRACE_NAME_CHANGED_EVENT_TYPE),
   data: traceNameChangedEventDataSchema,
-  metadata: traceNameChangedEventMetadataSchema,
+  metadata: traceNameChangedEventMetadataSchema.optional(),
 });
 
 export type TraceNameChangedEventData = z.infer<typeof traceNameChangedEventDataSchema>;

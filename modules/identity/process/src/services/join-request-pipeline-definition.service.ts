@@ -56,18 +56,6 @@ import {
 } from "../eventing/join-request.intent.ts";
 import type { JoinRequestGuardsService } from "./join-request-guards.service.ts";
 
-/**
- * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer
- * maps a command type to one of these strings).
- */
-const JOIN_REQUEST_COMMANDS = [
-  ["requestJoin", RequestJoinCommand],
-  ["approveJoin", ApproveJoinCommand],
-  ["rejectJoin", RejectJoinCommand],
-  ["withdrawJoin", WithdrawJoinCommand],
-  ["expireJoin", ExpireJoinCommand],
-] as const;
-
 export interface JoinRequestPipelineDeps {
   joinRequestProjectionStore: StateProjectionStore<JoinRequestFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-process`'s
@@ -89,30 +77,43 @@ export class JoinRequestPipelineDefinitionAdapter {
   static create(
     deps: JoinRequestPipelineDeps,
   ): StaticPipelineDefinition<JoinRequestEvent, Record<string, Projection>, RegisteredCommand> {
-    let builder = definePipeline<JoinRequestEvent>({
+    const builder = definePipeline<JoinRequestEvent>({
       name: JOIN_REQUEST_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: JOIN_REQUEST_AGGREGATE_TYPE,
         events: defineEvents(JOIN_REQUEST_EVENT_TYPES),
       }),
-    }).withPostgresProjection(
-      new JoinRequestStateFoldProjection({
-        store: deps.joinRequestProjectionStore,
-      }),
-    );
-
-    for (const [name, Command] of JOIN_REQUEST_COMMANDS) {
-      // The builder mutates and returns ITSELF; what narrows per call is only
-      // its type, and what that type carries is the command-name registry —
-      // which nothing downstream reads, because the ledger resolves senders by
-      // string. So the loop holds one builder type and the table above stays
-      // the readable list of verbs.
-      builder = builder.withCommandInstance(
-        name,
-        Command,
-        new Command(deps.joinRequestGuards),
-      ) as typeof builder;
-    }
+    })
+      .withPostgresProjection(
+        new JoinRequestStateFoldProjection({
+          store: deps.joinRequestProjectionStore,
+        }),
+      )
+      .withCommandInstance(
+        "requestJoin",
+        RequestJoinCommand,
+        new RequestJoinCommand(deps.joinRequestGuards),
+      )
+      .withCommandInstance(
+        "approveJoin",
+        ApproveJoinCommand,
+        new ApproveJoinCommand(deps.joinRequestGuards),
+      )
+      .withCommandInstance(
+        "rejectJoin",
+        RejectJoinCommand,
+        new RejectJoinCommand(deps.joinRequestGuards),
+      )
+      .withCommandInstance(
+        "withdrawJoin",
+        WithdrawJoinCommand,
+        new WithdrawJoinCommand(deps.joinRequestGuards),
+      )
+      .withCommandInstance(
+        "expireJoin",
+        ExpireJoinCommand,
+        new ExpireJoinCommand(deps.joinRequestGuards),
+      );
 
     return builder
       .withProcessManager(JOIN_REQUEST_LIFECYCLE_PROCESS_NAME, (pm) =>

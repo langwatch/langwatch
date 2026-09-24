@@ -296,7 +296,7 @@ export class EventSourcing {
       definition.foldSubscribers.size +
       definition.mapSubscribers.size +
       definition.eventSubscribers.size;
-    const commands = definition.commands.map((command) => command.name).join(", ");
+    const commands = definition.commands.map((command) => command.definition.name).join(", ");
     return (
       `aggregate "${definition.metadata.aggregateType}", ` +
       `${definition.foldProjections.size} fold and ${definition.mapProjections.size} map projections, ` +
@@ -849,15 +849,7 @@ function buildServiceOptions<
 
   const mapProjections = Array.from(definition.mapProjections.values());
 
-  const commandRegistrations =
-    definition.commands.length > 0
-      ? definition.commands.map((cmd) => ({
-          name: cmd.name,
-          handlerClass: cmd.handlerClass,
-          handlerInstance: cmd.handlerInstance,
-          options: cmd.options,
-        }))
-      : undefined;
+  const commandRegistrations = definition.commands.length > 0 ? definition.commands : undefined;
 
   const foldSubscriberList = Array.from(definition.foldSubscribers.values()).map((entry) => ({
     foldName: entry.projectionName as string,

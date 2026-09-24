@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
@@ -152,7 +153,7 @@ describe("QueueManager", () => {
       manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
       manager.initializeProjectionQueues({ p1: createMockProjectionDefinition("p1") }, vi.fn());
       manager.initializeCommandQueues(
-        [{ name: "c1", handlerClass: createMockCommandHandlerClass("c1") }],
+        [sealCommandClass({ name: "c1", handlerClass: createMockCommandHandlerClass("c1") })],
         vi.fn(),
         "test-pipeline",
       );
@@ -710,10 +711,10 @@ describe("QueueManager", () => {
       });
 
       const commandRegistrations = [
-        {
+        sealCommandClass({
           name: "command1",
           handlerClass: createMockCommandHandlerClass("command1"),
-        },
+        }),
       ];
       const storeEventsFn = vi.fn();
 
@@ -734,14 +735,14 @@ describe("QueueManager", () => {
       });
 
       const commandRegistrations = [
-        {
+        sealCommandClass({
           name: "command1",
           handlerClass: createMockCommandHandlerClass("command1"),
-        },
-        {
+        }),
+        sealCommandClass({
           name: "command2",
           handlerClass: createMockCommandHandlerClass("command2"),
-        },
+        }),
       ];
       const storeEventsFn = vi.fn();
 
@@ -774,10 +775,10 @@ describe("QueueManager", () => {
       });
 
       const commandRegistrations = [
-        {
+        sealCommandClass({
           name: "command1",
           handlerClass: createMockCommandHandlerClass("command1"),
-        },
+        }),
       ];
       const storeEventsFn = vi.fn();
 
@@ -813,11 +814,11 @@ describe("QueueManager", () => {
       });
 
       const commandRegistrations = [
-        {
+        sealCommandClass({
           name: "command1",
           handlerClass: createMockCommandHandlerClass("command1"),
           options: { delay: 5000 },
-        },
+        }),
       ];
       const storeEventsFn = vi.fn();
 
@@ -849,10 +850,10 @@ describe("QueueManager", () => {
       });
 
       const commandRegistrations = [
-        {
+        sealCommandClass({
           name: "command1",
           handlerClass: createMockCommandHandlerClass("command1"),
-        },
+        }),
       ];
       const storeEventsFn = vi.fn();
 
@@ -1064,10 +1065,10 @@ describe("QueueManager", () => {
       );
       manager.initializeCommandQueues(
         [
-          {
+          sealCommandClass({
             name: "command1",
             handlerClass: createMockCommandHandlerClass("command1"),
-          },
+          }),
         ],
         vi.fn(),
         "test-pipeline",
@@ -1083,14 +1084,14 @@ describe("QueueManager", () => {
     it("individual facade close is a no-op", async () => {
       manager.initializeCommandQueues(
         [
-          {
+          sealCommandClass({
             name: "command1",
             handlerClass: createMockCommandHandlerClass("command1"),
-          },
-          {
+          }),
+          sealCommandClass({
             name: "command2",
             handlerClass: createMockCommandHandlerClass("command2"),
-          },
+          }),
         ],
         vi.fn(),
         "test-pipeline",

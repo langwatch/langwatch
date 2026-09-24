@@ -126,7 +126,7 @@ describe("ClickHouseExperimentRunProcessingAdapter", () => {
       const { pipeline } = compose();
 
       expect(pipeline.metadata.name).toBe("experiment_run_processing");
-      expect(pipeline.commands.map((command) => command.name)).toEqual([
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "startExperimentRun",
         "recordTargetResult",
         "recordEvaluatorResult",

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
@@ -129,11 +130,11 @@ describe("QueueManager ready scores", () => {
       const registry = new Map<string, JobRegistryEntry>();
       createManager(registry).initializeCommandQueues(
         [
-          {
+          sealCommandClass({
             name: "readyScore",
             handlerClass: createMockCommandHandlerClass() as never,
             options: {},
-          },
+          }),
         ] as never,
         vi.fn(),
         "test-pipeline",

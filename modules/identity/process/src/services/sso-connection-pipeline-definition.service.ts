@@ -85,35 +85,33 @@ import type { SsoConnectionGuardsService } from "./sso-connection-guards.service
  * maps a command type to one of these strings).
  */
 const CONNECTION_COMMANDS = [
-  ["registerConnection", RegisterConnectionCommand],
-  ["claimDomain", ClaimDomainCommand],
-  ["approveDomainClaim", ApproveDomainClaimCommand],
-  ["rejectDomainClaim", RejectDomainClaimCommand],
-  ["discardConnection", DiscardConnectionCommand],
-  ["requestVerification", RequestVerificationCommand],
-  ["attestDomain", AttestDomainCommand],
-  ["withdrawDomain", WithdrawDomainCommand],
-  ["verifyDomain", VerifyDomainCommand],
-  ["activateConnection", ActivateConnectionCommand],
-  ["suspendConnection", SuspendConnectionCommand],
-  ["resumeConnection", ResumeConnectionCommand],
-  ["requestTeardown", RequestTeardownCommand],
-  ["completeTeardown", CompleteTeardownCommand],
-  ["grandfatherConnection", GrandfatherConnectionCommand],
-  ["renameConnection", RenameConnectionCommand],
-  ["registerReplacementConnection", RegisterReplacementConnectionCommand],
-  ["selectMigrationRoute", SelectMigrationRouteCommand],
-  ["beginMigrationFinalization", BeginMigrationFinalizationCommand],
-  ["finalizeMigration", FinalizeMigrationCommand],
-  ["setArrivalPolicy", SetArrivalPolicyCommand],
-  ["recordDomainProofAbsent", RecordDomainProofAbsentCommand],
-  ["recordDomainProofPresent", RecordDomainProofPresentCommand],
+  "registerConnection",
+  "claimDomain",
+  "approveDomainClaim",
+  "rejectDomainClaim",
+  "discardConnection",
+  "requestVerification",
+  "attestDomain",
+  "withdrawDomain",
+  "verifyDomain",
+  "activateConnection",
+  "suspendConnection",
+  "resumeConnection",
+  "requestTeardown",
+  "completeTeardown",
+  "grandfatherConnection",
+  "renameConnection",
+  "registerReplacementConnection",
+  "selectMigrationRoute",
+  "beginMigrationFinalization",
+  "finalizeMigration",
+  "setArrivalPolicy",
+  "recordDomainProofAbsent",
+  "recordDomainProofPresent",
 ] as const;
 
 /** The sender names the pipeline carries, which the ledger's own table must match. */
-export const CONNECTION_COMMAND_NAMES: readonly string[] = CONNECTION_COMMANDS.map(
-  ([name]) => name,
-);
+export const CONNECTION_COMMAND_NAMES: readonly string[] = CONNECTION_COMMANDS;
 
 export interface SsoConnectionPipelineDeps {
   connectionProjectionStore: StateProjectionStore<SsoConnectionFoldState>;
@@ -138,30 +136,133 @@ export class SsoConnectionPipelineDefinitionAdapter {
   static create(
     deps: SsoConnectionPipelineDeps,
   ): StaticPipelineDefinition<SsoConnectionEvent, Record<string, Projection>, RegisteredCommand> {
-    let builder = definePipeline<SsoConnectionEvent>({
+    const builder = definePipeline<SsoConnectionEvent>({
       name: SSO_CONNECTION_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: SSO_CONNECTION_AGGREGATE_TYPE,
         events: defineEvents(SSO_CONNECTION_EVENT_TYPES),
       }),
-    }).withPostgresProjection(
-      new SsoConnectionStateFoldProjection({
-        store: deps.connectionProjectionStore,
-      }),
-    );
-
-    for (const [name, Command] of CONNECTION_COMMANDS) {
-      // The builder mutates and returns ITSELF; what narrows per call is only
-      // its type, and what that type carries is the command-name registry —
-      // which nothing downstream reads, because the ledger resolves senders by
-      // string. So the loop holds one builder type and the table above stays
-      // the readable list of verbs.
-      builder = builder.withCommandInstance(
-        name,
-        Command,
-        new Command(deps.connectionGuards),
-      ) as typeof builder;
-    }
+    })
+      .withPostgresProjection(
+        new SsoConnectionStateFoldProjection({
+          store: deps.connectionProjectionStore,
+        }),
+      )
+      .withCommandInstance(
+        "registerConnection",
+        RegisterConnectionCommand,
+        new RegisterConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "claimDomain",
+        ClaimDomainCommand,
+        new ClaimDomainCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "approveDomainClaim",
+        ApproveDomainClaimCommand,
+        new ApproveDomainClaimCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "rejectDomainClaim",
+        RejectDomainClaimCommand,
+        new RejectDomainClaimCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "discardConnection",
+        DiscardConnectionCommand,
+        new DiscardConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "requestVerification",
+        RequestVerificationCommand,
+        new RequestVerificationCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "attestDomain",
+        AttestDomainCommand,
+        new AttestDomainCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "withdrawDomain",
+        WithdrawDomainCommand,
+        new WithdrawDomainCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "verifyDomain",
+        VerifyDomainCommand,
+        new VerifyDomainCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "activateConnection",
+        ActivateConnectionCommand,
+        new ActivateConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "suspendConnection",
+        SuspendConnectionCommand,
+        new SuspendConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "resumeConnection",
+        ResumeConnectionCommand,
+        new ResumeConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "requestTeardown",
+        RequestTeardownCommand,
+        new RequestTeardownCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "completeTeardown",
+        CompleteTeardownCommand,
+        new CompleteTeardownCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "grandfatherConnection",
+        GrandfatherConnectionCommand,
+        new GrandfatherConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "renameConnection",
+        RenameConnectionCommand,
+        new RenameConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "registerReplacementConnection",
+        RegisterReplacementConnectionCommand,
+        new RegisterReplacementConnectionCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "selectMigrationRoute",
+        SelectMigrationRouteCommand,
+        new SelectMigrationRouteCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "beginMigrationFinalization",
+        BeginMigrationFinalizationCommand,
+        new BeginMigrationFinalizationCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "finalizeMigration",
+        FinalizeMigrationCommand,
+        new FinalizeMigrationCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "setArrivalPolicy",
+        SetArrivalPolicyCommand,
+        new SetArrivalPolicyCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "recordDomainProofAbsent",
+        RecordDomainProofAbsentCommand,
+        new RecordDomainProofAbsentCommand(deps.connectionGuards),
+      )
+      .withCommandInstance(
+        "recordDomainProofPresent",
+        RecordDomainProofPresentCommand,
+        new RecordDomainProofPresentCommand(deps.connectionGuards),
+      );
 
     return builder
       .withProcessManager(CONNECTION_TEARDOWN_PROCESS_NAME, (pm) =>

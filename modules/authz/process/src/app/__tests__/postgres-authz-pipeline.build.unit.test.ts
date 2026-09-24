@@ -145,7 +145,7 @@ describe("PostgresAuthzPipelineAdapter", () => {
 
       expect(pipeline.metadata.name).toBe("authz_grant");
       expect(pipeline.aggregate.type).toBe("authz_grant");
-      expect(pipeline.commands.map((command) => command.name)).toEqual([
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "attachGrant",
         "changeGrantRole",
         "revokeGrant",
@@ -171,7 +171,7 @@ describe("PostgresAuthzPipelineAdapter", () => {
     it("keeps the three grant commands on one aggregate lane and the role commands off it", () => {
       const { pipeline } = compose();
       const optionsFor = (name: string) =>
-        pipeline.commands.find((command) => command.name === name)?.options;
+        pipeline.commands.find((command) => command.definition.name === name)?.definition.options;
 
       for (const name of ["attachGrant", "changeGrantRole", "revokeGrant"]) {
         expect(optionsFor(name), name).toMatchObject({

@@ -52,7 +52,9 @@ export interface KillSwitchComponentSource {
   foldProjections: Map<string, { definition: KillSwitchComponent }>;
   mapProjections: Map<string, { definition: KillSwitchComponent }>;
   stateProjections?: Map<string, { definition: { options?: { killSwitch?: KillSwitchOptions } } }>;
-  commands: readonly { name: string; options?: { killSwitch?: KillSwitchOptions } }[];
+  commands: readonly {
+    definition: { name: string; options?: { killSwitch?: KillSwitchOptions } };
+  }[];
   eventSubscribers: Map<string, KillSwitchComponent>;
 }
 
@@ -90,7 +92,7 @@ export function killSwitchDescriptorsFor(
   for (const [name, projection] of definition.stateProjections ?? []) {
     push("projection", name, projection.definition.options?.killSwitch);
   }
-  for (const command of definition.commands) {
+  for (const { definition: command } of definition.commands) {
     push("command", command.name, command.options?.killSwitch);
   }
   // Subscribers belong here most of all: their enqueue seam discards what it

@@ -12,16 +12,24 @@ import { stripEnvelope, withCommandEnvelope } from "./commandEnvelope.ts";
 import type { CommandHandlerClass } from "./commandHandlerClass.ts";
 import { defineCommandSchema } from "./commandSchema.ts";
 
-/**
- * Return type of defineCommand() — extends CommandHandlerClass with optional makeJobId.
- * Uses Event (base) for the event type parameter so commands are compatible with
- * any pipeline event union (covariant event type).
- */
-export type DefinedCommandClass<TCommandData, TCmdType extends CommandType> = CommandHandlerClass<
+/** The event a defined command produces: its declared type, version and the schema's data. */
+export type DefinedCommandEvent<
+  TEvtType extends EventType,
+  TVersion extends string,
+  TAggType extends AggregateType,
+  TCommandData extends CommandEnvelope,
+> = Omit<Event<Omit<TCommandData, keyof CommandEnvelope>>, "type" | "version" | "aggregateType"> & {
+  type: TEvtType;
+  version: TVersion;
+  aggregateType: TAggType;
+};
+
+/** A command class that declares the one event it produces; `withCommand` checks it (§9). */
+export type DefinedCommandClass<
   TCommandData,
-  TCmdType,
-  Event
-> & {
+  TCmdType extends CommandType,
+  TEvent extends Event,
+> = CommandHandlerClass<TCommandData, TCmdType, TEvent> & {
   makeJobId?: (data: TCommandData) => string;
 };
 
@@ -33,6 +41,8 @@ export function defineCommand<
   TEventDataSchema extends z.ZodObject<z.ZodRawShape>,
   TCmdType extends CommandType,
   TEvtType extends EventType,
+  TVersion extends string,
+  TAggType extends AggregateType,
 >({
   commandType,
   eventType,
@@ -47,8 +57,8 @@ export function defineCommand<
 }: {
   commandType: TCmdType;
   eventType: TEvtType;
-  eventVersion: string;
-  aggregateType: AggregateType;
+  eventVersion: TVersion;
+  aggregateType: TAggType;
   schema: TEventDataSchema;
   aggregateId: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
   idempotencyKey: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
@@ -57,14 +67,19 @@ export function defineCommand<
     data: z.infer<TEventDataSchema> & CommandEnvelope,
   ) => Record<string, string | number | boolean>;
   makeJobId?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
-}): DefinedCommandClass<z.infer<TEventDataSchema> & CommandEnvelope, TCmdType> {
+}): DefinedCommandClass<
+  z.infer<TEventDataSchema> & CommandEnvelope,
+  TCmdType,
+  DefinedCommandEvent<TEvtType, TVersion, TAggType, z.infer<TEventDataSchema> & CommandEnvelope>
+> {
   type CommandData = z.infer<TEventDataSchema> & CommandEnvelope;
+  type ProducedEvent = DefinedCommandEvent<TEvtType, TVersion, TAggType, CommandData>;
 
   const commandDataSchema = withCommandEnvelope(schema);
 
   const cmdSchema = defineCommandSchema(commandType, commandDataSchema);
 
-  class DefinedCommand implements CommandHandler<Command<CommandData>, Event> {
+  class DefinedCommand implements CommandHandler<Command<CommandData>, ProducedEvent> {
     static readonly schema = cmdSchema;
 
     static getAggregateId(payload: CommandData): string {
@@ -79,13 +94,13 @@ export function defineCommand<
 
     static makeJobId: ((payload: CommandData) => string) | undefined = makeJobId;
 
-    handle(command: Command<CommandData>): CommandHandlerResult<Event> {
+    handle(command: Command<CommandData>): CommandHandlerResult<ProducedEvent> {
       const { tenantId: tenantIdStr, data: commandData } = command;
       const tenantId = createTenantId(tenantIdStr);
 
       const eventData = stripEnvelope(commandData);
 
-      const event = EventUtils.createEvent({
+      const event = EventUtils.createEvent<ProducedEvent>({
         aggregateType,
         aggregateId: aggregateId(commandData),
         tenantId,
@@ -105,5 +120,5 @@ export function defineCommand<
   // The inner class structurally satisfies DefinedCommandClass but TS needs the
   // intermediate `unknown` to bridge the nominal gap between class literals and
   // intersection constructor types.
-  return DefinedCommand as unknown as DefinedCommandClass<CommandData, TCmdType>;
+  return DefinedCommand as unknown as DefinedCommandClass<CommandData, TCmdType, ProducedEvent>;
 }

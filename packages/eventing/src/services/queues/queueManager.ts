@@ -2,8 +2,12 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { Command, CommandHandler } from "../../commands/command.ts";
-import type { CommandHandlerClass } from "../../commands/commandHandlerClass.ts";
 import type { CommandSchema } from "../../commands/commandSchema.ts";
+import type {
+  CommandRegistration,
+  SealedCommand,
+  TenantScopedPayload,
+} from "../../commands/sealedCommand.ts";
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { CommandType } from "../../domain/commandType.ts";
 import type { Event } from "../../domain/types.ts";
@@ -21,7 +25,6 @@ import { mapValidationIssues } from "../../utils/errors.ts";
 import {
   type CommandHandlerOptions,
   processCommand,
-  type TenantScopedPayload,
   processCommandBatch,
 } from "../commands/commandDispatcher.ts";
 import { ConfigurationError, ValidationError } from "../errorHandling.ts";
@@ -621,14 +624,8 @@ export class QueueManager<EventType extends Event = Event> {
     });
   };
 
-  initializeCommandQueues<Payload extends Record<string, unknown>>(
-    commandRegistrations: {
-      name: string;
-      handlerClass: CommandHandlerClass<any, any, EventType>;
-      /** Pre-constructed instance — when provided, used instead of `new handlerClass()`. */
-      handlerInstance?: CommandHandler<any, EventType>;
-      options?: CommandHandlerOptions<Payload>;
-    }[],
+  initializeCommandQueues(
+    commands: readonly SealedCommand<EventType>[],
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
     _pipelineName: string,
   ): void {
@@ -638,8 +635,10 @@ export class QueueManager<EventType extends Event = Event> {
 
     // Step 1: resolve every command's name; a later registration of one name replaces the earlier
     const commandRegistry = new Map<string, () => void>();
-    for (const registration of commandRegistrations) {
-      this.registerCommandHandlerEntry(registration, commandRegistry, storeEvents);
+    for (const command of commands) {
+      command.open((registration) =>
+        this.registerCommandHandlerEntry(registration, commandRegistry, storeEvents),
+      );
     }
 
     // Step 2: Register each command in the global queue and create facades
@@ -649,20 +648,18 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   /** Registers a command's handler-registry entry (step 1 of `initializeCommandQueues`). */
-  private registerCommandHandlerEntry<Payload extends TenantScopedPayload>(
-    registration: {
-      name: string;
-      handlerClass: CommandHandlerClass<Payload, CommandType, EventType>;
-      handlerInstance?: CommandHandler<Command<Payload>, EventType>;
-      options?: CommandHandlerOptions<Payload>;
-    },
+  private registerCommandHandlerEntry<
+    Payload extends TenantScopedPayload,
+    Type extends CommandType,
+  >(
+    registration: CommandRegistration<Payload, Type, EventType>,
     commandRegistry: Map<string, () => void>,
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
   ): void {
     const handlerClass = registration.handlerClass;
     const schema = handlerClass.schema;
     const commandType = schema.type;
-    const handlerInstance = registration.handlerInstance ?? new handlerClass();
+    const handlerInstance = registration.createHandler();
 
     const getAggregateId =
       registration.options?.getAggregateId ?? handlerClass.getAggregateId.bind(handlerClass);

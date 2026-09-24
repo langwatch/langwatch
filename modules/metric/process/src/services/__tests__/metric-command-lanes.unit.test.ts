@@ -77,13 +77,20 @@ describe("metric command lanes", () => {
         metricTimeRollupAppendStore: store,
         metricCommandShardCount: 8,
       });
-      const command = pipeline.commands.find((candidate) => candidate.name === "recordDataPoint");
-      const getGroupKey = command?.options?.getGroupKey;
-      expect(getGroupKey).toBeDefined();
+      const command = pipeline.commands.find(
+        (candidate) => candidate.definition.name === "recordDataPoint",
+      );
+      expect(command?.definition.options?.getGroupKey).toBeDefined();
+      const getGroupKey = (payload: unknown) =>
+        command!.open(({ handlerClass, options }) => {
+          const parsed = handlerClass.schema.validate(payload);
+          if (!parsed.success) throw parsed.error;
+          return options?.getGroupKey?.(parsed.data);
+        });
 
       const groups = new Set(
         Array.from({ length: 64 }, (_, index) =>
-          getGroupKey!(
+          getGroupKey(
             point({
               pointId: index.toString(16).padStart(64, "0"),
               timeUnixMs: 1_700_000_000_000 + index,

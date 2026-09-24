@@ -138,7 +138,7 @@ describe("RedisCodingAgentProcessingRepository", () => {
       const { pipeline } = compose();
 
       expect(pipeline.metadata.name).toBe("coding_agent_processing");
-      expect(pipeline.commands.map((command) => command.name)).toEqual([
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
         "contributeSpanFacts",
         "contributeLogFacts",
         "contributeMetricFacts",

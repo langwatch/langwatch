@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
@@ -105,10 +106,10 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
 
       manager.initializeCommandQueues(
         [
-          {
+          sealCommandClass({
             name: "recordResult",
             handlerClass: createMockCommandHandlerClassWithGroupKey("recordResult"),
-          },
+          }),
         ],
         vi.fn(),
         "test-pipeline",
@@ -145,10 +146,10 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
 
       manager.initializeCommandQueues(
         [
-          {
+          sealCommandClass({
             name: "startRun",
             handlerClass: createMockCommandHandlerClass("startRun"),
-          },
+          }),
         ],
         vi.fn(),
         "test-pipeline",
@@ -184,11 +185,11 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
 
       manager.initializeCommandQueues(
         [
-          {
+          sealCommandClass({
             name: "recordResult",
             handlerClass: createMockCommandHandlerClassWithGroupKey("recordResult"),
             options: { getGroupKey: optionsGroupKey },
-          },
+          }),
         ],
         vi.fn(),
         "test-pipeline",
@@ -252,10 +253,10 @@ describe("QueueManager migration preflight targets", () => {
     );
     manager.initializeCommandQueues(
       [
-        {
+        sealCommandClass({
           name: "start",
           handlerClass: createMockCommandHandlerClass("start"),
-        },
+        }),
       ],
       vi.fn(),
       "test-pipeline",
@@ -309,10 +310,10 @@ describe("QueueManager migration preflight targets", () => {
     );
     manager.initializeCommandQueues(
       [
-        {
+        sealCommandClass({
           name: "start",
           handlerClass: createMockCommandHandlerClass("start"),
-        },
+        }),
       ],
       vi.fn(),
       "test-pipeline",
@@ -372,7 +373,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "hot",
               handlerClass: createMockCommandHandlerClass("hot"),
               options: {
@@ -380,7 +381,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
                 coalesceMaxBatch: 200,
                 coalesceMaxBytes: 1024,
               },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -401,11 +402,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "cold",
               handlerClass: createMockCommandHandlerClass("cold"),
               options: { serializeByAggregate: true },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -427,11 +428,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "cold",
               handlerClass: createMockCommandHandlerClass("cold"),
               options: { serializeByAggregate: true },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -453,11 +454,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "hot",
               handlerClass: createMockCommandHandlerClass("hot"),
               options: { serializeByAggregate: true, coalesceMaxBatch: 200 },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -480,10 +481,10 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "sharded",
               handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -504,13 +505,13 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "sharded",
               handlerClass: createMockCommandHandlerClass("sharded"),
               options: {
                 getGroupKey: (payload: any) => `shard:${payload.index}`,
               },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -532,11 +533,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "sharded",
               handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
               options: { coalesceMaxBatch: 256 },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -555,10 +556,10 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "perAggregate",
               handlerClass: createMockCommandHandlerClass("perAggregate"),
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -580,11 +581,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "hot",
               handlerClass: createMockCommandHandlerClass("hot"),
               options: { serializeByAggregate: true, coalesceMaxBatch: bound },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -601,14 +602,14 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "hot",
               handlerClass: createMockCommandHandlerClass("hot"),
               options: {
                 serializeByAggregate: true,
                 coalesceMaxBatch: () => 64,
               },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -625,11 +626,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "sharded",
               handlerClass: createMockCommandHandlerClassWithGroupKey("sharded"),
               options: { coalesceMaxBatch: (p: any) => (p.oversized ? 1 : 64) },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",
@@ -647,11 +648,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
         manager.initializeCommandQueues(
           [
-            {
+            sealCommandClass({
               name: "cold",
               handlerClass: createMockCommandHandlerClass("cold"),
               options: { serializeByAggregate: true, coalesceMaxBatch: 1 },
-            },
+            }),
           ],
           vi.fn(),
           "test-pipeline",

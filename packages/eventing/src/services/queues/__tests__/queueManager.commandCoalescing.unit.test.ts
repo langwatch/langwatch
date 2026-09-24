@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
@@ -64,13 +65,13 @@ function registryFor(): Map<string, JobRegistryEntry> {
     [
       // A high-fan-in producer: many items funnel onto one aggregate, so its
       // appends are worth folding.
-      {
+      sealCommandClass({
         name: "recordCorrelation",
         handlerClass: commandClass("recordCorrelation"),
         options: { coalesceMaxBatch: 256 },
-      },
+      }),
       // One event per human action. Nothing to fold.
-      { name: "addAnnotation", handlerClass: commandClass("addAnnotation") },
+      sealCommandClass({ name: "addAnnotation", handlerClass: commandClass("addAnnotation") }),
     ] as never,
     vi.fn(),
     TEST_CONSTANTS.PIPELINE_NAME,

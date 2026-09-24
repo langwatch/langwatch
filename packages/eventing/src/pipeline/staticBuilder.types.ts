@@ -1,5 +1,4 @@
-import type * as commandModule from "../commands/command.ts";
-import type { CommandHandlerClass } from "../commands/commandHandlerClass.ts";
+import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
@@ -109,13 +108,7 @@ export interface StaticPipelineDefinition<
   mapProjections: Map<string, SealedMapProjection<EventType> & { options?: MapProjectionOptions }>;
 
   /** Command handlers registered in this pipeline */
-  commands: {
-    name: string;
-    handlerClass: CommandHandlerClass<any, any, EventType>;
-    /** Pre-constructed handler instance for DI; used instead of `new handlerClass()`. */
-    handlerInstance?: commandModule.CommandHandler<any, EventType>;
-    options?: CommandHandlerOptions;
-  }[];
+  commands: SealedCommand<EventType>[];
 
   /** Subscribers attached to fold projections (post-fold side-effect handlers) */
   foldSubscribers: Map<

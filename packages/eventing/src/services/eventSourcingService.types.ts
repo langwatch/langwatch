@@ -1,6 +1,6 @@
 import type { createLogger } from "@langwatch/observability";
 
-import type { CommandHandlerClass } from "../commands/commandHandlerClass.ts";
+import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event, EventOrderingStrategy } from "../domain/types.ts";
 import type { KillSwitch } from "../kill-switch/index.ts";
@@ -19,7 +19,6 @@ import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.
 import type { EventStore } from "../stores/eventStore.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
-import type { CommandHandlerOptions } from "./commands/commandDispatcher.ts";
 import type { JobRegistryEntry } from "./queues/queueManager.ts";
 
 /**
@@ -90,11 +89,7 @@ export interface EventSourcingServiceOptions<
   /**
    * Command handler registrations for this pipeline.
    */
-  commandRegistrations?: {
-    name: string;
-    handlerClass: CommandHandlerClass<any, any, EventType>;
-    options?: CommandHandlerOptions<unknown>;
-  }[];
+  commandRegistrations?: readonly SealedCommand<EventType>[];
   /**
    * Subscribers (post-fold side-effect handlers) for this pipeline.
    * `ReadonlyArray` since the service only reads it, so an `as const` list

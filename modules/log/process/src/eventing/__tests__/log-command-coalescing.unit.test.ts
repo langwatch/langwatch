@@ -73,7 +73,10 @@ function batchParamsFor({
     events: CanonicalLogRecordReceivedEvent[],
     context: EventStoreReadContext<CanonicalLogRecordReceivedEvent>,
   ) => Promise<void>;
-}): ProcessCommandBatchParams<CanonicalLogRecordReceivedEvent> {
+}): ProcessCommandBatchParams<
+  CanonicalLogRecordReceivedEvent,
+  Parameters<typeof RecordCanonicalLogCommand.getAggregateId>[0]
+> {
   return {
     payloads: payloads.map((payload) => ({ ...payload })),
     commandType: RECORD_CANONICAL_LOG_COMMAND_TYPE,
@@ -99,10 +102,12 @@ describe("log command append coalescing", () => {
           logCommandShardCount: 8,
         });
 
-        const command = pipeline.commands.find((candidate) => candidate.name === "recordLogRecord");
+        const command = pipeline.commands.find(
+          (candidate) => candidate.definition.name === "recordLogRecord",
+        );
 
-        expect(command?.options?.coalesceMaxBatch).toBe(LOG_COMMAND_COALESCE_MAX_BATCH);
-        expect(command?.options?.getGroupKey).toBeDefined();
+        expect(command?.definition.options?.coalesceMaxBatch).toBe(LOG_COMMAND_COALESCE_MAX_BATCH);
+        expect(command?.definition.options?.getGroupKey).toBeDefined();
       });
     });
   });
