@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { createEventCatalogue, defineAggregate, defineEvents } from "../definitions.ts";
+import { aggregateWithEvents, createEventCatalogue, defineAggregate } from "../definitions.ts";
 
 describe("event catalogue", () => {
   /** @scenario "The application composes an explicit event catalogue" */
   it("registers aggregate-owned event types", () => {
-    const traces = defineAggregate({
-      type: "trace",
-      events: defineEvents(["lw.obs.trace.started", "lw.obs.trace.finished"] as const),
+    const traces = aggregateWithEvents({
+      aggregate: defineAggregate({ type: "trace" }),
+      eventTypes: ["lw.obs.trace.started", "lw.obs.trace.finished"],
     });
     const catalogue = createEventCatalogue([traces]);
 
@@ -17,11 +17,11 @@ describe("event catalogue", () => {
   });
 
   it("rejects duplicate aggregate types", () => {
-    const first = defineAggregate({
-      type: "trace",
-      events: defineEvents(["lw.obs.trace.started"] as const),
+    const first = aggregateWithEvents({
+      aggregate: defineAggregate({ type: "trace" }),
+      eventTypes: ["lw.obs.trace.started"],
     });
-    const second = defineAggregate({ type: "trace", events: [] });
+    const second = defineAggregate({ type: "trace" });
 
     expect(() => createEventCatalogue([first, second])).toThrow(
       'Aggregate type "trace" is registered twice',
@@ -29,21 +29,21 @@ describe("event catalogue", () => {
   });
 
   it("allows infrastructure-only pipelines to share an empty global aggregate", () => {
-    const first = defineAggregate({ type: "global", events: [] });
-    const second = defineAggregate({ type: "global", events: [] });
+    const first = defineAggregate({ type: "global" });
+    const second = defineAggregate({ type: "global" });
 
     expect(() => createEventCatalogue([first, second])).not.toThrow();
   });
 
   /** @scenario "Conflicting event definitions are rejected" */
   it("rejects an event type owned by multiple aggregates", () => {
-    const traces = defineAggregate({
-      type: "trace",
-      events: defineEvents(["lw.obs.shared.received"] as const),
+    const traces = aggregateWithEvents({
+      aggregate: defineAggregate({ type: "trace" }),
+      eventTypes: ["lw.obs.shared.received"],
     });
-    const logs = defineAggregate({
-      type: "log",
-      events: defineEvents(["lw.obs.shared.received"] as const),
+    const logs = aggregateWithEvents({
+      aggregate: defineAggregate({ type: "log" }),
+      eventTypes: ["lw.obs.shared.received"],
     });
 
     expect(() => createEventCatalogue([traces, logs])).toThrow(
@@ -53,9 +53,9 @@ describe("event catalogue", () => {
 
   it("rejects an event routed to the wrong aggregate", () => {
     const catalogue = createEventCatalogue([
-      defineAggregate({
-        type: "trace",
-        events: defineEvents(["lw.obs.trace.started"] as const),
+      aggregateWithEvents({
+        aggregate: defineAggregate({ type: "trace" }),
+        eventTypes: ["lw.obs.trace.started"],
       }),
     ]);
 

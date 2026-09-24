@@ -3,17 +3,19 @@ import {
   INGESTION_PULL_COMMAND_TYPES,
   INGESTION_PULL_EVENT_TYPES,
   INGESTION_PULL_EVENT_VERSIONS,
-  INGESTION_PULL_PROCESSING_EVENT_TYPES,
   ingestionPullConfiguredCommandDataSchema,
   ingestionPullDisabledEventDataSchema,
   ingestionPullRunCompletedEventDataSchema,
   ingestionPullRunFailedEventDataSchema,
   type IngestionPullProcessingEvent,
+  ingestionPullConfiguredEventSchema,
+  ingestionPullDisabledEventSchema,
+  ingestionPullRunCompletedEventSchema,
+  ingestionPullRunFailedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import {
   defineAggregate,
   defineCommand,
-  defineEvents,
   definePipeline,
   type Event,
   type Projection,
@@ -62,13 +64,18 @@ export class IngestionPullEventingAdapter {
     Record<string, Projection>,
     RegisteredCommand
   > {
-    return definePipeline<EventingIngestionPullEvent>({
+    return definePipeline({
       name: "ingestion_pull_processing",
       aggregate: defineAggregate({
         type: INGESTION_PULL_AGGREGATE_TYPE,
-        events: defineEvents(INGESTION_PULL_PROCESSING_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        ingestionPullConfiguredEventSchema,
+        ingestionPullDisabledEventSchema,
+        ingestionPullRunCompletedEventSchema,
+        ingestionPullRunFailedEventSchema,
+      ])
       .withPostgresProjection(
         IngestionPullRunStatusEventingProjection.create(this.options.runStatusStore),
       )

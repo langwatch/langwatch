@@ -32,7 +32,6 @@ import {
   TopicClusteringRunFailedEventSchema,
   TopicClusteringTopicsRecordedEventSchema,
 } from "./topic-events.service.ts";
-import type { TopicClusteringProcessingEvent } from "./topic-events.service.ts";
 
 // Composition needs the projection state types to declare its stores; the
 // projection implementations stay private to the feature server.
@@ -59,7 +58,7 @@ export interface TopicClusteringProcessingPipelineDeps {
 
 /** The topic_clustering_processing pipeline definition itself, built once per deps. */
 const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingPipelineDeps) => {
-  return definePipeline<TopicClusteringProcessingEvent>({
+  return definePipeline({
     name: "topic_clustering_processing",
     aggregate: defineAggregate({
       type: "topic_clustering",

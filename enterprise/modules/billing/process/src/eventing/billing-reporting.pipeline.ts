@@ -50,12 +50,13 @@ export class BillingReportingPipeline {
       },
     });
 
-    return definePipeline<Event>({
+    return definePipeline({
       name: BILLING_REPORTING_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: "billing_report",
       }),
     })
+      .withEvents([])
       .withCommandInstance(
         "reportUsageForMonth",
         ReportUsageForMonthCommandHandler,

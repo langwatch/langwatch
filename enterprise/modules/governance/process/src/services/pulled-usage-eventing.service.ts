@@ -4,16 +4,16 @@ import {
   PULLED_USAGE_EVENT_TYPES,
   PULLED_USAGE_EVENT_VERSIONS,
   PULLED_USAGE_PIPELINE_NAME,
-  PULLED_USAGE_PROCESSING_EVENT_TYPES,
   pulledUsageObservationKey,
   pulledUsageObservedEventDataSchema,
   type PulledUsageObservedEvent,
   type PulledUsageRetractedEvent,
+  pulledUsageObservedEventSchema,
+  pulledUsageRetractedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import {
   defineAggregate,
   defineCommand,
-  defineEvents,
   definePipeline,
   type Event,
   type Projection,
@@ -80,13 +80,14 @@ export class PulledUsageEventingAdapter {
     Record<string, Projection>,
     RegisteredCommand
   > {
-    const pipeline = definePipeline<PulledUsageEvent>({
+    const pipeline = definePipeline({
       name: PULLED_USAGE_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: PULLED_USAGE_AGGREGATE_TYPE,
-        events: defineEvents(PULLED_USAGE_PROCESSING_EVENT_TYPES),
       }),
-    }).withCommand("recordPulledUsage", RecordPulledUsageCommand);
+    })
+      .withEvents([pulledUsageObservedEventSchema, pulledUsageRetractedEventSchema])
+      .withCommand("recordPulledUsage", RecordPulledUsageCommand);
     if (this.ledger) {
       pipeline.withProcessManager(PULLED_USAGE_LEDGER_PROCESS_NAME, this.ledger.processManager());
     }

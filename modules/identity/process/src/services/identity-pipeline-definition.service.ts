@@ -77,7 +77,7 @@ export class IdentityPipelineDefinitionAdapter {
     Record<string, Projection>,
     RegisteredCommand
   > {
-    return definePipeline<IdentityEvent | MfaEvent>({
+    return definePipeline({
       name: IDENTITY_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: USER_IDENTITY_AGGREGATE_TYPE,

@@ -1,16 +1,19 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
 
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
-import type { Event } from "../../domain/types.ts";
 import type { SubscriberSpec, TriggerContext } from "../../pipeline/processManagerDefinition.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
+import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import type { FoldProjectionDefinition } from "../foldProjection.types.ts";
 import type { MapProjectionDefinition } from "../mapProjection.types.ts";
 import { sealFoldProjection, sealMapProjection } from "../sealedProjection.ts";
 
-type Started = Event<{ at: number }> & { type: "run.started" };
-type Finished = Event<{ ok: boolean }> & { type: "run.finished" };
+const startedSchema = testEventSchema("run.started", z.object({ at: z.number() }));
+const finishedSchema = testEventSchema("run.finished", z.object({ ok: z.boolean() }));
+type Started = z.infer<typeof startedSchema>;
+type Finished = z.infer<typeof finishedSchema>;
 type RunEvent = Started | Finished;
 
 const counter: FoldProjectionDefinition<{ count: number }, RunEvent> & { name: "counter" } = {
@@ -55,13 +58,13 @@ const started: RunEvent = { ...envelope, id: "e1", type: "run.started", data: { 
 const finished: RunEvent = { ...envelope, id: "e2", type: "run.finished", data: { ok: true } };
 
 function runPipeline() {
-  return definePipeline<RunEvent>({
+  return definePipeline({
     name: "run",
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(["run.started", "run.finished"] as const),
     }),
   })
+    .withEvents([startedSchema, finishedSchema])
     .withClickHouseFoldProjection(counter)
     .withClickHouseFoldProjection(outcome);
 }

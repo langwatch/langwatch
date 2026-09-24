@@ -2,7 +2,6 @@
 
 import {
   GOVERNANCE_EVENTS_AGGREGATE_TYPE,
-  GOVERNANCE_EVENTS_EVENT_TYPES,
   GOVERNANCE_EVENTS_EVENT_VERSION_LATEST,
   GOVERNANCE_EVENTS_PIPELINE_NAME,
   GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE,
@@ -13,12 +12,13 @@ import {
   type RecordVkLifecycleCommandData,
   recordBudgetCrossingCommandDataSchema,
   recordVkLifecycleCommandDataSchema,
+  governanceVkLifecycleEventSchema,
+  governanceBudgetCrossingEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import {
   createTenantId,
   defineAggregate,
   defineCommandSchema,
-  defineEvents,
   definePipeline,
   EventUtils,
   type Command,
@@ -127,13 +127,13 @@ export class GovernanceEventsAdapter {
     Record<string, Projection>,
     RegisteredCommand
   > {
-    let pipeline = definePipeline<GovernanceEventsProcessingEvent>({
+    let pipeline = definePipeline({
       name: GOVERNANCE_EVENTS_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: GOVERNANCE_EVENTS_AGGREGATE_TYPE,
-        events: defineEvents(GOVERNANCE_EVENTS_EVENT_TYPES),
       }),
     })
+      .withEvents([governanceVkLifecycleEventSchema, governanceBudgetCrossingEventSchema])
       .withCommand("recordVkLifecycle", RecordVkLifecycleCommand)
       .withCommand("recordBudgetCrossing", RecordBudgetCrossingCommand);
     if (this.deps.webhookDelivery) {

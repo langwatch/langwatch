@@ -157,7 +157,7 @@ export class SsoConnectionPipelineDefinitionAdapter {
   static create(
     deps: SsoConnectionPipelineDeps,
   ): StaticPipelineDefinition<SsoConnectionEvent, Record<string, Projection>, RegisteredCommand> {
-    const builder = definePipeline<SsoConnectionEvent>({
+    const builder = definePipeline({
       name: SSO_CONNECTION_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: SSO_CONNECTION_AGGREGATE_TYPE,

@@ -47,7 +47,7 @@ export type LogProcessingPipeline = StaticPipelineDefinition<
 export function createLogProcessingPipeline(
   deps: LogProcessingPipelineDeps,
 ): LogProcessingPipeline {
-  let builder = definePipeline<LogProcessingEvent>({
+  let builder = definePipeline({
     name: LOG_PROCESSING_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "log" }),
   })

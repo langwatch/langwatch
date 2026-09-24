@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { DisabledPipeline } from "../../disabledPipeline.ts";
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
@@ -10,30 +11,35 @@ import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProce
 import {
   createMockEventStore,
   createMockMapProjectionDefinition,
+  testEventSchema,
 } from "../../services/__tests__/testHelpers.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
+
+const pipelineEventSchema = testEventSchema("test.event", z.record(z.string(), z.unknown()));
+type PipelineEvent = z.infer<typeof pipelineEventSchema>;
 
 /**
  * Creates a minimal static pipeline definition for testing.
  */
 function createTestPipelineDefinition() {
-  return definePipeline<Event>({
+  return definePipeline({
     name: "test-pipeline",
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(["test.event"] as const),
     }),
-  }).build();
+  })
+    .withEvents([pipelineEventSchema])
+    .build();
 }
 
 function createProcessPipelineDefinition() {
-  return definePipeline<Event>({
+  return definePipeline({
     name: "process-pipeline",
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(["test.event"] as const),
     }),
   })
+    .withEvents([pipelineEventSchema])
     .withProcessManager("durable-process", (process) =>
       process
         .state({ handled: 0 })
@@ -205,27 +211,27 @@ describe("EventSourcing", () => {
 
     it("forwards projection payload preparation into the live pipeline", async () => {
       const eventStore = createMockEventStore<Event>();
-      const mapProjection = createMockMapProjectionDefinition<Event>("spanStorage", {
+      const mapProjection = createMockMapProjectionDefinition<PipelineEvent>("spanStorage", {
         eventTypes: ["test.event"],
       });
-      const prepare = vi.fn((event: Event) => ({
+      const prepare = vi.fn((event: PipelineEvent) => ({
         ...event,
         data: { ...(event.data as Record<string, unknown>), leaned: true },
       }));
-      const definition = definePipeline<Event>({
+      const definition = definePipeline({
         name: "prepared-pipeline",
         aggregate: defineAggregate({
           type: "trace",
-          events: defineEvents(["test.event"] as const),
         }),
       })
+        .withEvents([pipelineEventSchema])
         .withProjectionPayloadPreparation(prepare)
         .withClickHouseMapProjection(mapProjection)
         .build();
       const eventSourcing = EventSourcing.createForTesting({ eventStore });
       const pipeline = eventSourcing.register(definition);
       const tenantId = createTenantId("project-1");
-      const event: Event = {
+      const event: PipelineEvent = {
         id: "event-1",
         aggregateId: "trace-1",
         aggregateType: "trace",

@@ -7,7 +7,7 @@ import type { CommandSchema } from "../../commands/commandSchema.ts";
 import { defineCommandSchema } from "../../commands/commandSchema.ts";
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { CommandType } from "../../domain/commandType.ts";
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event, Projection } from "../../domain/types.ts";
 import type {
@@ -22,6 +22,7 @@ import type { EventSourcedQueueProcessor } from "../../queues/index.ts";
 import {
   createTestEvent,
   TEST_COMMAND_TYPES,
+  TEST_EVENT_SCHEMAS,
   TEST_EVENT_TYPES,
 } from "../../services/__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
@@ -275,13 +276,13 @@ export function createMinimalPipelineDefinition() {
       TestEvent
     >,
   ) => {
-    return definePipeline<TestEvent>({
+    return definePipeline({
       name: "test-pipeline",
       aggregate: defineAggregate({
         type: "trace",
-        events: defineEvents(TEST_EVENT_TYPES),
       }),
     })
+      .withEvents(TEST_EVENT_SCHEMAS)
       .withCommand("testCommand", HandlerClass)
       .build();
   };

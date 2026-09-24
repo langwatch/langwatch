@@ -72,7 +72,7 @@ function buildSimulationProcessingPipelineDefinition(
 ): SimulationProcessingPipelineDefinition {
   const commands = SimulationProcessingCommandsAdapter.create();
 
-  return definePipeline<SimulationProcessingEvent>({
+  return definePipeline({
     name: "simulation_processing",
     aggregate: defineAggregate({
       type: "simulation_run",

@@ -7,9 +7,9 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 
 import type { AuthApp } from "../app/auth.app.ts";
@@ -31,10 +31,11 @@ export function buildSignInLockMaintenance({
   repositories,
   processStore,
 }: EventingSetup<Pick<AuthRepositories, "signInLocks">, unknown>): StaticPipelineDefinition<Event> {
-  return definePipeline<Event>({
+  return definePipeline({
     name: SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
   })
+    .withEvents([])
     .withProcessManager(SIGN_IN_LOCK_REAP_PROCESS_NAME, (pm) =>
       pm
         .state<SignInLockReapState>(SIGN_IN_LOCK_REAP_INITIAL_STATE)

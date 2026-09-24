@@ -80,7 +80,7 @@ export class JoinRequestPipelineDefinitionAdapter {
   static create(
     deps: JoinRequestPipelineDeps,
   ): StaticPipelineDefinition<JoinRequestEvent, Record<string, Projection>, RegisteredCommand> {
-    const builder = definePipeline<JoinRequestEvent>({
+    const builder = definePipeline({
       name: JOIN_REQUEST_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: JOIN_REQUEST_AGGREGATE_TYPE,

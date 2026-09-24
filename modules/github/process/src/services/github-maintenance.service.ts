@@ -1,10 +1,10 @@
 import {
   defineAggregate,
   definePipeline,
-  type Event,
   type ProcessStore,
   type Projection,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 
 import type { GithubBranchMaintenance } from "../app/github.members.ts";
@@ -44,7 +44,7 @@ export class EventingGithubMaintenanceAdapter {
   build(): StaticPipelineDefinition<Event, Record<string, Projection>, never> {
     const deps = this.deps;
 
-    return definePipeline<Event>({
+    return definePipeline({
       name: "github_maintenance",
       aggregate: defineAggregate({
         // `global`, like the other maintenance pipelines: this appends no events,
@@ -52,6 +52,7 @@ export class EventingGithubMaintenanceAdapter {
         type: "global",
       }),
     })
+      .withEvents([])
       .withProcessManager(GITHUB_BRANCH_RECHECK_PROCESS_NAME, (pm) =>
         pm
           .state<GithubBranchRecheckState>(GITHUB_BRANCH_RECHECK_INITIAL_STATE)

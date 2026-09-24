@@ -33,7 +33,7 @@ export type ScenarioLifecyclePipeline = StaticPipelineDefinition<
 export function buildScenarioLifecyclePipeline(
   nurturing: ScenarioCreatedNurturingDeps,
 ): ScenarioLifecyclePipeline {
-  return definePipeline<ScenarioLifecycleEvent>({
+  return definePipeline({
     name: SCENARIO_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: SCENARIO_AGGREGATE_TYPE,

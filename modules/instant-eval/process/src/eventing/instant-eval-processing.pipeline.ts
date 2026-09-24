@@ -56,7 +56,7 @@ function buildInstantEvalProcessingPipeline(
 ): InstantEvalProcessingPipelineDefinition {
   const commands = InstantEvalProcessingCommandsAdapter.create();
 
-  return definePipeline<InstantEvalProcessingEvent>({
+  return definePipeline({
     name: INSTANT_EVAL_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: INSTANT_EVAL_AGGREGATE_TYPE,

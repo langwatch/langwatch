@@ -92,7 +92,7 @@ export class EventingGatewaySpendAdapter {
     Record<string, Projection>,
     RegisteredCommand
   > {
-    let pipeline = definePipeline<GatewaySpendProcessingEvent>({
+    let pipeline = definePipeline({
       name: GATEWAY_SPEND_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: GATEWAY_SPEND_AGGREGATE_TYPE,

@@ -1,5 +1,4 @@
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
-import type { Event } from "../../domain/types.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import {
   type ProcessRetentionSweepDeps,
@@ -26,7 +25,7 @@ export interface ProcessManagerMaintenancePipelineDeps {
 export function createProcessManagerMaintenancePipeline(
   deps: ProcessManagerMaintenancePipelineDeps,
 ) {
-  return definePipeline<Event>({
+  return definePipeline({
     name: "process_manager_maintenance",
     aggregate: defineAggregate({
       // `global`, like blob_maintenance and langy_maintenance: this pipeline
@@ -34,9 +33,9 @@ export function createProcessManagerMaintenancePipeline(
       // in the event store would be taxonomy debt for nothing. The sweep spans
       // every tenant by design.
       type: "global",
-      events: defineEvents([]),
     }),
   })
+    .withEvents([])
     .withProcessManager(PROCESS_RETENTION_SWEEP_PROCESS_NAME, (pm) =>
       pm
         .state<ProcessRetentionSweepState>(PROCESS_RETENTION_SWEEP_INITIAL_STATE)

@@ -8,12 +8,12 @@ import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { defineCommandSchema } from "../../commands/commandSchema.ts";
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
-import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import { InMemoryProcessStore } from "../../process-manager/stores/inMemoryProcessStore.ts";
+import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
 
@@ -23,7 +23,8 @@ const PROCESS_NAME = "run-execution";
 /** The event schema version, in the ISO-date form the event contract requires. */
 const EVENT_SCHEMA_VERSION = "2026-09-02";
 
-type RecordedEvent = Event<{ note: string }> & { type: "producer.recorded" };
+const recordedEventSchema = testEventSchema("producer.recorded", z.object({ note: z.string() }));
+type RecordedEvent = z.infer<typeof recordedEventSchema>;
 
 const recordPayloadSchema = z.object({
   tenantId: z.string(),
@@ -62,13 +63,13 @@ class RecordCommand implements CommandHandler<
  * not do at all before this mode existed.
  */
 function pipelineWithProcessManager() {
-  return definePipeline<RecordedEvent>({
+  return definePipeline({
     name: "producer-process-pipeline",
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(["producer.recorded"] as const),
     }),
   })
+    .withEvents([recordedEventSchema])
     .withProcessManager(PROCESS_NAME, (process) =>
       process
         .state({ handled: 0 })

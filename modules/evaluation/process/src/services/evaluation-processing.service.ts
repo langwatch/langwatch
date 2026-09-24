@@ -62,7 +62,7 @@ export class EvaluationProcessingAdapter {
   > {
     const commands = EvaluationCommandAdapter.create();
 
-    return definePipeline<EvaluationProcessingEvent>({
+    return definePipeline({
       name: "evaluation_processing",
       aggregate: defineAggregate({
         type: "evaluation",

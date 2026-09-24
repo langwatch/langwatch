@@ -101,7 +101,7 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
 
   const commands = EventingTraceProcessingAdapter.create();
 
-  return definePipeline<TraceProcessingEvent>({
+  return definePipeline({
     name: TRACE_PROCESSING_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: "trace",

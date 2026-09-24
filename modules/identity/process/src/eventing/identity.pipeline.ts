@@ -7,7 +7,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
 } from "@langwatch/eventing";
 
@@ -37,10 +36,11 @@ export const IDENTITY_MAINTENANCE_PIPELINE_NAME = "identity_maintenance";
 export const identityEventing = defineEventingModule({
   pipeline: IDENTITY_MAINTENANCE_PIPELINE_NAME,
   build: ({ app, processStore }: EventingSetup<IdentityRepositories, IdentityApp>) =>
-    definePipeline<Event>({
+    definePipeline({
       name: IDENTITY_MAINTENANCE_PIPELINE_NAME,
       aggregate: defineAggregate({ type: "global" }),
     })
+      .withEvents([])
       .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
         pm
           .state<BreakGlassExpiryWarnState>(BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE)

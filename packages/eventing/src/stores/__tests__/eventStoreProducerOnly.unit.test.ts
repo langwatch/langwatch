@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import { defineCommandSchema } from "../../commands/commandSchema.ts";
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
@@ -17,13 +17,15 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../queues/queue.types.ts";
+import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { EventUtils } from "../../utils/event.utils.ts";
 import type { EventStoreReadContext } from "../eventStore.types.ts";
 import { EventStoreProducerOnly } from "../eventStoreProducerOnly.ts";
 
 const readContext: EventStoreReadContext = { tenantId: createTenantId("organization-1") };
 
-type RecordedEvent = Event<{ note: string }> & { type: "producer.recorded" };
+const recordedEventSchema = testEventSchema("producer.recorded", z.object({ note: z.string() }));
+type RecordedEvent = z.infer<typeof recordedEventSchema>;
 
 const recordPayloadSchema = z.object({
   tenantId: z.string(),
@@ -57,13 +59,13 @@ class RecordCommand implements CommandHandler<
 }
 
 function producerPipeline() {
-  return definePipeline<RecordedEvent>({
+  return definePipeline({
     name: "producer-only-pipeline",
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(["producer.recorded"] as const),
     }),
   })
+    .withEvents([recordedEventSchema])
     .withCommand("record", RecordCommand)
     .build();
 }

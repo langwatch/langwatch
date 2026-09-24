@@ -109,7 +109,7 @@ export class EventingCodingAgentProcessingAdapter {
     const github = deps.github;
     const contextMemo =
       deps.sessionContextMemo ?? RedisSessionContextMemoRepository.create(deps.redis);
-    const builder = definePipeline<CodingAgentProcessingEvent>({
+    const builder = definePipeline({
       name: "coding_agent_processing",
       aggregate: defineAggregate({
         type: "coding_agent_session",

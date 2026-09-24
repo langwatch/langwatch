@@ -1,23 +1,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
+import { createTenantId } from "../../domain/tenantId.ts";
 import type { Event } from "../../domain/types.ts";
 import type { StateProjectionDefinition } from "../../projections/stateProjection.types.ts";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
+  testEventSchema,
 } from "../../services/__tests__/testHelpers.ts";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types.ts";
 import { definePipeline } from "../staticBuilder.ts";
 
-function testPipeline<E extends Event>() {
-  return definePipeline<E>({
+const pipelineEventSchema = testEventSchema("test.event", z.record(z.string(), z.unknown()));
+type PipelineEvent = z.infer<typeof pipelineEventSchema>;
+
+function testPipeline() {
+  return definePipeline({
     name: "test-pipeline",
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(["test.event"] as const),
     }),
-  });
+  }).withEvents([pipelineEventSchema]);
 }
 
 function createMockStateProjectionDefinition<E extends Event>(
@@ -49,9 +54,9 @@ describe("PipelineBuilder validations", () => {
 
   describe("when projection payload preparation is configured", () => {
     it("keeps the transform on the built definition", () => {
-      const prepare = vi.fn((event: Event) => event);
+      const prepare = vi.fn((event: PipelineEvent) => event);
 
-      const pipeline = testPipeline<Event>().withProjectionPayloadPreparation(prepare).build();
+      const pipeline = testPipeline().withProjectionPayloadPreparation(prepare).build();
 
       expect(pipeline.prepareEventForProjection).toBe(prepare);
     });
@@ -61,10 +66,10 @@ describe("PipelineBuilder validations", () => {
     it("builds successfully", () => {
       const fold = {
         ...createMockFoldProjectionDefinition<Event>("withKey"),
-        key: (event: Event) => String(event.tenantId),
+        key: (event: PipelineEvent) => String(event.tenantId),
       };
 
-      expect(() => testPipeline<Event>().withClickHouseFoldProjection(fold).build()).not.toThrow();
+      expect(() => testPipeline().withClickHouseFoldProjection(fold).build()).not.toThrow();
     });
   });
 
@@ -72,7 +77,7 @@ describe("PipelineBuilder validations", () => {
     it("builds successfully", () => {
       const fold = createMockFoldProjectionDefinition<Event>("simple");
 
-      expect(() => testPipeline<Event>().withClickHouseFoldProjection(fold).build()).not.toThrow();
+      expect(() => testPipeline().withClickHouseFoldProjection(fold).build()).not.toThrow();
     });
   });
 
@@ -84,7 +89,7 @@ describe("PipelineBuilder validations", () => {
         handle: vi.fn(),
       };
 
-      const pipeline = testPipeline<Event>()
+      const pipeline = testPipeline()
         .withEventSubscriber("conversationProcess", subscriber)
         .build();
 
@@ -95,14 +100,21 @@ describe("PipelineBuilder validations", () => {
   });
 
   describe("when a subscriber uses custom deduplication", () => {
-    const event = {
-      tenantId: "project-1",
+    const event: PipelineEvent = {
+      id: "event-1",
       aggregateId: "trace-1",
-    } as Event;
+      aggregateType: "trace",
+      tenantId: createTenantId("project-1"),
+      type: "test.event",
+      version: "2026-01-01",
+      createdAt: 1,
+      occurredAt: 1,
+      data: {},
+    };
 
     it("preserves the full deduplication contract on a fold subscriber", () => {
       const fold = createMockFoldProjectionDefinition<Event>("summary");
-      const pipeline = testPipeline<Event>()
+      const pipeline = testPipeline()
         .withClickHouseFoldProjection(fold)
         .withProjectionSubscriber("settle", {
           fold: "summary",
@@ -136,7 +148,7 @@ describe("PipelineBuilder validations", () => {
       // behind the 2026-07-31 parallel sweep storm (dedup bounded staging,
       // nothing bounded concurrency).
       const laneFn = (e: Event) => `lane:${e.tenantId}`;
-      const pipeline = testPipeline<Event>()
+      const pipeline = testPipeline()
         .withEventSubscriber("settle", {
           events: ["trace_received"],
           groupKeyFn: laneFn,
@@ -155,7 +167,7 @@ describe("PipelineBuilder validations", () => {
       // dropping it recreates the raw-subscriber gap on the subscriber path.
       const laneFn = (e: Event) => `lane:${e.tenantId}`;
       const fold = createMockFoldProjectionDefinition<Event>("summary");
-      const pipeline = testPipeline<Event>()
+      const pipeline = testPipeline()
         .withClickHouseFoldProjection(fold)
         .withProjectionSubscriber("settle", {
           fold: "summary",
@@ -171,7 +183,7 @@ describe("PipelineBuilder validations", () => {
     });
 
     it("preserves the full deduplication contract on a raw subscriber", () => {
-      const pipeline = testPipeline<Event>()
+      const pipeline = testPipeline()
         .withEventSubscriber("settle", {
           events: ["trace_received"],
           dedup: {
@@ -202,7 +214,7 @@ describe("PipelineBuilder validations", () => {
     it("keeps it out of the legacy fold and subscriber registries", () => {
       const projection = createMockStateProjectionDefinition<Event>("conversationState");
 
-      const pipeline = testPipeline<Event>().withPostgresProjection(projection).build();
+      const pipeline = testPipeline().withPostgresProjection(projection).build();
 
       expect(pipeline.stateProjections?.get("conversationState")?.definition).toBe(projection);
       expect(pipeline.foldProjections.size).toBe(0);
@@ -213,7 +225,7 @@ describe("PipelineBuilder validations", () => {
     it("cannot be used as a subscriber parent", () => {
       const projection = createMockStateProjectionDefinition<Event>("conversationState");
       expect(() =>
-        testPipeline<Event>()
+        testPipeline()
           .withPostgresProjection(projection)
           .withProjectionSubscriber("shouldNotAttach", {
             fold: "conversationState" as never,
@@ -232,7 +244,7 @@ describe("PipelineBuilder validations", () => {
       };
 
       expect(() =>
-        testPipeline<Event>()
+        testPipeline()
           .withEventSubscriber("conversationProcess", subscriber)
           .withEventSubscriber("conversationProcess", subscriber),
       ).toThrow(/already exists/);
@@ -243,7 +255,7 @@ describe("PipelineBuilder validations", () => {
     it("stores the registration in foldSubscribers", () => {
       const fold = createMockFoldProjectionDefinition<Event>("myFold");
 
-      const pipeline = testPipeline<Event>()
+      const pipeline = testPipeline()
         .withClickHouseFoldProjection(fold)
         .withProjectionSubscriber("mySubscriber", {
           fold: "myFold" as never,
@@ -261,7 +273,7 @@ describe("PipelineBuilder validations", () => {
     it("stores the registration in mapSubscribers", () => {
       const mapProj = createMockMapProjectionDefinition<Event>("myMap");
 
-      const pipeline = testPipeline<Event>()
+      const pipeline = testPipeline()
         .withClickHouseMapProjection(mapProj)
         .withProjectionSubscriber("mySubscriber", {
           map: "myMap",
@@ -280,7 +292,7 @@ describe("PipelineBuilder validations", () => {
       const fold = createMockFoldProjectionDefinition<Event>("myFold");
 
       expect(() =>
-        testPipeline<Event>()
+        testPipeline()
           .withClickHouseFoldProjection(fold)
           .withProjectionSubscriber("mySubscriber", {
             fold: "myFold" as never,
@@ -300,7 +312,7 @@ describe("PipelineBuilder validations", () => {
       const fold = createMockFoldProjectionDefinition<Event>("myFold");
 
       expect(() =>
-        testPipeline<Event>()
+        testPipeline()
           .withClickHouseFoldProjection(fold)
           .withProjectionSubscriber("sameName", {
             fold: "myFold" as never,

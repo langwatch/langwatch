@@ -2,9 +2,9 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -23,10 +23,11 @@ export const USAGE_REPORT_PIPELINE_NAME = "ops_usage_report";
 export function buildOpsUsageReportPipeline(
   deps: UsageReportRunDeps,
 ): StaticPipelineDefinition<Event> {
-  return definePipeline<Event>({
+  return definePipeline({
     name: USAGE_REPORT_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
   })
+    .withEvents([])
     .withProcessManager(USAGE_REPORT_PROCESS_NAME, usageReportPM(deps))
     .build();
 }

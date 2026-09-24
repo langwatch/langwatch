@@ -1,11 +1,12 @@
 import type { Logger } from "@langwatch/observability";
 import { type Mock, vi } from "vitest";
+import { z } from "zod";
 
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { EventType } from "../../domain/eventType.ts";
 import type { TenantId } from "../../domain/tenantId.ts";
 import { createTenantId } from "../../domain/tenantId.ts";
-import type { Event, Projection } from "../../domain/types.ts";
+import { type Event, EventSchema, type Projection } from "../../domain/types.ts";
 import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
@@ -18,6 +19,19 @@ import type { EventStore, EventStoreReadContext } from "../../stores/eventStore.
 import type { QueueManager } from "../queues/queueManager.ts";
 
 export const TEST_EVENT_TYPES = ["test.event.one", "test.event.two"] as const;
+/** A whole test event schema for `.withEvents`, the envelope plus one type literal and its data. */
+export function testEventSchema<const Type extends string, Data extends z.ZodType>(
+  type: Type,
+  data: Data,
+) {
+  return z.object({ ...EventSchema.shape, type: z.literal(type), data });
+}
+
+export const TEST_EVENT_SCHEMAS = [
+  testEventSchema(TEST_EVENT_TYPES[0], z.object({ result: z.string() })),
+  testEventSchema(TEST_EVENT_TYPES[1], z.object({ result: z.string() })),
+] as const;
+
 export const TEST_COMMAND_TYPES = ["test.command.run"] as const;
 
 /**

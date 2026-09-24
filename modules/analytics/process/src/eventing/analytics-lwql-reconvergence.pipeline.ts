@@ -7,9 +7,9 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -41,10 +41,11 @@ export function buildLwqlReconvergence({
   app: LwqlReconvergenceApp;
   bootedAt?: number;
 }): StaticPipelineDefinition<Event> {
-  return definePipeline<Event>({
+  return definePipeline({
     name: LWQL_RECONVERGENCE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
   })
+    .withEvents([])
     .withProcessManager(LWQL_RECONVERGENCE_PROCESS_NAME, (pm) =>
       pm
         .state<LwqlReconvergenceState>(LWQL_RECONVERGENCE_INITIAL_STATE)

@@ -9,9 +9,9 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -38,10 +38,11 @@ export function buildConnectedBilling({
 }: EventingSetup<unknown, Pick<BillingApi, "runConnectedBillingTick">> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<Event> {
-  return definePipeline<Event>({
+  return definePipeline({
     name: CONNECTED_BILLING_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
   })
+    .withEvents([])
     .withProcessManager(CONNECTED_BILLING_PROCESS_NAME, (pm) =>
       pm
         .state<ConnectedBillingTickState>(CONNECTED_BILLING_INITIAL_STATE)

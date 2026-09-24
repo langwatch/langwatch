@@ -1,3 +1,4 @@
+import { createTenantId } from "@langwatch/eventing";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
@@ -21,9 +22,13 @@ import { IdentityProducerPipelinesAdapter } from "../producer-identity-pipelines
 const PROCESS_NAME = "langwatch-api";
 
 /** The command names a definition declares, in the order it declares them. */
-function commandNamesOf(definition: { commands: readonly { name: string }[] }): string[] {
-  return definition.commands.map((command) => command.name);
+function commandNamesOf(definition: {
+  commands: readonly { definition: { name: string } }[];
+}): string[] {
+  return definition.commands.map((command) => command.definition.name);
 }
+
+const storeContext = { aggregateId: "aggregate_1", tenantId: createTenantId("org_1") };
 
 describe("given a process that produces identity commands without consuming them", () => {
   describe("when it builds the four definitions", () => {
@@ -97,30 +102,26 @@ describe("given a process that produces identity commands without consuming them
     it("refuses the projection read by name, saying which process reached it", async () => {
       const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
-      }).joinRequestPipeline() as unknown as {
-        stateProjections: Map<string, { store: { get(): Promise<unknown> } }>;
-      };
-      const projection = [...definition.stateProjections.values()][0];
+      }).joinRequestPipeline();
+      const projection = [...(definition.stateProjections?.values() ?? [])][0];
       if (!projection)
         throw new Error("the join-request definition registered no state projection");
 
-      await expect(projection.store.get()).rejects.toThrow(
-        /langwatch-api registered the join-requests pipeline as a producer only/,
-      );
+      await expect(
+        projection.open((state) => state.store.get(storeContext.aggregateId, storeContext)),
+      ).rejects.toThrow(/langwatch-api registered the join-requests pipeline as a producer only/);
     });
 
     it("refuses a guard's read by name rather than answering an empty head", async () => {
       const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
-      }).ssoConnectionPipeline() as unknown as {
-        stateProjections: Map<string, { store: { store(): Promise<unknown> } }>;
-      };
-      const projection = [...definition.stateProjections.values()][0];
+      }).ssoConnectionPipeline();
+      const projection = [...(definition.stateProjections?.values() ?? [])][0];
       if (!projection) throw new Error("the connection definition registered no state projection");
 
-      await expect(projection.store.store()).rejects.toThrow(
-        /langwatch-api registered the sso-connections pipeline as a producer only/,
-      );
+      await expect(
+        projection.open((state) => state.store.get(storeContext.aggregateId, storeContext)),
+      ).rejects.toThrow(/langwatch-api registered the sso-connections pipeline as a producer only/);
     });
 
     /**
@@ -131,15 +132,13 @@ describe("given a process that produces identity commands without consuming them
     it("refuses the directory-sync head rather than answering an empty one", async () => {
       const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
-      }).scimSyncPipeline() as unknown as {
-        stateProjections: Map<string, { store: { get(): Promise<unknown> } }>;
-      };
-      const projection = [...definition.stateProjections.values()][0];
+      }).scimSyncPipeline();
+      const projection = [...(definition.stateProjections?.values() ?? [])][0];
       if (!projection) throw new Error("the scim-sync definition registered no state projection");
 
-      await expect(projection.store.get()).rejects.toThrow(
-        /langwatch-api registered the scim-sync pipeline as a producer only/,
-      );
+      await expect(
+        projection.open((state) => state.store.get(storeContext.aggregateId, storeContext)),
+      ).rejects.toThrow(/langwatch-api registered the scim-sync pipeline as a producer only/);
     });
 
     it("refuses the directory move on a finished migration rather than dropping it", async () => {

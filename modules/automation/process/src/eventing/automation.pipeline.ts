@@ -73,7 +73,7 @@ export interface AutomationsPipelineDeps {
 
 /** The whole process-manager topology, factored out so its inferred return type can be named. */
 const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
-  return definePipeline<AutomationEvent>({
+  return definePipeline({
     name: "automations",
     aggregate: defineAggregate({
       type: "trigger",

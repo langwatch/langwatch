@@ -1,3 +1,4 @@
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import type { PulledUsageRateReader } from "../app/governance.members.ts";
@@ -50,7 +51,7 @@ describe("governance server", () => {
       id: "event",
       aggregateId: "source",
       aggregateType: "ingestion_pull" as const,
-      tenantId: "project",
+      tenantId: createTenantId("project"),
       createdAt: 30,
       occurredAt: 30,
       type: "lw.obs.ingestion_pull.run_completed" as const,

@@ -7,9 +7,9 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -33,10 +33,11 @@ export function buildLicenseSync({
 }: EventingSetup<unknown, Pick<LicensingApp, "syncLicenses">> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<Event> {
-  return definePipeline<Event>({
+  return definePipeline({
     name: LICENSE_SYNC_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
   })
+    .withEvents([])
     .withProcessManager(LICENSE_SYNC_PROCESS_NAME, (pm) =>
       pm
         .state<LicenseSyncState>(LICENSE_SYNC_INITIAL_STATE)

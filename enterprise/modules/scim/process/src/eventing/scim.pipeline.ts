@@ -7,9 +7,9 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -34,10 +34,11 @@ export function buildScimMaintenance({
   app,
   processStore,
 }: EventingSetup<unknown, Pick<ScimApp, "sweepExpiredRequests">>): StaticPipelineDefinition<Event> {
-  return definePipeline<Event>({
+  return definePipeline({
     name: SCIM_MAINTENANCE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
   })
+    .withEvents([])
     .withProcessManager(SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME, (pm) =>
       pm
         .state<ScimRequestLogRetentionState>(SCIM_REQUEST_LOG_RETENTION_INITIAL_STATE)

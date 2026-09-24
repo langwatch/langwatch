@@ -1,5 +1,5 @@
 import { defineAggregate, definePipeline, type FoldProjectionStore } from "@langwatch/eventing";
-import type { SuiteRunStateData, SuiteRunProcessingEvent } from "@langwatch/suite-contract";
+import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import {
   SuiteRunStartedEventSchema,
   SuiteRunItemStartedEventSchema,
@@ -41,7 +41,7 @@ const buildSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) =
   const commands = SuiteRunCommandsAdapter.create();
 
   return (
-    definePipeline<SuiteRunProcessingEvent>({
+    definePipeline({
       name: "suite_run_processing",
       aggregate: defineAggregate({
         type: "suite_run",

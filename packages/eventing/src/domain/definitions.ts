@@ -13,46 +13,36 @@ export interface AggregateDefinition<
   readonly events: Events;
 }
 
-export function defineEvent<const Type extends EventType>(type: Type): EventDefinition<Type> {
-  return Object.freeze({ type });
-}
-
-export function defineEvents<const Types extends readonly EventType[]>(
-  types: Types,
-): { readonly [Index in keyof Types]: EventDefinition<Types[Index]> } {
-  return types.map((type) => defineEvent(type)) as {
-    readonly [Index in keyof Types]: EventDefinition<Types[Index]>;
-  };
-}
-
-export function defineAggregate<
-  const Type extends AggregateType,
-  const Events extends readonly EventDefinition[],
->(definition: {
+export function defineAggregate<const Type extends AggregateType>(definition: {
   readonly type: Type;
-  readonly events?: Events;
-}): AggregateDefinition<Type, Events> {
-  const events = definition.events ?? [];
+}): AggregateDefinition<Type, readonly []> {
   if (definition.type.trim().length === 0) {
     throw new Error("Aggregate type must be a non-empty string");
   }
+  return Object.freeze({ type: definition.type, events: Object.freeze([] as const) });
+}
 
+/** The aggregate a pipeline registers: its type and the types its `.withEvents` schemas name. */
+export function aggregateWithEvents<const Type extends AggregateType>({
+  aggregate,
+  eventTypes,
+}: {
+  aggregate: AggregateDefinition<Type>;
+  eventTypes: readonly EventType[];
+}): AggregateDefinition<Type> {
   const seen = new Set<string>();
-  for (const event of events) {
-    if (event.type.trim().length === 0) {
-      throw new Error(`Aggregate "${definition.type}" has an empty event type`);
+  for (const type of eventTypes) {
+    if (type.trim().length === 0) {
+      throw new Error(`Aggregate "${aggregate.type}" has an empty event type`);
     }
-    if (seen.has(event.type)) {
-      throw new Error(
-        `Aggregate "${definition.type}" declares event "${event.type}" more than once`,
-      );
+    if (seen.has(type)) {
+      throw new Error(`Aggregate "${aggregate.type}" declares event "${type}" more than once`);
     }
-    seen.add(event.type);
+    seen.add(type);
   }
-
   return Object.freeze({
-    type: definition.type,
-    events: Object.freeze([...events]) as unknown as Events,
+    type: aggregate.type,
+    events: Object.freeze(eventTypes.map((type) => Object.freeze({ type }))),
   });
 }
 

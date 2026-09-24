@@ -106,7 +106,7 @@ function buildLangyConversationPipeline(
   Record<string, Projection>,
   RegisteredCommand
 > {
-  let builder = definePipeline<LangyConversationProcessingEvent>({
+  let builder = definePipeline({
     name: "langy_conversation_processing",
     aggregate: defineAggregate({
       type: "langy_conversation",

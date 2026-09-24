@@ -1,8 +1,8 @@
 import {
   defineAggregate,
   definePipeline,
-  type Event,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 
 import {
@@ -51,7 +51,7 @@ export class EventingAgentSandboxMaintenanceAdapter {
     const sandboxKeyReap = this.deps.sandboxKeyReap;
     const cliLoginKeyReap = this.deps.cliLoginKeyReap;
 
-    return definePipeline<Event>({
+    return definePipeline({
       name: "agent_sandbox_maintenance",
       aggregate: defineAggregate({
         // `global`, like the other maintenance pipelines: this one appends no
@@ -59,6 +59,7 @@ export class EventingAgentSandboxMaintenanceAdapter {
         type: "global",
       }),
     })
+      .withEvents([])
       .withProcessManager(AGENT_SANDBOX_KEY_REAP_PROCESS_NAME, (pm) =>
         pm
           .state<AgentSandboxKeyReapState>(AGENT_SANDBOX_KEY_REAP_INITIAL_STATE)

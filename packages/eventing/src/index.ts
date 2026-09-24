@@ -14,13 +14,7 @@ export { defineCommand } from "./commands/defineCommand.ts";
 export { eventIdempotencyKey } from "./commands/idempotency-key.ts";
 // Domain types
 export { AggregateTypeSchema, type AggregateType } from "./domain/aggregateType.ts";
-export {
-  createEventCatalogue,
-  defineAggregate,
-  defineEvent,
-  defineEvents,
-  EventCatalogue,
-} from "./domain/definitions.ts";
+export { createEventCatalogue, defineAggregate, EventCatalogue } from "./domain/definitions.ts";
 export type { AggregateDefinition, EventDefinition } from "./domain/definitions.ts";
 export type { PipelineEventSchema } from "./domain/eventSchemas.ts";
 export type { EventType } from "./domain/eventType.ts";
@@ -48,7 +42,12 @@ export type { EventSourcingOptions } from "./eventSourcing.ts";
 // Runtime
 export { EventSourcing } from "./eventSourcing.ts";
 // Pipeline (static definitions)
-export { definePipeline, type PipelineBuilder } from "./pipeline/staticBuilder.ts";
+export {
+  type DeclaredEvents,
+  definePipeline,
+  type PipelineBuilder,
+  type PipelineDeclaration,
+} from "./pipeline/staticBuilder.ts";
 // The seam into a module: one declaration `.withEventing(...)` takes.
 export {
   defineEventingModule,

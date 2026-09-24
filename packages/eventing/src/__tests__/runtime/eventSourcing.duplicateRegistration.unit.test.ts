@@ -5,26 +5,26 @@
  * modules/trace/specs/trace-processing-registration-ownership.feature}
  */
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
-import type { Event } from "../../domain/types.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
+import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 
-type RecordedEvent = Event<{ note: string }> & { type: "trace.recorded" };
+const recordedEventSchema = testEventSchema("trace.recorded", z.object({ note: z.string() }));
 
 /**
  * Two definitions over one name, differing exactly the way the real pair does:
  * the draining one carries a subscriber, the producing one carries none.
  */
 function definePipelineOverOneName(options: { withSubscriber: boolean }) {
-  const pipeline = definePipeline<RecordedEvent>({
+  const pipeline = definePipeline({
     name: "trace_processing",
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(["trace.recorded"] as const),
     }),
-  });
+  }).withEvents([recordedEventSchema]);
   if (!options.withSubscriber) return pipeline.build();
   return pipeline
     .withEventSubscriber("recordedSpans", {
@@ -93,9 +93,10 @@ describe("given two pipelines with different names", () => {
           name: "trace_maintenance",
           aggregate: defineAggregate({
             type: "trace_maintenance_run",
-            events: defineEvents(["trace.maintained"] as const),
           }),
-        }).build(),
+        })
+          .withEvents([testEventSchema("trace.maintained", z.object({}))])
+          .build(),
       );
 
       expect(eventSourcing.definitions.map((definition) => definition.metadata.name)).toEqual([

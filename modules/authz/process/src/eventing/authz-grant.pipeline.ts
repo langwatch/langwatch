@@ -11,11 +11,7 @@ import {
   GRANT_COALESCE_MAX_BATCH,
   RevokeGrantCommand,
 } from "./authz-grant.commands.ts";
-import {
-  AUTHZ_GRANT_AGGREGATE_TYPE,
-  type AuthzGrantsEvent,
-  authzGrantEventSchemas,
-} from "./authz-grant.events.ts";
+import { AUTHZ_GRANT_AGGREGATE_TYPE, authzGrantEventSchemas } from "./authz-grant.events.ts";
 import { AuthzGrantProjection } from "./authz-grant.projection.ts";
 import { EventingAuthzAuditAdapter } from "./authz-grant.subscriber.ts";
 
@@ -28,7 +24,7 @@ export interface EventingAuthzAdapterOptions {
 
 const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
   return (
-    definePipeline<AuthzGrantsEvent>({
+    definePipeline({
       name: AUTHZ_GRANT_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: AUTHZ_GRANT_AGGREGATE_TYPE,

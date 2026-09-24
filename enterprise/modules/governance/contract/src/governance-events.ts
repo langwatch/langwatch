@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { governanceEventEnvelopeSchema } from "./governance.ts";
+
 /** Content-free governance facts delivered by the webhook platform. */
 export const GOVERNANCE_EVENTS_PIPELINE_NAME = "governance_events_processing" as const;
 export const GOVERNANCE_EVENTS_AGGREGATE_TYPE = "governance_subject" as const;
@@ -59,3 +61,13 @@ export const recordBudgetCrossingCommandDataSchema = z.object({
   occurred_at: z.number().int().positive(),
 });
 export type RecordBudgetCrossingCommandData = z.infer<typeof recordBudgetCrossingCommandDataSchema>;
+
+export const governanceVkLifecycleEventSchema = governanceEventEnvelopeSchema.safeExtend({
+  type: z.literal(GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE),
+  data: recordVkLifecycleCommandDataSchema,
+});
+
+export const governanceBudgetCrossingEventSchema = governanceEventEnvelopeSchema.safeExtend({
+  type: z.literal(GOVERNANCE_BUDGET_CROSSING_EVENT_TYPE),
+  data: recordBudgetCrossingCommandDataSchema,
+});

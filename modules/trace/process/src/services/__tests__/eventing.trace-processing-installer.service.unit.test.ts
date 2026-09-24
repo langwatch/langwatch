@@ -2,9 +2,21 @@ import {
   type DatasetNormalizePayload,
   DatasetNormalizationWorker,
 } from "@langwatch/dataset-contract";
-import { defineAggregate, defineEvents, definePipeline, EventSourcing } from "@langwatch/eventing";
+import { defineAggregate, definePipeline, EventSourcing } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { TRACE_PROCESSING_EVENT_TYPES, type TraceProcessingEvent } from "@langwatch/trace-contract";
+import {
+  annotationAddedEventSchema,
+  annotationRemovedEventSchema,
+  annotationsBulkSyncedEventSchema,
+  logContributedEventSchema,
+  logRecordReceivedEventSchema,
+  metricDataPointCorrelatedEventSchema,
+  originResolvedEventSchema,
+  spanReceivedEventSchema,
+  spanRecordedEventSchema,
+  topicAssignedEventSchema,
+  traceNameChangedEventSchema,
+} from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -33,13 +45,23 @@ class TestTracePipeline implements TraceProcessingPipeline {
     deferredOrigins: TraceDeferredOriginScheduler;
   }): TraceProcessingPipelineDefinition {
     this.deferredOrigins = options.deferredOrigins;
-    return definePipeline<TraceProcessingEvent>({
+    return definePipeline({
       name: "trace_processing",
-      aggregate: defineAggregate({
-        type: "trace",
-        events: defineEvents(TRACE_PROCESSING_EVENT_TYPES),
-      }),
+      aggregate: defineAggregate({ type: "trace" }),
     })
+      .withEvents([
+        spanReceivedEventSchema,
+        spanRecordedEventSchema,
+        topicAssignedEventSchema,
+        logRecordReceivedEventSchema,
+        logContributedEventSchema,
+        metricDataPointCorrelatedEventSchema,
+        originResolvedEventSchema,
+        annotationAddedEventSchema,
+        annotationRemovedEventSchema,
+        annotationsBulkSyncedEventSchema,
+        traceNameChangedEventSchema,
+      ])
       .withCommand("resolveOrigin", EventingTraceOriginAdapter)
       .withCommand("assignTopic", EventingTraceTopicAdapter)
       .build() as unknown as TraceProcessingPipelineDefinition;

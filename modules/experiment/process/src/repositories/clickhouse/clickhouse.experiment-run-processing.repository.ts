@@ -224,7 +224,7 @@ export class ExperimentEventingAdapter {
   static pipeline(
     deps: ClickhouseExperimentRunProcessingRepository,
   ): ExperimentRunProcessingPipeline {
-    const builder = definePipeline<ExperimentRunProcessingEvent>({
+    const builder = definePipeline({
       name: "experiment_run_processing",
       aggregate: defineAggregate({
         type: "experiment_run",

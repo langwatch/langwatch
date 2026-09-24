@@ -28,7 +28,7 @@ export const governanceEventEnvelopeSchema = z
     id: z.string().min(1),
     aggregateId: z.string().min(1),
     aggregateType: z.string().min(1),
-    tenantId: z.string().min(1),
+    tenantId: z.string().min(1).brand<"TenantId">(),
     createdAt: z.number().int().nonnegative(),
     occurredAt: z.number().int().nonnegative(),
     type: z.string().min(1),

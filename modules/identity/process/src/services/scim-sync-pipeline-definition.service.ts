@@ -50,7 +50,7 @@ export class ScimSyncPipelineDefinitionAdapter {
   static create(
     deps: ScimSyncPipelineDeps,
   ): StaticPipelineDefinition<ScimSyncEvent, Record<string, Projection>, RegisteredCommand> {
-    const builder = definePipeline<ScimSyncEvent>({
+    const builder = definePipeline({
       name: SCIM_SYNC_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: SCIM_SYNC_AGGREGATE_TYPE,

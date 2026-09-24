@@ -62,7 +62,7 @@ export type MetricProcessingPipeline = StaticPipelineDefinition<
 function createMetricProcessingPipeline(
   deps: MetricProcessingPipelineDeps,
 ): MetricProcessingPipeline {
-  let builder = definePipeline<MetricProcessingEvent>({
+  let builder = definePipeline({
     name: "metric_processing",
     aggregate: defineAggregate({
       type: "metric",

@@ -1,8 +1,8 @@
 import {
   defineAggregate,
   definePipeline,
-  type Event,
   type StaticPipelineDefinition,
+  type Event,
 } from "@langwatch/eventing";
 
 import {
@@ -33,7 +33,7 @@ export class EventingLangyMaintenanceAdapter {
 
   buildProcessing(): StaticPipelineDefinition<Event> {
     const sessionKeyReap = this.deps.sessionKeyReap;
-    return definePipeline<Event>({
+    return definePipeline({
       name: "langy_maintenance",
       aggregate: defineAggregate({
         // `global`, like blob_maintenance: this pipeline appends no events, so
@@ -42,6 +42,7 @@ export class EventingLangyMaintenanceAdapter {
         type: "global",
       }),
     })
+      .withEvents([])
       .withProcessManager(LANGY_SESSION_KEY_REAP_PROCESS_NAME, (pm) =>
         pm
           .state<LangySessionKeyReapState>({ lastReapAt: null })

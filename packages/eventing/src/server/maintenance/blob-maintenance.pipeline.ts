@@ -1,7 +1,6 @@
 import { BLOB_SWEEP_INTERVAL_MS } from "@langwatch/group-queue/operational";
 
-import { defineAggregate, defineEvents } from "../../domain/definitions.ts";
-import type { Event } from "../../domain/types.ts";
+import { defineAggregate } from "../../domain/definitions.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import { type BlobCleanupDeps, runBlobCleanup } from "./blob-cleanup.intent.ts";
 import {
@@ -21,7 +20,7 @@ export interface BlobMaintenancePipelineDeps {
  * Exactly-once is inherited: only the worker with the tick's winning commit proceeds.
  */
 export function createBlobMaintenancePipeline(deps: BlobMaintenancePipelineDeps) {
-  return definePipeline<Event>({
+  return definePipeline({
     name: "blob_maintenance",
     aggregate: defineAggregate({
       // `global` rather than a new taxonomy entry: aggregate types are a
@@ -30,9 +29,9 @@ export function createBlobMaintenancePipeline(deps: BlobMaintenancePipelineDeps)
       // debt for nothing. The sweep is genuinely global — it belongs to the queue,
       // not to a tenant.
       type: "global",
-      events: defineEvents([]),
     }),
   })
+    .withEvents([])
     .withProcessManager(BLOB_CLEANUP_PROCESS_NAME, (pm) =>
       pm
         .state<BlobCleanupState>(BLOB_CLEANUP_INITIAL_STATE)
