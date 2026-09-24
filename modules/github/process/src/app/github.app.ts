@@ -1,3 +1,4 @@
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   GithubApi,
   type GithubApi as GithubApiContract,
@@ -23,7 +24,7 @@ import {
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
 import { reads, type ProcessMembers } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
@@ -212,7 +213,11 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
 export class GithubApp implements GithubApiContract {
   static readonly reads = reads("redis", "secrets");
   static readonly contract = GithubApi;
-  static readonly dependencies = { organizations: OrganizationApi, projects: ProjectApi };
+  static readonly dependencies = {
+    organizations: OrganizationApi,
+    projects: ProjectApi,
+    permissions: AuthzApi,
+  };
   static readonly config = githubConfig;
   static readonly secrets = {
     privateKey: Secret.load("GITHUB_LANGY_PRIVATE_KEY", { optional: true }),
@@ -221,10 +226,19 @@ export class GithubApp implements GithubApiContract {
 
   readonly #service: GithubApiContract;
   readonly #branchMaintenance: GithubBranchMaintenance;
+  readonly #projects: ProjectApiContract;
+  readonly #permissions: AuthzApi;
 
-  private constructor(service: GithubApiContract, branchMaintenance: GithubBranchMaintenance) {
-    this.#service = service;
-    this.#branchMaintenance = branchMaintenance;
+  private constructor(parts: {
+    service: GithubApiContract;
+    branchMaintenance: GithubBranchMaintenance;
+    projects: ProjectApiContract;
+    permissions: AuthzApi;
+  }) {
+    this.#service = parts.service;
+    this.#branchMaintenance = parts.branchMaintenance;
+    this.#projects = parts.projects;
+    this.#permissions = parts.permissions;
   }
 
   /**
@@ -361,8 +375,8 @@ export class GithubApp implements GithubApiContract {
     };
     const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
 
-    return new GithubApp(
-      GithubApp.composeApi({
+    return new GithubApp({
+      service: GithubApp.composeApi({
         repositories,
         redis: members.redis,
         organization: dependencies.organizations,
@@ -380,13 +394,27 @@ export class GithubApp implements GithubApiContract {
       // `github_maintenance` (ADR-144), ported from the deleted
       // `GithubWorkerFeatureInstaller`: composed here, not received, so the
       // sweep runs over this same graph's rows.
-      GithubApp.composeBranchMaintenance({
+      branchMaintenance: GithubApp.composeBranchMaintenance({
         repositories,
         redis: members.redis,
         config: branchConfig,
         ...hostConfig,
       }),
-    );
+      projects: dependencies.projects,
+      permissions: dependencies.permissions,
+    });
+  }
+
+  /** The capability the installation and connection doors read: this module itself. */
+  github(): GithubApiContract {
+    return this;
+  }
+  /** Connecting grants the whole organization's repository access, so it takes management. */
+  canManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean> {
+    return this.#permissions.hasPermission({ ...input, permission: "organization:manage" });
+  }
+  findOrganizationForProject(projectId: string): Promise<string | undefined> {
+    return this.#projects.findOrganizationId(projectId);
   }
 
   /** The fleet-wide branch sweep `github_maintenance` schedules. */
