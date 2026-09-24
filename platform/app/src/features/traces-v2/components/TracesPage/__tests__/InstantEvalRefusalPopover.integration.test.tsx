@@ -103,7 +103,7 @@ describe("given the Instant Evals flag is off for the project", () => {
       ).toBeInTheDocument();
       expect(
         screen.getByText(
-          "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Contact us and we'll switch them on for you.",
+          "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
@@ -121,7 +121,7 @@ describe("given the Instant Evals flag is off for the project", () => {
         "Instant Evals aren't enabled for this project yet",
       );
       expect(copy.body).toBe(
-        "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Contact us and we'll switch them on for you.",
+        "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
       );
       expect(copy.action).toEqual({
         label: "Contact us",

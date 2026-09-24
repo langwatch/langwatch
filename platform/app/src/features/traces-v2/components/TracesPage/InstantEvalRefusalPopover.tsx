@@ -73,7 +73,7 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   }
   return {
     title: "Instant Evals aren't enabled for this project yet",
-    body: `${what} Contact us and we'll switch them on for you.`,
+    body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
     action: { label: "Contact us", href: CONTACT_US_HREF },
     dismiss: "Not now",
   };
