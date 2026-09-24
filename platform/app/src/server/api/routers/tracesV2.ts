@@ -62,7 +62,6 @@ import {
 } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import {
-  CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
@@ -92,6 +91,7 @@ import {
   applySpanProtections,
   extractRedactionsFromAllSpanInputs,
   extractRedactionsFromAllSpanOutputs,
+  hiddenContentCategoryRules,
   redactObject,
 } from "~/server/traces/mappers/redaction";
 import type {
@@ -630,32 +630,6 @@ export function contentSearchTermsForViewer({
 }
 
 /**
- * Synthetic hidden-attribute rules for the standalone system/tools attribute
- * keys (`gen_ai.system_instructions`, `gen_ai.tool.call.*`, …) when those
- * categories are hidden from the viewer, so their values are replaced by the
- * audience-naming placeholder in the attributes table just like a custom
- * restrict rule — the conversation turns are handled separately.
- */
-function hiddenCategoryAttributeRules(
-  protections: V2Protections,
-): Array<{ pattern: string; visibleTo: string }> {
-  const cats = protections.contentCategories;
-  if (!cats) return [];
-  const rules: Array<{ pattern: string; visibleTo: string }> = [];
-  for (const category of ["system", "tools"] as const) {
-    if (!cats[category].canSee) {
-      for (const key of CONTENT_KEY_CATALOG[category]) {
-        rules.push({
-          pattern: key,
-          visibleTo: cats[category].restrictVisibleTo ?? "no one",
-        });
-      }
-    }
-  }
-  return rules;
-}
-
-/**
  * Recursively remove hidden chat turns from any attribute value: drop messages
  * whose role is hidden, strip assistant `tool_calls` when tool calls are hidden,
  * and apply the same to JSON-string-encoded conversations. This covers the raw
@@ -755,13 +729,13 @@ export function redactV2Content<
     if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
     redacted.attributes = attributes;
   }
-  // Custom attribute rules with a restrict disposition, plus the standalone
-  // system/tools attribute keys when those categories are hidden: replace the
+  // Custom attribute rules with a restrict disposition, plus the attribute
+  // keys of every content category hidden from the viewer: replace the
   // matched attribute values (header attributes, span params, span-event
   // attributes) with the placeholder naming who can see them.
   const hidden = [
     ...(protections.hiddenAttributes ?? []),
-    ...hiddenCategoryAttributeRules(protections),
+    ...hiddenContentCategoryRules(protections),
   ];
   if (hidden.length > 0) {
     const matchers = compileHiddenAttributeMatchers(hidden);

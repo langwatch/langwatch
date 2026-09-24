@@ -40,9 +40,19 @@ function makeSpan(params: Record<string, unknown>): Span {
   } as unknown as Span;
 }
 
-function protect(span: Span) {
+function protect(span: Span): Span["params"] {
   const redactions = new Set(extractRedactionsFromAllSpanInputs([span]));
-  return applySpanProtections(span, INPUT_HIDDEN, redactions).params as any;
+  return applySpanProtections(span, INPUT_HIDDEN, redactions).params;
+}
+
+/** The value at a dotted path inside the (nested) span params. */
+function at(params: Span["params"], path: string): unknown {
+  let node: unknown = params;
+  for (const key of path.split(".")) {
+    if (typeof node !== "object" || node === null) return undefined;
+    node = (node as Record<string, unknown>)[key];
+  }
+  return node;
 }
 
 describe("applySpanProtections", () => {
@@ -60,7 +70,9 @@ describe("applySpanProtections", () => {
         }),
       );
 
-      expect(params.langwatch.input).toBe("[REDACTED] (visible to Admins)");
+      expect(at(params, "langwatch.input")).toBe(
+        "[REDACTED] (visible to Admins)",
+      );
     });
 
     /** @scenario "Hiding input does not blank unrelated attributes" */
@@ -81,7 +93,7 @@ describe("applySpanProtections", () => {
         }),
       );
 
-      expect(params.langwatch.langchain.run.extra_params).toEqual({
+      expect(at(params, "langwatch.langchain.run.extra_params")).toEqual({
         tool_choice: "user_selected",
         schema_type: "text",
         max_tokens: 1024,
@@ -94,7 +106,7 @@ describe("applySpanProtections", () => {
         makeSpan({ app: { echo: `the user asked: ${PROMPT}` } }),
       );
 
-      expect(params.app.echo).toBe("[REDACTED]");
+      expect(at(params, "app.echo")).toBe("[REDACTED]");
     });
 
     /** @scenario "Hidden input copied into another attribute is still scrubbed" */
@@ -103,7 +115,7 @@ describe("applySpanProtections", () => {
         makeSpan({ app: { verdict: `the model said ${SHORT_ANSWER}.` } }),
       );
 
-      expect(params.app.verdict).toBe("[REDACTED]");
+      expect(at(params, "app.verdict")).toBe("[REDACTED]");
     });
 
     /** @scenario "Hidden input copied into another attribute is still scrubbed" */
@@ -112,14 +124,14 @@ describe("applySpanProtections", () => {
         makeSpan({ app: { deal: "merger with Initech" } }),
       );
 
-      expect(params.app.deal).toBe("[REDACTED]");
+      expect(at(params, "app.deal")).toBe("[REDACTED]");
     });
 
     /** @scenario "Hiding input does not blank unrelated attributes" */
     it("keeps a value that only contains a short hidden word inside a longer word", () => {
       const params = protect(makeSpan({ app: { rule: "antifraud_v2" } }));
 
-      expect(params.app.rule).toBe("antifraud_v2");
+      expect(at(params, "app.rule")).toBe("antifraud_v2");
     });
   });
 
@@ -141,14 +153,15 @@ describe("applySpanProtections", () => {
           canSeeCosts: true,
           canSeeCapturedInput: true,
           canSeeCapturedOutput: false,
+          capturedOutputVisibleTo: "Admins",
         },
         new Set(),
-      ).params as any;
+      ).params;
 
-      expect(params.gen_ai.output.messages).toBe(
-        "[REDACTED] (visible to members of this project)",
+      expect(at(params, "gen_ai.output.messages")).toBe(
+        "[REDACTED] (visible to Admins)",
       );
-      expect(params.gen_ai.input.messages).toBe("[visible prompt]");
+      expect(at(params, "gen_ai.input.messages")).toBe("[visible prompt]");
     });
   });
 });

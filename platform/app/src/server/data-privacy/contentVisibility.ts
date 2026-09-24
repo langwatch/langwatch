@@ -9,12 +9,16 @@ import type { Disposition, ResolvedAudience } from "./dataPrivacy.types";
 
 /** What we know about the viewer for an audience check. */
 export interface ViewerFacts {
+  /** Holds an admin role on the project, its team or its organization. */
   isAdmin: boolean;
-  /** Has project access of any kind (any role on the project's team). */
+  /**
+   * May read traces on the project at all: the permission engine's
+   * `traces:view` decision, whichever tier the role that grants it sits on.
+   */
   isMember: boolean;
-  /** Holds the built-in MEMBER role on the project's team. */
+  /** Holds the built-in MEMBER role on the project or its team. */
   isMemberRole: boolean;
-  /** Holds the built-in VIEWER role on the project's team. */
+  /** Holds the built-in VIEWER role on the project or its team. */
   isViewer: boolean;
   /** Owns the (personal) project the trace belongs to. */
   isProjectOwner: boolean;

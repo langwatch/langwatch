@@ -3,6 +3,10 @@ import {
   redactTraceContent,
 } from "~/server/app-layer/traces/visibility-window.service";
 import {
+  CONTENT_CATEGORIES,
+  type ContentCategory,
+} from "~/server/data-privacy/dataPrivacy.types";
+import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
 } from "~/server/data-privacy/dropKeyCatalog";
@@ -16,7 +20,10 @@ import type {
   TraceInput,
   TraceOutput,
 } from "~/server/tracer/types";
-import type { Protections } from "~/server/traces/protections";
+import type {
+  CategoryVisibility,
+  Protections,
+} from "~/server/traces/protections";
 import { parsePythonInsideJson } from "~/utils/parsePythonInsideJson";
 import { redactHiddenAttributes } from "./redactAttributes";
 
@@ -253,25 +260,57 @@ export function extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
 }
 
 /**
- * The attribute keys that carry input or output content the viewer cannot
- * see, as hidden-attribute rules naming who can see them instead.
+ * Synthetic hidden-attribute rules for the attribute keys that carry each
+ * content category the viewer cannot see (`langwatch.input`, the gen_ai
+ * message keys, `gen_ai.system_instructions`, `gen_ai.tool.call.*`, ...), so
+ * their values are replaced whole by the placeholder naming who can see them,
+ * like a custom restrict rule. Shared by the span protections and the v2 read
+ * mappers so one attribute never carries two different audience labels.
  */
-function hiddenContentAttributes(
-  protections: Protections,
-): Array<{ pattern: string; visibleTo: string }> {
-  const hidden = (keys: readonly string[], visibleTo?: string | null) =>
-    keys.map((pattern) => ({
-      pattern,
-      visibleTo: visibleTo ?? "members of this project",
-    }));
-  return [
-    ...(protections.canSeeCapturedInput !== true
-      ? hidden(CONTENT_KEY_CATALOG.input, protections.capturedInputVisibleTo)
-      : []),
-    ...(protections.canSeeCapturedOutput !== true
-      ? hidden(CONTENT_KEY_CATALOG.output, protections.capturedOutputVisibleTo)
-      : []),
-  ];
+export function hiddenContentCategoryRules(protections: {
+  canSeeCapturedInput?: boolean | null;
+  canSeeCapturedOutput?: boolean | null;
+  capturedInputVisibleTo?: string | null;
+  capturedOutputVisibleTo?: string | null;
+  contentCategories?: Record<ContentCategory, CategoryVisibility>;
+}): Array<{ pattern: string; visibleTo: string }> {
+  const categories: Record<
+    ContentCategory,
+    { canSee: boolean; visibleTo: string | null | undefined }
+  > = {
+    input: {
+      canSee:
+        protections.contentCategories?.input.canSee ??
+        protections.canSeeCapturedInput === true,
+      visibleTo:
+        protections.contentCategories?.input.restrictVisibleTo ??
+        protections.capturedInputVisibleTo,
+    },
+    output: {
+      canSee:
+        protections.contentCategories?.output.canSee ??
+        protections.canSeeCapturedOutput === true,
+      visibleTo:
+        protections.contentCategories?.output.restrictVisibleTo ??
+        protections.capturedOutputVisibleTo,
+    },
+    system: {
+      canSee: protections.contentCategories?.system.canSee ?? true,
+      visibleTo: protections.contentCategories?.system.restrictVisibleTo,
+    },
+    tools: {
+      canSee: protections.contentCategories?.tools.canSee ?? true,
+      visibleTo: protections.contentCategories?.tools.restrictVisibleTo,
+    },
+  };
+  return CONTENT_CATEGORIES.flatMap((category) =>
+    categories[category].canSee
+      ? []
+      : CONTENT_KEY_CATALOG[category].map((pattern) => ({
+          pattern,
+          visibleTo: categories[category].visibleTo ?? "no one",
+        })),
+  );
 }
 
 /**
@@ -340,7 +379,7 @@ export function applySpanProtections(
       span.params as Record<string, unknown> | null | undefined,
       [
         ...(protections.hiddenAttributes ?? []),
-        ...hiddenContentAttributes(protections),
+        ...hiddenContentCategoryRules(protections),
       ],
     ),
     redactions,

@@ -88,6 +88,12 @@ type ScopedGrant = {
   roleKey: string;
 };
 
+type GrantScopeWhere = {
+  OR?: Array<{ scopeType: string; scopeId: string }>;
+  scopeType?: string;
+  scopeId?: string;
+};
+
 /**
  * Seed the ledger with the user's grants and answer `grant.findMany` by the
  * scopes the query actually asks for, so a query that forgets a tier misses
@@ -95,9 +101,10 @@ type ScopedGrant = {
  */
 function seedGrants(grants: ScopedGrant[]) {
   mockPrisma.grant.findMany.mockImplementation(
-    async ({ where }: { where: any }) => {
-      const scopes: Array<{ scopeType: string; scopeId: string }> =
-        where.OR ?? [{ scopeType: where.scopeType, scopeId: where.scopeId }];
+    async ({ where }: { where: GrantScopeWhere }) => {
+      const scopes = where.OR ?? [
+        { scopeType: where.scopeType, scopeId: where.scopeId },
+      ];
       return grants
         .filter((grant) =>
           scopes.some(
