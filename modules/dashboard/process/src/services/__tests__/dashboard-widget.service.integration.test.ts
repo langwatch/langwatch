@@ -25,6 +25,7 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
 import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
@@ -106,9 +107,10 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     });
 
   beforeAll(async () => {
-    service = DashboardWidgetService.create(
-      PrismaDashboardWidgetRepository.create({ prisma: database() }),
-    );
+    service = DashboardWidgetService.create({
+      repository: PrismaDashboardWidgetRepository.create({ prisma: database() }),
+      analytics: createDashboardTestAnalytics(),
+    });
     organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${randomUUID()}` },
     });

@@ -47,19 +47,6 @@ const widgetNotFoundResponse: Record<404, RouteResponse> = {
   },
 };
 
-/** The credential's own project, once this family's flag is found switched on. */
-async function projectFor({
-  app,
-  scope,
-}: {
-  app: DashboardApi;
-  scope: { id: string };
-}): Promise<string> {
-  await app.assertCustomChartPlaygroundEnabled({ projectId: scope.id });
-
-  return scope.id;
-}
-
 /** The widget as the API publishes it. */
 function widgetResource(
   widget: DashboardWidget,
@@ -112,7 +99,7 @@ export const dashboardWidgetRest: Readonly<{
     },
   })
   .handle(async ({ app, scope }, platformUrl) => {
-    const projectId = await projectFor({ app, scope });
+    const projectId = scope.id;
     const widgets = await app.listDashboardWidgets({ projectId });
 
     return { data: widgets.map((widget) => widgetResource(widget, platformUrl)) };
@@ -139,7 +126,7 @@ export const dashboardWidgetRest: Readonly<{
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
-    const projectId = await projectFor({ app, scope });
+    const projectId = scope.id;
     const widget = await app.createDashboardWidget({
       projectId,
       name: input.name,
@@ -170,7 +157,7 @@ export const dashboardWidgetRest: Readonly<{
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
-    const projectId = await projectFor({ app, scope });
+    const projectId = scope.id;
     const widget = await app.getDashboardWidget({ id: input.widgetId, projectId });
 
     return widgetResource(widget, platformUrl);
@@ -197,7 +184,7 @@ export const dashboardWidgetRest: Readonly<{
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
-    const projectId = await projectFor({ app, scope });
+    const projectId = scope.id;
     const { name, code, queries } = input;
     const widget = await app.updateDashboardWidget({
       id: input.widgetId,
@@ -231,7 +218,7 @@ export const dashboardWidgetRest: Readonly<{
     },
   })
   .handle(async ({ app, input, scope }, platformUrl) => {
-    const projectId = await projectFor({ app, scope });
+    const projectId = scope.id;
     const widget = await app.assignDashboardWidgetToDashboard({
       id: input.widgetId,
       projectId,
@@ -260,7 +247,7 @@ export const dashboardWidgetRest: Readonly<{
     },
   })
   .handle(async ({ app, input, scope }) => {
-    const projectId = await projectFor({ app, scope });
+    const projectId = scope.id;
 
     await app.deleteDashboardWidget({ id: input.widgetId, projectId });
   })

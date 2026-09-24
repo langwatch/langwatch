@@ -37,7 +37,8 @@ const TEST_SUITE = {
 
 function composedRoot() {
   const updateTestSuite = vi.fn(async () => TEST_SUITE);
-  const app = createApiFixture<SuiteApi>({ updateTestSuite });
+  const createTestSuite = vi.fn(async () => TEST_SUITE);
+  const app = createApiFixture<SuiteApi>({ updateTestSuite, createTestSuite });
   const trpc = initTRPC.context<SuiteTrpcTestContext>().create();
   const runtime = createTrpcRuntime<SuiteTrpcTestContext>({
     root: trpc,
@@ -55,6 +56,7 @@ function composedRoot() {
     paths: Object.keys(router._def.procedures),
     caller: testSuites.createCaller({ actor: { id: "user_lena" } }),
     updateTestSuite,
+    createTestSuite,
   };
 }
 
@@ -96,6 +98,23 @@ describe("the test suites tRPC namespace", () => {
         testSuiteId: TEST_SUITE.id,
         name: "Refunds v2",
         fields: [],
+        evaluators: [],
+      });
+    });
+  });
+
+  describe("when the suite editor creates a test suite with fields and evaluators", () => {
+    /** @scenario "A test suite is created with its fields and evaluators through suites.testSuites.create" */
+    it("passes the fields and evaluators through to the suite service, as main did", async () => {
+      const { caller, createTestSuite } = composedRoot();
+      const fields = [{ identifier: "golden_sql", type: "text" as const }];
+
+      await caller.create({ projectId: PROJECT_ID, name: "Refunds v2", fields, evaluators: [] });
+
+      expect(createTestSuite).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        name: "Refunds v2",
+        fields,
         evaluators: [],
       });
     });

@@ -9,6 +9,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import { DashboardApp } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
 import { dashboardWidgetRest, dashboardWidgetUrl } from "./transport/dashboard-widget.rest.ts";
+import { dashboardWidgetTrpcTransport } from "./transport/dashboard-widget.trpc.ts";
 import { dashboardRest } from "./transport/dashboard.rest.ts";
 import { dashboardTrpcTransport } from "./transport/dashboard.trpc.ts";
 import { graphRest } from "./transport/graph.rest.ts";
@@ -32,6 +33,7 @@ export const dashboardServer = defineServerModule("dashboard")
     graphTrpcTransport,
     savedViewTrpcTransport,
     savedWorkbenchChartTrpcTransport,
+    dashboardWidgetTrpcTransport,
   )
   // The saved-workbench-chart family declares these facts: the credential's
   // own project content protections, and the deployment's deep link back into

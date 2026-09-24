@@ -164,7 +164,10 @@ export class DashboardApp implements DashboardApi {
           analytics,
         }),
         savedViews: SavedViewService.create({ repository: setup.repositories.savedViews }),
-        widgets: DashboardWidgetService.create(setup.repositories.dashboardWidgets),
+        widgets: DashboardWidgetService.create({
+          repository: setup.repositories.dashboardWidgets,
+          analytics,
+        }),
       },
       peers: {
         analytics,
@@ -320,12 +323,17 @@ export class DashboardApp implements DashboardApi {
     return this.#widgets.getById(input);
   }
 
-  /** A new widget on the unplaced authoring grid. */
+  /** A new widget, on the dashboard named or on the unplaced authoring grid. */
   createDashboardWidget(
-    input: { projectId: string; name: string } & DashboardWidgetDefinitionInput,
+    input: {
+      projectId: string;
+      dashboardId?: string;
+      name: string;
+    } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget> {
     return this.#widgets.createWidget({
       projectId: input.projectId,
+      ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
       input: { name: input.name, code: input.code, queries: input.queries },
     });
   }

@@ -333,3 +333,9 @@ Feature: A test suite groups scenarios
     Given a test suite the suite editor has open
     When it saves a new name, fields and evaluators through suites.testSuites.update
     Then the suite service receives them unchanged for that suite
+
+  @unit
+  Scenario: A test suite is created with its fields and evaluators through suites.testSuites.create
+    Given the suite editor fills in a new test suite's name, fields and evaluators
+    When it creates the suite through suites.testSuites.create
+    Then the suite service receives the fields and evaluators unchanged

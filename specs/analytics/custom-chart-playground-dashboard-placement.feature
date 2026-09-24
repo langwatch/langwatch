@@ -85,3 +85,15 @@ Feature: Dashboard widgets placed on a dashboard
     Given a saved widget with both author code and named queries
     When only the code is updated, or only the queries
     Then the side that was not sent is kept, not blanked, and the update is not silently dropped
+
+  @unit
+  Scenario: The create drawer places a new widget on the dashboard it names through dashboardWidgets.create
+    Given a dashboard in a project with the custom-chart playground on
+    When a widget is created through dashboardWidgets.create naming that dashboard
+    Then the widget is placed on that dashboard and answered in main's widget shape
+
+  @unit
+  Scenario: Every dashboard widget procedure is refused while the custom-chart playground is off
+    Given a project with the custom-chart playground off
+    When any dashboardWidgets procedure is called
+    Then it is refused with the playground's own error code

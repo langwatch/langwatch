@@ -140,6 +140,8 @@ export const suiteSummariesTrpcInputSchema = z.object({
 export const createTestSuiteTrpcInputSchema = z.object({
   ...projectShape,
   name: z.string().trim().min(1),
+  fields: suiteFieldDefinitionsSchema.optional(),
+  evaluators: evaluatorAttachmentsSchema.optional(),
 });
 
 export const renameTestSuiteTrpcInputSchema = z.object({

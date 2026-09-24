@@ -3,6 +3,7 @@ export * from "./dashboard.errors.ts";
 export * from "./dashboard.responses.ts";
 export * from "./dashboard.trpc.ts";
 export * from "./dashboard-widget-rest.schemas.ts";
+export * from "./dashboard-widget.trpc.ts";
 export { DashboardApi } from "./dashboard.api.ts";
 export type {
   DashboardGraphCountScope,

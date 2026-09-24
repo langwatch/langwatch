@@ -88,8 +88,13 @@ export interface DashboardApi {
   assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
   listDashboardWidgets(input: { projectId: string }): Promise<DashboardWidget[]>;
   getDashboardWidget(input: { projectId: string; id: string }): Promise<DashboardWidget>;
+  /** Placed on `dashboardId` when named, otherwise on the unplaced authoring grid. */
   createDashboardWidget(
-    input: { projectId: string; name: string } & DashboardWidgetDefinitionInput,
+    input: {
+      projectId: string;
+      dashboardId?: string;
+      name: string;
+    } & DashboardWidgetDefinitionInput,
   ): Promise<DashboardWidget>;
   updateDashboardWidget(
     input: {
