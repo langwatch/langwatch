@@ -175,11 +175,9 @@ export class OrganizationJoinDoorService {
 }
 
 /** One waiting request, as both pending lists render it. */
-function waitingSince(request: OrganizationJoinRequestState): {
-  joinRequestId: string;
-  requestedAt: Date;
-  expiresAt: Date | null;
-} {
+function waitingSince(
+  request: OrganizationJoinRequestState,
+): Omit<JoinRequestMine[number], "organizationId"> {
   return {
     joinRequestId: request.joinRequestId,
     requestedAt: toDate(Temporal.Instant.fromEpochMilliseconds(request.createdAtMs)),

@@ -73,12 +73,14 @@ interface InviteRow {
   email: string;
   role: string;
   status: string;
-  expiration: Date | null;
+  expiration: InviteWire["expiration"];
   inviteCode: string;
   teamAssignments: unknown;
   teamIds: string;
-  createdAt: Date;
+  createdAt: InviteWire["createdAt"];
 }
+
+type InviteWire = z.infer<typeof organizationManagementRestInviteSchema>;
 
 /**
  * The invite's team assignments in the one shape POST accepts, whichever of

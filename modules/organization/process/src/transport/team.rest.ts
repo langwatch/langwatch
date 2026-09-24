@@ -28,6 +28,7 @@ import {
   type OrganizationApi,
   type OrganizationCaller,
   type OrganizationTeam,
+  type OrganizationTeamRest,
   type UpdateOrganizationTeamInput,
 } from "@langwatch/organization-contract";
 import type { z } from "zod";
@@ -73,14 +74,7 @@ const callerOf = (actor: { type: string; id?: string } | null): OrganizationCall
  * The team's response shape: the stored shape omits the personal flag and owner,
  * so the wire is narrower.
  */
-function teamResponse(team: OrganizationTeam): {
-  id: string;
-  name: string;
-  slug: string;
-  organizationId: string;
-  createdAt: Date;
-  updatedAt: Date;
-} {
+function teamResponse(team: OrganizationTeam): OrganizationTeamRest {
   return {
     id: team.id,
     name: team.name,

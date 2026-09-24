@@ -6,7 +6,6 @@ import type {
   OrganizationListedInvite,
   OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
-import type { Instant } from "@langwatch/time";
 
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
 /**
@@ -331,7 +330,9 @@ export interface OrganizationInvitations {
   /** The invited address, masked: an invite code is a bearer token. */
   maskAddress(email: string): string;
   /** PENDING / ACCEPTED / EXPIRED / REVOKED, expiry included. */
-  displayStatus(invite: Readonly<{ status: string; expiration: Instant | Date | null }>): string;
+  displayStatus(
+    invite: Readonly<{ status: string; expiration: OrganizationInvite["expiration"] }>,
+  ): string;
   /** Tells the organization's administrators a seat limit was reached. */
   notifySeatLimitReached(
     input: Readonly<{

@@ -25,7 +25,7 @@ import {
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
@@ -342,13 +342,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
   }
 
   displayStatus(invite: Parameters<OrganizationInvitations["displayStatus"]>[0]): string {
-    // This adapter's own rows carry a Postgres `Date`, never the port's Instant option; narrowed
-    // rather than widening `resolveInviteDisplayStatus` itself for a caller this class has none of.
-    const expiration =
-      invite.expiration === null || invite.expiration instanceof Date
-        ? invite.expiration
-        : toDate(invite.expiration);
-    return resolveInviteDisplayStatus({ status: invite.status, expiration });
+    return resolveInviteDisplayStatus(invite);
   }
 
   /** No mail gateway is composed on this process (D11's "absent is supported" state), so the
