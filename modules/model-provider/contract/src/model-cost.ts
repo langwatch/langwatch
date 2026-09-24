@@ -125,7 +125,7 @@ export const normalizeModelName = (model: string): string => {
 const regexCache = new Map<string, RegExp | null>();
 const REGEX_CACHE_MAX_ENTRIES = 5_000;
 
-const tryRegex = (pattern: string): RegExp | null => {
+const buildSafeRegex = (pattern: string): RegExp | null => {
   const cached = regexCache.get(pattern);
   if (cached !== undefined) return cached;
 
@@ -145,7 +145,7 @@ const findModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
 ): ModelCostRate | undefined => {
-  const matched = costs.find((cost) => tryRegex(cost.regex)?.test(model));
+  const matched = costs.find((cost) => buildSafeRegex(cost.regex)?.test(model));
   if (matched) return matched;
   if (model.includes("/")) return findModelCost(model.slice(model.indexOf("/") + 1), costs);
   return undefined;
@@ -329,4 +329,4 @@ function guardrailReportedCost(output: unknown): number {
  * is free of catastrophic backtracking. The tRPC shapes carrying a
  * caller-supplied `regex` refuse one that is not.
  */
-export const isSafeCostRegex = (pattern: string): boolean => tryRegex(pattern) !== null;
+export const isSafeCostRegex = (pattern: string): boolean => buildSafeRegex(pattern) !== null;

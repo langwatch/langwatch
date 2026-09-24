@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { recommendedChatModel, resolveLatestAlias } from "../latest-aliases.ts";
+import { pickRecommendedChatModel, resolveLatestAlias } from "../latest-aliases.ts";
 import { getModelById } from "../model-catalog.ts";
 
 describe("given the committed model catalog", () => {
@@ -17,23 +17,23 @@ describe("given the committed model catalog", () => {
       ["gemini", "gemini/gemini-3.8-flash"],
       ["deepseek", "deepseek/deepseek-v4-pro"],
     ])("recommends %s's newest main-tier model", (provider, expected) => {
-      expect(recommendedChatModel(provider)).toBe(expected);
+      expect(pickRecommendedChatModel(provider)).toBe(expected);
       expect(getModelById(expected)?.mode).toBe("chat");
     });
 
     /** @scenario The recommendation is never the top tier, a serving mode or a batch lane */
     it("never recommends the top tier, a serving mode or a batch lane", () => {
       for (const provider of ["openai", "anthropic", "gemini", "deepseek"]) {
-        const pick = recommendedChatModel(provider) ?? "";
+        const pick = pickRecommendedChatModel(provider) ?? "";
         expect(pick).not.toMatch(/astra|-sol|fable|gemini-[\d.]+-pro|:batch|-\d{4}$|-exp$/);
       }
     });
 
     it("recommends nothing for a provider the catalog has no chat models for", () => {
-      expect(recommendedChatModel("groq")).toBeNull();
-      expect(recommendedChatModel("azure")).toBeNull();
-      expect(recommendedChatModel("bedrock")).toBeNull();
-      expect(recommendedChatModel("custom")).toBeNull();
+      expect(pickRecommendedChatModel("groq")).toBeNull();
+      expect(pickRecommendedChatModel("azure")).toBeNull();
+      expect(pickRecommendedChatModel("bedrock")).toBeNull();
+      expect(pickRecommendedChatModel("custom")).toBeNull();
     });
   });
 
@@ -42,7 +42,7 @@ describe("given the committed model catalog", () => {
     it.each(["openai", "anthropic", "gemini"])(
       "resolves %s/latest to the recommendation",
       (provider) => {
-        expect(resolveLatestAlias(`${provider}/latest`)).toBe(recommendedChatModel(provider));
+        expect(resolveLatestAlias(`${provider}/latest`)).toBe(pickRecommendedChatModel(provider));
       },
     );
 

@@ -2,7 +2,7 @@ import {
   cardKindFor,
   parseCliResult,
   tracesCardSchema,
-  traceIdOf,
+  extractTraceId,
   type TraceSummary,
 } from "@langwatch/langy-contract/cards";
 // Contract test pinning CLI JSON output schema to Langy panel expectations.
@@ -84,7 +84,7 @@ describe("the CLI's json output against the shared card contract", () => {
             // A reduced result may carry an in-band "… truncated" string
             // marker between rows; readers skip it, and so does this test.
             .filter((trace): trace is TraceSummary => typeof trace !== "string")
-            .map((trace) => traceIdOf(trace)),
+            .map((trace) => extractTraceId(trace)),
         ).toEqual(["trace_abc", "trace_def"]);
       });
 

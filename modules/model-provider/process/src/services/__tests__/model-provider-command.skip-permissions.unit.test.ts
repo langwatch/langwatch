@@ -5,6 +5,7 @@ import {
   ModelProviderNotFoundError,
   ModelProviderSkipPermissionsPatternInvalidError,
 } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderCommandService } from "../model-provider-command.service.ts";
@@ -33,13 +34,15 @@ function serviceWith(
     },
   };
   const scopes = {
-    tryGetProjectScopes: async () => null,
-    tryResolveAnchor: async () => "organization-1",
+    getProjectScopes: async () => {
+      throw new ProjectNotFoundError();
+    },
+    getAnchorOrganizationId: async () => "organization-1",
     getOrganizationIdForScopes: async () => "organization-1",
   };
   const catalog = {
     exists: () => true,
-    tryGetProviderDeprecation: () => null,
+    pickProviderDeprecation: () => null,
   };
   const ids = {
     generate: () => "provider-1",

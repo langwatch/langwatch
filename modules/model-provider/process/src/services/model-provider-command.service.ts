@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   ModelProviderAnchorRequiredError,
   ModelProviderDeprecatedError,
@@ -97,19 +98,25 @@ export class ModelProviderCommandService {
     this.assertTenantAnchor(input);
 
     const parsed = modelProviderDeleteInputSchema.parse(input);
-    const organizationId = await this.options.scopes.tryResolveAnchor({
-      projectId: parsed.projectId,
-      organizationId: parsed.organizationId,
-    });
-    if (!organizationId) {
-      throw new ModelProviderNotFoundError();
-    }
-
-    const projectScopes = parsed.projectId
-      ? await this.options.scopes.tryGetProjectScopes(parsed.projectId)
-      : null;
+    const organizationId = await this.options.scopes
+      .getAnchorOrganizationId({
+        projectId: parsed.projectId,
+        organizationId: parsed.organizationId,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found")
+          throw new ModelProviderNotFoundError();
+        throw error;
+      });
     const existingByProvider = async () => {
-      if (!projectScopes) throw new ModelProviderNotFoundError();
+      if (!parsed.projectId) throw new ModelProviderNotFoundError();
+      const projectScopes = await this.options.scopes
+        .getProjectScopes(parsed.projectId)
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found")
+            throw new ModelProviderNotFoundError();
+          throw error;
+        });
       return this.options.repository.getByProviderForProject({
         provider: parsed.provider,
         projectScopes,
@@ -143,13 +150,16 @@ export class ModelProviderCommandService {
     input: ModelProviderTestConnectionInput,
   ): Promise<ModelProviderCredentialVerdict> {
     const parsed = modelProviderTestConnectionInputSchema.parse(input);
-    const organizationId = await this.options.scopes.tryResolveAnchor({
-      projectId: parsed.projectId,
-      organizationId: parsed.organizationId,
-    });
-    if (!organizationId) {
-      throw new ModelProviderNotFoundError();
-    }
+    const organizationId = await this.options.scopes
+      .getAnchorOrganizationId({
+        projectId: parsed.projectId,
+        organizationId: parsed.organizationId,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found")
+          throw new ModelProviderNotFoundError();
+        throw error;
+      });
 
     const provider = await this.options.repository.getById({
       id: parsed.modelProviderId,
@@ -215,8 +225,11 @@ export class ModelProviderCommandService {
 
   private async getExistingProvider(input: ModelProviderWriteInput): Promise<ModelProvider | null> {
     const projectScopes = input.projectId
-      ? await this.options.scopes.tryGetProjectScopes(input.projectId)
-      : null;
+      ? await this.options.scopes.getProjectScopes(input.projectId).catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found") return undefined;
+          throw error;
+        })
+      : undefined;
     const existing = input.id
       ? await this.options.repository.getById({
           id: input.id,
@@ -226,7 +239,7 @@ export class ModelProviderCommandService {
       : null;
 
     if (!existing) {
-      const deprecation = this.options.catalog.tryGetProviderDeprecation(input.provider);
+      const deprecation = this.options.catalog.pickProviderDeprecation(input.provider);
       if (deprecation) {
         throw new ModelProviderDeprecatedError({
           provider: input.provider,
@@ -279,13 +292,19 @@ export class ModelProviderCommandService {
   ): Promise<string> {
     const organizationId =
       existing?.organizationId ??
-      (await this.options.scopes.tryResolveAnchor({
-        projectId: input.projectId,
-        organizationId: input.organizationId,
-      }));
-    if (!organizationId) {
-      throw new ModelProviderInvalidError("Provider scope does not resolve to an organization");
-    }
+      (await this.options.scopes
+        .getAnchorOrganizationId({
+          projectId: input.projectId,
+          organizationId: input.organizationId,
+        })
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found") {
+            throw new ModelProviderInvalidError(
+              "Provider scope does not resolve to an organization",
+            );
+          }
+          throw error;
+        }));
 
     const scopeOrganizationId = await this.options.scopes.getOrganizationIdForScopes(scopes);
     if (organizationId !== scopeOrganizationId) {
@@ -327,7 +346,7 @@ export class ModelProviderCommandService {
         parsed.providerConfig === undefined
           ? (existing?.providerConfig ?? null)
           : parsed.providerConfig,
-      langySkipPermissionsModels: skipPermissionsForWrite(parsed, existing),
+      langySkipPermissionsModels: deriveSkipPermissionsForWrite(parsed, existing),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
@@ -465,7 +484,7 @@ function humanize(provider: string): string {
  * the stored list alone; an empty list clears it, so the registry default
  * applies — stored as null, not an empty array reading as "trust nothing".
  */
-function skipPermissionsForWrite(
+function deriveSkipPermissionsForWrite(
   parsed: ModelProviderWriteInput,
   existing: ModelProvider | null,
 ): string[] | null {

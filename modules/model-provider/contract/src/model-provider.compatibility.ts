@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { modelCatalogEntrySchema, getAllModels } from "./catalog/model-catalog.ts";
 import { customModelEntrySchema, type CustomModelEntry } from "./custom-model.ts";
-import { getParameterConstraints, parameterConstraintsSchema } from "./model-provider-registry.ts";
+import { pickParameterConstraints, parameterConstraintsSchema } from "./model-provider-registry.ts";
 import {
   modelProviderScopeSchema,
   type Model,
@@ -210,7 +210,7 @@ export function getModelMetadataForFrontend(): Record<string, ModelMetadataForFr
         supportsAudioInput: model.supportsAudioInput,
         pricing: model.pricing,
         reasoningConfig: model.reasoningConfig,
-        parameterConstraints: getParameterConstraints(model.id),
+        parameterConstraints: pickParameterConstraints(model.id),
       }),
     ]),
   );
@@ -251,7 +251,7 @@ export function mergeCustomModelMetadata(
         supportsImageInput: model.multimodalInputs?.includes("image") ?? false,
         supportsAudioInput: model.multimodalInputs?.includes("audio") ?? false,
         pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
-        parameterConstraints: getParameterConstraints(id),
+        parameterConstraints: pickParameterConstraints(id),
       });
     }
   }

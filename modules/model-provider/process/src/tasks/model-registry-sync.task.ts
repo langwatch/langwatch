@@ -32,7 +32,7 @@ import {
   mapModelId,
   mapProviderName,
 } from "../rules/provider-id-mapping.rules.ts";
-import { getReasoningConfig } from "../rules/reasoning-config.rules.ts";
+import { pickReasoningConfig } from "../rules/reasoning-config.rules.ts";
 
 const logger = createLogger("langwatch:task:model-registry-sync");
 
@@ -174,7 +174,7 @@ function hasModality(modalities: string[] | undefined, type: string): boolean {
 }
 
 /** Strips OpenRouter promotional links from a model description. */
-function sanitizeDescription(description: string | undefined): string | undefined {
+function normalizeDescription(description: string | undefined): string | undefined {
   if (!description) return undefined;
   let sanitized = description.replace(
     /\[([^\]]*)\]\(https?:\/\/(?:www\.)?openrouter\.ai[^)]*\)/gi,
@@ -201,14 +201,14 @@ function transformModel(model: Model, raw?: RawPricing): LLMModelEntry {
     defaultParameters: model.defaultParameters ?? null,
     modality: model.architecture?.modality ?? "text->text",
     mode: determineMode(model.architecture?.modality ?? null),
-    description: sanitizeDescription(model.description),
+    description: normalizeDescription(model.description),
     supportsImageInput: hasModality(model.architecture?.inputModalities, "image"),
     supportsAudioInput: hasModality(model.architecture?.inputModalities, "audio"),
     supportsImageOutput: hasModality(model.architecture?.outputModalities, "image"),
     supportsAudioOutput: hasModality(model.architecture?.outputModalities, "audio"),
   };
 
-  const reasoningConfig = getReasoningConfig(mappedId);
+  const reasoningConfig = pickReasoningConfig(mappedId);
   if (reasoningConfig) entry.reasoningConfig = reasoningConfig;
 
   return entry;

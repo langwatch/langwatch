@@ -44,7 +44,7 @@ const AUDIO_MODES = ["audio_speech", "audio_transcription", "realtime"];
 /** Dated snapshot ids (e.g. gpt-4o-mini-transcribe-2025-03-20) are noise. */
 const DATED_VARIANT = /-\d{4}-\d{2}-\d{2}$/;
 
-const positive = (value: number | undefined): number | undefined =>
+const pickPositive = (value: number | undefined): number | undefined =>
   typeof value === "number" && value > 0 ? value : undefined;
 
 /**
@@ -55,7 +55,7 @@ const positive = (value: number | undefined): number | undefined =>
 function unrepresentableFields(price: LitellmPriceEntry): string[] {
   const fields: string[] = [];
   const differs = (a: number | undefined, b: number | undefined): boolean =>
-    positive(a) !== undefined && positive(a) !== positive(b);
+    pickPositive(a) !== undefined && pickPositive(a) !== pickPositive(b);
 
   if (differs(price.output_cost_per_second, price.input_cost_per_second)) {
     fields.push("output_cost_per_second");
@@ -69,23 +69,23 @@ function unrepresentableFields(price: LitellmPriceEntry): string[] {
 /** Maps the litellm rate set onto catalog pricing fields. */
 function toPricing(price: LitellmPriceEntry): LLMModelPricing | null {
   const pricing: LLMModelPricing = {
-    inputCostPerToken: positive(price.input_cost_per_token) ?? 0,
-    outputCostPerToken: positive(price.output_cost_per_token) ?? 0,
+    inputCostPerToken: pickPositive(price.input_cost_per_token) ?? 0,
+    outputCostPerToken: pickPositive(price.output_cost_per_token) ?? 0,
   };
 
-  const perCharacter = positive(price.input_cost_per_character);
+  const perCharacter = pickPositive(price.input_cost_per_character);
   if (perCharacter !== undefined) pricing.inputCostPerCharacter = perCharacter;
 
-  const perSecond = positive(price.input_cost_per_second);
+  const perSecond = pickPositive(price.input_cost_per_second);
   if (perSecond !== undefined) pricing.inputCostPerSecond = perSecond;
 
-  const perAudioToken = positive(price.input_cost_per_audio_token);
+  const perAudioToken = pickPositive(price.input_cost_per_audio_token);
   if (perAudioToken !== undefined) pricing.audioCostPerToken = perAudioToken;
 
-  const perAudioOutputToken = positive(price.output_cost_per_audio_token);
+  const perAudioOutputToken = pickPositive(price.output_cost_per_audio_token);
   if (perAudioOutputToken !== undefined) pricing.audioOutputCostPerToken = perAudioOutputToken;
 
-  const cacheRead = positive(price.cache_read_input_token_cost);
+  const cacheRead = pickPositive(price.cache_read_input_token_cost);
   if (cacheRead !== undefined) pricing.inputCacheReadPerToken = cacheRead;
 
   const priced =

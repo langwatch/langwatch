@@ -640,7 +640,7 @@ class Catalog extends ModelProviderCatalog {
     const value = input.customKeys?.[input.key];
     return typeof value === "string" ? value : null;
   }
-  tryGetExecutionDefinition(_input: {
+  pickExecutionDefinition(_input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
     return { apiKey: "OPENAI_API_KEY", endpointKey: "OPENAI_BASE_URL" };
@@ -651,7 +651,7 @@ class DeprecatedCatalog extends Catalog {
     return providerName === "gemini" || providerName === "google_agent_platform";
   }
 
-  tryGetProviderDeprecation(providerName: string): { replacement?: string } | null {
+  pickProviderDeprecation(providerName: string): { replacement?: string } | null {
     return providerName === "google_agent_platform" ? { replacement: "gemini" } : null;
   }
 }
@@ -693,7 +693,7 @@ class ExecutionCatalog extends Catalog {
     return this.pickStoredExecutionValue(input) ?? this.environment[input.key] ?? null;
   }
 
-  tryGetExecutionDefinition(input: {
+  pickExecutionDefinition(input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
     const definitions: Record<string, { apiKey: string; endpointKey: string | null }> = {

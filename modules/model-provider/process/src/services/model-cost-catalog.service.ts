@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { modelCostListInputSchema, type ModelCost } from "@langwatch/model-provider-contract";
 
 import type { ModelCostProjectScope } from "../app/model-provider.members.ts";
@@ -23,8 +24,12 @@ export class ModelCostCatalogService {
 
   async listCosts(input: { projectId: string }): Promise<ModelCost[]> {
     const projectId = modelCostListInputSchema.parse(input).projectId;
-    const projectScopes = await this.scopes.tryGetProjectScopes(projectId);
-
-    return projectScopes ? this.costs.listForProject(projectScopes) : [];
+    return this.scopes
+      .getProjectScopes(projectId)
+      .then((projectScopes) => this.costs.listForProject(projectScopes))
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
+        throw error;
+      });
   }
 }

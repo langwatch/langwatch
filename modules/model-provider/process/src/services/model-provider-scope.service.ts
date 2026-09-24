@@ -1,6 +1,6 @@
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 
 import {
@@ -67,39 +67,30 @@ export class ModelProviderScopeService {
     return this.projectScopeFacts.getProjectSystemContext(projectId);
   }
 
-  async tryGetOrganizationSystemReference(organizationId: string): Promise<Instant | null> {
+  async getOrganizationSystemReference(organizationId: string): Promise<Instant> {
     const firstPage = await this.projects.listByOrganization({
       organizationId,
       page: 1,
       limit: 1,
     });
-    if (firstPage.pagination.total === 0) {
-      return null;
+    const reference =
+      firstPage.pagination.total > 1
+        ? await this.projects.listByOrganization({
+            organizationId,
+            page: firstPage.pagination.total,
+            limit: 1,
+          })
+        : firstPage;
+    const createdAt = reference.data[0]?.createdAt;
+    if (!createdAt) {
+      throw new ProjectNotFoundError();
     }
 
-    if (firstPage.pagination.total === 1) {
-      const only = firstPage.data[0]?.createdAt;
-
-      return only ? fromDate(only) : null;
-    }
-
-    const lastPage = await this.projects.listByOrganization({
-      organizationId,
-      page: firstPage.pagination.total,
-      limit: 1,
-    });
-
-    const last = lastPage.data[0]?.createdAt;
-
-    return last ? fromDate(last) : null;
+    return fromDate(createdAt);
   }
 
-  tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null> {
-    return this.projectScopeFacts.tryGetProjectScopes(projectId);
-  }
-
-  tryResolveAnchor(input: { projectId?: string; organizationId?: string }): Promise<string | null> {
-    return this.projectScopeFacts.tryResolveAnchor(input);
+  getAnchorOrganizationId(input: { projectId?: string; organizationId?: string }): Promise<string> {
+    return this.projectScopeFacts.getAnchorOrganizationId(input);
   }
 
   async getOrganizationIdForScope(scope: ModelDefaultScope): Promise<string> {

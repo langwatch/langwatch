@@ -3,12 +3,12 @@ import {
   getAllModels,
   getAllProviders,
   getModelById,
-  getModelMetadata,
+  pickModelMetadata,
   getModelsForProvider,
   getProviderModelOptions,
   getRegistryMetadata,
   hasVariantSuffix,
-  getParameterConstraints,
+  pickParameterConstraints,
   modelProviders,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
@@ -54,7 +54,7 @@ describe("Registry Model Access", () => {
     it("returns metadata for existing model", () => {
       const allModels = getAllModels();
       const modelId = Object.keys(allModels)[0]!;
-      const metadata = getModelMetadata(modelId);
+      const metadata = pickModelMetadata(modelId);
 
       expect(metadata).not.toBeNull();
       expect(metadata?.supportedParameters).toBeInstanceOf(Array);
@@ -64,14 +64,14 @@ describe("Registry Model Access", () => {
     });
 
     it("returns null for non-existent model", () => {
-      const metadata = getModelMetadata("nonexistent/model");
+      const metadata = pickModelMetadata("nonexistent/model");
       expect(metadata).toBeNull();
     });
 
     it("includes multimodal flags", () => {
       const allModels = getAllModels();
       const modelId = Object.keys(allModels)[0]!;
-      const metadata = getModelMetadata(modelId);
+      const metadata = pickModelMetadata(modelId);
       expect(metadata).toHaveProperty("supportsImageInput");
       expect(metadata).toHaveProperty("supportsAudioInput");
     });
@@ -441,7 +441,7 @@ describe("Multimodal Support", () => {
 describe("Parameter Constraints", () => {
   describe("when getting parameter constraints", () => {
     it("returns constraints for Anthropic models", () => {
-      const constraints = getParameterConstraints("anthropic/claude-sonnet-4");
+      const constraints = pickParameterConstraints("anthropic/claude-sonnet-4");
 
       expect(constraints).toBeDefined();
       expect(constraints?.temperature).toEqual({ min: 0, max: 1 });
@@ -449,34 +449,34 @@ describe("Parameter Constraints", () => {
 
     /** @scenario "OpenAI provider uses global defaults" */
     it("returns undefined for OpenAI models (no constraints defined)", () => {
-      const constraints = getParameterConstraints("openai/gpt-4.1");
+      const constraints = pickParameterConstraints("openai/gpt-4.1");
 
       expect(constraints).toBeUndefined();
     });
 
     /** @scenario "Unknown provider returns undefined constraints" */
     it("returns undefined for unknown provider", () => {
-      const constraints = getParameterConstraints("unknown-provider/some-model");
+      const constraints = pickParameterConstraints("unknown-provider/some-model");
 
       expect(constraints).toBeUndefined();
     });
 
     /** @scenario "Model ID without provider prefix returns undefined" */
     it("returns undefined for model ID without provider prefix", () => {
-      const constraints = getParameterConstraints("standalone-model");
+      const constraints = pickParameterConstraints("standalone-model");
 
       expect(constraints).toBeUndefined();
     });
 
     it("returns undefined for empty model ID", () => {
-      const constraints = getParameterConstraints("");
+      const constraints = pickParameterConstraints("");
 
       expect(constraints).toBeUndefined();
     });
 
     it("extracts provider correctly from model ID with slashes", () => {
       // Model IDs like "anthropic/claude-3.5-sonnet" should extract "anthropic"
-      const constraints = getParameterConstraints("anthropic/claude-3.5-sonnet");
+      const constraints = pickParameterConstraints("anthropic/claude-3.5-sonnet");
 
       expect(constraints).toBeDefined();
       expect(constraints?.temperature?.max).toBe(1);

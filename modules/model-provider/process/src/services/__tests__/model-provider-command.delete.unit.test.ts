@@ -5,6 +5,7 @@ import {
   ModelProviderAnchorRequiredError,
   ModelProviderNotFoundError,
 } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderCommandService } from "../model-provider-command.service.ts";
@@ -37,9 +38,14 @@ function serviceWith(
     },
   };
   const scopes = {
-    tryResolveAnchor: async () =>
-      options.anchor === undefined ? "organization-1" : options.anchor,
-    tryGetProjectScopes: async () => options.projectScopes ?? null,
+    getAnchorOrganizationId: async () => {
+      if (options.anchor === null) throw new ProjectNotFoundError();
+      return options.anchor ?? "organization-1";
+    },
+    getProjectScopes: async () => {
+      if (!options.projectScopes) throw new ProjectNotFoundError();
+      return options.projectScopes;
+    },
   };
   const writeAuthorization = {
     assertCanWrite: async (actorId: string, providerScopes: unknown) => {

@@ -1,4 +1,5 @@
 import {
+  ModelDefaultNotFoundError,
   ModelProviderInvalidError,
   modelDefaultResolveInputSchema,
   modelDefaultSnapshotInputSchema,
@@ -117,7 +118,7 @@ export class ModelProviderDefaultsService {
     return { inherited, referenceScope: reference };
   }
 
-  async tryGetResolved(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
+  async getResolved(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective> {
     const parsed = modelDefaultResolveInputSchema.parse({
       projectId: input.projectId,
       featureKey: input.featureKey,
@@ -131,14 +132,18 @@ export class ModelProviderDefaultsService {
     const feature = this.options.catalog
       .defaultFeatures()
       .find((candidate) => candidate.key === parsed.featureKey);
-    const roleDefault = feature ? (snapshot.effective[feature.role] ?? null) : null;
+    const roleDefault = feature ? snapshot.effective[feature.role] : undefined;
     if (roleDefault) {
       return roleDefault;
     }
 
-    return parsed.featureKey === "langy.chat"
-      ? (snapshot.effective["prompt.create_default"] ?? null)
-      : null;
+    const langyFallback =
+      parsed.featureKey === "langy.chat" ? snapshot.effective["prompt.create_default"] : undefined;
+    if (langyFallback) {
+      return langyFallback;
+    }
+
+    throw new ModelDefaultNotFoundError();
   }
 
   /** Every scope the caller can reach, by id, for labelling a snapshot. */

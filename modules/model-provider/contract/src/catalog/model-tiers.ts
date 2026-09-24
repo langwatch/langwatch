@@ -112,7 +112,7 @@ export const TIERED_PROVIDERS = Object.keys(GRAMMARS);
  * returns null when the id is not a member of that variant's tier, or the
  * provider has no grammar.
  */
-export function rankChatModel({
+export function deriveChatModelRank({
   id,
   provider,
   variant,

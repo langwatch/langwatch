@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectWithTeam } from "@langwatch/project-contract";
+import { ProjectNotFoundError, type ProjectWithTeam } from "@langwatch/project-contract";
 /**
  * The setup checklist's provider step, read through this feature's own
  * persistence.
@@ -27,7 +27,7 @@ class TestProjects extends ModelCostProject {
   }
 
   async getWithTeam(): Promise<ProjectWithTeam> {
-    if (!this.project) throw new Error("no project");
+    if (!this.project) throw new ProjectNotFoundError();
     return this.project;
   }
 }

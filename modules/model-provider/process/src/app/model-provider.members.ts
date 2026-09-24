@@ -181,7 +181,7 @@ export abstract class ModelProviderCatalog {
   classifyRoutingHandleProblem(handle: string | null): "shape" | "reserved" | null {
     return classifyRoutingHandleProblem(handle);
   }
-  tryGetProviderDeprecation(provider: string): { replacement?: string } | null {
+  pickProviderDeprecation(provider: string): { replacement?: string } | null {
     const deprecation = providerDeprecation(provider);
     return deprecation ? { replacement: deprecation.replacedBy } : null;
   }
@@ -211,7 +211,7 @@ export abstract class ModelProviderCatalog {
     const value = input.customKeys?.[input.key];
     return typeof value === "string" && value.length > 0 ? value : null;
   }
-  tryGetExecutionDefinition(input: {
+  pickExecutionDefinition(input: {
     provider: string;
   }): { apiKey: string; endpointKey: string | null } | null {
     const definition = findModelProviderDefinition(input.provider);
@@ -256,7 +256,7 @@ export abstract class ModelCostProject {
  * that composes it.
  */
 export abstract class ModelCostProjectScope {
-  abstract tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null>;
+  abstract getProjectScopes(projectId: string): Promise<ModelDefaultScope[]>;
 }
 
 /**

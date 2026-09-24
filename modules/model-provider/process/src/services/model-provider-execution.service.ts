@@ -117,7 +117,7 @@ export class ModelProviderExecutionService {
     parameters: ModelProviderExecutionParameters,
     provider: ModelProvider | ModelProviderExecution,
   ): void {
-    const definition = this.options.catalog.tryGetExecutionDefinition({
+    const definition = this.options.catalog.pickExecutionDefinition({
       provider: provider.provider,
     });
     const apiKey = definition ? this.executionValue(provider, definition.apiKey) : null;

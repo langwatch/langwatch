@@ -269,7 +269,7 @@ async function readUpstreamRefusal(
 /**
  * Google's verdict on the key itself, when it gave one.
  */
-function geminiReasonRefusal({
+function classifyGeminiRefusal({
   provider,
   reason,
   googleDoor,
@@ -331,7 +331,7 @@ async function handleHttpError({
     "provider refused a credential check",
   );
 
-  const fromReason = geminiReasonRefusal({
+  const fromReason = classifyGeminiRefusal({
     provider: context.provider,
     reason,
     googleDoor: context.googleDoor,
@@ -519,7 +519,7 @@ type RankedFailure = {
 /**
  * Picks the refusal worth showing, keeping the first of equally useful ones.
  */
-function mostInformativeFailure(failures: RankedFailure[]): RankedFailure | undefined {
+function pickMostInformativeFailure(failures: RankedFailure[]): RankedFailure | undefined {
   return failures.reduce<RankedFailure | undefined>(
     (chosen, failure) => (!chosen || failure.rank < chosen.rank ? failure : chosen),
     undefined,
@@ -638,7 +638,7 @@ async function runProbeChain({
     }
   }
 
-  const chosen = mostInformativeFailure(failures);
+  const chosen = pickMostInformativeFailure(failures);
 
   // Nothing answered — or nothing was even asked — so there is no verdict on
   // the key to report, only a failure to have asked. Thrown rather than
@@ -700,7 +700,7 @@ function agentPlatformPair({
  * The credential-shaped reasons we decline to ask: nothing usable to send,
  * or nowhere to send it.
  */
-function whyNotCheckable({
+function detectUncheckableReason({
   provider,
   apiKey,
   baseUrl,
@@ -852,7 +852,7 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
 
     const agentPlatform = agentPlatformPair({ provider, customKeys });
 
-    const cannotCheck = whyNotCheckable({
+    const cannotCheck = detectUncheckableReason({
       provider,
       apiKey,
       baseUrl,

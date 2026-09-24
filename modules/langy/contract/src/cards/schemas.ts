@@ -30,7 +30,7 @@ export const traceSummarySchema = z.looseObject({
 export type TraceSummary = z.infer<typeof traceSummarySchema>;
 
 /** The id of a trace, whichever way this response chose to spell it. */
-export const traceIdOf = (trace: TraceSummary): string | undefined =>
+export const extractTraceId = (trace: TraceSummary): string | undefined =>
   trace.trace_id ?? trace.traceId;
 
 /** `trace search` / `trace export` — the traces card. */

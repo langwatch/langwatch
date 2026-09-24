@@ -46,10 +46,7 @@ export {
   type CodexPollResult,
 } from "./services/codex-oauth.model-provider-token-refresher.service.ts";
 export { AiCallFailureService } from "./services/ai-call-failure.service.ts";
-export type {
-  ModelCostPreviewSpanReader,
-  ModelCostRuleReader,
-} from "./services/model-cost-preview.service.ts";
+export type { ModelCostPreviewSpanReader } from "./services/model-cost-preview.service.ts";
 export { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
 export {
   SsrfModelProviderEgressAdapter,
@@ -62,7 +59,7 @@ export {
   type ModelProviderExecutionHandleInput,
   type ModelProviderExecutionHandleOptions,
 } from "./services/model-provider-execution-handle.service.ts";
-export { resolveMaxTokensCeiling } from "./model-provider.server.ts";
+export { pickMaxTokensCeiling } from "./model-provider.server.ts";
 export { ModelProviderExecutionAdapter } from "./services/model-provider-topic-clustering-execution.service.ts";
 export {
   getModelMetadataForFrontend,

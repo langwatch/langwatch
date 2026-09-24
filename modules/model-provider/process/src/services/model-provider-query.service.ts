@@ -47,16 +47,18 @@ export class ModelProviderQueryService {
 
   async listForOrganization(input: { organizationId: string }): Promise<ModelProviderSummary[]> {
     const parsed = modelProviderListOrganizationInputSchema.parse(input);
-    const [saved, referenceCreatedAt] = await Promise.all([
+    const [saved, system] = await Promise.all([
       this.options.repository.findForOrganization(parsed.organizationId),
-      this.options.scopes.tryGetOrganizationSystemReference(parsed.organizationId),
+      this.options.scopes
+        .getOrganizationSystemReference(parsed.organizationId)
+        .then((referenceCreatedAt) =>
+          this.options.catalog.systemProviders({ ...parsed, referenceCreatedAt }),
+        )
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
+          throw error;
+        }),
     ]);
-    const system = referenceCreatedAt
-      ? await this.options.catalog.systemProviders({
-          ...parsed,
-          referenceCreatedAt,
-        })
-      : [];
     const savedProviders = new Set(saved.map((provider) => provider.provider));
 
     return [
@@ -90,24 +92,33 @@ export class ModelProviderQueryService {
     const parsed = modelProviderListProjectInputSchema.parse({
       projectId: input.projectId,
     });
-    const projectScopes = await this.options.scopes.tryGetProjectScopes(parsed.projectId);
-    if (!projectScopes) {
-      return null;
-    }
-
-    return this.options.repository
-      .getByProviderForProject({ projectScopes, provider: input.provider })
+    return this.options.scopes
+      .getProjectScopes(parsed.projectId)
+      .then((projectScopes) =>
+        this.options.repository.getByProviderForProject({
+          projectScopes,
+          provider: input.provider,
+        }),
+      )
       .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "model_provider_not_found") return null;
+        if (
+          HandledError.isHandled(error) &&
+          (error.code === "project_not_found" || error.code === "model_provider_not_found")
+        ) {
+          return null;
+        }
         throw error;
       });
   }
 
   async getByIdForProject(input: { id: string; projectId: string }): Promise<ModelProvider> {
-    const projectScopes = await this.options.scopes.tryGetProjectScopes(input.projectId);
-    if (!projectScopes) {
-      throw new ModelProviderNotFoundError();
-    }
+    const projectScopes = await this.options.scopes
+      .getProjectScopes(input.projectId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found")
+          throw new ModelProviderNotFoundError();
+        throw error;
+      });
 
     return this.options.repository.getById({
       id: input.id,

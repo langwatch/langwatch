@@ -1,4 +1,4 @@
-import { firstPullRequestUrlIn } from "./langy.github-pr-url.ts";
+import { extractFirstPullRequestUrl } from "./langy.github-pr-url.ts";
 
 export type GithubProgressStage =
   | "cloning"
@@ -39,14 +39,14 @@ export function needsGithubAuth(command: string): boolean {
 export function githubStepsOf(command: string): GithubStep[] {
   const steps: GithubStep[] = [];
   for (const tokens of commandSegments(command)) {
-    const step = stepOfSegment(tokens);
+    const step = classifySegmentStep(tokens);
     if (step) steps.push(step);
   }
   return steps;
 }
 
 /** The FIRST step of the PR flow this command performs, if any. */
-export function githubStepOf(command: string): GithubStep | null {
+export function classifyGithubStep(command: string): GithubStep | null {
   return githubStepsOf(command)[0] ?? null;
 }
 
@@ -64,7 +64,7 @@ function progressForPart(part: {
   output?: unknown;
 }): GithubProgressEvent[] {
   if (typeof part.type !== "string" || !part.type.startsWith("tool-")) return [];
-  const command = commandOf(part.input);
+  const command = extractCommand(part.input);
   if (!command) return [];
   // An errored command completed no step — a rejected push has not pushed.
   if (part.state === "output-error") return [];
@@ -75,7 +75,7 @@ function progressForPart(part: {
   if (part.state === "output-available") {
     // `gh pr create` prints the pull request's URL on stdout, so the opened step can link to
     // it. Only a settled, successful call has that output.
-    const prUrl = firstPullRequestUrlIn(part.output);
+    const prUrl = extractFirstPullRequestUrl(part.output);
     return steps.map((step) =>
       eventOf(step.end, step.detail, step.end === "opened" ? prUrl : undefined),
     );
@@ -95,12 +95,12 @@ function eventOf(
   return { stage, ...(detail ? { detail } : {}), ...(url ? { url } : {}) };
 }
 
-function stepOfSegment(tokens: string[]): GithubStep | null {
+function classifySegmentStep(tokens: string[]): GithubStep | null {
   const [argv0, ...rest] = tokens;
 
   if (argv0 === "gh") {
     if (rest[0] === "repo" && rest[1] === "clone") {
-      return { begin: "cloning", end: "cloned", detail: repoSlug(rest[2]) };
+      return { begin: "cloning", end: "cloned", detail: extractRepoSlug(rest[2]) };
     }
 
     if (rest[0] === "pr" && rest[1] === "create") {
@@ -112,7 +112,7 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
 
   if (argv0 !== "git") return null;
 
-  const git = gitSubcommand(rest);
+  const git = extractGitSubcommand(rest);
   if (!git) return null;
 
   const [subcommand, ...args] = git;
@@ -122,7 +122,7 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
       return {
         begin: "cloning",
         end: "cloned",
-        detail: repoSlug(args.find((arg) => !arg.startsWith("-"))),
+        detail: extractRepoSlug(args.find((arg) => !arg.startsWith("-"))),
       };
     case "checkout": {
       const branchOptionIndex = args.findIndex((arg) => arg === "-b" || arg === "-B");
@@ -131,7 +131,7 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
         : { end: "branched", detail: args[branchOptionIndex + 1] };
     }
     case "commit":
-      return { end: "committed", detail: valueAfter(args, "-m") };
+      return { end: "committed", detail: extractValueAfter(args, "-m") };
     case "push":
       return { end: "pushed" };
     default:
@@ -139,7 +139,7 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
   }
 }
 
-function gitSubcommand(rest: string[]): string[] | null {
+function extractGitSubcommand(rest: string[]): string[] | null {
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index];
     if (!token) continue;
@@ -155,14 +155,14 @@ function gitSubcommand(rest: string[]): string[] | null {
   return null;
 }
 
-function repoSlug(arg: string | undefined): string | undefined {
+function extractRepoSlug(arg: string | undefined): string | undefined {
   if (!arg) return undefined;
 
   const cleaned = arg.replace(/\.git$/, "");
   return /([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+)$/.exec(cleaned)?.[1];
 }
 
-function valueAfter(args: string[], flag: string): string | undefined {
+function extractValueAfter(args: string[], flag: string): string | undefined {
   const flagIndex = args.indexOf(flag);
   if (flagIndex === -1) return undefined;
 
@@ -201,7 +201,7 @@ function isNetworkGit(tokens: string[]): boolean {
   return false;
 }
 
-function commandOf(input: unknown): string | null {
+function extractCommand(input: unknown): string | null {
   const parsed = z.object({ command: z.string() }).safeParse(input);
   return parsed.success ? parsed.data.command : null;
 }

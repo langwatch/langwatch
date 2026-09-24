@@ -260,7 +260,10 @@ export class ModelProviderService {
   }
 
   findResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
-    return this.defaults.tryGetResolved(input);
+    return this.defaults.getResolved(input).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "model_default_not_found") return null;
+      throw error;
+    });
   }
 
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
@@ -312,13 +315,14 @@ export class ModelProviderService {
 
   async translate(input: TranslateInput): Promise<TranslateOutput> {
     const parsed = translateInputSchema.parse(input);
-    const resolved = await this.defaults.tryGetResolved({
-      projectId: parsed.projectId,
-      featureKey: "translate.text",
-    });
-    if (!resolved) {
-      throw new ModelProviderInvalidError("No translation model is configured");
-    }
+    const resolved = await this.defaults
+      .getResolved({ projectId: parsed.projectId, featureKey: "translate.text" })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "model_default_not_found") {
+          throw new ModelProviderInvalidError("No translation model is configured");
+        }
+        throw error;
+      });
 
     return {
       translation: await this.options.translation.translate({

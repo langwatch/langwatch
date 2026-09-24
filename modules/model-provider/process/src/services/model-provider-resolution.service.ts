@@ -224,7 +224,7 @@ function findConfiguredModels({
 
   for (const key of [feature.key, feature.role]) {
     for (const config of tierConfigs) {
-      const value = readConfiguredModel(config.config[key]);
+      const value = pickConfiguredModel(config.config[key]);
 
       if (!value) {
         continue;
@@ -243,6 +243,6 @@ function findConfiguredModels({
   return models;
 }
 
-function readConfiguredModel(value: unknown): string | null {
+function pickConfiguredModel(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }

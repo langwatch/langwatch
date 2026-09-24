@@ -1,10 +1,10 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { HandledError } from "@langwatch/handled-error";
 import {
   expandLatestAlias,
   isCodexModel,
   ModelNotConfiguredError,
   ModelProviderDisabledError,
-  type ModelProviderAlternateResolution,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import type { LanguageModel } from "ai";
@@ -84,7 +84,7 @@ async function resolveModel({
   }
 
   // 3. Find any enabled provider with a usable custom model.
-  const rescued = anyEnabledCustomModel(modelProviders);
+  const rescued = pickEnabledCustomModel(modelProviders);
   if (rescued) {
     return rescued;
   }
@@ -168,12 +168,12 @@ async function disabledProviderError({
     throw new Error("resolveModelForFeature returned a null scope");
   }
 
-  const alternate = await tryFindAlternate({
-    projectId,
-    featureKey,
-    skipFromScope: resolved.scope,
-    modelProviderService,
-  });
+  const alternate = await modelProviderService
+    .findAlternateModel({ projectId, featureKey, skipFromScope: resolved.scope })
+    .catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "model_not_configured") return undefined;
+      throw error;
+    });
   const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
 
   return new ModelProviderDisabledError(
@@ -197,33 +197,8 @@ async function disabledProviderError({
   );
 }
 
-/** The cascade-next candidate, or null when nothing else resolves. */
-async function tryFindAlternate({
-  projectId,
-  featureKey,
-  skipFromScope,
-  modelProviderService,
-}: {
-  projectId: string;
-  featureKey: string;
-  skipFromScope: NonNullable<
-    Awaited<ReturnType<ModelProviderApi["resolveModelForFeature"]>>["scope"]
-  >;
-  modelProviderService: ModelProviderResolutionGateway;
-}): Promise<ModelProviderAlternateResolution | null> {
-  try {
-    return await modelProviderService.findAlternateModel({ projectId, featureKey, skipFromScope });
-  } catch (error) {
-    if (!(error instanceof ModelNotConfiguredError)) {
-      throw error;
-    }
-
-    return null;
-  }
-}
-
 /** The conservative rescue: the first enabled provider carrying a usable custom model. */
-function anyEnabledCustomModel(
+function pickEnabledCustomModel(
   modelProviders: Record<string, LegacyModelProviderExecution>,
 ): string | null {
   for (const [key, provider] of Object.entries(modelProviders)) {

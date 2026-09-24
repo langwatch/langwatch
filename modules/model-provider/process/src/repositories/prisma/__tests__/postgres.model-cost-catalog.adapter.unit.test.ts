@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaModelCostCatalogRepository } from "../../../model-provider.server.ts";
@@ -44,7 +45,10 @@ function catalogue(options: { project?: unknown } = {}) {
     findWithTeam: vi.fn(async () =>
       options.project === undefined ? projectWithTeam() : options.project,
     ),
-    getWithTeam: vi.fn(async () => projectWithTeam()),
+    getWithTeam: vi.fn(async () => {
+      if (options.project === null) throw new ProjectNotFoundError();
+      return options.project ?? projectWithTeam();
+    }),
   };
 
   return {

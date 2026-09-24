@@ -24,7 +24,7 @@ function executionWith(providers: Record<string, unknown>, rowById?: unknown) {
     catalog: {
       prepareExecution: async ({ parameters }: { parameters: Record<string, unknown> }) =>
         parameters,
-      tryGetExecutionDefinition: () => null,
+      pickExecutionDefinition: () => null,
       tryGetExecutionValue: () => null,
       pickStoredExecutionValue: () => null,
     },

@@ -5,7 +5,7 @@ import {
   customModelEntrySchema,
   type CustomModelEntry,
   getAllModels,
-  getParameterConstraints,
+  pickParameterConstraints,
   getSchemaShape,
   modelProviders,
   type Model,
@@ -183,7 +183,7 @@ export const getModelMetadataForFrontend = (): Record<string, ModelMetadataForFr
         supportsAudioInput: model.supportsAudioInput,
         pricing: model.pricing,
         reasoningConfig: model.reasoningConfig,
-        parameterConstraints: getParameterConstraints(model.id),
+        parameterConstraints: pickParameterConstraints(model.id),
       },
     ]),
   );
@@ -219,7 +219,7 @@ export const mergeCustomModelMetadata = (
         supportsImageInput: entry.multimodalInputs?.includes("image") ?? false,
         supportsAudioInput: entry.multimodalInputs?.includes("audio") ?? false,
         pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
-        parameterConstraints: getParameterConstraints(fullId),
+        parameterConstraints: pickParameterConstraints(fullId),
       };
     }
   }

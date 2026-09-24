@@ -1,12 +1,12 @@
 import { getModelById } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { resolveMaxTokensCeiling } from "../model-provider.server.ts";
+import { pickMaxTokensCeiling } from "../model-provider.server.ts";
 
-describe("resolveMaxTokensCeiling", () => {
+describe("pickMaxTokensCeiling", () => {
   it("prefers a configured custom-model ceiling", () => {
     expect(
-      resolveMaxTokensCeiling("custom/model", {
+      pickMaxTokensCeiling("custom/model", {
         customModels: [
           {
             modelId: "model",
@@ -22,12 +22,12 @@ describe("resolveMaxTokensCeiling", () => {
   it("falls back to the catalog completion limit", () => {
     const model = getModelById("openai/gpt-5");
     expect(model).toBeDefined();
-    expect(resolveMaxTokensCeiling("openai/gpt-5", null)).toBe(
+    expect(pickMaxTokensCeiling("openai/gpt-5", null)).toBe(
       model?.maxCompletionTokens ?? undefined,
     );
   });
 
   it("returns undefined for an unknown model", () => {
-    expect(resolveMaxTokensCeiling("unknown/model", undefined)).toBeUndefined();
+    expect(pickMaxTokensCeiling("unknown/model", undefined)).toBeUndefined();
   });
 });

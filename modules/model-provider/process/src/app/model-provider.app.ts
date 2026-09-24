@@ -659,7 +659,7 @@ export class ModelProviderApp implements ModelProviderApi {
 
   /** The registry's ceilings for a model id, or null when it names no such model. */
   findModelLimits(input: { model: string }): ModelLimits | null {
-    return this.#limits.tryGetModelLimits(input.model);
+    return this.#limits.pickModelLimits(input.model);
   }
 
   /**

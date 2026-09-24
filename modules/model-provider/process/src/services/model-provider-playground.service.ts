@@ -77,7 +77,7 @@ export class ModelProviderPlaygroundService {
         body: readableStreamChunks(response.body),
       };
     } catch (error) {
-      const refusal = upstreamCredentialRefusal(error);
+      const refusal = extractUpstreamCredentialRefusal(error);
       if (!refusal) throw error;
 
       this.#credentialRefusals.set(cacheKey, { error: refusal.error.message });
@@ -114,7 +114,7 @@ export class ModelProviderPlaygroundService {
   }
 }
 
-function upstreamCredentialRefusal(error: unknown): { error: { message: string } } | null {
+function extractUpstreamCredentialRefusal(error: unknown): { error: { message: string } } | null {
   const failure = error as { statusCode?: number; cause?: { value?: { responseBody?: string } } };
   if (failure?.statusCode !== 401 && failure?.statusCode !== 403) return null;
 

@@ -88,7 +88,7 @@ export const llmModels: LLMModelRegistry = {
   models: mergedModels,
 };
 
-export function getModelMetadata(modelId: string): {
+export function pickModelMetadata(modelId: string): {
   supportedParameters: string[];
   contextLength: number;
   maxCompletionTokens: number | null;

@@ -145,24 +145,24 @@ const REASONING_RULES: readonly { matches: (id: string) => boolean; config: Reas
 ];
 
 /** Reasoning configuration for a model id, or undefined if it takes none. */
-export function getReasoningConfig(modelId: string): ReasoningConfig | undefined {
+export function pickReasoningConfig(modelId: string): ReasoningConfig | undefined {
   const lowerModelId = modelId.toLowerCase();
   return REASONING_RULES.find((rule) => rule.matches(lowerModelId))?.config;
 }
 
 /** Whether a model takes a reasoning parameter at all. */
 export function supportsReasoning(modelId: string): boolean {
-  return getReasoningConfig(modelId) !== undefined;
+  return pickReasoningConfig(modelId) !== undefined;
 }
 
 /** Allowed reasoning-effort values for a model, or empty if it takes none. */
 export function getAllowedReasoningValues(modelId: string): readonly ReasoningEffortOption[] {
-  return getReasoningConfig(modelId)?.allowedValues ?? [];
+  return pickReasoningConfig(modelId)?.allowedValues ?? [];
 }
 
 /** Default reasoning effort for a model, or undefined if it takes none. */
-export function getDefaultReasoningEffort(modelId: string): ReasoningEffortOption | undefined {
-  return getReasoningConfig(modelId)?.defaultValue;
+export function pickDefaultReasoningEffort(modelId: string): ReasoningEffortOption | undefined {
+  return pickReasoningConfig(modelId)?.defaultValue;
 }
 
 function includesAny(text: string, needles: readonly string[]): boolean {
