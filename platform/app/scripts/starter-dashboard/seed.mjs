@@ -2,8 +2,9 @@
 // @ts-nocheck
 /**
  * Starter dashboard: one-shot populates an "Analytics starter" dashboard
- * with 8 widgets pulled from the north-star-widgets and legacy-parity-widgets
- * packs, in a fixed order (order = vertical layout order).
+ * with 8 widgets pulled from the north-star-widgets pack and this folder's
+ * own legacy-parity JSON files, in a fixed order (order = vertical layout
+ * order).
  *
  * This does NOT replace the pack seeders — it reuses their env contract and
  * fetch style, but pins pre-existing (or newly created) dashboard widgets
@@ -41,11 +42,11 @@ const MANIFEST = [
   { pack: "north-star-widgets", file: "north-star-metric-stat.json" },
   { pack: "north-star-widgets", file: "north-star-area-timeseries.json" },
   { pack: "north-star-widgets", file: "north-star-stacked-bars.json" },
-  { pack: "legacy-parity-widgets", file: "legacy-trace-count-over-time.json" },
+  { pack: "starter-dashboard", file: "legacy-trace-count-over-time.json" },
   { pack: "north-star-widgets", file: "north-star-donut.json" },
   { pack: "north-star-widgets", file: "north-star-leaderboard.json" },
   { pack: "north-star-widgets", file: "north-star-heatmap.json" },
-  { pack: "legacy-parity-widgets", file: "legacy-latency-percentiles.json" },
+  { pack: "starter-dashboard", file: "legacy-latency-percentiles.json" },
 ];
 
 function requireEnv(name) {

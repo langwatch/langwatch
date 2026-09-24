@@ -332,6 +332,14 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // No-op when API is on plain HTTP.
         secure: false,
       },
+      // The chart frame is served by the API server with its own CSP headers;
+      // without this entry the dev iframe gets the SPA shell (index.html),
+      // causing CORS errors from the opaque-origin frame loading /src/main.tsx.
+      "^/sandbox/chart-frame(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
       // An exporter given the site root as its OTLP endpoint posts to
       // `/v1/traces`. In production start.ts routes those into the API; in dev
       // the frontend owns the root, so they need an entry of their own or they
