@@ -151,7 +151,7 @@ describe("prefetchWithFixture", () => {
     };
 
     const voiceTargets: VoiceTargetReader = {
-      resolve: async ({ agentId }: { projectId: string; agentId: string }) => {
+      getVoiceTarget: async ({ agentId }: { projectId: string; agentId: string }) => {
         const provider = await findElevenLabsProviderForProject();
         const credential = provider
           ? await getElevenLabsApiCredential({ modelProviderId: provider.id })

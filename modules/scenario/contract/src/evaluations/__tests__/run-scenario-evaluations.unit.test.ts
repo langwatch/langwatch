@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { EvaluatorAttachment } from "../../evaluator-attachments.ts";
 import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators.ts";
+import { ScenarioNotFoundError, SimulationRunNotFoundError } from "../../scenario.errors.ts";
 import { MAX_STORED_INPUT_LENGTH } from "../constants.ts";
 import {
   deriveCheckType,
@@ -140,6 +141,46 @@ const recorded = (deps: RunScenarioEvaluationsDeps) =>
   vi.mocked(deps.recordEvaluations).mock.calls[0]?.[0];
 
 describe("runScenarioEvaluations", () => {
+  describe("given the scenario was deleted before the run was graded", () => {
+    it("evaluates nothing and records nothing", async () => {
+      const deps = makeDeps();
+      deps.scenarios.getById = vi.fn(async () => {
+        throw new ScenarioNotFoundError("scenario-1");
+      });
+
+      await expect(
+        runScenarioEvaluations({ deps, payload, isFinalAttempt: false }),
+      ).resolves.toEqual([]);
+      expect(deps.runEvaluation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the scenario read fails for another reason", () => {
+    it("propagates the failure so the job retries", async () => {
+      const deps = makeDeps();
+      deps.scenarios.getById = vi.fn(async () => {
+        throw new Error("database unreachable");
+      });
+
+      await expect(
+        runScenarioEvaluations({ deps, payload, isFinalAttempt: false }),
+      ).rejects.toThrow("database unreachable");
+    });
+  });
+
+  describe("given the run has no recorded state yet", () => {
+    it("grades without the run's messages instead of failing", async () => {
+      const deps = makeDeps();
+      deps.runs.getRunState = vi.fn(async () => {
+        throw new SimulationRunNotFoundError("run-1");
+      });
+
+      await expect(
+        runScenarioEvaluations({ deps, payload, isFinalAttempt: false }),
+      ).resolves.toEqual(expect.any(Array));
+    });
+  });
+
   describe("given an exact match evaluator mapped to the last agent message and a field", () => {
     /** @scenario "A finished run with attached evaluators is graded on the platform" */
     it("runs the evaluator with the resolved inputs and records a passed result", async () => {

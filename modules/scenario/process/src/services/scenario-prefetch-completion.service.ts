@@ -11,7 +11,10 @@ import type {
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { ScenarioExecutionPrefetchConfig } from "../services/scenario-execution-prefetcher.service.ts";
-import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
+import type {
+  RunSuite,
+  ScenarioExecutionLookupService,
+} from "./scenario-execution-lookup.service.ts";
 import {
   type ScenarioModelParametersService,
   type ModelParamsResult,
@@ -21,16 +24,39 @@ import type { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.s
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
 export type ScenarioPrefetchLookups = {
-  scenario: ReturnType<ScenarioExecutionLookupService["fetchScenario"]>;
+  scenario: ReturnType<ScenarioExecutionLookupService["getScenarioExecution"]>;
   project: ReturnType<ScenarioExecutionLookupService["fetchProject"]>;
-  adapter: ReturnType<ScenarioTargetPrefetchService["fetch"]>;
-  suite: ReturnType<ScenarioExecutionLookupService["fetchSuite"]>;
+  adapter: ReturnType<ScenarioTargetPrefetchService["getTargetAdapter"]>;
+  suite: ReturnType<ScenarioExecutionLookupService["getRunSuite"]>;
 };
 
-type ScenarioResult = NonNullable<
-  Awaited<ReturnType<ScenarioExecutionLookupService["fetchScenario"]>>
->;
-type SuiteOverrides = Awaited<ReturnType<ScenarioExecutionLookupService["fetchSuite"]>>;
+type ScenarioResult = Awaited<ReturnType<ScenarioExecutionLookupService["getScenarioExecution"]>>;
+type ProjectResult = Awaited<ReturnType<ScenarioExecutionLookupService["fetchProject"]>>;
+type AdapterResult = Awaited<ReturnType<ScenarioTargetPrefetchService["getTargetAdapter"]>>;
+
+type SettledLookup<T> = { found: true; value: T } | { found: false };
+
+function extractSettled<T>(settled: PromiseSettledResult<T>): T {
+  if (settled.status === "fulfilled") {
+    return settled.value;
+  }
+
+  throw settled.reason;
+}
+
+function extractSettledOrMiss<T>(
+  settled: PromiseSettledResult<T>,
+  missCode: string,
+): SettledLookup<T> {
+  if (settled.status === "fulfilled") {
+    return { found: true, value: settled.value };
+  }
+  if (HandledError.isHandled(settled.reason) && settled.reason.code === missCode) {
+    return { found: false };
+  }
+
+  throw settled.reason;
+}
 
 type ValidatedLookups =
   | {
@@ -38,7 +64,7 @@ type ValidatedLookups =
       scenario: ScenarioResult;
       project: { apiKey: string };
       adapter: TargetAdapterData;
-      suite: SuiteOverrides;
+      suite: RunSuite;
     }
   | { success: false; result: ScenarioExecutionPrefetchResult };
 
@@ -81,7 +107,7 @@ export class ScenarioPrefetchCompletionService {
     target: TargetConfig;
     lookups: ScenarioPrefetchLookups;
   }): Promise<ScenarioExecutionPrefetchResult> {
-    const [scenario, project, adapter, suite] = await Promise.all([
+    const [scenario, project, adapter, suite] = await Promise.allSettled([
       input.lookups.scenario,
       input.lookups.project,
       input.lookups.adapter,
@@ -139,13 +165,18 @@ export class ScenarioPrefetchCompletionService {
     context: ScenarioExecutionPrefetchInput["context"],
     target: TargetConfig,
     lookups: {
-      scenario: Awaited<ReturnType<ScenarioExecutionLookupService["fetchScenario"]>>;
-      project: Awaited<ReturnType<ScenarioExecutionLookupService["fetchProject"]>>;
-      adapter: Awaited<ReturnType<ScenarioTargetPrefetchService["fetch"]>>;
-      suite: SuiteOverrides;
+      scenario: PromiseSettledResult<ScenarioResult>;
+      project: PromiseSettledResult<ProjectResult>;
+      adapter: PromiseSettledResult<AdapterResult>;
+      suite: PromiseSettledResult<RunSuite>;
     },
   ): ValidatedLookups {
-    if (!lookups.scenario) {
+    const scenario = extractSettledOrMiss(lookups.scenario, "scenario_not_found");
+    const project = extractSettled(lookups.project);
+    const adapter = extractSettledOrMiss(lookups.adapter, "scenario_target_not_found");
+    const suite = extractSettled(lookups.suite);
+
+    if (!scenario.found) {
       logger.warn(
         { projectId: context.projectId, scenarioId: context.scenarioId },
         "Scenario not found",
@@ -160,39 +191,16 @@ export class ScenarioPrefetchCompletionService {
       };
     }
 
-    if (!lookups.project.success) {
-      logger.warn(
-        { projectId: context.projectId, error: lookups.project.error },
-        "Project fetch failed",
-      );
+    if (!project.success) {
+      logger.warn({ projectId: context.projectId, error: project.error }, "Project fetch failed");
 
       return {
         success: false,
-        result: { success: false, error: lookups.project.error },
+        result: { success: false, error: project.error },
       };
     }
 
-    if (lookups.adapter !== null && "success" in lookups.adapter) {
-      logger.warn(
-        {
-          projectId: context.projectId,
-          targetType: target.type,
-          reason: lookups.adapter.reason,
-        },
-        `Workflow LLM hydration failed: ${lookups.adapter.message}`,
-      );
-
-      return {
-        success: false,
-        result: {
-          success: false,
-          error: lookups.adapter.message,
-          reason: lookups.adapter.reason,
-        },
-      };
-    }
-
-    if (!lookups.adapter) {
+    if (!adapter.found) {
       logger.warn(
         {
           projectId: context.projectId,
@@ -211,12 +219,32 @@ export class ScenarioPrefetchCompletionService {
       };
     }
 
+    if ("success" in adapter.value) {
+      logger.warn(
+        {
+          projectId: context.projectId,
+          targetType: target.type,
+          reason: adapter.value.reason,
+        },
+        `Workflow LLM hydration failed: ${adapter.value.message}`,
+      );
+
+      return {
+        success: false,
+        result: {
+          success: false,
+          error: adapter.value.message,
+          reason: adapter.value.reason,
+        },
+      };
+    }
+
     return {
       success: true,
-      scenario: lookups.scenario,
-      project: lookups.project.data,
-      adapter: lookups.adapter,
-      suite: lookups.suite,
+      scenario: scenario.value,
+      project: project.data,
+      adapter: adapter.value,
+      suite,
     };
   }
 
@@ -240,15 +268,18 @@ export class ScenarioPrefetchCompletionService {
   private applyPromptMappings(
     adapter: TargetAdapterData,
     target: TargetConfig,
-    suite: SuiteOverrides,
+    suite: RunSuite,
   ): void {
     if (adapter.type !== "prompt") {
       return;
     }
 
-    adapter.scenarioMappings = suite?.targets?.find(
-      (candidate) => candidate.type === "prompt" && candidate.referenceId === target.referenceId,
-    )?.scenarioMappings;
+    adapter.scenarioMappings = suite.found
+      ? suite.suite.targets.find(
+          (candidate) =>
+            candidate.type === "prompt" && candidate.referenceId === target.referenceId,
+        )?.scenarioMappings
+      : undefined;
   }
 
   private async resolveModels(
@@ -270,8 +301,8 @@ export class ScenarioPrefetchCompletionService {
       // provider understands it as a model id.
       const { simulatorModel, judgeModel } = await resolveRunModels({
         plan: {
-          simulatorModel: lookups.suite?.simulatorModel,
-          judgeModel: lookups.suite?.judgeModel,
+          simulatorModel: lookups.suite.found ? lookups.suite.suite.simulatorModel : undefined,
+          judgeModel: lookups.suite.found ? lookups.suite.suite.judgeModel : undefined,
         },
         scenario: {
           simulatorModel: lookups.scenario.simulatorModel,

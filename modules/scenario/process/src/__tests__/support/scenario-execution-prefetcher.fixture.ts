@@ -442,7 +442,7 @@ export function createTestScenarioExecutionPrefetcherService(
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
     }),
     voiceTargets: deps.voiceTargets ?? {
-      resolve: async ({ agentId }) => ({
+      getVoiceTarget: async ({ agentId }) => ({
         type: "voice",
         agentId,
         voiceTarget: {

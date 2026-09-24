@@ -5,6 +5,7 @@ import {
   type EvaluatorWithFields,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -71,7 +72,7 @@ export interface RunScenarioEvaluationsDeps {
     getById(params: {
       projectId: string;
       id: string;
-    }): Promise<Pick<Scenario, "id" | "situation" | "criteria" | "fields" | "testSuiteId"> | null>;
+    }): Promise<Pick<Scenario, "id" | "situation" | "criteria" | "fields" | "testSuiteId">>;
   };
   suites: {
     getRunAttachments: (params: {
@@ -85,10 +86,7 @@ export interface RunScenarioEvaluationsDeps {
     }) => Promise<Map<string, EvaluatorWithFields>>;
   };
   runs: {
-    getRunState(params: {
-      tenantId: string;
-      scenarioRunId: string;
-    }): Promise<ScenarioRunState | null>;
+    getRunState(params: { tenantId: string; scenarioRunId: string }): Promise<ScenarioRunState>;
   };
   spans: {
     getSpansByTraceId: (params: { tenantId: string; traceId: string }) => Promise<Span[]>;
@@ -133,7 +131,12 @@ export async function loadRunAttachments({
   scenarioId: string;
   planId: string | null;
 }): Promise<RunEvaluators> {
-  const scenario = await deps.scenarios.getById({ projectId, id: scenarioId });
+  const scenario = await deps.scenarios
+    .getById({ projectId, id: scenarioId })
+    .catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "scenario_not_found") return undefined;
+      throw error;
+    });
   const suiteId = scenario?.testSuiteId ?? null;
   const attachments = await deps.suites.getRunAttachments({
     projectId,
@@ -623,7 +626,12 @@ export async function runScenarioEvaluations({
 }): Promise<ScenarioEvaluationResult[]> {
   const { tenantId: projectId, scenarioRunId, scenarioId, planId } = payload;
 
-  const scenario = await deps.scenarios.getById({ projectId, id: scenarioId });
+  const scenario = await deps.scenarios
+    .getById({ projectId, id: scenarioId })
+    .catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "scenario_not_found") return undefined;
+      throw error;
+    });
   if (!scenario) {
     logger.warn(
       { projectId, scenarioRunId, scenarioId },
@@ -648,7 +656,10 @@ export async function runScenarioEvaluations({
     payload.definitions
       ? new Map(payload.definitions.map((entry) => [entry.id, entry]))
       : loadDefinitions({ deps, projectId, attachments }),
-    deps.runs.getRunState({ tenantId: projectId, scenarioRunId }),
+    deps.runs.getRunState({ tenantId: projectId, scenarioRunId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "simulation_run_not_found") return null;
+      throw error;
+    }),
   ]);
 
   const context = await buildRunContext({

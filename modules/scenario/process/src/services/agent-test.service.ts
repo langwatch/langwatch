@@ -12,6 +12,7 @@ import type {
   AgentTestRunResult,
   AgentTestTurnResult,
 } from "@langwatch/agent-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -184,11 +185,15 @@ export class AgentTestService {
     projectId: string;
     target: TargetConfig;
   }): Promise<AdapterRead> {
-    const result = await this.targetPrefetch.fetch({
-      projectId: input.projectId,
-      target: input.target,
-      runSecretValues: {},
-    });
+    const result = await this.targetPrefetch
+      .getTargetAdapter({ projectId: input.projectId, target: input.target, runSecretValues: {} })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "scenario_target_not_found") {
+          return null;
+        }
+
+        throw error;
+      });
     if (result === null) {
       return null;
     }

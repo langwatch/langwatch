@@ -10,10 +10,15 @@ import {
   type ScenarioConfig,
   parseCallerVoiceConfig,
   type CallerVoiceConfig,
+  ScenarioNotFoundError,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
 import type { ScenarioService } from "./scenario.service.ts";
+
+export type RunSuite =
+  | { found: true; suite: Suite }
+  | { found: false; reason: "not_a_suite_set" | "suite_missing" };
 
 type FetchProjectResult =
   | { success: true; data: { apiKey: string } }
@@ -38,7 +43,7 @@ export class ScenarioExecutionLookupService {
     },
   ) {}
 
-  async fetchScenario({
+  async getScenarioExecution({
     projectId,
     scenarioId,
     suppliedParameters,
@@ -52,13 +57,13 @@ export class ScenarioExecutionLookupService {
     simulatorModel: string | null;
     judgeModel: string | null;
     callerVoice: CallerVoiceConfig;
-  } | null> {
+  }> {
     const scenario = await this.options.scenarios.tryGetById({
       projectId,
       id: scenarioId,
     });
     if (!scenario) {
-      return null;
+      throw new ScenarioNotFoundError(scenarioId);
     }
 
     const definitions = parseScenarioParameterDefinitions(scenario.parameters);
@@ -121,21 +126,15 @@ export class ScenarioExecutionLookupService {
     return { success: true, data: { apiKey: project.apiKey } };
   }
 
-  async fetchSuite({
-    setId,
-    projectId,
-  }: {
-    setId: string;
-    projectId: string;
-  }): Promise<Suite | null> {
+  async getRunSuite({ setId, projectId }: { setId: string; projectId: string }): Promise<RunSuite> {
     const suiteId = extractSuiteId(setId);
     if (!suiteId) {
-      return null;
+      return { found: false, reason: "not_a_suite_set" };
     }
 
     const [suite] = await this.options.suites.listByIds({ ids: [suiteId], projectId });
 
-    return suite ?? null;
+    return suite ? { found: true, suite } : { found: false, reason: "suite_missing" };
   }
 
   async resolveModel({

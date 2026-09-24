@@ -6,7 +6,11 @@ import {
   type AgentApi,
 } from "@langwatch/agent-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { AuthConfigSchema, FieldMappingSchema } from "@langwatch/scenario-contract";
+import {
+  AuthConfigSchema,
+  FieldMappingSchema,
+  ScenarioTargetNotFoundError,
+} from "@langwatch/scenario-contract";
 import type {
   CodeAgentData,
   HttpAgentData,
@@ -32,7 +36,7 @@ type HydrationFailure = {
 };
 
 export interface VoiceTargetReader {
-  resolve(input: { projectId: string; agentId: string }): Promise<VoiceAgentData | null>;
+  getVoiceTarget(input: { projectId: string; agentId: string }): Promise<VoiceAgentData>;
 }
 
 export class ScenarioTargetPrefetchService {
@@ -63,7 +67,23 @@ export class ScenarioTargetPrefetchService {
     private readonly workflowMappings: ScenarioWorkflowMappingService,
   ) {}
 
-  async fetch({
+  async getTargetAdapter(input: {
+    projectId: string;
+    target: TargetConfig;
+    runSecretValues: Record<string, string>;
+  }): Promise<TargetAdapterData | HydrationFailure> {
+    const adapter = await this.fetchAdapter(input);
+    if (adapter === null) {
+      throw new ScenarioTargetNotFoundError({
+        targetType: input.target.type,
+        referenceId: input.target.referenceId,
+      });
+    }
+
+    return adapter;
+  }
+
+  private async fetchAdapter({
     projectId,
     target,
     runSecretValues,
@@ -103,14 +123,11 @@ export class ScenarioTargetPrefetchService {
     });
   }
 
-  private async fetchVoiceAgentTarget(
-    projectId: string,
-    agentId: string,
-  ): Promise<VoiceAgentData | null> {
+  private async fetchVoiceAgentTarget(projectId: string, agentId: string): Promise<VoiceAgentData> {
     if (!this.options.voiceTargets) {
       throw new Error("Voice target prefetch is not installed");
     }
-    return this.options.voiceTargets.resolve({ projectId, agentId });
+    return this.options.voiceTargets.getVoiceTarget({ projectId, agentId });
   }
 
   private async tryGetAgent(projectId: string, agentId: string): Promise<Agent | null> {

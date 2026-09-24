@@ -2245,6 +2245,11 @@ const presentations = {
         : `${rejected} This run declares no parameters at all.`;
     },
   },
+  scenario_target_not_found: {
+    title: "That agent or prompt is no longer available",
+    describe: () =>
+      "The scenario points at an agent or prompt that was removed or can no longer run. Pick another one and run it again.",
+  },
   scenario_test_suite_not_found: {
     title: "That test suite isn't available",
     describe: () => "It may have been archived or removed. Reload, then pick a test suite again.",

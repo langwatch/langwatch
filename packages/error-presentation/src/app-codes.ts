@@ -561,6 +561,7 @@ export const APP_ERROR_CODES = [
   "scenario_secret_parameter_in_text",
   "scenario_secret_parameter_missing",
   "scenario_stale_version",
+  "scenario_target_not_found",
   "scenario_test_suite_not_found",
   "scenario_version_not_found",
   "schedule_already_in_flight",
