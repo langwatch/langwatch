@@ -371,21 +371,23 @@ export function applySpanProtections(
     }
   }
 
-  // Custom attribute rules with a restrict disposition, plus the attributes
-  // that carry hidden input/output (`langwatch.input`, the gen_ai message
-  // keys): replace matched span params whole (the mapper unflattens dotted
-  // keys into nested objects, so the matcher walks the nested paths) with the
-  // placeholder naming who can see them. A copy of hidden content riding along
-  // in any other param is scrubbed by the redactions set.
-  const transformedParams = redactObject(
-    redactHiddenAttributes(
+  // A copy of hidden content riding along in any param is scrubbed by the
+  // redactions set first. Then custom attribute rules with a restrict
+  // disposition, plus the attributes that carry a hidden content category
+  // (`langwatch.input`, the gen_ai message keys), replace matched span params
+  // whole (the mapper unflattens dotted keys into nested objects, so the
+  // matcher walks the nested paths) with the placeholder naming who can see
+  // them. In that order the scrub never rewrites a placeholder that happens to
+  // share a word with the hidden content.
+  const transformedParams = redactHiddenAttributes(
+    redactObject(
       span.params as Record<string, unknown> | null | undefined,
-      [
-        ...(protections.hiddenAttributes ?? []),
-        ...hiddenContentCategoryRules(protections),
-      ],
+      redactions,
     ),
-    redactions,
+    [
+      ...(protections.hiddenAttributes ?? []),
+      ...hiddenContentCategoryRules(protections),
+    ],
   );
 
   const transformed = {

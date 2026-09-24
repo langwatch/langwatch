@@ -231,6 +231,14 @@ Feature: Restricting who can see trace content
     Given "dave" cannot see the input of a span
     When "dave" opens that span's attributes
     Then "langwatch.input" is replaced by a redaction placeholder naming the audience
+    And the placeholder keeps its audience even when the hidden input shares a word with it
+
+  @unit
+  Scenario: Hidden output is replaced whole in the attributes that carry it
+    Given "dave" can see the input of a span but not its output
+    When "dave" opens that span's attributes
+    Then the gen_ai output messages are replaced by a redaction placeholder naming the audience
+    And the gen_ai input messages are still visible to "dave"
 
   @unit
   Scenario: Hiding input does not blank unrelated attributes

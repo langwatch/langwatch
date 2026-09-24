@@ -31,6 +31,7 @@ function makeSpan(params: Record<string, unknown>): Span {
             { type: "text", text: "" },
             { type: "text", text: PROMPT },
             { type: "text", text: SHORT_ANSWER },
+            { type: "text", text: "Admins" },
           ],
         },
         { role: "user", content: { type: "merger with Initech", body: "" } },
@@ -136,7 +137,7 @@ describe("applySpanProtections", () => {
   });
 
   describe("when the viewer cannot see a span's output", () => {
-    /** @scenario "Hidden input is replaced whole in the attributes that carry it" */
+    /** @scenario "Hidden output is replaced whole in the attributes that carry it" */
     it("replaces the gen_ai output messages whole and leaves the input keys alone", () => {
       const span = {
         ...makeSpan({
