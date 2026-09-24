@@ -36,9 +36,14 @@ export const userApiLinkedAccountsSchema = z.array(userApiLinkedAccountSchema);
  * The caller's personal workspace inside one organization, plus the routing
  * policy it inherits by default. Null where the organization declares none.
  */
+/** `project.apiKey` is blank unless the caller holds `project:manage` on the personal project. */
+const personalContextWorkspaceSchema = ensuredPersonalWorkspaceSchema.safeExtend({
+  project: ensuredPersonalWorkspaceSchema.shape.project.safeExtend({ apiKey: z.string() }),
+});
+
 export const userApiPersonalContextSchema = z
   .object({
-    workspace: ensuredPersonalWorkspaceSchema,
+    workspace: personalContextWorkspaceSchema,
     routingPolicy: z.object({ id: z.string(), name: z.string() }).strict().nullable(),
   })
   .strict();

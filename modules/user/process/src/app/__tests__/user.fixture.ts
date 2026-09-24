@@ -1,5 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { IdentityApi, RoutingDecision } from "@langwatch/identity-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import {
@@ -164,6 +165,7 @@ export function createUserTestApp(
     members?: Partial<UserInfrastructure>;
     dependencies?: Partial<{
       auth: AuthApi;
+      authz: AuthzApi;
       identity: IdentityApi;
       organizations: OrganizationApi;
       ops: OpsApi;
@@ -178,6 +180,7 @@ export function createUserTestApp(
     facts: input.facts ?? TEST_USER_CONFIG,
     dependencies: {
       auth: input.dependencies?.auth ?? createUserTestAuth(),
+      authz: input.dependencies?.authz ?? createApiFixture<AuthzApi>(),
       identity: input.dependencies?.identity ?? createApiFixture<IdentityApi>(),
       organizations: input.dependencies?.organizations ?? createUserTestOrganizations(),
       ops: input.dependencies?.ops ?? createUserTestOps(),

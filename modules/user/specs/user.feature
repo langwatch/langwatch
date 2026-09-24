@@ -64,3 +64,18 @@ Feature: Canonical user lifecycle
     When they end one of the other browsers
     Then that session alone is ended
     And the request names no account, so nobody else's session is reachable
+
+  # main's #7631 hardening: the personal context is readable with
+  # organization:view, so the project's API key needs project:manage.
+  @unit
+  Scenario: A caller who may manage their personal project reads its API key in the personal context
+    Given a member holding project:manage on their personal project
+    When they read their personal context in that organization
+    Then the personal project's API key is returned
+
+  @unit
+  Scenario: A caller who may not manage their personal project reads a blank API key in the personal context
+    Given a member without project:manage on their personal project
+    When they read their personal context in that organization
+    Then the personal project's API key is blank
+    And the blank key is a valid personal context on the wire

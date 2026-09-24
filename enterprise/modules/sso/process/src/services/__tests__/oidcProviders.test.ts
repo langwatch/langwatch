@@ -63,6 +63,41 @@ const configFor = (configs: ReturnType<typeof buildGenericOAuthConfigs>, provide
     | undefined;
 
 describe("buildGenericOAuthConfigs", () => {
+  const enterpriseEnv = (provider: string) =>
+    envWith({
+      provider,
+      auth0ClientId: "auth0-client-id",
+      auth0ClientSecret: "auth0-client-secret",
+      auth0Issuer: "https://tenant.eu.auth0.com",
+      oktaClientId: "okta-client-id",
+      oktaClientSecret: "okta-client-secret",
+      oktaIssuer: "https://acme.okta.com",
+      oidcClientId: "oidc-client-id",
+      oidcClientSecret: "oidc-client-secret",
+      oidcIssuer: "https://idp.acme.com",
+    });
+
+  /** @scenario Supported enterprise providers require ID-token verification */
+  it.each(["auth0", "okta"])("requires cryptographic ID-token verification for %s", (provider) => {
+    const config = buildGenericOAuthConfigs(enterpriseEnv(provider)).find(
+      (c) => c.providerId === provider,
+    );
+
+    expect(config?.requireIdTokenVerification).toBe(true);
+  });
+
+  /** @scenario "Enterprise provider accounts stay under the issuer namespace their stored rows carry" */
+  it.each(["auth0", "okta", ...PLAIN_OIDC_PROVIDER_IDS])(
+    "pins the %s account issuer to its stored local namespace",
+    (provider) => {
+      const config = buildGenericOAuthConfigs(enterpriseEnv(provider)).find(
+        (c) => c.providerId === provider,
+      );
+
+      expect(config?.accountIssuer).toBe(`local:oauth:${provider}`);
+    },
+  );
+
   describe("when provider is cognito", () => {
     /** @scenario Cognito mode */
     it("mounts a cognito provider that discovers its endpoints from the issuer", () => {

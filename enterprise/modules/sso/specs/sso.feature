@@ -61,3 +61,11 @@ Feature: Enterprise SSO package boundary
       not the issuer's own address
     And the request carries the client id, the openid, email and profile scopes,
       the registered redirect address and an authorization-code response type
+
+  # main's #7631 hardening; the namespace is migration 20260825030000_account_issuer.
+  @unit
+  Scenario: Enterprise provider accounts stay under the issuer namespace their stored rows carry
+    Given the active enterprise connection is any generic OAuth provider
+    When the server builds its generic OAuth provider
+    Then the account issuer is pinned to the provider's stored local namespace
+    And not to the issuer the provider's discovery document names

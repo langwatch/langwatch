@@ -395,6 +395,29 @@ export const LEGACY_CALLBACK_PROVIDER_IDS: readonly string[] = [
 ];
 
 /**
+ * The stored `Account.issuer` namespace for an OAuth provider, restated as a literal
+ * because a module may not value-import another's process package (ADR-134).
+ */
+const OAUTH_ACCOUNT_ISSUER_PREFIX = "local:oauth:";
+
+/**
+ * Keeps each account under the namespace its stored rows carry (migration
+ * 20260825030000_account_issuer). Auth0 and Okta session MFA evidence comes from the
+ * callback ID token, so both refuse to initialize unless discovery supplies issuer and JWKS.
+ */
+function pinnedToStoredAccountsAndVerifiedTokens(
+  config: NonNullable<Parameters<typeof genericOAuth>[0]["config"]>[number],
+): NonNullable<Parameters<typeof genericOAuth>[0]["config"]>[number] {
+  return {
+    ...config,
+    accountIssuer: `${OAUTH_ACCOUNT_ISSUER_PREFIX}${encodeURIComponent(config.providerId)}`,
+    ...(config.providerId === "auth0" || config.providerId === "okta"
+      ? { requireIdTokenVerification: true }
+      : {}),
+  };
+}
+
+/**
  * Builds the BetterAuth genericOAuth `config` array from environment
  * configuration. Only the provider named by `NEXTAUTH_PROVIDER` is added, and
  * only when its credentials are present. Each entry carries the `providerId`
@@ -518,7 +541,7 @@ const genericOAuthImplementation = {
       );
     }
 
-    return genericOAuthConfigs;
+    return genericOAuthConfigs.map(pinnedToStoredAccountsAndVerifiedTokens);
   },
 };
 

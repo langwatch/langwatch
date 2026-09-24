@@ -1,5 +1,6 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityApi,
@@ -131,6 +132,7 @@ const CREDENTIAL_ISSUER = "local:credential";
 /** The peer capabilities this module calls, resolved by the kernel at boot. */
 interface UserAppDependencies {
   auth: AuthApiContract;
+  authz: AuthzApi;
   identity: IdentityApiContract;
   ops: OpsApi;
   organizations: OrganizationApi;
@@ -158,12 +160,14 @@ export class UserApp implements UserApi {
   static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl"] as const;
   static readonly dependencies: {
     auth: typeof AuthApi;
+    authz: typeof AuthzApi;
     identity: typeof IdentityApi;
     organizations: typeof OrganizationApi;
     ops: typeof OpsApi;
     projects: typeof ProjectApi;
   } = {
     auth: AuthApi,
+    authz: AuthzApi,
     identity: IdentityApi,
     organizations: OrganizationApi,
     ops: OpsApi,
@@ -774,9 +778,17 @@ export class UserApp implements UserApi {
       organizationId,
       personalTeamId: workspace.team.id,
     });
+    const canManageProject = await this.#peers.authz.hasPermission({
+      userId,
+      permission: "project:manage",
+      projectId: workspace.project.id,
+    });
 
     return {
-      workspace,
+      workspace: {
+        ...workspace,
+        project: { ...workspace.project, apiKey: canManageProject ? workspace.project.apiKey : "" },
+      },
       routingPolicy: policy ? { id: policy.id, name: policy.name } : null,
     };
   }
