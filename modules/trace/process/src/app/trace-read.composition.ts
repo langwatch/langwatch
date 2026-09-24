@@ -116,6 +116,7 @@ export type TraceReaderCompositionOptions = {
   requestBounds: TraceAppDependencies["requestBounds"];
   /** The export door's rate window and in-flight slots, built by the app from process members. */
   exportBounds: TraceAppDependencies["exportBounds"];
+  shareReadLimiter?: TraceAppDependencies["shareReadLimiter"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 };
@@ -257,6 +258,7 @@ export function composeTraceAppDependencies(
     protections,
     requestBounds: options.requestBounds,
     exportBounds: options.exportBounds,
+    shareReadLimiter: options.shareReadLimiter,
     ...(options.apiKeys
       ? {
           legacyCredential: TraceLegacyCredentialService.create({

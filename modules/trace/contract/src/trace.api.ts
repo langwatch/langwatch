@@ -34,6 +34,7 @@ import type {
 } from "./trace-query.contract.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import type { TraceRecord } from "./trace-record.ts";
+import type { SharedTraceDto } from "./trace-share.schemas.ts";
 import type {
   SpanSummaryRow,
   SpanResourceInfo,
@@ -490,6 +491,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     payload: unknown;
   }): Promise<void>;
   findProject(projectId: string): Promise<unknown>;
+  /**
+   * The anonymous share page's whole payload for one token (port of main's
+   * `sharedTrace.get`, ADR-057). `viewerUserId` is the signed-in caller, if any.
+   */
+  getSharedTrace(input: {
+    token: string;
+    viewerUserId: string | null;
+    clientIp: string | null;
+    userAgent: string | null;
+  }): Promise<SharedTraceDto>;
 
   /**
    * The Explorer's Instant Eval, priced. The shorthand it sends is turned into

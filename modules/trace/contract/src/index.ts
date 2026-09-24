@@ -44,6 +44,7 @@ export * from "./trace-record.ts";
 export * from "./trace.errors.ts";
 export * from "./otlp-ingest.rest.ts";
 export * from "./traces.trpc.ts";
+export * from "./shared-trace.trpc.ts";
 export * from "./spans.trpc.ts";
 export * from "./trace-edit-overlay.trpc.ts";
 export * from "./trace-projection.ts";

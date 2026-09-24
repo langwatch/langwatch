@@ -436,6 +436,13 @@ class ApiSurface {
           : null,
       ),
       bindTrpcFact(gatewaySessionFact, (ctx: TrpcRequestContext) => ctx.session ?? null),
+      bindTrpcFact(shareViewerFact, (ctx: TrpcRequestContext) => {
+        const userAgent = ctx.req?.headers["user-agent"];
+        return {
+          userId: ctx.tryActor()?.id ?? null,
+          userAgent: typeof userAgent === "string" ? userAgent : null,
+        };
+      }),
     ];
   }
 }
@@ -554,6 +561,10 @@ const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
 const organizationSessionPersonFact = defineTrpcFact("organizationSessionPerson", z.unknown());
 const opsOperatorFact = defineTrpcFact("opsOperator", z.unknown());
 const gatewaySessionFact = defineTrpcFact("gatewaySession", z.unknown());
+const shareViewerFact = defineTrpcFact(
+  "shareViewer",
+  z.object({ userId: z.string().nullable(), userAgent: z.string().nullable() }),
+);
 const aiFailureSchema = z.object({
   code: z.literal("ai_call_failed"),
   cause: z.string(),

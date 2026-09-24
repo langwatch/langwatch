@@ -23,7 +23,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
-import { type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -183,6 +183,8 @@ import type {
   CollectorEvaluationReport,
   CollectorSpanIngest,
 } from "../services/trace-collector-dispatch.service.ts";
+import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
+import { traceReadMapperPorts } from "../transport/api-trpc/trace-read-mapper-ports.ts";
 import type {
   TraceLegacyCredential,
   TraceLegacyReads,
@@ -521,6 +523,8 @@ export interface TraceAppDependencies {
   metricCollection?: TraceOtlpIngestApi["otlpMetrics"];
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
+  /** Counts the anonymous share read per token and per IP; absent, the share read refuses. */
+  shareReadLimiter?: RateLimiter | undefined;
 }
 
 /**
@@ -615,6 +619,7 @@ export class TraceApp implements TraceApi, CollectorApp {
           redis: input.members.redis,
         }),
         presence: input.dependencies.presence,
+        shareReadLimiter: input.members.rateLimiter,
         protections: {
           authz: input.dependencies.authz,
           projects: input.dependencies.projects,
@@ -633,8 +638,20 @@ export class TraceApp implements TraceApi, CollectorApp {
   #scenarioEventMedia: TraceScenarioEventMediaService;
   #dependencies: TraceAppDependencies;
   #explorerEvals: TraceInstantEvalRunService | null;
+  #sharedRead: TraceSharedReadService | null;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
+    this.#sharedRead =
+      dependencies.protections && dependencies.shareReadLimiter
+        ? TraceSharedReadService.create({
+            reads: this,
+            share: dependencies.share,
+            projects: dependencies.projects,
+            protections: dependencies.protections,
+            rateLimiter: dependencies.shareReadLimiter,
+            mappers: traceReadMapperPorts,
+          })
+        : null;
     this.#explorerEvals = dependencies.instantEvals
       ? TraceInstantEvalRunService.create({ instantEvals: dependencies.instantEvals })
       : null;
@@ -1725,6 +1742,21 @@ export class TraceApp implements TraceApi, CollectorApp {
     payload: SharedTraceDto;
   }): Promise<void> {
     return this.#dependencies.share.cachePayload(input);
+  }
+
+  getSharedTrace(input: {
+    token: string;
+    viewerUserId: string | null;
+    clientIp: string | null;
+    userAgent: string | null;
+  }): Promise<SharedTraceDto> {
+    if (!this.#sharedRead) {
+      throw new Error(
+        "The public share read was asked for, and this process composed Trace without protections or a rate limiter",
+      );
+    }
+
+    return this.#sharedRead.getSharedTrace(input);
   }
 
   /** The project card the share page prints above the trace. */

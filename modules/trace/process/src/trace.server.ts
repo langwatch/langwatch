@@ -13,6 +13,7 @@ import type { TracePayloadReaderRepository } from "./repositories/trace-payload-
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
+import { sharedTraceTrpcTransport } from "./transport/shared-trace.trpc.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 import { traceExportRest } from "./transport/trace-export.rest.ts";
@@ -57,6 +58,7 @@ export const traceServer = defineServerModule("trace")
   .withApp(TraceApp)
   .withTransports(
     tracesTrpcTransport,
+    sharedTraceTrpcTransport,
     spansTrpcTransport,
     traceEditOverlayTrpcTransport,
     traceExportRest,
