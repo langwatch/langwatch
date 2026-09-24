@@ -51,3 +51,5 @@ against the installed module class at `.withTransports(...)`, so a missing opera
   `LangyNotEnabledError` (langy-composition.build.ts:156), so best-effort provisioning always logs and returns. Port main's mint.
 - project fixed (5e97e22eec). Separate finding while checking boot: `apps/worker` installation test asserts the job list
   includes `trace_processing` and it does not (worker boots; the job is missing from the list).
+- Found by experiment-4: main's voice audio routes `/api/voice/run/:id/audio` and `/api/voice/session/:id/audio` have no
+  transport on this branch and `createVoiceSessionInfrastructureFromServices` has no composer — unported.
