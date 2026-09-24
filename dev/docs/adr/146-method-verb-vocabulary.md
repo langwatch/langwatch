@@ -65,6 +65,10 @@ infer · classify · detect · pick · describe · map          (added by this A
 fold · reduce          (Alex, 2026-09-24: event reducers; state is null before the first event)
 ```
 
+A lookup in a **fixed in-code table** keyed by the input is a derivation too (Alex, 2026-09-24): the table is part of
+the code, not a store, so a miss means "the input names nothing in it" — name it `pick*`/`map*` (a model catalogue's
+`pickModelById`). A table read from a store, config or a peer is a lookup and follows the `get*`/`find*` rules.
+
 **`resolve*` and `read*` stay governed.** They are the two verbs that read both
 ways — `resolveOriginFromSpan` is a derivation, `resolveProjectId` is a lookup
 that should throw — and 103 findings sit on them. A blanket exemption would
