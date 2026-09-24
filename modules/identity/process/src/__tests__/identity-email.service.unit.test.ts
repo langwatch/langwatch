@@ -25,39 +25,42 @@ describe("the identity email read fork", () => {
     it("answers from the identifiers", async () => {
       const { service } = harness();
 
-      expect(await service.tryResolveEmail({ userId: USER })).toBe("chosen@acme.com");
+      expect(await service.resolveEmail({ userId: USER })).toEqual({
+        kind: "resolved",
+        email: "chosen@acme.com",
+      });
     });
   });
 
   describe("given a user whose backfill is not finalized", () => {
     /** @scenario "An unmigrated user keeps the legacy email column" */
-    it("answers null without reading the projection at all", async () => {
+    it("answers keep_legacy without reading the projection at all", async () => {
       const { service, heads } = harness({ onIdentity: false });
       const findHeads = vi.spyOn(heads, "findHeads");
 
-      expect(await service.tryResolveEmail({ userId: USER })).toBeNull();
+      expect(await service.resolveEmail({ userId: USER })).toEqual({ kind: "keep_legacy" });
       expect(findHeads).not.toHaveBeenCalled();
     });
   });
 
   describe("when the projection cannot be read", () => {
     /** @scenario "An unreadable projection never fails a request" */
-    it("answers null rather than throwing into the session boundary", async () => {
+    it("answers keep_legacy rather than throwing into the session boundary", async () => {
       const { service, heads } = harness();
       vi.spyOn(heads, "findHeads").mockRejectedValue(new Error("postgres unavailable"));
 
-      expect(await service.tryResolveEmail({ userId: USER })).toBeNull();
+      expect(await service.resolveEmail({ userId: USER })).toEqual({ kind: "keep_legacy" });
     });
   });
 
   describe("when the gate itself cannot be read", () => {
-    it("answers null: a read fork must never break sign-in", async () => {
+    it("answers keep_legacy: a read fork must never break sign-in", async () => {
       const heads = new InMemoryHeads();
       const service = IdentityEmailService.create(heads, async () => {
         throw new Error("migration state unavailable");
       });
 
-      expect(await service.tryResolveEmail({ userId: USER })).toBeNull();
+      expect(await service.resolveEmail({ userId: USER })).toEqual({ kind: "keep_legacy" });
     });
   });
 });
@@ -88,35 +91,38 @@ describe("the verified emails a user can accept an invitation through", () => {
         },
       });
 
-      expect(await service.verifiedEmailsOf({ userId: USER })).toEqual([
-        {
-          identifierId: "idf_google",
-          value: "sam@home.net",
-          provider: "google",
-        },
-        {
-          identifierId: "idf_primary",
-          value: "chosen@acme.com",
-          provider: "email",
-        },
-      ]);
+      expect(await service.verifiedEmailsOf({ userId: USER })).toEqual({
+        kind: "resolved",
+        emails: [
+          {
+            identifierId: "idf_google",
+            value: "sam@home.net",
+            provider: "google",
+          },
+          {
+            identifierId: "idf_primary",
+            value: "chosen@acme.com",
+            provider: "email",
+          },
+        ],
+      });
     });
   });
 
   describe("given a user whose backfill is not finalized", () => {
-    it("answers null so the caller keeps the legacy comparison", async () => {
+    it("answers keep_legacy so the caller keeps the legacy comparison", async () => {
       const { service } = harness({ onIdentity: false });
 
-      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
+      expect(await service.verifiedEmailsOf({ userId: USER })).toEqual({ kind: "keep_legacy" });
     });
   });
 
   describe("when the projection cannot be read", () => {
-    it("answers null rather than failing the acceptance path", async () => {
+    it("answers keep_legacy rather than failing the acceptance path", async () => {
       const { service, heads } = harness();
       vi.spyOn(heads, "findHeads").mockRejectedValue(new Error("postgres unavailable"));
 
-      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
+      expect(await service.verifiedEmailsOf({ userId: USER })).toEqual({ kind: "keep_legacy" });
     });
   });
 });

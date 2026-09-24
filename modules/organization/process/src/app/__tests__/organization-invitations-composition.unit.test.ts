@@ -125,7 +125,7 @@ function invitations(options: { teamsInOrganization?: readonly string[] } = {}) 
     repository,
     throttle,
     baseHost: BASE_HOST,
-    identity: { verifiedEmailsOf: async () => null },
+    identity: { verifiedEmailsOf: async () => ({ kind: "keep_legacy" }) },
     userDirectory: PrismaOrganizationUserDirectoryRepository.create({
       user: { findUnique: async () => null },
     } as never),

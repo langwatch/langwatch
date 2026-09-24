@@ -1,4 +1,8 @@
-import { type IdentifierFact, isLiveIdentifierState } from "@langwatch/identity-contract";
+import {
+  type IdentifierFact,
+  IdentityIdentifierNotFoundError,
+  isLiveIdentifierState,
+} from "@langwatch/identity-contract";
 
 import type {
   IdentityAccountRow,
@@ -59,7 +63,7 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
       .map((identifier) => this.assemble(identifier));
   }
 
-  async tryFindByProviderSubject({
+  async getAccountByProviderSubject({
     userId,
     providerId,
     providerAccountId,
@@ -67,14 +71,19 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
     userId: string;
     providerId: string;
     providerAccountId: string;
-  }): Promise<IdentityAccountRow | null> {
+  }): Promise<IdentityAccountRow> {
     const identifier = this.linkedIdentifiers().find(
       (candidate) =>
         candidate.userId === userId &&
         candidate.providerId === providerId &&
         candidate.providerAccountId === providerAccountId,
     );
-    return identifier === undefined ? null : this.assemble(identifier);
+    if (identifier === undefined) {
+      throw new IdentityIdentifierNotFoundError(
+        "no live linked identifier for this provider subject",
+      );
+    }
+    return this.assemble(identifier);
   }
 
   async createCredential({
@@ -152,11 +161,11 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
     }
   }
 
-  async tryResolveByIdentifierValue({
+  async getResolutionByIdentifierValue({
     normalizedValue,
   }: {
     normalizedValue: string;
-  }): Promise<IdentityResolution | null> {
+  }): Promise<IdentityResolution> {
     return this.resolve(
       (identifier) =>
         identifier.value === normalizedValue &&
@@ -164,13 +173,13 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
     );
   }
 
-  async tryResolveByProviderSubject({
+  async getResolutionByProviderSubject({
     providerId,
     providerAccountId,
   }: {
     providerId: string;
     providerAccountId: string;
-  }): Promise<IdentityResolution | null> {
+  }): Promise<IdentityResolution> {
     return this.resolve(
       (identifier) =>
         identifier.providerId === providerId &&
@@ -179,13 +188,13 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
     );
   }
 
-  async resolveByIssuerSubject({
+  async getResolutionByIssuerSubject({
     issuer,
     providerAccountId,
   }: {
     issuer: string;
     providerAccountId: string;
-  }): Promise<(IdentityResolution & { providerId: string }) | null> {
+  }): Promise<IdentityResolution & { providerId: string }> {
     for (const heads of this.heads.heads.values()) {
       for (const identifier of Object.values(heads.identifiers)) {
         if (
@@ -203,10 +212,10 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
         };
       }
     }
-    return null;
+    throw new IdentityIdentifierNotFoundError("no live identifier for this issuer subject");
   }
 
-  private resolve(matches: (identifier: IdentifierFact) => boolean): IdentityResolution | null {
+  private resolve(matches: (identifier: IdentifierFact) => boolean): IdentityResolution {
     for (const heads of this.heads.heads.values()) {
       for (const identifier of Object.values(heads.identifiers)) {
         if (!matches(identifier)) continue;
@@ -216,7 +225,7 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
         };
       }
     }
-    return null;
+    throw new IdentityIdentifierNotFoundError("no resolvable identifier matched");
   }
 
   private linkedIdentifiers(): IdentifierFact[] {
@@ -250,13 +259,17 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
   }
 }
 
+const missing = async (): Promise<never> => {
+  throw new IdentityIdentifierNotFoundError("no user is latched; the inert ports hold nothing");
+};
+
 const refuses = (method: string) => () => {
   throw new Error(`the identity branch wrote through ${method} with the gate closed`);
 };
 
 /**
  * Ports that hold nothing: what the adapter runs on when no user is latched.
- * Reads answer empty (a probe with no user to gate on yet); every write
+ * Reads answer empty or not-found (a probe with no user to gate on yet); every write
  * throws — a closed gate must never write a row or fact.
  */
 export const inertIdentityPorts = {
@@ -267,9 +280,7 @@ export const inertIdentityPorts = {
     async findByAccountIds() {
       return [];
     },
-    async tryFindByProviderSubject() {
-      return null;
-    },
+    getAccountByProviderSubject: missing,
     createCredential: refuses("createCredential"),
     updateCredentials: refuses("updateCredentials"),
     deleteCredentials: refuses("deleteCredentials"),
@@ -277,14 +288,8 @@ export const inertIdentityPorts = {
     mirrorSecretsOntoAccounts: refuses("mirrorSecretsOntoAccounts"),
   } satisfies IdentityAccounts,
   resolution: {
-    async tryResolveByIdentifierValue() {
-      return null;
-    },
-    async tryResolveByProviderSubject() {
-      return null;
-    },
-    async resolveByIssuerSubject() {
-      return null;
-    },
+    getResolutionByIdentifierValue: missing,
+    getResolutionByProviderSubject: missing,
+    getResolutionByIssuerSubject: missing,
   } satisfies IdentityResolver,
 };

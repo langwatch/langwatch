@@ -1,4 +1,7 @@
-import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
+import {
+  OrganizationNotFoundError,
+  UNLIMITED_PLAN,
+} from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
 import type { OrganizationLicense } from "../app/licensing.members.ts";
@@ -24,8 +27,8 @@ class StoredLicense implements OrganizationLicense {
 
   private constructor(private readonly licenseKey: string | null) {}
 
-  async tryReadLicense(): Promise<string | null> {
-    return this.licenseKey;
+  async getOrganizationLicense(): Promise<{ licenseKey: string | null }> {
+    return { licenseKey: this.licenseKey };
   }
 }
 
@@ -47,6 +50,23 @@ describe("given the plan a signed licence entitles an organization to", () => {
 
       await expect(plans.getActivePlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
       await expect(plans.getSelfHostedPlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+    });
+  });
+
+  describe("when the organization no longer exists", () => {
+    it("answers the unlimited baseline and lets any other failure through", async () => {
+      const missing = LicensePlanSourceService.create({
+        licenses: { getOrganizationLicense: () => Promise.reject(new OrganizationNotFoundError()) },
+        cryptography,
+      });
+      const broken = LicensePlanSourceService.create({
+        licenses: { getOrganizationLicense: () => Promise.reject(new Error("connection reset")) },
+        cryptography,
+      });
+
+      await expect(missing.getActivePlan("org-gone")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(missing.getSelfHostedPlan("org-gone")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(broken.getActivePlan("org-1")).rejects.toThrow("connection reset");
     });
   });
 

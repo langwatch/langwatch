@@ -46,7 +46,7 @@ export class MailDeliveryService {
 /** The gateway these settings select; empty where none is, or the one named is half-configured. */
 function findProviderNames(settings: MailGatewaySettings): EmailProviderName[] {
   try {
-    const name = EmailProviderService.create(settings).tryResolveName();
+    const name = EmailProviderService.create(settings).pickProviderName();
     return name === null ? [] : [name];
   } catch (error) {
     if (error instanceof EmailProviderConfigurationError) return [];

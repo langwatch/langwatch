@@ -52,8 +52,8 @@ class MemoryLicenseRepository implements LicenseStorage {
     }));
   }
 
-  async tryReadLicense(organizationId: string): Promise<string | null> {
-    return this.stored.get(organizationId)?.licenseKey ?? null;
+  async getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }> {
+    return { licenseKey: this.stored.get(organizationId)?.licenseKey ?? null };
   }
 
   async organizationExists(organizationId: string): Promise<boolean> {

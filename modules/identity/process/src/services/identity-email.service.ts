@@ -1,8 +1,9 @@
 import {
+  type IdentityEmailResolution,
   IdentityEmailService as IdentityEmailCapability,
-  type MatchableEmail,
   matchableEmailsOf,
   pickPrimaryEmail,
+  type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -10,6 +11,8 @@ import type { IdentityHeadsReader } from "../repositories/identity-heads.reposit
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 
 const logger = createLogger("langwatch:identity:email");
+
+const KEEP_LEGACY: { kind: "keep_legacy" } = { kind: "keep_legacy" };
 
 /**
  * The READ fork for `User.email` (ADR-101 §5; D03 generalizes it to the
@@ -28,17 +31,17 @@ export class IdentityEmailService extends IdentityEmailCapability {
 
   /**
    * The user's email according to their identifiers — PRIMARY, else the
-   * most recently VERIFIED — or null to keep the legacy column's answer.
+   * most recently VERIFIED — or `keep_legacy` to keep the legacy column's answer.
    */
-  async tryResolveEmail({ userId }: { userId: string }): Promise<string | null> {
+  async resolveEmail({ userId }: { userId: string }): Promise<IdentityEmailResolution> {
     try {
       if (!(await this.isOnIdentity({ userId }))) {
-        return null;
+        return KEEP_LEGACY;
       }
 
-      const heads = await this.heads.findHeads({ userId });
+      const email = pickPrimaryEmail({ heads: await this.heads.findHeads({ userId }) });
 
-      return pickPrimaryEmail({ heads });
+      return email === null ? KEEP_LEGACY : { kind: "resolved", email };
     } catch (error) {
       // A read fork that can break sign-in is worse than a stale email.
       logger.warn(
@@ -46,7 +49,7 @@ export class IdentityEmailService extends IdentityEmailCapability {
         "could not resolve the identifier email; falling back to the legacy User.email column",
       );
 
-      return null;
+      return KEEP_LEGACY;
     }
   }
 
@@ -55,22 +58,22 @@ export class IdentityEmailService extends IdentityEmailCapability {
    * (D11): an invite targets an address, and any VERIFIED identifier holding it vouches for the
    * person.
    */
-  async verifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
+  async verifiedEmailsOf({ userId }: { userId: string }): Promise<VerifiedEmailsResolution> {
     try {
       if (!(await this.isOnIdentity({ userId }))) {
-        return null;
+        return KEEP_LEGACY;
       }
 
       const heads = await this.heads.findHeads({ userId });
 
-      return matchableEmailsOf({ heads });
+      return { kind: "resolved", emails: matchableEmailsOf({ heads }) };
     } catch (error) {
       logger.warn(
         { userId, error },
         "could not resolve the verified identifier emails; falling back to the legacy User.email column",
       );
 
-      return null;
+      return KEEP_LEGACY;
     }
   }
 }

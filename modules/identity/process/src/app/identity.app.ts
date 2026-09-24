@@ -14,7 +14,9 @@ import {
   IdentityCapabilityUnavailableError,
   identityConfig,
   sealedProviderConfigCipher,
+  type IdentityEmailResolution,
   type IdentityServerConfig,
+  type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -621,11 +623,11 @@ export class IdentityApp implements IdentityApi {
     this.#parts = parts;
   }
 
-  findEmail(input: { userId: string }): Promise<string | null> {
-    return this.#parts.emails.tryResolveEmail(input);
+  resolveEmail(input: { userId: string }): Promise<IdentityEmailResolution> {
+    return this.#parts.emails.resolveEmail(input);
   }
 
-  verifiedEmailsOf(input: { userId: string }) {
+  verifiedEmailsOf(input: { userId: string }): Promise<VerifiedEmailsResolution> {
     return this.#parts.emails.verifiedEmailsOf(input);
   }
 

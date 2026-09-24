@@ -70,7 +70,7 @@ const encodeAttachments = (attachments: EmailContent["attachments"]) => {
  */
 const buildPayload = (content: EmailContent, defaultFrom: string, mime: EmailMimeService) => {
   const bccAddresses = EmailGateway.recipients(content.bcc);
-  const headers = mime.trySanitizeHeaders(content.headers);
+  const headers = mime.normalizeHeaders(content.headers);
   const attachments = encodeAttachments(content.attachments);
 
   return {

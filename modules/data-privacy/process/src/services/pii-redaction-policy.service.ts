@@ -232,7 +232,7 @@ export class PiiRedactionPolicyService {
    * strict (its default entity list), `{ entities }` for a custom level that selected
    * analysis-service identifiers, or null to skip it.
    */
-  tryLambdaAfterNative(policy: ResolvedDataPrivacy): {
+  deriveLambdaAfterNative(policy: ResolvedDataPrivacy): {
     entities?: readonly string[];
     exceptPatterns?: readonly string[];
   } | null {

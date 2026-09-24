@@ -12,7 +12,7 @@ describe("given a message carrying a header name and value with line breaks", ()
     /** @scenario "A crafted header cannot inject another one" */
     it("removes the breaks from both halves", () => {
       expect(
-        mime.trySanitizeHeaders({
+        mime.normalizeHeaders({
           "List-Unsubscribe\r\nBcc": "<https://example.test>\r\nX-Injected: yes",
         }),
       ).toEqual({ "List-UnsubscribeBcc": "<https://example.test> X-Injected: yes" });
@@ -20,7 +20,7 @@ describe("given a message carrying a header name and value with line breaks", ()
 
     /** @scenario "A crafted header cannot inject another one" */
     it("drops a header whose name is nothing but control characters", () => {
-      expect(mime.trySanitizeHeaders({ "\r\n": "value" })).toBeUndefined();
+      expect(mime.normalizeHeaders({ "\r\n": "value" })).toBeUndefined();
     });
 
     /** @scenario "A crafted header cannot inject another one" */

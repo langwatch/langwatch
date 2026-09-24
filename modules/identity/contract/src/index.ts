@@ -348,7 +348,7 @@ export {
   type OrganizationSsoConnection,
   type SsoConnectionHistoryEntryView,
 } from "./sso-connection-history.ts";
-export { IdentityEmailService } from "./identity-email.service.ts";
+export { type IdentityEmailResolution, IdentityEmailService } from "./identity-email.service.ts";
 export {
   coarseColleagueCount,
   DEFAULT_DOMAIN_JOIN_SETTING,
@@ -491,7 +491,11 @@ export {
   reduceIdentifier,
   userErasureFacts,
 } from "./identifier-aggregate.ts";
-export { type MatchableEmail, matchableEmailsOf } from "./matchable-emails.ts";
+export {
+  type MatchableEmail,
+  matchableEmailsOf,
+  type VerifiedEmailsResolution,
+} from "./matchable-emails.ts";
 export {
   BACKUP_CODE_CONSUMED_EVENT_TYPE,
   BACKUP_CODES_REGENERATED_EVENT_TYPE,

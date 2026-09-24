@@ -1,3 +1,4 @@
+import { OrganizationNotFoundError } from "@langwatch/enterprise-licensing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -19,12 +20,13 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
 
   private constructor(private readonly prisma: OrganizationLicenseDatabase) {}
 
-  async tryReadLicense(organizationId: string): Promise<string | null> {
+  async getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { license: true },
     });
-    return organization?.license ?? null;
+    if (organization === null) throw new OrganizationNotFoundError();
+    return { licenseKey: organization.license };
   }
 
   // Organization carries no archive column today; when one is added, exclude it

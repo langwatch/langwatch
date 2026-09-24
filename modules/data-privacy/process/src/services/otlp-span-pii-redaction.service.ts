@@ -155,7 +155,7 @@ export class OtlpSpanPiiRedactionService {
     }
 
     this.applyNativeSpanPass(span, resource, native.policy);
-    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    const lambda = this.policy.deriveLambdaAfterNative(native.policy);
     if (lambda) {
       try {
         const ran = await this.lambdaRedactSpan({

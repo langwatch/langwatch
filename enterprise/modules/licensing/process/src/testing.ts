@@ -140,8 +140,8 @@ export const GARBAGE_DATA = "garbage-data";
 class TestLicenseStorage implements LicenseStorage {
   private license: string | null = null;
 
-  async tryReadLicense(): Promise<string | null> {
-    return this.license;
+  async getOrganizationLicense(): Promise<{ licenseKey: string | null }> {
+    return { licenseKey: this.license };
   }
 
   async findOrganizationsWithLicense() {

@@ -69,7 +69,7 @@ export function distinctIdForTarget(target: FeatureFlagTarget): string {
  * person (same in every browser), anonymous browser id for a visitor,
  * undefined for a system target, which a percentage rule never admits.
  */
-export function bucketingIdForTarget(target: FeatureFlagTarget): string | undefined {
+export function pickBucketingId(target: FeatureFlagTarget): string | undefined {
   if (target.kind === "system") return undefined;
   if (target.kind === "anonymous") return target.anonymousId;
   return target.userId;
@@ -79,7 +79,7 @@ export function projectIdForTarget(target: FeatureFlagTarget): string | undefine
   return target.kind === "project" ? target.projectId : undefined;
 }
 
-export function organizationIdForTarget(target: FeatureFlagTarget): string | undefined {
+export function pickTargetOrganizationId(target: FeatureFlagTarget): string | undefined {
   if (target.kind === "project" || target.kind === "organization") {
     return target.organizationId;
   }
@@ -97,8 +97,8 @@ export function ruleContextForTarget(target: FeatureFlagTarget): {
 
   return {
     projectId: projectIdForTarget(target),
-    organizationId: organizationIdForTarget(target),
-    bucketingId: bucketingIdForTarget(target),
+    organizationId: pickTargetOrganizationId(target),
+    bucketingId: pickBucketingId(target),
     userEmail,
   };
 }

@@ -6,7 +6,7 @@ import {
   apiKeyVisibleProjectsInputSchema,
   apiKeyVisibleProjectsSchema,
   getTokenType,
-  splitApiKeyToken,
+  parseApiKeyToken,
 } from "@langwatch/api-key-contract";
 import { describe, expect, it } from "vitest";
 
@@ -19,11 +19,11 @@ describe("API-key contract", () => {
   });
 
   it("splits the supported bearer token shape", () => {
-    expect(splitApiKeyToken(`sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`)).toEqual({
+    expect(parseApiKeyToken(`sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`)).toEqual({
       lookupId: "a".repeat(16),
       secret: "b".repeat(48),
     });
-    expect(splitApiKeyToken("unknown-token")).toBeNull();
+    expect(parseApiKeyToken("unknown-token")).toBeNull();
   });
 
   it("defines the supported permission modes", () => {

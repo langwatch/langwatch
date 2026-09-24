@@ -76,12 +76,15 @@ export class BrowserSessionService {
     if (await this.pastItsWindow({ stored })) return null;
 
     const user = await this.deps.users.findById({ id: verified.user.id });
+    const identityEmail = await this.deps.identityEmails?.resolveEmail({
+      userId: verified.user.id,
+    });
     const session = browserSessionSchema.parse({
       user: {
         id: verified.user.id,
         name: verified.user.name ?? null,
         email:
-          (await this.deps.identityEmails?.tryResolveEmail({ userId: verified.user.id })) ??
+          (identityEmail?.kind === "resolved" ? identityEmail.email : null) ??
           user?.email ??
           verified.user.email ??
           null,
@@ -118,13 +121,16 @@ export class BrowserSessionService {
       return session;
     }
 
+    const identityEmail = await this.deps.identityEmails?.resolveEmail({
+      userId: impersonation.data.id,
+    });
     return browserSessionSchema.parse({
       ...session,
       user: {
         id: impersonation.data.id,
         name: impersonation.data.name ?? null,
         email:
-          (await this.deps.identityEmails?.tryResolveEmail({ userId: impersonation.data.id })) ??
+          (identityEmail?.kind === "resolved" ? identityEmail.email : null) ??
           impersonatedUser.email ??
           impersonation.data.email ??
           null,

@@ -18,10 +18,10 @@ describe("the installed licensing application's plan operation", () => {
       ["paid", ENTERPRISE_LICENSE_KEY],
       ["tampered", TAMPERED_LICENSE_KEY],
     ]);
-    const tryReadLicense = vi.fn(
-      async (organizationId: string) => keys.get(organizationId) ?? null,
-    );
-    const repository = createApiFixture<LicenseStorage>({ tryReadLicense });
+    const getOrganizationLicense = vi.fn(async (organizationId: string) => ({
+      licenseKey: keys.get(organizationId) ?? null,
+    }));
+    const repository = createApiFixture<LicenseStorage>({ getOrganizationLicense });
     const app = await LicensingApp.create({
       dependencies: { gateway: createApiFixture<GatewayApi>() },
       members: {
@@ -39,6 +39,6 @@ describe("the installed licensing application's plan operation", () => {
     });
     expect(await app.resolve({ organizationId: "unlicensed" })).toMatchObject({ free: true });
     expect(await app.resolve({ organizationId: "tampered" })).toMatchObject({ free: true });
-    expect(tryReadLicense.mock.calls).toEqual([["paid"], ["unlicensed"], ["tampered"]]);
+    expect(getOrganizationLicense.mock.calls).toEqual([["paid"], ["unlicensed"], ["tampered"]]);
   });
 });

@@ -13,8 +13,8 @@ class InMemoryLicenseStorage implements LicenseStorage {
 
   constructor(private readonly memberCount: number) {}
 
-  async tryReadLicense(): Promise<string | null> {
-    return this.stored?.licenseKey ?? null;
+  async getOrganizationLicense(): Promise<{ licenseKey: string | null }> {
+    return { licenseKey: this.stored?.licenseKey ?? null };
   }
   async findOrganizationsWithLicense() {
     return [];
@@ -53,7 +53,9 @@ describe("given an organization with 25 active members and no license yet", () =
       });
 
       expect(result).toMatchObject({ success: true });
-      await expect(storage.tryReadLicense()).resolves.toBe(ENTERPRISE_LICENSE_KEY);
+      await expect(storage.getOrganizationLicense()).resolves.toEqual({
+        licenseKey: ENTERPRISE_LICENSE_KEY,
+      });
     });
   });
 });

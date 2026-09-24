@@ -212,11 +212,12 @@ export class ConnectedBillingService {
     return (await this.repository.findAccount(input.organizationId)) ?? account;
   }
 
-  /** The connected account billed through this customer; null for a Cloud customer. */
-  async accountFor(stripeCustomerId: string): Promise<{ organizationId: string } | null> {
+  /** The connected account billed through this customer; a Cloud customer throws connected_billing_not_onboarded. */
+  async getAccountByCustomer(stripeCustomerId: string): Promise<{ organizationId: string }> {
     const account = await this.repository.findAccountByCustomer(stripeCustomerId);
+    if (!account) throw new ConnectedBillingNotOnboardedError();
 
-    return account ? { organizationId: account.organizationId } : null;
+    return { organizationId: account.organizationId };
   }
 
   /** Creates the renewal credit once the old term's last usage invoice is finalized. */

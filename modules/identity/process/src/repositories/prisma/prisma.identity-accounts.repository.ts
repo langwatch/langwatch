@@ -1,4 +1,7 @@
-import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
+import {
+  IdentityIdentifierNotFoundError,
+  LIVE_IDENTIFIER_STATES,
+} from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
@@ -124,7 +127,7 @@ export class PrismaIdentityAccountsRepository implements IdentityAccounts {
    * `provider` vocabulary collapses every enterprise IdP into `oidc` and a
    * subject is unique only WITHIN an issuer, so it cannot be the match key.
    */
-  async tryFindByProviderSubject({
+  async getAccountByProviderSubject({
     userId,
     providerId,
     providerAccountId,
@@ -132,7 +135,7 @@ export class PrismaIdentityAccountsRepository implements IdentityAccounts {
     userId: string;
     providerId: string;
     providerAccountId: string;
-  }): Promise<IdentityAccountRow | null> {
+  }): Promise<IdentityAccountRow> {
     const identifier = await this.prisma.identifier.findFirst({
       where: {
         userId,
@@ -142,9 +145,13 @@ export class PrismaIdentityAccountsRepository implements IdentityAccounts {
         accountId: { not: null },
       },
     });
-    if (identifier === null) return null;
-    const [row] = await this.assemble([identifier]);
-    return row ?? null;
+    const [row] = identifier === null ? [] : await this.assemble([identifier]);
+    if (row === undefined) {
+      throw new IdentityIdentifierNotFoundError(
+        "no live linked identifier for this provider subject",
+      );
+    }
+    return row;
   }
 
   async createCredential({

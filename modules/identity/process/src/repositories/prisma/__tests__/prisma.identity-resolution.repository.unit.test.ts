@@ -43,7 +43,7 @@ describe("PrismaIdentityResolutionRepository", () => {
         queryRawResult: [{ identifierId: "id-1", userId: "user-1", status: "finalized" }],
       });
 
-      const result = await repository.tryResolveByIdentifierValue({
+      const result = await repository.getResolutionByIdentifierValue({
         normalizedValue: "jane@example.com",
       });
       await flush();
@@ -61,7 +61,7 @@ describe("PrismaIdentityResolutionRepository", () => {
         updateImpl: () => Promise.reject(new Error("connection reset")),
       });
 
-      const result = await repository.tryResolveByIdentifierValue({
+      const result = await repository.getResolutionByIdentifierValue({
         normalizedValue: "jane@example.com",
       });
       await flush();
@@ -72,15 +72,14 @@ describe("PrismaIdentityResolutionRepository", () => {
   });
 
   describe("given no matching row", () => {
-    it("resolves nothing and touches nothing", async () => {
+    it("throws identity_identifier_not_found and touches nothing", async () => {
       const { repository, update } = repositoryOver({ queryRawResult: [] });
 
-      const result = await repository.tryResolveByIdentifierValue({
-        normalizedValue: "nobody@example.com",
-      });
+      await expect(
+        repository.getResolutionByIdentifierValue({ normalizedValue: "nobody@example.com" }),
+      ).rejects.toMatchObject({ code: "identity_identifier_not_found" });
       await flush();
 
-      expect(result).toBeNull();
       expect(update).not.toHaveBeenCalled();
     });
   });
@@ -91,7 +90,7 @@ describe("PrismaIdentityResolutionRepository", () => {
         queryRawResult: [{ identifierId: "id-2", userId: "user-2", status: "finalized" }],
       });
 
-      await repository.tryResolveByProviderSubject({
+      await repository.getResolutionByProviderSubject({
         providerId: "google",
         providerAccountId: "sub-123",
       });
@@ -112,7 +111,7 @@ describe("PrismaIdentityResolutionRepository", () => {
         ],
       });
 
-      const result = await repository.resolveByIssuerSubject({
+      const result = await repository.getResolutionByIssuerSubject({
         issuer: "https://accounts.google.com",
         providerAccountId: "sub-456",
       });
@@ -125,20 +124,21 @@ describe("PrismaIdentityResolutionRepository", () => {
       });
     });
 
-    it("touches nothing when the row backs no protocol account", async () => {
+    it("throws identity_identifier_not_found and touches nothing when the row backs no protocol account", async () => {
       const { repository, update } = repositoryOver({
         queryRawResult: [
           { identifierId: "id-4", userId: "user-4", providerId: null, status: "finalized" },
         ],
       });
 
-      const result = await repository.resolveByIssuerSubject({
-        issuer: "https://accounts.google.com",
-        providerAccountId: "sub-789",
-      });
+      await expect(
+        repository.getResolutionByIssuerSubject({
+          issuer: "https://accounts.google.com",
+          providerAccountId: "sub-789",
+        }),
+      ).rejects.toMatchObject({ code: "identity_identifier_not_found" });
       await flush();
 
-      expect(result).toBeNull();
       expect(update).not.toHaveBeenCalled();
     });
   });

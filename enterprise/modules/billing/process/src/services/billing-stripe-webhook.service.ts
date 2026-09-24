@@ -2,6 +2,7 @@ import {
   type HandleEventResult,
   type StripePriceMap,
 } from "@langwatch/enterprise-billing-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
@@ -72,7 +73,8 @@ export type WebhookService = {
 
 /** A finalized invoice of a connected self-hosted customer completes a waiting renewal. */
 export interface ConnectedBillingInvoiceEvents {
-  accountFor(stripeCustomerId: string): Promise<{ organizationId: string } | null>;
+  /** Throws connected_billing_not_onboarded for a LangWatch Cloud customer. */
+  getAccountByCustomer(stripeCustomerId: string): Promise<{ organizationId: string }>;
   completeRenewalIfDue(input: { organizationId: string }): Promise<unknown>;
 }
 
@@ -276,7 +278,14 @@ export class EEWebhookService implements WebhookService {
       typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
     if (!this.connectedBilling || !customerId) return { status: "ok" };
 
-    const account = await this.connectedBilling.accountFor(customerId);
+    const account = await this.connectedBilling
+      .getAccountByCustomer(customerId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "connected_billing_not_onboarded") {
+          return null;
+        }
+        throw error;
+      });
     if (!account) return { status: "ok" };
 
     await this.connectedBilling.completeRenewalIfDue({ organizationId: account.organizationId });

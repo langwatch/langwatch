@@ -19,8 +19,9 @@ function licenceRows(): {
   const candidates = MemoryOrganizationLicenseRepository.create();
   candidates.activate(LICENSED_ORGANIZATION_ID, VALID_LICENSE_KEY);
   const licenses: OrganizationLicenseReads = {
-    tryReadLicense: async (organizationId: string) =>
-      organizationId === LICENSED_ORGANIZATION_ID ? VALID_LICENSE_KEY : null,
+    getOrganizationLicense: async (organizationId: string) => ({
+      licenseKey: organizationId === LICENSED_ORGANIZATION_ID ? VALID_LICENSE_KEY : null,
+    }),
     findOrganizationsWithLicense: () => candidates.findOrganizationsWithLicense(),
   };
 

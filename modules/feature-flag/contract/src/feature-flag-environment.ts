@@ -17,7 +17,7 @@ export function deriveFeatureFlagEnvVarName(flagKey: string): string {
  * Resolve the environment override for a flag; legacy env var keeps
  * backward compatibility with older truthy semantics.
  */
-export function resolveFeatureFlagEnvOverride({
+export function parseFeatureFlagEnvOverride({
   read,
   flagKey,
   legacyEnvVar,

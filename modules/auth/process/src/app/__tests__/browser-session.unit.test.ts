@@ -1,5 +1,5 @@
 import { SessionIsCurrentError } from "@langwatch/auth-contract";
-import { IdentityEmailService } from "@langwatch/identity-contract";
+import { type IdentityEmailResolution, IdentityEmailService } from "@langwatch/identity-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -38,8 +38,9 @@ class IdentityEmails extends IdentityEmailService {
     super();
   }
 
-  async tryResolveEmail({ userId }: { userId: string }): Promise<string | null> {
-    return this.emails.get(userId) ?? null;
+  async resolveEmail({ userId }: { userId: string }): Promise<IdentityEmailResolution> {
+    const email = this.emails.get(userId);
+    return typeof email === "string" ? { kind: "resolved", email } : { kind: "keep_legacy" };
   }
 }
 

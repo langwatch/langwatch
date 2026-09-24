@@ -28,8 +28,8 @@ class OfflineLicenseStorage implements LicenseStorage {
     private readonly memberCount: number,
   ) {}
 
-  async tryReadLicense(organizationId: string): Promise<string | null> {
-    return organizationId === ORG ? this.licenseKey : null;
+  async getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }> {
+    return { licenseKey: organizationId === ORG ? this.licenseKey : null };
   }
 
   async findOrganizationsWithLicense() {

@@ -18,7 +18,7 @@ export interface DeviceLabelSource {
  * null when nothing usable survives, so a caller can fall back to something
  * other than naming every machine the same.
  */
-export function sanitizeDeviceLabel(raw: string | null | undefined): string | null {
+export function normalizeDeviceLabel(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const cleaned = raw
     .toLowerCase()
@@ -36,7 +36,7 @@ export function sanitizeDeviceLabel(raw: string | null | undefined): string | nu
  */
 export function deviceLabelForSession(clientInfo: DeviceLabelSource | undefined | null): string {
   return (
-    sanitizeDeviceLabel(clientInfo?.device_label ?? clientInfo?.hostname) ??
+    normalizeDeviceLabel(clientInfo?.device_label ?? clientInfo?.hostname) ??
     CLI_LOGIN_UNKNOWN_DEVICE_LABEL
   );
 }

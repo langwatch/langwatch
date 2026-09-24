@@ -11,6 +11,7 @@ import {
   type RemoveLicenseResult,
   type StoreLicenseResult,
 } from "@langwatch/enterprise-licensing-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { licenseResourceCounts } from "@langwatch/plans";
 import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
 
@@ -23,6 +24,13 @@ import type {
 } from "../app/licensing.members.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
+
+/** An organization that no longer exists holds no licence: the status read answers unlicensed. */
+const unlicensedWhenMissing = (error: unknown): { licenseKey: null } => {
+  if (HandledError.isHandled(error) && error.code === "organization_not_found")
+    return { licenseKey: null };
+  throw error;
+};
 
 export type LicenseRetentionConfiguration = {
   categories: readonly string[];
@@ -203,7 +211,9 @@ export class LicenseService extends LicensingServiceContract {
   }
 
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
-    const licenseKey = await this.repository.tryReadLicense(organizationId);
+    const { licenseKey } = await this.repository
+      .getOrganizationLicense(organizationId)
+      .catch(unlicensedWhenMissing);
     if (!licenseKey) {
       return { hasLicense: false, valid: false };
     }

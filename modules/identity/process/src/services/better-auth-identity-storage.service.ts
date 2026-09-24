@@ -36,6 +36,9 @@ import { BetterAuthIdentityBirthAdapter } from "./better-auth-identity-birth.ser
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
+/** A resolution or account miss: the normal "not on the identity branch" answer. */
+const IDENTIFIER_NOT_FOUND = "identity_identifier_not_found";
+
 /**
  * A refusal, logged on its way out. better-auth catches an adapter throw and turns it into a
  * redirect carrying the error CODE and nothing else, so an unlogged refusal reaches the
@@ -325,6 +328,18 @@ function identityCustomAdapter({
       issuer: row.issuer ?? BetterAuthAccountQueriesAdapter.issuerForProviderId(row.providerId),
     });
 
+    const linkedAccount = async (key: {
+      userId: string;
+      providerId: string;
+      providerAccountId: string;
+    }): Promise<IdentityAccountRow[] | null> => {
+      const row = await accounts.getAccountByProviderSubject(key).catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === IDENTIFIER_NOT_FOUND) return null;
+        throw error;
+      });
+      return row === null ? null : [row];
+    };
+
     const serveAccounts = async (query: AccountQuery): Promise<IdentityAccountRow[] | null> => {
       switch (query.kind) {
         case "byUser":
@@ -339,12 +354,11 @@ function identityCustomAdapter({
           // what keeps a subject collision between two IdPs from answering
           // with the wrong person's account.
           if (!(await routesToIdentity({ userId: query.userId }))) return null;
-          const row = await accounts.tryFindByProviderSubject({
+          return linkedAccount({
             userId: query.userId,
             providerId: query.providerId,
             providerAccountId: query.accountId,
           });
-          return row === null ? null : [row];
         }
         case "byId":
         case "byIds": {
@@ -368,17 +382,21 @@ function identityCustomAdapter({
           // The IdP callback's resolution read: no user is named, so the identity tables are
           // consulted FIRST and answer only when the
           // resolved user is finalized (ADR-116 §2). A miss, or a held
-          const resolved = await resolution.tryResolveByProviderSubject({
-            providerId: query.providerId,
-            providerAccountId: query.accountId,
-          });
+          const resolved = await resolution
+            .getResolutionByProviderSubject({
+              providerId: query.providerId,
+              providerAccountId: query.accountId,
+            })
+            .catch((error: unknown) => {
+              if (HandledError.isHandled(error) && error.code === IDENTIFIER_NOT_FOUND) return null;
+              throw error;
+            });
           if (!resolved?.finalized) return null;
-          const row = await accounts.tryFindByProviderSubject({
+          return linkedAccount({
             userId: resolved.userId,
             providerId: query.providerId,
             providerAccountId: query.accountId,
           });
-          return row === null ? null : [row];
         }
         case "byIssuerSubject": {
           // The provider id comes BACK from resolution, not derived here: a
@@ -386,17 +404,21 @@ function identityCustomAdapter({
           // would let one IdP's subject answer for another's user. A miss, or
           // an unfinalized user, falls through to the legacy row — the
           // callback key names no user, so every user rides the same answer.
-          const resolved = await resolution.resolveByIssuerSubject({
-            issuer: query.issuer,
-            providerAccountId: query.accountId,
-          });
+          const resolved = await resolution
+            .getResolutionByIssuerSubject({
+              issuer: query.issuer,
+              providerAccountId: query.accountId,
+            })
+            .catch((error: unknown) => {
+              if (HandledError.isHandled(error) && error.code === IDENTIFIER_NOT_FOUND) return null;
+              throw error;
+            });
           if (!resolved?.finalized) return null;
-          const row = await accounts.tryFindByProviderSubject({
+          return linkedAccount({
             userId: resolved.userId,
             providerId: resolved.providerId,
             providerAccountId: query.accountId,
           });
-          return row === null ? null : [row];
         }
       }
     };
@@ -503,9 +525,12 @@ function identityCustomAdapter({
       if (where.length !== 1 || clause === undefined) return [...where];
       if (getDefaultFieldName({ model, field: clause.field }) !== "email") return [...where];
       if (clause.operator !== "eq" || typeof clause.value !== "string") return [...where];
-      const resolved = await resolution.tryResolveByIdentifierValue({
-        normalizedValue: normalizeIdentifierValue(clause.value),
-      });
+      const resolved = await resolution
+        .getResolutionByIdentifierValue({ normalizedValue: normalizeIdentifierValue(clause.value) })
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === IDENTIFIER_NOT_FOUND) return null;
+          throw error;
+        });
       if (!resolved?.finalized) return [...where];
       return [
         {

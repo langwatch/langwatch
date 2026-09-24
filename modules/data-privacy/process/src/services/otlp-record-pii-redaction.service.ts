@@ -145,7 +145,7 @@ export class OtlpRecordPiiRedactionService {
     }
 
     this.applyNativeLogPass(log, native.policy);
-    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    const lambda = this.policy.deriveLambdaAfterNative(native.policy);
     if (lambda) {
       await this.lambdaRedactLog(log, "STRICT", {
         entities: lambda.entities,
@@ -226,7 +226,7 @@ export class OtlpRecordPiiRedactionService {
       });
     }
 
-    const lambda = this.policy.tryLambdaAfterNative(native.policy);
+    const lambda = this.policy.deriveLambdaAfterNative(native.policy);
     if (lambda) {
       await this.lambdaRedactMetricAttributes(metric, "STRICT", {
         entities: lambda.entities,

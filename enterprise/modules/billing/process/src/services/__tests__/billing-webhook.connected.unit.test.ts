@@ -3,6 +3,7 @@
  * section 7): whose invoices it acts on, and whose it leaves.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import { ConnectedBillingNotOnboardedError } from "@langwatch/enterprise-billing-contract";
 import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
 
@@ -18,7 +19,10 @@ type WebhookOptions = Parameters<typeof EEWebhookService.create>[0];
 
 function connectedBilling(account: { organizationId: string } | null) {
   return {
-    accountFor: vi.fn(async () => account),
+    getAccountByCustomer: vi.fn(async () => {
+      if (account === null) throw new ConnectedBillingNotOnboardedError();
+      return account;
+    }),
     completeRenewalIfDue: vi.fn(async () => "completed"),
   } satisfies ConnectedBillingInvoiceEvents;
 }
@@ -52,7 +56,7 @@ describe("a finalized invoice", () => {
       const result = await buildService(events).handleEvent(finalized("cus_acme"));
 
       expect(result).toEqual({ status: "ok" });
-      expect(events.accountFor).toHaveBeenCalledWith("cus_acme");
+      expect(events.getAccountByCustomer).toHaveBeenCalledWith("cus_acme");
       expect(events.completeRenewalIfDue).toHaveBeenCalledWith({ organizationId: "org_acme" });
     });
   });

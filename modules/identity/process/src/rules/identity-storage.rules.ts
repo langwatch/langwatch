@@ -48,14 +48,13 @@ export interface IdentityAccounts {
   findByUser(args: { userId: string }): Promise<IdentityAccountRow[]>;
   /** By pinned account id — the id better-auth already holds for a row. */
   findByAccountIds(args: { accountIds: readonly string[] }): Promise<IdentityAccountRow[]>;
-  /**
-   * The IdP callback's lookup, once resolution has named the user.
-   */
-  tryFindByProviderSubject(args: {
+  /** The IdP callback's lookup, once resolution has named the user. Throws
+   *  identity_identifier_not_found. */
+  getAccountByProviderSubject(args: {
     userId: string;
     providerId: string;
     providerAccountId: string;
-  }): Promise<IdentityAccountRow | null>;
+  }): Promise<IdentityAccountRow>;
   /**
    * The secrets of an account whose identifier the ceremony has attached. Idempotent on the pinned
    * id: a retried sign-up derives the same identifier and therefore the same row, and must not
@@ -113,25 +112,24 @@ export interface IdentityIssuerResolution extends IdentityResolution {
  * The reads that carry no `userId` (ADR-116 §2). Each resolves an identifier
  */
 export interface IdentityResolver {
-  /** Sign-in by any verified email. The value arrives D01-normalized. */
-  tryResolveByIdentifierValue(args: {
-    normalizedValue: string;
-  }): Promise<IdentityResolution | null>;
+  /** Sign-in by any verified email; the value arrives D01-normalized. Each read here throws
+   *  identity_identifier_not_found. */
+  getResolutionByIdentifierValue(args: { normalizedValue: string }): Promise<IdentityResolution>;
   /**
    * The OAuth callback's lookup, on the pair `Account` is unique by: better-auth's own provider id,
    * verbatim, and the provider's subject.
    */
-  tryResolveByProviderSubject(args: {
+  getResolutionByProviderSubject(args: {
     providerId: string;
     providerAccountId: string;
-  }): Promise<IdentityResolution | null>;
+  }): Promise<IdentityResolution>;
   /**
    * The same callback lookup for a provider that asserts its OWN issuer.
    * Answers on the (issuer, subject) pair the row is indexed by and hands
    * back the provider id — guessing it risks answering with another IdP's user.
    */
-  resolveByIssuerSubject(args: {
+  getResolutionByIssuerSubject(args: {
     issuer: string;
     providerAccountId: string;
-  }): Promise<IdentityIssuerResolution | null>;
+  }): Promise<IdentityIssuerResolution>;
 }

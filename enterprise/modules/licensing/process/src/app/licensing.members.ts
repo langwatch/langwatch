@@ -355,7 +355,8 @@ export interface LicenseUsage {
  * plan-only processes.
  */
 export interface OrganizationLicense {
-  tryReadLicense(organizationId: string): Promise<string | null>;
+  /** Throws `organization_not_found`; an unlicensed organization answers `licenseKey: null`. */
+  getOrganizationLicense(organizationId: string): Promise<{ licenseKey: string | null }>;
 }
 
 export type StoredLicense = {
