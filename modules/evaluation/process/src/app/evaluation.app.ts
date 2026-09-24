@@ -17,6 +17,7 @@ import {
   type EvaluationRunOutcome,
   type EvaluationSlugLookup,
   type EvaluationSlugMatch,
+  type ExecuteEvaluationCommandData,
   type ReportEvaluationCommandData,
   type RunEvaluatorInput,
   type SavedEvaluatorLookup,
@@ -541,6 +542,11 @@ export class EvaluationApp implements EvaluationApiContract {
 
   async reportEvaluation(data: ReportEvaluationCommandData): Promise<void> {
     await this.#report.reportEvaluation(data);
+  }
+
+  async queueTraceEvaluation(data: ExecuteEvaluationCommandData): Promise<void> {
+    if (!this.#commands) throw new Error("this evaluation app was composed with its own report");
+    await this.#commands.queueTraceEvaluation(data);
   }
 
   async listEvaluators(input: EvaluationProjectScope): Promise<EvaluatorCatalogue> {

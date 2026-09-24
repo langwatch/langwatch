@@ -30,6 +30,7 @@ import {
   type CodingAgentTracePullRequestInput,
   type CodingAgentTracePullRequestLink,
   type CodingAgentTranscript,
+  type ContributeSpanFactsCommandData,
 } from "@langwatch/coding-agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -275,6 +276,10 @@ export class CodingAgentApp implements CodingAgentApi {
   /** Binds the registered pipeline's own senders. */
   connectCommands(commands: EventingCommands<CodingAgentProcessingPipeline>): void {
     this.#commands.connect(commands);
+  }
+
+  contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void> {
+    return this.#commands.contributeSpanFacts(data);
   }
 
   /** Pure derivation, no session store read: which log fields an event name captures. */

@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 import type { LogContentKey } from "./coding-agent-log-content.ts";
+import type { ContributeSpanFactsCommandData } from "./coding-agent-processing.commands.ts";
 import type {
   CodingAgentTracePullRequestInput,
   CodingAgentTracePullRequestLink,
@@ -96,6 +97,8 @@ export interface CodingAgentApi {
     input: CodingAgentSessionsListInput,
     by: CodingAgentViewer,
   ): Promise<CodingAgentSessionListRow[]>;
+  /** Queues one span's bounded session facts onto coding_agent_processing (ADR-056/069). */
+  contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void>;
   /** Records who read an answer that names people. */
   recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;
   githubWebBase(): string;

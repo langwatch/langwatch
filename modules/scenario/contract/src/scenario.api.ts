@@ -57,7 +57,7 @@ import type {
   ScenarioVersionRestoreInput,
   ScenarioVersionSummary,
 } from "./scenario.version.ts";
-import type { SimulationQueueRun } from "./simulation.commands.ts";
+import type { ComputeRunMetricsCommandData, SimulationQueueRun } from "./simulation.commands.ts";
 import type {
   SimulationAllSuitesInput,
   SimulationBatchHistoryInput,
@@ -296,6 +296,8 @@ export interface ScenarioApi {
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult>;
   queueSimulationRun(input: QueueSimulationRunInput): Promise<void>;
+  /** Queues a settled simulation trace's run metrics onto simulation_processing. */
+  computeRunMetrics(input: ComputeRunMetricsCommandData): Promise<void>;
   cancelJob(input: CancelScenarioRunInput): Promise<{ cancelled: boolean }>;
   cancelBatchRun(
     input: CancelScenarioBatchInput,

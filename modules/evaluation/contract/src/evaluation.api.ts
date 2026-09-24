@@ -1,7 +1,10 @@
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
-import type { ReportEvaluationCommandData } from "./evaluation-event.commands.ts";
+import type {
+  ExecuteEvaluationCommandData,
+  ReportEvaluationCommandData,
+} from "./evaluation-event.commands.ts";
 import type {
   DatasetEvaluationRow,
   EvaluationCostRecord,
@@ -100,6 +103,8 @@ export interface EvaluationApi {
   recordDatasetEvaluationRow(input: DatasetEvaluationRow): Promise<void>;
   /** Reports one verdict onto the evaluation processing pipeline. */
   reportEvaluation(data: ReportEvaluationCommandData): Promise<void>;
+  /** Queues a trace's online evaluation with the trigger's delay and dedup. */
+  queueTraceEvaluation(data: ExecuteEvaluationCommandData): Promise<void>;
   /** The evaluator-id slug rule for an evaluation that names no evaluator. */
   deriveEvaluatorId(name: string): string;
   /** The evaluation half of a trigger's legacy filters against a trace's runs. */

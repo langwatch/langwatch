@@ -203,3 +203,21 @@ Feature: Evaluation service boundary
     Given a deployment that stages langevals payloads over a threshold
     When a PII batch that names no project and is over the threshold is posted
     Then it is posted inline and nothing is staged
+
+  @unit
+  Scenario: A trace's online evaluation is queued with the trace trigger's dedup
+    Given evaluation_processing's senders are connected
+    When trace queues an evaluation for a trace-level monitor
+    Then executeEvaluation is sent keeping the command's delay, deduplicated per trace and evaluator for six minutes past dispatch
+
+  @unit
+  Scenario: A thread-level online evaluation waits out the thread's idle window
+    Given evaluation_processing's senders are connected
+    When trace queues an evaluation for a monitor with a thread idle timeout on a threaded trace
+    Then executeEvaluation is delayed and deduplicated per thread and evaluator for that idle window
+
+  @unit
+  Scenario: A trace evaluation queued before the pipeline is connected is refused by name
+    Given an installed evaluation module whose evaluation_processing senders are not connected
+    When trace queues an evaluation
+    Then the call is refused naming the missing executeEvaluation sender

@@ -6,6 +6,7 @@ import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberContext,
   AutomationEvaluationSubscriberEvent,
+  AutomationTraceSubscriberContext,
 } from "./automation-evaluation-subscriber.ts";
 import type {
   AutomationListRow,
@@ -173,6 +174,11 @@ export interface AutomationApi {
   handleEvaluationTriggerMatch(input: {
     event: AutomationEvaluationSubscriberEvent;
     context: AutomationEvaluationSubscriberContext;
+  }): Promise<void>;
+  /** An origin-guarded trace: records a match per trace trigger that reads no evaluation. */
+  handleTraceTriggerMatch(input: {
+    event: AutomationEvaluationSubscriberEvent;
+    context: AutomationTraceSubscriberContext;
   }): Promise<void>;
   /** A terminal evaluation: re-evaluates the project's graph alerts in real time. */
   handleEvaluationGraphTriggerActivity(input: {

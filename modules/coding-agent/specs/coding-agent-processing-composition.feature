@@ -74,3 +74,15 @@ Feature: Composing durable coding-agent session processing
     When the graph is composed
     Then the coding-agent feature is mounted anyway, built from this process's own substrate
     And it is mounted before metric, log and trace, whose subscribers dispatch into it
+
+  @unit
+  Scenario: A span's facts from trace are sent onto the session pipeline
+    Given coding_agent_processing has registered its senders
+    When trace hands the coding-agent API one span's facts
+    Then the contributeSpanFacts command is sent with those facts
+
+  @unit
+  Scenario: Span facts sent where no session pipeline registered are refused by name
+    Given a process where coding_agent_processing registered no senders
+    When trace hands the coding-agent API one span's facts
+    Then the call is refused naming the contributeSpanFacts sender

@@ -29,3 +29,12 @@ export const automationEvaluationActivityContextSchema = z.object({ tenantId: z.
 export type AutomationEvaluationActivityContext = z.infer<
   typeof automationEvaluationActivityContextSchema
 >;
+
+export const automationTraceSubscriberContextSchema = z.object({
+  tenantId: z.string(),
+  aggregateId: z.string().optional(),
+});
+
+export type AutomationTraceSubscriberContext = z.infer<
+  typeof automationTraceSubscriberContextSchema
+>;

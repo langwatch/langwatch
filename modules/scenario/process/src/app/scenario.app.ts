@@ -24,6 +24,7 @@ import {
   ScenarioApi,
   type CancelScenarioBatchInput,
   type CancelScenarioRunInput,
+  type ComputeRunMetricsCommandData,
   type CodeScenario,
   type ResolveScenarioRunParametersInput,
   type ResolvedScenarioRunParameters,
@@ -762,6 +763,10 @@ export class ScenarioApp implements ScenarioApi {
       target: { type: target.type, referenceId: target.referenceId },
       occurredAt: nowInstant().epochMilliseconds,
     });
+  }
+
+  computeRunMetrics(input: ComputeRunMetricsCommandData): Promise<void> {
+    return this.#simulationCommands.computeRunMetrics(input);
   }
 
   /** Cancels one queued or running job. */

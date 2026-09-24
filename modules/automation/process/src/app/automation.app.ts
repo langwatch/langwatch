@@ -24,6 +24,7 @@ import {
   type AutomationEvaluationActivityContext,
   type AutomationEvaluationSubscriberContext,
   type AutomationEvaluationSubscriberEvent,
+  type AutomationTraceSubscriberContext,
   type AutomationTestFireAuthor,
   type UnsubscribeChannel,
   type AutomationListRow,
@@ -524,6 +525,16 @@ export class AutomationApp implements AutomationApi {
     context: AutomationEvaluationSubscriberContext;
   }): Promise<void> {
     return this.#evaluations.handleEvaluationTriggerMatch(event, context);
+  }
+
+  handleTraceTriggerMatch({
+    event,
+    context,
+  }: {
+    event: AutomationEvaluationSubscriberEvent;
+    context: AutomationTraceSubscriberContext;
+  }): Promise<void> {
+    return this.#evaluations.handleTraceTriggerMatch(event, context);
   }
 
   /** Re-evaluates the project's graph alerts after an evaluation finished. */

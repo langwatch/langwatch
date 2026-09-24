@@ -2,6 +2,7 @@ import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberContext,
   AutomationEvaluationSubscriberEvent,
+  AutomationTraceSubscriberContext,
 } from "@langwatch/automation-contract";
 
 import type {
@@ -12,6 +13,7 @@ import type {
 } from "../app/automation.members.ts";
 import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-trigger-match.subscriber.ts";
 import { handleGraphTriggerActivity } from "../eventing/graph-trigger-activity.subscriber.ts";
+import { handleTraceAlertTriggerMatch } from "../eventing/trace-alert-trigger-match.subscriber.ts";
 import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 
 /**
@@ -50,6 +52,17 @@ export class AutomationEvaluationSubscriberService {
         evaluationFilters: this.deps.evaluationFilters,
         triggerMatches: this.deps.triggerMatches,
       },
+      event,
+      context,
+    );
+  }
+
+  handleTraceTriggerMatch(
+    event: AutomationEvaluationSubscriberEvent,
+    context: AutomationTraceSubscriberContext,
+  ): Promise<void> {
+    return handleTraceAlertTriggerMatch(
+      { triggers: this.deps.triggers, triggerMatches: this.deps.triggerMatches },
       event,
       context,
     );

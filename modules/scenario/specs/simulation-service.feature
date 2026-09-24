@@ -60,3 +60,15 @@ Feature: Simulation service
     When a caller reads the runs across all suites
     Then the read is served from ClickHouse against the caller's own tenant
     And the deployment does not refuse it as uncomposed
+
+  @unit
+  Scenario: A settled simulation trace's run metrics are sent onto simulation_processing
+    Given simulation_processing has registered its senders
+    When trace asks the scenario API to compute a run's metrics
+    Then the computeRunMetrics command is sent with that payload and no send options
+
+  @unit
+  Scenario: Run metrics asked for before simulation_processing registers are refused by name
+    Given a process where simulation_processing has not registered its senders
+    When trace asks the scenario API to compute a run's metrics
+    Then the call is refused naming the computeRunMetrics command

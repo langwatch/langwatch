@@ -125,3 +125,15 @@ Feature: Automation ownership
     Given the automations pipeline registered and its senders connected
     When an evaluation reaction records a trigger match
     Then the match is sent through recordTriggerMatch
+
+  @unit
+  Scenario: An origin-guarded trace records a match per trace trigger that reads no evaluation
+    Given a project with one trace-only automation and one whose filter reads evaluations
+    When trace hands the automation API a settled trace
+    Then one match is recorded, for the trace-only automation, with its action class and debounce
+
+  @unit
+  Scenario: A trace event with no aggregate records no match
+    Given a project with an active trace automation
+    When trace hands the automation API an event that names no trace
+    Then no automation is read and no match is recorded
