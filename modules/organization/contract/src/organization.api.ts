@@ -174,6 +174,7 @@ export interface OrganizationAdministrator {
  */
 export interface OrganizationUsageCount {
   readonly members: number;
+  readonly teams: number;
   readonly ssoProviders: string[];
   readonly secondMemberJoinedAt?: number;
 }
@@ -321,9 +322,7 @@ export interface OrganizationApi {
   /** Every member row, disabled and deactivated included: governance's identity match reads it. */
   findMembersIncludingDeactivated(input: Readonly<{ organizationId: string }>): Promise<User[]>;
   /** Every member's department column with their name (main `department.service.ts:112-119`). */
-  findMembersWithDepartments(input: {
-    organizationId: string;
-  }): Promise<
+  findMembersWithDepartments(input: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
@@ -434,6 +433,10 @@ export interface OrganizationApi {
     input: Readonly<{ organizationId: string; billingCustomerId: string }>,
   ): Promise<boolean>;
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
+  /** Main `personal-team-scope.ts:78-81`: the personal teams among the ids, archived too. */
+  findPersonalTeamOwners(
+    input: Readonly<{ organizationId: string; teamIds: readonly string[] }>,
+  ): Promise<{ teamId: string; ownerUserId: string | null }[]>;
   createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam>;
   addTeamMember(input: AddOrganizationTeamMemberInput): Promise<void>;
   getTeamById(input: GetOrganizationTeamByIdInput): Promise<OrganizationTeam>;

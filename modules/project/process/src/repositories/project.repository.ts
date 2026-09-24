@@ -85,10 +85,6 @@ export interface ProjectRepository {
   findIdsByOrganization(organizationId: string): Promise<string[]>;
   findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
   findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;
-  findActiveTeamInOrganization(input: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<{ id: string; isPersonal: boolean } | null>;
   findLiveTraceDestination(input: {
     organizationId: string;
     projectId: string;
@@ -103,8 +99,8 @@ export interface ProjectRepository {
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
-  /** Resolves personal team/project ownership for a caller that owns neither table. */
-  findPersonalWorkspaceOwner(input: {
+  /** Who owns the workspace a live personal project, or one in a personal team, sits in. */
+  findPersonalProjectOwner(input: {
     organizationId: string;
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null>;

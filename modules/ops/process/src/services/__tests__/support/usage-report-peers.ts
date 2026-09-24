@@ -45,12 +45,12 @@ export class UsageReportWorld {
     };
     return {
       organizations: {
-        countUsage: async () => ({ members: 1, ssoProviders: [] }),
+        countUsage: async () => ({ members: 1, teams: 1, ssoProviders: [] }),
       },
       projects: {
         listIdsByOrganization: async ({ organizationId }) =>
           this.projectsByOrganization.get(organizationId) ?? [],
-        countUsage: async () => ({ projects: 0, teams: 1, updatedProjects: 0 }),
+        countUsage: async () => ({ projects: 0, updatedProjects: 0 }),
       },
       users: { countUsage: async () => ({ emailDomains: this.emailDomains }) },
       auth: {

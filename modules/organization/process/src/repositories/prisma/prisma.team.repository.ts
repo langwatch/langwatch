@@ -54,6 +54,21 @@ export class PrismaTeamRepository extends TeamRepository {
     return team;
   }
 
+  async findPersonalTeamOwners(input: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; ownerUserId: string | null }[]> {
+    const teams = await this.database.team.findMany({
+      where: {
+        id: { in: [...input.teamIds] },
+        organizationId: input.organizationId,
+        isPersonal: true,
+      },
+      select: { id: true, ownerUserId: true },
+    });
+    return teams.map((team) => ({ teamId: team.id, ownerUserId: team.ownerUserId }));
+  }
+
   async findOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
     const team = await this.database.team.findUnique({
       where: { id: teamId },

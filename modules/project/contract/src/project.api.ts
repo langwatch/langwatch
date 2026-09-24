@@ -28,12 +28,11 @@ export type ProjectPath = { projectId: string; fullPath: string };
 
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): the
- * projects and teams made, since `since` where one is given, the projects
+ * projects made, since `since` where one is given, the projects
  * changed since then, and when the first project was. Epoch milliseconds.
  */
 export interface ProjectUsageCount {
   readonly projects: number;
-  readonly teams: number;
   readonly updatedProjects: number;
   readonly firstProjectAt?: number;
 }

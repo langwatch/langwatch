@@ -42,7 +42,7 @@ import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project
 export type PrismaProjectDatabase = Pick<PrismaClient, "project" | "team">;
 
 export class PrismaProjectRepository
-  extends PrismaRepository.for("Project", "Team")
+  extends PrismaRepository.for("Project")
   implements ProjectRepository
 {
   async findProjectsWithDepartments({
@@ -95,14 +95,10 @@ export class PrismaProjectRepository
     since?: number;
   }): Promise<ProjectUsageCount> {
     const inOrganizations = { team: { organizationId: { in: [...organizationIds] } } };
-    const teamScope = { organizationId: { in: [...organizationIds] } };
     const after = since === undefined ? {} : { gte: new Date(since) };
-    const [projects, teams, updatedProjects, first] = await Promise.all([
+    const [projects, updatedProjects, first] = await Promise.all([
       this.prisma.project.count({
         where: since === undefined ? inOrganizations : { ...inOrganizations, createdAt: after },
-      }),
-      this.prisma.team.count({
-        where: since === undefined ? teamScope : { ...teamScope, createdAt: after },
       }),
       this.prisma.project.count({
         where: since === undefined ? inOrganizations : { ...inOrganizations, updatedAt: after },
@@ -115,7 +111,6 @@ export class PrismaProjectRepository
     ]);
     return {
       projects,
-      teams,
       updatedProjects,
       ...(first ? { firstProjectAt: first.createdAt.getTime() } : {}),
     };
@@ -448,16 +443,6 @@ export class PrismaProjectRepository
     return this.mapProject(await this.prisma.project.findFirst({ where: input }));
   }
 
-  findActiveTeamInOrganization(input: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<{ id: string; isPersonal: boolean } | null> {
-    return this.prisma.team.findFirst({
-      where: { id: input.teamId, organizationId: input.organizationId, archivedAt: null },
-      select: { id: true, isPersonal: true },
-    });
-  }
-
   async findLiveTraceDestination(input: {
     organizationId: string;
     projectId: string;
@@ -532,19 +517,10 @@ export class PrismaProjectRepository
     return result.count > 0;
   }
 
-  async findPersonalWorkspaceOwner(input: {
+  async findPersonalProjectOwner(input: {
     organizationId: string;
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null> {
-    const team = await this.prisma.team.findFirst({
-      where: {
-        id: input.scopeId,
-        organizationId: input.organizationId,
-        isPersonal: true,
-      },
-      select: { ownerUserId: true },
-    });
-    if (team) return team;
     const project = await this.prisma.project.findFirst({
       where: {
         id: input.scopeId,

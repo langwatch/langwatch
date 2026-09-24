@@ -7,6 +7,7 @@ import {
   type CreateOrganizationTeamInput,
   type OrganizationBillingProfile,
   type OrganizationTeam,
+  TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import {
   DestinationTeamNotFoundError,
@@ -102,15 +103,12 @@ class StubRepository implements ProjectRepository {
   findLiveInternalIds = vi.fn(async () => []);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
-  findActiveTeamInOrganization = vi.fn<() => Promise<{ id: string; isPersonal: boolean } | null>>(
-    async () => ({ id: "team_1", isPersonal: false }),
-  );
   findBySlugInTeam = vi.fn(async () => null);
   findAllByTeam = vi.fn(async () => [applicationProject]);
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
   findIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
-  countUsage = vi.fn(async () => ({ projects: 0, teams: 0, updatedProjects: 0 }));
+  countUsage = vi.fn(async () => ({ projects: 0, updatedProjects: 0 }));
   create = vi.fn(async () => applicationProject);
   findById = vi.fn(async () => applicationProject);
   findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(async () => "org");
@@ -142,13 +140,19 @@ class StubRepository implements ProjectRepository {
   findTraceDestinations = vi.fn(async () => []);
   findIdByLegacyApiKey = vi.fn(async (): Promise<string | null> => null);
   rotateLegacyApiKey = vi.fn(async () => true);
-  findPersonalWorkspaceOwner = vi.fn(
+  findPersonalProjectOwner = vi.fn(
     async (): Promise<{ ownerUserId: string | null } | null> => null,
   );
 }
 
 class StubOrganizationService extends OrganizationServiceContract {
   teamId: string | null = "oldest-team";
+  findActiveTeam = vi.fn<
+    (input: { teamId: string; organizationId: string }) => Promise<{
+      id: string;
+      isPersonal: boolean;
+    } | null>
+  >(async () => ({ id: "team_1", isPersonal: false }));
   readonly createdTeams: CreateOrganizationTeamInput[] = [];
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
 
@@ -359,6 +363,20 @@ const createService = (
       getOldestTeamId: () => organizations.getOldestTeamId(),
       createTeam: (input) => organizations.createTeam(input),
       addTeamMember: (input) => organizations.addTeamMember(input),
+      getTeam: async (input) => {
+        const team = await organizations.findActiveTeam(input);
+        if (!team) throw new TeamNotFoundError(input.teamId);
+        return {
+          ...team,
+          name: team.id,
+          slug: team.id,
+          organizationId: input.organizationId,
+          ownerUserId: null,
+          archivedAt: null,
+          createdAt: new Date(0),
+          updatedAt: new Date(0),
+        };
+      },
     }),
   });
 
@@ -525,9 +543,10 @@ describe("ProjectService", () => {
 
   it("creates an application project through its own repository", async () => {
     const repository = new StubRepository();
+    const organizations = new StubOrganizationService();
 
     await expect(
-      createService(repository).create({
+      createService(repository, organizations).create({
         organizationId: "org",
         teamId: "team_1",
         name: "Application",
@@ -536,7 +555,7 @@ describe("ProjectService", () => {
       }),
     ).resolves.toBe(applicationProject);
 
-    expect(repository.findActiveTeamInOrganization).toHaveBeenCalledWith({
+    expect(organizations.findActiveTeam).toHaveBeenCalledWith({
       teamId: "team_1",
       organizationId: "org",
     });
@@ -691,13 +710,14 @@ describe("ProjectService", () => {
 
   it("does not allow an application project into a personal workspace", async () => {
     const repository = new StubRepository();
-    repository.findActiveTeamInOrganization.mockResolvedValue({
+    const organizations = new StubOrganizationService();
+    organizations.findActiveTeam.mockResolvedValue({
       id: "personal-team",
       isPersonal: true,
     });
 
     await expect(
-      createService(repository).create({
+      createService(repository, organizations).create({
         organizationId: "org",
         teamId: "personal-team",
         name: "Second project",
@@ -711,14 +731,15 @@ describe("ProjectService", () => {
   /** @scenario ProjectService.update with no teamId leaves team unchanged */
   it("updates without looking up a destination team when teamId is absent", async () => {
     const repository = new StubRepository();
+    const organizations = new StubOrganizationService();
 
-    await createService(repository).update({
+    await createService(repository, organizations).update({
       id: applicationProject.id,
       organizationId: "org",
       data: { name: "Renamed" },
     });
 
-    expect(repository.findActiveTeamInOrganization).not.toHaveBeenCalled();
+    expect(organizations.findActiveTeam).not.toHaveBeenCalled();
     expect(repository.update).toHaveBeenCalledWith({
       id: applicationProject.id,
       organizationId: "org",
@@ -729,10 +750,11 @@ describe("ProjectService", () => {
   /** @scenario ProjectService.update rejects archived destination team */
   it("rejects an unavailable destination team", async () => {
     const repository = new StubRepository();
-    repository.findActiveTeamInOrganization.mockResolvedValue(null);
+    const organizations = new StubOrganizationService();
+    organizations.findActiveTeam.mockResolvedValue(null);
 
     await expect(
-      createService(repository).update({
+      createService(repository, organizations).update({
         id: applicationProject.id,
         organizationId: "org",
         data: { teamId: "missing" },
@@ -750,10 +772,11 @@ describe("ProjectService", () => {
     destination: { id: string; isPersonal: boolean };
   }) => {
     const repository = new StubRepository();
+    const organizations = new StubOrganizationService();
     repository.findWithTeam.mockResolvedValue(current);
-    repository.findActiveTeamInOrganization.mockResolvedValue(destination);
+    organizations.findActiveTeam.mockResolvedValue(destination);
 
-    const outcome = await createService(repository)
+    const outcome = await createService(repository, organizations)
       .update({ id: current.id, organizationId: "org", data: { teamId: destination.id } })
       .catch((error: unknown) => error);
     return { outcome, repository };
@@ -785,19 +808,20 @@ describe("ProjectService", () => {
   /** @scenario tRPC project.update accepts optional teamId */
   it("moves the project to a live team in the same organization", async () => {
     const repository = new StubRepository();
+    const organizations = new StubOrganizationService();
     repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
-    repository.findActiveTeamInOrganization.mockResolvedValue({
+    organizations.findActiveTeam.mockResolvedValue({
       id: "team_2",
       isPersonal: false,
     });
 
-    await createService(repository).update({
+    await createService(repository, organizations).update({
       id: applicationProject.id,
       organizationId: "org",
       data: { teamId: "team_2" },
     });
 
-    expect(repository.findActiveTeamInOrganization).toHaveBeenCalledWith({
+    expect(organizations.findActiveTeam).toHaveBeenCalledWith({
       teamId: "team_2",
       organizationId: "org",
     });
@@ -811,10 +835,11 @@ describe("ProjectService", () => {
   /** @scenario tRPC project.update rejects cross-org team */
   it("refuses a destination team that belongs to another organization", async () => {
     const repository = new StubRepository();
-    repository.findActiveTeamInOrganization.mockResolvedValue(null);
+    const organizations = new StubOrganizationService();
+    organizations.findActiveTeam.mockResolvedValue(null);
 
     await expect(
-      createService(repository).update({
+      createService(repository, organizations).update({
         id: applicationProject.id,
         organizationId: "org",
         data: { teamId: "team-of-another-org" },
@@ -825,16 +850,17 @@ describe("ProjectService", () => {
 
   it("allows an update that names the current personal team", async () => {
     const repository = new StubRepository();
+    const organizations = new StubOrganizationService();
     repository.findWithTeam.mockResolvedValue(
       projectWithTeam({ isPersonal: true, teamId: "personal" }),
     );
-    repository.findActiveTeamInOrganization.mockResolvedValue({
+    organizations.findActiveTeam.mockResolvedValue({
       id: "personal",
       isPersonal: true,
     });
 
     await expect(
-      createService(repository).update({
+      createService(repository, organizations).update({
         id: applicationProject.id,
         organizationId: "org",
         data: { name: "My Workspace", teamId: "personal" },

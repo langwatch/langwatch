@@ -47,8 +47,9 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     organizationIds: readonly string[];
   }): Promise<OrganizationUsageCount> {
     const scope = { organizationId: { in: [...organizationIds] } };
-    const [members, organizations, firstTwo] = await Promise.all([
+    const [members, teams, organizations, firstTwo] = await Promise.all([
       this.database.organizationUser.count({ where: scope }),
+      this.database.team.count({ where: scope }),
       this.database.organization.findMany({
         where: { id: { in: [...organizationIds] } },
         select: { ssoProvider: true },
@@ -63,6 +64,7 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     const second = firstTwo[1];
     return {
       members,
+      teams,
       ssoProviders: organizations.flatMap((row) => (row.ssoProvider ? [row.ssoProvider] : [])),
       ...(second ? { secondMemberJoinedAt: second.createdAt.getTime() } : {}),
     };

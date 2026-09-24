@@ -861,9 +861,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.findMembersIncludingDeactivated(input);
   }
 
-  findMembersWithDepartments(input: {
-    organizationId: string;
-  }): Promise<
+  findMembersWithDepartments(input: { organizationId: string }): Promise<
     {
       userId: string;
       departmentId: string | null;
@@ -1046,6 +1044,12 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   /** One team by id. */
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
     return this.#dependencies.organizations.getTeam(input);
+  }
+
+  findPersonalTeamOwners(
+    input: Readonly<{ organizationId: string; teamIds: readonly string[] }>,
+  ): Promise<{ teamId: string; ownerUserId: string | null }[]> {
+    return this.#dependencies.organizations.findPersonalTeamOwners(input);
   }
 
   createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {

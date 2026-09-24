@@ -169,14 +169,13 @@ export class UsageReportCollectionService {
     connected: boolean;
   }): Promise<Record<string, unknown>> {
     const { organizationIds } = scope;
-    const [projects, organizations, [authMethod]] = await Promise.all([
-      this.deps.peers.projects.countUsage({ organizationIds }),
+    const [organizations, [authMethod]] = await Promise.all([
       this.deps.peers.organizations.countUsage({ organizationIds }),
       this.findAuthMethods(),
     ]);
     return {
       organizations: organizationIds.length,
-      teams: projects.teams,
+      teams: organizations.teams,
       projects: scope.projectIds.length,
       users: organizations.members,
       ...(authMethod === undefined ? {} : { auth_method: authMethod }),

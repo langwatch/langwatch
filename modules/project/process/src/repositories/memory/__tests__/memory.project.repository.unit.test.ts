@@ -268,28 +268,16 @@ describe("MemoryProjectRepository", () => {
     });
   });
 
-  describe("when a personal workspace's owner is asked for", () => {
+  describe("when a personal project's owner is asked for", () => {
     it("answers null for a scope this store records no personal workspace for", async () => {
       const { repository } = seeded();
 
       expect(
-        await repository.findPersonalWorkspaceOwner({
+        await repository.findPersonalProjectOwner({
           organizationId: ORGANIZATION_ID,
           scopeId: TEAM_ID,
         }),
       ).toBeNull();
-    });
-
-    it("answers a personal team's own owner", async () => {
-      const { database, repository } = seeded();
-      database.putTeam(team({ id: "team_personal", isPersonal: true, ownerUserId: "user_1" }));
-
-      expect(
-        await repository.findPersonalWorkspaceOwner({
-          organizationId: ORGANIZATION_ID,
-          scopeId: "team_personal",
-        }),
-      ).toEqual({ ownerUserId: "user_1" });
     });
 
     it("answers the owner of the team a personal project hangs from", async () => {
@@ -303,7 +291,7 @@ describe("MemoryProjectRepository", () => {
       });
 
       expect(
-        await repository.findPersonalWorkspaceOwner({
+        await repository.findPersonalProjectOwner({
           organizationId: ORGANIZATION_ID,
           scopeId: "project_personal",
         }),
@@ -320,11 +308,17 @@ describe("MemoryProjectRepository", () => {
           organizationId: "organization_2",
         }),
       );
+      await repository.create({
+        ...creation,
+        id: "project_elsewhere",
+        slug: "elsewhere",
+        teamId: "team_personal",
+      });
 
       expect(
-        await repository.findPersonalWorkspaceOwner({
+        await repository.findPersonalProjectOwner({
           organizationId: ORGANIZATION_ID,
-          scopeId: "team_personal",
+          scopeId: "project_elsewhere",
         }),
       ).toBeNull();
     });

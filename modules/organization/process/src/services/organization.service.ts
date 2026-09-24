@@ -356,6 +356,13 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.teams.get(parsed);
   }
 
+  findPersonalTeamOwners(
+    input: Readonly<{ organizationId: string; teamIds: readonly string[] }>,
+  ): Promise<{ teamId: string; ownerUserId: string | null }[]> {
+    if (input.teamIds.length === 0) return Promise.resolve([]);
+    return this.teams.findPersonalTeamOwners(input);
+  }
+
   listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage> {
     return this.teams.listPage(listOrganizationTeamsInputSchema.parse(input));
   }

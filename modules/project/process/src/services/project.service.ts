@@ -1,4 +1,8 @@
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  type OrganizationTeam,
+  TeamNotFoundError,
+} from "@langwatch/organization-contract";
 import {
   PROJECT_KIND,
   activeProjectsByScopesInputSchema,
@@ -276,7 +280,7 @@ export class ProjectService {
     teamId: string;
     organizationId: string;
   }): Promise<void> {
-    const destinationTeam = await this.repository.findActiveTeamInOrganization(input);
+    const [destinationTeam] = await this.findActiveTeam(input);
     if (!destinationTeam) {
       throw new TeamNotInOrganizationError("Team does not belong to this organization");
     }
@@ -368,7 +372,7 @@ export class ProjectService {
   }): Promise<Project> {
     const data = input.data;
     if (data.teamId) {
-      const team = await this.repository.findActiveTeamInOrganization({
+      const [team] = await this.findActiveTeam({
         teamId: data.teamId,
         organizationId: input.organizationId,
       });
@@ -528,10 +532,27 @@ export class ProjectService {
     return this.repository.rotateLegacyApiKey(input);
   }
 
-  findPersonalWorkspaceOwner(input: {
+  async findPersonalWorkspaceOwner(input: {
     organizationId: string;
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null> {
-    return this.repository.findPersonalWorkspaceOwner(input);
+    const [team] = await this.organizations.findPersonalTeamOwners({
+      organizationId: input.organizationId,
+      teamIds: [input.scopeId],
+    });
+    if (team) return { ownerUserId: team.ownerUserId };
+    return this.repository.findPersonalProjectOwner(input);
+  }
+
+  private async findActiveTeam(input: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<OrganizationTeam[]> {
+    try {
+      return [await this.organizations.getTeam(input)];
+    } catch (error) {
+      if (error instanceof TeamNotFoundError) return [];
+      throw error;
+    }
   }
 }

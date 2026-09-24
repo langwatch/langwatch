@@ -12,6 +12,10 @@ export abstract class TeamRepository {
    * not exclude archived teams — a project's archived team still belongs to its tenant.
    */
   abstract findOrganizationId(input: { teamId: string }): Promise<string | null>;
+  abstract findPersonalTeamOwners(input: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; ownerUserId: string | null }[]>;
   abstract getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam>;
   abstract listPage(input: {
     organizationId: string;

@@ -14,8 +14,8 @@ export class TestProjectApi implements ProjectApi {
     throw new Error("TestProjectApi.assignProjectDepartment is not configured");
   }
 
-  countUsage(): Promise<{ projects: number; teams: number; updatedProjects: number }> {
-    return Promise.resolve({ projects: 0, teams: 0, updatedProjects: 0 });
+  countUsage(): Promise<{ projects: number; updatedProjects: number }> {
+    return Promise.resolve({ projects: 0, updatedProjects: 0 });
   }
 
   constructor(private readonly overrides: Partial<ProjectApi>) {}

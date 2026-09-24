@@ -45,8 +45,8 @@ class StubRepository extends OrganizationRepository {
     return [];
   }
 
-  async countUsage(): Promise<{ members: number; ssoProviders: string[] }> {
-    return { members: 0, ssoProviders: [] };
+  async countUsage(): Promise<{ members: number; teams: number; ssoProviders: string[] }> {
+    return { members: 0, teams: 0, ssoProviders: [] };
   }
 
   guidedOnboarding: GuidedOnboardingRecord = { state: { paths: [], donePaths: [] }, variant: null };
@@ -163,6 +163,9 @@ class UnusedTeams extends TeamRepository {
     throw new Error("not used by this test");
   }
   findOrganizationId(): Promise<string | null> {
+    throw new Error("not used by this test");
+  }
+  findPersonalTeamOwners(): Promise<{ teamId: string; ownerUserId: string | null }[]> {
     throw new Error("not used by this test");
   }
   listPage(): Promise<OrganizationTeamPage> {
@@ -360,6 +363,9 @@ class MemoryTeams extends TeamRepository {
   }
   findOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
     return Promise.resolve(teamId === this.team.id ? this.team.organizationId : null);
+  }
+  findPersonalTeamOwners(): Promise<{ teamId: string; ownerUserId: string | null }[]> {
+    throw new Error("not used by this test");
   }
   listPage(): Promise<OrganizationTeamPage> {
     return Promise.resolve({

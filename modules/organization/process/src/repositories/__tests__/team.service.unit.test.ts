@@ -96,6 +96,9 @@ class MemoryTeams extends TeamRepository {
   findOrganizationId(): Promise<string | null> {
     return Promise.resolve(team.organizationId);
   }
+  findPersonalTeamOwners(): Promise<{ teamId: string; ownerUserId: string | null }[]> {
+    throw new Error("not used by this test");
+  }
   getBySlug(): Promise<OrganizationTeam> {
     return Promise.resolve(team);
   }

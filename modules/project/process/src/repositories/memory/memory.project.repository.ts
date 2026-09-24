@@ -321,12 +321,6 @@ export class MemoryProjectRepository implements ProjectRepository {
     const made = projects.map((project) => project.createdAt.getTime());
     return {
       projects: projects.filter((project) => after(project.createdAt.getTime())).length,
-      teams: this.#database
-        .teams()
-        .filter(
-          (team) =>
-            organizationIds.includes(team.organizationId) && after(team.createdAt.getTime()),
-        ).length,
       updatedProjects: projects.filter((project) => after(project.updatedAt.getTime())).length,
       ...(made.length === 0 ? {} : { firstProjectAt: Math.min(...made) }),
     };
@@ -360,18 +354,6 @@ export class MemoryProjectRepository implements ProjectRepository {
         .projects()
         .find((project) => project.slug === input.slug && project.teamId === input.teamId) ?? null
     );
-  }
-
-  async findActiveTeamInOrganization(input: {
-    teamId: string;
-    organizationId: string;
-  }): Promise<{ id: string; isPersonal: boolean } | null> {
-    const team = this.#database.findTeam(input.teamId);
-    if (!team || team.organizationId !== input.organizationId || team.archivedAt !== null) {
-      return null;
-    }
-
-    return { id: team.id, isPersonal: team.isPersonal };
   }
 
   async findLiveTraceDestination(input: {
@@ -448,15 +430,10 @@ export class MemoryProjectRepository implements ProjectRepository {
     return true;
   }
 
-  async findPersonalWorkspaceOwner(input: {
+  async findPersonalProjectOwner(input: {
     organizationId: string;
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null> {
-    const team = this.#database.findTeam(input.scopeId);
-    if (team && team.organizationId === input.organizationId && team.isPersonal) {
-      return { ownerUserId: team.ownerUserId };
-    }
-
     const project = this.#database.findProject(input.scopeId);
     if (!project || project.archivedAt !== null) return null;
     const owningTeam = this.#database.findTeam(project.teamId);

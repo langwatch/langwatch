@@ -53,8 +53,12 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       .map((row) => row.createdAt.epochMilliseconds)
       .toSorted((left, right) => left - right);
     const second = joined[1];
+    const teams = [...this.memory.teams.values()].filter((team) =>
+      organizationIds.includes(team.organizationId),
+    );
     return {
       members: joined.length,
+      teams: teams.length,
       ssoProviders: [],
       ...(second === undefined ? {} : { secondMemberJoinedAt: second }),
     };

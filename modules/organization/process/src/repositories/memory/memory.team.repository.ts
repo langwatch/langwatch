@@ -48,6 +48,18 @@ export class MemoryTeamRepository extends TeamRepository {
     return this.memory.teams.get(input.teamId)?.organizationId ?? null;
   }
 
+  async findPersonalTeamOwners(input: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; ownerUserId: string | null }[]> {
+    return input.teamIds.flatMap((teamId) => {
+      const team = this.memory.teams.get(teamId);
+      return team?.isPersonal && team.organizationId === input.organizationId
+        ? [{ teamId, ownerUserId: team.ownerUserId }]
+        : [];
+    });
+  }
+
   async getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam> {
     const team = this.activeTeamsOf(input.organizationId).find((row) => row.slug === input.slug);
     if (!team) throw new TeamNotFoundError(input.slug);
