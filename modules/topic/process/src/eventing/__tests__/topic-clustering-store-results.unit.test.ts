@@ -39,8 +39,8 @@ describe("storeResults", () => {
         isIncremental: false,
       });
 
-      expect(deps.traceAssignments.assignTopic).toHaveBeenCalledTimes(2);
-      expect(deps.traceAssignments.assignTopic).toHaveBeenCalledWith(
+      expect(deps.traces.assignTopic).toHaveBeenCalledTimes(2);
+      expect(deps.traces.assignTopic).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: "project_regression",
           traceId: "trace_1",
@@ -48,7 +48,7 @@ describe("storeResults", () => {
           topicName: "Greetings",
         }),
       );
-      expect(deps.traceAssignments.assignTopic).toHaveBeenCalledWith(
+      expect(deps.traces.assignTopic).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: "project_regression",
           traceId: "trace_2",

@@ -1,3 +1,4 @@
+import type { TraceTopicClusteringPage } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
 import type { TopicClusteringRunnerDeps } from "../topic-clustering-runner.intent.ts";
@@ -18,7 +19,15 @@ export function makeProject(overrides: Record<string, unknown> = {}) {
  */
 export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {}) {
   const deps = {
-    resolveClickHouseClient: vi.fn(),
+    traces: {
+      readTopicClusteringCounts: vi.fn().mockResolvedValue({
+        totalTracesCount: 0,
+        recentTracesCount: 0,
+        assignedTracesCount: 0,
+      }),
+      readTopicClusteringPage: vi.fn().mockResolvedValue(tracePage(0)),
+      assignTopic: vi.fn().mockResolvedValue(undefined),
+    },
     models: {
       resolveClusteringModel: vi.fn().mockResolvedValue({ model: "openai/gpt-5-mini" }),
       findExecutionProviders: vi.fn().mockResolvedValue({ openai: { enabled: true } }),
@@ -54,13 +63,25 @@ export function fakeRunnerDeps(overrides: Partial<TopicClusteringRunnerDeps> = {
       recordTopics: vi.fn().mockResolvedValue(undefined),
       requestClustering: vi.fn().mockResolvedValue(undefined),
     },
-    traceAssignments: {
-      assignTopic: vi.fn().mockResolvedValue(undefined),
-    },
     observePayloadSize: vi.fn(),
   };
   // Compile-time check that the fakes satisfy the real deps; the returned
   // type keeps the vi.fn mock types so tests can assert calls directly.
   const _checked: TopicClusteringRunnerDeps = deps;
   return Object.assign(deps, overrides);
+}
+
+/** A page as trace answers it: `count` clusterable traces, newest first. */
+export function tracePage(count: number, now = Date.now()): TraceTopicClusteringPage {
+  const traces = Array.from({ length: count }, (_, i) => ({
+    trace_id: `trace-${i}`,
+    input: `User message ${i}`,
+    topic_id: null,
+    subtopic_id: null,
+  }));
+  return {
+    traces,
+    lastSort: count > 0 ? [now - (count - 1) * 1000, `trace-${count - 1}`] : undefined,
+    returnedCount: count,
+  };
 }

@@ -6,34 +6,23 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { clusterTopicsForProject, storeResults } from "../topic-clustering-runner.intent.ts";
-import { fakeRunnerDeps } from "./topic-clustering-runner.fixture.ts";
-
-/** A full page of clusterable traces, well over the batch minimum of 10. */
-function usableTraceRows(count: number) {
-  const now = Date.now();
-  return Array.from({ length: count }, (_, i) => ({
-    TraceId: `trace-${i}`,
-    ComputedInput: JSON.stringify(`User message ${i}`),
-    TopicId: null,
-    SubTopicId: null,
-    OccurredAtMs: String(now - i * 1000),
-  }));
-}
+import { fakeRunnerDeps, tracePage } from "./topic-clustering-runner.fixture.ts";
 
 describe("clusterTopicsForProject", () => {
   describe("given the clustering service endpoint is not configured", () => {
     describe("when a batch page of clusterable traces is run", () => {
       const depsWithUsablePage = () => {
-        const mockClickHouseQuery = vi.fn();
-        mockClickHouseQuery.mockResolvedValueOnce({
-          json: () => Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
-        });
-        mockClickHouseQuery.mockResolvedValueOnce({
-          json: () => Promise.resolve(usableTraceRows(12)),
-        });
         // The deployment shape that triggers the bug: no clustering endpoint.
         return fakeRunnerDeps({
-          resolveClickHouseClient: vi.fn().mockResolvedValue({ query: mockClickHouseQuery }),
+          traces: {
+            readTopicClusteringCounts: vi.fn().mockResolvedValue({
+              totalTracesCount: 100,
+              recentTracesCount: 100,
+              assignedTracesCount: 0,
+            }),
+            readTopicClusteringPage: vi.fn().mockResolvedValue(tracePage(12)),
+            assignTopic: vi.fn().mockResolvedValue(undefined),
+          },
           evaluations: {
             requestTopicClustering: vi.fn().mockResolvedValue({ kind: "not_configured" }),
           },

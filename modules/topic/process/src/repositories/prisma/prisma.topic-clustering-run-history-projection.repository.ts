@@ -36,7 +36,7 @@ const TOPIC_CLUSTERING_RUN_HISTORY_KSUID_RESOURCE = "topicrunhist";
 
 type Row = Prisma.TopicClusteringRunHistoryProjectionGetPayload<object>;
 
-type RunHistoryPrismaClient = {
+export type RunHistoryPrismaClient = {
   topicClusteringRunHistoryProjection: {
     findUnique(args: Prisma.TopicClusteringRunHistoryProjectionFindUniqueArgs): Promise<Row | null>;
     upsert(args: Prisma.TopicClusteringRunHistoryProjectionUpsertArgs): Promise<Row>;

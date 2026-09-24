@@ -1,5 +1,7 @@
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { Instant } from "@langwatch/time";
 import type {
   Topic,
@@ -10,8 +12,22 @@ import type {
   TopicProjectInput,
 } from "@langwatch/topic-contract";
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
+import {
+  createTopicClusteringProcessingPipeline,
+  type TopicClusteringProcessingPipelineDefinition,
+} from "../eventing/topic-clustering-processing.pipeline.ts";
+import { TopicClusteringRunner } from "../eventing/topic-clustering-runner.intent.ts";
+import { classifyClusteringError } from "../eventing/topic-clustering.intent.ts";
+import { LegacyImportTopicClusteringMigration } from "../migrations/legacy-import.topic-clustering.migration.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
+import {
+  EventingTopicClusteringCommandsService,
+  EventingTopicClusteringOutcomeCommandsService,
+} from "../services/topic-clustering-commands.service.ts";
+import { OtelTopicClusteringMetricsService } from "../services/topic-clustering-metrics.service.ts";
+import { ModelProviderTopicClusteringModelsService } from "../services/topic-clustering-models.service.ts";
 import { EventingTopicClusteringScheduleService } from "../services/topic-clustering-schedule.service.ts";
 import { TopicService } from "../services/topic.service.ts";
 
@@ -26,23 +42,87 @@ export class TopicApp implements TopicApi {
   static readonly contract = TopicApiToken;
   static readonly dependencies = {
     evaluations: EvaluationApi,
+    traces: TraceApi,
+    modelProviders: ModelProviderApi,
   };
 
   readonly #topics: TopicService;
+  readonly #commands: EventingTopicClusteringCommandsService;
+  readonly #outcomes: EventingTopicClusteringOutcomeCommandsService;
+  readonly #pipeline: TopicClusteringProcessingPipelineDefinition;
 
-  private constructor(topics: TopicService) {
-    this.#topics = topics;
+  private constructor(parts: {
+    topics: TopicService;
+    commands: EventingTopicClusteringCommandsService;
+    outcomes: EventingTopicClusteringOutcomeCommandsService;
+    pipeline: TopicClusteringProcessingPipelineDefinition;
+  }) {
+    this.#topics = parts.topics;
+    this.#commands = parts.commands;
+    this.#outcomes = parts.outcomes;
+    this.#pipeline = parts.pipeline;
   }
 
   static create(setup: TopicSetup): TopicApp {
-    return new TopicApp(
-      TopicService.create({
-        repository: setup.repositories.topics,
+    const { repositories, dependencies } = setup;
+    const commands = EventingTopicClusteringCommandsService.create();
+    const outcomes = EventingTopicClusteringOutcomeCommandsService.create();
+    const metrics = OtelTopicClusteringMetricsService.create();
+    const runner = TopicClusteringRunner.create({
+      traces: dependencies.traces,
+      models: ModelProviderTopicClusteringModelsService.create({
+        modelProviders: dependencies.modelProviders,
+      }),
+      evaluations: dependencies.evaluations,
+      repository: repositories.clustering,
+      migration: LegacyImportTopicClusteringMigration.create({
+        repository: repositories.clustering,
+        redis: null,
+        commands,
+      }),
+      commands,
+      observePayloadSize: (kind, sizeBytes) => metrics.observePayloadSize(kind, sizeBytes),
+    });
+
+    return new TopicApp({
+      topics: TopicService.create({
+        repository: repositories.topics,
         schedule: EventingTopicClusteringScheduleService.create({
-          processStore: setup.repositories.processStore,
+          processStore: repositories.processStore,
         }),
       }),
-    );
+      commands,
+      outcomes,
+      pipeline: createTopicClusteringProcessingPipeline({
+        topicClusteringRunStatusStore: repositories.runStatus,
+        topicClusteringRunHistoryStore: repositories.runHistory,
+        topicModelStore: repositories.topicModel,
+        dispatch: {
+          runPort: runner,
+          commands: outcomes,
+          classifyError: classifyClusteringError,
+          metrics,
+        },
+      }),
+    });
+  }
+
+  /** The pipeline `topic_clustering_processing` registers, built once by {@link create}. */
+  eventingPipeline(): TopicClusteringProcessingPipelineDefinition {
+    return this.#pipeline;
+  }
+
+  /** Binds the registered pipeline's own senders; every clustering write goes through them. */
+  connectCommands(commands: EventingCommands<TopicClusteringProcessingPipelineDefinition>): void {
+    this.#commands.connect({
+      recordTopics: commands.recordTopics,
+      requestClustering: commands.requestClustering,
+    });
+    this.#outcomes.connect({
+      recordClusteringRunStarted: commands.recordClusteringRunStarted,
+      recordClusteringRunCompleted: commands.recordClusteringRunCompleted,
+      recordClusteringRunFailed: commands.recordClusteringRunFailed,
+    });
   }
 
   getAll(input: TopicProjectInput): Promise<Topic[]> {

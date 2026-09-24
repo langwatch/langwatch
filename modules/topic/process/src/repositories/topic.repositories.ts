@@ -1,5 +1,8 @@
-import type { ProcessStore } from "@langwatch/eventing";
+import type { ProcessStore, StateProjectionStore } from "@langwatch/eventing";
 
+import type { TopicClusteringRunHistoryData } from "../eventing/topic-clustering-run-history.projection.ts";
+import type { TopicClusteringRunStatusData } from "../eventing/topic-clustering-run-status.projection.ts";
+import type { TopicModelData } from "../eventing/topic-model.projection.ts";
 import type { TopicClusteringRepository } from "./topic-clustering.repository.ts";
 import type { TopicRepository } from "./topic.repository.ts";
 
@@ -13,4 +16,8 @@ export interface TopicRepositories {
   readonly clustering: TopicClusteringRepository;
   /** The clustering wake's process-manager row, which the status panel reads. */
   readonly processStore: ProcessStore;
+  /** The clustering pipeline's read models: the status panel, its audit trail, the topic model. */
+  readonly runStatus: StateProjectionStore<TopicClusteringRunStatusData>;
+  readonly runHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
+  readonly topicModel: StateProjectionStore<TopicModelData>;
 }

@@ -1,13 +1,32 @@
-import { defineAggregate, definePipeline, type StateProjectionStore } from "@langwatch/eventing";
+/**
+ * Topic clustering's pipeline, ported from main's deleted `PrismaTopicServerInstallerRepository`:
+ * the app builds the definition, and the senders are bound back to it once registered.
+ */
+import {
+  defineAggregate,
+  defineEventingModule,
+  definePipeline,
+  type EventingSetup,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 
+import type { TopicApp } from "../app/topic.app.ts";
+import type { TopicRepositories } from "../repositories/topic.repositories.ts";
+import {
+  TopicClusteringRequestedEventSchema,
+  TopicClusteringRunStartedEventSchema,
+  TopicClusteringRunCompletedEventSchema,
+  TopicClusteringRunFailedEventSchema,
+  TopicClusteringTopicsRecordedEventSchema,
+} from "../services/topic-events.service.ts";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
-} from "../eventing/topic-clustering-run-history.projection.ts";
+} from "./topic-clustering-run-history.projection.ts";
 import {
   type TopicClusteringRunStatusData,
   TopicClusteringRunStatusFoldProjection,
-} from "../eventing/topic-clustering-run-status.projection.ts";
+} from "./topic-clustering-run-status.projection.ts";
 import {
   RecordClusteringRunCompletedCommand,
   RecordClusteringRunFailedCommand,
@@ -16,32 +35,14 @@ import {
   RequestTopicClusteringCommand,
   recordTopicsDedupeId,
   type TopicClusteringDispatchDeps,
-} from "../eventing/topic-clustering.intent.ts";
+} from "./topic-clustering.intent.ts";
 import {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,
-} from "../eventing/topic-clustering.process.ts";
-import {
-  type TopicModelData,
-  TopicModelFoldProjection,
-} from "../eventing/topic-model.projection.ts";
-import {
-  TopicClusteringRequestedEventSchema,
-  TopicClusteringRunStartedEventSchema,
-  TopicClusteringRunCompletedEventSchema,
-  TopicClusteringRunFailedEventSchema,
-  TopicClusteringTopicsRecordedEventSchema,
-} from "./topic-events.service.ts";
+} from "./topic-clustering.process.ts";
+import { type TopicModelData, TopicModelFoldProjection } from "./topic-model.projection.ts";
 
-// Composition needs the projection state types to declare its stores; the
-// projection implementations stay private to the feature server.
-export type { TopicClusteringRunHistoryData } from "../eventing/topic-clustering-run-history.projection.ts";
-export {
-  topicClusteringRunHistoryProjectionEntrySchema,
-  type TopicClusteringRunHistoryEntry,
-} from "../eventing/topic-clustering-run-history.projection.ts";
-export type { TopicClusteringRunStatusData } from "../eventing/topic-clustering-run-status.projection.ts";
-export type { ProjectedTopic, TopicModelData } from "../eventing/topic-model.projection.ts";
+export const TOPIC_CLUSTERING_PIPELINE_NAME = "topic_clustering_processing";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
@@ -59,7 +60,7 @@ export interface TopicClusteringProcessingPipelineDeps {
 /** The topic_clustering_processing pipeline definition itself, built once per deps. */
 const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingPipelineDeps) => {
   return definePipeline({
-    name: "topic_clustering_processing",
+    name: TOPIC_CLUSTERING_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: "topic_clustering",
     }),
@@ -103,27 +104,19 @@ const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingP
     .build();
 };
 
-/**
- * The topic-clustering-processing pipeline (ADR-051).
- * Process manager: `topicClustering` (ADR-052 builder) — owns the per-project
- */
-export class TopicClusteringEventingService {
-  private constructor(private readonly deps: TopicClusteringProcessingPipelineDeps) {}
+export type TopicClusteringProcessingPipelineDefinition = ReturnType<
+  typeof buildTopicClusteringProcessingPipeline
+>;
 
-  static create(deps: TopicClusteringProcessingPipelineDeps): TopicClusteringEventingService {
-    return new TopicClusteringEventingService(deps);
-  }
-
-  static createPipeline(
-    deps: TopicClusteringProcessingPipelineDeps,
-  ): ReturnType<typeof buildTopicClusteringProcessingPipeline> {
-    return TopicClusteringEventingService.create(deps).build();
-  }
-
-  build(): ReturnType<typeof buildTopicClusteringProcessingPipeline> {
-    return buildTopicClusteringProcessingPipeline(this.deps);
-  }
+export function createTopicClusteringProcessingPipeline(
+  deps: TopicClusteringProcessingPipelineDeps,
+): TopicClusteringProcessingPipelineDefinition {
+  return buildTopicClusteringProcessingPipeline(deps);
 }
 
-export const createTopicClusteringProcessingPipeline =
-  TopicClusteringEventingService.createPipeline.bind(TopicClusteringEventingService);
+/** Passive in the api process, which only sends; the worker folds and drives the runs. */
+export const topicClusteringEventing = defineEventingModule({
+  pipeline: TOPIC_CLUSTERING_PIPELINE_NAME,
+  build: ({ app }: EventingSetup<TopicRepositories, TopicApp>) => app.eventingPipeline(),
+  connect: ({ app, commands }) => app.connectCommands(commands),
+});

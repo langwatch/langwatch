@@ -14,7 +14,7 @@ const TOPIC_CLUSTERING_RUN_KSUID_RESOURCE = "topicrun";
 
 type Row = Prisma.TopicClusteringRunProjectionGetPayload<object>;
 
-type RunProjectionPrismaClient = {
+export type RunProjectionPrismaClient = {
   topicClusteringRunProjection: {
     findUnique(args: Prisma.TopicClusteringRunProjectionFindUniqueArgs): Promise<Row | null>;
     upsert(args: Prisma.TopicClusteringRunProjectionUpsertArgs): Promise<Row>;

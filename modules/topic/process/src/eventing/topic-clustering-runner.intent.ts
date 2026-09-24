@@ -16,14 +16,9 @@ import {
   type TopicClusteringTrace,
   type TopicClusteringModels,
 } from "@langwatch/topic-contract";
-import type { TraceTopicAssignment } from "@langwatch/trace-contract";
-import { z } from "zod";
+import type { TraceApi } from "@langwatch/trace-contract";
 
-import type {
-  TopicClusteringClickHouse,
-  TopicClusteringClickHouseResolver,
-  TopicClusteringCommands,
-} from "../app/topic.members.ts";
+import type { TopicClusteringCommands } from "../app/topic.members.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
@@ -33,18 +28,8 @@ import {
 
 const logger = createLogger("langwatch:topicClustering");
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /** The embeddings dimension the clustering params pin (text-embedding-3-small). */
 const OPENAI_EMBEDDING_DIMENSION = 1536;
-
-// 12-month look-back for batch-vs-incremental decision; narrowing flips mature-but-quiet projects
-// into expensive full-batch re-cluster (measured: 49d threshold would flip 54 of 73 projects).
-const CLUSTERING_MODE_WINDOW_DAYS = 365;
-
-// Fetch window stays in ClickHouse hot tier to avoid cold reads that stalled the worker loop;
-// trade-off: unassigned traces >49 days old are no longer retroactively clustered.
-const CLUSTERING_FETCH_WINDOW_DAYS = 49;
 
 // Hard deadline on langevals call derived from outbox lease to prevent concurrent runs
 // destroying the model in batch mode; 60% of lease leaves room for response + store + outcome.
@@ -95,7 +80,8 @@ export interface TopicClusteringWritePathSeed {
  * Prisma, no app singletons past this point.
  */
 export interface TopicClusteringRunnerDeps {
-  resolveClickHouseClient: TopicClusteringClickHouseResolver;
+  /** Trace owns the summaries clustering reads and the topic it assigns (ARCHITECTURE §3.3). */
+  traces: Pick<TraceApi, "readTopicClusteringCounts" | "readTopicClusteringPage" | "assignTopic">;
   models: TopicClusteringModels;
   /** `not_configured` when the deployment names no langevals endpoint; evaluation logs it. */
   evaluations: Pick<EvaluationApi, "requestTopicClustering">;
@@ -103,7 +89,6 @@ export interface TopicClusteringRunnerDeps {
   /** The legacy import, for the write-path topic-model seed guard. */
   migration: TopicClusteringWritePathSeed;
   commands: TopicClusteringCommands;
-  traceAssignments: TraceTopicAssignment;
   /** Payload-size histogram observation per langevals call kind. */
   observePayloadSize: (
     kind: (typeof PAYLOAD_KIND)[keyof typeof PAYLOAD_KIND],
@@ -152,15 +137,8 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
 
-  let clickhouse: TopicClusteringClickHouse;
-  try {
-    clickhouse = await deps.resolveClickHouseClient(projectId);
-  } catch {
-    throw new Error(`ClickHouse client not available for project ${projectId}`);
-  }
-
   const { totalTracesCount, recentTracesCount, assignedTracesCount } =
-    await fetchCountsFromClickHouse({ clickhouse, projectId });
+    await deps.traces.readTopicClusteringCounts({ projectId });
 
   logger.info(
     {
@@ -223,13 +201,12 @@ export const clusterTopicsForProject = async (
     "Starting trace search for topic clustering",
   );
 
-  const { traces, lastSort, returnedCount } = await fetchTracesFromClickHouse({
-    clickhouse,
+  const { traces, lastSort, returnedCount } = await deps.traces.readTopicClusteringPage({
     projectId,
     isIncrementalProcessing,
     topicIds,
     subtopicIds,
-    searchAfter,
+    ...(searchAfter ? { searchAfter } : {}),
   });
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
@@ -294,253 +271,6 @@ export const clusterTopicsForProject = async (
     ...(nextSearchAfter ? { nextSearchAfter } : {}),
   };
 };
-
-// --- ClickHouse read helpers ---
-
-type TraceCounts = {
-  totalTracesCount: number;
-  recentTracesCount: number;
-  assignedTracesCount: number;
-};
-
-type TraceSearchResult = {
-  traces: TopicClusteringTrace[];
-  lastSort: [number, string] | undefined;
-  returnedCount: number;
-};
-
-const traceCountsRowSchema = z.object({
-  total: z.string(),
-  recent: z.string(),
-  assigned: z.string(),
-});
-
-const tracePageRowSchema = z.object({
-  TraceId: z.string(),
-  ComputedInput: z.string().nullable(),
-  TopicId: z.string().nullable(),
-  SubTopicId: z.string().nullable(),
-  OccurredAtMs: z.string(),
-});
-
-export async function fetchCountsFromClickHouse({
-  clickhouse,
-  projectId,
-}: {
-  clickhouse: TopicClusteringClickHouse;
-  projectId: string;
-}): Promise<TraceCounts> {
-  const thirtyDaysAgo = nowInstant().epochMilliseconds - 30 * 24 * 60 * 60 * 1000;
-  // Wide MODE window (kept at 365d): light-column scan that decides
-  // batch-vs-incremental, so it must reflect the project's whole history.
-  const twelveMonthsAgo = nowInstant().epochMilliseconds - CLUSTERING_MODE_WINDOW_DAYS * DAY_MS;
-
-  // Fold to latest trace version in one GROUP BY pass (not IN-tuple dedup's two scans).
-  // Assigned check uses TopicId boolean to handle NULL, so a cleared topic doesn't fold to stale.
-  const result = await clickhouse.query({
-    query: `
-      SELECT
-        toString(count(*)) AS total,
-        toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-        toString(countIf(latestAssigned)) AS assigned
-      FROM (
-        SELECT
-          argMax(OccurredAt, UpdatedAt) AS latestOccurredAt,
-          argMax(TopicId IS NOT NULL AND TopicId != '', UpdatedAt) AS latestAssigned
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-        GROUP BY TenantId, TraceId
-      )
-    `,
-    query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
-    format: "JSONEachRow",
-  });
-
-  const rows = z.array(traceCountsRowSchema).parse(await result.json());
-  const row = rows[0];
-
-  return {
-    totalTracesCount: parseInt(row?.total ?? "0", 10),
-    recentTracesCount: parseInt(row?.recent ?? "0", 10),
-    assignedTracesCount: parseInt(row?.assigned ?? "0", 10),
-  };
-}
-
-export async function fetchTracesFromClickHouse({
-  clickhouse,
-  projectId,
-  isIncrementalProcessing,
-  topicIds,
-  subtopicIds,
-  searchAfter,
-}: {
-  clickhouse: TopicClusteringClickHouse;
-  projectId: string;
-  isIncrementalProcessing: boolean;
-  topicIds: string[];
-  subtopicIds: string[];
-  searchAfter?: [number, string];
-}): Promise<TraceSearchResult> {
-  // Narrow FETCH window (49d, hot-tier only): bounds how far cursor-paging
-  // reads the heavy ComputedInput column, keeping it off S3 cold storage.
-  const fetchWindowStartMs = nowInstant().epochMilliseconds - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
-
-  // Page CTE selects <=2000 traces on key columns; outer query reads ComputedInput for selection
-  // only. No outer ORDER BY/LIMIT/LIMIT 2000 to avoid buffering full rows (killed prod at 3.5 GiB).
-  const pageHaving: string[] = [];
-
-  if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
-    // Must either not have any of the known topics, or not have any of the known subtopics
-    const topicCondition =
-      topicIds.length > 0
-        ? `(argMax(TopicId, UpdatedAt) IS NULL OR argMax(TopicId, UpdatedAt) NOT IN ({topicIds:Array(String)}))`
-        : "1=1";
-    const subtopicCondition =
-      subtopicIds.length > 0
-        ? `(argMax(SubTopicId, UpdatedAt) IS NULL OR argMax(SubTopicId, UpdatedAt) NOT IN ({subtopicIds:Array(String)}))`
-        : "1=1";
-    pageHaving.push(`(${topicCondition} OR ${subtopicCondition})`);
-  }
-
-  if (searchAfter) {
-    // Mixed sort: OccurredAt DESC, TraceId ASC — tuple < doesn't work here.
-    // Compare against the latest version's OccurredAt (argMax over UpdatedAt).
-    pageHaving.push(`(
-      toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) < {lastTs:UInt64}
-      OR (
-        toUnixTimestamp64Milli(argMax(OccurredAt, UpdatedAt)) = {lastTs:UInt64}
-        AND TraceId > {lastTraceId:String}
-      )
-    )`);
-  }
-
-  const pageHavingClause = pageHaving.length ? `HAVING ${pageHaving.join(" AND ")}` : "";
-
-  const result = await clickhouse.query({
-    query: `
-      WITH page AS (
-        SELECT TraceId
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-          AND OccurredAt < now64(3)
-        GROUP BY TenantId, TraceId
-        ${pageHavingClause}
-        ORDER BY argMax(OccurredAt, UpdatedAt) DESC, TraceId ASC
-        LIMIT 2000
-      )
-      SELECT
-        t.TraceId AS TraceId,
-        t.ComputedInput AS ComputedInput,
-        t.TopicId AS TopicId,
-        t.SubTopicId AS SubTopicId,
-        toString(toUnixTimestamp64Milli(t.OccurredAt)) AS OccurredAtMs
-      FROM trace_summaries t
-      WHERE TenantId = {tenantId:String}
-        AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-        AND OccurredAt < now64(3)
-        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({fetchWindowStartMs:UInt64})
-            AND OccurredAt < now64(3)
-            AND TraceId IN (SELECT TraceId FROM page)
-          GROUP BY TenantId, TraceId
-        )
-    `,
-    query_params: {
-      tenantId: projectId,
-      fetchWindowStartMs,
-      topicIds: topicIds.length > 0 ? topicIds : ["__none__"],
-      subtopicIds: subtopicIds.length > 0 ? subtopicIds : ["__none__"],
-      ...(searchAfter ? { lastTs: searchAfter[0], lastTraceId: searchAfter[1] } : {}),
-    },
-    format: "JSONEachRow",
-    // The outer query reads ComputedInput (a potentially large payload) for a
-    // page of <=2000 traces; peak memory scales with the number of read
-    // streams holding one at once. Large-input tenants crossed
-    // max_memory_usage_per_query here (MEMORY_LIMIT_EXCEEDED). This is a
-    // background batch, not latency-critical, so read streams are capped; rows are unchanged.
-    clickhouse_settings: { max_threads: 2 },
-  });
-
-  const rawRows = z.array(tracePageRowSchema).parse(await result.json());
-
-  // Reapply the page ordering (OccurredAt DESC, TraceId ASC) in JS. The query
-  // dropped its outer ORDER BY to avoid the top-N memory buffer (see above), so
-  // rows now arrive in scan order; sort the small (<=2000) result set here so
-  // the dedup-first-row and `lastSort` cursor logic below stay correct.
-  rawRows.sort((a, b) => {
-    const aTs = parseInt(a.OccurredAtMs, 10);
-    const bTs = parseInt(b.OccurredAtMs, 10);
-    if (aTs !== bTs) return bTs - aTs; // OccurredAt DESC
-    if (a.TraceId < b.TraceId) return -1; // TraceId ASC
-    if (a.TraceId > b.TraceId) return 1;
-    return 0;
-  });
-
-  // Defensive de-dup by TraceId in JS, not SQL: the per-key SQL dedup
-  // operator is banned in this path for OOM safety (it reads heavy columns
-  // for the whole granule; see trace-dedup-oom-safety.unit.test). Rows are
-  // ordered `OccurredAt DESC, TraceId ASC` above, so the first row per
-  // TraceId is the one the boundary cursor should land on.
-  const seenTraceIds = new Set<string>();
-  const rows = rawRows.filter((row) => {
-    if (seenTraceIds.has(row.TraceId)) return false;
-    seenTraceIds.add(row.TraceId);
-    return true;
-  });
-
-  const traces: TopicClusteringTrace[] = rows
-    .map((row) => {
-      const inputText = extractInputFromComputed(row.ComputedInput);
-      if (!inputText || inputText === "<empty>") return null;
-
-      return {
-        trace_id: row.TraceId,
-        input: inputText.slice(0, 8192),
-        topic_id: row.TopicId && topicIds.includes(row.TopicId) ? row.TopicId : null,
-        subtopic_id: row.SubTopicId && subtopicIds.includes(row.SubTopicId) ? row.SubTopicId : null,
-      };
-    })
-    .filter((t): t is TopicClusteringTrace => t !== null);
-
-  const lastRow = rows[rows.length - 1];
-  const lastSort: [number, string] | undefined = lastRow
-    ? [parseInt(lastRow.OccurredAtMs, 10), lastRow.TraceId]
-    : undefined;
-
-  return { traces, lastSort, returnedCount: rows.length };
-}
-
-/** The `input` a JSON-encoded value wraps, or the value itself when it wraps none. */
-function unwrapInnerInput(value: string): string {
-  try {
-    const inner = JSON.parse(value);
-    if (typeof inner?.input === "string" && inner.input.length > 0) return inner.input;
-  } catch {
-    // value is already a string
-  }
-  return value;
-}
-
-/** Extract text from a ComputedInput JSON string (mirrors getExtractedInput logic) */
-function extractInputFromComputed(computedInput: string | null): string {
-  if (!computedInput) return "<empty>";
-
-  try {
-    const parsed = JSON.parse(computedInput);
-    // ComputedInput is typically the already-extracted input value as JSON
-    if (typeof parsed === "string") return parsed || "<empty>";
-    if (typeof parsed?.value === "string") return unwrapInnerInput(parsed.value) || "<empty>";
-    if (typeof parsed?.input === "string") return parsed.input || "<empty>";
-    return typeof parsed === "object" ? JSON.stringify(parsed) : String(parsed) || "<empty>";
-  } catch {
-    return computedInput || "<empty>";
-  }
-}
 
 const getProjectTopicClusteringModelProvider = async (
   deps: TopicClusteringRunnerDeps,
@@ -796,7 +526,7 @@ export const storeResults = async ({
       // Send commands in parallel (queue handles batching internally)
       await Promise.all(
         tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-          deps.traceAssignments.assignTopic({
+          deps.traces.assignTopic({
             tenantId: projectId,
             traceId: trace_id,
             topicId: topic_id,

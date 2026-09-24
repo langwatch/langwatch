@@ -1,11 +1,10 @@
+export type { TopicClusteringProcessingPipelineDeps } from "./eventing/topic-clustering-processing.pipeline.ts";
 export type {
-  ProjectedTopic,
-  TopicClusteringProcessingPipelineDeps,
   TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryEntry,
-  TopicClusteringRunStatusData,
-  TopicModelData,
-} from "./services/topic-clustering-eventing.service.ts";
+} from "./eventing/topic-clustering-run-history.projection.ts";
+export type { TopicClusteringRunStatusData } from "./eventing/topic-clustering-run-status.projection.ts";
+export type { ProjectedTopic, TopicModelData } from "./eventing/topic-model.projection.ts";
 export { TopicApp } from "./app/topic.app.ts";
 export { topicServer, createTopicClusteringMetrics } from "./topic.server.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";
@@ -37,10 +36,8 @@ export {
   type ClusteringRunContext,
   type ClusteringStoreSummary,
   clusterTopicsForProject,
-  fetchCountsFromClickHouse,
   fetchTopicsBatchClustering,
   fetchTopicsIncrementalClustering,
-  fetchTracesFromClickHouse,
   incrementalClustering,
   storeResults,
   TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
@@ -52,12 +49,6 @@ export {
   LegacyImportTopicClusteringMigration,
   type TopicClusteringBackfillSummary,
 } from "./migrations/legacy-import.topic-clustering.migration.ts";
-export {
-  type TopicClusteringClickHouse,
-  type TopicClusteringClickHouseQuery,
-  type TopicClusteringClickHouseQueryParams,
-  type TopicClusteringClickHouseResolver,
-} from "./app/topic.members.ts";
 export type { TopicClusteringCommands } from "./app/topic.members.ts";
 export { RequestTopicClusteringTask } from "./eventing/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
