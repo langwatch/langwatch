@@ -112,6 +112,12 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.findInternal?.(input) ?? this.unimplemented("findInternal");
   }
 
+  findInternalIds(
+    input: Parameters<ProjectApi["findInternalIds"]>[0],
+  ): ReturnType<ProjectApi["findInternalIds"]> {
+    return this.overrides.findInternalIds?.(input) ?? this.unimplemented("findInternalIds");
+  }
+
   ensureInternal(input: Parameters<ProjectApi["ensureInternal"]>[0]): ReturnType<ProjectApi["ensureInternal"]> {
     return this.overrides.ensureInternal?.(input) ?? this.unimplemented("ensureInternal");
   }

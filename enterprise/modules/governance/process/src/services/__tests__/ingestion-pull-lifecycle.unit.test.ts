@@ -1,3 +1,5 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import { ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -30,10 +32,21 @@ class MemoryLifecycleRepository extends IngestionPullLifecycleRepository {
     super();
   }
 
-  async findForReconciliation(): Promise<IngestionPullLifecycleSource[]> {
+  readonly askedFor: string[][] = [];
+
+  async findForReconciliation({
+    governanceProjectIds,
+  }: {
+    governanceProjectIds: string[];
+  }): Promise<IngestionPullLifecycleSource[]> {
+    this.askedFor.push(governanceProjectIds);
     return this.sources;
   }
 }
+
+const projects = createApiFixture<ProjectApi>({
+  findInternalIds: async () => ["gov-1"],
+});
 
 class FixedTenant implements IngestionPullTenantResolver {
   async resolveTenantId(organizationId: string): Promise<string> {
@@ -55,6 +68,7 @@ describe("IngestionPullLifecycleService", () => {
     const commands = new RecordingCommand();
     const service = IngestionPullLifecycleService.create({
       repository: new MemoryLifecycleRepository([]),
+      projects,
       tenant: new FixedTenant(),
       commands,
       now: () => 2_000,
@@ -77,6 +91,7 @@ describe("IngestionPullLifecycleService", () => {
     const commands = new RecordingCommand();
     const service = IngestionPullLifecycleService.create({
       repository: new MemoryLifecycleRepository([]),
+      projects,
       tenant: new FixedTenant(),
       commands,
       now: () => 2_000,
@@ -102,6 +117,7 @@ describe("IngestionPullLifecycleService", () => {
         source({ id: "source-failed" }),
         source({ id: "source-ok" }),
       ]),
+      projects,
       tenant: new FixedTenant(),
       commands,
       diagnostics,
@@ -115,5 +131,19 @@ describe("IngestionPullLifecycleService", () => {
       sourceId: "source-failed",
       error: "pipeline unavailable",
     });
+  });
+
+  it("reads processes only under the live Governance projects the project module names", async () => {
+    const repository = new MemoryLifecycleRepository([]);
+    const service = IngestionPullLifecycleService.create({
+      repository,
+      projects,
+      tenant: new FixedTenant(),
+      commands: new RecordingCommand(),
+    });
+
+    await service.reconcile();
+
+    expect(repository.askedFor).toEqual([["gov-1"]]);
   });
 });

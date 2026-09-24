@@ -65,6 +65,7 @@ export class TestProjectApi implements ProjectApi {
   );
   findInternal = unsupported<ProjectApi["findInternal"]>("findInternal");
   ensureInternal = unsupported<ProjectApi["ensureInternal"]>("ensureInternal");
+  findInternalIds = unsupported<ProjectApi["findInternalIds"]>("findInternalIds");
   findIdentity = unsupported<ProjectApi["findIdentity"]>("findIdentity");
   listActiveByScopes = unsupported<ProjectApi["listActiveByScopes"]>("listActiveByScopes");
   updateMetadata = unsupported<ProjectApi["updateMetadata"]>("updateMetadata");

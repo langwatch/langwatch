@@ -647,40 +647,6 @@ export interface GovernanceSubscriberDiagnosticsSink {
   capture(error: unknown): void;
 }
 
-export type TraceAlertTrigger = {
-  id: string;
-  action: string;
-  actionClass: "notify" | "persist";
-  traceDebounceMs: number;
-  notificationCadence: string | null;
-  hasEvaluationFilters: boolean;
-};
-
-export interface TraceAlertTriggerReader {
-  activeForProject(projectId: string): Promise<TraceAlertTrigger[]>;
-}
-
-export interface TraceAlertTriggerMatchChannel {
-  send(input: {
-    tenantId: string;
-    occurredAt: number;
-    triggerId: string;
-    traceId: string;
-    action: string;
-    actionClass: "notify" | "persist";
-    traceDebounceMs: number;
-    notificationCadence: string | null;
-  }): Promise<void>;
-}
-
-export interface TraceAlertOriginGuard {
-  passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean;
-}
-
-export interface TraceAlertMetricsSink {
-  countRecorded(count: number): void;
-}
-
 export type GovernanceVkLifecycleData = RecordVkLifecycleCommandData;
 
 export type GovernanceBudgetCrossingData = RecordBudgetCrossingCommandData;

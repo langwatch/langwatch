@@ -30,6 +30,7 @@ function trigger(id: string, filters: Record<string, unknown>): TriggerSummary {
 
 function harness() {
   const reads: string[] = [];
+  const counted: number[] = [];
   const matches: (TriggerMatchRecordedEventData & { tenantId: string; occurredAt: number })[] = [];
   const deps = {
     triggers: {
@@ -46,8 +47,13 @@ function harness() {
         matches.push(input);
       },
     },
+    metrics: {
+      countRecorded: (count: number) => {
+        counted.push(count);
+      },
+    },
   };
-  return { deps, reads, matches };
+  return { deps, reads, matches, counted };
 }
 
 describe("handleTraceAlertTriggerMatch", () => {
@@ -75,6 +81,37 @@ describe("handleTraceAlertTriggerMatch", () => {
             notificationCadence: "immediate",
           },
         ]);
+      });
+    });
+
+    describe("when the matches are recorded", () => {
+      /** @scenario "Match-record volume is measured for the team, not capped" */
+      it("counts every record written on the team metric", async () => {
+        const { deps, counted } = harness();
+
+        await handleTraceAlertTriggerMatch(
+          deps,
+          { occurredAt: 1_000 },
+          { tenantId: "project-1", aggregateId: "trace-1" },
+        );
+
+        expect(counted).toEqual([1]);
+      });
+
+      /** @scenario "Recording a match consumes nothing" */
+      it("records through triggers, the match recorder and the metric alone", async () => {
+        const { deps, matches } = harness();
+
+        await handleTraceAlertTriggerMatch(
+          deps,
+          { occurredAt: 1_000 },
+          { tenantId: "project-1", aggregateId: "trace-1" },
+        );
+
+        expect({ deps: Object.keys(deps), recorded: matches.length }).toEqual({
+          deps: ["triggers", "triggerMatches", "metrics"],
+          recorded: 1,
+        });
       });
     });
 

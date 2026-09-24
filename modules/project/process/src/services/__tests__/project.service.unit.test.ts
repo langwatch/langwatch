@@ -97,6 +97,7 @@ class StubRepository implements ProjectRepository {
   existing: InternalProject | null = null;
   findInternalByOrganization = vi.fn(async () => this.existing);
   findInternalBySlug = vi.fn(async () => null);
+  findLiveInternalIds = vi.fn(async () => []);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
   findActiveTeamInOrganization = vi.fn<() => Promise<{ id: string; isPersonal: boolean } | null>>(

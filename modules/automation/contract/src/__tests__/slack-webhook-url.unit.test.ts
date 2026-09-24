@@ -7,7 +7,7 @@ describe("Slack webhook URLs", () => {
     const url = "https://hooks.slack.com/services/T/B/X";
 
     expect(isSlackWebhookUrl(url)).toBe(true);
-    expect(slackActionParamsSchema.safeParse({ slackWebhook: url }).success).toBe(true);
+    expect(slackActionParamsSchema.validate({ slackWebhook: url })).toBe(true);
   });
 
   it.each([
@@ -18,6 +18,6 @@ describe("Slack webhook URLs", () => {
     "https://hooks.slack.com/not-services/T/B/X",
   ])("rejects %s", (url) => {
     expect(isSlackWebhookUrl(url)).toBe(false);
-    expect(slackActionParamsSchema.safeParse({ slackWebhook: url }).success).toBe(false);
+    expect(slackActionParamsSchema.validate({ slackWebhook: url })).toBe(false);
   });
 });

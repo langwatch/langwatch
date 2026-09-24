@@ -3,6 +3,7 @@ import {
   PROJECT_KIND,
   activeProjectsByScopesInputSchema,
   createProjectInputSchema,
+  internalProjectKindSchema,
   internalProjectQuerySchema,
   personalWorkspaceArchiveViolation,
   personalWorkspaceCreateViolation,
@@ -11,10 +12,10 @@ import {
   projectIdsByOrganizationInputSchema,
   projectNamesByIdsInputSchema,
   projectPresenceInputSchema,
-  updateProjectInputSchema,
   type ActiveProjectsByScopes,
   type ActiveProjectsByScopesInput,
   type InternalProject,
+  type InternalProjectKind,
   type InternalProjectQuery,
   type OrgAdminResolution,
   type PaginatedProjects,
@@ -24,7 +25,6 @@ import {
   type ProjectWithTeam,
   type SearchProjectsResult,
   type TraceSharingConfig,
-  traceDestinationDecisionSchema,
   type TraceDestinationDecision,
   type TraceDestinationInput,
   type TraceDestinationProject,
@@ -135,6 +135,12 @@ export class ProjectService {
     return this.repository.findInternalByOrganization(parsed.organizationId);
   }
 
+  findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]> {
+    return this.repository.findLiveInternalIds({
+      kind: internalProjectKindSchema.parse(input.kind),
+    });
+  }
+
   async resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision> {
     const parsed = traceDestinationInputSchema.parse(input);
     if (parsed.traceProjectId) {
@@ -142,11 +148,7 @@ export class ProjectService {
         organizationId: parsed.organizationId,
         projectId: parsed.traceProjectId,
       });
-      const decision = project
-        ? { outcome: "resolved" as const, project }
-        : { outcome: "unknown" as const };
-
-      return traceDestinationDecisionSchema.parse(decision);
+      return project ? { outcome: "resolved", project } : { outcome: "unknown" };
     }
 
     if (parsed.projectScopeIds.length === 1) {
@@ -155,7 +157,7 @@ export class ProjectService {
         projectId: parsed.projectScopeIds[0]!,
       });
       if (project) {
-        return traceDestinationDecisionSchema.parse({ outcome: "resolved", project });
+        return { outcome: "resolved", project };
       }
     }
 
@@ -169,15 +171,9 @@ export class ProjectService {
     const alternatives = await this.repository.countLiveNonGovernanceProjects(
       parsed.organizationId,
     );
-    const decision =
-      alternatives > 0
-        ? {
-            outcome: "ambiguous" as const,
-            projectScopeCount: parsed.projectScopeIds.length,
-          }
-        : { outcome: "resolved" as const, project: governance };
-
-    return traceDestinationDecisionSchema.parse(decision);
+    return alternatives > 0
+      ? { outcome: "ambiguous", projectScopeCount: parsed.projectScopeIds.length }
+      : { outcome: "resolved", project: governance };
   }
 
   findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
@@ -356,7 +352,7 @@ export class ProjectService {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
-    const data = updateProjectInputSchema.parse(input.data);
+    const data = input.data;
     if (data.teamId) {
       const team = await this.repository.findActiveTeamInOrganization({
         teamId: data.teamId,

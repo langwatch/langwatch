@@ -6,7 +6,6 @@ import {
   type IngestionPullLifecycleSource,
 } from "../ingestion-pull-lifecycle.repository.ts";
 
-const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
 const INGESTION_PULL_PROCESS_NAME = "ingestionPull";
 
 export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecycleRepository {
@@ -18,19 +17,18 @@ export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecyc
     return new PrismaIngestionPullLifecycleRepository(database);
   }
 
-  async findForReconciliation(): Promise<IngestionPullLifecycleSource[]> {
-    const projects = await this.database.project.findMany({
-      where: { kind: INTERNAL_GOVERNANCE_PROJECT_KIND, archivedAt: null },
-      select: { id: true },
-    });
-    const projectIds = projects.map(({ id }) => id);
+  async findForReconciliation({
+    governanceProjectIds,
+  }: {
+    governanceProjectIds: string[];
+  }): Promise<IngestionPullLifecycleSource[]> {
     const processes =
-      projectIds.length === 0
+      governanceProjectIds.length === 0
         ? []
         : await this.database.processManagerInstance.findMany({
             where: {
               processName: INGESTION_PULL_PROCESS_NAME,
-              projectId: { in: projectIds },
+              projectId: { in: governanceProjectIds },
             },
             select: { processKey: true },
           });

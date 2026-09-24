@@ -4,17 +4,11 @@ import type {
   GovernanceKpiContributionWriter,
   GovernanceOcsfEventWriter,
   GovernanceSubscriberDiagnosticsSink,
-  TraceAlertMetricsSink,
-  TraceAlertOriginGuard,
-  TraceAlertTriggerMatchChannel,
-  TraceAlertTriggerReader,
   GovernanceKpiContribution,
   GovernanceOcsfEvent,
-  TraceAlertTrigger,
 } from "../../app/governance.members.ts";
 import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
 import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
-import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import { governanceTraceContext, governanceTraceEvent } from "./governance-subscriber.fixtures.ts";
 
 class RecordingKpis implements GovernanceKpiContributionWriter {
@@ -41,34 +35,6 @@ class RecordingDiagnostics implements GovernanceSubscriberDiagnosticsSink {
   }
   capture(error: unknown): void {
     this.errors.push(error);
-  }
-}
-
-class FixedTriggers implements TraceAlertTriggerReader {
-  constructor(private readonly triggers: TraceAlertTrigger[]) {}
-  activeForProject(): Promise<TraceAlertTrigger[]> {
-    return Promise.resolve(this.triggers);
-  }
-}
-
-class RecordingMatches implements TraceAlertTriggerMatchChannel {
-  readonly inputs: Parameters<TraceAlertTriggerMatchChannel["send"]>[0][] = [];
-  send(input: Parameters<TraceAlertTriggerMatchChannel["send"]>[0]): Promise<void> {
-    this.inputs.push(input);
-    return Promise.resolve();
-  }
-}
-
-class PassingOrigin implements TraceAlertOriginGuard {
-  passes(): boolean {
-    return true;
-  }
-}
-
-class RecordingMetrics implements TraceAlertMetricsSink {
-  readonly counts: number[] = [];
-  countRecorded(count: number): void {
-    this.counts.push(count);
   }
 }
 
@@ -130,45 +96,5 @@ describe("governance fold subscribers", () => {
     await subscriber.handle(event, alerted);
     expect(rows.rows.map((row) => row.eventId)).toEqual(["trace-1", "trace-1"]);
     expect(rows.rows[0]?.severityId).toBe(4);
-  });
-});
-
-describe("trace alert trigger match subscriber", () => {
-  it("redelivers byte-identical command identities and skips evaluation triggers", async () => {
-    const matches = new RecordingMatches();
-    const metrics = new RecordingMetrics();
-    const subscriber = TraceAlertTriggerMatchSubscriber.create({
-      triggers: new FixedTriggers([
-        {
-          id: "trace-trigger",
-          action: "send_email",
-          actionClass: "notify",
-          traceDebounceMs: 1_000,
-          notificationCadence: "once",
-          hasEvaluationFilters: false,
-        },
-        {
-          id: "evaluation-trigger",
-          action: "send_email",
-          actionClass: "notify",
-          traceDebounceMs: 1_000,
-          notificationCadence: "once",
-          hasEvaluationFilters: true,
-        },
-      ]),
-      matches,
-      originGuard: new PassingOrigin(),
-      metrics,
-    });
-    await subscriber.handle(event, context);
-    await subscriber.handle(event, context);
-    expect(matches.inputs).toHaveLength(2);
-    expect(matches.inputs[0]).toEqual(matches.inputs[1]);
-    expect(matches.inputs[0]).toMatchObject({
-      occurredAt: event.occurredAt,
-      triggerId: "trace-trigger",
-      traceId: "trace-1",
-    });
-    expect(metrics.counts).toEqual([1, 1]);
   });
 });

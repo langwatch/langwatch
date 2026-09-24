@@ -15,6 +15,7 @@ import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-
 import { handleGraphTriggerActivity } from "../eventing/graph-trigger-activity.subscriber.ts";
 import { handleTraceAlertTriggerMatch } from "../eventing/trace-alert-trigger-match.subscriber.ts";
 import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationMatchRecordMetricsSink } from "./automation-match-record-metrics.service.ts";
 
 /**
  * Evaluation event subscribers using four narrow ports instead of two capability
@@ -27,6 +28,7 @@ export class AutomationEvaluationSubscriberService {
     traces: AutomationEvaluationTraceSummary;
     evaluationFilters: AutomationEvaluationTriggerFilter;
     triggerMatches: AutomationTriggerMatchRecorder;
+    matchRecordMetrics: AutomationMatchRecordMetricsSink;
   }): AutomationEvaluationSubscriberService {
     return new AutomationEvaluationSubscriberService(input);
   }
@@ -38,6 +40,7 @@ export class AutomationEvaluationSubscriberService {
       traces: AutomationEvaluationTraceSummary;
       evaluationFilters: AutomationEvaluationTriggerFilter;
       triggerMatches: AutomationTriggerMatchRecorder;
+      matchRecordMetrics: AutomationMatchRecordMetricsSink;
     },
   ) {}
 
@@ -62,7 +65,11 @@ export class AutomationEvaluationSubscriberService {
     context: AutomationTraceSubscriberContext,
   ): Promise<void> {
     return handleTraceAlertTriggerMatch(
-      { triggers: this.deps.triggers, triggerMatches: this.deps.triggerMatches },
+      {
+        triggers: this.deps.triggers,
+        triggerMatches: this.deps.triggerMatches,
+        metrics: this.deps.matchRecordMetrics,
+      },
       event,
       context,
     );

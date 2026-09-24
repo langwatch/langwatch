@@ -85,6 +85,7 @@ import type {
   AutomationHeartbeat,
   AutomationLogger,
 } from "../services/automation-graph-runtime.service.ts";
+import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
 import {
   AutomationRulesService,
   type AutomationProjectIdentity,
@@ -471,6 +472,7 @@ export class AutomationApp implements AutomationApi {
         traces: dependencies.traces,
         evaluationFilters: AutomationEvaluationTriggerFilterService.create(dependencies.traces),
         triggerMatches,
+        matchRecordMetrics: AutomationMatchRecordMetricsService.create(),
       }),
       triggerMatches,
       settlement: undefined,

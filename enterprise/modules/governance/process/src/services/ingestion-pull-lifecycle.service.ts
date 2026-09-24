@@ -1,3 +1,5 @@
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
+
 import type {
   GovernanceDiagnosticsSink,
   IngestionPullLifecycleChannel,
@@ -12,6 +14,7 @@ import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.servi
 
 export class IngestionPullLifecycleService {
   private readonly repository: IngestionPullLifecycleRepository;
+  private readonly projects: Pick<ProjectApi, "findInternalIds">;
   private readonly tenant: IngestionPullTenantResolver;
   private readonly commands: IngestionPullLifecycleChannel;
   private readonly diagnostics: GovernanceDiagnosticsSink;
@@ -19,18 +22,21 @@ export class IngestionPullLifecycleService {
 
   private constructor({
     repository,
+    projects,
     tenant,
     commands,
     diagnostics,
     now,
   }: {
     repository: IngestionPullLifecycleRepository;
+    projects: Pick<ProjectApi, "findInternalIds">;
     tenant: IngestionPullTenantResolver;
     commands: IngestionPullLifecycleChannel;
     diagnostics: GovernanceDiagnosticsSink;
     now: () => number;
   }) {
     this.repository = repository;
+    this.projects = projects;
     this.tenant = tenant;
     this.commands = commands;
     this.diagnostics = diagnostics;
@@ -39,6 +45,7 @@ export class IngestionPullLifecycleService {
 
   static create(options: {
     repository: IngestionPullLifecycleRepository;
+    projects: Pick<ProjectApi, "findInternalIds">;
     tenant: IngestionPullTenantResolver;
     commands: IngestionPullLifecycleChannel;
     diagnostics?: GovernanceDiagnosticsSink;
@@ -46,6 +53,7 @@ export class IngestionPullLifecycleService {
   }): IngestionPullLifecycleService {
     return new IngestionPullLifecycleService({
       repository: options.repository,
+      projects: options.projects,
       tenant: options.tenant,
       commands: options.commands,
       diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
@@ -81,7 +89,10 @@ export class IngestionPullLifecycleService {
   }
 
   async reconcile(): Promise<{ reconciled: number; failed: number }> {
-    const sources = await this.repository.findForReconciliation();
+    const governanceProjectIds = await this.projects.findInternalIds({
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+    });
+    const sources = await this.repository.findForReconciliation({ governanceProjectIds });
     let reconciled = 0;
     let failed = 0;
 

@@ -11,12 +11,6 @@ export type IngestionPullLifecycleSource = {
 };
 
 export type IngestionPullLifecycleDatabase = {
-  project: {
-    findMany(input: {
-      where: { kind: string; archivedAt: null };
-      select: { id: true };
-    }): Promise<{ id: string }[]>;
-  };
   processManagerInstance: {
     findMany(input: {
       where: { processName: string; projectId: { in: string[] } };
@@ -38,5 +32,7 @@ export type IngestionPullLifecycleDatabase = {
 };
 
 export abstract class IngestionPullLifecycleRepository {
-  abstract findForReconciliation(): Promise<IngestionPullLifecycleSource[]>;
+  abstract findForReconciliation(input: {
+    governanceProjectIds: string[];
+  }): Promise<IngestionPullLifecycleSource[]>;
 }

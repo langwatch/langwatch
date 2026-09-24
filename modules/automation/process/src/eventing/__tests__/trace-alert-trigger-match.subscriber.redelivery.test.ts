@@ -36,6 +36,7 @@ describe("handleTraceAlertTriggerMatch redelivery", () => {
             recorded.set(`${input.triggerId}:${input.traceId}:${input.occurredAt}`, input);
           },
         },
+        metrics: { countRecorded: () => undefined },
       };
       const context = { tenantId: "project-1", aggregateId: "trace-1" };
 

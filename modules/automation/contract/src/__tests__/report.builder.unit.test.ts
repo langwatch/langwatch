@@ -59,7 +59,7 @@ describe("reportScheduleSchema", () => {
       { cron: "0 */6 * * *", timezone: "UTC" },
       { cron: "*/15 * * * *", timezone: "UTC" },
     ])("accepts $cron ($timezone)", ({ cron, timezone }) => {
-      expect(reportScheduleSchema.safeParse({ cron, timezone }).success).toBe(true);
+      expect(reportScheduleSchema.validate({ cron, timezone })).toBe(true);
     });
   });
 
@@ -100,17 +100,15 @@ describe("reportScheduleSchema", () => {
 describe("reportSourceSchema", () => {
   describe("when discriminating the source kind", () => {
     it("accepts dashboard, customGraph, and traceQuery, and rejects unknown", () => {
-      expect(reportSourceSchema.safeParse({ kind: "dashboard", dashboardId: "d1" }).success).toBe(
-        true,
-      );
+      expect(reportSourceSchema.validate({ kind: "dashboard", dashboardId: "d1" })).toBe(true);
       expect(
-        reportSourceSchema.safeParse({
+        reportSourceSchema.validate({
           kind: "customGraph",
           customGraphId: "g1",
-        }).success,
+        }),
       ).toBe(true);
-      expect(reportSourceSchema.safeParse({ kind: "traceQuery" }).success).toBe(true);
-      expect(reportSourceSchema.safeParse({ kind: "spreadsheet" }).success).toBe(false);
+      expect(reportSourceSchema.validate({ kind: "traceQuery" })).toBe(true);
+      expect(reportSourceSchema.validate({ kind: "spreadsheet" })).toBe(false);
     });
 
     it("defaults trace-query topN to 5 and filters to empty", () => {

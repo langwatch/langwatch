@@ -5,12 +5,12 @@ import { findGraphAlertFromTriggerRow, graphAlertActionParamsSchema } from "../g
 describe("graph-alert contract", () => {
   it("validates the portable threshold shape", () => {
     expect(
-      graphAlertActionParamsSchema.safeParse({
+      graphAlertActionParamsSchema.validate({
         threshold: 2,
         operator: "gte",
         timePeriod: 15,
         seriesName: "0/latency/p95",
-      }).success,
+      }),
     ).toBe(true);
   });
 

@@ -10,6 +10,7 @@ import {
   type ActiveProjectsByScopes,
   type ActiveProjectsByScopesInput,
   type InternalProject,
+  type InternalProjectKind,
   type InternalProjectQuery,
   type OrgAdminResolution,
   type Project,
@@ -461,6 +462,10 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
 
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
     return this.#projectService.findInternal(input);
+  }
+
+  findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]> {
+    return this.#projectService.findInternalIds(input);
   }
 
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {

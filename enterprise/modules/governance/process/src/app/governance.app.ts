@@ -295,7 +295,7 @@ export interface GovernanceAppDependencies {
    */
   projects: Pick<
     ProjectApi,
-    "getOrganizationId" | "findInternal" | "findWithTeam" | "ensureInternal"
+    "getOrganizationId" | "findInternal" | "findWithTeam" | "ensureInternal" | "findInternalIds"
   >;
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
@@ -649,6 +649,7 @@ export class GovernanceApp implements GovernanceRestApi {
     const { projects } = this.dependencies;
     return IngestionPullLifecycleService.create({
       repository: this.repositories.ingestionPullLifecycle,
+      projects,
       tenant: {
         resolveTenantId: async (organizationId) =>
           (

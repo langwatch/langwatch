@@ -52,7 +52,6 @@ export type * from "./repositories/personal-virtual-key.repository.ts";
 export type * from "./repositories/routing-policy.repository.ts";
 export type * from "./repositories/session-policy.repository.ts";
 export type * from "./repositories/spend-spike-anomaly.repository.ts";
-export { OtelTraceAlertMetricsAdapter } from "./services/otel-trace-alert-metrics.service.ts";
 
 export { SEAT_REPORT_ACTION } from "./rules/microsoft-graph-seats.rules.ts";
 export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
@@ -95,7 +94,6 @@ export {
   createIngestionPullSources,
   createPulledUsageEventing,
   createSpendSpikeAnomalyEvaluator,
-  createTraceAlertMetrics,
   findAgentsListings,
   type IngestionPullWorkerSubstrates,
 } from "./governance.server.ts";
@@ -113,7 +111,6 @@ export {
   GovernanceKpisSubscriber,
 } from "./eventing/governance-kpis.subscriber.ts";
 export { GovernanceOcsfSubscriber } from "./eventing/governance-ocsf.subscriber.ts";
-export { TraceAlertTriggerMatchSubscriber } from "./eventing/trace-alert-trigger-match.subscriber.ts";
 
 // The thirteen tRPC transports this feature owns are not exported: they still
 // name the deleted legacy builder, so nothing may reach them until each is

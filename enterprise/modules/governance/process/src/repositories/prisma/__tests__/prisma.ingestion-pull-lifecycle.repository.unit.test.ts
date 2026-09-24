@@ -5,23 +5,17 @@ import { PrismaIngestionPullLifecycleRepository } from "../prisma.ingestion-pull
 
 describe("PrismaIngestionPullLifecycleRepository", () => {
   it("only discovers processes belonging to Governance projects", async () => {
-    const projectFindMany = vi.fn().mockResolvedValue([{ id: "gov-1" }]);
     const processFindMany = vi
       .fn()
       .mockResolvedValue([{ processKey: "source-with-removed-schedule" }]);
     const sourceFindMany = vi.fn().mockResolvedValue([]);
     const repository = PrismaIngestionPullLifecycleRepository.create({
-      project: { findMany: projectFindMany },
       processManagerInstance: { findMany: processFindMany },
       ingestionSource: { findMany: sourceFindMany },
     } satisfies IngestionPullLifecycleDatabase);
 
-    await repository.findForReconciliation();
+    await repository.findForReconciliation({ governanceProjectIds: ["gov-1"] });
 
-    expect(projectFindMany).toHaveBeenCalledWith({
-      where: { kind: "internal_governance", archivedAt: null },
-      select: { id: true },
-    });
     expect(processFindMany).toHaveBeenCalledWith({
       where: {
         processName: "ingestionPull",
@@ -39,12 +33,11 @@ describe("PrismaIngestionPullLifecycleRepository", () => {
   it("does not issue an unscoped process query without Governance projects", async () => {
     const processFindMany = vi.fn();
     const repository = PrismaIngestionPullLifecycleRepository.create({
-      project: { findMany: vi.fn().mockResolvedValue([]) },
       processManagerInstance: { findMany: processFindMany },
       ingestionSource: { findMany: vi.fn().mockResolvedValue([]) },
     } satisfies IngestionPullLifecycleDatabase);
 
-    await repository.findForReconciliation();
+    await repository.findForReconciliation({ governanceProjectIds: [] });
 
     expect(processFindMany).not.toHaveBeenCalled();
   });

@@ -89,6 +89,9 @@ export class TestProjectApi implements ProjectApi {
   findInternal: ProjectApi["findInternal"] = (input) =>
     this.overrides.findInternal?.(input) ?? Promise.resolve(null);
 
+  findInternalIds: ProjectApi["findInternalIds"] = (input) =>
+    this.overrides.findInternalIds?.(input) ?? this.unimplemented("findInternalIds");
+
   ensureInternal: ProjectApi["ensureInternal"] = (input) =>
     this.overrides.ensureInternal?.(input) ?? this.unimplemented("ensureInternal");
 

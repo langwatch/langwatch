@@ -16,6 +16,8 @@ import {
 import type { AutomationHeartbeat } from "./automation-graph-runtime.service.ts";
 import type { AutomationRunawayMetricsSink } from "./automation-runaway-metrics.service.ts";
 
+const traceCountRowsSchema = z.array(z.object({ Total: z.string() }));
+
 /**
  * Who a limit notice goes to, resolved through this process's own
  * directories. Two collaborators: a project breaches the ceiling, but its
@@ -95,7 +97,7 @@ export class AutomationRunawayAdapter extends AutomationRunaway {
       query_params: { tenantId: projectId },
       format: "JSONEachRow",
     });
-    const rows = z.array(z.object({ Total: z.string() })).parse(await result.json());
+    const rows = traceCountRowsSchema.parse(await result.json());
 
     return Number.parseInt(rows[0]?.Total ?? "0", 10);
   }

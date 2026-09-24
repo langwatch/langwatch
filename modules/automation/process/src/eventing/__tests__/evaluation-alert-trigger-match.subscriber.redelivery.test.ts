@@ -217,6 +217,7 @@ describe("evaluation alert trigger-match subscriber redelivery", () => {
       traces: new TestTraceService(),
       evaluationFilters: AutomationEvaluationTriggerFilterService.create(new TestTraceService()),
       triggerMatches: recordTriggerMatch,
+      matchRecordMetrics: { countRecorded: () => undefined },
     });
     const context: TriggerContext<EvaluationRunData> = {
       tenantId: "project-1",

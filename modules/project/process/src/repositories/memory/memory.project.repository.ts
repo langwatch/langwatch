@@ -7,6 +7,7 @@ import {
   type ActiveProjectsByScopesInput,
   type CreateProjectInput,
   type InternalProject,
+  type InternalProjectKind,
   type PaginatedProjects,
   type Project,
   type ProjectIdentity,
@@ -76,6 +77,13 @@ export class MemoryProjectRepository implements ProjectRepository {
       );
 
     return project ? this.#internal(project) : null;
+  }
+
+  async findLiveInternalIds({ kind }: { kind: InternalProjectKind }): Promise<string[]> {
+    return this.#database
+      .projects()
+      .filter((row) => row.kind === kind && row.archivedAt === null)
+      .map((row) => row.id);
   }
 
   async findInternalBySlug(slug: string): Promise<InternalProject | null> {

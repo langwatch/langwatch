@@ -3,6 +3,7 @@ import type {
   ActiveProjectsByScopesInput,
   CreateProjectInput,
   InternalProject,
+  InternalProjectKind,
   PaginatedProjects,
   Project,
   ProjectIdentity,
@@ -38,6 +39,7 @@ export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
   findInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
   findInternalBySlug(slug: string): Promise<InternalProject | null>;
+  findLiveInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;
   createInternalOrFindWinner(input: {
     id: string;
     name: string;

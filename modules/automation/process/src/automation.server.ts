@@ -58,6 +58,7 @@ import type { TriggerRepository } from "./repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
+import { AutomationMatchRecordMetricsService } from "./services/automation-match-record-metrics.service.ts";
 import {
   AutomationSlackSecretsService,
   type AutomationSecretCrypto,
@@ -198,6 +199,7 @@ export function createAutomationEvaluationSubscriber(input: {
     traces: input.traces,
     evaluationFilters: AutomationEvaluationTriggerFilterService.create(input.traces),
     triggerMatches: input.triggerMatches,
+    matchRecordMetrics: AutomationMatchRecordMetricsService.create(),
   });
 }
 

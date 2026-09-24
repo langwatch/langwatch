@@ -6,6 +6,7 @@ import type {
   ActiveProjectsByScopes,
   ActiveProjectsByScopesInput,
   InternalProject,
+  InternalProjectKind,
   InternalProjectQuery,
   OrgAdminResolution,
   PaginatedProjects,
@@ -106,6 +107,8 @@ export interface ProjectApi {
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
   /** The organisation's internal governance project, created on first ask. */
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
+  /** Every live internal project of this kind, across organisations: its id only. */
+  findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;
   /**
    * Reads only who the project is — five indexed columns, no team row,
    * because this runs once per authenticated request. Absent when missing.

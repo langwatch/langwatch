@@ -1,3 +1,10 @@
+import {
+  bindRestHeader,
+  bindRestMiddleware,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import { defineServerModule } from "@langwatch/kernel";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What a process composes this feature's process-side work from: the ingestion
@@ -7,13 +14,7 @@
  * stays private to this feature server — a composition states which substrates
  * it has, never which class to construct.
  */
-import {
-  bindRestHeader,
-  bindRestMiddleware,
-  projectCredentialOfRequest,
-} from "@langwatch/api/rest";
-import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
-import { defineServerModule } from "@langwatch/kernel";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   GovernanceInstallationComposition,
@@ -37,7 +38,6 @@ import type {
   GovernanceOcsfEventSink,
   GovernanceProjectDirectory,
   GovernanceSignalChannel,
-  TraceAlertMetricsSink,
   IngestionPullDiagnosticsSink,
   IngestionPullLifecycleChannel,
   IngestionPullMetricsSink,
@@ -98,7 +98,6 @@ import { IngestionPullWorkerService } from "./services/ingestion-pull-worker.ser
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
 import { OpenAiAdminPullerAdapter } from "./services/openai-admin-puller.service.ts";
 import { OpenAiComplianceReferencePullerService } from "./services/openai-compliance-puller.service.ts";
-import { OtelTraceAlertMetricsAdapter } from "./services/otel-trace-alert-metrics.service.ts";
 import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 import { PulledUsagePricingService } from "./services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "./services/pulled-usage-record.service.ts";
@@ -252,12 +251,14 @@ export function createIngestionPullExecution(options: {
  */
 export function createIngestionPullLifecycle(options: {
   database: IngestionPullLifecycleDatabase;
+  projects: Pick<ProjectApi, "findInternalIds">;
   tenant: IngestionPullTenantResolver;
   commands: IngestionPullLifecycleChannel;
   diagnostics?: GovernanceDiagnosticsSink;
 }): IngestionPullLifecycleService {
   return IngestionPullLifecycleService.create({
     repository: PrismaIngestionPullLifecycleRepository.create(options.database),
+    projects: options.projects,
     tenant: options.tenant,
     commands: options.commands,
     diagnostics: options.diagnostics,
@@ -333,11 +334,6 @@ export function createGovernanceEventsPipeline(
   deps: GovernanceEventsPipelineDeps,
 ): ReturnType<typeof GovernanceEventsAdapter.prototype.pipeline> {
   return GovernanceEventsAdapter.create(deps).pipeline();
-}
-
-/** Where a trace-alert match is counted. */
-export function createTraceAlertMetrics(): TraceAlertMetricsSink {
-  return OtelTraceAlertMetricsAdapter.create();
 }
 
 /** The sources one ingestion-pull installation reads, over its own connection. */
