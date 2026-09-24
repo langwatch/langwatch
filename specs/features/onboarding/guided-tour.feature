@@ -425,19 +425,6 @@ Feature: Guided onboarding tour
     Then no coach mark starts
     And it is not marked as shown, so it starts once the path is done
 
-  # Langy navigates to the simulations screen at the end of the llmops path,
-  # and the screen's welcome card sat on the sidebar beside the run results it
-  # had opened. The trace explorer's coach mark had the rule; this card did
-  # not. The other screens the path opens carry no coach mark of their own:
-  # the scenario editor drawer, the prompts drawers, the traces page beyond
-  # the first-trace mark, whose drawer spotlights start from it.
-  @unit
-  Scenario: the simulations welcome card stays quiet while a guided path is active
-    Given the organization is in the guided variant with a path being set up, or its tour is running
-    When the Agent Testing sidebar would pin its welcome card
-    Then no card is pinned, not even for the address parameter that brings it back
-    And nothing is snoozed or recorded, so the card shows once the path is done
-
   # ============================================================================
   # Analytics
   # ============================================================================

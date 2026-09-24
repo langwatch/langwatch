@@ -37,7 +37,6 @@ import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { DashboardLayout } from "../dashboard-layout.tsx";
 import { ScenarioWorkflowHostBridge } from "../workflow-host-bridge.tsx";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";
-import { ReturnToNewSimulationsBanner } from "./return-to-new-simulations-banner.tsx";
 import { RunHistoryPanel } from "./run-history-panel.tsx";
 import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel.tsx";
 import { SuiteSidebar } from "./suite-sidebar.tsx";
@@ -359,7 +358,6 @@ function SimulationsBoard() {
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulations</PageLayout.Heading>
               <HStack>
-                <ReturnToNewSimulationsBanner target="runs" />
                 <PeriodSelector
                   period={period}
                   mode={mode}

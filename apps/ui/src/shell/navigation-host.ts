@@ -35,7 +35,6 @@ export type BrowserNavigationReading = {
   currentUser: NavigationUser | undefined;
   organizationRole: string | undefined;
   rememberedProjectSlug: string;
-  prefersPreviousSimulationsScreens: boolean;
   pathname: string;
   search: string;
   projectParam: string | undefined;
@@ -124,10 +123,6 @@ export class BrowserNavigationHost extends NavigationHost {
   featureFlag(flag: string): NavigationFlagReading {
     const answer = this.reading.featureFlag(flag);
     return { enabled: answer === true, isLoading: answer === void 0 };
-  }
-
-  prefersPreviousSimulationsScreens(): boolean {
-    return this.reading.prefersPreviousSimulationsScreens;
   }
 
   waiting(): ReactNode {

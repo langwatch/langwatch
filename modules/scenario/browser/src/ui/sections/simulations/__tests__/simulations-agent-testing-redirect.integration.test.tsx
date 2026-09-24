@@ -1,10 +1,8 @@
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
-import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 /**
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
- * @see specs/suites/new-simulations-callout.feature
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
@@ -74,9 +72,6 @@ function TestScenarioHost({ children }: { children: React.ReactNode }) {
     failed() {
       // Nothing here reports a failure.
     }
-    isGuidedPathActive() {
-      return false;
-    }
   })();
 
   return (
@@ -97,7 +92,6 @@ async function renderRoute() {
 
 describe("the simulations address", () => {
   beforeEach(() => {
-    setUiStorage(new BrowserUiStorage());
     state.flagEnabled = false;
     state.flagLoading = false;
     state.replace.mockReset();
@@ -110,27 +104,6 @@ describe("the simulations address", () => {
   describe("given the Agent Testing release flag is on", () => {
     beforeEach(() => {
       state.flagEnabled = true;
-    });
-
-    describe("and the previous-screens preference is recorded", () => {
-      beforeEach(() => {
-        localStorage.setItem("langwatch:prefer-legacy-simulations:v1:project-1", "1");
-      });
-
-      afterEach(() => {
-        localStorage.clear();
-      });
-
-      /** @scenario "The previous-screens preference disables the Agent Testing redirect" */
-      it("renders the v1 page without redirecting", async () => {
-        state.params = { project: "demo" };
-        state.query = {};
-
-        await renderRoute();
-
-        expect(state.replace).not.toHaveBeenCalled();
-        expect(screen.getByText("v1 simulations page")).toBeDefined();
-      });
     });
 
     /** @scenario "A saved simulations address opens in Agent Testing when the flag is on" */

@@ -31,7 +31,6 @@ import {
 import { ScenarioTable } from "../../../ui/elements/scenarios/scenario-table.tsx";
 import { DashboardLayout } from "../../../ui/sections/dashboard-layout.tsx";
 import { ScenarioCreateModal } from "../../../ui/sections/scenarios/scenario-create-modal.tsx";
-import { ReturnToNewSimulationsBanner } from "../../../ui/sections/suites/return-to-new-simulations-banner.tsx";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
@@ -165,7 +164,6 @@ function ScenarioLibraryPage() {
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Scenario Library</PageLayout.Heading>
           <Spacer />
-          <ReturnToNewSimulationsBanner target="scenarios" />
           <LabelFilterDropdown
             allLabels={allLabels}
             activeLabels={activeLabels}

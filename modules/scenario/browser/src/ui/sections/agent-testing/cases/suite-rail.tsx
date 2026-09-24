@@ -1,4 +1,4 @@
-import { Box, VStack } from "@chakra-ui/react";
+import { VStack } from "@chakra-ui/react";
 /**
  * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
  * @see specs/features/agent-testing/suites-rail.feature
@@ -14,7 +14,6 @@ import type {
   ExternalSetEntry,
   TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
 import { SuiteRailFooter } from "./suite-rail-footer.tsx";
 import { SuiteRailSections } from "./suite-rail-sections.tsx";
 import type { SuiteLastRun } from "./use-test-cases-data.ts";
@@ -82,12 +81,6 @@ export function SuiteRail(props: SuiteRailProps) {
       data-testid="agent-testing-suite-rail"
     >
       <SuiteRailSections {...props} onRequestArchive={setSuiteToArchive} />
-
-      {!collapsed && (
-        <Box paddingX={3}>
-          <NewSimulationsCallout target="scenarios" />
-        </Box>
-      )}
 
       <SuiteRailFooter {...props} />
 

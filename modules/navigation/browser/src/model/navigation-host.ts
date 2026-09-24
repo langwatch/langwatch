@@ -208,13 +208,6 @@ export abstract class NavigationHost {
   abstract featureFlag(flag: string): NavigationFlagReading;
 
   /**
-   * Whether this project asked to keep the previous simulations screens — the
-   * scenario family's choice, which the Test section honours over the Agent
-   * Testing flag. Spec: specs/suites/new-simulations-callout.feature
-   */
-  abstract prefersPreviousSimulationsScreens(): boolean;
-
-  /**
    * What the application shows while a navigation decision is still being
    * made — belongs to the host's own chrome (logo, motion budget), the same
    * shape `projectSwitcher()` established.

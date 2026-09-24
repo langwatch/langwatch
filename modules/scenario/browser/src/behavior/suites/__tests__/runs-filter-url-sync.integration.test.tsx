@@ -81,9 +81,6 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
       failed() {
         // Nothing here reports a failure.
       }
-      isGuidedPathActive() {
-        return false;
-      }
     })();
   }, [location.pathname, location.search, params, navigate]);
 

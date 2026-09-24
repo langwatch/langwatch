@@ -35,7 +35,6 @@ import {
   useUiRouteReading,
   useUiScopeMemory,
 } from "@langwatch/organization-browser/surfaces/scope-capability";
-import { useLegacySimulationsPreference } from "@langwatch/scenario-browser/surfaces/simulations-preference";
 import { PresenceMenuItem } from "@langwatch/trace-browser/surfaces/presence-menu-item";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
@@ -162,11 +161,6 @@ function useNavigationHostReading(commandBar: boolean) {
 
   const deployment = useMemo(readNavigationDeployment, []);
 
-  // THE MENU'S ONE SCENARIO-OWNED READING. The preference is the scenario
-  // family's and the Test section the navigation package's; neither browser
-  // package may name the other, so the application reads it and answers.
-  const prefersPreviousSimulationsScreens = useLegacySimulationsPreference(project?.id);
-
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
   const canAskLangy = offersLangyAsk({
@@ -257,7 +251,6 @@ function useNavigationHostReading(commandBar: boolean) {
           currentUser,
           organizationRole,
           rememberedProjectSlug: memory.selection.projectSlug,
-          prefersPreviousSimulationsScreens,
           pathname,
           search,
           projectParam: routeReading.projectParam,
@@ -298,7 +291,6 @@ function useNavigationHostReading(commandBar: boolean) {
       currentUser,
       organizationRole,
       memory.selection.projectSlug,
-      prefersPreviousSimulationsScreens,
       pathname,
       search,
       routeReading,

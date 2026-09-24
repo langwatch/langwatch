@@ -659,11 +659,4 @@ describe("the test suites rail", () => {
     // the shorter period.
     expect(props.setRelativePeriod).toHaveBeenCalledWith("7d");
   });
-
-  /** @scenario "The rail carries the new-simulations announcement" */
-  it("carries the new-simulations announcement", () => {
-    renderRail();
-
-    expect(screen.getByText("Welcome to the new simulations screen")).toBeInTheDocument();
-  });
 });

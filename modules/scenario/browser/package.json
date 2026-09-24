@@ -20,11 +20,6 @@
       "types": "./dist/ui/sections/media-part.d.ts",
       "default": "./src/ui/sections/media-part.tsx"
     },
-    "./surfaces/simulations-preference": {
-      "langwatch-declaration-source": "./src/simulations-preference.ts",
-      "types": "./dist/simulations-preference.d.ts",
-      "default": "./src/simulations-preference.ts"
-    },
     "./surfaces/parameter-line-field": {
       "types": "./dist/ui/sections/agent-testing/run/parameter-line-field.d.ts",
       "default": "./src/ui/sections/agent-testing/run/parameter-line-field.tsx"

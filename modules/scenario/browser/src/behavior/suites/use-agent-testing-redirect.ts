@@ -8,7 +8,6 @@ import { useEffect } from "react";
 
 import { useFeatureFlag } from "../use-feature-flag.ts";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
-import { useLegacySimulationsPreference } from "./use-legacy-simulations-preference.ts";
 import { toAgentTestingAddress } from "./use-suite-routing.ts";
 
 export function useAgentTestingRedirect({
@@ -35,13 +34,10 @@ export function useAgentTestingRedirect({
       enabled: !!organizationId,
     },
   );
-  // Someone who chose the previous screens on this browser reads this page,
-  // whatever the flag says. See the new-simulations callout.
-  const legacyPreferred = useLegacySimulationsPreference(project?.id);
 
   const projectSlug = router.query.project;
   const target =
-    enabled && !legacyPreferred && router.isReady && typeof projectSlug === "string"
+    enabled && router.isReady && typeof projectSlug === "string"
       ? toAgentTestingAddress({
           projectSlug,
           segments,
@@ -54,6 +50,6 @@ export function useAgentTestingRedirect({
   }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
-    deciding: orgLoading || (!legacyPreferred && !!organizationId && flagLoading) || !!target,
+    deciding: orgLoading || (!!organizationId && flagLoading) || !!target,
   };
 }

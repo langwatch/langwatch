@@ -12,7 +12,6 @@ import type { RunPlanBatches } from "../../../../behavior/agent-testing/results/
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { RunsSidebarEntry } from "../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
 import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
-import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
 import type { PeriodControls } from "./period-controls.ts";
 import { RunsSidebarBatchEntry } from "./runs-sidebar-batch-entry.tsx";
 
@@ -135,8 +134,8 @@ export function RunsSidebar({
         <ArrowLeft size={13} /> Results
       </Button>
 
-      {/* Only the list scrolls: the announcement and the period picker stay
-          in reach however long the run history grows. */}
+      {/* Only the list scrolls: the period picker stays in reach however
+          long the run history grows. */}
       <VStack align="stretch" gap={1} flex={1} minHeight={0} overflow="auto">
         {isPendingShown ? <PendingEntry /> : null}
 
@@ -147,8 +146,6 @@ export function RunsSidebar({
           isPendingShown={isPendingShown}
         />
       </VStack>
-
-      <NewSimulationsCallout target="runs" />
 
       <Box paddingLeft={1} paddingTop={4}>
         <AgentTestingPeriodPicker
