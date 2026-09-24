@@ -17,20 +17,20 @@ describe("personal usage contract", () => {
 
   it("rejects inverted windows and malformed output", () => {
     expect(
-      personalUsageQueryInputSchema.safeParse({
+      personalUsageQueryInputSchema.validate({
         personalProjectId: "project",
         window: { startMs: 20, endMs: 10 },
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      personalUsageSummarySchema.safeParse({
+      personalUsageSummarySchema.validate({
         spentUsd: 1,
         billedUsd: 1,
         requests: -1,
         promptTokens: 0,
         completionTokens: 0,
         mostUsedModel: null,
-      }).success,
+      }),
     ).toBe(false);
   });
 });

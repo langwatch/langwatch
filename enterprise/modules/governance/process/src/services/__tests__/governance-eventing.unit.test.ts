@@ -58,6 +58,7 @@ import {
   RecordVkLifecycleCommand,
 } from "../governance-events.service.ts";
 import { IngestionPullEventingAdapter } from "../ingestion-pull-eventing.service.ts";
+import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
 import { IngestionPullService } from "../ingestion-pull.service.ts";
 import { PulledUsageEventingAdapter } from "../pulled-usage-eventing.service.ts";
 
@@ -363,6 +364,17 @@ describe("ingestion pull process and projection", () => {
       outcomePort: new UnusedOutcome(),
       metrics: new UnusedMetrics(),
     }),
+    listing: IngestionPullListingService.create({
+      sources: { findById: () => Promise.reject(new Error("unused")) },
+      agents: { syncFromSource: () => Promise.reject(new Error("unused")) },
+      people: { syncFromSource: () => Promise.reject(new Error("unused")) },
+      outcomes: {
+        agentsListed: () => Promise.reject(new Error("unused")),
+        agentsListingRefused: () => Promise.reject(new Error("unused")),
+        peopleListed: () => Promise.reject(new Error("unused")),
+        peopleListingRefused: () => Promise.reject(new Error("unused")),
+      },
+    }),
   });
   const definition = buildProcessDefinition(
     buildProcessManager<IngestionPullProcessingEvent & Event>({
@@ -525,6 +537,7 @@ describe("ingestion pull retry outcomes", () => {
       error: "provider unavailable",
       errorCode: "pull_failed",
       retryable: false,
+      retryAfterMs: null,
     });
     expect(metrics.counts).toEqual(["failed_retryable", "failed_final"]);
   });

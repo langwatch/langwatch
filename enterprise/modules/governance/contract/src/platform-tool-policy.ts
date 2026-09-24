@@ -36,5 +36,5 @@ export const PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE: Readonly<Record<string, Platform
 };
 
 export function isPlatformToolSlug(value: string): value is PlatformToolSlug {
-  return platformToolSlugSchema.safeParse(value).success;
+  return platformToolSlugSchema.validate(value);
 }

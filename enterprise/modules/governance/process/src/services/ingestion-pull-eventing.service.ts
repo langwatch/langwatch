@@ -12,6 +12,12 @@ import {
   ingestionPullDisabledEventSchema,
   ingestionPullRunCompletedEventSchema,
   ingestionPullRunFailedEventSchema,
+  ingestionPullAgentsListingRequestedEventSchema,
+  ingestionPullAgentsListedEventSchema,
+  ingestionPullAgentsListingRefusedEventSchema,
+  ingestionPullPeopleListingRequestedEventSchema,
+  ingestionPullPeopleListedEventSchema,
+  ingestionPullPeopleListingRefusedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import {
   defineAggregate,
@@ -24,6 +30,14 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
+import {
+  RecordIngestionPullAgentsListedCommand,
+  RecordIngestionPullAgentsListingRefusedCommand,
+  RecordIngestionPullPeopleListedCommand,
+  RecordIngestionPullPeopleListingRefusedCommand,
+  RequestIngestionPullAgentsListingCommand,
+  RequestIngestionPullPeopleListingCommand,
+} from "../eventing/ingestion-pull-listing.commands.ts";
 import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
@@ -53,12 +67,24 @@ export class IngestionPullEventingAdapter {
     disable: typeof DisableIngestionPullCommand;
     recordRunCompleted: typeof RecordIngestionPullRunCompletedCommand;
     recordRunFailed: typeof RecordIngestionPullRunFailedCommand;
+    requestAgentsListing: typeof RequestIngestionPullAgentsListingCommand;
+    recordAgentsListed: typeof RecordIngestionPullAgentsListedCommand;
+    recordAgentsListingRefused: typeof RecordIngestionPullAgentsListingRefusedCommand;
+    requestPeopleListing: typeof RequestIngestionPullPeopleListingCommand;
+    recordPeopleListed: typeof RecordIngestionPullPeopleListedCommand;
+    recordPeopleListingRefused: typeof RecordIngestionPullPeopleListingRefusedCommand;
   } {
     return {
       configure: ConfigureIngestionPullCommand,
       disable: DisableIngestionPullCommand,
       recordRunCompleted: RecordIngestionPullRunCompletedCommand,
       recordRunFailed: RecordIngestionPullRunFailedCommand,
+      requestAgentsListing: RequestIngestionPullAgentsListingCommand,
+      recordAgentsListed: RecordIngestionPullAgentsListedCommand,
+      recordAgentsListingRefused: RecordIngestionPullAgentsListingRefusedCommand,
+      requestPeopleListing: RequestIngestionPullPeopleListingCommand,
+      recordPeopleListed: RecordIngestionPullPeopleListedCommand,
+      recordPeopleListingRefused: RecordIngestionPullPeopleListingRefusedCommand,
     } as const;
   }
 
@@ -78,6 +104,12 @@ export class IngestionPullEventingAdapter {
         ingestionPullDisabledEventSchema,
         ingestionPullRunCompletedEventSchema,
         ingestionPullRunFailedEventSchema,
+        ingestionPullAgentsListingRequestedEventSchema,
+        ingestionPullAgentsListedEventSchema,
+        ingestionPullAgentsListingRefusedEventSchema,
+        ingestionPullPeopleListingRequestedEventSchema,
+        ingestionPullPeopleListedEventSchema,
+        ingestionPullPeopleListingRefusedEventSchema,
       ])
       .withPostgresProjection(
         IngestionPullRunStatusEventingProjection.create(this.options.runStatusStore),
@@ -85,7 +117,13 @@ export class IngestionPullEventingAdapter {
       .withCommand("configure", ConfigureIngestionPullCommand)
       .withCommand("disable", DisableIngestionPullCommand)
       .withCommand("recordRunCompleted", RecordIngestionPullRunCompletedCommand)
-      .withCommand("recordRunFailed", RecordIngestionPullRunFailedCommand);
+      .withCommand("recordRunFailed", RecordIngestionPullRunFailedCommand)
+      .withCommand("requestAgentsListing", RequestIngestionPullAgentsListingCommand)
+      .withCommand("recordAgentsListed", RecordIngestionPullAgentsListedCommand)
+      .withCommand("recordAgentsListingRefused", RecordIngestionPullAgentsListingRefusedCommand)
+      .withCommand("requestPeopleListing", RequestIngestionPullPeopleListingCommand)
+      .withCommand("recordPeopleListed", RecordIngestionPullPeopleListedCommand)
+      .withCommand("recordPeopleListingRefused", RecordIngestionPullPeopleListingRefusedCommand);
     if (this.options.process) {
       pipeline.withProcessManager(
         INGESTION_PULL_PROCESS_NAME,

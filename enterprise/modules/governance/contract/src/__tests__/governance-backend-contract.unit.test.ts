@@ -36,7 +36,7 @@ describe("governance backend contract", () => {
 
   it("validates portable anomaly rule commands and records with Zod 4", () => {
     expect(
-      createAnomalyRuleInputSchema.safeParse({
+      createAnomalyRuleInputSchema.validate({
         organizationId: "organization",
         name: "Spend spike",
         severity: "warning",
@@ -44,10 +44,10 @@ describe("governance backend contract", () => {
         scope: "organization",
         scopeId: "organization",
         actorUserId: "user",
-      }).success,
+      }),
     ).toBe(true);
     expect(
-      anomalyRuleSchema.safeParse({
+      anomalyRuleSchema.validate({
         id: "rule",
         organizationId: "organization",
         name: "Spend spike",
@@ -63,7 +63,7 @@ describe("governance backend contract", () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         createdById: "user",
-      }).success,
+      }),
     ).toBe(false);
   });
 
@@ -83,17 +83,17 @@ describe("governance backend contract", () => {
 
   it("requires provider-reported usage to declare whether its cost is exact", () => {
     expect(
-      pulledUsageHintSchema.safeParse({
+      pulledUsageHintSchema.validate({
         costBasis: "provider_reported",
         dimensions: { workspaceId: "workspace" },
-      }).success,
+      }),
     ).toBe(false);
     expect(
-      pulledUsageHintSchema.safeParse({
+      pulledUsageHintSchema.validate({
         costBasis: "provider_reported",
         costStatus: "exact",
         dimensions: { workspaceId: "workspace" },
-      }).success,
+      }),
     ).toBe(true);
   });
 
@@ -112,13 +112,13 @@ describe("governance backend contract", () => {
 
   it("keeps department records portable", () => {
     expect(
-      departmentSchema.safeParse({
+      departmentSchema.validate({
         id: "department",
         name: "Engineering",
         organizationId: "organization",
         createdAt: new Date(),
         updatedAt: new Date(),
-      }).success,
+      }),
     ).toBe(true);
   });
 
@@ -130,19 +130,19 @@ describe("governance backend contract", () => {
 
   it("validates the portable OTTL gateway boundary", () => {
     expect(
-      ottlTransformInputSchema.safeParse({
+      ottlTransformInputSchema.validate({
         sourceId: "source",
         kind: "log",
         encoding: "proto",
         payloadB64: "AQID",
         statements: ['set(attributes["service.name"], "example")'],
-      }).success,
+      }),
     ).toBe(true);
     expect(
-      ottlValidationResultSchema.safeParse({
+      ottlValidationResultSchema.validate({
         status: "deferred",
         reason: "unknown",
-      }).success,
+      }),
     ).toBe(false);
   });
 });

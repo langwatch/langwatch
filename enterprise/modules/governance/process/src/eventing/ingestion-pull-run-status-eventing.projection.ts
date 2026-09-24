@@ -1,10 +1,15 @@
 import {
+  INGESTION_PULL_LISTING_OUTCOME,
   INGESTION_PULL_PROJECTION_VERSIONS,
   INGESTION_PULL_RUN_OUTCOME,
   ingestionPullConfiguredEventSchema,
   ingestionPullDisabledEventSchema,
   ingestionPullRunCompletedEventSchema,
   ingestionPullRunFailedEventSchema,
+  ingestionPullAgentsListedEventSchema,
+  ingestionPullAgentsListingRefusedEventSchema,
+  ingestionPullPeopleListedEventSchema,
+  ingestionPullPeopleListingRefusedEventSchema,
 } from "@langwatch/enterprise-governance-contract";
 import {
   AbstractFoldProjection,
@@ -28,6 +33,18 @@ export interface IngestionPullRunStatusData {
   LastSuccessAt: number | null;
   LastReadThroughAt: number | null;
   LastRunCompleteness: "complete" | "truncated" | null;
+  LastAgentsListingAt: number | null;
+  LastAgentsListingOutcome: string | null;
+  LastAgentsListingCount: number | null;
+  LastAgentsListingReason: string | null;
+  LastAgentsListingStatus: number | null;
+  LastPeopleListingAt: number | null;
+  LastPeopleListingOutcome: string | null;
+  LastPeopleDirectoryCount: number | null;
+  /** Nothing reads it: a withheld count that moves dates an erasure (main's commands.ts). */
+  LastPeopleWithheldCount: number | null;
+  LastPeopleListingReason: string | null;
+  LastPeopleListingStatus: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
@@ -38,12 +55,49 @@ const ingestionPullEvents = [
   ingestionPullDisabledEventSchema,
   ingestionPullRunCompletedEventSchema,
   ingestionPullRunFailedEventSchema,
+  ingestionPullAgentsListedEventSchema,
+  ingestionPullAgentsListingRefusedEventSchema,
+  ingestionPullPeopleListedEventSchema,
+  ingestionPullPeopleListingRefusedEventSchema,
 ] as const;
 
 type ConfiguredEvent = z.infer<typeof ingestionPullConfiguredEventSchema>;
 type DisabledEvent = z.infer<typeof ingestionPullDisabledEventSchema>;
 type CompletedEvent = z.infer<typeof ingestionPullRunCompletedEventSchema>;
 type FailedEvent = z.infer<typeof ingestionPullRunFailedEventSchema>;
+type AgentsListedEvent = z.infer<typeof ingestionPullAgentsListedEventSchema>;
+type AgentsListingRefusedEvent = z.infer<typeof ingestionPullAgentsListingRefusedEventSchema>;
+type PeopleListedEvent = z.infer<typeof ingestionPullPeopleListedEventSchema>;
+type PeopleListingRefusedEvent = z.infer<typeof ingestionPullPeopleListingRefusedEventSchema>;
+
+/** Absent fields leave the stored value: an older completion is no evidence either way. */
+function readThroughOf(event: CompletedEvent): {
+  LastReadThroughAt?: number;
+  LastRunCompleteness?: "complete" | "truncated";
+} {
+  return {
+    ...(typeof event.data.readThroughAt === "number"
+      ? { LastReadThroughAt: event.data.readThroughAt }
+      : {}),
+    ...(event.data.completeness !== undefined
+      ? { LastRunCompleteness: event.data.completeness }
+      : {}),
+  };
+}
+
+/** An unread page counts as a failure; skipped rows hold the count; a clean run resets it. */
+function consecutiveErrorsAfterCompletion({
+  previous,
+  hasPartialSuccess,
+  hasUnreadPage,
+}: {
+  previous: number;
+  hasPartialSuccess: boolean;
+  hasUnreadPage: boolean;
+}): number {
+  if (hasUnreadPage) return previous + 1;
+  return hasPartialSuccess ? previous : 0;
+}
 
 export class IngestionPullRunStatusEventingProjection
   extends AbstractFoldProjection<
@@ -91,6 +145,17 @@ export class IngestionPullRunStatusEventingProjection
       LastSuccessAt: null,
       LastReadThroughAt: null,
       LastRunCompleteness: null,
+      LastAgentsListingAt: null,
+      LastAgentsListingOutcome: null,
+      LastAgentsListingCount: null,
+      LastAgentsListingReason: null,
+      LastAgentsListingStatus: null,
+      LastPeopleListingAt: null,
+      LastPeopleListingOutcome: null,
+      LastPeopleDirectoryCount: null,
+      LastPeopleWithheldCount: null,
+      LastPeopleListingReason: null,
+      LastPeopleListingStatus: null,
     };
   }
 
@@ -124,6 +189,8 @@ export class IngestionPullRunStatusEventingProjection
     state: IngestionPullRunStatusData,
   ): IngestionPullRunStatusData {
     if (this.superseded(state, event.data.scheduledFor)) return state;
+    const hasUnreadPage = event.data.unreadPage === true;
+    const hasPartialSuccess = (event.data.errorCount ?? 0) > 0 || hasUnreadPage;
     return {
       ...state,
       SourceId: event.data.sourceId,
@@ -133,9 +200,14 @@ export class IngestionPullRunStatusEventingProjection
       LastRunEventCount: event.data.eventCount,
       LastRunError: null,
       LastRunErrorCode: null,
-      ConsecutiveErrors: 0,
+      ConsecutiveErrors: consecutiveErrorsAfterCompletion({
+        previous: state.ConsecutiveErrors,
+        hasPartialSuccess,
+        hasUnreadPage,
+      }),
       LastRunScheduledFor: event.data.scheduledFor,
-      LastSuccessAt: event.occurredAt,
+      LastSuccessAt: hasPartialSuccess ? state.LastSuccessAt : event.occurredAt,
+      ...readThroughOf(event),
     };
   }
 
@@ -155,6 +227,77 @@ export class IngestionPullRunStatusEventingProjection
       ConsecutiveErrors: state.ConsecutiveErrors + 1,
       LastRunScheduledFor: event.data.scheduledFor,
     };
+  }
+
+  handleIngestionPullAgentsListed(
+    event: AgentsListedEvent,
+    state: IngestionPullRunStatusData,
+  ): IngestionPullRunStatusData {
+    if (this.listingSuperseded(state.LastAgentsListingAt, event.data.requestedAt)) return state;
+    return {
+      ...state,
+      SourceId: event.data.sourceId,
+      LastAgentsListingAt: event.data.requestedAt,
+      LastAgentsListingOutcome: INGESTION_PULL_LISTING_OUTCOME.LISTED,
+      LastAgentsListingCount: event.data.agentCount,
+      LastAgentsListingReason: null,
+      LastAgentsListingStatus: null,
+    };
+  }
+
+  handleIngestionPullAgentsListingRefused(
+    event: AgentsListingRefusedEvent,
+    state: IngestionPullRunStatusData,
+  ): IngestionPullRunStatusData {
+    if (this.listingSuperseded(state.LastAgentsListingAt, event.data.requestedAt)) return state;
+    return {
+      ...state,
+      SourceId: event.data.sourceId,
+      LastAgentsListingAt: event.data.requestedAt,
+      LastAgentsListingOutcome: INGESTION_PULL_LISTING_OUTCOME.REFUSED,
+      LastAgentsListingCount: null,
+      LastAgentsListingReason: event.data.reason,
+      LastAgentsListingStatus: event.data.status,
+    };
+  }
+
+  handleIngestionPullPeopleListed(
+    event: PeopleListedEvent,
+    state: IngestionPullRunStatusData,
+  ): IngestionPullRunStatusData {
+    if (this.listingSuperseded(state.LastPeopleListingAt, event.data.requestedAt)) return state;
+    return {
+      ...state,
+      SourceId: event.data.sourceId,
+      LastPeopleListingAt: event.data.requestedAt,
+      LastPeopleListingOutcome: INGESTION_PULL_LISTING_OUTCOME.LISTED,
+      LastPeopleDirectoryCount: event.data.directoryPersonCount,
+      LastPeopleWithheldCount: event.data.withheldPersonCount,
+      LastPeopleListingReason: null,
+      LastPeopleListingStatus: null,
+    };
+  }
+
+  handleIngestionPullPeopleListingRefused(
+    event: PeopleListingRefusedEvent,
+    state: IngestionPullRunStatusData,
+  ): IngestionPullRunStatusData {
+    if (this.listingSuperseded(state.LastPeopleListingAt, event.data.requestedAt)) return state;
+    return {
+      ...state,
+      SourceId: event.data.sourceId,
+      LastPeopleListingAt: event.data.requestedAt,
+      LastPeopleListingOutcome: INGESTION_PULL_LISTING_OUTCOME.REFUSED,
+      LastPeopleDirectoryCount: null,
+      LastPeopleWithheldCount: null,
+      LastPeopleListingReason: event.data.reason,
+      LastPeopleListingStatus: event.data.status,
+    };
+  }
+
+  /** A listing asked earlier than the recorded one lost the race and must not overwrite it. */
+  private listingSuperseded(recorded: number | null, requestedAt: number): boolean {
+    return recorded !== null && requestedAt < recorded;
   }
 
   private superseded(state: IngestionPullRunStatusData, scheduledFor: number): boolean {

@@ -41,11 +41,12 @@ export class MemoryIngestionPullRunRepository extends IngestionPullRunRepository
     projectId: string;
   }): Promise<Map<string, AgentsListingSummary>> {
     return new Map(
-      sourceIds.flatMap((sourceId): [string, AgentsListingSummary][] =>
-        this.rows.has(this.keyOf(projectId, sourceId))
-          ? [[sourceId, { LastAgentsListingOutcome: null, LastAgentsListingReason: null }]]
-          : [],
-      ),
+      sourceIds.flatMap((sourceId): [string, AgentsListingSummary][] => {
+        const row = this.rows.get(this.keyOf(projectId, sourceId));
+        if (!row) return [];
+        const { LastAgentsListingOutcome, LastAgentsListingReason } = row.state;
+        return [[sourceId, { LastAgentsListingOutcome, LastAgentsListingReason }]];
+      }),
     );
   }
 

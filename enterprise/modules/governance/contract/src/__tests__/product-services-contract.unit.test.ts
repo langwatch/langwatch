@@ -33,16 +33,16 @@ describe("Governance product contracts", () => {
 
   it("validates tool config against its discriminator", () => {
     expect(
-      aiToolConfigEnvelopeSchema.safeParse({
+      aiToolConfigEnvelopeSchema.validate({
         type: "model_provider",
         config: { providerKey: "openai" },
-      }).success,
+      }),
     ).toBe(true);
     expect(
-      aiToolConfigEnvelopeSchema.safeParse({
+      aiToolConfigEnvelopeSchema.validate({
         type: "model_provider",
         config: { setupCommand: "langwatch claude" },
-      }).success,
+      }),
     ).toBe(false);
     expect(AI_TOOL_STARTER_TILES).toHaveLength(9);
   });

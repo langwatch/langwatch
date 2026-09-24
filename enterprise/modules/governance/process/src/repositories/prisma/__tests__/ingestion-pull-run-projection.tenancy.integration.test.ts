@@ -82,6 +82,17 @@ function projectionFor(sourceId: string): StoredProjection<IngestionPullRunStatu
       LastRunScheduledFor: 1_500,
       LastReadThroughAt: null,
       LastRunCompleteness: null,
+      LastAgentsListingAt: null,
+      LastAgentsListingOutcome: null,
+      LastAgentsListingCount: null,
+      LastAgentsListingReason: null,
+      LastAgentsListingStatus: null,
+      LastPeopleListingAt: null,
+      LastPeopleListingOutcome: null,
+      LastPeopleDirectoryCount: null,
+      LastPeopleWithheldCount: null,
+      LastPeopleListingReason: null,
+      LastPeopleListingStatus: null,
       // A listed agents outcome and a refused people one, on the same row at
       // the same time: the two kinds keep their own columns precisely so this
       // is representable, and a fixture that only ever carried one kind would

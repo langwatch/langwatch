@@ -13,7 +13,7 @@ export function getStarterTemplate(_sourceType: string): readonly string[] {
 }
 
 export function isOttlEnabledSourceType(sourceType: string): sourceType is OttlEnabledSourceType {
-  return ottlEnabledSourceTypeSchema.safeParse(sourceType).success;
+  return ottlEnabledSourceTypeSchema.validate(sourceType);
 }
 
 /**

@@ -24,6 +24,17 @@ function runStatus(sourceId: string): StoredProjection<IngestionPullRunStatusDat
       LastSuccessAt: null,
       LastReadThroughAt: null,
       LastRunCompleteness: null,
+      LastAgentsListingAt: null,
+      LastAgentsListingOutcome: null,
+      LastAgentsListingCount: null,
+      LastAgentsListingReason: null,
+      LastAgentsListingStatus: null,
+      LastPeopleListingAt: null,
+      LastPeopleListingOutcome: null,
+      LastPeopleDirectoryCount: null,
+      LastPeopleWithheldCount: null,
+      LastPeopleListingReason: null,
+      LastPeopleListingStatus: null,
       CreatedAt: 1,
       UpdatedAt: 1,
       LastEventOccurredAt: 1,
@@ -70,6 +81,24 @@ describe("given the memory run-status repository", () => {
       });
 
       expect([...listings.keys()]).toEqual(["source-1"]);
+    });
+
+    it("answers the listing outcome the fold stored", async () => {
+      const runs = MemoryIngestionPullRunRepository.create();
+      const refused = runStatus("source-1");
+      refused.state.LastAgentsListingOutcome = "refused";
+      refused.state.LastAgentsListingReason = "forbidden";
+      await runs.store(refused, project("project-1"));
+
+      const listings = await runs.findAgentsListings({
+        sourceIds: ["source-1"],
+        projectId: "project-1",
+      });
+
+      expect(listings.get("source-1")).toEqual({
+        LastAgentsListingOutcome: "refused",
+        LastAgentsListingReason: "forbidden",
+      });
     });
   });
 });

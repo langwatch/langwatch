@@ -16,7 +16,7 @@ describe("governance contract", () => {
 
   it("rejects lossy pulled-usage facts", () => {
     expect(
-      pulledUsageObservedEventDataSchema.safeParse({
+      pulledUsageObservedEventDataSchema.validate({
         itemKey: "bucket",
         restatementKey: "org:day",
         source: "provider",
@@ -35,7 +35,7 @@ describe("governance contract", () => {
         costStatus: "exact",
         occurredAtMs: 1,
         observedAtMs: 2,
-      }).success,
+      }),
     ).toBe(false);
   });
 

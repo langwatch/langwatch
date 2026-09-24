@@ -28,14 +28,14 @@ describe("ingestion template contract", () => {
   });
 
   it("rejects source types outside the stable wire format", () => {
-    expect(ingestionTemplateSourceTypeSchema.safeParse("Invalid Source!").success).toBe(false);
+    expect(ingestionTemplateSourceTypeSchema.validate("Invalid Source!")).toBe(false);
     expect(
-      createIngestionTemplateInputSchema.safeParse({
+      createIngestionTemplateInputSchema.validate({
         organizationId: "organization-1",
         callerUserId: "user-1",
         sourceType: "valid_source",
         displayName: "",
-      }).success,
+      }),
     ).toBe(false);
   });
 

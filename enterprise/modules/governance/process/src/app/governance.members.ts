@@ -291,14 +291,26 @@ export type IngestionPullRun = {
   runId: string;
   scheduledFor: number;
   cursor: string | null;
+  /** The run this one takes over from, when that run outlived its allowance. */
+  abandonedRunId?: string;
 };
 
 export interface IngestionPullRunner {
   run(input: {
     sourceId: string;
     cursor: string | null;
-  }): Promise<{ nextCursor: string | null; eventCount: number }>;
+  }): Promise<IngestionPullRunResult>;
 }
+
+/** What one run read; the optional fields stay absent until the runner reports them. */
+export type IngestionPullRunResult = {
+  nextCursor: string | null;
+  eventCount: number;
+  errorCount?: number;
+  completeness?: "complete" | "truncated";
+  unreadPage?: true;
+  readThroughAt?: number | null;
+};
 
 export interface IngestionPullOutcomeChannel {
   completed(input: {
@@ -309,6 +321,10 @@ export interface IngestionPullOutcomeChannel {
     scheduledFor: number;
     nextCursor: string | null;
     eventCount: number;
+    errorCount?: number;
+    completeness?: "complete" | "truncated";
+    unreadPage?: true;
+    readThroughAt?: number | null;
   }): Promise<void>;
 
   failed(input: {
@@ -320,7 +336,34 @@ export interface IngestionPullOutcomeChannel {
     error: string;
     errorCode: string;
     retryable: false;
+    retryAfterMs?: number | null;
+    replacedByRunId?: string;
   }): Promise<void>;
+}
+
+/** Where one listing's outcome lands: the ingestion-pull pipeline's own record commands. */
+export type IngestionPullListingOutcome = {
+  tenantId: string;
+  occurredAt: number;
+  sourceId: string;
+  requestId: string;
+  requestedAt: number;
+};
+export type IngestionPullListingRefusal = IngestionPullListingOutcome & {
+  reason: string;
+  status: number | null;
+};
+
+export interface IngestionPullListingOutcomeChannel {
+  agentsListed(input: IngestionPullListingOutcome & { agentCount: number }): Promise<void>;
+  agentsListingRefused(input: IngestionPullListingRefusal): Promise<void>;
+  peopleListed(
+    input: IngestionPullListingOutcome & {
+      directoryPersonCount: number;
+      withheldPersonCount: number;
+    },
+  ): Promise<void>;
+  peopleListingRefused(input: IngestionPullListingRefusal): Promise<void>;
 }
 
 export interface IngestionPullMetricsSink {

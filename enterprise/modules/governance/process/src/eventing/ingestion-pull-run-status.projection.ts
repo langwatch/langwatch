@@ -86,6 +86,8 @@ export class IngestionPullRunStatusProjection {
           consecutiveErrors: state.consecutiveErrors + 1,
           lastRunScheduledFor: event.data.scheduledFor,
         };
+      default:
+        return state;
     }
   }
 }
