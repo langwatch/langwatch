@@ -28,7 +28,8 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
-    "posthog-node": "catalog:"
+    "posthog-node": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",

@@ -1,6 +1,5 @@
 import type {
   ProjectionStoreContext,
-  StateProjectionStore,
   StoredProjection,
   StoredProjectionRead,
 } from "@langwatch/eventing";
@@ -9,6 +8,7 @@ import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { IngestionPullRunStatusData } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
 import type { AgentsListingSummary } from "../../rules/agents-listing-outcome.rules.ts";
+import { IngestionPullRunRepository } from "../ingestion-pull-run.repository.ts";
 import { buildIngestionSourceMirror } from "./prisma.ingestion-source-mirror.mapper.ts";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
@@ -60,8 +60,10 @@ export type IngestionPullRunProjectionDatabase = Pick<
   "ingestionPullRunProjection" | "ingestionSource" | "$transaction"
 >;
 
-export class PrismaIngestionPullRunProjectionRepository implements StateProjectionStore<IngestionPullRunStatusData> {
-  private constructor(private readonly prisma: IngestionPullRunProjectionDatabase) {}
+export class PrismaIngestionPullRunProjectionRepository extends IngestionPullRunRepository {
+  private constructor(private readonly prisma: IngestionPullRunProjectionDatabase) {
+    super();
+  }
 
   static create(
     database: IngestionPullRunProjectionDatabase,

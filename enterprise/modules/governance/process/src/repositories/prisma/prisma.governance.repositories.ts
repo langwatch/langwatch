@@ -16,6 +16,7 @@ import { PrismaGovernanceSetupStateRepository } from "./prisma.governance-setup-
 import { PrismaGovernanceTenantHistoryRepository } from "./prisma.governance-tenant-history.repository.ts";
 import { PrismaIdentityMatchSuggestionRepository } from "./prisma.identity-match-suggestion.repository.ts";
 import { PrismaIdentityMatchRepository } from "./prisma.identity-match.repository.ts";
+import { PrismaIngestionPullRunProjectionRepository } from "./prisma.ingestion-pull-run-projection.repository.ts";
 import { PrismaIngestionSourceRepository } from "./prisma.ingestion-source.repository.ts";
 import { PrismaIngestionTemplateRepository } from "./prisma.ingestion-template.repository.ts";
 import { PrismaGovernanceOcsfExportRepository } from "./prisma.ocsf-export.repository.ts";
@@ -45,6 +46,7 @@ export class PostgresGovernanceRepositories {
       erasedIdentifierSuppressions: PrismaErasedIdentifierSuppressionRepository.create(prisma),
       identityMatches: PrismaIdentityMatchRepository.create(prisma),
       identityMatchSuggestions: PrismaIdentityMatchSuggestionRepository.create(prisma),
+      ingestionPullRuns: PrismaIngestionPullRunProjectionRepository.create(prisma),
       ingestionSources: PrismaIngestionSourceRepository.create(prisma),
       ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
       ocsfExports: PrismaGovernanceOcsfExportRepository.create(prisma),

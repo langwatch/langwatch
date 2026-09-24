@@ -55,8 +55,11 @@ import { HttpCopilotStudioDataverseChannel } from "./channels/http/http.copilot-
 import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.channel.ts";
 import { HttpPollingPullerAdapter } from "./channels/http/http.polling.channel.ts";
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
+import { governanceEventsEventing } from "./eventing/governance-events.pipeline.ts";
+import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
 import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 import type { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
+import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import type { IngestionPullLifecycleDatabase } from "./repositories/ingestion-pull-lifecycle.repository.ts";
 import {
@@ -133,7 +136,10 @@ export const governanceServer = defineServerModule("governance")
       return { viewerUserId: credential.type === "apiKey" ? credential.userId : null };
     }),
     bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
-  ]);
+  ])
+  .withEventing(governanceEventsEventing)
+  .withEventing(pulledUsageEventing)
+  .withEventing(ingestionPullEventing);
 
 /** The substrates one ingestion-pull worker installation is built over. */
 export type IngestionPullWorkerSubstrates = Readonly<{

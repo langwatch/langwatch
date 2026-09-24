@@ -35,8 +35,11 @@ type EventingIngestionPullEvent = IngestionPullProcessingEvent & Event;
 
 export type IngestionPullEventingAdapterOptions = {
   runStatusStore: StateProjectionStore<IngestionPullRunStatusData>;
-  process: IngestionPullProcess;
+  /** Absent until a process composes the pull runner; commands and run status still land. */
+  process?: IngestionPullProcess;
 };
+
+export const INGESTION_PULL_PIPELINE_NAME = "ingestion_pull_processing" as const;
 
 export class IngestionPullEventingAdapter {
   private constructor(private readonly options: IngestionPullEventingAdapterOptions) {}
@@ -64,8 +67,8 @@ export class IngestionPullEventingAdapter {
     Record<string, Projection>,
     RegisteredCommand
   > {
-    return definePipeline({
-      name: "ingestion_pull_processing",
+    const pipeline = definePipeline({
+      name: INGESTION_PULL_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: INGESTION_PULL_AGGREGATE_TYPE,
       }),
@@ -82,9 +85,14 @@ export class IngestionPullEventingAdapter {
       .withCommand("configure", ConfigureIngestionPullCommand)
       .withCommand("disable", DisableIngestionPullCommand)
       .withCommand("recordRunCompleted", RecordIngestionPullRunCompletedCommand)
-      .withCommand("recordRunFailed", RecordIngestionPullRunFailedCommand)
-      .withProcessManager(INGESTION_PULL_PROCESS_NAME, this.options.process.processManager())
-      .build();
+      .withCommand("recordRunFailed", RecordIngestionPullRunFailedCommand);
+    if (this.options.process) {
+      pipeline.withProcessManager(
+        INGESTION_PULL_PROCESS_NAME,
+        this.options.process.processManager(),
+      );
+    }
+    return pipeline.build();
   }
 }
 

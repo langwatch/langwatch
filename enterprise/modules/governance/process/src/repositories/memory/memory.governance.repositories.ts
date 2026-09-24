@@ -17,6 +17,7 @@ import { MemoryGovernanceTenantHistoryRepository } from "./memory.governance-ten
 import { MemoryGovernanceStore } from "./memory.governance.store.ts";
 import { MemoryIdentityMatchSuggestionRepository } from "./memory.identity-match-suggestion.repository.ts";
 import { MemoryIdentityMatchRepository } from "./memory.identity-match.repository.ts";
+import { MemoryIngestionPullRunRepository } from "./memory.ingestion-pull-run.repository.ts";
 import { MemoryIngestionSourceRepository } from "./memory.ingestion-source.repository.ts";
 import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
 import { MemoryOrganizationSessionPolicyRepository } from "./memory.organization-session-policy.repository.ts";
@@ -45,6 +46,7 @@ export class MemoryGovernanceRepositories {
       erasedIdentifierSuppressions: MemoryErasedIdentifierSuppressionRepository.create(people),
       identityMatches: MemoryIdentityMatchRepository.create(people),
       identityMatchSuggestions: MemoryIdentityMatchSuggestionRepository.create(people),
+      ingestionPullRuns: MemoryIngestionPullRunRepository.create(),
       ingestionSources: MemoryIngestionSourceRepository.create(),
       ingestionTemplates: MemoryIngestionTemplateRepository.create(store),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
