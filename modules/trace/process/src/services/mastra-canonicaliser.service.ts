@@ -20,6 +20,8 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
     return new MastraCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "mastra";
 
   apply(ctx: ExtractorContext): void {

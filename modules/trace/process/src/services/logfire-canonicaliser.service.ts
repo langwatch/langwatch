@@ -17,6 +17,8 @@ export class LogfireCanonicaliserService implements AttributeCanonicaliser {
     return new LogfireCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "logfire";
 
   apply(ctx: ExtractorContext): void {

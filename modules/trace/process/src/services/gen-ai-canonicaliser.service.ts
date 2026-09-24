@@ -13,6 +13,8 @@ export class GenAICanonicaliserService implements AttributeCanonicaliser {
     return new GenAICanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "genai";
 
   apply(ctx: ExtractorContext): void {

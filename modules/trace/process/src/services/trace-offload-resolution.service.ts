@@ -45,6 +45,8 @@ export class TraceOffloadResolutionService {
     return new TraceOffloadResolutionService();
   }
 
+  private constructor() {}
+
   /**
    * Resolves offloaded event refs for one trace's normalized spans, replacing spanAttributes with
    * the resolved map and re-running IO extraction when any span resolved. A missing event_log row

@@ -31,6 +31,8 @@ export class ClaudeCodeSpanEnrichmentService {
     return new ClaudeCodeSpanEnrichmentService();
   }
 
+  private constructor() {}
+
   /**
    * Computes the input and output to attach to each model-call span from the trace's content logs.
    * The map is keyed by spanId and a span appears only when it gained something, so an unrelated

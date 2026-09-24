@@ -209,6 +209,8 @@ export class TraceProjectionLeanService {
     return new TraceProjectionLeanService();
   }
 
+  private constructor() {}
+
   /** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
   static utf8Preview(value: string, maxBytes: number): string {
     const buf = Buffer.from(value, "utf8");

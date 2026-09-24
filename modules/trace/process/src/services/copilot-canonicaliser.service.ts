@@ -38,6 +38,8 @@ export class CopilotCanonicaliserService implements AttributeCanonicaliser {
     return new CopilotCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "copilot";
 
   // A flat, linear sequence of independent `take attribute → if present, lift` guards: the score

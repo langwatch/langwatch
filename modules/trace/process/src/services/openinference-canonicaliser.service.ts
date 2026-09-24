@@ -11,6 +11,8 @@ export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser
     return new OpenInferenceCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "openinference";
 
   /** `openinference.span.kind` names the span type, unless one was declared explicitly. */

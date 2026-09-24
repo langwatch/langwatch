@@ -10,6 +10,8 @@ export class FallbackCanonicaliserService implements AttributeCanonicaliser {
     return new FallbackCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "fallback";
 
   apply(ctx: ExtractorContext): void {

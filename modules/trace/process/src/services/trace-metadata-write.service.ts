@@ -35,6 +35,8 @@ export class TraceMetadataWriteService {
     return new TraceMetadataWriteService();
   }
 
+  private constructor() {}
+
   static async updateTraceMetadata({
     ingest,
     projectId,

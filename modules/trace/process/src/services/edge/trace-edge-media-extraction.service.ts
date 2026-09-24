@@ -94,6 +94,8 @@ export class TraceEdgeMediaExtractionService {
     return new TraceEdgeMediaExtractionService();
   }
 
+  private constructor() {}
+
   /**
    * True when any span or span-event attribute string value carries a media
    * marker. Pure linear scans, no allocation, no I/O — this is the gate that

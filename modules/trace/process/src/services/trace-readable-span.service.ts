@@ -203,6 +203,8 @@ export class TraceReadableSpanService {
     return new TraceReadableSpanService();
   }
 
+  private constructor() {}
+
   /**
    * A whole trace's spans rendered as the one readable digest a judge reads. The formatter is the
    * scenario judge's, because the digest a judge is shown and the digest an evaluator is shown

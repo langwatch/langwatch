@@ -26,6 +26,8 @@ export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
     return new ClaudeCodeCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "claude-code";
 
   apply(ctx: ExtractorContext): void {

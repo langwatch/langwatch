@@ -105,6 +105,8 @@ export class ClaudeCodeLogEnrichmentService {
     return new ClaudeCodeLogEnrichmentService();
   }
 
+  private constructor() {}
+
   /**
    * Maps the trace's model-call spans to {@link ClaudeSpanRef}. Only spans carrying a request_id
    * participate, since those are what logs join to and restricting the set keeps positional input

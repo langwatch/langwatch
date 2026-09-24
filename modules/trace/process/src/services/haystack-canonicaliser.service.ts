@@ -11,6 +11,8 @@ export class HaystackCanonicaliserService implements AttributeCanonicaliser {
     return new HaystackCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "haystack";
 
   apply(ctx: ExtractorContext): void {

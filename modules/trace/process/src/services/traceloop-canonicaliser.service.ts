@@ -15,6 +15,8 @@ export class TraceloopCanonicaliserService implements AttributeCanonicaliser {
     return new TraceloopCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "traceloop";
 
   apply(ctx: ExtractorContext): void {

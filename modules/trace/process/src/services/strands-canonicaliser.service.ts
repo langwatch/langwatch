@@ -80,6 +80,8 @@ export class StrandsCanonicaliserService implements AttributeCanonicaliser {
     return new StrandsCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "strands";
 
   apply(ctx: ExtractorContext): void {

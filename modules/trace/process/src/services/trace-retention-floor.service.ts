@@ -47,4 +47,6 @@ export class TraceRetentionFloorService {
       logger,
     });
   }
+
+  private constructor() {}
 }

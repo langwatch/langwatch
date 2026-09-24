@@ -128,6 +128,8 @@ export class TraceContentExtractionService {
     return new TraceContentExtractionService();
   }
 
+  private constructor() {}
+
   /**
    * Rewrites one content part, storing inline bytes via the service, and returns the possibly new
    * part with an optional ref. The part is unknown because the walker no longer pre-validates

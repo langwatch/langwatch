@@ -395,6 +395,8 @@ export class TraceValueMediaExtractionService {
     return new TraceValueMediaExtractionService();
   }
 
+  private constructor() {}
+
   static createExtractionBudget(now: number = nowInstant().epochMilliseconds): ExtractionBudget {
     return {
       deadlineAt: now + EXTRACTION_DEADLINE_MS,

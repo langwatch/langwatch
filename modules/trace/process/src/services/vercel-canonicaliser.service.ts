@@ -7,6 +7,8 @@ export class VercelCanonicaliserService implements AttributeCanonicaliser {
     return new VercelCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "vercel";
 
   apply(ctx: ExtractorContext): void {

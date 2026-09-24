@@ -256,6 +256,8 @@ export class TraceEditOverlayRedactionService {
     return new TraceEditOverlayRedactionService();
   }
 
+  private constructor() {}
+
   /**
    * The correction as this viewer may read it: content edits drop out when the viewer may not read
    * that category or the trace is past the visibility window, and surviving corrected `params`

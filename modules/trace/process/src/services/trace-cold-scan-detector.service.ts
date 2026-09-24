@@ -31,6 +31,8 @@ export class TraceColdScanDetectorService {
     return new TraceColdScanDetectorService();
   }
 
+  private constructor() {}
+
   /**
    * The name of a time-partitioned table the query reads with no filter on its partition time
    * column, or null when fine. Errs toward flagging, since a projection or ORDER BY mention

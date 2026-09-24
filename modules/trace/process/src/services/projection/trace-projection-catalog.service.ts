@@ -278,6 +278,8 @@ export class TraceProjectionCatalogService {
     return new TraceProjectionCatalogService();
   }
 
+  private constructor() {}
+
   /**
    * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
    * path is not in the allowlist (the caller collects nulls into a 400).

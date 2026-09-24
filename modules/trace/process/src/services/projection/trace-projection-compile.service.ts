@@ -247,6 +247,8 @@ export class TraceProjectionCompileService {
     return new TraceProjectionCompileService();
   }
 
+  private constructor() {}
+
   static compileProjection({
     from = "traces",
     select,

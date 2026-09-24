@@ -124,6 +124,8 @@ export class TraceOffloadResolutionBatchService {
     return new TraceOffloadResolutionBatchService();
   }
 
+  private constructor() {}
+
   /**
    * Resolves refs for a whole result set in one bounded pass; see the module doc. Takes the tenant,
    * per-trace span arrays in result order, the blob store, IO recomputation and a warning logger,

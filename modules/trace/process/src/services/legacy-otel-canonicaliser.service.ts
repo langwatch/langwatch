@@ -23,6 +23,8 @@ export class LegacyOtelCanonicaliserService implements AttributeCanonicaliser {
     return new LegacyOtelCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "legacy-otel-traces";
 
   apply(ctx: ExtractorContext): void {

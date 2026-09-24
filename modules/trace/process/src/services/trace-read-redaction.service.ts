@@ -49,6 +49,8 @@ export class TraceReadRedactionService {
     return new TraceReadRedactionService();
   }
 
+  private constructor() {}
+
   /**
    * Collects the union of content categories any span reports as dropped by a
    * `drop` privacy policy, in a stable order, so the trace view can explain the

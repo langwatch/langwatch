@@ -11,12 +11,12 @@ import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OtlpIngestCredential, OtlpIngestCredentialInput } from "@langwatch/trace-contract";
 
-import type { CollectorCredential } from "../transport/collector.rest.ts";
 import {
   extractTraceIngestCredentials,
   extractTraceLegacyRequestCredentials,
   type TraceLegacyRequestCredentials,
-} from "./trace-legacy-credential.service.ts";
+} from "../rules/trace-request-credentials.rules.ts";
+import type { CollectorCredential } from "../transport/collector.rest.ts";
 
 /** Exactly the API-key directory operations an ingestion door reaches. */
 export type TraceIngestApiKeys = Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;

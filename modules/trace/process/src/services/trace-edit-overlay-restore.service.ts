@@ -219,6 +219,8 @@ export class TraceEditOverlayRestoreService {
     return new TraceEditOverlayRestoreService();
   }
 
+  private constructor() {}
+
   /**
    * The correction to store on save. A save replaces the whole correction and the viewer composed
    * theirs atop a redacted read, so anything withheld would otherwise be dropped by the write.

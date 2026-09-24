@@ -9,6 +9,8 @@ export class VertexAdkCanonicaliserService implements AttributeCanonicaliser {
     return new VertexAdkCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "vertex-adk";
 
   apply(ctx: ExtractorContext): void {

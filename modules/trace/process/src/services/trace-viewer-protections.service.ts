@@ -5,6 +5,8 @@ export class TraceViewerProtectionsService {
     return new TraceViewerProtectionsService();
   }
 
+  private constructor() {}
+
   /**
    * Whether this viewer may read text the model wrote from the conversation, rather than a fact
    * about it. Both sides are required: summaries, titles and evaluator prose paraphrase prompt

@@ -11,6 +11,8 @@ export class CodexCanonicaliserService implements AttributeCanonicaliser {
     return new CodexCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "codex";
   private readonly logCanonicaliser = CodexLogCanonicaliserService.create();
   private readonly spanCanonicaliser = CodexSpanCanonicaliserService.create();

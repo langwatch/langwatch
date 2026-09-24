@@ -221,6 +221,8 @@ export class TraceCollectorSpanService {
     return new TraceCollectorSpanService();
   }
 
+  private constructor() {}
+
   static convertSpanToOtlp = convertSpanToOtlp;
 
   static buildResource = buildResource;

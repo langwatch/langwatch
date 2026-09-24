@@ -19,6 +19,8 @@ export class SpringAICanonicaliserService implements AttributeCanonicaliser {
     return new SpringAICanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "spring-ai";
 
   apply(_ctx: ExtractorContext): void {

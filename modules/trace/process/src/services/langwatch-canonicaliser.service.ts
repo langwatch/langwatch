@@ -9,6 +9,8 @@ export class LangWatchCanonicaliserService implements AttributeCanonicaliser {
     return new LangWatchCanonicaliserService();
   }
 
+  private constructor() {}
+
   readonly id = "langwatch";
 
   apply(ctx: ExtractorContext): void {

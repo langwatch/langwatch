@@ -150,6 +150,8 @@ export class TraceAiQueryService {
     return new TraceAiQueryService();
   }
 
+  private constructor() {}
+
   /**
    * Translates a natural-language description into our trace query language: calls the project's
    * default model with the grammar doc and a snapshot of categorical values, validates the output,

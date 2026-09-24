@@ -17,6 +17,8 @@ export class TraceStreamBufferService {
     return new TraceStreamBufferService();
   }
 
+  private constructor() {}
+
   /**
    * Buffers a Readable into one Buffer. `maxBytes` bounds the total: past it the stream is
    * destroyed and {@link StreamTooLargeError} thrown, so an oversized object cannot exhaust

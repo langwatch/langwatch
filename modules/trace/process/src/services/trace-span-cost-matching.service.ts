@@ -6,6 +6,8 @@ export class TraceSpanCostMatchingService {
     return new TraceSpanCostMatchingService();
   }
 
+  private constructor() {}
+
   /**
    * Per-span cost by priority cascade: enrichment cost rates, then the span's explicit
    * `langwatch.span.cost`, then the static model registry, then guardrail cost. An explicit total
