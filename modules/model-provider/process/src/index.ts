@@ -59,7 +59,6 @@ export {
   type ModelProviderExecutionHandleOptions,
 } from "./services/model-provider-execution-handle.service.ts";
 export { pickMaxTokensCeiling } from "./rules/max-tokens-ceiling.rules.ts";
-export { ModelProviderExecutionAdapter } from "./services/model-provider-topic-clustering-execution.service.ts";
 export {
   getModelMetadataForFrontend,
   getProjectModelProviders,
@@ -89,7 +88,6 @@ export { modelProviderServer } from "./model-provider.server.ts";
 export {
   createModelProviderCodexDeviceFlow,
   createModelProviderCostCatalog,
-  createModelProviderExecution,
   createModelProviderRuntime,
   readModelProviderCustomKeys,
   resolveModelProviderExecutionHandle,

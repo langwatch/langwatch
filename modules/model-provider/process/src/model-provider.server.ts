@@ -39,7 +39,6 @@ import { ModelCostCatalogService } from "./services/model-cost-catalog.service.t
 import { ModelProviderExecutionHandleService } from "./services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "./services/model-provider-keys.service.ts";
 import { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service.ts";
-import { ModelProviderExecutionAdapter } from "./services/model-provider-topic-clustering-execution.service.ts";
 import { ModelProviderService } from "./services/model-provider.service.ts";
 import { PrefixedModelProviderIdAdapter } from "./services/prefixed.model-provider-id.service.ts";
 import { RegistryModelProviderCatalogAdapter } from "./services/registry.model-provider-catalog.service.ts";
@@ -288,13 +287,6 @@ export function readModelProviderCustomKeys(
   }>,
 ): CustomKeysRead {
   return EncryptedModelProviderCredentialAdapter.readCustomKeys(input.stored, input.decryptor);
-}
-
-/** The model execution topic clustering runs its calls through. */
-export function createModelProviderExecution(
-  input: Parameters<typeof ModelProviderExecutionAdapter.create>[0],
-): ModelProviderExecutionAdapter {
-  return ModelProviderExecutionAdapter.create(input);
 }
 
 /** What a feature asks for when it needs a model to call, resolved through the scope cascade. */

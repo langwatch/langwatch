@@ -1,9 +1,9 @@
 import { defineRepositories } from "@langwatch/kernel";
 
+import { LiveTopicRepositories } from "./live/live.topic.repositories.ts";
 import { MemoryTopicRepositories } from "./memory/memory.topic.repositories.ts";
-import { PostgresTopicRepositories } from "./prisma/prisma.topic.repositories.ts";
 
 export const topicRepositories = defineRepositories({
-  live: PostgresTopicRepositories,
+  live: LiveTopicRepositories,
   memory: MemoryTopicRepositories,
 });

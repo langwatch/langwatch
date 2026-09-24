@@ -3,6 +3,7 @@ import type { ProcessStore, StateProjectionStore } from "@langwatch/eventing";
 import type { TopicClusteringRunHistoryData } from "../eventing/topic-clustering-run-history.projection.ts";
 import type { TopicClusteringRunStatusData } from "../eventing/topic-clustering-run-status.projection.ts";
 import type { TopicModelData } from "../eventing/topic-model.projection.ts";
+import type { TopicClusteringClaimRepository } from "./topic-clustering-claim.repository.ts";
 import type { TopicClusteringRepository } from "./topic-clustering.repository.ts";
 import type { TopicRepository } from "./topic.repository.ts";
 
@@ -20,4 +21,6 @@ export interface TopicRepositories {
   readonly runStatus: StateProjectionStore<TopicClusteringRunStatusData>;
   readonly runHistory: StateProjectionStore<TopicClusteringRunHistoryData>;
   readonly topicModel: StateProjectionStore<TopicModelData>;
+  /** The bootstrap gate and the legacy seeds' claims, shared across replicas. */
+  readonly claims: TopicClusteringClaimRepository;
 }

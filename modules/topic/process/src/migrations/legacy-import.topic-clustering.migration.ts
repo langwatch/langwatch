@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { Cluster, Redis } from "ioredis";
 
 import type { TopicClusteringCommands } from "../app/topic.members.ts";
+import type { TopicClusteringClaimRepository } from "../repositories/topic-clustering-claim.repository.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 
 const logger = createLogger("langwatch:topic-clustering:seed");
@@ -11,14 +11,14 @@ const scheduleLogger = createLogger("langwatch:topic-clustering:schedule-seed");
 /** One claim per window across replicas; the seed is idempotent regardless. */
 const TOPICS_SEED_CLAIM_KEY = "topic-clustering:topics-seed:v1";
 const SEED_CLAIM_TTL_SECONDS = 24 * 60 * 60;
-/** Permanent once a pass finds nothing left to seed: later boots exit on one GET. */
+/** Permanent once a pass finds nothing left to seed: later wakes exit on one read. */
 const TOPICS_SEED_DONE_KEY = "topic-clustering:topics-seed:v1:done";
 
 const TOPICS_SEED_PAGE_SIZE = 200;
 
 /** One claim per window across replicas; the walk is idempotent regardless. */
 const SCHEDULE_SEED_CLAIM_KEY = "topic-clustering:schedule-seed:v1";
-/** Permanent once a pass finds nothing left to seed: later boots exit on one GET. */
+/** Permanent once a pass finds nothing left to seed: later wakes exit on one read. */
 const SCHEDULE_SEED_DONE_KEY = "topic-clustering:schedule-seed:v1:done";
 
 /** Projects fetched (and bootstrapped) per round-trip. */
@@ -38,60 +38,39 @@ export interface TopicClusteringBackfillSummary {
 /**
  * The one-time legacy import for topic clustering (ADR-051): puts
  * pre-cutover state onto the event stream. Topic MODEL and clustering
- * SCHEDULE seeds run on worker start, safe to re-run on their own idempotency.
+ * SCHEDULE seeds run on the pipeline's scheduled wake, safe to re-run on their own idempotency.
  */
 export class LegacyImportTopicClusteringMigration {
   private readonly repository: TopicClusteringRepository;
-  private readonly redis: Redis | Cluster | null;
+  private readonly claims: TopicClusteringClaimRepository;
   private readonly commands: TopicClusteringCommands;
   private readonly schedulePageSize?: number;
 
   private constructor(deps: {
     repository: TopicClusteringRepository;
-    redis: Redis | Cluster | null;
+    claims: TopicClusteringClaimRepository;
     commands: TopicClusteringCommands;
     schedulePageSize?: number;
   }) {
     this.repository = deps.repository;
-    this.redis = deps.redis;
+    this.claims = deps.claims;
     this.commands = deps.commands;
     this.schedulePageSize = deps.schedulePageSize;
   }
 
   static create(options: {
     repository: TopicClusteringRepository;
-    /** Coordination only — without Redis both seeds still run safely. */
-    redis: Redis | Cluster | null;
+    /** Coordination only — when it cannot answer, both seeds still run safely. */
+    claims: TopicClusteringClaimRepository;
     commands: TopicClusteringCommands;
     /** Test override for the schedule walk's page size. */
     schedulePageSize?: number;
   }): LegacyImportTopicClusteringMigration {
     return new LegacyImportTopicClusteringMigration({
       repository: options.repository,
-      redis: options.redis,
+      claims: options.claims,
       commands: options.commands,
       schedulePageSize: options.schedulePageSize,
-    });
-  }
-
-  /**
-   * Fires both one-time seeds in the background on worker start. Failures
-   * are logged and the next boot retries — nothing here may take the boot
-   * down, so this returns immediately and never throws.
-   */
-  startBootSeeds(): void {
-    void this.seedTopicModelHistory().catch((error: unknown) => {
-      logger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Topic model seed pass failed; the next boot retries",
-      );
-    });
-
-    void this.seedClusteringSchedules().catch((error: unknown) => {
-      scheduleLogger.error(
-        { error: error instanceof Error ? error.message : String(error) },
-        "Topic clustering schedule seed failed; the next boot retries",
-      );
     });
   }
 
@@ -144,8 +123,8 @@ export class LegacyImportTopicClusteringMigration {
       return await this.runTopicModelSeedPass();
     } finally {
       // Release the claim once the pass is over (finished or crashed): the
-      // claim only elects one replica per concurrent boot window, it must not
-      // hold failed projects hostage until the TTL — "the next boot retries"
+      // claim only elects one replica per concurrent window, it must not
+      // hold failed projects hostage until the TTL — "the next wake retries"
       // is the contract.
       await this.releaseSeedClaim(TOPICS_SEED_CLAIM_KEY);
     }
@@ -192,22 +171,22 @@ export class LegacyImportTopicClusteringMigration {
         } catch (error) {
           failed++;
           // Per-project isolation: one bad project must not truncate the
-          // fleet. The next boot retries it (its cursor row never appeared).
+          // fleet. The next wake retries it (its cursor row never appeared).
           logger.warn(
             {
               projectId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Seeding this project's topics failed; the next boot retries it",
+            "Seeding this project's topics failed; the next wake retries it",
           );
         }
       }
     }
 
     // Nothing seeded and nothing failed means every legacy project is owned
-    // (or there never were any — fresh installs land here on first boot).
+    // (or there never were any — fresh installs land here on the first wake).
     // Mark the migration finished so signups after the cutover never pay for
-    // a scan again; without Redis the scan itself is the (cheap) fallback.
+    // a scan again; without the markers the scan itself is the (cheap) fallback.
     if (seeded === 0 && failed === 0) {
       await this.markSeedDone(TOPICS_SEED_DONE_KEY);
     }
@@ -244,8 +223,8 @@ export class LegacyImportTopicClusteringMigration {
       return summary;
     } finally {
       // Release the claim once the pass is over (finished or crashed): it
-      // only elects one replica per concurrent boot window, and must not
-      // hold a failed pass hostage until the TTL — "the next boot retries".
+      // only elects one replica per concurrent window, and must not
+      // hold a failed pass hostage until the TTL — "the next wake retries".
       await this.releaseSeedClaim(SCHEDULE_SEED_CLAIM_KEY);
     }
   }
@@ -305,48 +284,37 @@ export class LegacyImportTopicClusteringMigration {
   }
 
   private async claimSeed(claimKey: string, log: typeof logger): Promise<boolean> {
-    if (!this.redis) return true;
     try {
-      const claimed = await this.redis.set(
-        claimKey,
-        String(nowInstant().epochMilliseconds),
-        "EX",
-        SEED_CLAIM_TTL_SECONDS,
-        "NX",
-      );
-      return claimed === "OK";
+      return await this.claims.claim({ key: claimKey, ttlSeconds: SEED_CLAIM_TTL_SECONDS });
     } catch (error) {
       // Coordination is best-effort; the seed itself is idempotent.
       log.warn(
         { error: error instanceof Error ? error.message : String(error) },
-        "Redis seed claim failed; seeding anyway",
+        "Seed claim failed; seeding anyway",
       );
       return true;
     }
   }
 
   private async releaseSeedClaim(claimKey: string): Promise<void> {
-    if (!this.redis) return;
     try {
-      await this.redis.del(claimKey);
+      await this.claims.release({ key: claimKey });
     } catch {
       // Best-effort: worst case the TTL clears it.
     }
   }
 
   private async isSeedDone(doneKey: string): Promise<boolean> {
-    if (!this.redis) return false;
     try {
-      return (await this.redis.get(doneKey)) !== null;
+      return await this.claims.isMarked({ key: doneKey });
     } catch {
       return false;
     }
   }
 
   private async markSeedDone(doneKey: string): Promise<void> {
-    if (!this.redis) return;
     try {
-      await this.redis.set(doneKey, String(nowInstant().epochMilliseconds));
+      await this.claims.mark({ key: doneKey, value: String(nowInstant().epochMilliseconds) });
     } catch {
       // Best-effort: the next pass just re-derives the same answer.
     }

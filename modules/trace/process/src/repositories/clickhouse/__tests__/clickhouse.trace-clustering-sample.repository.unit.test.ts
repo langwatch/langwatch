@@ -81,6 +81,15 @@ describe("ClickHouseTraceClusteringSampleRepository", () => {
     expect(request?.clickhouse_settings).toEqual({ max_threads: "2" });
   });
 
+  it("streams the outer query without a top-N sort buffer", async () => {
+    const { repository, clickhouse } = repositoryOver([]);
+
+    await repository.findPageRows({ tenantId: "project-1", windowStartMs: 49 });
+
+    // An outer ORDER BY ... LIMIT buffers every ComputedInput at once; only the page CTE sorts.
+    expect(clickhouse.requests[0]?.query.match(/ORDER BY/gi)).toHaveLength(1);
+  });
+
   it("keeps an incremental page to traces outside the known topics, after the cursor", async () => {
     const { repository, clickhouse } = repositoryOver([]);
 

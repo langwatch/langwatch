@@ -28,6 +28,19 @@ import {
   TopicClusteringRunStatusFoldProjection,
 } from "./topic-clustering-run-status.projection.ts";
 import {
+  runClusteringScheduleSeed,
+  runTopicModelSeed,
+  type TopicClusteringSeeds,
+} from "./topic-clustering-seed.intent.ts";
+import {
+  TOPIC_CLUSTERING_SEED_INITIAL_STATE,
+  TOPIC_CLUSTERING_SEED_INTERVAL_MS,
+  TOPIC_CLUSTERING_SEED_PROCESS_NAME,
+  type TopicClusteringSeedState,
+  topicClusteringSeedSchema,
+  topicClusteringSeedWake,
+} from "./topic-clustering-seed.process.ts";
+import {
   RecordClusteringRunCompletedCommand,
   RecordClusteringRunFailedCommand,
   RecordClusteringRunStartedCommand,
@@ -55,6 +68,8 @@ export interface TopicClusteringProcessingPipelineDeps {
   /** Write-through store for the topic model (the Topic table + cursor). */
   topicModelStore: StateProjectionStore<TopicModelData>;
   dispatch: TopicClusteringDispatchDeps;
+  /** The legacy topic-model and schedule seeds, run once across the fleet per wake. */
+  seeds: TopicClusteringSeeds;
 }
 
 /** The topic_clustering_processing pipeline definition itself, built once per deps. */
@@ -100,6 +115,14 @@ const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingP
     .withProcessManager(
       TOPIC_CLUSTERING_PROCESS_NAME,
       TopicClusteringProcess.processManager(deps.dispatch),
+    )
+    .withProcessManager(TOPIC_CLUSTERING_SEED_PROCESS_NAME, (pm) =>
+      pm
+        .state<TopicClusteringSeedState>(TOPIC_CLUSTERING_SEED_INITIAL_STATE)
+        .intent("seedTopicModels", topicClusteringSeedSchema, runTopicModelSeed(deps.seeds))
+        .intent("seedSchedules", topicClusteringSeedSchema, runClusteringScheduleSeed(deps.seeds))
+        .schedule({ everyMs: TOPIC_CLUSTERING_SEED_INTERVAL_MS })
+        .onWake(topicClusteringSeedWake),
     )
     .build();
 };

@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryTopicClusteringClaimRepository } from "../../repositories/memory/memory.topic-clustering-claim.repository.ts";
 import { PrismaTopicClusteringRepository } from "../../repositories/prisma/prisma.topic-clustering.repository.ts";
 import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
 
@@ -159,7 +160,7 @@ const fakeDbStub = ({
 function makeMigration(prisma: PrismaClient, recordTopics = vi.fn().mockResolvedValue(undefined)) {
   const migration = LegacyImportTopicClusteringMigration.create({
     repository: PrismaTopicClusteringRepository.create({ database: prisma }),
-    redis: null,
+    claims: MemoryTopicClusteringClaimRepository.create(),
     commands: {
       recordTopics,
       requestClustering: vi.fn().mockResolvedValue(undefined),

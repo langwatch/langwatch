@@ -1,6 +1,7 @@
 import { InMemoryProcessStore } from "@langwatch/eventing";
 
 import type { TopicRepositories } from "../topic.repositories.ts";
+import { MemoryTopicClusteringClaimRepository } from "./memory.topic-clustering-claim.repository.ts";
 import { MemoryTopicClusteringRunHistoryProjectionRepository } from "./memory.topic-clustering-run-history-projection.repository.ts";
 import { MemoryTopicClusteringRunProjectionRepository } from "./memory.topic-clustering-run-projection.repository.ts";
 import { MemoryTopicClusteringRepository } from "./memory.topic-clustering.repository.ts";
@@ -25,6 +26,7 @@ export class MemoryTopicRepositories {
       runStatus: MemoryTopicClusteringRunProjectionRepository.create(),
       runHistory: MemoryTopicClusteringRunHistoryProjectionRepository.create(),
       topicModel: MemoryTopicModelProjectionRepository.create(),
+      claims: MemoryTopicClusteringClaimRepository.create(),
     };
   }
 }

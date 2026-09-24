@@ -7,6 +7,7 @@ import type {
   Topic,
   TopicApi,
   TopicClusteringRunHistoryEntry,
+  TopicClusteringRequestInput,
   TopicClusteringStatus,
   TopicNamesInput,
   TopicProjectInput,
@@ -22,6 +23,7 @@ import { TopicClusteringRunner } from "../eventing/topic-clustering-runner.inten
 import { classifyClusteringError } from "../eventing/topic-clustering.intent.ts";
 import { LegacyImportTopicClusteringMigration } from "../migrations/legacy-import.topic-clustering.migration.ts";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";
+import { TopicClusteringBootstrapService } from "../services/topic-clustering-bootstrap.service.ts";
 import {
   EventingTopicClusteringCommandsService,
   EventingTopicClusteringOutcomeCommandsService,
@@ -49,17 +51,20 @@ export class TopicApp implements TopicApi {
   readonly #topics: TopicService;
   readonly #commands: EventingTopicClusteringCommandsService;
   readonly #outcomes: EventingTopicClusteringOutcomeCommandsService;
+  readonly #bootstrap: TopicClusteringBootstrapService;
   readonly #pipeline: TopicClusteringProcessingPipelineDefinition;
 
   private constructor(parts: {
     topics: TopicService;
     commands: EventingTopicClusteringCommandsService;
     outcomes: EventingTopicClusteringOutcomeCommandsService;
+    bootstrap: TopicClusteringBootstrapService;
     pipeline: TopicClusteringProcessingPipelineDefinition;
   }) {
     this.#topics = parts.topics;
     this.#commands = parts.commands;
     this.#outcomes = parts.outcomes;
+    this.#bootstrap = parts.bootstrap;
     this.#pipeline = parts.pipeline;
   }
 
@@ -68,6 +73,11 @@ export class TopicApp implements TopicApi {
     const commands = EventingTopicClusteringCommandsService.create();
     const outcomes = EventingTopicClusteringOutcomeCommandsService.create();
     const metrics = OtelTopicClusteringMetricsService.create();
+    const migration = LegacyImportTopicClusteringMigration.create({
+      repository: repositories.clustering,
+      claims: repositories.claims,
+      commands,
+    });
     const runner = TopicClusteringRunner.create({
       traces: dependencies.traces,
       models: ModelProviderTopicClusteringModelsService.create({
@@ -75,11 +85,7 @@ export class TopicApp implements TopicApi {
       }),
       evaluations: dependencies.evaluations,
       repository: repositories.clustering,
-      migration: LegacyImportTopicClusteringMigration.create({
-        repository: repositories.clustering,
-        redis: null,
-        commands,
-      }),
+      migration,
       commands,
       observePayloadSize: (kind, sizeBytes) => metrics.observePayloadSize(kind, sizeBytes),
     });
@@ -93,6 +99,10 @@ export class TopicApp implements TopicApi {
       }),
       commands,
       outcomes,
+      bootstrap: TopicClusteringBootstrapService.create({
+        claims: repositories.claims,
+        commands,
+      }),
       pipeline: createTopicClusteringProcessingPipeline({
         topicClusteringRunStatusStore: repositories.runStatus,
         topicClusteringRunHistoryStore: repositories.runHistory,
@@ -103,6 +113,7 @@ export class TopicApp implements TopicApi {
           classifyError: classifyClusteringError,
           metrics,
         },
+        seeds: migration,
       }),
     });
   }
@@ -123,6 +134,15 @@ export class TopicApp implements TopicApi {
       recordClusteringRunCompleted: commands.recordClusteringRunCompleted,
       recordClusteringRunFailed: commands.recordClusteringRunFailed,
     });
+  }
+
+  requestClustering(input: TopicClusteringRequestInput): Promise<void> {
+    const { projectId, ...request } = input;
+    return this.#commands.requestClustering({ tenantId: projectId, ...request });
+  }
+
+  bootstrapClustering(input: TopicProjectInput): Promise<void> {
+    return this.#bootstrap.bootstrap(input);
   }
 
   getAll(input: TopicProjectInput): Promise<Topic[]> {

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryTopicClusteringClaimRepository } from "../../repositories/memory/memory.topic-clustering-claim.repository.ts";
+import type { TopicClusteringClaimRepository } from "../../repositories/topic-clustering-claim.repository.ts";
 import type { TopicClusteringRepository } from "../../repositories/topic-clustering.repository.ts";
 import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
 
@@ -44,13 +46,13 @@ function makeMigration(
       occurredAt: number;
       trigger: "bootstrap";
     }) => Promise<void>;
-    redis?: never;
+    claims?: TopicClusteringClaimRepository;
     schedulePageSize?: number;
   } = {},
 ) {
   return LegacyImportTopicClusteringMigration.create({
     repository,
-    redis: options.redis ?? null,
+    claims: options.claims ?? unansweredClaims(),
     commands: {
       recordTopics: vi.fn().mockResolvedValue(undefined),
       requestClustering: vi.fn(options.requestClustering ?? (async () => undefined)),
@@ -219,37 +221,27 @@ describe("backfillTopicClusteringSchedules", () => {
   });
 });
 
-function fakeRedis() {
-  const store = new Map<string, string>();
-  return {
-    set: vi.fn(async (key: string, value: string, ...rest: unknown[]) => {
-      const nx = rest.includes("NX");
-      if (nx && store.has(key)) return null;
-      store.set(key, value);
-      return "OK";
-    }),
-    get: vi.fn(async (key: string) => store.get(key) ?? null),
-    del: vi.fn(async (key: string) => {
-      store.delete(key);
-    }),
-  };
+/** A claims store that cannot answer, which the seed reads as "coordinate nothing, seed anyway". */
+function unansweredClaims(): TopicClusteringClaimRepository {
+  const unavailable = () => Promise.reject(new Error("claims store unavailable"));
+  return { claim: unavailable, release: unavailable, mark: unavailable, isMarked: unavailable };
 }
 
-describe("seedClusteringSchedules redis coordination", () => {
+describe("seedClusteringSchedules claim coordination", () => {
   const oneProjectMigration = (
-    redis: ReturnType<typeof fakeRedis>,
+    claims: TopicClusteringClaimRepository,
     requestClustering = vi.fn().mockResolvedValue(undefined),
   ) =>
     LegacyImportTopicClusteringMigration.create({
       repository: fakeRepository({ pages: [["p1"]] }).repository,
-      redis: redis as never,
+      claims,
       commands: {
         recordTopics: vi.fn().mockResolvedValue(undefined),
         requestClustering,
       },
     });
 
-  describe("given no Redis", () => {
+  describe("given a claims store that cannot answer", () => {
     it("runs the walk on every call", async () => {
       const requestClustering = vi.fn().mockResolvedValue(undefined);
       await makeMigration(fakeRepository({ pages: [["p1"]] }).repository, {
@@ -263,12 +255,13 @@ describe("seedClusteringSchedules redis coordination", () => {
   });
 
   describe("given a fresh install with no eligible projects", () => {
-    it("marks the seed done so later boots skip the scan", async () => {
-      const redis = fakeRedis();
+    /** @scenario "The schedule seed coordinates across replicas without a deploy-time job" */
+    it("marks the seed done so later wakes skip the scan", async () => {
+      const claims = MemoryTopicClusteringClaimRepository.create();
       const requestClustering = vi.fn();
       await LegacyImportTopicClusteringMigration.create({
         repository: fakeRepository({ pages: [[]] }).repository,
-        redis: redis as never,
+        claims,
         commands: {
           recordTopics: vi.fn().mockResolvedValue(undefined),
           requestClustering,
@@ -276,22 +269,22 @@ describe("seedClusteringSchedules redis coordination", () => {
       }).seedClusteringSchedules();
 
       const requestClusteringAgain = vi.fn();
-      await oneProjectMigration(redis, requestClusteringAgain).seedClusteringSchedules();
+      await oneProjectMigration(claims, requestClusteringAgain).seedClusteringSchedules();
 
       expect(requestClusteringAgain).not.toHaveBeenCalled();
     });
   });
 
   describe("given a project failed to schedule", () => {
-    it("does not mark the seed done, so the next boot retries", async () => {
-      const redis = fakeRedis();
+    it("does not mark the seed done, so the next wake retries", async () => {
+      const claims = MemoryTopicClusteringClaimRepository.create();
       await oneProjectMigration(
-        redis,
+        claims,
         vi.fn().mockRejectedValue(new Error("boom")),
       ).seedClusteringSchedules();
 
       const requestClusteringRetry = vi.fn().mockResolvedValue(undefined);
-      await oneProjectMigration(redis, requestClusteringRetry).seedClusteringSchedules();
+      await oneProjectMigration(claims, requestClusteringRetry).seedClusteringSchedules();
 
       expect(requestClusteringRetry).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "p1" }),
@@ -299,23 +292,28 @@ describe("seedClusteringSchedules redis coordination", () => {
     });
 
     it("releases the claim so another replica is not blocked", async () => {
-      const redis = fakeRedis();
+      const claims = MemoryTopicClusteringClaimRepository.create();
+      const release = vi.spyOn(claims, "release");
       await oneProjectMigration(
-        redis,
+        claims,
         vi.fn().mockRejectedValue(new Error("boom")),
       ).seedClusteringSchedules();
 
-      expect(redis.del).toHaveBeenCalledWith("topic-clustering:schedule-seed:v1");
+      expect(release).toHaveBeenCalledWith({ key: "topic-clustering:schedule-seed:v1" });
     });
   });
 
   describe("given another replica holds the claim", () => {
+    /** @scenario "The schedule seed coordinates across replicas without a deploy-time job" */
     it("skips the walk without touching the bootstrap command", async () => {
-      const redis = fakeRedis();
-      await redis.set("topic-clustering:schedule-seed:v1", "1", "EX", 3600, "NX");
+      const claims = MemoryTopicClusteringClaimRepository.create();
+      await claims.claim({ key: "topic-clustering:schedule-seed:v1", ttlSeconds: 3600 });
 
       const requestClustering = vi.fn();
-      const summary = await oneProjectMigration(redis, requestClustering).seedClusteringSchedules();
+      const summary = await oneProjectMigration(
+        claims,
+        requestClustering,
+      ).seedClusteringSchedules();
 
       expect(requestClustering).not.toHaveBeenCalled();
       expect(summary).toEqual({ succeeded: 0, failed: 0, skipped: 0, scanned: 0 });

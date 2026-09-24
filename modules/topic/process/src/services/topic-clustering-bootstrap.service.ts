@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import type { Cluster, Redis } from "ioredis";
 
-import type { TopicClusteringCommands } from "../../app/topic.members.ts";
+import type { TopicClusteringCommands } from "../app/topic.members.ts";
+import type { TopicClusteringClaimRepository } from "../repositories/topic-clustering-claim.repository.ts";
 
 const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
 
@@ -10,39 +10,31 @@ const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
 // clustering schedule went missing; at most one process-manager commit per project per hour.
 export const BOOTSTRAP_CLAIM_TTL_SECONDS = 60 * 60;
 
-function buildKey(projectId: string): string {
-  return `topic-clustering:bootstrap-claimed:${projectId}`;
-}
-
 // Rate-limits bootstrap so it can be called on every ingest without per-trace write;
 // level-triggered so the system re-asserts the schedule and heals itself.
-export class RedisTopicClusteringBootstrapRepository {
+export class TopicClusteringBootstrapService {
   private constructor(
-    private readonly redis: Redis | Cluster,
-    private readonly commands: TopicClusteringCommands,
-    private readonly ttlSeconds: number,
+    private readonly claims: TopicClusteringClaimRepository,
+    private readonly commands: Pick<TopicClusteringCommands, "requestClustering">,
   ) {}
 
   static create(options: {
-    redis: Redis | Cluster;
-    commands: TopicClusteringCommands;
-    ttlSeconds?: number;
-  }): RedisTopicClusteringBootstrapRepository {
-    return new RedisTopicClusteringBootstrapRepository(
-      options.redis,
-      options.commands,
-      options.ttlSeconds ?? BOOTSTRAP_CLAIM_TTL_SECONDS,
-    );
+    claims: TopicClusteringClaimRepository;
+    commands: Pick<TopicClusteringCommands, "requestClustering">;
+  }): TopicClusteringBootstrapService {
+    return new TopicClusteringBootstrapService(options.claims, options.commands);
   }
 
-  async claimAndBootstrap(projectId: string): Promise<void> {
+  async bootstrap(input: { projectId: string }): Promise<void> {
     let claimed = true;
     try {
-      const result = await this.redis.set(buildKey(projectId), "1", "EX", this.ttlSeconds, "NX");
-      claimed = result === "OK";
+      claimed = await this.claims.claim({
+        key: `topic-clustering:bootstrap-claimed:${input.projectId}`,
+        ttlSeconds: BOOTSTRAP_CLAIM_TTL_SECONDS,
+      });
     } catch (error) {
       logger.warn(
-        { projectId, error },
+        { projectId: input.projectId, error },
         "Bootstrap claim failed; requesting anyway rather than risking an unscheduled project",
       );
     }
@@ -50,7 +42,7 @@ export class RedisTopicClusteringBootstrapRepository {
     if (!claimed) return;
 
     await this.commands.requestClustering({
-      tenantId: projectId,
+      tenantId: input.projectId,
       occurredAt: nowInstant().epochMilliseconds,
       trigger: "bootstrap",
     });

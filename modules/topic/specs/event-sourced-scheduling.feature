@@ -108,20 +108,35 @@ Feature: Event-sourced topic clustering scheduling
     And its first daily wake is scheduled
     And re-sending the bootstrap request changes nothing
 
-  Scenario: Existing projects are backfilled once
+  @unit
+  Scenario: Existing projects are backfilled on a scheduled wake
     Given eligible projects that predate process-managed scheduling
-    When a worker boots
+    When the clustering pipeline's hourly seed process wakes, once across the fleet
     Then each project gets a clustering process with a scheduled wake
-    And re-running the seed on a later boot changes nothing
-    And this runs in the background on worker start, never a deploy-time job
+    And re-running the seed on a later wake changes nothing
+    And this is a scheduled process on the clustering pipeline, never a deploy-time job
 
+  @unit
   Scenario: The schedule seed coordinates across replicas without a deploy-time job
-    Given several worker replicas starting at once
-    When the schedule seed runs on service start
-    Then replicas coordinate through Redis when it is available
-    And without Redis the seed still runs safely because it is idempotent
+    Given several worker replicas able to run the seed
+    When the schedule seed runs on its scheduled wake
+    Then replicas coordinate through a shared claim when it can be taken
+    And without the claim the seed still runs safely because it is idempotent
     And a fresh install with no eligible projects marks itself done
-    And a project that failed to schedule is retried on the next boot
+    And a project that failed to schedule is retried on the next wake
+
+  @unit
+  Scenario: A project's clustering bootstrap is rate-limited to once per hour
+    Given a project whose traces keep arriving
+    When its clustering bootstrap is asked for on every trace
+    Then the bootstrap request is sent once per project per hour
+    And a different project is claimed independently
+
+  @unit
+  Scenario: A project's clustering bootstrap fails open when the claim cannot be taken
+    Given the shared claim store cannot answer
+    When a project's clustering bootstrap is asked for
+    Then the bootstrap request is sent anyway rather than leaving the project unscheduled
 
   Scenario: The settings page shows the schedule state
     When the user opens the topic clustering settings page

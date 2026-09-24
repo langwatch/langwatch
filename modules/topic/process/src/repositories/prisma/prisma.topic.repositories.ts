@@ -16,7 +16,7 @@ import {
 import { PrismaTopicModelProjectionRepository } from "./prisma.topic-model-projection.repository.ts";
 import { PrismaTopicRepository } from "./prisma.topic.repository.ts";
 
-type TopicRepositoriesDatabase = TopicClusteringDatabase &
+export type TopicRepositoriesDatabase = TopicClusteringDatabase &
   RunProjectionPrismaClient &
   RunHistoryPrismaClient;
 
@@ -28,7 +28,9 @@ type TopicRepositoriesDatabase = TopicClusteringDatabase &
 export class PostgresTopicRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(members: Readonly<{ prisma: TopicRepositoriesDatabase }>): TopicRepositories {
+  static create(
+    members: Readonly<{ prisma: TopicRepositoriesDatabase }>,
+  ): Omit<TopicRepositories, "claims"> {
     return {
       topics: PrismaTopicRepository.create({ prisma: members.prisma }),
       clustering: PrismaTopicClusteringRepository.create({ database: members.prisma }),

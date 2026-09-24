@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TOPIC_CLUSTERING_TRIGGER } from "./topic-clustering.constants.ts";
+
 export const topicSchema = z
   .object({
     id: z.string(),
@@ -21,8 +23,15 @@ export const topicNamesInputSchema = topicProjectInputSchema.safeExtend({
   ids: z.array(z.string()),
 });
 
+export const topicClusteringRequestInputSchema = topicProjectInputSchema.safeExtend({
+  occurredAt: z.number(),
+  trigger: z.enum([TOPIC_CLUSTERING_TRIGGER.MANUAL, TOPIC_CLUSTERING_TRIGGER.BOOTSTRAP]),
+  requestedByUserId: z.string().optional(),
+});
+
 export type TopicProjectInput = z.infer<typeof topicProjectInputSchema>;
 export type TopicNamesInput = z.infer<typeof topicNamesInputSchema>;
+export type TopicClusteringRequestInput = z.infer<typeof topicClusteringRequestInputSchema>;
 
 export const topicClusteringStatusSchema = z
   .object({

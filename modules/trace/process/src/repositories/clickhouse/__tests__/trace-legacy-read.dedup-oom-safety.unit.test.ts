@@ -52,16 +52,12 @@ describe("trace dedup OOM safety", () => {
   const traceServicePath = path.resolve(__dirname, "..", "trace-legacy-read.repository.ts");
   const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-  /**
-   * The clustering domain has moved twice and this read followed neither.
-   * Resolved from the workspace root so the next move fails loudly on the
-   * path instead of silently taking the whole suite out of CI.
-   */
-  const topicClusteringPath = path.join(
-    repoRoot(),
-    "modules/topic/process/src/intents/topic-clustering-runner.intent.ts",
+  const clusteringSamplePath = path.resolve(
+    __dirname,
+    "..",
+    "clickhouse.trace-clustering-sample.repository.ts",
   );
-  const topicClusteringSource = fs.readFileSync(topicClusteringPath, "utf-8");
+  const clusteringSampleSource = fs.readFileSync(clusteringSamplePath, "utf-8");
 
   // ---------------------------------------------------------------------------
   // clickhouse-trace.service.ts: fetchTracesWithPagination + fetchTraceSummaryRows
@@ -190,10 +186,17 @@ describe("trace dedup OOM safety", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // topicClustering.ts: fetchTracesFromClickHouse
+  // clickhouse.trace-clustering-sample.repository.ts: findPageRows
   // ---------------------------------------------------------------------------
-  describe("fetchTracesFromClickHouse()", () => {
-    const body = extractFunctionBody(topicClusteringSource, "fetchTracesFromClickHouse");
+  describe("ClickHouseTraceClusteringSampleRepository.findPageRows()", () => {
+    // The page read is the class's last method, so its body runs to the end of the file.
+    const body = withoutComments(
+      clusteringSampleSource.slice(clusteringSampleSource.indexOf("async findPageRows(")),
+    );
+
+    it("finds the page read in the repository source", () => {
+      expect(body).toContain("findPageRows");
+    });
 
     describe("when the topic clustering query SQL is inspected", () => {
       it("does not use LIMIT 1 BY for deduplication", () => {
