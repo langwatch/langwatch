@@ -28,6 +28,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

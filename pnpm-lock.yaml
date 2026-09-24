@@ -11511,6 +11511,9 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
