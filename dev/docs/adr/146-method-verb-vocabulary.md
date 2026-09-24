@@ -44,6 +44,11 @@ fragment of them and none of the fragments agreed.
 | `find<Noun>` | an array. The empty array is the absence. |
 | `list<Noun>` | a collection or a page. Service vocabulary; a repository answers `find*`. |
 
+**A keyed read that may miss is a `get*`** (Alex, 2026-09-24). One thing by its key
+that may not exist throws the module's not-found `HandledError`; a caller for
+whom absence is normal catches that error's `code` and nothing else. It is never
+a `find*` returning an array of at most one for the caller to destructure.
+
 **Writes.** `create`, `update`, `delete`, `upsert`, `archive` — the five the
 tree already uses. A write whose target may normally be absent returns an
 explicit result union rather than null.
