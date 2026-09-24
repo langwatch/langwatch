@@ -182,7 +182,7 @@ export const bannedVerbPrefixRule = defineRule({
     },
   },
   create(context) {
-    let aliasShapes = { nullable: new Set(), plural: new Set(), pages: new Set() };
+    let aliasShapes = aliasShapesOf({ body: [] });
     let vendorNames = new Set();
     const check = (declaration) => reportBannedPrefix(context, { ...declaration, aliasShapes });
 

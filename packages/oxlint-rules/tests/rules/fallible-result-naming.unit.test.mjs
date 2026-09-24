@@ -1,3 +1,6 @@
+import { mkdirSync, symlinkSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterAll, describe, expect, it } from "vitest";
 
 import { bannedVerbPrefixRule } from "../../src/rules/banned-verb-prefix.rule.mjs";
@@ -6,7 +9,44 @@ import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { process: {}, contract: {} } } },
+  files: {
+    "packages/agent-pages/package.json":
+      '{"name":"@langwatch/agent-pages","exports":{".":{"types":"./dist/index.d.ts","default":"./src/index.ts"}}}',
+    "packages/agent-pages/src/index.ts":
+      'export * from "./pages.ts";\nexport type { AgentLedger as Ledger } from "./ledger.ts";',
+    "packages/agent-pages/src/pages.ts": [
+      'import { z } from "zod";',
+      "export interface AgentPage { agents: Agent[]; nextCursor?: string }",
+      "export interface AgentSummary { agents: Agent[]; spendAvailable: boolean }",
+      "export const agentTeamPageSchema = z",
+      "  .object({ data: z.array(agentSchema), pagination: z.object({ total: z.number() }).strict() })",
+      "  .strict();",
+      "export type AgentTeamPage = z.infer<typeof agentTeamPageSchema>;",
+      "const boundSchema = z.object({ included: z.number(), total: z.number() });",
+      "export const agentRunSchema = z.object({",
+      "  total: z.number().nullable().optional(),",
+      "  steps: z.array(stepSchema),",
+      "  errors: z.array(errorSchema),",
+      "  errorsBound: boundSchema,",
+      "});",
+      "export type AgentRun = z.infer<typeof agentRunSchema>;",
+    ].join("\n"),
+    "packages/agent-pages/src/ledger.ts":
+      "export type AgentLedger = { entries: Entry[]; total: number };",
+    "modules/agent/process/src/repositories/agent-records.repository.ts": [
+      "export abstract class AgentRecordsRepository {",
+      "  abstract listRecords(): Promise<{ records: Agent[]; hasMore: boolean }>;",
+      "  abstract findNames(): Promise<string[]>;",
+      "}",
+    ].join("\n"),
+  },
 });
+mkdirSync(join(workspace.cwd, "node_modules/@langwatch"), { recursive: true });
+symlinkSync(
+  join(workspace.cwd, "packages/agent-pages"),
+  join(workspace.cwd, "node_modules/@langwatch/agent-pages"),
+  "dir",
+);
 
 afterAll(() => workspace.cleanup());
 
@@ -572,6 +612,84 @@ describe("given a read whose declared answer is a page", () => {
       );
 
       expect(found.map((entry) => entry.messageId)).not.toContain("findAnswersPage");
+    });
+  });
+});
+
+describe("given a read whose declared answer is a page type imported from another file", () => {
+  const IMPORTS = [
+    'import type { AgentPage, AgentRun, AgentSummary, AgentTeamPage, Ledger } from "@langwatch/agent-pages";',
+    'import type { MissingPage } from "@langwatch/missing-pages";',
+    'import type { VendorPage } from "vendor-pages";',
+    'import { AgentRecordsRepository } from "../agent-records.repository.ts";',
+    "type LocalPage = AgentPage;",
+  ].join("\n");
+
+  describe("when a repository names it with list vocabulary", () => {
+    /** @scenario "A page type imported from another file is read from its declaration" */
+    it("leaves an imported, re-exported, zod-inferred, aliased and ReturnType page alone", () => {
+      const found = report(
+        [
+          IMPORTS,
+          "export class MemoryAgentRepository {",
+          "  listPage(): Promise<AgentPage> { return this.page(); }",
+          "  listLedger(): Promise<Ledger> { return this.ledger(); }",
+          "  listTeams(): Promise<AgentTeamPage> { return this.teams(); }",
+          "  listLocal(): Promise<LocalPage> { return this.local(); }",
+          '  listRecords(): ReturnType<AgentRecordsRepository["listRecords"]> { return this.records(); }',
+          "}",
+        ].join("\n"),
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found).toEqual([]);
+    });
+
+    /** @scenario "A page type imported from another file is read from its declaration" */
+    it("still reports an imported non-page, an optional count, an unresolvable import and a vendor type", () => {
+      const found = report(
+        [
+          IMPORTS,
+          "export class MemoryAgentRepository {",
+          "  listSummary(): Promise<AgentSummary> { return this.summary(); }",
+          "  listRun(): Promise<AgentRun> { return this.run(); }",
+          "  listMissing(): Promise<MissingPage> { return this.missing(); }",
+          "  listVendor(): Promise<VendorPage> { return this.vendor(); }",
+          '  listNames(): ReturnType<AgentRecordsRepository["findNames"]> { return this.names(); }',
+          "}",
+        ].join("\n"),
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.data.name])).toEqual([
+        ["repositoryServiceVocabulary", "listSummary"],
+        ["repositoryServiceVocabulary", "listRun"],
+        ["repositoryServiceVocabulary", "listMissing"],
+        ["repositoryServiceVocabulary", "listVendor"],
+        ["repositoryServiceVocabulary", "listNames"],
+      ]);
+    });
+  });
+
+  describe("when it is named with find vocabulary", () => {
+    /** @scenario "A page type imported from another file is read from its declaration" */
+    it("reports findAnswersPage for an imported page and not for an imported non-page", () => {
+      const found = report(
+        [
+          IMPORTS,
+          "export class AgentService {",
+          "  findPage(): Promise<AgentPage> { return this.page(); }",
+          "  findTeams(): Promise<AgentTeamPage | null> { return this.teams(); }",
+          "  findSummary(): Promise<AgentSummary[]> { return this.summary(); }",
+          "}",
+        ].join("\n"),
+        SERVICE,
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.data.name])).toEqual([
+        ["findAnswersPage", "findPage"],
+        ["findAnswersPage", "findTeams"],
+      ]);
     });
   });
 });

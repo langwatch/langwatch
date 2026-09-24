@@ -26,9 +26,12 @@ Feature: The fallible-result-naming lint rule
   array. It is pointed at a throwing `get*`, or at an explicit result union
   when absence means something other than not-found.
 
-  A page is an object type carrying a required array member and a cursor, next or
-  total member, declared inline or as an interface or type alias in the same
-  file. ADR-146 names a page `list*`, in a service or a repository, so a
+  A page is an object type carrying a required array member and a position: a
+  cursor or next member, a required total or hasMore member, or a pagination
+  object holding only page, limit, offset and position members. It is declared inline, as an
+  interface, a type alias or a `z.infer` of a `z.object` schema, in the same
+  file or behind a relative or workspace import the rule follows to the
+  declaration; an import it cannot follow is not a page. A name is never evidence. ADR-146 names a page `list*`, in a service or a repository, so a
   repository `list*` answering a page is left alone and a `find*` answering
   one is told to become `list*`. A plain array or a plain object is not a page.
 
@@ -172,3 +175,12 @@ Feature: The fallible-result-naming lint rule
     Then it reports findAnswersPage naming the list-prefixed rename
     But a find answering an array is left alone
     And a find answering an object that is not a page is never pointed at list
+
+  @unit
+  Scenario: A page type imported from another file is read from its declaration
+    Given a repository list method whose declared answer is a page type imported from a relative file or a workspace package
+    And the type is re-exported, a local alias of it, a z.infer of a zod object schema, or a ReturnType of another repository's method
+    When the fallible-result-naming rule runs over it
+    Then it reports nothing for that method
+    And a find method answering the same imported page reports findAnswersPage
+    But an imported type that is not a page, one whose only total is optional, an unresolvable import and a vendor type are still told to become find
