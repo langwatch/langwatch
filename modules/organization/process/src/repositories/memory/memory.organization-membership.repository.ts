@@ -365,6 +365,16 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map(toUser);
   }
 
+  async findMemberUsersIncludingDeactivated({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<User[]> {
+    return this.memory.organizationUsers
+      .filter((row) => row.organizationId === organizationId)
+      .map((row) => toUser(this.userRow(row.userId)));
+  }
+
   async getMembership(params: {
     organizationId: string;
     userId: string;

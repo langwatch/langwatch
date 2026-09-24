@@ -407,6 +407,11 @@ export class OrganizationMembershipService {
     return this.repo.findActiveMemberUsers(organizationId);
   }
 
+  /** Every member row, disabled and deactivated included (main's governance identity read). */
+  findMembersIncludingDeactivated(input: { organizationId: string }): Promise<User[]> {
+    return this.repo.findMemberUsersIncludingDeactivated(input);
+  }
+
   /** Every administrator who can still sign in, named. Both halves are read
    *  here rather than joined in a query: who is an administrator and who can
    *  sign in are two different rules, and one is the ledger's. */

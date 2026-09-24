@@ -1,5 +1,7 @@
-import { GovernanceValidationError } from "@langwatch/enterprise-governance-contract";
-export const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie" as const;
+import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  GovernanceValidationError,
+} from "@langwatch/enterprise-governance-contract";
 
 /**
  * The only hosts a Genie workspace is ever served from, one per cloud. Databricks owns all

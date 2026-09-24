@@ -615,6 +615,14 @@ export class MemoryScimRepository extends ScimRepository {
       .filter((row) => input.connectionIds.includes(row.connectionId))
       .map((row) => ({ connectionId: row.connectionId, userId: row.userId }));
   }
+
+  async findDirectoryExternalIds(input: {
+    connectionIds: string[];
+  }): Promise<{ userId: string; externalId: string }[]> {
+    return this.directoryIdentities
+      .filter((row) => input.connectionIds.includes(row.connectionId))
+      .map((row) => ({ userId: row.userId, externalId: row.externalId }));
+  }
 }
 
 function identityOf(token: StoredToken): ScimTokenIdentity {

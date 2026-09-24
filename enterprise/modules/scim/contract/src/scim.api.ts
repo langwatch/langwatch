@@ -66,6 +66,10 @@ export interface ScimApi {
    * mints one reads the choices from the module that owns them.
    */
   findConnections(input: { organizationId: string }): Promise<ScimDirectoryConnection[]>;
+  /** The identity provider's own id for each member, across every connection the organization holds. */
+  findDirectoryExternalIds(input: {
+    organizationId: string;
+  }): Promise<{ userId: string; externalId: string }[]>;
   /**
    * Mints a token for one directory connection. `connectionId` is the whole of
    * the token's write authority, so it is named rather than defaulted.

@@ -5,11 +5,11 @@ import {
   IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { DirectoryIdentifiersChannel } from "../channels/directory-identifiers.channel.ts";
-import type { OrganizationMembersChannel } from "../channels/organization-members.channel.ts";
 import type { DiscoveredPersonRepository } from "../repositories/discovered-person.repository.ts";
 import type {
   IdentityMatchSuggestionRepository,
@@ -36,8 +36,8 @@ export interface IdentityMatchDependencies {
   discoveredPeople: DiscoveredPersonRepository;
   matches: IdentityMatchRepository;
   suggestions: IdentityMatchSuggestionRepository;
-  members: OrganizationMembersChannel;
-  directoryIds: DirectoryIdentifiersChannel;
+  organizations: Pick<OrganizationApi, "findMembersIncludingDeactivated">;
+  directory: Pick<ScimApi, "findDirectoryExternalIds">;
   now?: () => Instant;
   logger?: Logger;
 }
@@ -66,13 +66,15 @@ export class IdentityMatchService {
   }: {
     organizationId: string;
   }): Promise<OrganizationAccountIndex> {
-    const [emails, directoryIds] = await Promise.all([
-      this.deps.members.findVerifiedMemberEmails({ organizationId }),
-      this.deps.directoryIds.findDirectoryIds({ organizationId }),
+    const [members, directoryIds] = await Promise.all([
+      this.deps.organizations.findMembersIncludingDeactivated({ organizationId }),
+      this.deps.directory.findDirectoryExternalIds({ organizationId }),
     ]);
 
     const usersByVerifiedEmail = new Map<string, string[]>();
-    for (const { userId, email } of emails) {
+    for (const { id: userId, email, emailVerified } of members) {
+      // An unconfirmed address is a claim anyone can type into a profile, so it proves nothing.
+      if (!emailVerified || !email) continue;
       const key = normalizeEmail(email);
       if (key === null) continue;
       usersByVerifiedEmail.set(key, [...(usersByVerifiedEmail.get(key) ?? []), userId]);

@@ -329,6 +329,8 @@ export abstract class OrganizationMembershipRepository {
 
   abstract findActiveMemberUsers(organizationId: string): Promise<User[]>;
 
+  abstract findMemberUsersIncludingDeactivated(input: { organizationId: string }): Promise<User[]>;
+
   /**
    * A single membership row with its user, disabled or not; throws `MemberNotFoundError`. Unlike
    * `findMemberById` there is no caller pre-check: the management surface

@@ -316,6 +316,8 @@ export interface OrganizationApi {
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null>;
   getAllMembers(input: Readonly<{ organizationId: string }>): Promise<User[]>;
+  /** Every member row, disabled and deactivated included: governance's identity match reads it. */
+  findMembersIncludingDeactivated(input: Readonly<{ organizationId: string }>): Promise<User[]>;
   /** Why each member is here, keyed by user id; explains, never grants. */
   getMemberProvenance(
     input: Readonly<{ organizationId: string }>,

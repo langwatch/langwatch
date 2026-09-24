@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import {
+  copilotStudioDataversePullConfigSchema,
+  DATABRICKS_GENIE_ADAPTER_ID,
+  databricksGeniePullConfigSchema,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
@@ -16,8 +20,6 @@ import {
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../rules/dataverse-environment-service.rules.ts";
 import { type AgentListingSourceType } from "../rules/listing-source-types.rules.ts";
 import { refusalFromListingThrow } from "../rules/provider-sign-in.rules.ts";
-import { databricksGeniePullConfigSchema } from "./databricks-genie-puller.service.ts";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
 import type {
   SourceCredentialAccessService,
   SourceCredentialContext,

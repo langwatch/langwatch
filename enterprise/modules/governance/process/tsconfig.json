@@ -36,6 +36,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../scim/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
     },
     {

@@ -765,6 +765,17 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return users.map(userFromRecord);
   }
 
+  async findMemberUsersIncludingDeactivated({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<User[]> {
+    const users = await this.prisma.user.findMany({
+      where: { orgMemberships: { some: { organizationId } } },
+    });
+    return users.map(userFromRecord);
+  }
+
   async getMembership(params: {
     organizationId: string;
     userId: string;

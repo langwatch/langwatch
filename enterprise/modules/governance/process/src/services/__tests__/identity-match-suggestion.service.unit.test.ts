@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { MemoryOrganizationMembersChannel } from "../../channels/memory/memory.organization-members.channel.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import {
   IdentityMatchSuggestionService,
@@ -14,14 +15,47 @@ import {
 const ORG = "org_acme";
 const COMPUTED_AT = Temporal.Instant.from("2026-09-03T05:41:00Z");
 
+function memberUser({
+  userId,
+  name,
+  email,
+  emailVerified,
+}: {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  emailVerified: boolean;
+}): User {
+  const epoch = Temporal.Instant.fromEpochMilliseconds(0);
+  return {
+    id: userId,
+    name,
+    email,
+    emailVerified,
+    image: null,
+    pendingSsoSetup: false,
+    userHashKey: null,
+    twoFactorEnabled: false,
+    createdAt: epoch,
+    updatedAt: epoch,
+    lastLoginAt: null,
+    deactivatedAt: null,
+    lastHomePath: null,
+    tracesExplorerTourDismissedAt: null,
+    passkeyNudgeDismissedAt: null,
+  };
+}
+
 function buildWorld() {
   const repositories = MemoryGovernanceRepositories.create();
-  const members = MemoryOrganizationMembersChannel.create();
+  const members: User[] = [];
   const service = IdentityMatchSuggestionService.create({
     discoveredPeople: repositories.discoveredPeople,
     matches: repositories.identityMatches,
     suggestions: repositories.identityMatchSuggestions,
-    members,
+    organizations: createApiFixture<OrganizationApi>({
+      findMembersIncludingDeactivated: () => Promise.resolve(members),
+    }),
     now: () => COMPUTED_AT,
     logger: createTestLogger().logger,
   });
@@ -46,7 +80,7 @@ function buildWorld() {
   };
 
   const member = (userId: string, name: string) =>
-    members.seed({ organizationId: ORG, userId, name, email: null, emailVerified: false });
+    members.push(memberUser({ userId, name, email: null, emailVerified: false }));
 
   const stored = () =>
     repositories.identityMatchSuggestions.findAllByOrganization({ organizationId: ORG });

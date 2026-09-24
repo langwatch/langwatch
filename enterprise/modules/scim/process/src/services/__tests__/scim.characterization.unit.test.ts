@@ -31,6 +31,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     scimConnectionExists: vi.fn(async () => true),
     findDirectoryUserId: vi.fn(async () => null),
     findDirectoryOwnership: vi.fn(async () => []),
+    findDirectoryExternalIds: vi.fn(async () => []),
     findDirectoryIdentities: vi.fn(async () => []),
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),

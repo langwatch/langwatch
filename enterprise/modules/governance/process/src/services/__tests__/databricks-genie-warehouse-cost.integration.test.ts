@@ -19,7 +19,10 @@
 import http from "http";
 import type { AddressInfo } from "net";
 
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
+import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  PULLED_USAGE_HINT_KEY,
+} from "@langwatch/enterprise-governance-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -31,7 +34,6 @@ import {
   WAREHOUSE_COST_ROW_LIMIT,
   WAREHOUSE_COST_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../pull-destination.service.ts";
 
 function dimensionsOf(value: unknown): unknown {
   if (typeof value !== "object" || value === null || !("dimensions" in value)) {

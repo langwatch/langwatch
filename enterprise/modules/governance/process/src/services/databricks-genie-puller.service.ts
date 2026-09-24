@@ -56,10 +56,13 @@
 import { Buffer } from "node:buffer";
 
 import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  databricksGeniePullConfigSchema,
   PULLED_USAGE_HINT_KEY,
   ProviderSignInError,
 } from "@langwatch/enterprise-governance-contract";
 import type {
+  DatabricksGeniePullConfig,
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
   PullResult,
@@ -81,7 +84,6 @@ import {
   type WarehousePricedStatement,
   warehouseCostRowSchema,
 } from "../rules/warehouse-cost.rules.ts";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
 import { DatabricksWarehouseCostService } from "./puller-databricks-warehouse-cost.service.ts";
 
 const logger = createLogger("langwatch:governance:databricks-genie-puller");
@@ -99,58 +101,6 @@ const MAX_REQUESTS_PER_RUN = 400;
 
 /** The ledger's model label. Genie is one product, not a family of models. */
 const GENIE_MODEL = "databricks/genie" as const;
-
-export const databricksGeniePullConfigSchema = z.object({
-  adapter: z.literal(DATABRICKS_GENIE_ADAPTER_ID),
-  /** Workspace base URL, e.g. `https://adb-1234567890.4.azuredatabricks.net`. */
-  workspaceUrl: z.string().url(),
-  /**
-   * Which spaces to pull. Empty means "every space the credential can see",
-   * which is the setting most customers want and the one that silently starts
-   * covering a space the day someone creates it.
-   */
-  spaceIds: z.array(z.string()).default([]),
-  /** ISO instant the very first run starts from. Later runs use the cursor. */
-  startingAt: z.string().datetime().optional(),
-  schedule: z.string().default("*/15 * * * *"),
-  /**
-   * A SQL warehouse this credential can run a query on. Naming it is what opts
-   * the source into attributing the compute behind each question; leaving it
-   * out keeps the source's records at a cost of zero, which is what Genie
-   * itself charges.
-   *
-   * This is the executor, not the subject. The billing query reads every
-   * warehouse the workspace's Genie questions actually ran on and prices each
-   * hour against that warehouse's own bill — a space answers on whichever
-   * warehouse it was authored against, and expecting that to be the one the
-   * credential can sign in to is how a whole workspace prices at nothing. Any
-   * warehouse the credential holds `CAN USE` on will do.
-   *
-   * It is optional because the grants it needs are not the ones the rest of this
-   * adapter needs. Reading the billing tables requires `SELECT` on `system` from
-   * a metastore administrator, and a workspace whose owner has not issued it
-   * should still get its Genie activity rather than a failing source.
-   */
-  warehouseId: z.string().min(1).optional(),
-  /**
-   * Whether to also read the paid Genie bill line.
-   *
-   * Databricks bills paid Genie usage on its own line in
-   * `system.billing.usage`, per person and per day, under
-   * `billing_origin_product = 'GENIE'` — and with no warehouse id, which is
-   * exactly why the warehouse allocation above can never see it. This is a
-   * separate read of that line, walking on a position of its own
-   * (`cursorSchema.paidBillReadThroughMs`), priced from list prices where one
-   * is published and landing with its quantity and no amount where none is.
-   *
-   * Off by default and opt-in per source. It needs the same executor warehouse
-   * and the same `SELECT` on `system` the warehouse read needs, and it lands
-   * rows under a new key — a key cannot be changed once money sits under it,
-   * so switching it on is a decision rather than a default.
-   */
-  readPaidGenieBill: z.boolean().default(false),
-});
-export type DatabricksGeniePullConfig = z.infer<typeof databricksGeniePullConfigSchema>;
 
 /**
  * How far back a completed sweep sets its watermark from the instant it began.

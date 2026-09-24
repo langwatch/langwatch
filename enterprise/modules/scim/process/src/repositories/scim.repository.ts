@@ -275,6 +275,9 @@ export abstract class ScimRepository extends ScimGrantRepository {
   abstract findDirectoryOwnership(input: {
     connectionIds: string[];
   }): Promise<ScimDirectoryOwnership[]>;
+  abstract findDirectoryExternalIds(input: {
+    connectionIds: string[];
+  }): Promise<{ userId: string; externalId: string }[]>;
   /**
    * The `externalId <-> userId` mapping on one connection, newest first: the
    * operator's detail (ADR-122). Keyed on the connection, never the identifier

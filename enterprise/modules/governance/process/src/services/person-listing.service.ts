@@ -3,6 +3,8 @@
 import {
   ANTHROPIC_ADMIN_ADAPTER_ID,
   copilotStudioDataversePullConfigSchema,
+  DATABRICKS_GENIE_ADAPTER_ID,
+  databricksGeniePullConfigSchema,
   OPENAI_ADMIN_ADAPTER_ID,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -23,10 +25,8 @@ import {
   personListingEvents,
 } from "../rules/people-listing.rules.ts";
 import { refusalFromListingThrow } from "../rules/provider-sign-in.rules.ts";
-import { databricksGeniePullConfigSchema } from "./databricks-genie-puller.service.ts";
 import type { ErasureSuppressionService } from "./erasure-suppression.service.ts";
 import type { PersonDiscoveryService } from "./person-discovery.service.ts";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
 import type {
   SourceCredentialAccessService,
   SourceCredentialContext,

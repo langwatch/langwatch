@@ -2,10 +2,10 @@
 
 import {
   ANTHROPIC_ADMIN_ADAPTER_ID,
+  DATABRICKS_GENIE_ADAPTER_ID,
   OPENAI_ADMIN_ADAPTER_ID,
 } from "@langwatch/enterprise-governance-contract";
 
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../services/pull-destination.service.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment-service.rules.ts";
 
 /** The source types whose provider can be asked for its agents; the dispatch is keyed by this list. */

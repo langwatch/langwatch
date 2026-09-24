@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
+import {
+  databricksGeniePullConfigSchema,
+  PULLED_USAGE_HINT_KEY,
+} from "@langwatch/enterprise-governance-contract";
 /**
  * @vitest-environment node
  *
@@ -23,7 +26,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 import {
   DatabricksGeniePullerService,
-  databricksGeniePullConfigSchema,
   PAID_GENIE_BILL_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
 import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";

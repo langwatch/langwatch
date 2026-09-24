@@ -855,6 +855,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.membership.getAllMembers(input.organizationId);
   }
 
+  findMembersIncludingDeactivated(input: { organizationId: string }): Promise<User[]> {
+    return this.#dependencies.membership.findMembersIncludingDeactivated(input);
+  }
+
   /** Every administrator who can still sign in, named. */
   findAdministrators(input: { organizationId: string }): Promise<OrganizationAdministrator[]> {
     return this.#dependencies.membership.findAdministrators(input);

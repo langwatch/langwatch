@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
-import type { OrganizationMembersChannel } from "../channels/organization-members.channel.ts";
 import type { DiscoveredPersonRepository } from "../repositories/discovered-person.repository.ts";
 import type { IdentityMatchSuggestionRepository } from "../repositories/identity-match-suggestion.repository.ts";
 import type { IdentityMatchRepository } from "../repositories/identity-match.repository.ts";
@@ -50,7 +50,7 @@ export interface IdentityMatchSuggestionDependencies {
   discoveredPeople: DiscoveredPersonRepository;
   matches: IdentityMatchRepository;
   suggestions: IdentityMatchSuggestionRepository;
-  members: OrganizationMembersChannel;
+  organizations: Pick<OrganizationApi, "findMembersIncludingDeactivated">;
   now?: () => Instant;
   logger?: Logger;
 }
@@ -75,11 +75,16 @@ export class IdentityMatchSuggestionService {
 
   /** Recomputes the queue from scratch and swaps it in whole; linked people are never scored. */
   async recompute({ organizationId }: { organizationId: string }): Promise<SuggestionPassOutcome> {
-    const [people, openLinks, members] = await Promise.all([
+    const [people, openLinks, users] = await Promise.all([
       this.deps.discoveredPeople.findMatchable({ organizationId }),
       this.deps.matches.findOpenByOrganization({ organizationId }),
-      this.deps.members.findMemberNames({ organizationId }),
+      this.deps.organizations.findMembersIncludingDeactivated({ organizationId }),
     ]);
+    // The address stands in for a missing name rather than being a second candidate for one member.
+    const members = users.flatMap((user) => {
+      const name = user.name ?? user.email;
+      return name ? [{ userId: user.id, name }] : [];
+    });
 
     const linkedPeople = new Set(openLinks.map((link) => link.discoveredPersonId));
     const candidates = people.filter((person) => !linkedPeople.has(person.id));

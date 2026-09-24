@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   IdentityAlreadyLinkedError,
   IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
+import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { MemoryDirectoryIdentifiersChannel } from "../../channels/memory/memory.directory-identifiers.channel.ts";
-import { MemoryOrganizationMembersChannel } from "../../channels/memory/memory.organization-members.channel.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { MATCH_EVIDENCE_KIND } from "../../rules/identity-evidence.rules.ts";
 import { IdentityMatchService } from "../identity-match.service.ts";
@@ -18,17 +19,52 @@ import { IdentityMatchService } from "../identity-match.service.ts";
 const ORG = "org_acme";
 const AT = Temporal.Instant.from("2026-09-03T05:41:00Z");
 
+function memberUser({
+  userId,
+  name,
+  email,
+  emailVerified,
+}: {
+  userId: string;
+  name: string | null;
+  email: string | null;
+  emailVerified: boolean;
+}): User {
+  const epoch = Temporal.Instant.fromEpochMilliseconds(0);
+  return {
+    id: userId,
+    name,
+    email,
+    emailVerified,
+    image: null,
+    pendingSsoSetup: false,
+    userHashKey: null,
+    twoFactorEnabled: false,
+    createdAt: epoch,
+    updatedAt: epoch,
+    lastLoginAt: null,
+    deactivatedAt: null,
+    lastHomePath: null,
+    tracesExplorerTourDismissedAt: null,
+    passkeyNudgeDismissedAt: null,
+  };
+}
+
 /** Real memory twins; spies only inject a race or observe that a read did not happen. */
 function buildWorld() {
   const repositories = MemoryGovernanceRepositories.create();
-  const members = MemoryOrganizationMembersChannel.create();
-  const directoryIds = MemoryDirectoryIdentifiersChannel.create();
+  const members: User[] = [];
+  const directoryIds: { userId: string; externalId: string }[] = [];
   const service = IdentityMatchService.create({
     discoveredPeople: repositories.discoveredPeople,
     matches: repositories.identityMatches,
     suggestions: repositories.identityMatchSuggestions,
-    members,
-    directoryIds,
+    organizations: createApiFixture<OrganizationApi>({
+      findMembersIncludingDeactivated: () => Promise.resolve(members),
+    }),
+    directory: createApiFixture<ScimApi>({
+      findDirectoryExternalIds: () => Promise.resolve(directoryIds),
+    }),
     now: () => AT,
     logger: createTestLogger().logger,
   });
@@ -56,7 +92,7 @@ function buildWorld() {
   };
 
   const verifiedMember = (userId: string, email: string) =>
-    members.seed({ organizationId: ORG, userId, name: null, email, emailVerified: true });
+    members.push(memberUser({ userId, name: null, email, emailVerified: true }));
 
   const erase = (id: string) =>
     repositories.discoveredPeople.pseudonymize({
@@ -84,6 +120,7 @@ function buildWorld() {
 
   return {
     repositories,
+    members,
     directoryIds,
     service,
     seedPerson,
@@ -130,13 +167,32 @@ describe("Feature: linking provider-named people to accounts on proof", () => {
     });
   });
 
+  describe("given a person whose address a member has typed but never confirmed", () => {
+    it("links nobody, since an unconfirmed address proves nothing", async () => {
+      const world = buildWorld();
+      await world.seedPerson();
+      world.members.push(
+        memberUser({
+          userId: "user_42",
+          name: null,
+          email: "m.silva@acme.test",
+          emailVerified: false,
+        }),
+      );
+
+      await world.service.linkProvenMatches({ organizationId: ORG });
+
+      expect(await world.openLinks()).toEqual([]);
+    });
+  });
+
   describe("given the directory agrees with the confirmed address", () => {
     /** @scenario "A directory identifier agreeing with the address is recorded as the stronger proof" */
     it("records the stronger proof on the link", async () => {
       const world = buildWorld();
       await world.seedPerson({ rawActorId: "ext-991", displayText: "m.silva@acme.test" });
       world.verifiedMember("user_42", "m.silva@acme.test");
-      world.directoryIds.seed({ organizationId: ORG, userId: "user_42", externalId: "ext-991" });
+      world.directoryIds.push({ userId: "user_42", externalId: "ext-991" });
 
       await world.service.linkProvenMatches({ organizationId: ORG });
 

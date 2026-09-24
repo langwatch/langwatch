@@ -17,6 +17,31 @@ export type CopilotStudioDataversePullConfig = z.infer<
   typeof copilotStudioDataversePullConfigSchema
 >;
 
+export const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie" as const;
+
+export const databricksGeniePullConfigSchema = z.object({
+  adapter: z.literal(DATABRICKS_GENIE_ADAPTER_ID),
+  /** Workspace base URL, e.g. `https://adb-1234567890.4.azuredatabricks.net`. */
+  workspaceUrl: z.string().url(),
+  /** Empty means every space the credential can see, including ones created later. */
+  spaceIds: z.array(z.string()).default([]),
+  /** ISO instant the very first run starts from. Later runs use the cursor. */
+  startingAt: z.string().datetime().optional(),
+  schedule: z.string().default("*/15 * * * *"),
+  /**
+   * The executor warehouse for the billing query; naming it opts the source into compute
+   * attribution, omitting it keeps Genie records at zero. Optional because reading
+   * `system` billing tables needs a grant the rest of the adapter does not.
+   */
+  warehouseId: z.string().min(1).optional(),
+  /**
+   * Also read the paid Genie bill line (`billing_origin_product = 'GENIE'`, no warehouse id).
+   * Opt-in: it lands rows under a key that cannot change once money sits under it.
+   */
+  readPaidGenieBill: z.boolean().default(false),
+});
+export type DatabricksGeniePullConfig = z.infer<typeof databricksGeniePullConfigSchema>;
+
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
 const costUsdSchema = z
   .union([z.string(), z.number()])

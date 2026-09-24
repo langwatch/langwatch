@@ -745,6 +745,17 @@ export class PrismaScimRepository extends ScimRepository {
       select: { connectionId: true, userId: true },
     });
   }
+
+  async findDirectoryExternalIds(input: {
+    connectionIds: string[];
+  }): Promise<{ userId: string; externalId: string }[]> {
+    if (input.connectionIds.length === 0) return [];
+
+    return this.prisma.scimExternalId.findMany({
+      where: { connectionId: { in: input.connectionIds } },
+      select: { userId: true, externalId: true },
+    });
+  }
 }
 
 function organizationUserRole(role: string): OrganizationUserRole {

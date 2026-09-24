@@ -78,6 +78,7 @@ import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimConnectionRetirementService } from "../services/scim-connection-retirement.service.ts";
 import { ScimConnectionsService } from "../services/scim-connections.service.ts";
 import { ScimDeprovisionService } from "../services/scim-deprovision.service.ts";
+import { ScimDirectoryExternalIdsService } from "../services/scim-directory-external-ids.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import { ScimOversightService } from "../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../services/scim-reconciliation.service.ts";
@@ -210,6 +211,7 @@ type ScimOperatorGate = (userId: string) => Promise<boolean>;
 type ScimAppOptions = {
   scim: ScimService;
   connections: ScimConnectionsService;
+  directoryExternalIds: ScimDirectoryExternalIdsService;
   reconciliation: ScimReconciliationService;
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   auditLog: Pick<AuditLogApi, "record">;
@@ -237,6 +239,7 @@ export class ScimApp implements ScimApiContract {
 
   readonly #scim: ScimService;
   readonly #connections: ScimConnectionsService;
+  readonly #directoryExternalIds: ScimDirectoryExternalIdsService;
   readonly #entitlements: Pick<EntitlementApi, "getActivePlan">;
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #webhook: ScimDirectoryStreamService;
@@ -250,6 +253,7 @@ export class ScimApp implements ScimApiContract {
     this.#oversight = options.oversight;
     this.#operators = options.operators;
     this.#connections = options.connections;
+    this.#directoryExternalIds = options.directoryExternalIds;
     this.#reconciliation = options.reconciliation;
     this.#entitlements = options.entitlements;
     this.#auditLog = options.auditLog;
@@ -278,9 +282,15 @@ export class ScimApp implements ScimApiContract {
       provenOffboarding: config.provenOffboarding,
     });
 
+    const connections = ScimConnectionsService.create(dependencies.identity);
+
     return ScimApp.createWithService({
       scim,
-      connections: ScimConnectionsService.create(dependencies.identity),
+      connections,
+      directoryExternalIds: ScimDirectoryExternalIdsService.create({
+        connections,
+        identities: repositories.scim,
+      }),
       reconciliation: ScimReconciliationService.create({
         identity: dependencies.identity,
         grants: dependencies.authorization,
@@ -330,6 +340,12 @@ export class ScimApp implements ScimApiContract {
 
   findConnections(input: { organizationId: string }): Promise<ScimDirectoryConnection[]> {
     return this.#connections.findConnections(input);
+  }
+
+  findDirectoryExternalIds(input: {
+    organizationId: string;
+  }): Promise<{ userId: string; externalId: string }[]> {
+    return this.#directoryExternalIds.findForOrganization(input);
   }
 
   generateToken(input: {

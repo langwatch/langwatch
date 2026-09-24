@@ -23,15 +23,16 @@
 import http from "http";
 import type { AddressInfo } from "net";
 
-import type { NormalizedPullEvent, PullResult } from "@langwatch/enterprise-governance-contract";
+import {
+  DATABRICKS_GENIE_ADAPTER_ID,
+  type DatabricksGeniePullConfig,
+  type NormalizedPullEvent,
+  type PullResult,
+} from "@langwatch/enterprise-governance-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { FetchHttp } from "../../__tests__/support/puller-test-ports.ts";
-import {
-  type DatabricksGeniePullConfig,
-  DatabricksGeniePullerService,
-} from "../databricks-genie-puller.service.ts";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../pull-destination.service.ts";
+import { DatabricksGeniePullerService } from "../databricks-genie-puller.service.ts";
 
 /** Mirrors the adapter's own constant; asserted against, not imported by it. */
 const WATERMARK_LAG_MS = 5 * 60 * 1000;

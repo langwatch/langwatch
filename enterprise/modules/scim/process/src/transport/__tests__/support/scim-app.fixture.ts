@@ -28,6 +28,7 @@ import {
   ScimConnectionsService,
   type ScimConnectionReads,
 } from "../../../services/scim-connections.service.ts";
+import { ScimDirectoryExternalIdsService } from "../../../services/scim-directory-external-ids.service.ts";
 import type { ScimOversightService } from "../../../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
 
@@ -110,9 +111,14 @@ export function scimTestApp(
       return Promise.resolve();
     },
   };
+  const connections = ScimConnectionsService.create(identity);
   const app = ScimApp.createWithService({
     scim,
-    connections: ScimConnectionsService.create(identity),
+    connections,
+    directoryExternalIds: ScimDirectoryExternalIdsService.create({
+      connections,
+      identities: { findDirectoryExternalIds: () => Promise.resolve([]) },
+    }),
     reconciliation: ScimReconciliationService.create({
       identity: {
         ...identity,
