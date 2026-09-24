@@ -90,8 +90,12 @@ describe("given a conversation the customer never named", () => {
       });
 
       await expect(
-        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toEqual({ title: "Debugging a failing evaluation", model: "openai/gpt-5-mini" });
+        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+      ).resolves.toEqual({
+        outcome: "generated",
+        title: "Debugging a failing evaluation",
+        model: "openai/gpt-5-mini",
+      });
     });
 
     it("asks the cascade for the conversation-title key, naming the fallback", async () => {
@@ -100,7 +104,7 @@ describe("given a conversation the customer never named", () => {
         records: [{ role: "user", content: "hello" }],
       });
 
-      await service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
+      await service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
 
       expect((models as RecordingTitleModel).asked).toEqual([
         {
@@ -121,7 +125,7 @@ describe("given a conversation the customer never named", () => {
         })),
       });
 
-      await service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
+      await service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
 
       const sentPrompt = mockGenerateText.mock.calls[0]?.[0]?.prompt;
       const prompt = typeof sentPrompt === "string" ? sentPrompt : "";
@@ -150,7 +154,7 @@ describe("given a conversation the customer never named", () => {
       const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
 
       await expect(
-        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
       ).resolves.toMatchObject({ title: expected });
     });
 
@@ -160,12 +164,15 @@ describe("given a conversation the customer never named", () => {
       } as never);
       const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
 
-      const generated = await service.tryGenerate({
+      const generated = await service.generate({
         projectId: PROJECT_ID,
         conversationId: CONVERSATION_ID,
       });
 
-      expect(generated?.title.length).toBe(LANGY_TITLE_GENERATION.MAX_TITLE_CHARS);
+      expect(generated.outcome).toBe("generated");
+      expect("title" in generated && generated.title.length).toBe(
+        LANGY_TITLE_GENERATION.MAX_TITLE_CHARS,
+      );
     });
   });
 
@@ -174,8 +181,8 @@ describe("given a conversation the customer never named", () => {
       const { service } = generatorOver({ records: [{ role: "user", content: "   " }] });
 
       await expect(
-        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toBeNull();
+        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+      ).resolves.toEqual({ outcome: "unchanged" });
       expect(mockGenerateText).not.toHaveBeenCalled();
     });
   });
@@ -192,8 +199,8 @@ describe("given a conversation the customer never named", () => {
       });
 
       await expect(
-        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toBeNull();
+        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+      ).resolves.toEqual({ outcome: "unchanged" });
     });
   });
 
@@ -210,7 +217,7 @@ describe("given a conversation the customer never named", () => {
       });
 
       await expect(
-        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
       ).rejects.toThrow("no model gateway on this deployment");
     });
 
@@ -219,8 +226,8 @@ describe("given a conversation the customer never named", () => {
       const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
 
       await expect(
-        service.tryGenerate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toBeNull();
+        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
+      ).resolves.toEqual({ outcome: "unchanged" });
     });
   });
 });

@@ -4,6 +4,7 @@ import {
   Deferred,
   type StateProjectionStore,
 } from "@langwatch/eventing";
+import { NotFoundError } from "@langwatch/handled-error";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
@@ -130,7 +131,7 @@ export class EventingLangyConversationAdapter {
     });
 
     const conversationReader = {
-      read: async ({
+      getById: async ({
         projectId,
         conversationId,
       }: {
@@ -141,7 +142,13 @@ export class EventingLangyConversationAdapter {
           tenantId: createTenantId(projectId),
           aggregateId: conversationId,
         });
-        if (!projection) return null;
+        if (!projection) {
+          throw new NotFoundError(
+            "langy_conversation_not_found",
+            "Langy conversation",
+            conversationId,
+          );
+        }
         return {
           cursor: projection.cursor,
           status: projection.state.Status,

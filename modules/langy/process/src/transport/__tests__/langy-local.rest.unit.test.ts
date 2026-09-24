@@ -87,7 +87,7 @@ function buildApi(options: { granted: boolean; own?: boolean }) {
     runtime: () =>
       ({
         presence: { read: async () => null },
-        requests: { tryFindOpenForConversation: async () => null },
+        requests: { findOpenForConversation: async () => [] },
       }) as never,
     commands: () => ({}) as never,
     users: () => ({ tryReadPreference: async () => null }),

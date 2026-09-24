@@ -1,5 +1,6 @@
 import type { EventSubscriberContext } from "@langwatch/eventing";
 import { createTenantId, DispatchError } from "@langwatch/eventing";
+import { NotFoundError } from "@langwatch/handled-error";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -73,13 +74,13 @@ function makeHandoff(overrides: Partial<LangyTurnHandoff> = {}): LangyTurnHandof
 }
 
 function makeDeps(params?: {
-  conversation?: LangyConversationLivenessRecord | null;
+  conversation?: LangyConversationLivenessRecord;
   liveness?: { present: boolean; stale: boolean; lastBeatAt: number | null };
   handoff?: LangyTurnHandoff | null;
 }) {
   return {
     conversations: {
-      read: vi.fn().mockResolvedValue(params?.conversation ?? makeRecord()),
+      getById: vi.fn().mockResolvedValue(params?.conversation ?? makeRecord()),
     },
     buffer: {
       liveness: vi.fn().mockResolvedValue(
@@ -129,7 +130,7 @@ describe("agent turn liveness subscriber", () => {
 
     await expect(subscriber.handle(event, context)).rejects.toBeInstanceOf(DispatchError);
 
-    expect(deps.conversations.read).toHaveBeenCalledWith({
+    expect(deps.conversations.getById).toHaveBeenCalledWith({
       projectId: "project_2",
       conversationId: "conv_2",
     });
@@ -153,6 +154,27 @@ describe("agent turn liveness subscriber", () => {
       "langyConversation has not projected event evt_b yet",
     );
     expect(deps.buffer.liveness).not.toHaveBeenCalled();
+  });
+
+  it("retries the delivery while the conversation is not folded yet", async () => {
+    const deps = makeDeps();
+    deps.conversations.getById.mockRejectedValue(
+      new NotFoundError("langy_conversation_not_found", "Langy conversation", "conv_1"),
+    );
+    const subscriber = createAgentTurnLivenessSubscriber(deps);
+
+    await expect(subscriber.handle(makeEvent(), context)).rejects.toThrow(
+      "langyConversation has not projected event",
+    );
+    expect(deps.buffer.liveness).not.toHaveBeenCalled();
+  });
+
+  it("lets a conversation read failure other than not-found through", async () => {
+    const deps = makeDeps();
+    deps.conversations.getById.mockRejectedValue(new Error("postgres down"));
+    const subscriber = createAgentTurnLivenessSubscriber(deps);
+
+    await expect(subscriber.handle(makeEvent(), context)).rejects.toThrow("postgres down");
   });
 
   it("re-arms another check instead of going quiet when the heartbeat is healthy", async () => {

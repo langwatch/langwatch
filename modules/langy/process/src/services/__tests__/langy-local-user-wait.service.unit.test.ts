@@ -213,8 +213,11 @@ describe("given a command that is not on the read-only list", () => {
         callId: "lcall_1",
         decision: "deny",
       });
-      expect(await service.tryPoll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
-        state: "answered",
+      expect(await service.poll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: {
+          state: "answered",
+        },
       });
     });
   });
@@ -340,9 +343,9 @@ describe("given a command that is not on the read-only list", () => {
       const wait = await startPermission();
       now += PERMISSION_WAIT_BUDGET_MS + 1;
 
-      const answer = await service.tryPoll({ waitId: wait.waitId, holdMs: 0 });
+      const answer = await service.poll({ waitId: wait.waitId, holdMs: 0 });
 
-      expect(answer).toMatchObject({ state: "expired" });
+      expect(answer).toMatchObject({ outcome: "polled", answer: { state: "expired" } });
       expect(events.ended[0]).toMatchObject({ outcome: "expired" });
       expect(sendPermission).toHaveBeenCalledWith({
         conversationId,
@@ -355,7 +358,7 @@ describe("given a command that is not on the read-only list", () => {
     it("refuses a late answer, so no command runs on it", async () => {
       const wait = await startPermission();
       now += PERMISSION_WAIT_BUDGET_MS + 1;
-      await service.tryPoll({ waitId: wait.waitId, holdMs: 0 });
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
       sendPermission.mockClear();
 
       await expect(
@@ -371,15 +374,15 @@ describe("given a command that is not on the read-only list", () => {
     it("appends one status entry per interval, which is what refreshes the stream", async () => {
       const wait = await startPermission();
 
-      await service.tryPoll({ waitId: wait.waitId, holdMs: 0 });
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
       expect(buffer.statuses).toHaveLength(0);
 
       now += LIVE_STREAM_KEEPALIVE_MS + 1;
-      await service.tryPoll({ waitId: wait.waitId, holdMs: 0 });
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
       expect(buffer.statuses).toHaveLength(1);
 
       now += LIVE_STREAM_KEEPALIVE_MS + 1;
-      await service.tryPoll({ waitId: wait.waitId, holdMs: 0 });
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
       expect(buffer.statuses).toHaveLength(2);
     });
 
@@ -387,9 +390,9 @@ describe("given a command that is not on the read-only list", () => {
     it("refreshes the turn's liveness on every poll, which is what the subscriber reads", async () => {
       const wait = await startPermission();
 
-      await service.tryPoll({ waitId: wait.waitId, holdMs: 0 });
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
       now += LIVE_STREAM_KEEPALIVE_MS + 1;
-      await service.tryPoll({ waitId: wait.waitId, holdMs: 0 });
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
 
       expect(buffer.beats).toHaveLength(2);
       expect(buffer.beats[0]).toMatchObject({ conversationId, turnId });
@@ -415,8 +418,11 @@ describe("given a question Langy asked mid-task", () => {
           },
         ],
       });
-      expect(await service.tryPoll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
-        state: "pending",
+      expect(await service.poll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: {
+          state: "pending",
+        },
       });
     });
   });
@@ -437,9 +443,12 @@ describe("given a question Langy asked mid-task", () => {
         ],
       });
 
-      expect(await service.tryPoll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
-        state: "answered",
-        answers: [{ selected: ["app/tracing.py"] }],
+      expect(await service.poll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: {
+          state: "answered",
+          answers: [{ selected: ["app/tracing.py"] }],
+        },
       });
       expect(buffer.questions.at(-1)).toMatchObject({ status: "answered" });
     });
@@ -460,8 +469,11 @@ describe("given a question Langy asked mid-task", () => {
         ],
       });
 
-      expect(await service.tryPoll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
-        answers: [{ other: "src/observability/setup.ts" }],
+      expect(await service.poll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: {
+          answers: [{ other: "src/observability/setup.ts" }],
+        },
       });
     });
   });
@@ -472,8 +484,11 @@ describe("given a question Langy asked mid-task", () => {
       const wait = await startQuestion();
       now += QUESTION_WAIT_BUDGET_MS + 1;
 
-      expect(await service.tryPoll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
-        state: "expired",
+      expect(await service.poll({ waitId: wait.waitId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: {
+          state: "expired",
+        },
       });
       expect(events.ended[0]).toMatchObject({
         kind: "question",

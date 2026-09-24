@@ -100,7 +100,7 @@ export class RedisLangyLocalControlRuntimeRepository {
       conversationId,
       turnId,
     })) {
-      await runtime.dispatcher.tryCancel({ callId: call.callId });
+      await runtime.dispatcher.cancel({ callId: call.callId });
     }
     await runtime.waits.cancelTurn({ conversationId, turnId });
   }

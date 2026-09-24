@@ -1,10 +1,13 @@
 /**
  * Resolution for a navigate destination with no remembered platform link. The
- * address is STILL platform-computed, never agent-authored; anything unknown
- * or failing resolves to null rather than tearing down the relay stream.
+ * address is STILL platform-computed, never agent-authored; an unknown id, a missing
+ * project or a failed resource lookup drops the navigate, not the relay stream.
  */
+import { HandledError } from "@langwatch/handled-error";
+
 import {
   type LangyNavigateProject,
+  type LangyNavigateResourceLocation,
   type LangyNavigateResourceLocator,
 } from "../app/langy.members.ts";
 import { pickNavigatePage } from "../rules/langy-navigate-pages.rules.ts";
@@ -15,6 +18,11 @@ export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: stri
 
 /** Builds a deep link to an organization page, which sits at the top level. */
 export type LangyNavigateOrganizationUrl = (input: { path: string }) => string;
+
+/** The platform address a navigate opens, or `dropped` when nothing answers to the id. */
+export type LangyNavigateResolution = { outcome: "resolved"; url: string } | { outcome: "dropped" };
+
+const DROPPED: LangyNavigateResolution = { outcome: "dropped" };
 
 export class LangyNavigateFallbackService {
   private readonly projects: LangyNavigateProject;
@@ -57,43 +65,50 @@ export class LangyNavigateFallbackService {
     });
   }
 
-  /**
-   * The platform address this id names, or null when nothing in this project
-   * answers to it.
-   */
-  async tryResolveUrl(input: { projectId: string; resourceId: string }): Promise<string | null> {
+  async resolveUrl(input: {
+    projectId: string;
+    resourceId: string;
+  }): Promise<LangyNavigateResolution> {
     const page = pickNavigatePage(input.resourceId);
     if (page?.scope === "organization") {
-      return this.organizationUrl({ path: page.path });
+      return { outcome: "resolved", url: this.organizationUrl({ path: page.path }) };
     }
 
-    const path = page?.path ?? (await this.tryResolveResourcePath(input));
-    if (!path) {
-      return null;
+    const location = page
+      ? { outcome: "located" as const, path: page.path }
+      : await this.locateResource(input);
+    if (location.outcome === "unknown") {
+      return DROPPED;
     }
 
     // The slug is fetched once, and only after the destination is confirmed:
     // an id that resolves to nothing never costs a project read.
-    const projectSlug = await this.projects.trySlugOf(input.projectId).catch(() => null);
-    if (!projectSlug) {
-      return null;
+    try {
+      const projectSlug = await this.projects.getSlug(input.projectId);
+      return { outcome: "resolved", url: this.platformUrl({ projectSlug, path: location.path }) };
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "project_not_found") {
+        return DROPPED;
+      }
+      throw error;
     }
-
-    return this.platformUrl({ projectSlug, path });
   }
 
-  private async tryResolveResourcePath({
+  private async locateResource({
     projectId,
     resourceId,
   }: {
     projectId: string;
     resourceId: string;
-  }): Promise<string | null> {
+  }): Promise<LangyNavigateResourceLocation> {
     const kind = detectNavigateResourceKind(resourceId);
     if (!kind || !this.resources) {
-      return null;
+      return { outcome: "unknown" };
     }
 
-    return this.resources.tryLocate({ projectId, kind, resourceId }).catch(() => null);
+    // A failed lookup drops the navigate rather than the relay stream (see the header).
+    return this.resources
+      .locate({ projectId, kind, resourceId })
+      .catch((): LangyNavigateResourceLocation => ({ outcome: "unknown" }));
   }
 }

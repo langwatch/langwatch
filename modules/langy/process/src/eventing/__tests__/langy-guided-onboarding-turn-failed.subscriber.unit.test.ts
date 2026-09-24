@@ -58,7 +58,7 @@ function harness(options: {
       },
     },
     conversations: {
-      read: async () => {
+      getById: async () => {
         reads.conversations += 1;
         return { ownerUserId: options.ownerUserId === undefined ? "user-1" : options.ownerUserId };
       },

@@ -71,7 +71,7 @@ describe("agentTurnLiveness redelivery", () => {
         record = { ...record, status: "failed", currentTurnId: null };
       });
       const subscriber = createAgentTurnLivenessSubscriber({
-        conversations: { read: vi.fn(async () => record) },
+        conversations: { getById: vi.fn(async () => record) },
         buffer: {
           liveness: vi.fn(async () => ({ stale: true })),
           appendStatus: vi.fn(async () => undefined),
@@ -96,7 +96,7 @@ describe("agentTurnLiveness redelivery", () => {
       const dispatch = vi.fn(async () => undefined);
       const subscriber = createAgentTurnLivenessSubscriber({
         conversations: {
-          read: vi.fn(async () => ({
+          getById: vi.fn(async () => ({
             cursor: cursorAt("evt_1"),
             status: LANGY_CONVERSATION_STATUS.RUNNING,
             currentTurnId: "turn_2",
@@ -128,7 +128,7 @@ describe("langyConversationUpdateBroadcast redelivery", () => {
     const broadcastToTenant = vi.fn(async () => undefined);
     const subscriber = createLangyConversationUpdateBroadcastSubscriber({
       conversations: {
-        read: vi.fn(async () => ({
+        getById: vi.fn(async () => ({
           cursor: cursorAt("evt_1"),
           ownerUserId: "user_1",
           isShared: false,

@@ -91,7 +91,12 @@ export interface LangyEffectMembers {
 export type LangyTitleGenerator = (input: {
   projectId: string;
   conversationId: string;
-}) => Promise<{ title: string; model: string } | null>;
+}) => Promise<LangyGeneratedTitle>;
+
+/** A title and the model that wrote it, or `unchanged` when the conversation keeps its title. */
+export type LangyGeneratedTitle =
+  | { outcome: "generated"; title: string; model: string }
+  | { outcome: "unchanged" };
 
 /** The stable identity every frame is bound to. */
 export interface LangyFrameIdentity {
@@ -139,20 +144,21 @@ export interface LangyIds {
  * turn belongs to, and never from anything the agent wrote.
  */
 export interface LangyNavigateProject {
-  /** The project's slug, or null when it cannot be read. */
-  trySlugOf(projectId: string): Promise<string | null>;
+  /** The project's slug; throws `ProjectNotFoundError` when the project is missing. */
+  getSlug(projectId: string): Promise<string>;
 }
 
+/** Where a resource is read, or `unknown` when nothing in this project answers to the id. */
+export type LangyNavigateResourceLocation =
+  | { outcome: "located"; path: string }
+  | { outcome: "unknown" };
+
 export interface LangyNavigateResourceLocator {
-  /**
-   * The project-relative path this resource is read at, or null when nothing in
-   * this project answers to the id.
-   */
-  tryLocate(input: {
+  locate(input: {
     projectId: string;
     kind: LangyNavigateResourceKind;
     resourceId: string;
-  }): Promise<string | null>;
+  }): Promise<LangyNavigateResourceLocation>;
 }
 
 /** Counts minted/revoked/reaped as one series with operation labels so dashboards read

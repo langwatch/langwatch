@@ -80,7 +80,7 @@ function subscriberOver(cursor: { acceptedAt: number; eventId: string }) {
   const subscriber = createLangyConversationUpdateBroadcastSubscriber({
     broadcast: { broadcastToTenant },
     conversations: {
-      read: vi.fn().mockResolvedValue({
+      getById: vi.fn().mockResolvedValue({
         cursor,
         ownerUserId: "user_1",
         isShared: false,

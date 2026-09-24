@@ -57,7 +57,7 @@ async function callWaitingOnACard(clock: { now: number }) {
     timeoutMs: COMMAND_TIMEOUT_MS,
   });
   await dispatcher.ack(call.callId);
-  await dispatcher.tryAwaitPermission({ callId: call.callId, waitId: "lwait_1" });
+  await dispatcher.awaitPermission({ callId: call.callId, waitId: "lwait_1" });
   return { dispatcher, store, callId: call.callId };
 }
 
@@ -79,9 +79,8 @@ describe("given a call waiting on a permission card", () => {
     it("still holds the call, and gives the command its whole limit again", async () => {
       const waiting = await dispatcher.read(callId);
       expect(waiting?.state).toBe("awaiting_permission");
-      const polled = await dispatcher.tryPoll({ callId, holdMs: 0 });
-      expect(polled).not.toBeNull();
-      expect(polled?.state).toBe("awaiting_permission");
+      const polled = await dispatcher.poll({ callId, holdMs: 0 });
+      expect(polled).toMatchObject({ outcome: "polled", answer: { state: "awaiting_permission" } });
 
       await dispatcher.sendPermission({
         conversationId,

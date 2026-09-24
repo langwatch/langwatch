@@ -48,7 +48,7 @@ function makeDeps(value: LangyTurnHandoff | null = handoff()) {
       apiKeyId: "key-recovered",
     }),
     revokeSessionKey: vi.fn().mockResolvedValue(undefined),
-    titleGenerator: vi.fn().mockResolvedValue(null),
+    titleGenerator: vi.fn().mockResolvedValue({ outcome: "unchanged" }),
     saveTitle: vi.fn().mockResolvedValue(undefined),
     failTurn: { failTurn: vi.fn().mockResolvedValue(undefined) },
     markError: vi.fn().mockResolvedValue(undefined),
@@ -244,6 +244,7 @@ describe("RedisLangyEffectRepository", () => {
   it("saves a generated title with the triggering turn identity", async () => {
     const deps = makeDeps();
     deps.titleGenerator.mockResolvedValue({
+      outcome: "generated",
       title: "Fix Trace Ingestion",
       model: "openai/gpt-5-mini",
     });

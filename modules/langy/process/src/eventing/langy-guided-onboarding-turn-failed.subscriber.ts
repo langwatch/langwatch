@@ -4,6 +4,7 @@
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -26,10 +27,11 @@ export interface GuidedOnboardingReader {
 
 /** The owner of a conversation, for the distinct id the failure is tracked against. */
 export interface LangyConversationOwnerReader {
-  read(params: {
+  /** Throws `langy_conversation_not_found` until the conversation is folded. */
+  getById(params: {
     projectId: string;
     conversationId: string;
-  }): Promise<{ ownerUserId: string | null } | null>;
+  }): Promise<{ ownerUserId: string | null }>;
 }
 
 /** Fire and forget: a failed turn must not fail again on its analytics. */
@@ -100,7 +102,13 @@ export function createGuidedOnboardingTurnFailedSubscriber(
         const guided = await deps.guidedOnboarding.read({ projectId });
         if (!guided || guided.conversationId !== conversationId) return;
 
-        const conversation = await deps.conversations.read({ projectId, conversationId });
+        const conversation = await deps.conversations
+          .getById({ projectId, conversationId })
+          .catch((error: unknown) => {
+            if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found")
+              return null;
+            throw error;
+          });
         const userId = conversation?.ownerUserId;
         if (!userId) {
           logger.warn(

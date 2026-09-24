@@ -47,6 +47,9 @@ import {
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
 
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
+
+/** One poll of a call, or `gone` once its record has expired. */
+export type LocalCallPoll = { outcome: "polled"; answer: PollCallResponse } | { outcome: "gone" };
 export class LocalCallDispatcherService {
   private readonly store: SessionStateStore;
   private readonly presence: LangyLocalPresence;
@@ -122,7 +125,7 @@ export class LocalCallDispatcherService {
    * refreshes turn liveness here rather than on a timer, so a dead worker's
    * turn ends once it stops polling.
    */
-  async tryPoll({
+  async poll({
     callId,
     holdMs = CALL_POLL_HOLD_MS,
     signal,
@@ -130,7 +133,7 @@ export class LocalCallDispatcherService {
     callId: string;
     holdMs?: number;
     signal?: AbortSignal;
-  }): Promise<PollCallResponse | null> {
+  }): Promise<LocalCallPoll> {
     const until = this.now() + holdMs;
     const beat = this.beater();
     const look = async (): Promise<StoredLocalCall | null> => {
@@ -145,7 +148,7 @@ export class LocalCallDispatcherService {
       });
       call = await look();
     }
-    return call ? toPollResponse(call) : null;
+    return call ? { outcome: "polled", answer: toPollResponse(call) } : { outcome: "gone" };
   }
 
   /**
@@ -218,20 +221,14 @@ export class LocalCallDispatcherService {
   }
 
   /**
-   * The command line needs the developer's answer first. Returns the call as
-   * it now stands so the caller can raise the card against it. The envelope
-   * now has to outlive the CARD's wait budget, not the command's own deadline.
+   * The command line needs the developer's answer first; a settled or expired
+   * call is left alone. The envelope now has to outlive the CARD's wait
+   * budget, not the command's own deadline.
    */
-  async tryAwaitPermission({
-    callId,
-    waitId,
-  }: {
-    callId: string;
-    waitId: string;
-  }): Promise<StoredLocalCall | null> {
+  async awaitPermission({ callId, waitId }: { callId: string; waitId: string }): Promise<void> {
     const call = await this.read(callId);
     if (!call || call.state === "done") {
-      return null;
+      return;
     }
 
     const next: StoredLocalCall = {
@@ -241,8 +238,6 @@ export class LocalCallDispatcherService {
     };
     await this.write(next);
     await this.track(next);
-
-    return next;
   }
 
   /** Sends the developer's answer to the command line holding the call. */
@@ -304,7 +299,7 @@ export class LocalCallDispatcherService {
    * folder left, or the permission card expired. Idempotent, because the turn
    * cancel path and the worker's own cancel both reach here.
    */
-  async tryCancel({
+  async cancel({
     callId,
     code = "cancelled",
     message = "The turn was stopped, so the command did not finish.",
@@ -312,10 +307,10 @@ export class LocalCallDispatcherService {
     callId: string;
     code?: "cancelled" | "timeout" | "permission_expired" | "exec_failed";
     message?: string;
-  }): Promise<StoredLocalCall | null> {
+  }): Promise<void> {
     const call = await this.read(callId);
     if (!call || call.state === "done") {
-      return null;
+      return;
     }
 
     await this.store.publish(
@@ -323,7 +318,7 @@ export class LocalCallDispatcherService {
       JSON.stringify({ cancel: callId } satisfies WorkspaceNudge),
     );
 
-    return this.settle({ ...call, ok: false, error: { code, message } });
+    await this.settle({ ...call, ok: false, error: { code, message } });
   }
 
   /** Every call still in flight on one turn, for the Stop path. */

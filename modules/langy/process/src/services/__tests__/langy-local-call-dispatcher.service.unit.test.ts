@@ -94,11 +94,10 @@ describe("given a folder connected to the conversation", () => {
         frame: { ok: true, text: "README.md\npackage.json" },
       });
 
-      const answer = await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 });
-      expect(answer).toMatchObject({
-        state: "done",
-        ok: true,
-        text: "README.md\npackage.json",
+      const poll = await dispatcher.poll({ callId: call.callId, holdMs: 0 });
+      expect(poll).toMatchObject({
+        outcome: "polled",
+        answer: { state: "done", ok: true, text: "README.md\npackage.json" },
       });
     });
 
@@ -126,9 +125,9 @@ describe("given a folder connected to the conversation", () => {
         callId: call.callId,
         frame: { ok: true, text: "listed" },
       });
-      expect(await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 })).toMatchObject({
-        state: "done",
-        text: "listed",
+      expect(await dispatcher.poll({ callId: call.callId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: { state: "done", text: "listed" },
       });
     });
   });
@@ -152,14 +151,17 @@ describe("given a folder connected to the conversation", () => {
       await slowDispatcher.ack(call.callId);
       const controller = new AbortController();
 
-      const polling = slowDispatcher.tryPoll({
+      const polling = slowDispatcher.poll({
         callId: call.callId,
         holdMs: 60_000,
         signal: controller.signal,
       });
       controller.abort();
 
-      await expect(polling).resolves.toMatchObject({ state: "running" });
+      await expect(polling).resolves.toMatchObject({
+        outcome: "polled",
+        answer: { state: "running" },
+      });
     });
   });
 
@@ -175,7 +177,7 @@ describe("given a folder connected to the conversation", () => {
       });
       await dispatcher.ack(call.callId);
 
-      await dispatcher.tryAwaitPermission({
+      await dispatcher.awaitPermission({
         callId: call.callId,
         waitId: "lwait_1",
       });
@@ -207,14 +209,13 @@ describe("given a folder connected to the conversation", () => {
         timeoutMs: 60_000,
       });
 
-      await dispatcher.tryCancel({ callId: call.callId });
+      await dispatcher.cancel({ callId: call.callId });
       await new Promise((resolve) => setImmediate(resolve));
 
       expect(nudges).toContainEqual({ cancel: call.callId });
-      expect(await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 })).toMatchObject({
-        state: "done",
-        ok: false,
-        error: { code: "cancelled" },
+      expect(await dispatcher.poll({ callId: call.callId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: { state: "done", ok: false, error: { code: "cancelled" } },
       });
     });
 
@@ -231,10 +232,10 @@ describe("given a folder connected to the conversation", () => {
         frame: { ok: true, text: "listed" },
       });
 
-      expect(await dispatcher.tryCancel({ callId: call.callId })).toBeNull();
-      expect(await dispatcher.tryPoll({ callId: call.callId, holdMs: 0 })).toMatchObject({
-        ok: true,
-        text: "listed",
+      await dispatcher.cancel({ callId: call.callId });
+      expect(await dispatcher.poll({ callId: call.callId, holdMs: 0 })).toMatchObject({
+        outcome: "polled",
+        answer: { ok: true, text: "listed" },
       });
     });
   });

@@ -4,6 +4,7 @@
  * @see specs/langy/langy-local-control.feature
  */
 import type { EventSubscriberDefinition, ProjectionCursor } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 import {
   cursorHasReachedEvent,
   LANGY_CONVERSATION_EVENT_TYPES,
@@ -27,10 +28,11 @@ const logger = createLogger("langwatch:langy:local-control:connect-turn");
 
 /** The folded conversation, as far as the owed turn reads it. */
 export interface LocalConnectTurnConversationReader {
-  read(params: {
+  /** Throws `langy_conversation_not_found` until the conversation is folded. */
+  getById(params: {
     projectId: string;
     conversationId: string;
-  }): Promise<{ cursor: ProjectionCursor; status: string } | null>;
+  }): Promise<{ cursor: ProjectionCursor; status: string }>;
 }
 
 export type LocalConnectTurnPresence = Pick<
@@ -64,7 +66,13 @@ export function createLocalConnectTurnSubscriber(
       const owed = await owedTurnOf(presence, conversationId);
       if (!owed) return;
 
-      const record = await deps.conversations.read({ projectId, conversationId });
+      const record = await deps.conversations
+        .getById({ projectId, conversationId })
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found")
+            return null;
+          throw error;
+        });
       if (!record || !cursorHasReachedEvent(record.cursor, event)) {
         throw new Error(`langyConversation has not projected event ${event.id} yet`);
       }

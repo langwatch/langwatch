@@ -624,14 +624,13 @@ describe("given a folder shared with the conversation", () => {
         text: "package.json\nsrc",
       });
 
-      const answer = await podA.runtime.dispatcher.tryPoll({
+      const answer = await podA.runtime.dispatcher.poll({
         callId: call.callId,
         holdMs: 5_000,
       });
       expect(answer).toMatchObject({
-        state: "done",
-        ok: true,
-        text: "package.json\nsrc",
+        outcome: "polled",
+        answer: { state: "done", ok: true, text: "package.json\nsrc" },
       });
     });
   });
@@ -655,11 +654,11 @@ describe("given a folder shared with the conversation", () => {
         ok: true,
         text: "export const app = 1;",
       });
-      const answer = await podB.runtime.dispatcher.tryPoll({
+      const answer = await podB.runtime.dispatcher.poll({
         callId: call.callId,
         holdMs: 5_000,
       });
-      expect(answer).toMatchObject({ state: "done", ok: true });
+      expect(answer).toMatchObject({ outcome: "polled", answer: { state: "done", ok: true } });
     });
   });
 
@@ -693,13 +692,13 @@ describe("given a folder shared with the conversation", () => {
         },
       });
 
-      const answer = await podA.runtime.dispatcher.tryPoll({
+      const answer = await podA.runtime.dispatcher.poll({
         callId: call.callId,
         holdMs: 5_000,
       });
-      expect(answer?.output).toMatchObject({
-        pid: 51234,
-        logPath: ".langwatch/langy-logs/pnpm-dev.log",
+      expect(answer).toMatchObject({
+        outcome: "polled",
+        answer: { output: { pid: 51234, logPath: ".langwatch/langy-logs/pnpm-dev.log" } },
       });
     });
   });
@@ -1058,12 +1057,14 @@ describe("given a folder the developer stops sharing", () => {
         timeout: 5_000,
       })
       .toBeNull();
-    const answer = await podA.runtime.dispatcher.tryPoll({
+    const answer = await podA.runtime.dispatcher.poll({
       callId: call.callId,
       holdMs: 2_000,
     });
-    expect(answer).toMatchObject({ state: "done", ok: false });
-    expect(answer?.error?.code).toBe("cancelled");
+    expect(answer).toMatchObject({
+      outcome: "polled",
+      answer: { state: "done", ok: false, error: { code: "cancelled" } },
+    });
     expect(events.some((event) => event.name === "local_workspace_disconnected")).toBe(true);
   });
 
@@ -1143,11 +1144,11 @@ describe("given a network that blocks WebSockets", () => {
         },
       ],
     });
-    const answer = await podB.runtime.dispatcher.tryPoll({
+    const answer = await podB.runtime.dispatcher.poll({
       callId: call.callId,
       holdMs: 5_000,
     });
-    expect(answer).toMatchObject({ state: "done", ok: true });
+    expect(answer).toMatchObject({ outcome: "polled", answer: { state: "done", ok: true } });
 
     await podA.longPoll.retire(token, "cli_exit");
     expect(await podA.longPoll.poll({ token })).toMatchObject({ ok: false });

@@ -8,11 +8,17 @@ import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 
-import type { LangyTitleGenerator, LangyTitleModelResolver } from "../app/langy.members.ts";
+import type {
+  LangyGeneratedTitle,
+  LangyTitleGenerator,
+  LangyTitleModelResolver,
+} from "../app/langy.members.ts";
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
 import type { LangyTrustedMessageReader } from "./langy-message.service.ts";
 
 const logger = createLogger("langwatch:langy:title-generator");
+
+const UNCHANGED: LangyGeneratedTitle = { outcome: "unchanged" };
 
 /** The cascade key a project may point at a model of its own. */
 export const LANGY_TITLE_FEATURE_KEY = "langy.conversation_title";
@@ -46,13 +52,13 @@ export class LangyTitleGeneratorService {
 
   /** The generator as the conversation runtime's effect ports take it. */
   generator(): LangyTitleGenerator {
-    return (input) => this.tryGenerate(input);
+    return (input) => this.generate(input);
   }
 
-  async tryGenerate(input: {
+  async generate(input: {
     projectId: string;
     conversationId: string;
-  }): Promise<{ title: string; model: string } | null> {
+  }): Promise<LangyGeneratedTitle> {
     const { projectId, conversationId } = input;
     const records = await this.deps.messages.getRecordsByConversation({
       conversationId,
@@ -60,7 +66,7 @@ export class LangyTitleGeneratorService {
     });
     const transcript = buildTranscript(records);
     if (!transcript) {
-      return null;
+      return UNCHANGED;
     }
 
     let model: Awaited<ReturnType<LangyTitleModelResolver["resolveTitleModel"]>>;
@@ -81,7 +87,7 @@ export class LangyTitleGeneratorService {
           "no cheap model configured for Langy titles — leaving title unchanged",
         );
 
-        return null;
+        return UNCHANGED;
       }
 
       throw error;
@@ -101,7 +107,7 @@ export class LangyTitleGeneratorService {
     // conversation is which model wrote the title.
     const modelId = typeof model === "string" ? model : model.modelId;
 
-    return title ? { title, model: modelId } : null;
+    return title ? { outcome: "generated", title, model: modelId } : UNCHANGED;
   }
 }
 
