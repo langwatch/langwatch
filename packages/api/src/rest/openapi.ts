@@ -352,6 +352,7 @@ export const CREDENTIAL_CLASS_BY_DOOR = {
   apiKey: "project_api_key",
   scimToken: "scim_token",
   "instance-admin": "instance_admin_api_key",
+  sessionKey: "project_api_key",
   browser: "session",
   internalSecret: "internal_secret",
   public: "none",

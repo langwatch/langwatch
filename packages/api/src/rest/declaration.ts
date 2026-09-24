@@ -162,6 +162,7 @@ export type RestDoorCredential = Extract<
   | "scimToken"
   | "internalSecret"
   | "instance-admin"
+  | "sessionKey"
   | "browser"
 >;
 
@@ -178,6 +179,7 @@ export const DOOR_SCOPE_TIER = {
   browser: null,
   internalSecret: null,
   "instance-admin": null,
+  sessionKey: "project",
 } as const satisfies Record<RestDoorCredential, AuthzDeclaredScopeId["tier"] | null>;
 
 /** The scope a handler on `Door` is handed: the tier that door resolves. */

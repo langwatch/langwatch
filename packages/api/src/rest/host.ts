@@ -17,10 +17,11 @@ import type { IdempotentRunner } from "./idempotency.ts";
 import { isRestCredentialBinding, type RestTransportMiddlewareBinding } from "./request.ts";
 import { canonicalErrorResponse } from "./response.ts";
 import { createRestRuntime, type RestAuditSink, type RestIdentity } from "./runtime.ts";
+import { SessionKeyIdentity } from "./session-key-identity.ts";
 
-/** Every credential kind a family may name, except the per-family bearer. */
+/** Every credential kind a family may name, except the two a module binds for itself. */
 export type RestIdentities = Readonly<
-  Record<Exclude<RestDoorCredential, "internalSecret">, RestIdentity>
+  Record<Exclude<RestDoorCredential, "internalSecret" | "sessionKey">, RestIdentity>
 >;
 
 /**
@@ -118,6 +119,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     return {
       ...this.options.identities,
       internalSecret: this.options.bearers(declaration.namespace),
+      sessionKey: SessionKeyIdentity.unbound(declaration.namespace),
     };
   }
 }

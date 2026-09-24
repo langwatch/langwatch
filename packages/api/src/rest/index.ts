@@ -320,6 +320,11 @@ export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-ses
 export { bindRestCredential, type RestCredentialBinding } from "./request.ts";
 
 export { BearerIdentity } from "./bearer-identity.ts";
+export {
+  SessionKeyIdentity,
+  type SessionKeyHolder,
+  type SessionKeyPresented,
+} from "./session-key-identity.ts";
 
 export type { RestDeclaredResult } from "./declaration.ts";
 

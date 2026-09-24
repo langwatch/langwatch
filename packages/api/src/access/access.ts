@@ -86,6 +86,7 @@ export type Credential =
   | "scimToken"
   | "internalSecret"
   | "instance-admin"
+  | "sessionKey"
   | "public";
 
 /** An authenticated caller, normalized with a stable identifier for every kind. */
@@ -316,6 +317,7 @@ export function securityRequirement(credential: Credential): readonly Record<str
   switch (credential) {
     case "project":
     case "apiKey":
+    case "sessionKey":
       return [{ project_api_key: [] }];
     case "organization":
       return [{ admin_api_key: [] }];
