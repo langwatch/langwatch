@@ -293,9 +293,10 @@ export const SearchBar: React.FC = () => {
   // attached. A search that ran without the model that shapes it says so in
   // the strip under the bar (`SearchFallbackNotice`), which is where the
   // model settings are offered.
-  // While the read is in flight the submit still goes to the server, which
-  // refuses with this same popover on `instant_eval_not_enabled` — so a slow
-  // flag read never hides a feature the project actually has.
+  // While the flag read is in flight the submit is treated as available, so
+  // the estimate goes out; if the server refuses it, the user gets the model
+  // popover and the phrase search fallback, so a slow flag read never hides a
+  // feature the project actually has.
   const { enabled: instantEvalsReleased, isLoading: instantEvalsFlagLoading } =
     useFeatureFlag("release_instant_evals", {
       projectId: project?.id,

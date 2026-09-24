@@ -312,22 +312,15 @@ export function useSubmitSearch({
   const applyFilter = useCallback(
     ({
       queryText,
-      projectId,
+      run,
     }: {
       queryText: string;
-      projectId: string | null;
+      run: InstantEvalRoutePayload | null;
     }) => {
-      const run = projectId ? typedEvalRunOf({ queryText, projectId }) : null;
-      if (run && !isInstantEvalAvailable) {
-        // Nothing is searched: the typed chip stays in the bar under the
-        // popover that says why the run did not start.
-        onInstantEval(run);
-        return;
-      }
       applyQueryText(queryText);
       if (run) onInstantEval(run);
     },
-    [applyQueryText, isInstantEvalAvailable, onInstantEval],
+    [applyQueryText, onInstantEval],
   );
 
   const submitSearch = useCallback(
@@ -343,9 +336,18 @@ export function useSubmitSearch({
       }
       // The sample preview has no project to search or judge in.
       const projectId = isSamplePreview ? null : (project?.id ?? null);
+      const run = projectId
+        ? typedEvalRunOf({ queryText: trimmed, projectId })
+        : null;
+      if (run && !isInstantEvalAvailable) {
+        // Nothing is searched: the typed chip stays in the bar under the
+        // popover that says why the run did not start.
+        onInstantEval(run);
+        return;
+      }
       const { sentence } = splitBareWords(trimmed);
       if (!sentence) {
-        applyFilter({ queryText: trimmed, projectId });
+        applyFilter({ queryText: trimmed, run });
         return;
       }
       if (!projectId) {
@@ -357,7 +359,9 @@ export function useSubmitSearch({
     [
       applyFilter,
       applyQueryText,
+      isInstantEvalAvailable,
       isSamplePreview,
+      onInstantEval,
       onSupersede,
       project?.id,
       route,

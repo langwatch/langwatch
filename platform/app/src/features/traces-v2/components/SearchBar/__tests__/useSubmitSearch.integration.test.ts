@@ -411,6 +411,27 @@ describe("given the text is an eval chip typed by hand", () => {
       // and the typed chip stays exactly where the reader left it.
       expect(useExplorerStore.getState().queryText).toBe("");
     });
+
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("refuses a chip typed alongside a bare word the same way, before any request", () => {
+      const { result } = renderSubmit({ isInstantEvalAvailable: false });
+      act(() =>
+        result.current.submitSearch('eval:"the user is annoyed" urgent'),
+      );
+      // A bare word beside the chip is what makes this a sentence to
+      // `splitBareWords` — the router route a plain sentence would otherwise
+      // take is never reached: the unreleased chip is caught first.
+      expect(mutation.mutate).not.toHaveBeenCalled();
+      expect(handlers.onInstantEval).toHaveBeenCalledTimes(1);
+      expect(handlers.onInstantEval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          question: { instructions: "the user is annoyed" },
+          otherQuery: "urgent",
+        }),
+      );
+      // Nothing applied over the typed text either.
+      expect(useExplorerStore.getState().queryText).toBe("");
+    });
   });
 });
 

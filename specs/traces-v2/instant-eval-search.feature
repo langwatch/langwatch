@@ -385,6 +385,14 @@ Feature: Instant Evals inside the Trace Explorer
       Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
       And no estimate is requested and the typed query stays in the bar
       And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+      And a chip typed alongside other words is refused the same way, before any request
+
+    @integration
+    Scenario: A flag read still in flight lets the submit reach the estimate
+      Given the flag read has not answered yet
+      When the user submits an eval chip
+      Then the estimate is requested
+      And no popover opens
 
     @integration
     Scenario: Any other refusal falls back to the phrase search

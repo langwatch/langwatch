@@ -418,7 +418,8 @@ function estimateThenRoute({
  *
  * Spec: specs/traces-v2/instant-eval-search.feature ("A run starts under
  * the cost rule", "A refusal is a popover, never an error state",
- * "Instant Evals unreleased for this project").
+ * "Instant Evals switched off open the contact-us popover and nothing is
+ * searched").
  */
 export function useInstantEvalRoute({
   isInstantEvalAvailable,
