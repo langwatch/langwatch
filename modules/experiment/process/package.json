@@ -34,6 +34,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/config": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",

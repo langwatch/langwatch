@@ -197,7 +197,7 @@ export class ExperimentEventingAdapter {
     );
   }
 
-  stateRepository(input: { defaultRetentionDays: number }): ExperimentRunStateRepository {
+  stateRepository(input: { defaultRetentionDays: () => number }): ExperimentRunStateRepository {
     return this.clickhouse
       ? ClickHouseExperimentRunStateRepository.create({
           clickhouse: this.clickhouse,
@@ -213,7 +213,7 @@ export class ExperimentEventingAdapter {
   }
 
   itemStore(input: {
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): AppendStore<ClickHouseExperimentRunResultRecord> {
     return ExperimentRunItemStore.create({
       clickhouse: this.clickhouse,

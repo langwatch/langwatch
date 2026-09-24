@@ -59,7 +59,7 @@ function storage(): ExperimentRunResultStorageMapProjection {
   return ExperimentRunResultStorageMapProjection.create({
     store: ExperimentRunItemStore.create({
       clickhouse: new SuiteClickHouse(),
-      defaultRetentionDays: 90,
+      defaultRetentionDays: () => 90,
     }),
   });
 }

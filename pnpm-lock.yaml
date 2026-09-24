@@ -2433,6 +2433,9 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/enterprise-scim-contract':
+        specifier: workspace:*
+        version: link:../../scim/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
@@ -5087,6 +5090,9 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
+      '@langwatch/annotation-contract':
+        specifier: workspace:*
+        version: link:../../annotation/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -7128,6 +7134,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -11545,6 +11554,9 @@ importers:
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../packages/csv
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract

@@ -19,7 +19,7 @@ export class ClickhouseExperimentRunStateStoreRepository {
   static create(options: {
     type: "clickhouse";
     resolveClient: (tenantId: string) => Promise<ExperimentEventingClickHouseClient>;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): ClickhouseExperimentRunStateStoreRepository {
     const clickhouse: ExperimentClickHouseRepository = { resolveClient: options.resolveClient };
     return new ClickhouseExperimentRunStateStoreRepository(

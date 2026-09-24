@@ -14,12 +14,12 @@ const logger = createLogger("langwatch:experiment-run-processing:experiment-run-
 export class ExperimentRunItemStore implements AppendStore<ClickHouseExperimentRunResultRecord> {
   private constructor(
     private readonly clickhouse: ExperimentClickHouseRepository | null,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   static create(options: {
     clickhouse: ExperimentClickHouseRepository | null;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): ExperimentRunItemStore {
     return new ExperimentRunItemStore(options.clickhouse, options.defaultRetentionDays);
   }
@@ -36,7 +36,7 @@ export class ExperimentRunItemStore implements AppendStore<ClickHouseExperimentR
       return;
     }
 
-    const retentionDays = context.retentionPolicy?.experiments ?? this.defaultRetentionDays;
+    const retentionDays = context.retentionPolicy?.experiments ?? this.defaultRetentionDays();
     const recordWithRetention = {
       ...record,
       _retention_days: retentionDays,

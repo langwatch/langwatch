@@ -84,7 +84,7 @@ function compose(options: { foldCacheTtlSeconds?: number } = {}) {
 
   const pipeline: ExperimentRunProcessingPipeline = RedisExperimentRunProcessingRepository.create({
     resolveClient: resolveClient as never,
-    defaultRetentionDays: 49,
+    defaultRetentionDays: () => 49,
     redis: redis as never,
     ...(options.foldCacheTtlSeconds === undefined
       ? {}

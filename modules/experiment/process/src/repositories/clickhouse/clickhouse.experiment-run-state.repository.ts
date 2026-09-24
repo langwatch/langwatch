@@ -90,12 +90,12 @@ export class ClickHouseExperimentRunStateRepository<
 > implements ExperimentRunStateRepository<ProjectionType> {
   private constructor(
     private readonly clickhouse: ExperimentClickHouseRepository,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   static create<ProjectionType extends Projection = Projection>(options: {
     clickhouse: ExperimentClickHouseRepository;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): ClickHouseExperimentRunStateRepository<ProjectionType> {
     return new ClickHouseExperimentRunStateRepository<ProjectionType>(
       options.clickhouse,
@@ -177,7 +177,7 @@ export class ClickHouseExperimentRunStateRepository<
       LastEventOccurredAt: clickHouseDateTime(data.LastEventOccurredAt ?? 0),
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
-      _retention_days: this.defaultRetentionDays,
+      _retention_days: this.defaultRetentionDays(),
     };
   }
 
@@ -304,7 +304,8 @@ export class ClickHouseExperimentRunStateRepository<
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { experiments?: number | null }
         | undefined;
-      projectionRecord._retention_days = retentionPolicy?.experiments ?? this.defaultRetentionDays;
+      projectionRecord._retention_days =
+        retentionPolicy?.experiments ?? this.defaultRetentionDays();
 
       await client.insert({
         table: TABLE_NAME,
@@ -360,7 +361,7 @@ export class ClickHouseExperimentRunStateRepository<
       const retentionPolicy = context.metadata?.retentionPolicy as
         | { experiments?: number | null }
         | undefined;
-      const retentionDays = retentionPolicy?.experiments ?? this.defaultRetentionDays;
+      const retentionDays = retentionPolicy?.experiments ?? this.defaultRetentionDays();
       const records = projections.map((projection) => {
         const { runId } = parseExperimentRunKey(String(projection.aggregateId));
         const record = this.mapProjectionDataToClickHouseRecord({

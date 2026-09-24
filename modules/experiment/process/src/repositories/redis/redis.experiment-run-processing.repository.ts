@@ -23,7 +23,7 @@ const EXPERIMENT_RUN_FOLD_CACHE_KEY_PREFIX = "experiment_runs";
 export type ClickHouseExperimentRunProcessingAdapterOptions = {
   resolveClient: ExperimentEventingClickHouseResolver;
   /** The fallback for rows whose tenant declares no retention override. */
-  defaultRetentionDays: number;
+  defaultRetentionDays: () => number;
   /**
    * The process's own Redis, required rather than optional.
    */

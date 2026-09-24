@@ -32,6 +32,9 @@
       "path": "../../../packages/csv/tsconfig.build.json"
     },
     {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {

@@ -18,6 +18,9 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
+      "path": "../../annotation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {

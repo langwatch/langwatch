@@ -20,12 +20,18 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { ExperimentRunStateStore } from "../eventing/experiment-run-state.store.ts";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
+import {
+  ExperimentEventingAdapter,
+  type ExperimentRunProcessingPipeline,
+} from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
 import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
+import { RedisExperimentRunProcessingRepository } from "../repositories/redis/redis.experiment-run-processing.repository.ts";
 import { RedisExperimentRunProgressRepository } from "../repositories/redis/redis.experiment-run-progress.repository.ts";
 import type {
   ExecutionDataServices,
@@ -120,7 +126,7 @@ class ClickHouseMemberSession {
 
   async insert(input: {
     table: string;
-    values: unknown[];
+    values: readonly unknown[];
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<unknown> {
@@ -233,6 +239,39 @@ function monitorCascade(monitors: MonitorApi): ExperimentMonitorCascade {
 }
 
 /** What this process hands `ExperimentApp` at boot. */
+function memberSessionResolver(clickhouse: ClickHouseQueryClient) {
+  return (tenantId: string) => Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
+}
+
+/**
+ * `experiment_run_processing`, ported from the deleted `ExperimentWorkerFeatureInstaller`:
+ * the run fold caches through Redis where this deployment has one, and reads ClickHouse uncached
+ * otherwise.
+ */
+export function buildExperimentRunProcessing(input: {
+  clickhouse: ClickHouseQueryClient;
+  redis: ProcessMembers["redis"] | undefined;
+  defaultRetentionDays: () => number;
+}): ExperimentRunProcessingPipeline {
+  const { redis, defaultRetentionDays } = input;
+  const resolveClient = memberSessionResolver(input.clickhouse);
+  if (redis) {
+    return RedisExperimentRunProcessingRepository.create({
+      resolveClient,
+      defaultRetentionDays,
+      redis,
+    }).buildProcessing();
+  }
+
+  const eventing = ExperimentEventingAdapter.create({ resolveClient, clickhouseEnabled: true });
+  return ExperimentEventingAdapter.pipeline({
+    experimentRunStateFoldStore: ExperimentRunStateStore.create({
+      repository: eventing.stateRepository({ defaultRetentionDays }),
+    }),
+    experimentRunItemAppendStore: eventing.itemStore({ defaultRetentionDays }),
+  });
+}
+
 export function buildExperimentInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
@@ -254,8 +293,7 @@ export function buildExperimentInfrastructure(input: {
   };
 }): Omit<ExperimentAppDependencies, "runLookup"> {
   const { prisma, clickhouse, redis, logger, dependencies } = input;
-  const resolveClient = (tenantId: string) =>
-    Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
+  const resolveClient = memberSessionResolver(clickhouse);
   const runHistoryTelemetry = LoggedExperimentRunHistoryTelemetry.create(logger);
   const tupleParam = (values: string[]) => new TupleParam(values);
 
