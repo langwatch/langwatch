@@ -269,6 +269,10 @@ export class LangyApp implements LangyApiContract {
         skipGate: (gate) => workspace.canSkipPermissions(gate),
       }),
     });
+    setup.resources.own("Langy local-control session state", () =>
+      setup.repositories.sessionState.close(),
+    );
+    setup.resources.own("Langy local-control long-poll sessions", () => longPoll.close());
     const sessionKeyDoor = SessionKeyIdentity.create({
       instanceTokenHeader: INSTANCE_TOKEN_HEADER,
       verify: (presented) => longPoll.verifySessionKey(presented),

@@ -97,6 +97,47 @@ describe("the session key door", () => {
     });
   });
 
+  describe("given the key as Basic base64(projectId:token)", () => {
+    it("reads the project and the key from the header", async () => {
+      const presented: SessionKeyPresented[] = [];
+      const basic = Buffer.from("project-1:sk-lw-session-live").toString("base64");
+      const response = await hostWith(presented).app.request("/api/session-key/me", {
+        headers: { authorization: `Basic ${basic}`, "x-project-id": "project-2" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(presented).toEqual([
+        { token: "sk-lw-session-live", projectId: "project-1", instanceToken: null },
+      ]);
+    });
+  });
+
+  describe("given a Basic header that does not decode to projectId:token", () => {
+    it("refuses as missing credentials without asking the module", async () => {
+      const presented: SessionKeyPresented[] = [];
+      const response = await hostWith(presented).app.request("/api/session-key/me", {
+        headers: { authorization: `Basic ${Buffer.from("no-separator").toString("base64")}` },
+      });
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ code: "missing_credentials" });
+      expect(presented).toEqual([]);
+    });
+  });
+
+  describe("given the key only in X-Auth-Token", () => {
+    it("refuses as missing credentials, as main's session core did", async () => {
+      const presented: SessionKeyPresented[] = [];
+      const response = await hostWith(presented).app.request("/api/session-key/me", {
+        headers: { "x-auth-token": "sk-lw-session-live", "x-project-id": "project-1" },
+      });
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ code: "missing_credentials" });
+      expect(presented).toEqual([]);
+    });
+  });
+
   describe("given no key", () => {
     it("refuses as missing credentials without asking the module", async () => {
       const presented: SessionKeyPresented[] = [];

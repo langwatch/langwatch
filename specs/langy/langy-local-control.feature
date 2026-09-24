@@ -469,6 +469,34 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the connection is refused
       And the refusal names the reason
 
+    @unit
+    Scenario: The CLI may send the session key as a bearer token or as Basic credentials
+      Given an approved control request
+      When the CLI registers over long-poll with the session key as a bearer token or as Basic credentials
+      Then the folder is registered
+      And a key sent only as X-Auth-Token is refused with the frame that asks for a bearer token
+
+    @unit
+    Scenario: A long-poll register with a key that is not a Langy session key answers a refused frame
+      Given an approved control request
+      When the CLI registers over long-poll with a key that is not the minted session key
+      Then register answers 403 with a refused frame
+      And the frame names the reason: an invalid key, the wrong kind of key, or a key that controls no conversation
+
+    @unit
+    Scenario: A long-poll poll or post for an unknown instance token answers 410
+      Given a long-poll share registered on another pod, or one that has ended
+      When the CLI polls or posts frames with its instance token
+      Then the platform answers 410 with no frames and nothing accepted
+      And the CLI registers again, as it does after a dropped socket
+
+    @unit
+    Scenario: A pod that shuts down retires its long-poll shares before closing the session store
+      Given a folder shared over long-poll on a pod
+      When the pod shuts down
+      Then the pod retires every long-poll share it holds
+      And only then closes its session-state store
+
     @integration
     Scenario: Disconnecting from the panel revokes the key
       Given a connected folder

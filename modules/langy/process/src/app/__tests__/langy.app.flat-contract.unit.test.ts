@@ -22,6 +22,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
+import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
 import { LangyApp } from "../langy.app.ts";
 
 const CONVERSATION = {
@@ -56,7 +57,7 @@ describe("LangyApp", () => {
       handles.push(handle);
       return build("langy-test-secret");
     });
-    const app = await createApp(secrets);
+    const app = await createApp({ secrets });
     expect(handles).toEqual([langySecrets.internal]);
     const door = app.internalDoor;
     if (!door.identify) throw new Error("The Langy internal credential has no identify operation");
@@ -75,6 +76,27 @@ describe("LangyApp", () => {
       }),
     ).toThrow(expect.objectContaining({ code: "unauthorized" }));
     expect(handles).toHaveLength(1);
+  });
+
+  /** @scenario "A pod that shuts down retires its long-poll shares before closing the session store" */
+  it("closes the long-poll sessions, then the session-state store, when the process shuts down", async () => {
+    const owned: { name: string; close: () => void | Promise<void> }[] = [];
+    const repositories = MemoryLangyRepositories.create();
+    const closed: string[] = [];
+    vi.spyOn(repositories.sessionState, "close").mockImplementation(async () => {
+      closed.push("session state");
+    });
+    vi.spyOn(LocalControlLongPollService.prototype, "close").mockImplementation(async () => {
+      closed.push("long-poll sessions");
+    });
+    await createApp({
+      repositories,
+      resources: { own: (name, close) => owned.push({ name, close }), ownService: () => void 0 },
+    });
+
+    for (const resource of [...owned].reverse()) await resource.close();
+
+    expect(closed).toEqual(["long-poll sessions", "session state"]);
   });
 
   it("keeps one service instance behind the application", async () => {
@@ -136,7 +158,17 @@ function fakePresence(): PresenceApi {
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-function createApp(secrets = noSecrets): Promise<LangyApp> {
+type LangySetupResources = Parameters<typeof LangyApp.create>[0]["resources"];
+
+function createApp({
+  secrets = noSecrets,
+  resources = { own: () => void 0, ownService: () => void 0 },
+  repositories = MemoryLangyRepositories.create(),
+}: {
+  secrets?: ScopedSecrets;
+  resources?: LangySetupResources;
+  repositories?: ReturnType<typeof MemoryLangyRepositories.create>;
+} = {}): Promise<LangyApp> {
   return LangyApp.create({
     dependencies: {
       presence: fakePresence(),
@@ -161,8 +193,8 @@ function createApp(secrets = noSecrets): Promise<LangyApp> {
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
     config: { agentUrl: undefined },
-    resources: { own: () => void 0, ownService: () => void 0 },
+    resources,
     secrets,
-    repositories: MemoryLangyRepositories.create(),
+    repositories,
   });
 }

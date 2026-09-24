@@ -48,19 +48,50 @@ export class SessionKeyIdentity implements RestIdentity {
   }
 
   async identify({ request }: { request: Request }): Promise<RestCaller> {
-    const authorization = request.headers.get("authorization") ?? "";
-    const token = authorization.toLowerCase().startsWith("bearer ")
-      ? authorization.slice("bearer ".length).trim()
-      : "";
+    const credential = readAuthorization({
+      authorization: request.headers.get("authorization") ?? "",
+      projectId: request.headers.get("x-project-id"),
+    });
 
-    if (token === "") throw new ProjectMissingCredentialsError();
+    if (credential === undefined) throw new ProjectMissingCredentialsError();
 
     const holder = await this.#verify({
-      token,
-      projectId: request.headers.get("x-project-id"),
+      ...credential,
       instanceToken: request.headers.get(this.#instanceTokenHeader),
     });
 
     return { actor: holder.actor, scope: { tier: "project", id: holder.projectId } };
   }
+}
+
+/**
+ * Main's `extractCredentials` over the `authorization` header alone, as its session core read it:
+ * Basic `base64(projectId:token)` first, then Bearer with `x-project-id`. `X-Auth-Token` was never
+ * read for a session key, so it is not read here.
+ */
+function readAuthorization({
+  authorization,
+  projectId,
+}: {
+  authorization: string;
+  projectId: string | null;
+}): Omit<SessionKeyPresented, "instanceToken"> | undefined {
+  const scheme = authorization.toLowerCase();
+
+  if (scheme.startsWith("basic ")) {
+    const decoded = Buffer.from(authorization.slice("basic ".length), "base64").toString("utf-8");
+    const separator = decoded.indexOf(":");
+    const basicProjectId = separator === -1 ? "" : decoded.slice(0, separator);
+    const basicToken = separator === -1 ? "" : decoded.slice(separator + 1);
+    if (basicProjectId !== "" && basicToken !== "") {
+      return { token: basicToken, projectId: basicProjectId };
+    }
+  }
+
+  if (scheme.startsWith("bearer ")) {
+    const token = authorization.slice("bearer ".length).trim();
+    if (token !== "") return { token, projectId };
+  }
+
+  return undefined;
 }

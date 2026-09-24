@@ -98,17 +98,15 @@ function family() {
   });
   const request = (path: string, init: RequestInit = {}) =>
     host.app.request(`http://api.test/api/v1/langy/control/connect${path}`, init);
-  const register = (body: unknown, key?: string) =>
+  const registerWith = (body: unknown, headers: Record<string, string>) =>
     request("/register", {
       method: "POST",
       body: JSON.stringify(body),
-      headers: {
-        "content-type": "application/json",
-        "x-project-id": "project-1",
-        ...(key ? { authorization: `Bearer ${key}` } : {}),
-      },
+      headers: { "content-type": "application/json", "x-project-id": "project-1", ...headers },
     });
-  return { ops, request, register };
+  const register = (body: unknown, key?: string) =>
+    registerWith(body, key ? { authorization: `Bearer ${key}` } : {});
+  return { ops, request, register, registerWith };
 }
 
 function refused(code: string, message: string) {
@@ -130,6 +128,41 @@ describe("registering a folder over long-poll", () => {
         authorization: `Bearer ${LIVE_KEY}`,
         frame: REGISTER_FRAME,
       });
+    });
+  });
+
+  describe("given the session key as Basic base64(projectId:key)", () => {
+    /** @scenario "The CLI may send the session key as a bearer token or as Basic credentials" */
+    it("registers with the key and project the header carries, status 200", async () => {
+      const api = family();
+      const authorization = `Basic ${Buffer.from(`project-1:${LIVE_KEY}`).toString("base64")}`;
+
+      const response = await api.registerWith(REGISTER_FRAME, { authorization });
+
+      expect(response.status).toBe(200);
+      expect(api.ops.verifyLocalControlSessionKey).toHaveBeenCalledWith({
+        token: LIVE_KEY,
+        projectId: "project-1",
+        instanceToken: null,
+      });
+      expect(api.ops.registerLocalControlSession).toHaveBeenCalledWith(
+        expect.objectContaining({ authorization }),
+      );
+    });
+  });
+
+  describe("given the session key only in X-Auth-Token", () => {
+    /** @scenario "The CLI may send the session key as a bearer token or as Basic credentials" */
+    it("answers main's bearer-token refused frame without asking Langy, status 403", async () => {
+      const api = family();
+
+      const response = await api.registerWith(REGISTER_FRAME, { "x-auth-token": LIVE_KEY });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual(
+        refused("api_key_invalid", "Send the Langy session key as a bearer token."),
+      );
+      expect(api.ops.verifyLocalControlSessionKey).not.toHaveBeenCalled();
     });
   });
 
@@ -160,6 +193,7 @@ describe("registering a folder over long-poll", () => {
       "That key does not control a conversation any more. Ask Langy for the code change again.",
     ],
   ])("given the key %s", (key, code, message) => {
+    /** @scenario "A long-poll register with a key that is not a Langy session key answers a refused frame" */
     it(`answers the refused frame ${code}, status 403`, async () => {
       const api = family();
 
@@ -209,6 +243,7 @@ describe("polling a long-poll share", () => {
   });
 
   describe("given no instance token this pod knows", () => {
+    /** @scenario "A long-poll poll or post for an unknown instance token answers 410" */
     it("answers main's empty frames, status 410", async () => {
       const api = family();
 
@@ -236,6 +271,7 @@ describe("posting a long-poll share's frames", () => {
     expect(await response.text()).toBe(JSON.stringify({ accepted: 1 }));
   });
 
+  /** @scenario "A long-poll poll or post for an unknown instance token answers 410" */
   it("answers main's 410 for an instance token this pod does not know", async () => {
     const response = await post(family(), { frames: [ack] }, "lcs_other");
 
