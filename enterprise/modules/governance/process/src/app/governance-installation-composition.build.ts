@@ -6,6 +6,8 @@ import type {
   GovernanceOttlGateway,
   GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -15,7 +17,6 @@ import type {
   AiToolSlug,
 } from "../repositories/ai-tool-catalog.repository.ts";
 import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
-import { PrismaPersonalVirtualKeyRepository } from "../repositories/prisma/prisma.governance-personal-key.repository.ts";
 import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
 import { PrismaActivityMonitorRepository } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
@@ -88,6 +89,8 @@ export type GovernanceInstallationOptions = {
   cliContacts: CliAdminContactReader;
   auth: Pick<AuthApi, "findCliTokenRecordsForUser" | "revokeCliTokens">;
   apiKeys: Pick<ApiKeyApi, "revokeCliSessionKey">;
+  gateway: Pick<GatewayApi, "findPersonalVirtualKeys" | "findVirtualKeyById">;
+  modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
   diagnostics?: GovernanceDiagnosticsSink;
   adminWorkspaceOcsf?: AdminWorkspaceViewOcsfChannel;
   adminWorkspaceDiagnostics?: GovernanceDiagnosticsSink;
@@ -141,7 +144,8 @@ export class GovernanceInstallationComposition {
       repository: PrismaRoutingPolicyRepository.create(this.options.database),
     });
     const personalVirtualKeys = DefaultGovernancePersonalVirtualKeyService.create({
-      repository: PrismaPersonalVirtualKeyRepository.create(this.options.database),
+      keys: this.options.gateway,
+      providers: this.options.modelProviders,
       issuer: this.options.personalVirtualKeyIssuer,
       organizations: this.options.organizations,
       policies: routingPolicies,

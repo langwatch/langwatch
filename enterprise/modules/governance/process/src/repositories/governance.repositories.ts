@@ -33,7 +33,6 @@ import type { IngestionPullRunRepository } from "./ingestion-pull-run.repository
 import type { IngestionSourceRepository } from "./ingestion-source.repository.ts";
 import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
-import type { PersonalVirtualKeyRepository } from "./personal-virtual-key.repository.ts";
 import type { RollupErasureRepository } from "./rollup-erasure.repository.ts";
 import type { RoutingPolicyRepository } from "./routing-policy.repository.ts";
 import type { OrganizationSessionPolicyRepository } from "./session-policy.repository.ts";
@@ -66,7 +65,6 @@ export interface GovernanceRepositories {
   readonly ingestionTemplates: IngestionTemplateRepository;
   readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
   readonly ocsfExports: GovernanceOcsfExportRepository;
-  readonly personalVirtualKeys: PersonalVirtualKeyRepository;
   readonly rollupErasure: RollupErasureRepository;
   readonly routingPolicies: RoutingPolicyRepository;
   readonly sessionPolicies: OrganizationSessionPolicyRepository;

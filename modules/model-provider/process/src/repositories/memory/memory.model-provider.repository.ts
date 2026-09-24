@@ -31,6 +31,14 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
 
   private constructor(private readonly database: MemoryModelProviderDatabase) {}
 
+  async countEnabledInScopes(input: {
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number> {
+    return [...this.database.providers.values()].filter(
+      (row) => row.enabled && matchesAnyScope(row.scopes, input.scopes),
+    ).length;
+  }
+
   async countUsage({
     organizationIds,
   }: {

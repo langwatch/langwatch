@@ -57,6 +57,22 @@ export class PrismaModelProviderRepository implements ModelProviderRepository {
     return new PrismaModelProviderRepository(database, credentials);
   }
 
+  countEnabledInScopes(input: {
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number> {
+    return this.database.modelProvider.count({
+      where: {
+        enabled: true,
+        disabledAt: null,
+        scopes: {
+          some: {
+            OR: input.scopes.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
+          },
+        },
+      },
+    });
+  }
+
   async countUsage({
     organizationIds,
   }: {

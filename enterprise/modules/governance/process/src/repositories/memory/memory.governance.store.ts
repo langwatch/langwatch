@@ -5,7 +5,6 @@ import type {
   AnomalyRule,
   Department,
   IngestionTemplate,
-  PersonalVirtualKey,
   RoutingPolicy,
 } from "@langwatch/enterprise-governance-contract";
 
@@ -54,7 +53,6 @@ export class MemoryGovernanceStore {
   readonly ingestionTemplates: IngestionTemplate[] = [];
   readonly anomalyRules: AnomalyRule[] = [];
   readonly routingPolicies: RoutingPolicy[] = [];
-  readonly personalVirtualKeys: PersonalVirtualKey[] = [];
   readonly eligibleProviderIds = new Map<string, string[]>();
   readonly alerts: MemoryGovernanceAlert[] = [];
 

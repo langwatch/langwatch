@@ -80,6 +80,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve({ providers: [] });
   }
 
+  countEnabledInScopes(): Promise<number> {
+    return Promise.resolve(0);
+  }
+
   constructor(
     private readonly estimate: (input: ModelCostEstimateInput) => number = () => 0,
   ) {}

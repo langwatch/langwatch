@@ -565,6 +565,12 @@ export class ModelProviderApp implements ModelProviderApi {
    * The providers this deployment holds its own keys for, in dispatch order.
    * Empty where it holds none, which is a self-hosted install's answer.
    */
+  countEnabledInScopes(input: {
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number> {
+    return this.#modelProviders.countEnabledInScopes(input);
+  }
+
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {
     return this.#modelProviders.countUsage(input);
   }

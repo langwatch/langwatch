@@ -47,7 +47,6 @@ export type * from "./repositories/governance-setup-state.repository.ts";
 export type * from "./repositories/ingestion-pull-lifecycle.repository.ts";
 export type * from "./repositories/ingestion-source.repository.ts";
 export type * from "./repositories/ingestion-template.repository.ts";
-export type * from "./repositories/personal-virtual-key.repository.ts";
 export type * from "./repositories/routing-policy.repository.ts";
 export type * from "./repositories/session-policy.repository.ts";
 export type * from "./repositories/spend-spike-anomaly.repository.ts";

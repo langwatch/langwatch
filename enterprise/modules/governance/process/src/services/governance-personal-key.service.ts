@@ -16,12 +16,20 @@ import {
   type RevokeAllPersonalVirtualKeysInput,
   type RevokePersonalVirtualKeyInput,
 } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 
 import type { PersonalVirtualKeyIssuer } from "../app/governance.members.ts";
-import type { PersonalVirtualKeyRepository } from "../repositories/personal-virtual-key.repository.ts";
+import {
+  DEFAULT_PERSONAL_KEY_LABEL,
+  isDefaultPersonalKey,
+  personalKeyEligibilityScopes,
+  toPersonalVirtualKey,
+} from "../rules/personal-virtual-key.rules.ts";
 
-const DEFAULT_PERSONAL_KEY_LABEL = "default";
+type PersonalKeyReads = Pick<GatewayApi, "findPersonalVirtualKeys" | "findVirtualKeyById">;
+type ProviderCounts = Pick<ModelProviderApi, "countEnabledInScopes">;
 
 type RoutingPolicyReader = {
   findById(input: { id: string; organizationId: string }): Promise<{
@@ -46,26 +54,30 @@ type RoutingPolicy = {
 };
 
 export class DefaultGovernancePersonalVirtualKeyService {
-  private readonly repository: PersonalVirtualKeyRepository;
+  private readonly keys: PersonalKeyReads;
+  private readonly providers: ProviderCounts;
   private readonly issuer: PersonalVirtualKeyIssuer;
   private readonly organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
   private readonly policies: RoutingPolicyReader;
   private readonly gatewayBaseUrl: string;
 
   private constructor({
-    repository,
+    keys,
+    providers,
     issuer,
     organizations,
     policies,
     gatewayBaseUrl,
   }: {
-    repository: PersonalVirtualKeyRepository;
+    keys: PersonalKeyReads;
+    providers: ProviderCounts;
     issuer: PersonalVirtualKeyIssuer;
     organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }) {
-    this.repository = repository;
+    this.keys = keys;
+    this.providers = providers;
     this.issuer = issuer;
     this.organizations = organizations;
     this.policies = policies;
@@ -73,14 +85,16 @@ export class DefaultGovernancePersonalVirtualKeyService {
   }
 
   static create(options: {
-    repository: PersonalVirtualKeyRepository;
+    keys: PersonalKeyReads;
+    providers: ProviderCounts;
     issuer: PersonalVirtualKeyIssuer;
     organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }): DefaultGovernancePersonalVirtualKeyService {
     return new DefaultGovernancePersonalVirtualKeyService({
-      repository: options.repository,
+      keys: options.keys,
+      providers: options.providers,
       issuer: options.issuer,
       organizations: options.organizations,
       policies: options.policies,
@@ -111,11 +125,13 @@ export class DefaultGovernancePersonalVirtualKeyService {
   ): Promise<IssuedPersonalVirtualKey> {
     const parsed = ensureDefaultPersonalVirtualKeyInputSchema.parse(input);
     const workspace = await this.organizations.ensurePersonalWorkspace(parsed);
-    const existing = await this.repository.findDefault({
-      userId: parsed.userId,
+    const held = await this.keys.findPersonalVirtualKeys({
       organizationId: parsed.organizationId,
-      personalProjectId: workspace.project.id,
+      principalUserId: parsed.userId,
     });
+    const existing = held.find((key) =>
+      isDefaultPersonalKey({ key, personalProjectId: workspace.project.id }),
+    );
     if (existing) {
       throw new PersonalVirtualKeyAlreadyExistsError(existing.id);
     }
@@ -141,10 +157,8 @@ export class DefaultGovernancePersonalVirtualKeyService {
       parsed.routingPolicyId === undefined || parsed.routingPolicyId === null;
     const policyIsEmpty = Boolean(policy && policy.modelProviderIds.length === 0);
     if (noPolicyRequested && (!policy || policyIsEmpty)) {
-      const eligible = await this.repository.countEligibleProviders({
-        organizationId: parsed.organizationId,
-        personalTeamId: parsed.personalTeamId,
-        personalProjectId: parsed.personalProjectId,
+      const eligible = await this.providers.countEnabledInScopes({
+        scopes: personalKeyEligibilityScopes(parsed),
       });
       if (eligible === 0) {
         throw new NoEligibleProvidersError(parsed.organizationId);
@@ -173,18 +187,19 @@ export class DefaultGovernancePersonalVirtualKeyService {
     };
   }
 
-  list(input: ListPersonalVirtualKeysInput): Promise<PersonalVirtualKey[]> {
-    return this.repository.findAll(listPersonalVirtualKeysInputSchema.parse(input));
+  async list(input: ListPersonalVirtualKeysInput): Promise<PersonalVirtualKey[]> {
+    const parsed = listPersonalVirtualKeysInputSchema.parse(input);
+    const keys = await this.keys.findPersonalVirtualKeys({
+      organizationId: parsed.organizationId,
+      ...(parsed.userId === undefined ? {} : { principalUserId: parsed.userId }),
+    });
+    return keys.map(toPersonalVirtualKey);
   }
 
   async revoke(input: RevokePersonalVirtualKeyInput): Promise<PersonalVirtualKey> {
     const parsed = revokePersonalVirtualKeyInputSchema.parse(input);
-    const key = await this.repository.findOwned({
-      id: parsed.virtualKeyId,
-      organizationId: parsed.organizationId,
-      userId: parsed.userId,
-    });
-    if (!key) {
+    const key = await this.keys.findVirtualKeyById(parsed.virtualKeyId, parsed.organizationId);
+    if (!key || key.principalUserId !== parsed.userId) {
       throw new PersonalVirtualKeyNotFoundError(parsed.virtualKeyId);
     }
 
@@ -195,9 +210,22 @@ export class DefaultGovernancePersonalVirtualKeyService {
     });
   }
 
+  /** Whether the person already holds a live key under this label here, as main refused. */
+  async hasLiveKeyLabelled(input: {
+    organizationId: string;
+    userId: string;
+    label: string;
+  }): Promise<boolean> {
+    const keys = await this.keys.findPersonalVirtualKeys({
+      organizationId: input.organizationId,
+      principalUserId: input.userId,
+    });
+    return keys.some((key) => key.name === input.label);
+  }
+
   async revokeAllForUser(input: RevokeAllPersonalVirtualKeysInput): Promise<number> {
     const parsed = revokeAllPersonalVirtualKeysInputSchema.parse(input);
-    const keys = await this.repository.findActiveForUser(parsed.userId);
+    const keys = await this.keys.findPersonalVirtualKeys({ principalUserId: parsed.userId });
     for (const key of keys) {
       await this.issuer.revoke({
         id: key.id,

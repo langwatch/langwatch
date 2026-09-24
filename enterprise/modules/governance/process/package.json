@@ -49,6 +49,7 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/otlp": "workspace:*",

@@ -1,6 +1,4 @@
 import {
-  gatewayGuardrailResourceSchema,
-  gatewayGuardrailBundleEntrySchema,
   type ArchiveGatewayGuardrailInput,
   type CreateGatewayGuardrailInput,
   type GatewayGuardrailResource,
@@ -60,16 +58,14 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
       include: { evaluator: { select: { slug: true } } },
       orderBy: [{ direction: "asc" }, { name: "asc" }],
     });
-    return rows.map((row) =>
-      gatewayGuardrailBundleEntrySchema.parse({
-        id: row.id,
-        name: row.name,
-        evaluatorId: row.evaluatorId,
-        evaluatorSlug: row.evaluator?.slug ?? null,
-        direction: guardrailDirectionOf(row.direction),
-        failureMode: row.failureMode === "FAIL_OPEN" ? "fail_open" : "fail_closed",
-      }),
-    );
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      evaluatorId: row.evaluatorId,
+      evaluatorSlug: row.evaluator?.slug ?? null,
+      direction: guardrailDirectionOf(row.direction),
+      failureMode: row.failureMode === "FAIL_OPEN" ? "fail_open" : "fail_closed",
+    }));
   }
 
   async findById({
@@ -125,7 +121,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
 }
 
 function toResource(row: GatewayGuardrail): GatewayGuardrailResource {
-  return gatewayGuardrailResourceSchema.parse({
+  return {
     id: row.id,
     projectId: row.projectId,
     name: row.name,
@@ -138,7 +134,7 @@ function toResource(row: GatewayGuardrail): GatewayGuardrailResource {
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  });
+  };
 }
 
 function guardrailDirectionOf(direction: string) {

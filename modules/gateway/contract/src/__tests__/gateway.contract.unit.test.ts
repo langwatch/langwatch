@@ -5,20 +5,20 @@ import { gatewayBudgetCheckInputSchema, gatewayBudgetCheckResultSchema } from ".
 describe("gateway contract", () => {
   it("requires request scope context at the boundary", () => {
     expect(
-      gatewayBudgetCheckInputSchema.safeParse({
+      gatewayBudgetCheckInputSchema.validate({
         organizationId: "org_1",
         teamId: null,
         projectId: null,
         virtualKeyId: "vk_1",
         projectedCostUsd: "0.01",
-      }).success,
+      }),
     ).toBe(true);
     expect(
-      gatewayBudgetCheckInputSchema.safeParse({
+      gatewayBudgetCheckInputSchema.validate({
         organizationId: "org_1",
         virtualKeyId: "vk_1",
         projectedCostUsd: "0.01",
-      }).success,
+      }),
     ).toBe(false);
   });
 
@@ -49,8 +49,6 @@ describe("gateway contract", () => {
       ],
     };
     expect(gatewayBudgetCheckResultSchema.parse(result)).toEqual(result);
-    expect(gatewayBudgetCheckResultSchema.safeParse({ ...result, extra: true }).success).toBe(
-      false,
-    );
+    expect(gatewayBudgetCheckResultSchema.validate({ ...result, extra: true })).toBe(false);
   });
 });

@@ -9,6 +9,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve({ providers: [] });
   }
 
+  countEnabledInScopes(): Promise<number> {
+    return Promise.resolve(0);
+  }
+
   readonly costInputs: ModelCostEstimateInput[] = [];
 
   constructor(private readonly cost = 0) {}

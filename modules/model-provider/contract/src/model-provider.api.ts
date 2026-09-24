@@ -305,6 +305,10 @@ export interface ModelProviderApi {
    */
   platformProviderChain(): Promise<PlatformProviderEntry[]>;
   /** The usage report's figures (ADR-156, section 10). */
+  /** Enabled providers attached to any of the scopes; main's personal-key eligibility count. */
+  countEnabledInScopes(input: {
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number>;
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount>;
 }
 

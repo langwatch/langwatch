@@ -514,6 +514,14 @@ export interface GatewayApi extends GatewayInternalProtocol {
     id: string;
     userId: string;
   }): Promise<GatewayVirtualKeyRecord>;
+  /**
+   * Live keys held by a person (any person when unnamed), newest first: main's
+   * personal-key reads.
+   */
+  findPersonalVirtualKeys(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<GatewayVirtualKeyRecord[]>;
   findVirtualKeyById(id: string, organizationId: string): Promise<GatewayVirtualKeyRecord | null>;
   /** One key anchored to this organization, without any visibility rule. */
   getExistingVirtualKey(input: {

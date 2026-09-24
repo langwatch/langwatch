@@ -171,6 +171,10 @@ export type GatewayVirtualKeyBudgetInput = Readonly<{
 export type GatewayVirtualKeyOperations = Readonly<{
   getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
   findById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null>;
+  findLiveWithPrincipal(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<VirtualKeyWithScopes[]>;
   getPage(input: {
     organizationId: string;
     limit: number;
@@ -1374,6 +1378,13 @@ export class GatewayApp implements GatewayApi {
       virtualKeyNames,
       clickHouseDisabled: false,
     };
+  }
+
+  findPersonalVirtualKeys(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<GatewayVirtualKeyRecord[]> {
+    return this.#dependencies.virtualKeys.findLiveWithPrincipal(input);
   }
 
   findVirtualKeyById(id: string, organizationId: string): Promise<GatewayVirtualKeyRecord | null> {

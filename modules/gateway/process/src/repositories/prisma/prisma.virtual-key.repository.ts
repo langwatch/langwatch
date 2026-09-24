@@ -190,6 +190,32 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
   }
 
   /**
+   * Live keys held by a person (any person when unnamed), newest first: main's
+   * personal-key reads.
+   */
+  async findLiveWithPrincipal(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<VirtualKeyWithScopes[]> {
+    return toVirtualKeyRecordsFrom(
+      this.client().virtualKey.findMany({
+        where: {
+          ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+          principalUserId:
+            input.principalUserId === undefined ? { not: null } : { equals: input.principalUserId },
+          revokedAt: null,
+        },
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: { select: gatewayRoutingPolicySelect },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    );
+  }
+
+  /**
    * Every customer-owned VK reachable from a given scope entry, for project/team/org settings
    * pages listing keys with a matching scope row. Product-managed keys excluded, same reason
    * as findAllInOrganization.

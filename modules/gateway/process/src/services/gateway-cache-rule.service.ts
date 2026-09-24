@@ -1,8 +1,6 @@
 import {
-  archiveGatewayCacheRuleInputSchema,
   createGatewayCacheRuleInputSchema,
   GatewayCacheRuleNotFoundError,
-  updateGatewayCacheRuleInputSchema,
   type ArchiveGatewayCacheRuleInput,
   type CreateGatewayCacheRuleInput,
   type GatewayCacheRuleCursor,
@@ -44,29 +42,27 @@ export class GatewayCacheRuleService {
   }
 
   async update(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
-    const parsed = updateGatewayCacheRuleInputSchema.parse(input);
     const existing = await this.repository.findById({
-      id: parsed.id,
-      organizationId: parsed.organizationId,
+      id: input.id,
+      organizationId: input.organizationId,
     });
     if (!existing) {
       throw new GatewayCacheRuleNotFoundError();
     }
 
-    return this.repository.update(parsed);
+    return this.repository.update(input);
   }
 
   async archive(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
-    const parsed = archiveGatewayCacheRuleInputSchema.parse(input);
     const existing = await this.repository.findById({
-      id: parsed.id,
-      organizationId: parsed.organizationId,
+      id: input.id,
+      organizationId: input.organizationId,
     });
     if (!existing) {
       throw new GatewayCacheRuleNotFoundError();
     }
 
-    return this.repository.archive(parsed);
+    return this.repository.archive(input);
   }
 
   listEnabledForOrganization(organizationId: string): Promise<GatewayCacheRuleResource[]> {

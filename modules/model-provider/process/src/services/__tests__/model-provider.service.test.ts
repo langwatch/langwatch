@@ -68,6 +68,10 @@ class Providers implements ModelProviderRepository {
     return { providers: [] };
   }
 
+  async countEnabledInScopes(): Promise<number> {
+    return 0;
+  }
+
   rows = [provider()];
   created: ModelProvider[] = [];
   deleted: string[] = [];

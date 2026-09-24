@@ -1,11 +1,8 @@
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
-  archiveGatewayGuardrailInputSchema,
-  createGatewayGuardrailInputSchema,
   GatewayGuardrailEvaluatorInvalidError,
   GatewayGuardrailNotFoundError,
   GatewayGuardrailProjectNotFoundError,
-  updateGatewayGuardrailInputSchema,
   type ArchiveGatewayGuardrailInput,
   type CreateGatewayGuardrailInput,
   type GatewayGuardrailResource,
@@ -76,13 +73,12 @@ export class GatewayGuardrailService {
   }
 
   async create(input: CreateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
-    const parsed = createGatewayGuardrailInputSchema.parse(input);
-    await this.assertEvaluatorEligible(parsed.evaluatorId, parsed.projectId);
-    const row = await this.repository.create(parsed);
+    await this.assertEvaluatorEligible(input.evaluatorId, input.projectId);
+    const row = await this.repository.create(input);
     await this.audit.append({
-      organizationId: await this.organizationIdFor(parsed.projectId),
-      projectId: parsed.projectId,
-      actorUserId: parsed.actorUserId,
+      organizationId: await this.organizationIdFor(input.projectId),
+      projectId: input.projectId,
+      actorUserId: input.actorUserId,
       action: "gateway.guardrail.created",
       targetKind: "guardrail",
       targetId: row.id,
@@ -93,24 +89,23 @@ export class GatewayGuardrailService {
   }
 
   async update(input: UpdateGatewayGuardrailInput): Promise<GatewayGuardrailResource> {
-    const parsed = updateGatewayGuardrailInputSchema.parse(input);
     const existing = await this.repository.findById({
-      id: parsed.id,
-      projectId: parsed.projectId,
+      id: input.id,
+      projectId: input.projectId,
     });
     if (!existing) {
       throw new GatewayGuardrailNotFoundError();
     }
 
-    if (parsed.evaluatorId !== undefined && parsed.evaluatorId !== existing.evaluatorId) {
-      await this.assertEvaluatorEligible(parsed.evaluatorId, parsed.projectId);
+    if (input.evaluatorId !== undefined && input.evaluatorId !== existing.evaluatorId) {
+      await this.assertEvaluatorEligible(input.evaluatorId, input.projectId);
     }
 
-    const row = await this.repository.update(parsed);
+    const row = await this.repository.update(input);
     await this.audit.append({
-      organizationId: await this.organizationIdFor(parsed.projectId),
-      projectId: parsed.projectId,
-      actorUserId: parsed.actorUserId,
+      organizationId: await this.organizationIdFor(input.projectId),
+      projectId: input.projectId,
+      actorUserId: input.actorUserId,
       action: "gateway.guardrail.updated",
       targetKind: "guardrail",
       targetId: row.id,
@@ -122,20 +117,19 @@ export class GatewayGuardrailService {
   }
 
   async archive(input: ArchiveGatewayGuardrailInput): Promise<void> {
-    const parsed = archiveGatewayGuardrailInputSchema.parse(input);
     const existing = await this.repository.findById({
-      id: parsed.id,
-      projectId: parsed.projectId,
+      id: input.id,
+      projectId: input.projectId,
     });
     if (!existing) {
       throw new GatewayGuardrailNotFoundError();
     }
 
-    await this.repository.archive(parsed);
+    await this.repository.archive(input);
     await this.audit.append({
-      organizationId: await this.organizationIdFor(parsed.projectId),
-      projectId: parsed.projectId,
-      actorUserId: parsed.actorUserId,
+      organizationId: await this.organizationIdFor(input.projectId),
+      projectId: input.projectId,
+      actorUserId: input.actorUserId,
       action: "gateway.guardrail.archived",
       targetKind: "guardrail",
       targetId: existing.id,

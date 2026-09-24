@@ -16,10 +16,12 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
@@ -44,7 +46,6 @@ const unreachablePrisma = {
   organizationUser: {
     findFirst: unreachable<GovernanceMemberDatabase["organizationUser"]["findFirst"]>(),
   },
-  virtualKey: { findFirst: unreachable<GovernanceMemberDatabase["virtualKey"]["findFirst"]>() },
 } as unknown as GovernanceMemberDatabase;
 
 const ORGANIZATION_ID = "org-1";
@@ -68,6 +69,8 @@ async function buildApp() {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      users: createApiFixture<UserApi>(),
     },
     members: {
       prisma: unreachablePrisma,
@@ -111,6 +114,8 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      users: createApiFixture<UserApi>(),
     },
     members: {
       prisma: unreachablePrisma,

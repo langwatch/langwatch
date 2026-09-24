@@ -6,10 +6,7 @@ import type {
   GovernancePersonalVirtualKeyMembers,
 } from "./governance.app.ts";
 
-export type GovernanceMemberDatabase = Pick<
-  ProcessMembers["prisma"],
-  "organizationUser" | "user" | "virtualKey"
->;
+export type GovernanceMemberDatabase = Pick<ProcessMembers["prisma"], "organizationUser" | "user">;
 
 export function createGovernanceMemberInfrastructure(
   database: GovernanceMemberDatabase,
@@ -32,18 +29,6 @@ export function createGovernanceMemberInfrastructure(
           select: { userId: true },
         });
         return membership !== null;
-      },
-      async hasActivePersonalKeyLabelled({ organizationId, userId, label }) {
-        const key = await database.virtualKey.findFirst({
-          where: {
-            organizationId,
-            principalUserId: userId,
-            name: label,
-            revokedAt: null,
-          },
-          select: { id: true },
-        });
-        return key !== null;
       },
     },
   };

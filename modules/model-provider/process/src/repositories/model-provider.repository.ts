@@ -31,4 +31,8 @@ export interface ModelProviderRepository {
   isRoutingHandleConflict(error: unknown): boolean;
   /** The usage report's read; one organization per query, as the tenancy guard admits. */
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount>;
+  /** Enabled providers attached to any of the scopes; main's personal-key eligibility count. */
+  countEnabledInScopes(input: {
+    scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
+  }): Promise<number>;
 }

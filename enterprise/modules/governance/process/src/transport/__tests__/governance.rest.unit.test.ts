@@ -25,10 +25,12 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
@@ -138,6 +140,8 @@ async function buildApi(
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      users: createApiFixture<UserApi>(),
     },
     members: {
       prisma: unreachablePrisma,

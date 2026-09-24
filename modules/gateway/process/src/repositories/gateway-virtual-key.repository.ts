@@ -103,6 +103,14 @@ export abstract class GatewayVirtualKeyRepository {
     organizationId: string,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord[]>;
+  /**
+   * Live keys held by a person (any person when unnamed), newest first: main's
+   * personal-key reads.
+   */
+  abstract findLiveWithPrincipal(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<GatewayVirtualKeyRecord[]>;
   abstract findAllForScope(
     scope: GatewayVirtualKeyScope,
     transaction?: GatewayPersistenceTransaction,

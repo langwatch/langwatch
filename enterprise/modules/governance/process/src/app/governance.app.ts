@@ -119,6 +119,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   OrganizationApi,
   type OrganizationService,
@@ -126,6 +127,7 @@ import {
 } from "@langwatch/organization-contract";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
+import { UserApi } from "@langwatch/user-contract";
 
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
@@ -228,12 +230,6 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 export interface GovernancePersonalVirtualKeyMembers {
   /** Whether the caller belongs to this organization at all. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
-  /** Whether this user already has an unrevoked personal key under this label. */
-  hasActivePersonalKeyLabelled(input: {
-    organizationId: string;
-    userId: string;
-    label: string;
-  }): Promise<boolean>;
 }
 
 /**
@@ -339,7 +335,12 @@ export interface GovernanceAppDependencies {
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
   traces: Pick<TraceApi, "otlpTraces">;
   apiKeys: Pick<ApiKeyApi, "revokeCliSessionKey">;
-  gateway: Pick<GatewayApi, "createVirtualKey" | "revokeVirtualKey">;
+  gateway: Pick<
+    GatewayApi,
+    "createVirtualKey" | "revokeVirtualKey" | "findPersonalVirtualKeys" | "findVirtualKeyById"
+  >;
+  modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
+  users: Pick<UserApi, "findById">;
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<
     AuthApi,
@@ -454,6 +455,8 @@ export class GovernanceApp implements GovernanceRestApi {
     traces: TraceApi,
     apiKeys: ApiKeyApi,
     gateway: GatewayApi,
+    modelProviders: ModelProviderApi,
+    users: UserApi,
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
@@ -492,6 +495,8 @@ export class GovernanceApp implements GovernanceRestApi {
         traces: dependencies.traces,
         apiKeys: dependencies.apiKeys,
         gateway: dependencies.gateway,
+        modelProviders: dependencies.modelProviders,
+        users: dependencies.users,
       },
       repositories,
       erasureSuppression,
@@ -521,7 +526,8 @@ export class GovernanceApp implements GovernanceRestApi {
       repository: repositories.routingPolicies,
     });
     this.personalKeys = DefaultGovernancePersonalVirtualKeyService.create({
-      repository: repositories.personalVirtualKeys,
+      keys: dependencies.gateway,
+      providers: dependencies.modelProviders,
       issuer: GatewayPersonalVirtualKeyIssuerService.create(dependencies.gateway),
       organizations: dependencies.organizations,
       policies: this.routingPolicies,
@@ -1314,15 +1320,16 @@ export class GovernanceApp implements GovernanceRestApi {
       userId: by.id,
     });
 
+    const profile = await this.dependencies.users.findById({ id: by.id });
     // Lazy backfill for members who joined before personal workspaces shipped.
     const workspace = await this.dependencies.organizations.ensurePersonalWorkspace({
       userId: by.id,
       organizationId: input.organizationId,
-      displayName: by.displayName ?? null,
-      displayEmail: by.displayEmail ?? null,
+      displayName: by.displayName ?? profile?.name ?? null,
+      displayEmail: by.displayEmail ?? profile?.email ?? null,
     });
 
-    const duplicate = await this.dependencies.personalVirtualKeys.hasActivePersonalKeyLabelled({
+    const duplicate = await this.personalKeys.hasLiveKeyLabelled({
       organizationId: input.organizationId,
       userId: by.id,
       label: input.label,

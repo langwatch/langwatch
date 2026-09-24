@@ -113,6 +113,13 @@ export class VirtualKeyService {
     return this.repository.findAllInOrganization(organizationId);
   }
 
+  findLiveWithPrincipal(input: {
+    organizationId?: string;
+    principalUserId?: string;
+  }): Promise<VirtualKeyWithScopes[]> {
+    return this.repository.findLiveWithPrincipal(input);
+  }
+
   async listActiveForPrincipal(input: {
     organizationId: string;
     userId: string;

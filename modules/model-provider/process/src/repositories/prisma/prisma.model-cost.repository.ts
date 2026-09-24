@@ -1,8 +1,4 @@
-import {
-  modelCostSchema,
-  type ModelCost,
-  type ModelDefaultScope,
-} from "@langwatch/model-provider-contract";
+import { type ModelCost, type ModelDefaultScope } from "@langwatch/model-provider-contract";
 import { type PrismaClient, type CustomLLMModelCost } from "@langwatch/prisma-client/generated";
 
 import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
@@ -61,7 +57,7 @@ export class PrismaModelCostRepository implements ModelCostRepository {
 }
 
 function toCost(row: CustomLLMModelCost): ModelCost {
-  return modelCostSchema.parse({
+  return {
     id: row.id,
     organizationId: row.organizationId,
     projectId: row.projectId ?? null,
@@ -76,5 +72,5 @@ function toCost(row: CustomLLMModelCost): ModelCost {
     cacheCreation1hCostPerToken: row.cacheCreation1hCostPerToken ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-  });
+  };
 }

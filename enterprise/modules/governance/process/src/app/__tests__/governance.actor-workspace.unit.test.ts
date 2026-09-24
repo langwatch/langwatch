@@ -12,6 +12,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   type OrganizationApi,
   type PersonalWorkspace,
@@ -20,6 +21,7 @@ import {
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
@@ -68,7 +70,6 @@ async function buildApp(options: {
   const prisma = {
     user: { findFirst: tryFindUser },
     organizationUser: { findFirst: isOrganizationMember },
-    virtualKey: { findFirst: unreachable<GovernanceMemberDatabase["virtualKey"]["findFirst"]>() },
   } as unknown as GovernanceMemberDatabase;
 
   const app = await GovernanceApp.create({
@@ -85,6 +86,8 @@ async function buildApp(options: {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      users: createApiFixture<UserApi>(),
     },
     members: { prisma, encryption: createApiFixture<GovernanceEncryptor>(), isSaas: false },
     resources: new ResourceScope(),

@@ -1,13 +1,16 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   NoEligibleProvidersError,
   type PersonalVirtualKey,
 } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi, GatewayVirtualKeyRecord } from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { TeamNotFoundError } from "@langwatch/organization-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import type { PersonalVirtualKeyIssuer } from "../../app/governance.members.ts";
-import { PersonalVirtualKeyRepository } from "../../repositories/personal-virtual-key.repository.ts";
 import { DefaultGovernancePersonalVirtualKeyService } from "../governance-personal-key.service.ts";
 
 const key: PersonalVirtualKey = {
@@ -25,13 +28,42 @@ const key: PersonalVirtualKey = {
   scopes: [{ scopeType: "PROJECT", scopeId: "project" }],
 };
 
-class MemoryKeys extends PersonalVirtualKeyRepository {
-  eligible = 1;
-  findDefault = vi.fn(async () => null);
-  findAll = vi.fn(async () => [key]);
-  findOwned = vi.fn(async () => key);
-  findActiveForUser = vi.fn(async () => [key]);
-  countEligibleProviders = vi.fn(async () => this.eligible);
+const at = Temporal.Instant.fromEpochMilliseconds(1);
+
+function gatewayKey(overrides: Partial<GatewayVirtualKeyRecord> = {}): GatewayVirtualKeyRecord {
+  return {
+    id: "key",
+    organizationId: "organization",
+    name: "default",
+    description: "Personal virtual key",
+    status: "ACTIVE",
+    purpose: "USER",
+    externalId: null,
+    metadata: null,
+    disabledAt: null,
+    disabledReason: null,
+    expiresAt: null,
+    hashedSecret: "hashed",
+    displayPrefix: "vk-lw-test",
+    principalUserId: "user",
+    traceProjectId: null,
+    config: null,
+    revision: 1n,
+    previousHashedSecret: null,
+    previousSecretValidUntil: null,
+    revokedAt: null,
+    revokedById: null,
+    createdAt: at,
+    updatedAt: at,
+    createdById: "user",
+    lastUsedAt: null,
+    routingPolicyId: null,
+    routingMode: "NONE",
+    scopes: [{ scopeType: "PROJECT", scopeId: "project" }],
+    principalUser: null,
+    routingPolicy: null,
+    ...overrides,
+  };
 }
 
 class MemoryIssuer implements PersonalVirtualKeyIssuer {
@@ -66,17 +98,26 @@ class MemoryPolicies {
   findDefaultForUser = vi.fn(async () => null);
 }
 
-function setup() {
-  const repository = new MemoryKeys();
+function setup({ eligible = 1, held = [gatewayKey()] } = {}) {
+  const scopesCounted: unknown[] = [];
   const issuer = new MemoryIssuer();
   const service = DefaultGovernancePersonalVirtualKeyService.create({
-    repository,
+    keys: createApiFixture<GatewayApi>({
+      findPersonalVirtualKeys: async () => held,
+      findVirtualKeyById: async (id) => held.find((candidate) => candidate.id === id) ?? null,
+    }),
+    providers: createApiFixture<ModelProviderApi>({
+      countEnabledInScopes: async ({ scopes }) => {
+        scopesCounted.push(scopes);
+        return eligible;
+      },
+    }),
     issuer,
     organizations: new MemoryOrganizations(),
     policies: new MemoryPolicies(),
     gatewayBaseUrl: "https://gateway.example.com",
   });
-  return { repository, issuer, service };
+  return { issuer, service, scopesCounted };
 }
 
 describe("DefaultGovernancePersonalVirtualKeyService", () => {
@@ -94,8 +135,7 @@ describe("DefaultGovernancePersonalVirtualKeyService", () => {
   });
 
   it("refuses a key when neither policy nor provider exists", async () => {
-    const { repository, service } = setup();
-    repository.eligible = 0;
+    const { service } = setup({ eligible: 0 });
     await expect(
       service.issue({
         userId: "user",
@@ -104,5 +144,49 @@ describe("DefaultGovernancePersonalVirtualKeyService", () => {
         label: "default",
       }),
     ).rejects.toBeInstanceOf(NoEligibleProvidersError);
+  });
+
+  it("counts enabled providers at the organization, the personal team and the personal project", async () => {
+    const { service, scopesCounted } = setup();
+    await service.issue({
+      userId: "user",
+      organizationId: "organization",
+      personalProjectId: "project",
+      personalTeamId: "team",
+      label: "laptop",
+    });
+    expect(scopesCounted).toEqual([
+      [
+        { scopeType: "ORGANIZATION", scopeId: "organization" },
+        { scopeType: "TEAM", scopeId: "team" },
+        { scopeType: "PROJECT", scopeId: "project" },
+      ],
+    ]);
+  });
+
+  it("refuses to revoke a key somebody else holds", async () => {
+    const { issuer, service } = setup({ held: [gatewayKey({ principalUserId: "other" })] });
+    await expect(
+      service.revoke({ userId: "user", organizationId: "organization", virtualKeyId: "key" }),
+    ).rejects.toMatchObject({ virtualKeyId: "key" });
+    expect(issuer.revoke).not.toHaveBeenCalled();
+  });
+
+  it("knows a label the person already holds live", async () => {
+    const { service } = setup();
+    await expect(
+      service.hasLiveKeyLabelled({
+        organizationId: "organization",
+        userId: "user",
+        label: "default",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      service.hasLiveKeyLabelled({
+        organizationId: "organization",
+        userId: "user",
+        label: "laptop",
+      }),
+    ).resolves.toBe(false);
   });
 });

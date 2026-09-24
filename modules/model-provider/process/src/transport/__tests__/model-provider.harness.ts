@@ -167,6 +167,7 @@ function forwarded(app: ModelProviderApp): ModelProviderApi {
   return {
     estimateCost: (...args) => app.estimateCost(...args),
     countUsage: (...args) => app.countUsage(...args),
+    countEnabledInScopes: (...args) => app.countEnabledInScopes(...args),
     platformProviderChain: (...args) => app.platformProviderChain(...args),
     listForProject: (...args) => app.listForProject(...args),
     findAllAccessibleForProject: (...args) => app.findAllAccessibleForProject(...args),

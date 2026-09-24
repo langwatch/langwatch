@@ -13,10 +13,12 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import type { GovernanceMemberDatabase } from "../../governance.server.ts";
@@ -61,6 +63,8 @@ async function buildApp(planType: string) {
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       gateway: createApiFixture<GatewayApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      users: createApiFixture<UserApi>(),
     },
     members: {
       prisma: createApiFixture<GovernanceMemberDatabase>(),

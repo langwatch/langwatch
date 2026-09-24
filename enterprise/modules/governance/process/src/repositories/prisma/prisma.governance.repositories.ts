@@ -10,7 +10,6 @@ import { PrismaDiscoveredAgentRepository } from "./prisma.discovered-agent.repos
 import { PrismaDiscoveredPersonRepository } from "./prisma.discovered-person.repository.ts";
 import { PrismaErasedIdentifierSuppressionRepository } from "./prisma.erased-identifier-suppression.repository.ts";
 import { PrismaGovernanceDirectoryRepository } from "./prisma.governance-directory.repository.ts";
-import { PrismaPersonalVirtualKeyRepository } from "./prisma.governance-personal-key.repository.ts";
 import { PrismaRoutingPolicyRepository } from "./prisma.governance-routing.repository.ts";
 import { PrismaGovernanceSetupStateRepository } from "./prisma.governance-setup-state.repository.ts";
 import { PrismaGovernanceTenantHistoryRepository } from "./prisma.governance-tenant-history.repository.ts";
@@ -52,7 +51,6 @@ export class PostgresGovernanceRepositories {
       ingestionSources: PrismaIngestionSourceRepository.create(prisma),
       ingestionTemplates: PrismaIngestionTemplateRepository.create(prisma),
       ocsfExports: PrismaGovernanceOcsfExportRepository.create(prisma),
-      personalVirtualKeys: PrismaPersonalVirtualKeyRepository.create(prisma),
       routingPolicies: PrismaRoutingPolicyRepository.create(prisma),
       sessionPolicies: PrismaOrganizationSessionPolicyRepository.create(prisma),
       setupState: PrismaGovernanceSetupStateRepository.create(prisma),
