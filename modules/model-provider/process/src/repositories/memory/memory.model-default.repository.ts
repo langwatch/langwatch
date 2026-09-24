@@ -4,6 +4,7 @@ import {
   type ModelDefaultConfig,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type {
   ModelDefaultConfigSaveInput,
@@ -63,8 +64,8 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
       config: input.config,
       scopes: input.scopes,
       authorId: input.authorId,
-      createdAt: existing?.createdAt ?? input.createdAt ?? new Date(),
-      updatedAt: new Date(),
+      createdAt: existing?.createdAt ?? input.createdAt ?? toDate(nowInstant()),
+      updatedAt: toDate(nowInstant()),
     });
     this.database.defaults.set(row.id, row);
 

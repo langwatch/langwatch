@@ -11,6 +11,7 @@ import {
 } from "@langwatch/scenario-contract";
 import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
 import { getSuiteSetId, hasParameterOverrides, targetKeyOf } from "@langwatch/suite-contract";
+import { nowInstant } from "@langwatch/time";
 
 import { type SuiteExecution, type SuiteRunCommands } from "../app/suite.app.ts";
 import { deriveBatchRunId, deriveScenarioRunId } from "../rules/suite-run-identity.rules.ts";
@@ -95,7 +96,7 @@ export class SuiteExecutionService implements SuiteExecution {
       scenarioIds: input.activeScenarioIds,
       targetIds: input.activeTargets.map((target) => target.referenceId),
       idempotencyKey: input.idempotencyKey,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
 
     const items = SuiteExecutionService.planItems({ input, batchRunId });
@@ -199,7 +200,7 @@ export class SuiteExecutionService implements SuiteExecution {
     parameters: Map<string, Map<string, SuiteRunParameters>>;
     secrets: Map<string, Record<string, string>>;
   }): Promise<void> {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const simulationModels = SuiteExecutionService.withSimulationModels(input);
     // Read before the first run is queued: every run of the batch says which
     // models it ran on, and the answer must not change part way through it.

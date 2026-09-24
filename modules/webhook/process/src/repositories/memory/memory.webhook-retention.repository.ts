@@ -1,3 +1,5 @@
+import { nowInstant, type Instant } from "@langwatch/time";
+
 import type { WebhookRetentionRepository } from "../webhook-retention.repository.ts";
 import type { MemoryWebhookDatabase } from "./memory.webhook-database.ts";
 
@@ -8,10 +10,8 @@ export class MemoryWebhookRetentionRepository implements WebhookRetentionReposit
     return new MemoryWebhookRetentionRepository(input.database);
   }
 
-  async pruneDeliveries({ now = new Date() }: { now?: Date } = {}): Promise<number> {
-    const before = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    return this.database.pruneDeliveriesBefore(before);
+  async pruneDeliveries({ now = nowInstant() }: { now?: Instant } = {}): Promise<number> {
+    return this.database.pruneDeliveriesBefore(now.subtract({ hours: 30 * 24 }));
   }
 
   async pruneExpiredIdempotencyReceipts(): Promise<number> {

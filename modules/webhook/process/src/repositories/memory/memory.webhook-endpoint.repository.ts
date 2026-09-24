@@ -1,4 +1,4 @@
-import { nowInstant, toDate, fromDate, Temporal, type Instant } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   WebhookEndpointNotFoundError,
   WebhookEndpointValidationError,
@@ -89,9 +89,9 @@ function statusSnapshotOf(row: MemoryWebhookEndpointRow): {
   return {
     status: row.status,
     disabledReason: row.disabledReason,
-    failingSince: row.failingSince === null ? null : fromDate(row.failingSince),
-    lastSuccessAt: row.lastSuccessAt === null ? null : fromDate(row.lastSuccessAt),
-    lastFailureAt: row.lastFailureAt === null ? null : fromDate(row.lastFailureAt),
+    failingSince: row.failingSince,
+    lastSuccessAt: row.lastSuccessAt,
+    lastFailureAt: row.lastFailureAt,
   };
 }
 
@@ -105,15 +105,15 @@ function toView(row: MemoryWebhookEndpointRow): WebhookEndpointView {
     enabledEvents: row.enabledEvents,
     status: row.status,
     disabledReason: row.disabledReason,
-    disabledAt: row.disabledAt,
-    failingSince: row.failingSince,
-    lastSuccessAt: row.lastSuccessAt,
-    lastFailureAt: row.lastFailureAt,
+    disabledAt: row.disabledAt === null ? null : toDate(row.disabledAt),
+    failingSince: row.failingSince === null ? null : toDate(row.failingSince),
+    lastSuccessAt: row.lastSuccessAt === null ? null : toDate(row.lastSuccessAt),
+    lastFailureAt: row.lastFailureAt === null ? null : toDate(row.lastFailureAt),
     maxBatchSize: row.maxBatchSize,
     maxBatchDelayMs: row.maxBatchDelayMs,
     maxInFlight: row.maxInFlight,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
   };
 }
 
@@ -383,7 +383,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     assertValidEvents(params.enabledEvents);
     this.#policy.assertValidDeliveryControls(params);
     const secret = newSecret();
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     const row: MemoryWebhookEndpointRow = {
       id: this.#options.ids.newEndpointId(),
       organizationId: params.organizationId,
@@ -415,7 +415,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     return this.#database
       .endpoints()
       .filter((row) => row.organizationId === params.organizationId && row.archivedAt === null)
-      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .toSorted(
+        (left, right) => left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds,
+      )
       .map(toView);
   }
 
@@ -459,7 +461,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       ...(params.maxBatchSize !== undefined ? { maxBatchSize: params.maxBatchSize } : {}),
       ...(params.maxBatchDelayMs !== undefined ? { maxBatchDelayMs: params.maxBatchDelayMs } : {}),
       ...(params.maxInFlight !== undefined ? { maxInFlight: params.maxInFlight } : {}),
-      updatedAt: toDate(nowInstant()),
+      updatedAt: nowInstant(),
     };
 
     return toView(this.#database.putEndpoint(updated));
@@ -472,14 +474,12 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     const endpoint = this.#live(params);
     const secret = newSecret();
-    const now = toDate(params.now ?? nowInstant());
+    const now = params.now ?? nowInstant();
     const updated = this.#database.putEndpoint({
       ...endpoint,
       secretEncrypted: this.#options.secrets.encrypt(secret),
       previousSecretEncrypted: endpoint.secretEncrypted,
-      previousSecretExpiresAt: toDate(
-        Temporal.Instant.fromEpochMilliseconds(now.getTime() + WEBHOOK_PREVIOUS_SECRET_TTL_MS),
-      ),
+      previousSecretExpiresAt: now.add({ milliseconds: WEBHOOK_PREVIOUS_SECRET_TTL_MS }),
       updatedAt: now,
     });
 
@@ -499,7 +499,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
         disabledReason: null,
         disabledAt: null,
         failingSince: null,
-        updatedAt: toDate(nowInstant()),
+        updatedAt: nowInstant(),
       }),
     );
   }
@@ -515,8 +515,8 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
         ...endpoint,
         status: "DISABLED",
         disabledReason: WEBHOOK_DISABLED_REASON_MANUAL,
-        disabledAt: toDate(nowInstant()),
-        updatedAt: toDate(nowInstant()),
+        disabledAt: nowInstant(),
+        updatedAt: nowInstant(),
       }),
     );
   }
@@ -525,9 +525,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     const endpoint = this.#live(params);
     this.#database.putEndpoint({
       ...endpoint,
-      archivedAt: toDate(nowInstant()),
+      archivedAt: nowInstant(),
       status: "DISABLED",
-      updatedAt: toDate(nowInstant()),
+      updatedAt: nowInstant(),
     });
   }
 
@@ -581,11 +581,11 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     now?: Instant;
   }): Promise<string[]> {
     const endpoint = this.#live(params);
-    const now = toDate(params.now ?? nowInstant());
+    const now = params.now ?? nowInstant();
     const previousIsValid =
       endpoint.previousSecretEncrypted !== null &&
       endpoint.previousSecretExpiresAt !== null &&
-      endpoint.previousSecretExpiresAt.getTime() > now.getTime();
+      endpoint.previousSecretExpiresAt.epochMilliseconds > now.epochMilliseconds;
     const secrets = [this.#options.secrets.decrypt(endpoint.secretEncrypted)];
     if (previousIsValid)
       secrets.push(this.#options.secrets.decrypt(endpoint.previousSecretEncrypted as string));
@@ -615,14 +615,14 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     since: Instant;
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }> {
-    const sinceMs = toDate(params.since).getTime();
+    const sinceMs = params.since.epochMilliseconds;
     const rows = this.#database
       .deliveries()
       .filter(
         (row) =>
           row.organizationId === params.organizationId &&
           row.endpointId === params.endpointId &&
-          row.firedAt.getTime() > sinceMs,
+          row.firedAt.epochMilliseconds > sinceMs,
       );
 
     return {
@@ -630,7 +630,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       delivered: rows.filter((row) => row.outcome === "success").length,
       latencies: rows
         .slice()
-        .toSorted((left, right) => right.firedAt.getTime() - left.firedAt.getTime())
+        .toSorted((left, right) => right.firedAt.epochMilliseconds - left.firedAt.epochMilliseconds)
         .slice(0, params.sampleLimit)
         .map((row) => row.latencyMs)
         .filter((latency): latency is number => latency !== null),
@@ -675,7 +675,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     response?: unknown;
     now?: Instant;
   }): Promise<void> {
-    const now = toDate(params.now ?? nowInstant());
+    const now = params.now ?? nowInstant();
     const endpoint = this.#database.findEndpoint(params.endpointId);
     if (!endpoint || endpoint.organizationId !== params.organizationId) return;
 
@@ -709,8 +709,8 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     await this.#autoDisableIfStreakExpired({
       organizationId: params.organizationId,
       endpointId: endpoint.id,
-      failingSince: fromDate(failingSince),
-      now: fromDate(now),
+      failingSince: failingSince,
+      now: now,
     });
   }
 
@@ -732,8 +732,8 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       ...endpoint,
       status: "DISABLED",
       disabledReason: WEBHOOK_DISABLED_REASON_AUTO,
-      disabledAt: toDate(params.now),
-      updatedAt: toDate(params.now),
+      disabledAt: params.now,
+      updatedAt: params.now,
     });
     try {
       await this.#options.notifyAutoDisabled?.({
@@ -770,7 +770,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
   }> {
     this.#live(params);
     const limit = Math.min(params.limit ?? 25, 200);
-    const cursorFiredAtMs = params.cursor ? toDate(params.cursor.firedAt).getTime() : null;
+    const cursorFiredAtMs = params.cursor ? params.cursor.firedAt.epochMilliseconds : null;
     const rows = this.#database
       .deliveries()
       .filter(
@@ -779,13 +779,16 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       )
       .filter((row) => {
         if (cursorFiredAtMs === null) return true;
-        if (row.firedAt.getTime() < cursorFiredAtMs) return true;
+        if (row.firedAt.epochMilliseconds < cursorFiredAtMs) return true;
 
-        return row.firedAt.getTime() === cursorFiredAtMs && row.id < (params.cursor?.id ?? "");
+        return (
+          row.firedAt.epochMilliseconds === cursorFiredAtMs && row.id < (params.cursor?.id ?? "")
+        );
       })
       .toSorted(
         (left, right) =>
-          right.firedAt.getTime() - left.firedAt.getTime() || (right.id < left.id ? -1 : 1),
+          right.firedAt.epochMilliseconds - left.firedAt.epochMilliseconds ||
+          (right.id < left.id ? -1 : 1),
       );
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
@@ -800,10 +803,9 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
         responseStatus: row.responseStatus,
         latencyMs: row.latencyMs,
         error: row.error,
-        firedAt: fromDate(row.firedAt),
+        firedAt: row.firedAt,
       })),
-      nextCursor:
-        rows.length > limit && last ? { firedAt: fromDate(last.firedAt), id: last.id } : null,
+      nextCursor: rows.length > limit && last ? { firedAt: last.firedAt, id: last.id } : null,
     };
   }
 
@@ -818,7 +820,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     if (this.#options.pruneDeliveries) return this.#options.pruneDeliveries(now);
 
     return this.#database.pruneDeliveriesBefore(
-      toDate(now.subtract({ milliseconds: WEBHOOK_DELIVERY_RETENTION_MS })),
+      now.subtract({ milliseconds: WEBHOOK_DELIVERY_RETENTION_MS }),
     );
   }
 

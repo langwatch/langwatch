@@ -537,9 +537,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );
@@ -577,9 +574,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );
@@ -611,9 +605,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );
@@ -655,9 +646,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );
@@ -690,9 +678,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );
@@ -741,9 +726,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );
@@ -785,9 +767,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );
@@ -826,9 +805,6 @@ describe("useSuiteForm()", () => {
               labels: [],
               simulatorModel: null,
               judgeModel: null,
-              archivedAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
             },
           }),
         );

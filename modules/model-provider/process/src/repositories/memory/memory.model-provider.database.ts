@@ -4,6 +4,7 @@ import type {
   ModelDefaultScope,
   ModelProvider,
 } from "@langwatch/model-provider-contract";
+import { compareMoments, type TimeInput } from "@langwatch/time";
 
 /**
  * The rows the four memory twins share. One store rather than four: the
@@ -36,16 +37,16 @@ export function matchesAnyScope(
 
 /** Oldest first, the order every Postgres provider listing reads in. */
 export function byCreatedAtAscending(
-  left: Readonly<{ createdAt: Date }>,
-  right: Readonly<{ createdAt: Date }>,
+  left: Readonly<{ createdAt: TimeInput }>,
+  right: Readonly<{ createdAt: TimeInput }>,
 ): number {
-  return left.createdAt.getTime() - right.createdAt.getTime();
+  return compareMoments(left.createdAt, right.createdAt);
 }
 
 /** Newest first, the order every Postgres default-config listing reads in. */
 export function byCreatedAtDescending(
-  left: Readonly<{ createdAt: Date }>,
-  right: Readonly<{ createdAt: Date }>,
+  left: Readonly<{ createdAt: TimeInput }>,
+  right: Readonly<{ createdAt: TimeInput }>,
 ): number {
-  return right.createdAt.getTime() - left.createdAt.getTime();
+  return compareMoments(right.createdAt, left.createdAt);
 }

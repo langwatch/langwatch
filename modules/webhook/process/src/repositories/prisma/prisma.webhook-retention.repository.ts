@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type { WebhookRetentionRepository } from "../webhook-retention.repository.ts";
 
@@ -31,8 +32,8 @@ export class PrismaWebhookRetentionRepository implements WebhookRetentionReposit
    * The one delivery-log prune. Deletes every attempt older than the retention
    * bound across both channels and returns the row count.
    */
-  async pruneDeliveries({ now = new Date() }: { now?: Date } = {}): Promise<number> {
-    const before = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS);
+  async pruneDeliveries({ now = nowInstant() }: { now?: Instant } = {}): Promise<number> {
+    const before = toDate(now.subtract({ milliseconds: WEBHOOK_DELIVERY_RETENTION_MS }));
     return this.prisma.$executeRaw`
       DELETE FROM "WebhookEndpointDelivery"
       WHERE "firedAt" < ${before}
@@ -46,11 +47,12 @@ export class PrismaWebhookRetentionRepository implements WebhookRetentionReposit
    * revisited. That is correct for replay semantics and wrong for the table, which only grows.
    */
   async pruneExpiredIdempotencyReceipts({
-    now = new Date(),
-  }: { now?: Date } = {}): Promise<number> {
+    now = nowInstant(),
+  }: { now?: Instant } = {}): Promise<number> {
+    const cutoff = toDate(now);
     return this.prisma.$executeRaw`
       DELETE FROM "IdempotencyReceipt"
-      WHERE "expiresAt" < ${now}
+      WHERE "expiresAt" < ${cutoff}
       -- @tenancy: idempotency receipt expiry sweep (system-owned maintenance)
     `;
   }

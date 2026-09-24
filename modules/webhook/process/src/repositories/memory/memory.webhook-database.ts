@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import type { WebhookDeliveryOutcome, WebhookDestinationKind } from "@langwatch/webhook-contract";
 
 export type MemoryWebhookEndpointRow = {
@@ -12,20 +13,20 @@ export type MemoryWebhookEndpointRow = {
   sqsSecretAccessKeyEncrypted: string | null;
   secretEncrypted: string;
   previousSecretEncrypted: string | null;
-  previousSecretExpiresAt: Date | null;
+  previousSecretExpiresAt: Instant | null;
   enabledEvents: string[];
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
-  disabledAt: Date | null;
-  failingSince: Date | null;
-  lastSuccessAt: Date | null;
-  lastFailureAt: Date | null;
+  disabledAt: Instant | null;
+  failingSince: Instant | null;
+  lastSuccessAt: Instant | null;
+  lastFailureAt: Instant | null;
   maxBatchSize: number;
   maxBatchDelayMs: number;
   maxInFlight: number;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  archivedAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
 };
 
 export type MemoryWebhookDeliveryRow = {
@@ -39,7 +40,7 @@ export type MemoryWebhookDeliveryRow = {
   responseStatus: number | null;
   latencyMs: number | null;
   error: string | null;
-  firedAt: Date;
+  firedAt: Instant;
 };
 
 /**
@@ -89,8 +90,10 @@ export class MemoryWebhookDatabase {
   }
 
   /** Drops delivery rows fired before the cutoff; answers the count removed. */
-  pruneDeliveriesBefore(before: Date): number {
-    const kept = this.#deliveries.filter((row) => row.firedAt.getTime() >= before.getTime());
+  pruneDeliveriesBefore(before: Instant): number {
+    const kept = this.#deliveries.filter(
+      (row) => row.firedAt.epochMilliseconds >= before.epochMilliseconds,
+    );
     const removed = this.#deliveries.length - kept.length;
     this.#deliveries.length = 0;
     this.#deliveries.push(...kept);

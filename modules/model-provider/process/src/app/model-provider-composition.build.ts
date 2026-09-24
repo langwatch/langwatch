@@ -1,5 +1,6 @@
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { nowInstant } from "@langwatch/time";
 /**
  * Builds ModelProviderInfrastructure (previously hand-composed) from redis
  * and config. Two intentional branches: managed is always Unmanaged (core
@@ -45,7 +46,7 @@ class RedisModelProviderRateLimit extends ModelProviderRateLimit {
     max: number;
   }): Promise<{ allowed: boolean; resetAt: number }> {
     const counter = `model-provider:rate-limit:${input.key}`;
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const used = await this.redis.incr(counter);
     if (used === 1) await this.redis.expire(counter, input.windowSeconds);
     if (used <= input.max) {

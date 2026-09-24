@@ -19,6 +19,7 @@ import {
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
+import type { TimeInput } from "@langwatch/time";
 
 /** What this module reads about an agent, and nothing more. */
 export type ConnectedTargetAgent = {
@@ -153,7 +154,7 @@ export class ConnectedTargetService {
    * Whether a target's agent is a connected agent whose process has not been seen for too
    * long.
    */
-  static isAgentUnseen(agent: { type?: string; lastSeenAt?: Date | string | null }): boolean {
+  static isAgentUnseen(agent: { type?: string; lastSeenAt?: TimeInput | null }): boolean {
     return agent.type === "connected" && isConnectedAgentStale({ lastSeenAt: agent.lastSeenAt });
   }
 

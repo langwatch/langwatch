@@ -99,9 +99,6 @@ export interface SuiteFormSuite {
   kind?: string | null;
   projectId?: string;
   slug?: string;
-  archivedAt?: Date | null;
-  createdAt?: Date;
-  updatedAt?: Date;
   name: string;
   description: string | null;
   labels: string[];
