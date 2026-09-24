@@ -113,6 +113,13 @@ function mountIngest(world: World = {}) {
     cloneIngestionTemplate: unsupportedRestOperation,
     departmentResolveByNameOrCreate: unsupportedRestOperation,
     departmentAssignUser: unsupportedRestOperation,
+    departmentList: unsupportedRestOperation,
+    departmentAssignments: unsupportedRestOperation,
+    departmentCreate: unsupportedRestOperation,
+    departmentRename: unsupportedRestOperation,
+    departmentArchive: unsupportedRestOperation,
+    departmentAssignTeam: unsupportedRestOperation,
+    departmentAssignProject: unsupportedRestOperation,
   };
 
   const runtime = createRestRuntime({

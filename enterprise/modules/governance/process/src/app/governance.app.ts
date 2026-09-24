@@ -48,6 +48,7 @@ import {
   type CreateRoutingPolicyInput,
   type DeleteRoutingPolicyInput,
   type Department,
+  type DepartmentAssignments,
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceApi,
@@ -1006,6 +1007,46 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   // ── Departments ────────────────────────────────────────────────────────────
+
+  departmentList(input: { organizationId: string }): Promise<Department[]> {
+    return this.departments.getAll(input);
+  }
+
+  departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments> {
+    return this.departments.getAssignments(input);
+  }
+
+  departmentCreate(input: { organizationId: string; name: string }): Promise<Department> {
+    return this.departments.create(input);
+  }
+
+  departmentRename(input: {
+    id: string;
+    organizationId: string;
+    name: string;
+  }): Promise<Department> {
+    return this.departments.rename(input);
+  }
+
+  departmentArchive(input: { id: string; organizationId: string }): Promise<void> {
+    return this.departments.archive(input);
+  }
+
+  departmentAssignTeam(input: {
+    organizationId: string;
+    teamId: string;
+    departmentId: string | null;
+  }): Promise<void> {
+    return this.departments.assignTeam(input);
+  }
+
+  departmentAssignProject(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<void> {
+    return this.departments.assignProject(input);
+  }
 
   /** Finds a department by name, or creates it, for SCIM cost-center sync. */
   async departmentResolveByNameOrCreate(input: {

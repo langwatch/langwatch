@@ -2378,6 +2378,9 @@ importers:
 
   enterprise/modules/governance/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../../packages/api
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../../../modules/api-key/contract

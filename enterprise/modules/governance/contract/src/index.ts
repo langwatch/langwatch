@@ -7,6 +7,7 @@ export * from "./cli-sessions.ts";
 export * from "./cli-bootstrap.ts";
 export * from "./canonical-cost.ts";
 export * from "./department.ts";
+export * from "./departments.trpc.ts";
 export * from "./governance.ts";
 export * from "./governance-attributes.ts";
 export * from "./governance-audit.ts";

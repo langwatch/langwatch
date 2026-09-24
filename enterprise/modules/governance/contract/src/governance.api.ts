@@ -432,6 +432,15 @@ export interface GovernanceRestApi {
     by: GovernanceProjectCaller,
   ): Promise<IngestionTemplate>;
 
+  departmentList(input: { organizationId: string }): Promise<Department[]>;
+  departmentAssignments(input: { organizationId: string }): Promise<DepartmentAssignments>;
+  departmentCreate(input: { organizationId: string; name: string }): Promise<Department>;
+  departmentRename(input: {
+    id: string;
+    organizationId: string;
+    name: string;
+  }): Promise<Department>;
+  departmentArchive(input: { id: string; organizationId: string }): Promise<void>;
   departmentResolveByNameOrCreate(input: {
     organizationId: string;
     name: string;
@@ -439,6 +448,16 @@ export interface GovernanceRestApi {
   departmentAssignUser(input: {
     organizationId: string;
     userId: string;
+    departmentId: string | null;
+  }): Promise<void>;
+  departmentAssignTeam(input: {
+    organizationId: string;
+    teamId: string;
+    departmentId: string | null;
+  }): Promise<void>;
+  departmentAssignProject(input: {
+    organizationId: string;
+    projectId: string;
     departmentId: string | null;
   }): Promise<void>;
 }

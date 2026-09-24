@@ -153,6 +153,13 @@ function mountCli(world: World = {}) {
     cloneIngestionTemplate: unavailable,
     departmentResolveByNameOrCreate: unavailable,
     departmentAssignUser: unavailable,
+    departmentList: unavailable,
+    departmentAssignments: unavailable,
+    departmentCreate: unavailable,
+    departmentRename: unavailable,
+    departmentArchive: unavailable,
+    departmentAssignTeam: unavailable,
+    departmentAssignProject: unavailable,
   };
 
   const runtime = createRestRuntime({
