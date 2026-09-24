@@ -1,4 +1,5 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AnnotationApi } from "@langwatch/annotation-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 /**
  * The automation feature's application: the one typed thing all five of its
@@ -45,7 +46,9 @@ import {
   type WebhookDeliveryRow,
   type AutomationUsageCount,
 } from "@langwatch/automation-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
@@ -55,6 +58,7 @@ import {
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { sessionSecret } from "@langwatch/secrets";
 import type { Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 
@@ -62,7 +66,11 @@ import type { AutomationGraphNotifier } from "../channels/automation-graph-alert
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
-import type { AutomationsPipeline } from "../eventing/automation.pipeline.ts";
+import {
+  createAutomationsPipeline,
+  type AutomationsPipeline,
+} from "../eventing/automation.pipeline.ts";
+import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
@@ -81,6 +89,7 @@ import {
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
 import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
+import { OtelAutomationSettlementObservabilityAdapter } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
 import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
@@ -94,7 +103,13 @@ import { HmacUnsubscribeTokenAdapter } from "../services/unsubscribe-token.servi
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import {
   buildAutomationInfrastructure,
+  createAutomationSettlement,
+  DatasetTraceMapper,
+  LoggedSettlementBreach,
+  PeerPersistActionWriter,
+  type AutomationComposedInfrastructure,
   type AutomationProcessMembers,
+  type AutomationSettlement,
 } from "./automation-composition.build.ts";
 import type { AutomationClock } from "./automation.members.ts";
 
@@ -224,10 +239,20 @@ type AutomationDependencies = Readonly<{
   auditLog: typeof AuditLogApi;
   /** The trace summary an evaluation match is confirmed against, and how its query is read. */
   traces: typeof TraceApi;
+  /** Settlement's peers: evaluation runs a match is re-checked on, and the two persist writes. */
+  evaluations: typeof EvaluationApi;
+  datasets: typeof DatasetApi;
+  annotations: typeof AnnotationApi;
 }>;
 
+/** Peers only settlement reads, which `create` composes and `fromInfrastructure` never sees. */
+type AutomationSettlementPeer = "evaluations" | "datasets" | "annotations";
+
 /** {@link AutomationDependencies}, resolved to the peer Apps `fromInfrastructure` itself reads. */
-type AutomationRuntimeDependencies = ResolvedTokens<AutomationDependencies>;
+type AutomationRuntimeDependencies = Omit<
+  ResolvedTokens<AutomationDependencies>,
+  AutomationSettlementPeer
+>;
 
 type AutomationSetup = FeatureSetup<
   AutomationDependencies,
@@ -247,6 +272,7 @@ interface AutomationAppCollaborators {
   publicBaseUrl: string | undefined;
   evaluations: AutomationEvaluationSubscriberService;
   triggerMatches: AutomationTriggerMatchDispatcherService;
+  settlement: AutomationSettlement | undefined;
 }
 
 export class AutomationApp implements AutomationApi {
@@ -259,18 +285,21 @@ export class AutomationApp implements AutomationApi {
     projects: ProjectApi,
     auditLog: AuditLogApi,
     traces: TraceApi,
+    evaluations: EvaluationApi,
+    datasets: DatasetApi,
+    annotations: AnnotationApi,
   };
   static readonly config = automationServerConfig;
-  /** `secrets` carries the cipher key `stores` owns: one owner declares
-   * `CREDENTIALS_SECRET`, and this module reads the value through the member. */
+  /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
+  static readonly secrets = { unsubscribe: sessionSecret } as const;
   static readonly reads = [
     "prisma",
     "redis",
     "logger",
     "encryption",
-    "secrets",
     "mail",
     "publicBaseUrl",
+    "isSaas",
   ] as const;
 
   /**
@@ -278,25 +307,74 @@ export class AutomationApp implements AutomationApi {
    * members it reads and its own config, then composes exactly as
    * {@link AutomationApp.fromInfrastructure} does.
    */
-  static create(setup: AutomationSetup): AutomationApp {
-    const unsubscribeSigningSecret = setup.members.secrets.find("CREDENTIALS_SECRET");
-    const infrastructure = buildAutomationInfrastructure({
-      members: setup.members,
-      auditLog: setup.dependencies.auditLog,
-      verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
-      unsubscribeSigningSecret,
-      repositories: setup.repositories,
-      caps: {
-        emailHourlyCap: setup.config.emailHourlyCap,
-        tenantDailyCap: setup.config.tenantDailyCap,
-      },
+  static create(setup: AutomationSetup): Promise<AutomationApp> {
+    return setup.secrets.into(AutomationApp.secrets.unsubscribe, (unsubscribeSigningSecret) => {
+      const infrastructure = buildAutomationInfrastructure({
+        members: setup.members,
+        auditLog: setup.dependencies.auditLog,
+        verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
+        unsubscribeSigningSecret,
+        repositories: setup.repositories,
+        caps: {
+          emailHourlyCap: setup.config.emailHourlyCap,
+          tenantDailyCap: setup.config.tenantDailyCap,
+        },
+      });
+      const automation = AutomationApp.fromInfrastructure({
+        infrastructure,
+        dependencies: setup.dependencies,
+        repositories: setup.repositories,
+        config: setup.config,
+      });
+      automation.#settlement = AutomationApp.#composeSettlement(setup, infrastructure, automation);
+      return automation;
     });
+  }
 
-    return AutomationApp.fromInfrastructure({
-      infrastructure,
-      dependencies: setup.dependencies,
-      repositories: setup.repositories,
-      config: setup.config,
+  /** Main's worker-automation-settlement.composition.ts, over peers instead of foreign tables. */
+  static #composeSettlement(
+    setup: AutomationSetup,
+    infrastructure: AutomationComposedInfrastructure,
+    automation: AutomationApp,
+  ): AutomationSettlement {
+    const { members, dependencies, config } = setup;
+    const logger = infrastructure.logger;
+    return createAutomationSettlement({
+      prisma: members.prisma,
+      clock: infrastructure.clock,
+      persistCapSlots: infrastructure.persistCaps,
+      projects: dependencies.projects,
+      traces: dependencies.traces,
+      evaluations: dependencies.evaluations,
+      traceFilters: dependencies.traces,
+      evaluationFilters: dependencies.evaluations,
+      mapper: new DatasetTraceMapper(),
+      writer: new PeerPersistActionWriter({
+        datasets: dependencies.datasets,
+        annotations: dependencies.annotations,
+      }),
+      delivery: infrastructure.delivery,
+      emailCaps: infrastructure.emailCaps,
+      crypto: members.encryption,
+      baseHost: members.publicBaseUrl ?? "",
+      observability: OtelAutomationSettlementObservabilityAdapter.create({
+        capture: (error, extra) =>
+          logger.error({ ...extra, error: error.message }, "Automation settlement dispatch failed"),
+      }),
+      breach: new LoggedSettlementBreach(logger),
+      analytics: dependencies.analytics,
+      logger,
+      graphActivity: automation.#automation,
+      persistCeiling: {
+        kind: "plan",
+        projects: dependencies.projects,
+        plans: dependencies.entitlement,
+        free: config.persistDailyCapFree,
+        paid: config.persistDailyCapPaid,
+        enterprise: config.persistDailyCapEnterprise,
+      },
+      emailHourlyCap: config.emailHourlyCap,
+      tenantDailyCap: config.tenantDailyCap,
     });
   }
 
@@ -394,6 +472,7 @@ export class AutomationApp implements AutomationApi {
         triggerMatches,
       }),
       triggerMatches,
+      settlement: undefined,
     });
   }
 
@@ -406,6 +485,7 @@ export class AutomationApp implements AutomationApi {
   readonly #publicBaseUrl: string | undefined;
   readonly #evaluations: AutomationEvaluationSubscriberService;
   readonly #triggerMatches: AutomationTriggerMatchDispatcherService;
+  #settlement: AutomationSettlement | undefined;
 
   private constructor(collaborators: AutomationAppCollaborators) {
     this.#automation = collaborators.automation;
@@ -417,6 +497,15 @@ export class AutomationApp implements AutomationApi {
     this.#publicBaseUrl = collaborators.publicBaseUrl;
     this.#evaluations = collaborators.evaluations;
     this.#triggerMatches = collaborators.triggerMatches;
+    this.#settlement = collaborators.settlement;
+  }
+
+  /** The `automations` pipeline, over the settlement {@link create} composed. */
+  eventingPipeline({ retention }: { retention: AutomationIntentRetention }): AutomationsPipeline {
+    if (!this.#settlement) {
+      throw new Error("Automation was asked for its pipeline, but no settlement was composed");
+    }
+    return createAutomationsPipeline({ ...this.#settlement, retention });
   }
 
   /** Binds the registered `automations` pipeline's own senders. */

@@ -1,16 +1,10 @@
-import type { AnalyticsApi, AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type {
-  GraphTriggerEvaluationResult,
-  GraphTriggerSweepCandidate,
   ReportTraceRow,
   AutomationEvaluationSubscriberService as AutomationEvaluationSubscriber,
 } from "@langwatch/automation-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { DispatchError } from "@langwatch/eventing";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { defineServerModule } from "@langwatch/kernel";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { Instant } from "@langwatch/time";
 import type { TraceListItem } from "@langwatch/trace-contract";
 
 import { AutomationApp } from "./app/automation.app.ts";
@@ -25,20 +19,12 @@ import type {
   AutomationTriggerMatchRecorder,
 } from "./app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
-import type { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 import type { SchedulerWake } from "./channels/automation-scheduler-wake.channel.ts";
+import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import type { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
-import type { AutomationPersistActionWriter } from "./repositories/automation-persist-action.repository.ts";
-import type { AutomationPersistCapRepository } from "./repositories/automation-persist-cap.repository.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
-import type { AutomationRunaway } from "./repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "./repositories/automation-scheduled-job.repository.ts";
 import type { AutomationSettlementLedger } from "./repositories/automation-settlement-ledger.repository.ts";
-import { AutomationSettlementBreach } from "./repositories/automation-settlement-ledger.repository.ts";
-import type {
-  AutomationSettlementEvaluationReader,
-  AutomationSettlementTraceReader,
-} from "./repositories/automation-settlement-read.repository.ts";
 import type { AutomationTraceTriggerCatalogue } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
@@ -47,10 +33,7 @@ import {
   type AutomationGraphActivityDatabase,
 } from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
 import { PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
-import {
-  PrismaAutomationSettlementLedgerRepository,
-  type AutomationSettlementLedgerDatabase,
-} from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
+import { PrismaAutomationSettlementLedgerRepository } from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
 import type { AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import { PrismaAutomationTraceTriggerCatalogueRepository } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import {
@@ -76,28 +59,13 @@ import {
 } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
 import type { TriggerRepository } from "./repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
-import type { AutomationDatasetMapper } from "./services/automation-dataset-mapper.service.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
-import type { AutomationRunawaySignals } from "./services/automation-runaway-signals.service.ts";
-import { AutomationScheduledIntent } from "./services/automation-scheduled-intent.service.ts";
-import type { AutomationSettlementExecutor } from "./services/automation-settlement-executor.service.ts";
-import type { AutomationSettlementLedgerService } from "./services/automation-settlement-ledger.service.ts";
-import {
-  AutomationSettlementMatchConfirmationService,
-  type AutomationSettlementEvaluationFilters,
-  type AutomationSettlementTraceFilters,
-} from "./services/automation-settlement-match-confirmation.service.ts";
-import type { AutomationSettlementObservability } from "./services/automation-settlement-observability.service.ts";
 import {
   AutomationSlackSecretsService,
   type AutomationSecretCrypto,
 } from "./services/automation-slack-secrets.service.ts";
-import { AutomationWebhookSecretsService } from "./services/automation-webhook-secrets.service.ts";
 import { AutomationEmailCapService } from "./services/email-cap.service.ts";
-import { GraphTriggerHeartbeatService } from "./services/graph-trigger-heartbeat.service.ts";
-import { AutomationPersistActionService } from "./services/persist-action.service.ts";
-import { AutomationPersistCapService } from "./services/persist-cap.service.ts";
 import { ReportChartService, type ReportChartDeps } from "./services/report-chart.service.ts";
 import {
   ReportDispatchService,
@@ -105,12 +73,10 @@ import {
 } from "./services/report-dispatch.service.ts";
 import { ReportScheduleService } from "./services/report-schedule.service.ts";
 import { ReportTraceRowService } from "./services/report-trace-row.service.ts";
-import { RunawayContainmentService } from "./services/runaway-containment.service.ts";
 import {
   TriggerNoReplyService,
   TriggerNoReplyWarning,
 } from "./services/trigger-no-reply.service.ts";
-import { AutomationSettlementDispatchService } from "./services/trigger-settlement-dispatch.service.ts";
 import {
   UnsubscribeTokenService,
   type UnsubscribeTokenPayload,
@@ -132,7 +98,8 @@ export const automationServer = defineServerModule("automation")
     emailSuppressionTrpcTransport,
     slackAutomationRest,
     unsubscribeRest,
-  );
+  )
+  .withEventing(automationsEventing);
 
 /**
  * The envelope a trigger's mail leaves in: who it appears to come from,
@@ -337,239 +304,13 @@ export function createAutomationReportCalendar(input: {
   };
 }
 
-/** Every table this feature's settlement half reads or writes. */
-export type AutomationSettlementDatabase = AutomationSettlementLedgerDatabase &
-  TriggerDatabase &
-  GraphTriggerSentDatabase &
-  WebhookDeliveryDatabase;
-
-/**
- * Where the daily persist ceiling comes from: a number this deployment stated,
- * or the plan a project's organization is actually on.
- */
-export type AutomationPersistCeiling =
-  | Readonly<{ kind: "fixed"; cap: number }>
-  | Readonly<{
-      kind: "plan";
-      projects: ProjectApi;
-      plans: EntitlementApi;
-      free: number;
-      paid: number;
-      enterprise: number;
-    }>;
-
-/** Everything containment reads, once the ledger it filters through exists. */
-export type AutomationRunawayCollaborator = AutomationRunaway &
-  AutomationRunawayNotice &
-  AutomationRunawaySignals;
-
-/**
- * This feature's settlement half, as the composing process's pipeline mounts it.
- */
-export type AutomationSettlement = Readonly<{
-  /** What a settled intent is carried out by. */
-  settlement: AutomationSettlementExecutor;
-  /** The two schedules the pipeline drives, and the graph re-check one reaches. */
-  scheduledIntents: AutomationScheduledIntent;
-}>;
-
-/**
- * Settlement, composed over substrates the process owns. Containment
- * shares the ledger's suppression rows with a digest, so the runaway
- * collaborator arrives as a callback, keeping that table to one reader.
- */
-export function createAutomationSettlement(input: {
-  /** The one database client the composing process opened. */
-  prisma: AutomationSettlementDatabase;
-  clock: AutomationClock;
-  /** Where the daily ceiling counts: a Redis one counts fleet-wide. */
-  persistCapSlots: AutomationPersistCapRepository;
-  projects: AutomationProjectDirectory;
-  traces: AutomationSettlementTraceReader;
-  evaluations: AutomationSettlementEvaluationReader;
-  /** How a saved automation's own filters are re-checked against the trace it matched. */
-  traceFilters: AutomationSettlementTraceFilters;
-  evaluationFilters: AutomationSettlementEvaluationFilters;
-  /** `ADD_TO_DATASET`'s row mapping, and the two persist writes. */
-  mapper: AutomationDatasetMapper;
-  writer: AutomationPersistActionWriter;
-  /**
-   * The process's outbound transports, the ceilings they spend, and the cipher
-   * they read secrets with.
-   */
-  delivery: AutomationNotificationDelivery;
-  emailCaps: AutomationEmailCapService;
-  crypto: AutomationSecretCrypto;
-  /** The deployment's own origin; every link in a digest is built from it. */
-  baseHost: string;
-  observability: AutomationSettlementObservability;
-  /**
-   * What this process does about an automation past its ceiling when it
-   * composed no containment.
-   */
-  breach: AutomationSettlementBreach;
-  /** Reads the recency the heartbeat sweep decides absence from. */
-  analytics: Pick<AnalyticsApi, "findLastOccurredAt">;
-  logger: AutomationLogger;
-  /** The graph half, when this process composed one. */
-  graphActivity?: AutomationGraphActivity | undefined;
-  persistCeiling: AutomationPersistCeiling;
-  emailHourlyCap: number;
-  tenantDailyCap: number;
-  /**
-   * Builds containment over the suppression rows the ledger owns. Absent leaves
-   * a breach logged and nobody notified, which is what a process with no
-   * outbound mail or no tenancy can honestly do.
-   */
-  createRunaway?:
-    | ((suppression: AutomationSettlementLedgerService) => AutomationRunawayCollaborator)
-    | undefined;
-}): AutomationSettlement {
-  const { prisma, clock } = input;
-  // The ceiling's tier, resolved through this feature's own cap service so that
-  // the hop from project to organization, the contract override and the
-  // ten-minute cache are the ones the interactive process uses. Only the
-  // resolution is taken: the COUNTING stays on the ledger's shared slot, and two
-  // services counting the same slot would give one fleet two tallies.
-  const persistCaps =
-    input.persistCeiling.kind === "plan"
-      ? AutomationPersistCapService.create({
-          projects: input.persistCeiling.projects,
-          planProvider: input.persistCeiling.plans,
-          slots: input.persistCapSlots,
-          config: {
-            free: input.persistCeiling.free,
-            paid: input.persistCeiling.paid,
-            enterprise: input.persistCeiling.enterprise,
-          },
-        })
-      : undefined;
-
-  let containment: RunawayContainmentService | undefined;
-  const ledger = PrismaAutomationSettlementLedgerRepository.create({
-    prisma,
-    clock,
-    persistCaps: input.persistCapSlots,
-    persistCap: persistCaps
-      ? { kind: "resolved", resolve: (projectId) => persistCaps.resolvePersistDailyCap(projectId) }
-      : { kind: "fixed", cap: statedCeiling(input.persistCeiling) },
-    breach: new LateContainmentBreach(input.breach, () => containment),
-  });
-
-  const createRunaway = input.createRunaway;
-  if (createRunaway) {
-    containment = RunawayContainmentService.create({
-      runaway: createRunaway(ledger),
-      triggers: PrismaTriggerRepository.create(prisma, clock),
-      clock,
-    });
-  }
-
-  return {
-    settlement: AutomationSettlementDispatchService.create({
-      automation: ledger,
-      projects: input.projects,
-      traces: input.traces,
-      baseHost: input.baseHost,
-      confirmation: AutomationSettlementMatchConfirmationService.create({
-        evaluations: input.evaluations,
-        traces: input.traces,
-        traceFilters: input.traceFilters,
-        evaluationFilters: input.evaluationFilters,
-      }),
-      persistActions: AutomationPersistActionService.create({
-        automation: ledger,
-        projects: input.projects,
-        traces: input.traces,
-        mapper: input.mapper,
-        writer: input.writer,
-      }),
-      delivery: input.delivery,
-      emailCaps: input.emailCaps,
-      slack: AutomationSlackSecretsService.create(input.crypto),
-      webhooks: AutomationWebhookSecretsService.create(input.crypto),
-      clock,
-      observability: input.observability,
-      emailHourlyCap: input.emailHourlyCap,
-      tenantDailyCap: input.tenantDailyCap,
-    }),
-    scheduledIntents: new ComposedScheduledIntents(
-      GraphTriggerHeartbeatService.create({
-        triggers: PrismaTriggerRepository.create(prisma, clock),
-        triggerSent: PrismaGraphTriggerSentRepository.create(prisma),
-        analytics: input.analytics,
-        logger: input.logger,
-      }),
-      PrismaWebhookDeliveryRepository.create(prisma),
-      input.graphActivity,
-    ),
-  };
-}
-
-/** The paid ceiling, stated rather than resolved. See the config leaf. */
-function statedCeiling(ceiling: AutomationPersistCeiling): number {
-  return ceiling.kind === "fixed" ? ceiling.cap : ceiling.paid;
-}
-
-/**
- * The breach handler, resolved LATE: containment reads suppression rows
- * off the ledger this port is handed to, so the thunk is the knot, not an
- * optional. Absent containment, this process's own report stands.
- */
-class LateContainmentBreach extends AutomationSettlementBreach {
-  constructor(
-    private readonly reported: AutomationSettlementBreach,
-    private readonly resolve: () => RunawayContainmentService | undefined,
-  ) {
-    super();
-  }
-
-  async handle(breach: Parameters<AutomationSettlementBreach["handle"]>[0]): Promise<void> {
-    const containment = this.resolve();
-    if (containment) return containment.handle(breach);
-
-    return this.reported.handle(breach);
-  }
-}
-
-/**
- * The two schedules, and the graph re-check one of them drives.
- */
-class ComposedScheduledIntents extends AutomationScheduledIntent {
-  constructor(
-    private readonly heartbeat: GraphTriggerHeartbeatService,
-    private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
-    private readonly graphActivity: AutomationGraphActivity | undefined,
-  ) {
-    super();
-  }
-
-  decideGraphTriggerHeartbeat(now: { now: Instant }): Promise<GraphTriggerSweepCandidate[]> {
-    return this.heartbeat.decide(now);
-  }
-
-  evaluateGraphTrigger(candidate: {
-    triggerId: string;
-    projectId: string;
-    reason: Parameters<AutomationGraphActivity["evaluateGraphTrigger"]>[0]["reason"];
-  }): Promise<GraphTriggerEvaluationResult> {
-    if (!this.graphActivity) {
-      return Promise.reject(
-        new DispatchError({
-          message:
-            "This process composes no graph-alert vertical, so a sweep candidate cannot be evaluated here. Set BASE_HOST to compose one.",
-          retryable: false,
-        }),
-      );
-    }
-
-    return this.graphActivity.evaluateGraphTrigger(candidate);
-  }
-
-  pruneWebhookDeliveries(now?: Instant): Promise<number> {
-    return this.deliveries.pruneExpired(now);
-  }
-}
+export {
+  createAutomationSettlement,
+  type AutomationPersistCeiling,
+  type AutomationRunawayCollaborator,
+  type AutomationSettlement,
+  type AutomationSettlementDatabase,
+} from "./app/automation-composition.build.ts";
 
 /**
  * The durable automation rows a composing process writes through, each built here rather than by

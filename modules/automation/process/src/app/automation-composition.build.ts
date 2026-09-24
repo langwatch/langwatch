@@ -2,32 +2,80 @@
  * Builds AutomationInfrastructure for both processes: trigger reads and writes, and the
  * graph-alert delivery a re-evaluation dispatches through (mail, Slack, webhook).
  */
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   ApiAutomationUnavailableError,
   type AutomationAction,
+  type AutomationPersistCapBreach,
+  type DatasetActionParams,
+  type GraphTriggerEvaluationReason,
+  type GraphTriggerEvaluationResult,
+  type GraphTriggerSweepCandidate,
   type SlackActionParams,
   type SlackChannelListing,
 } from "@langwatch/automation-contract";
+import {
+  mapTraceToDatasetEntry,
+  TRACE_EXPANSIONS,
+  type DatasetApi,
+  type DatasetRecordEntry,
+} from "@langwatch/dataset-contract";
+import {
+  WebhookDispatchRateLimiter,
+  WebhookEgressService,
+  type WebhookDispatchRateLimitResult,
+} from "@langwatch/egress";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { DispatchError } from "@langwatch/eventing";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { Logger } from "@langwatch/observability";
 import type { Encryption, Mail, ProcessMembers } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { traceSchema, type TraceRecord } from "@langwatch/trace-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
+import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import { EgressWebhookDeliveryTransport } from "../channels/http/http.webhook-egress.channel.ts";
+import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
+import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import type {
   AutomationScheduledJobRepository,
   ScheduledJobRecord,
 } from "../repositories/automation-scheduled-job.repository.ts";
+import { AutomationSettlementBreach } from "../repositories/automation-settlement-ledger.repository.ts";
+import type {
+  AutomationSettlementEvaluationReader,
+  AutomationSettlementTraceReader,
+} from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
+import {
+  PrismaAutomationSettlementLedgerRepository,
+  type AutomationSettlementLedgerDatabase,
+} from "../repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
+import {
+  PrismaGraphTriggerSentRepository,
+  type GraphTriggerSentDatabase,
+} from "../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import {
+  PrismaTriggerRepository,
+  type TriggerDatabase,
+} from "../repositories/prisma/prisma.trigger.repository.ts";
+import {
+  PrismaWebhookDeliveryRepository,
+  type WebhookDeliveryDatabase,
+} from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { RedisAutomationEmailCapRepository } from "../repositories/redis/redis.automation-email-cap.repository.ts";
 import { RedisAutomationPersistCapRepository } from "../repositories/redis/redis.automation-persist-cap.repository.ts";
+import { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 import type {
   AutomationDispatchError,
@@ -37,9 +85,28 @@ import type {
 import { AutomationNotificationDeliveryAdapter } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
 import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
-import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
+import { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
+import type { AutomationSettlementExecutor } from "../services/automation-settlement-executor.service.ts";
+import type { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
+import {
+  AutomationSettlementMatchConfirmationService,
+  type AutomationSettlementEvaluationFilters,
+  type AutomationSettlementTraceFilters,
+} from "../services/automation-settlement-match-confirmation.service.ts";
+import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
+import {
+  AutomationSlackSecretsService,
+  type AutomationSecretCrypto,
+  type AutomationSlackBotTokenDecryptor,
+} from "../services/automation-slack-secrets.service.ts";
+import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationEmailCapService } from "../services/email-cap.service.ts";
 import { GraphAlertDispatchService } from "../services/graph-alert-dispatch.service.ts";
+import { GraphTriggerHeartbeatService } from "../services/graph-trigger-heartbeat.service.ts";
+import { AutomationPersistActionService } from "../services/persist-action.service.ts";
+import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
+import { RunawayContainmentService } from "../services/runaway-containment.service.ts";
+import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import type {
   AutomationAuditSink,
   AutomationCallCounter,
@@ -49,7 +116,11 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "./automation.app.ts";
-import type { AutomationClock } from "./automation.members.ts";
+import type {
+  AutomationClock,
+  AutomationGraphActivity,
+  AutomationProjectDirectory,
+} from "./automation.members.ts";
 
 /** What `buildAutomationInfrastructure` reads off process members. */
 export type AutomationProcessMembers = Readonly<{
@@ -59,7 +130,8 @@ export type AutomationProcessMembers = Readonly<{
   encryption: Encryption;
   mail: Mail;
   publicBaseUrl: string | undefined;
-  secrets: Readonly<{ find(key: string): string | undefined }>;
+  /** SaaS verifies a webhook receiver's certificate; self-hosted receivers often self-sign. */
+  isSaas: boolean;
 }>;
 
 type AutomationInfrastructureInput = Readonly<{
@@ -72,15 +144,25 @@ type AutomationInfrastructureInput = Readonly<{
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
 }>;
 
+/** What settlement sends through: the SAME delivery and ceilings graph alerts spend. */
+export type AutomationComposedInfrastructure = AutomationInfrastructure &
+  Readonly<{ delivery: AutomationNotificationDelivery; emailCaps: AutomationEmailCapService }>;
+
 /** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
 export function buildAutomationInfrastructure(
   input: AutomationInfrastructureInput,
-): AutomationInfrastructure {
+): AutomationComposedInfrastructure {
   const { members } = input;
   const providers = AutomationProviderRegistryService.create(members.encryption);
   const clock = new ApiAutomationClock();
+  const delivery = buildNotificationDelivery(input);
+  const emailCaps = AutomationEmailCapService.create({
+    store: RedisAutomationEmailCapRepository.create({ connection: members.redis }),
+  });
 
   return {
+    delivery,
+    emailCaps,
     verifier: input.verifier,
     // The report calendar, on the SAME `ScheduledJob` store the worker's loop
     // claims a due row through — Eventing's own, not a second narrowing of it,
@@ -88,7 +170,7 @@ export function buildAutomationInfrastructure(
     jobs: new InstantScheduledJobRepository(new PrismaScheduledJobStore(members.prisma)),
     clock,
     wake: new ApiSchedulerWake(members.redis),
-    notifier: buildGraphAlertNotifier({ ...input, providers, clock }),
+    notifier: buildGraphAlertNotifier({ ...input, providers, clock, delivery, emailCaps }),
     logger: new ApiAutomationLogger(members.logger),
     slackTokens: new ApiAutomationSlackTokens(providers),
     dispatchErrors: new ApiAutomationDispatchErrors(),
@@ -172,27 +254,22 @@ class ApiSchedulerWake extends SchedulerWake {
  * Main's graph-alert delivery (worker-automation-graph.composition.ts): no public
  * origin means no alert, since every alert links back to it.
  */
-function buildGraphAlertNotifier(
-  input: AutomationInfrastructureInput &
-    Readonly<{ providers: AutomationProviderRegistryService; clock: AutomationClock }>,
+export function buildGraphAlertNotifier(
+  input: Pick<AutomationInfrastructureInput, "repositories" | "caps"> &
+    Readonly<{
+      members: Pick<AutomationProcessMembers, "publicBaseUrl">;
+      providers: AutomationProviderRegistryService;
+      clock: AutomationClock;
+      delivery: AutomationNotificationDelivery;
+      emailCaps: AutomationEmailCapService;
+    }>,
 ): AutomationGraphNotifier {
-  const baseHost = input.members.publicBaseUrl;
-  if (!baseHost) return new UndeliveredGraphAlerts();
+  if (!input.members.publicBaseUrl) return new UndeliveredGraphAlerts();
 
   return GraphAlertDispatchService.create({
     persistence: AutomationGraphDeliveryService.create(input.repositories),
-    emailCaps: AutomationEmailCapService.create({
-      store: RedisAutomationEmailCapRepository.create({ connection: input.members.redis }),
-    }),
-    delivery: AutomationNotificationDeliveryAdapter.create({
-      mailer: input.members.mail,
-      renderer: ReactEmailMailRenderer.create(),
-      baseHost,
-      ...(input.unsubscribeSigningSecret === undefined
-        ? {}
-        : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
-      logger: input.members.logger,
-    }),
+    emailCaps: input.emailCaps,
+    delivery: input.delivery,
     webhooks: input.providers.webhooks,
     clock: input.clock,
     emailHourlyCap: input.caps.emailHourlyCap,
@@ -200,10 +277,73 @@ function buildGraphAlertNotifier(
   });
 }
 
+/**
+ * Mail, Slack and webhook delivery over the mail member and the fenced webhook sender
+ * (main's worker-webhook-egress.composition.ts). No public origin, no delivery.
+ */
+function buildNotificationDelivery(
+  input: Pick<AutomationInfrastructureInput, "members" | "unsubscribeSigningSecret">,
+): AutomationNotificationDelivery {
+  const { members } = input;
+  if (!members.publicBaseUrl) return new UnavailableNotificationDelivery();
+
+  const egress = WebhookEgressService.create({
+    rateLimiter: new RedisWebhookDispatchRateLimiter(members.redis),
+    tls: { rejectUnauthorized: members.isSaas },
+  });
+  return AutomationNotificationDeliveryAdapter.create({
+    mailer: members.mail,
+    renderer: ReactEmailMailRenderer.create(),
+    baseHost: members.publicBaseUrl,
+    ...(input.unsubscribeSigningSecret === undefined
+      ? {}
+      : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
+    webhookTransport: EgressWebhookDeliveryTransport.create(egress),
+    logger: members.logger,
+  });
+}
+
+/** Main's refusal for a process with no public origin: a digest would link back to nowhere. */
+class UnavailableNotificationDelivery extends AutomationNotificationDelivery {
+  sendLegacyEmail(): Promise<void> {
+    return refuseDelivery();
+  }
+
+  sendEmail(): Promise<void> {
+    return refuseDelivery();
+  }
+
+  sendSlackWebhook(): Promise<void> {
+    return refuseDelivery();
+  }
+
+  sendLegacySlackWebhook(): Promise<void> {
+    return refuseDelivery();
+  }
+
+  sendSlackBot(): Promise<void> {
+    return refuseDelivery();
+  }
+
+  sendWebhook(): Promise<never> {
+    return refuseDelivery();
+  }
+}
+
+function refuseDelivery(): Promise<never> {
+  return Promise.reject(
+    new DispatchError({
+      message:
+        "This process composes no outbound automation delivery: it named no BASE_HOST, so a digest would carry links back to nowhere. Set BASE_HOST to send settled notifications from here.",
+      retryable: false,
+    }),
+  );
+}
+
 /** A process with no public origin cannot link an alert back, so it refuses by name. */
 class UndeliveredGraphAlerts implements AutomationGraphNotifier {
-  dispatch(): never {
-    throw new ApiAutomationUnavailableError("deliver graph alerts");
+  dispatch(): Promise<never> {
+    return Promise.reject(new ApiAutomationUnavailableError("deliver graph alerts"));
   }
 }
 
@@ -432,6 +572,32 @@ class RedisAutomationCallCounter implements AutomationCallCounter {
   }
 }
 
+/**
+ * The webhook dispatch cap, counted in Redis under main's key prefix: a different
+ * key would spend a budget the platform's own limiter protects.
+ */
+class RedisWebhookDispatchRateLimiter extends WebhookDispatchRateLimiter {
+  constructor(private readonly connection: RedisConnection) {
+    super();
+  }
+
+  async limit(
+    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+  ): Promise<WebhookDispatchRateLimitResult> {
+    const redisKey = `langwatch:ratelimit:${input.key}`;
+    const count = await this.connection.incr(redisKey);
+    if (count === 1) {
+      await this.connection.expire(redisKey, input.windowSeconds);
+    }
+    const ttl = await this.connection.ttl(redisKey);
+    return {
+      allowed: count <= input.max,
+      remaining: Math.max(0, input.max - count),
+      resetAt: nowInstant().epochMilliseconds + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
+    };
+  }
+}
+
 /** {@link AutomationAuditSink} over the SAME audit trail every other mutation is recorded on. */
 class AuditLogAutomationAuditSink implements AutomationAuditSink {
   constructor(private readonly auditLog: AuditLogApi) {}
@@ -445,5 +611,328 @@ class AuditLogAutomationAuditSink implements AutomationAuditSink {
       action: entry.action,
       ...(entry.args === undefined ? {} : { args: entry.args as RecordAuditLogCommand["args"] }),
     });
+  }
+}
+
+/** Every table this feature's settlement half reads or writes. */
+export type AutomationSettlementDatabase = AutomationSettlementLedgerDatabase &
+  TriggerDatabase &
+  GraphTriggerSentDatabase &
+  WebhookDeliveryDatabase;
+
+/**
+ * Where the daily persist ceiling comes from: a number this deployment stated,
+ * or the plan a project's organization is actually on.
+ */
+export type AutomationPersistCeiling =
+  | Readonly<{ kind: "fixed"; cap: number }>
+  | Readonly<{
+      kind: "plan";
+      projects: ProjectApi;
+      plans: EntitlementApi;
+      free: number;
+      paid: number;
+      enterprise: number;
+    }>;
+
+/** Everything containment reads, once the ledger it filters through exists. */
+export type AutomationRunawayCollaborator = AutomationRunaway &
+  AutomationRunawayNotice &
+  AutomationRunawaySignals;
+
+/**
+ * This feature's settlement half, as the composing process's pipeline mounts it.
+ */
+export type AutomationSettlement = Readonly<{
+  /** What a settled intent is carried out by. */
+  settlement: AutomationSettlementExecutor;
+  /** The two schedules the pipeline drives, and the graph re-check one reaches. */
+  scheduledIntents: AutomationScheduledIntent;
+}>;
+
+/**
+ * Settlement, composed over substrates the process owns. Containment
+ * shares the ledger's suppression rows with a digest, so the runaway
+ * collaborator arrives as a callback, keeping that table to one reader.
+ */
+export function createAutomationSettlement(input: {
+  /** The one database client the composing process opened. */
+  prisma: AutomationSettlementDatabase;
+  clock: AutomationClock;
+  /** Where the daily ceiling counts: a Redis one counts fleet-wide. */
+  persistCapSlots: AutomationPersistCapRepository;
+  projects: AutomationProjectDirectory;
+  traces: AutomationSettlementTraceReader;
+  evaluations: AutomationSettlementEvaluationReader;
+  /** How a saved automation's own filters are re-checked against the trace it matched. */
+  traceFilters: AutomationSettlementTraceFilters;
+  evaluationFilters: AutomationSettlementEvaluationFilters;
+  /** `ADD_TO_DATASET`'s row mapping, and the two persist writes. */
+  mapper: AutomationDatasetMapper;
+  writer: AutomationPersistActionWriter;
+  /**
+   * The process's outbound transports, the ceilings they spend, and the cipher
+   * they read secrets with.
+   */
+  delivery: AutomationNotificationDelivery;
+  emailCaps: AutomationEmailCapService;
+  crypto: AutomationSecretCrypto;
+  /** The deployment's own origin; every link in a digest is built from it. */
+  baseHost: string;
+  observability: AutomationSettlementObservability;
+  /**
+   * What this process does about an automation past its ceiling when it
+   * composed no containment.
+   */
+  breach: AutomationSettlementBreach;
+  /** Reads the recency the heartbeat sweep decides absence from. */
+  analytics: Pick<AnalyticsApi, "findLastOccurredAt">;
+  logger: AutomationLogger;
+  /** The graph half, when this process composed one. */
+  graphActivity?: AutomationGraphActivity | undefined;
+  persistCeiling: AutomationPersistCeiling;
+  emailHourlyCap: number;
+  tenantDailyCap: number;
+  /**
+   * Builds containment over the suppression rows the ledger owns. Absent leaves
+   * a breach logged and nobody notified, which is what a process with no
+   * outbound mail or no tenancy can honestly do.
+   */
+  createRunaway?:
+    | ((suppression: AutomationSettlementLedgerService) => AutomationRunawayCollaborator)
+    | undefined;
+}): AutomationSettlement {
+  const { prisma, clock } = input;
+  // The ceiling's tier, resolved through this feature's own cap service so that
+  // the hop from project to organization, the contract override and the
+  // ten-minute cache are the ones the interactive process uses. Only the
+  // resolution is taken: the COUNTING stays on the ledger's shared slot, and two
+  // services counting the same slot would give one fleet two tallies.
+  const persistCaps =
+    input.persistCeiling.kind === "plan"
+      ? AutomationPersistCapService.create({
+          projects: input.persistCeiling.projects,
+          planProvider: input.persistCeiling.plans,
+          slots: input.persistCapSlots,
+          config: {
+            free: input.persistCeiling.free,
+            paid: input.persistCeiling.paid,
+            enterprise: input.persistCeiling.enterprise,
+          },
+        })
+      : undefined;
+
+  let containment: RunawayContainmentService | undefined;
+  const ledger = PrismaAutomationSettlementLedgerRepository.create({
+    prisma,
+    clock,
+    persistCaps: input.persistCapSlots,
+    persistCap: persistCaps
+      ? { kind: "resolved", resolve: (projectId) => persistCaps.resolvePersistDailyCap(projectId) }
+      : { kind: "fixed", cap: statedCeiling(input.persistCeiling) },
+    breach: new LateContainmentBreach(input.breach, () => containment),
+  });
+
+  const createRunaway = input.createRunaway;
+  if (createRunaway) {
+    containment = RunawayContainmentService.create({
+      runaway: createRunaway(ledger),
+      triggers: PrismaTriggerRepository.create(prisma, clock),
+      clock,
+    });
+  }
+
+  return {
+    settlement: AutomationSettlementDispatchService.create({
+      automation: ledger,
+      projects: input.projects,
+      traces: input.traces,
+      baseHost: input.baseHost,
+      confirmation: AutomationSettlementMatchConfirmationService.create({
+        evaluations: input.evaluations,
+        traces: input.traces,
+        traceFilters: input.traceFilters,
+        evaluationFilters: input.evaluationFilters,
+      }),
+      persistActions: AutomationPersistActionService.create({
+        automation: ledger,
+        projects: input.projects,
+        traces: input.traces,
+        mapper: input.mapper,
+        writer: input.writer,
+      }),
+      delivery: input.delivery,
+      emailCaps: input.emailCaps,
+      slack: AutomationSlackSecretsService.create(input.crypto),
+      webhooks: AutomationWebhookSecretsService.create(input.crypto),
+      clock,
+      observability: input.observability,
+      emailHourlyCap: input.emailHourlyCap,
+      tenantDailyCap: input.tenantDailyCap,
+    }),
+    scheduledIntents: new ComposedScheduledIntents(
+      GraphTriggerHeartbeatService.create({
+        triggers: PrismaTriggerRepository.create(prisma, clock),
+        triggerSent: PrismaGraphTriggerSentRepository.create(prisma),
+        analytics: input.analytics,
+        logger: input.logger,
+      }),
+      PrismaWebhookDeliveryRepository.create(prisma),
+      input.graphActivity,
+    ),
+  };
+}
+
+/** The paid ceiling, stated rather than resolved. See the config leaf. */
+function statedCeiling(ceiling: AutomationPersistCeiling): number {
+  return ceiling.kind === "fixed" ? ceiling.cap : ceiling.paid;
+}
+
+/**
+ * The breach handler, resolved LATE: containment reads suppression rows
+ * off the ledger this port is handed to, so the thunk is the knot, not an
+ * optional. Absent containment, this process's own report stands.
+ */
+class LateContainmentBreach extends AutomationSettlementBreach {
+  constructor(
+    private readonly reported: AutomationSettlementBreach,
+    private readonly resolve: () => RunawayContainmentService | undefined,
+  ) {
+    super();
+  }
+
+  async handle(breach: AutomationPersistCapBreach): Promise<void> {
+    const containment = this.resolve();
+    if (containment) return containment.handle(breach);
+
+    return this.reported.handle(breach);
+  }
+}
+
+/**
+ * The two schedules, and the graph re-check one of them drives.
+ */
+class ComposedScheduledIntents extends AutomationScheduledIntent {
+  constructor(
+    private readonly heartbeat: GraphTriggerHeartbeatService,
+    private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
+    private readonly graphActivity: AutomationGraphActivity | undefined,
+  ) {
+    super();
+  }
+
+  decideGraphTriggerHeartbeat(now: { now: Instant }): Promise<GraphTriggerSweepCandidate[]> {
+    return this.heartbeat.decide(now);
+  }
+
+  evaluateGraphTrigger(candidate: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }): Promise<GraphTriggerEvaluationResult> {
+    if (!this.graphActivity) {
+      return Promise.reject(
+        new DispatchError({
+          message:
+            "This process composes no graph-alert vertical, so a sweep candidate cannot be evaluated here. Set BASE_HOST to compose one.",
+          retryable: false,
+        }),
+      );
+    }
+
+    return this.graphActivity.evaluateGraphTrigger(candidate);
+  }
+
+  pruneWebhookDeliveries(now?: Instant): Promise<number> {
+    return this.deliveries.pruneExpired(now);
+  }
+}
+
+/** `ADD_TO_DATASET`'s row mapping, through dataset's own trace mapping (main's worker mapper). */
+export class DatasetTraceMapper extends AutomationDatasetMapper {
+  map(input: {
+    trace: TraceRecord;
+    mapping: DatasetActionParams["datasetMapping"]["mapping"];
+    expansions: readonly string[];
+  }): Record<string, string | number>[] {
+    const expansions = new Set(
+      input.expansions.filter(
+        (value): value is keyof typeof TRACE_EXPANSIONS => value in TRACE_EXPANSIONS,
+      ),
+    );
+    return mapTraceToDatasetEntry(traceSchema.parse(input.trace), input.mapping, expansions);
+  }
+}
+
+const ANNOTATOR_REFERENCE_INVALID = "annotation_annotator_reference_invalid";
+
+/** The two persist writes, through the dataset and annotation owners' own operations. */
+export class PeerPersistActionWriter extends AutomationPersistActionWriter {
+  constructor(
+    private readonly peers: Readonly<{
+      datasets: Pick<DatasetApi, "batchCreateRecords">;
+      annotations: Pick<AnnotationApi, "queueTraces">;
+    }>,
+  ) {
+    super();
+  }
+
+  async addToAnnotationQueue(input: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }): Promise<void> {
+    try {
+      await this.peers.annotations.queueTraces(input);
+    } catch (error) {
+      // The annotator is saved on the automation, so a malformed one fails every redelivery.
+      if (readCode(error) !== ANNOTATOR_REFERENCE_INVALID) throw error;
+      throw new DispatchError({
+        message:
+          "This automation names an annotator that parses as neither a queue nor a member, so a queue item cannot be written for it. Re-save the automation with a queue or a member that still exists.",
+        retryable: false,
+      });
+    }
+  }
+
+  async addToDataset(input: {
+    datasetId: string;
+    projectId: string;
+    datasetRecords: DatasetRecordEntry[];
+  }): Promise<void> {
+    await this.peers.datasets.batchCreateRecords({
+      slugOrId: input.datasetId,
+      projectId: input.projectId,
+      entries: input.datasetRecords,
+    });
+  }
+}
+
+function readCode(error: unknown): unknown {
+  return typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+}
+
+/**
+ * A breach with no containment composed: logged, nobody notified, nothing paused
+ * (main's WorkerSettlementBreach; containment is a named parity gap).
+ */
+export class LoggedSettlementBreach extends AutomationSettlementBreach {
+  constructor(private readonly logger: AutomationLogger) {
+    super();
+  }
+
+  handle(input: AutomationPersistCapBreach): Promise<void> {
+    this.logger.error(
+      {
+        projectId: input.projectId,
+        triggerId: input.trigger.id,
+        cap: input.cap,
+        count: input.count,
+        skipped: input.skipped,
+      },
+      "Automation passed its daily ceiling on confirmed matches and further matches are being skipped; this process composed no containment, so nobody has been notified and the automation has not been paused",
+    );
+    return Promise.resolve();
   }
 }
