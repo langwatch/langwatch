@@ -1,6 +1,7 @@
+import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { getApp } from "~/server/app-layer/app";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
 import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
@@ -206,6 +207,90 @@ function restrictLabelFor(
     : null;
 }
 
+/** A viewer who may read nothing: what an unrecorded admin read resolves to. */
+const NO_CONTENT_VIEWER: ViewerFacts = {
+  isAdmin: false,
+  isMember: false,
+  isMemberRole: false,
+  isViewer: false,
+  isProjectOwner: false,
+  groupIds: [],
+};
+
+/**
+ * Reading someone else's personal workspace through an organization role
+ * alone is an admin read. It is recorded here, in the read path, because the
+ * page that shows the "viewing as admin" banner is not the only way in: an API
+ * call, a link or a closed tab never renders it. Answers whether the read may
+ * show content: every other read may, and an admin read only once recorded.
+ */
+async function admitPersonalWorkspaceRead({
+  prisma,
+  userId,
+  organizationId,
+  teamId,
+  isPersonal,
+  facts,
+  holdsWorkspaceRole,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  teamId: string;
+  isPersonal: boolean;
+  facts: ViewerFacts;
+  holdsWorkspaceRole: boolean;
+}): Promise<boolean> {
+  const readsAsAdmin =
+    isPersonal &&
+    facts.isMember &&
+    !facts.isProjectOwner &&
+    !holdsWorkspaceRole;
+  if (!readsAsAdmin) return true;
+  return recordAdminPersonalWorkspaceRead({
+    prisma,
+    actorUserId: userId,
+    organizationId,
+    teamId,
+  });
+}
+
+/**
+ * Record an admin's read of another member's personal workspace, deduplicated
+ * by the audit service over its window. Answers whether the read may go
+ * ahead: a record that cannot be written means the content stays hidden.
+ */
+async function recordAdminPersonalWorkspaceRead({
+  prisma,
+  actorUserId,
+  organizationId,
+  teamId,
+}: {
+  prisma: PrismaClient;
+  actorUserId: string;
+  organizationId: string;
+  teamId: string;
+}): Promise<boolean> {
+  try {
+    await AdminWorkspaceViewAuditService.create({
+      prisma,
+      ocsfRepository: tryGetApp()?.governance.ocsfEvents,
+    }).recordView({
+      actorUserId,
+      organizationId,
+      targetTeamId: teamId,
+      kind: "personal",
+    });
+    return true;
+  } catch (error) {
+    logger.error(
+      { error, organizationId, teamId, actorUserId },
+      "admin read of a personal workspace could not be recorded; hiding captured content (fail-closed)",
+    );
+    return false;
+  }
+}
+
 export async function getUserProtectionsForProject(
   ctx: {
     prisma: PrismaClient;
@@ -230,7 +315,7 @@ export async function getUserProtectionsForProject(
     select: {
       teamId: true,
       ownerUserId: true,
-      team: { select: { organizationId: true } },
+      team: { select: { organizationId: true, isPersonal: true } },
     },
   });
 
@@ -368,7 +453,7 @@ export async function getUserProtectionsForProject(
   const isProjectOwner =
     project.ownerUserId != null && project.ownerUserId === userId;
 
-  const viewer: ViewerFacts = {
+  const facts: ViewerFacts = {
     isAdmin,
     isMember,
     isMemberRole,
@@ -376,6 +461,19 @@ export async function getUserProtectionsForProject(
     isProjectOwner,
     groupIds,
   };
+  const viewer = (await admitPersonalWorkspaceRead({
+    prisma: ctx.prisma,
+    userId,
+    organizationId,
+    teamId: project.teamId,
+    isPersonal: project.team.isPersonal,
+    facts,
+    holdsWorkspaceRole: heldGrants.some(
+      (grant) => grant.scopeType !== "ORGANIZATION",
+    ),
+  }))
+    ? facts
+    : NO_CONTENT_VIEWER;
   const hiddenAttributeRules = restrictedAttributeRules.filter(
     (rule) =>
       !isContentVisible(

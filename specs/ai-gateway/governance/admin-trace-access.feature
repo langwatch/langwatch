@@ -290,6 +290,46 @@ Feature: Admin trace access — bird's-eye drill-in with persistent 'viewing as'
         that the integration test catches (the regression test asserts
         the OCSF event count after a known drill-in sequence)
 
+  # The read path, not the page, is what records an admin read of someone
+  # else's personal workspace. Opening the page fires the banner and a
+  # best-effort record from the browser; a read through the API, a link or a
+  # closed tab never renders that page. So resolving what the viewer may see
+  # records the read itself, and a read that cannot be recorded does not
+  # show the content.
+
+  @unit
+  Scenario: An admin reading another member's personal workspace is recorded by the read itself
+    Given "carol" can read "ariana"'s personal workspace only through her organization role
+    When "carol" reads trace content in that workspace
+    Then an admin workspace view by "carol" on "ariana"'s personal workspace is recorded
+    And the trace content is visible to "carol"
+
+  @unit
+  Scenario: A read that cannot be recorded does not show the content
+    Given "carol" can read "ariana"'s personal workspace only through her organization role
+    And the admin workspace view cannot be recorded
+    When "carol" reads trace content in that workspace
+    Then the trace content is redacted for "carol"
+
+  @unit
+  Scenario: The owner reading their own personal workspace is not recorded
+    When "ariana" reads trace content in her own personal workspace
+    Then no admin workspace view is recorded
+    And the trace content is visible to "ariana"
+
+  @unit
+  Scenario: Someone with a role on the workspace itself is not recorded
+    Given "dave" holds a role on "ariana"'s personal workspace
+    When "dave" reads trace content in that workspace
+    Then no admin workspace view is recorded
+
+  @unit
+  Scenario: Reading a team project is not recorded
+    Given "carol" can read the "engineering" team's project only through her organization role
+    When "carol" reads trace content in that project
+    Then no admin workspace view is recorded
+    And the trace content is visible to "carol"
+
   @bdd @audit @admin-trace-access @no-bypass
   Scenario: Even support / debugging access uses the same drill-in path
     Given the org has shipped LangWatch internal support tooling
