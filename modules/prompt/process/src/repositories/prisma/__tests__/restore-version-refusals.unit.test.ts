@@ -4,8 +4,10 @@
  * boundary as a 500; main answers 404 and 409 (measured 2026-09-21).
  * @see modules/prompt/specs/prompt-version-restore.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { LlmConfigRepository } from "../../prompt.repository.ts";
 import {
   PrismaLlmConfigVersionsRepository,
   type PromptVersionDatabase,
@@ -19,7 +21,10 @@ function repository(findUnique: ReturnType<typeof vi.fn>) {
     $transaction: vi.fn(),
   } as unknown as PromptVersionDatabase;
 
-  return PrismaLlmConfigVersionsRepository.create({ prisma });
+  return PrismaLlmConfigVersionsRepository.create({
+    prisma,
+    configs: createApiFixture<LlmConfigRepository>(),
+  });
 }
 
 const RESTORE = {

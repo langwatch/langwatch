@@ -11,14 +11,17 @@ import {
 } from "@langwatch/prompt-contract";
 import { describe, expect, it } from "vitest";
 
-import { mountPromptRest } from "./prompt-rest.harness.ts";
+import type { PromptService } from "../../services/prompt.service.ts";
+import { buildPromptApp, mountPromptRest } from "./prompt-rest.harness.ts";
 
 function updateRefusedWith(error: Error) {
-  const app = createApiFixture<PromptApi>({
-    updatePrompt: async () => {
-      throw error;
-    },
-  });
+  const app = buildPromptApp(
+    createApiFixture<PromptService>({
+      updatePrompt: async () => {
+        throw error;
+      },
+    }),
+  );
 
   return mountPromptRest({ app }).request("/api/prompts/checkout-agent", {
     method: "PUT",
@@ -27,7 +30,10 @@ function updateRefusedWith(error: Error) {
   });
 }
 
-function getPrompt(path: string, app: PromptApi = createApiFixture<PromptApi>()) {
+function getPrompt(
+  path: string,
+  app: PromptApi = buildPromptApp(createApiFixture<PromptService>()),
+) {
   return mountPromptRest({ app }).request(path);
 }
 
@@ -59,11 +65,13 @@ describe("the /api/prompts refusals", () => {
 
   describe("when a read names a tag the catalogue refuses", () => {
     it("answers 422 with the tag refusal's code", async () => {
-      const app = createApiFixture<PromptApi>({
-        getByIdOrHandle: async () => {
-          throw new PromptTagInvalidError("Invalid tag name.");
-        },
-      });
+      const app = buildPromptApp(
+        createApiFixture<PromptService>({
+          getPromptByIdOrHandle: async () => {
+            throw new PromptTagInvalidError("Invalid tag name.");
+          },
+        }),
+      );
 
       const response = await getPrompt("/api/prompts/checkout-agent:nightly", app);
       const body = (await response.json()) as { error: string };

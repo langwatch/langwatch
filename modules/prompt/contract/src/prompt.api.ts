@@ -1,5 +1,7 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { z } from "zod";
 
+import type { ApiResponsePrompt, syncInputSchema } from "./prompt-rest.schemas.ts";
 import type {
   CopyPromptCommand,
   CreatePromptCommand,
@@ -10,7 +12,6 @@ import type {
 } from "./prompt.commands.ts";
 import type { PlaygroundStreamEvent, PromptExecuteRequest } from "./prompt.playground-execute.ts";
 import type {
-  ApiResponsePrompt,
   PromptCopyChoice,
   PromptCopySource,
   PromptCopySummary,
@@ -39,6 +40,16 @@ export type PromptTagCatalogPrincipal =
       organizationId: string;
     }>
   | Readonly<{ type: "legacyProjectKey"; projectId: string }>;
+
+export type PromptRestSyncInput = {
+  idOrHandle: string;
+  localConfigData: z.infer<typeof syncInputSchema>["configData"];
+  localVersion?: number;
+  projectId: string;
+  organizationId: string;
+  commitMessage?: string;
+  parameters?: Record<string, unknown>;
+};
 
 export type PromptCreateInput = {
   projectId: string;
@@ -218,7 +229,7 @@ export interface PromptApi {
   seedTagsForOrganization(input: { organizationId: string }): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<PromptUsageCount>;
-  /** The `/api/prompts` REST family's operations: they refuse with the statuses that family has always answered. */
+  /** The `/api/prompts` REST family's operations: its refusals keep the statuses they had. */
   getByAddress(input: {
     address: string;
     version?: number;
@@ -232,9 +243,7 @@ export interface PromptApi {
   updateWithTags(
     input: UpdatePromptCommand & { organizationId: string; tags?: string[] },
   ): Promise<ApiResponsePrompt>;
-  syncAndAnnounce(
-    input: Record<string, unknown> & { idOrHandle: string; projectId: string },
-  ): Promise<PromptSyncResult>;
+  syncAndAnnounce(input: PromptRestSyncInput): Promise<PromptSyncResult>;
   assignTagByAddress(input: {
     idOrHandle: string;
     versionId: string;

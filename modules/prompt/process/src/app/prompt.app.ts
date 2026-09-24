@@ -9,6 +9,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import {
   PromptApi,
   hoistSystemMessage,
+  type ApiResponsePrompt,
   PromptNotFoundError,
   PromptTagMissingError,
   PromptHasNoCopiesError,
@@ -36,6 +37,7 @@ import {
   type PromptCopyChoice,
   type PromptPushToCopiesResult,
   type PromptExecuteRequest,
+  type PromptRestSyncInput,
   type PlaygroundStreamEvent,
   type PromptUsageCount,
 } from "@langwatch/prompt-contract";
@@ -45,6 +47,7 @@ import type { PromptRepositories } from "../repositories/prompt.repositories.ts"
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
 import { PromptExecutionService } from "../services/prompt-execution.service.ts";
+import { PromptRestService } from "../services/prompt-rest.service.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
 import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
@@ -130,6 +133,7 @@ type PromptAppDependencies = Readonly<{
   projects: ProjectApi;
   permissions: AuthzApi | null;
   members: PromptInfrastructure;
+  rest: PromptRestService;
   /** Absent only on the read-only twin, which deliberately has no executor. */
   execution: PromptExecutionService | null;
   /**
@@ -171,6 +175,12 @@ export class PromptApp implements PromptApi {
    */
   static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptApp {
     const { dependencies, members } = setup;
+    const afterPromptCreated: PromptInfrastructure["afterPromptCreated"] = (input) => {
+      members.logger.info(
+        { projectId: input.projectId, userId: input.userId ?? null },
+        "prompt created; no product-analytics sink is composed on this process",
+      );
+    };
     return new PromptApp({
       prompts,
       projects: dependencies.projects,
@@ -184,15 +194,8 @@ export class PromptApp implements PromptApi {
           rateLimiter: members.rateLimiter,
         }),
       }),
-      members: {
-        prompts,
-        afterPromptCreated: (input) => {
-          members.logger.info(
-            { projectId: input.projectId, userId: input.userId ?? null },
-            "prompt created; no product-analytics sink is composed on this process",
-          );
-        },
-      },
+      members: { prompts, afterPromptCreated },
+      rest: PromptRestService.create({ prompts, afterPromptCreated }),
       publicBaseUrl: members.publicBaseUrl,
     });
   }
@@ -209,6 +212,10 @@ export class PromptApp implements PromptApi {
       permissions: null,
       execution: null,
       members: { prompts: input.prompts, afterPromptCreated: () => undefined },
+      rest: PromptRestService.create({
+        prompts: input.prompts,
+        afterPromptCreated: () => undefined,
+      }),
       publicBaseUrl: undefined,
     });
   }
@@ -867,6 +874,69 @@ export class PromptApp implements PromptApi {
     } catch (error) {
       asHandledTagError(error);
     }
+  }
+
+  getByAddress(input: {
+    address: string;
+    version?: number;
+    tag?: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<VersionedPrompt> {
+    return this.#dependencies.rest.getByAddress(input);
+  }
+
+  createWithTags(
+    input: CreatePromptCommand & { organizationId: string; tags?: string[] },
+  ): Promise<ApiResponsePrompt> {
+    return this.#dependencies.rest.createWithTags(input);
+  }
+
+  updateWithTags(
+    input: UpdatePromptCommand & { organizationId: string; tags?: string[] },
+  ): Promise<ApiResponsePrompt> {
+    return this.#dependencies.rest.updateWithTags(input);
+  }
+
+  syncAndAnnounce(input: PromptRestSyncInput): Promise<PromptSyncResult> {
+    return this.#dependencies.rest.syncAndAnnounce(input);
+  }
+
+  assignTagByAddress(input: {
+    idOrHandle: string;
+    versionId: string;
+    tag: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<PromptTagAssignment> {
+    return this.#dependencies.rest.assignTagByAddress(input);
+  }
+
+  createTagDefinition(input: { organizationId: string; name: string }): Promise<PromptTag> {
+    return this.#dependencies.rest.createTagDefinition(input);
+  }
+
+  async renameTagDefinition(input: {
+    projectId: string;
+    organizationId: string;
+    oldName: string;
+    newName: string;
+    by: PromptTagCatalogPrincipal;
+  }): Promise<PromptTag> {
+    const { projectId, by, ...rename } = input;
+    await this.assertMayManageTagCatalog({ projectId, by });
+    return this.#dependencies.rest.renameTagDefinition(rename);
+  }
+
+  async deleteTagDefinition(input: {
+    projectId: string;
+    organizationId: string;
+    name: string;
+    by: PromptTagCatalogPrincipal;
+  }): Promise<void> {
+    const { projectId, by, ...deletion } = input;
+    await this.assertMayManageTagCatalog({ projectId, by });
+    return this.#dependencies.rest.deleteTagDefinition(deletion);
   }
 
   async #organizationOf(projectId: string): Promise<string> {

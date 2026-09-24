@@ -3,10 +3,13 @@
  * makes deliberately also matches ORGANIZATION-scoped prompts a sibling project owns, so
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
-import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { PromptService } from "../../services/prompt.service.ts";
 import {
+  buildPromptApp,
   mountPromptRest,
   PROMPT_TEST_ORGANIZATION,
   PROMPT_TEST_PROJECT,
@@ -14,20 +17,51 @@ import {
 
 const OWNING_PROJECT = "project_owner";
 
+const NOW = new Date("2026-09-04T00:00:00.000Z");
+
+const SIBLING_PROMPT: VersionedPrompt = {
+  id: "prompt_1",
+  name: "Checkout agent",
+  handle: "checkout-agent",
+  scope: "ORGANIZATION",
+  version: 1,
+  versionId: "prompt_version_old",
+  versionCreatedAt: NOW,
+  model: "openai/gpt-5-mini",
+  prompt: "Be brief.",
+  projectId: OWNING_PROJECT,
+  organizationId: PROMPT_TEST_ORGANIZATION,
+  messages: [],
+  authorId: null,
+  inputs: [],
+  outputs: [],
+  updatedAt: NOW,
+  createdAt: NOW,
+  tags: [],
+  parameters: {},
+};
+
 function buildApi() {
-  const assignTag = vi.fn(async (input: { tag: string; versionId: string }) => ({
+  const assignTag = vi.fn<PromptService["assignTag"]>(async (input) => ({
     configId: "prompt_1",
     versionId: input.versionId,
-    promptTag: { name: input.tag },
-    updatedAt: new Date("2026-09-04T00:00:00.000Z"),
+    promptTag: {
+      id: "tag_1",
+      organizationId: PROMPT_TEST_ORGANIZATION,
+      name: input.tag,
+      createdAt: NOW,
+    },
+    updatedAt: NOW,
   }));
 
-  const app = {
-    // The organization-scoped prompt a SIBLING project owns, which is what the
-    // by-handle lookup is written to reach.
-    getByIdOrHandle: vi.fn(async () => ({ id: "prompt_1", projectId: OWNING_PROJECT })),
-    assignTag,
-  } as unknown as PromptApi;
+  const app = buildPromptApp(
+    createApiFixture<PromptService>({
+      // The organization-scoped prompt a SIBLING project owns, which is what the
+      // by-handle lookup is written to reach.
+      getPromptByIdOrHandle: async () => SIBLING_PROMPT,
+      assignTag,
+    }),
+  );
 
   const family = mountPromptRest({ app });
 

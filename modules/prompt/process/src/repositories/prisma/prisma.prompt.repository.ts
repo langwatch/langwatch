@@ -70,7 +70,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     private readonly modelProvider?: ModelProviderApi,
   ) {
     super();
-    this.versions = versions ?? PrismaLlmConfigVersionsRepository.create({ prisma });
+    this.versions = versions ?? PrismaLlmConfigVersionsRepository.create({ prisma, configs: this });
   }
 
   async countUsage({

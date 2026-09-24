@@ -17,9 +17,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import {
   getLatestConfigVersionSchema,
-  parsePromptShorthand,
   PromptApi,
-  type ApiResponsePrompt,
   apiResponsePromptWithVersionDataSchema,
   assignTagInputSchema,
   assignTagResponseSchema,
@@ -32,19 +30,7 @@ import {
   idVersionParamsSchema,
   restorePromptVersionBodySchema,
   promptWindowQuerySchema,
-  PromptAddressInvalidError,
-  PromptNotFoundError,
-  PromptTagConflictError,
-  PromptTagInvalidError,
-  PromptTagMissingError,
-  PromptTagNotFoundError,
-  PromptTagProtectedError,
-  PromptTagProtectedRefusalError,
-  PromptTagTakenError,
-  PromptTagUnprocessableError,
-  PromptTagValidationError,
   renameTagInputSchema,
-  ShorthandParseError,
   promptWireSchema,
   syncInputSchema,
   tagDefinitionSchema,
@@ -167,45 +153,20 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { id, tag, versionId } = input;
+    const result = await app.assignTagByAddress({
+      idOrHandle: input.id,
+      versionId: input.versionId,
+      tag: input.tag,
+      projectId: scope.id,
+      organizationId: project.organizationId,
+    });
 
-    logger.info(
-      { projectId: scope.id, promptId: id, tag, versionId },
-      "Assigning tag to prompt version",
-    );
-
-    try {
-      const config = await app.getByIdOrHandle({
-        idOrHandle: id,
-        projectId: scope.id,
-        organizationId: project.organizationId,
-      });
-
-      // The lookup above also matches org-scoped prompts a SIBLING project
-      // owns, so the row's own projectId is not the one the credential was
-      // authorized on. The write goes to the authorized project.
-      const result = await app.assignTag({
-        configId: config.id,
-        versionId,
-        tag,
-        projectId: scope.id,
-        organizationId: project.organizationId,
-      });
-
-      logger.info(
-        { projectId: scope.id, configId: config.id, tag, versionId },
-        "Successfully assigned tag to prompt version",
-      );
-
-      return {
-        configId: result.configId,
-        versionId: result.versionId,
-        tag: result.promptTag.name,
-        updatedAt: result.updatedAt,
-      };
-    } catch (error: unknown) {
-      throw asRestRefusal(error);
-    }
+    return {
+      configId: result.configId,
+      versionId: result.versionId,
+      tag: result.promptTag.name,
+      updatedAt: result.updatedAt,
+    };
   })
 
   // --- Tag definition CRUD (org-level) ---
@@ -244,21 +205,12 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input }, project) => {
-    try {
-      const tag = await app.createTag({
-        organizationId: project.organizationId,
-        name: input.name,
-      });
+    const tag = await app.createTagDefinition({
+      organizationId: project.organizationId,
+      name: input.name,
+    });
 
-      logger.info(
-        { organizationId: project.organizationId, name: input.name },
-        "Custom prompt tag created via REST",
-      );
-
-      return { id: tag.id, name: tag.name, createdAt: tag.createdAt };
-    } catch (error) {
-      throw asRestRefusal(error);
-    }
+    return { id: tag.id, name: tag.name, createdAt: tag.createdAt };
   })
 
   .put("/api/prompts/tags/:tag", "putApiPromptsTagsByTag")
@@ -278,24 +230,15 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project, credential) => {
-    await app.assertMayManageTagCatalog({ projectId: scope.id, by: credential });
+    const tag = await app.renameTagDefinition({
+      projectId: scope.id,
+      organizationId: project.organizationId,
+      oldName: input.tag,
+      newName: input.name,
+      by: credential,
+    });
 
-    try {
-      const tag = await app.renameTag({
-        organizationId: project.organizationId,
-        oldName: input.tag,
-        newName: input.name,
-      });
-
-      logger.info(
-        { organizationId: project.organizationId, oldName: input.tag, newName: input.name },
-        "Custom prompt tag renamed via REST",
-      );
-
-      return { id: tag.id, name: tag.name, createdAt: tag.createdAt };
-    } catch (error) {
-      throw asRestRefusal(error);
-    }
+    return { id: tag.id, name: tag.name, createdAt: tag.createdAt };
   })
 
   .delete("/api/prompts/tags/:tag", "deleteApiPromptsTagsByTag")
@@ -308,21 +251,12 @@ export const promptRest = defineRestRouter(PromptApi)
     responses: { ...baseResponses, 204: { description: "Tag deleted", content: {} } },
   })
   .handle(async ({ app, input, scope }, project, credential) => {
-    await app.assertMayManageTagCatalog({ projectId: scope.id, by: credential });
-
-    try {
-      await app.deleteTagByName({
-        organizationId: project.organizationId,
-        name: input.tag,
-      });
-
-      logger.info(
-        { organizationId: project.organizationId, tagName: input.tag },
-        "Custom prompt tag deleted via REST",
-      );
-    } catch (error) {
-      throw asRestRefusal(error);
-    }
+    await app.deleteTagDefinition({
+      projectId: scope.id,
+      organizationId: project.organizationId,
+      name: input.tag,
+      by: credential,
+    });
   })
 
   .get("/api/prompts/:id{.+?}/versions", "getApiPromptsByIdVersions")
@@ -428,45 +362,20 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    try {
-      // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
-      const shorthand = parsePromptShorthand(input.id);
+    // The two window parameters stay unrefused by their schema: a caller that
+    // sends `version=abc` is answered by the conflict and shorthand rules.
+    const config = await app.getByAddress({
+      address: input.id,
+      projectId: scope.id,
+      organizationId: project.organizationId,
+      ...(input.version === undefined ? {} : { version: input.version }),
+      ...(input.tag === undefined ? {} : { tag: input.tag }),
+    });
 
-      // The two window parameters stay unrefused by their schema: a caller that
-      // sends `version=abc` is answered by the conflict and shorthand rules
-      // below, exactly as it always has been.
-      const queryVersion = input.version;
-      const queryTag = input.tag;
-
-      // Reject conflicting shorthand + query param. hadSuffix is true even for
-      // "latest" (which normalizes away), so "foo:latest?tag=production" is
-      // correctly rejected.
-      if (shorthand.hadSuffix && (queryTag || queryVersion)) {
-        throw new PromptAddressInvalidError(
-          `Conflict: shorthand syntax in path cannot be combined with tag or version query parameters. Use one or the other, not both.`,
-        );
-      }
-
-      const version = shorthand.version ?? queryVersion;
-      const tag = shorthand.tag ?? queryTag;
-
-      logger.info({ projectId: scope.id, id: shorthand.slug, version, tag }, "Getting prompt");
-
-      const config = await app.getByIdOrHandle({
-        idOrHandle: shorthand.slug,
-        projectId: scope.id,
-        organizationId: project.organizationId,
-        ...(version === undefined ? {} : { version }),
-        ...(tag === undefined ? {} : { tag }),
-      });
-
-      return {
-        ...apiResponsePromptWithVersionDataSchema.parse(config),
-        platformUrl: project.promptsUrl,
-      };
-    } catch (error: unknown) {
-      throw asRestRefusal(error);
-    }
+    return {
+      ...apiResponsePromptWithVersionDataSchema.parse(config),
+      platformUrl: project.promptsUrl,
+    };
   })
 
   // Create prompt with initial version. Asks for `prompts:create`; `:manage`
@@ -486,46 +395,16 @@ export const promptRest = defineRestRouter(PromptApi)
     },
   })
   .handle(async ({ app, input, scope }, project) => {
-    const { tags, ...data } = input;
+    const answered = await app.createWithTags({
+      projectId: scope.id,
+      organizationId: project.organizationId,
+      ...input,
+    });
 
-    logger.info(
-      {
-        handle: data.handle,
-        scope: data.scope,
-        projectId: scope.id,
-        organizationId: project.organizationId,
-        tags,
-      },
-      "Creating new prompt with initial version",
-    );
-
-    try {
-      const created = await app.createPrompt({
-        projectId: scope.id,
-        organizationId: project.organizationId,
-        ...data,
-      });
-
-      logger.info({ promptId: created.id }, "Successfully created prompt with initial version");
-
-      const answered = await assignInitialTags({
-        app,
-        prompt: created,
-        tags,
-        projectId: scope.id,
-        organizationId: project.organizationId,
-      });
-
-      app.announceCreated({ projectId: scope.id });
-
-      return {
-        ...apiResponsePromptWithVersionDataSchema.parse(answered),
-        platformUrl: project.promptsUrl,
-      };
-    } catch (error: unknown) {
-      logger.error({ projectId: scope.id, error }, "Error creating prompt");
-      throw asRestRefusal(error);
-    }
+    return {
+      ...apiResponsePromptWithVersionDataSchema.parse(answered),
+      platformUrl: project.promptsUrl,
+    };
   })
 
   .post("/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync")
@@ -544,35 +423,17 @@ export const promptRest = defineRestRouter(PromptApi)
       },
     },
   })
-  .handle(async ({ app, input, scope }, project) => {
-    const { id, ...data } = input;
-
-    logger.info({ projectId: scope.id, promptId: id }, "Syncing prompt with local content");
-
-    try {
-      const syncResult = await app.syncPrompt({
-        idOrHandle: id,
-        localConfigData: data.configData,
-        localVersion: data.localVersion,
-        projectId: scope.id,
-        organizationId: project.organizationId,
-        commitMessage: data.commitMessage,
-        parameters: data.parameters,
-      });
-
-      logger.info(
-        { projectId: scope.id, promptId: id, action: syncResult.action },
-        "Successfully synced prompt",
-      );
-
-      if (syncResult.action === "created") app.announceCreated({ projectId: scope.id });
-
-      return syncResult;
-    } catch (error: unknown) {
-      logger.error({ projectId: scope.id, promptId: id, error }, "Error syncing prompt");
-      throw asRestRefusal(error);
-    }
-  })
+  .handle(async ({ app, input, scope }, project) =>
+    app.syncAndAnnounce({
+      idOrHandle: input.id,
+      localConfigData: input.configData,
+      localVersion: input.localVersion,
+      projectId: scope.id,
+      organizationId: project.organizationId,
+      commitMessage: input.commitMessage,
+      parameters: input.parameters,
+    }),
+  )
 
   .put("/api/prompts/:id{.+}", "putApiPromptsById")
   .withParams(idParamsSchema)
@@ -595,35 +456,18 @@ export const promptRest = defineRestRouter(PromptApi)
   })
   .handle(async ({ app, input, scope }, project) => {
     const { id, tags, ...data } = input;
+    const answered = await app.updateWithTags({
+      idOrHandle: id,
+      projectId: scope.id,
+      organizationId: project.organizationId,
+      data,
+      tags,
+    });
 
-    logger.info({ projectId: scope.id, handleOrId: id, data, tags }, "Updating prompt");
-
-    try {
-      const updated = await app.updatePrompt({ idOrHandle: id, projectId: scope.id, data });
-
-      if (!updated) throw new PromptNotFoundError(`Prompt not found: ${id}`);
-
-      const answered = await assignInitialTags({
-        app,
-        prompt: updated,
-        tags,
-        projectId: scope.id,
-        organizationId: project.organizationId,
-      });
-
-      logger.info(
-        { projectId: scope.id, promptId: id, handle: updated.handle, scope: updated.scope },
-        "Successfully updated prompt",
-      );
-
-      return {
-        ...apiResponsePromptWithVersionDataSchema.parse(answered),
-        platformUrl: project.promptsUrl,
-      };
-    } catch (error: unknown) {
-      logger.error({ projectId: scope.id, promptId: id, error }, "Error updating prompt");
-      throw asRestRefusal(error);
-    }
+    return {
+      ...apiResponsePromptWithVersionDataSchema.parse(answered),
+      platformUrl: project.promptsUrl,
+    };
   })
 
   .delete("/api/prompts/:id{.+}", "deleteApiPromptsById")
@@ -656,59 +500,3 @@ export const promptRest = defineRestRouter(PromptApi)
     return result;
   })
   .build();
-
-/**
- * The tag names a create or an update carried, applied to the version it just
- * wrote. The prompt is re-read afterwards so the answer carries the tags it now
- * holds rather than the ones it had a moment before.
- */
-async function assignInitialTags(options: {
-  app: PromptApi;
-  prompt: ApiResponsePrompt;
-  tags: string[] | undefined;
-  projectId: string;
-  organizationId: string;
-}): Promise<ApiResponsePrompt> {
-  const { app, prompt, tags, projectId, organizationId } = options;
-
-  if (!tags || tags.length === 0) return prompt;
-
-  await Promise.all(
-    tags.map((tag) =>
-      app.assignTag({
-        configId: prompt.id,
-        versionId: prompt.versionId,
-        tag,
-        projectId: prompt.projectId,
-        organizationId,
-      }),
-    ),
-  );
-
-  logger.info({ promptId: prompt.id, tags }, "Assigned tags to version");
-
-  const refetched = await app.findByIdOrHandle({
-    idOrHandle: prompt.id,
-    projectId,
-    organizationId,
-  });
-
-  return refetched ? apiResponsePromptWithVersionDataSchema.parse(refetched) : prompt;
-}
-
-/** The statuses this family has always answered its tag and address refusals with. */
-function asRestRefusal(error: unknown): unknown {
-  if (
-    error instanceof PromptTagValidationError ||
-    error instanceof PromptTagInvalidError ||
-    error instanceof PromptTagProtectedError ||
-    error instanceof PromptTagProtectedRefusalError
-  ) {
-    return new PromptTagUnprocessableError(error);
-  }
-  if (error instanceof PromptTagConflictError) return new PromptTagTakenError(error.message);
-  if (error instanceof PromptTagNotFoundError) return new PromptTagMissingError(error.tagName);
-  if (error instanceof ShorthandParseError) return new PromptAddressInvalidError(error.message);
-
-  return error;
-}

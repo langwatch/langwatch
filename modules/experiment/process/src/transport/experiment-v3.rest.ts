@@ -40,6 +40,8 @@ import { z } from "zod";
 
 import type { ExperimentApp } from "#app/experiment.app";
 
+import { workbenchStateAnswer } from "../rules/experiment-workbench-state-answer.rules.ts";
+
 const logger = createLogger("langwatch:experiments-v3");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
@@ -233,20 +235,11 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .handle(async ({ app, input, scope }) => {
-    const { slug } = input;
+    const workbench = await app
+      .experiments()
+      .getWorkbenchState({ projectId: scope.id, slug: input.slug });
 
-    const workbench = await app.experiments().getWorkbenchState({ projectId: scope.id, slug });
-
-    const identity = {
-      id: workbench.experimentId,
-      slug: workbench.slug,
-      version: workbench.version,
-      updatedAt: workbench.updatedAt.toISOString(),
-    };
-
-    if (input.fields === "version") return identity;
-
-    return { ...identity, name: workbench.name, state: workbench.state };
+    return workbenchStateAnswer({ workbench, fields: input.fields });
   })
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────

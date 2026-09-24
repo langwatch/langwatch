@@ -2,11 +2,21 @@
  * The `/api/prompts` family over the runtime a process mounts it on, with the
  * two facts the process resolves bound to fixed answers.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
 
+import { PromptApp } from "#app/prompt.app";
+
+import type { PromptService } from "../../services/prompt.service.ts";
 import { promptRest, promptRestCredential, promptRestFacts } from "../prompt.rest.ts";
 
 export const PROMPT_TEST_PROJECT = "project_authorized";
@@ -28,6 +38,29 @@ const renderRefusal: RestErrorHandler = (error, c) => {
 
   return c.json({ error: "Internal Server Error" }, 500);
 };
+
+/** The real application over a scripted engine, so the family's own operations run. */
+export function buildPromptApp(prompts: PromptService): PromptApp {
+  return PromptApp.createWithPrompts(
+    {
+      dependencies: {
+        projects: createApiFixture<ProjectApi>(),
+        permissions: createApiFixture<AuthzApi>(),
+        plans: createApiFixture<EntitlementApi>(),
+        workflow: createApiFixture<WorkflowApi>(),
+      },
+      members: {
+        logger: createLogger("prompt-rest-test"),
+        rateLimiter: { check: async () => ({ allowed: true }) },
+        publicBaseUrl: "https://app.langwatch.test",
+      },
+      config: undefined,
+      resources: { own: () => {}, ownService: () => {} },
+      secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    },
+    prompts,
+  );
+}
 
 /** Mounts the family over one application, as a project key reaches it. */
 export function mountPromptRest(options: {

@@ -20,7 +20,7 @@ import {
   LlmConfigVersionsRepository,
   type LlmConfigVersionDTO,
 } from "../prompt-version.repository.ts";
-import { PrismaLlmConfigRepository } from "./prisma.prompt.repository.ts";
+import type { LlmConfigRepository } from "../prompt.repository.ts";
 
 /**
  * The client slice version persistence binds to, transaction included: a version row and
@@ -36,11 +36,20 @@ export type PromptVersionDatabase = Pick<
  * Principle by focusing only on LLM config versions data access
  */
 export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsRepository {
-  static create({ prisma }: { prisma: PromptVersionDatabase }): PrismaLlmConfigVersionsRepository {
-    return new PrismaLlmConfigVersionsRepository(prisma);
+  static create({
+    prisma,
+    configs,
+  }: {
+    prisma: PromptVersionDatabase;
+    configs: LlmConfigRepository;
+  }): PrismaLlmConfigVersionsRepository {
+    return new PrismaLlmConfigVersionsRepository(prisma, configs);
   }
 
-  private constructor(private readonly prisma: PromptVersionDatabase) {
+  private constructor(
+    private readonly prisma: PromptVersionDatabase,
+    private readonly configs: LlmConfigRepository,
+  ) {
     super();
   }
 
@@ -57,8 +66,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     organizationId: string;
   }): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
     // Verify the config exists
-    const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
-    const config = await promptRepository.findPromptByIdOrHandle({
+    const config = await this.configs.findPromptByIdOrHandle({
       idOrHandle,
       projectId,
       organizationId,
@@ -170,8 +178,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   }): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     const { versionData, organizationId } = params;
     // Verify the config exists
-    const promptRepository = PrismaLlmConfigRepository.create({ prisma: this.prisma });
-    const config = await promptRepository.findConfigByIdOrHandleWithLatestVersion({
+    const config = await this.configs.findConfigByIdOrHandleWithLatestVersion({
       idOrHandle: versionData.configId,
       projectId: versionData.projectId,
       organizationId,
