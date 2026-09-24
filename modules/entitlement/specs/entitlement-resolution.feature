@@ -26,6 +26,26 @@ Feature: Provider-neutral entitlement resolution
     Then the subscription plan is returned with source "subscription"
 
   @unit @entitlements
+  Scenario: A paying Cloud organization resolves its subscription plan
+    Given a LangWatch Cloud deployment where the organization holds no paid license
+    And the organization's active subscription is on a paid plan with its own trace limit
+    When the organization's active plan is resolved
+    Then billing's subscription plan answers, with its limit, from source "subscription"
+
+  @unit @entitlements
+  Scenario: A Cloud organization with no paid subscription resolves billing's free plan
+    Given a LangWatch Cloud deployment where the organization holds no paid license
+    And billing answers the free plan with the subscription's own trace limit
+    When the organization's active plan is resolved
+    Then that free plan answers, with its limit, from source "free"
+
+  @unit @entitlements
+  Scenario: A self-hosted deployment never reads a subscription
+    Given a self-hosted deployment where the organization holds no paid license
+    When the organization's active plan is resolved
+    Then billing is not asked and the self-hosted baseline answers
+
+  @unit @entitlements
   Scenario: The core baseline works without enterprise sources
     Given no enterprise entitlement source is installed
     When Entitlements resolves the active plan

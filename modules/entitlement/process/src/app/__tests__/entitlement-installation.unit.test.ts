@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   EntitlementApi,
@@ -93,6 +94,7 @@ describe("entitlement app installation", () => {
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
           user: createEntitlementTestUsers(),
+          billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
           licensing: createApiFixture<LicensingApi>({
             resolve: async () => free,
           }),
@@ -149,6 +151,7 @@ describe("entitlement app installation", () => {
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
           user: createEntitlementTestUsers(),
+          billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
           licensing: createApiFixture<LicensingApi>({
             resolve: async (input) => (await source.resolve(input)) ?? free,
           }),

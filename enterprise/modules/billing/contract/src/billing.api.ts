@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { SubscriptionPlanInput } from "./billing-types.ts";
 import type {
   ConnectedAddCommitRequest,
   ConnectedBillingAccountView,
@@ -75,6 +77,11 @@ export interface BillingApi {
    * organization went through, and the nurturing count behind it.
    */
   recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void>;
+  /**
+   * The plan an organization's active subscription grants on LangWatch Cloud, with the
+   * subscription's own limit overrides; the free plan where none is active or off Cloud.
+   */
+  getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");

@@ -215,3 +215,25 @@ describe("the installed billing application", () => {
     });
   });
 });
+
+describe("the subscription plan billing answers entitlement", () => {
+  /** @scenario "Billing answers a Cloud organization's active subscription plan" */
+  it("answers the active subscription's plan, lifting limits for an impersonating operator", async () => {
+    const { app, repositories } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+    const pending = await repositories.subscriptions.createPending({
+      organizationId: ACME,
+      plan: "LAUNCH",
+    });
+    await repositories.subscriptions.updateStatus({ id: pending.id, status: "ACTIVE" });
+
+    await expect(
+      app.getActiveSubscriptionPlan({
+        organizationId: ACME,
+        user: { ...CUSTOMER_ADMIN, impersonator: { email: STAFF.email } },
+      }),
+    ).resolves.toMatchObject({ type: "LAUNCH", free: false, overrideAddingLimitations: true });
+    await expect(
+      app.getActiveSubscriptionPlan({ organizationId: ACME, user: CUSTOMER_ADMIN }),
+    ).resolves.toMatchObject({ type: "LAUNCH", overrideAddingLimitations: false });
+  });
+});

@@ -28,18 +28,22 @@ export type SignupData = {
   referrer?: string | null;
 };
 
+/** Whose Cloud subscription plan is asked for, and the person asking. */
+export const subscriptionPlanInputSchema = z.object({
+  organizationId: z.string(),
+  user: z
+    .object({
+      id: z.string().optional(),
+      email: z.string().nullable().optional(),
+      name: z.string().nullable().optional(),
+      impersonator: z.object({ email: z.string().nullable().optional() }).optional(),
+    })
+    .optional(),
+});
+export type SubscriptionPlanInput = z.infer<typeof subscriptionPlanInputSchema>;
+
 export type BillingPlanProvider = {
-  getActivePlan(
-    organizationId: string,
-    user?: {
-      id?: string;
-      email?: string | null;
-      name?: string | null;
-      impersonator?: {
-        email?: string | null;
-      };
-    },
-  ): Promise<PlanInfo>;
+  getActivePlan(organizationId: string, user?: SubscriptionPlanInput["user"]): Promise<PlanInfo>;
 };
 
 export type PlanLimitNotifierInput = {

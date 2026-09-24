@@ -20,8 +20,9 @@ import {
   type ReportUsageForMonthCommandData,
   type ScenarioCreatedSignal,
   type SeatChangeBillingOutcome,
+  type SubscriptionPlanInput,
 } from "@langwatch/enterprise-billing-contract";
-import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
@@ -50,6 +51,7 @@ import { ConnectedMonthlyStatementService } from "../services/connected-monthly-
 import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
 import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import {
   ScenarioCreatedSignalService,
   type ScenarioSignalOrganizations,
@@ -142,6 +144,7 @@ export class BillingApp implements BillingApi {
       | "reportOrganizations"
       | "billableEvents"
       | "organizationCache"
+      | "subscriptions"
     >;
     config: Pick<BillingServerConfig, "bankDetails">;
     peers: ConnectedBillingPeers;
@@ -169,6 +172,10 @@ export class BillingApp implements BillingApi {
       auditLog: peers.auditLog,
       overview,
       scenarioSignals,
+      subscriptionPlans: SaaSPlanProviderService.create({
+        subscriptions: repositories.subscriptions,
+        isSaas,
+      }),
       isSaas,
       reporting: BillingApp.#composeReporting({
         repositories,
@@ -235,6 +242,7 @@ export class BillingApp implements BillingApi {
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #overview: ConnectedBillingOverviewService;
   readonly #scenarioSignals: ScenarioCreatedSignalService;
+  readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
   readonly #reporting: BillingReportingPipeline;
 
@@ -244,6 +252,7 @@ export class BillingApp implements BillingApi {
     auditLog,
     overview,
     scenarioSignals,
+    subscriptionPlans,
     isSaas,
     reporting,
   }: {
@@ -252,6 +261,7 @@ export class BillingApp implements BillingApi {
     auditLog: Pick<AuditLogApi, "record">;
     overview: ConnectedBillingOverviewService;
     scenarioSignals: ScenarioCreatedSignalService;
+    subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
     reporting: BillingReportingPipeline;
   }) {
@@ -260,6 +270,7 @@ export class BillingApp implements BillingApi {
     this.#auditLog = auditLog;
     this.#overview = overview;
     this.#scenarioSignals = scenarioSignals;
+    this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
     this.#reporting = reporting;
   }
@@ -329,6 +340,19 @@ export class BillingApp implements BillingApi {
 
   recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void> {
     return this.#scenarioSignals.record(input);
+  }
+
+  /** Main's composite recomputed `overrideAddingLimitations` from the impersonator. */
+  async getActiveSubscriptionPlan({
+    organizationId,
+    user,
+  }: SubscriptionPlanInput): Promise<PlanInfo> {
+    const plan = await this.#subscriptionPlans.getActivePlan(organizationId, user);
+
+    return {
+      ...plan,
+      overrideAddingLimitations: !!user?.impersonator && this.#operators.isAdmin(user.impersonator),
+    };
   }
 
   async getConnectedBillingOverview(

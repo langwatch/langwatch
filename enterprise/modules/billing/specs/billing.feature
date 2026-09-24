@@ -71,3 +71,10 @@ Feature: Enterprise billing compatibility
       Given an organization's key inside its cooldown
       When the cooldown is cleared
       Then the next claim succeeds
+
+  @unit
+  Scenario: Billing answers a Cloud organization's active subscription plan
+    Given LangWatch Cloud and an organization with an active paid subscription
+    When entitlement asks billing for the organization's subscription plan
+    Then the subscription's plan answers
+    And an operator impersonating a customer gets the adding limitations lifted

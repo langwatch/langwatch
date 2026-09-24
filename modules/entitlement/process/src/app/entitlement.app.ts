@@ -1,3 +1,4 @@
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import {
   entitlementConfig,
@@ -114,7 +115,7 @@ type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementApp implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
-  static readonly dependencies = { users: UserApi, license: LicensingApi };
+  static readonly dependencies = { users: UserApi, license: LicensingApi, billing: BillingApi };
   static readonly config = entitlementConfig;
   /** `logger` is the closed member; `isSaas`/`processName` are named raw so
    * `withMember`/`withMembers` can answer them (see {@link EntitlementMembers}). */
@@ -160,6 +161,7 @@ export class EntitlementApp implements EntitlementApiContract {
       isSaas: members.isSaas,
       processName: members.processName,
       license: dependencies.license,
+      billing: dependencies.billing,
     });
 
     return new EntitlementApp({ repositories, members: infrastructure, dependencies, config });
