@@ -26,18 +26,6 @@ const UNLIMITED_MESSAGES = 999_999_999;
 /** A plan resolved for one organization. */
 export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
-/**
- * No organization owns the team the caller named. A refusal rather than an allowance:
- * enforcement was asked about a tenant that does not resolve, and answering "within limits"
- * would meter traffic against nobody's plan.
- */
-export class OrganizationNotFoundForTeamError extends Error {
-  constructor(teamId: string) {
-    super(`No organization found for team ${teamId}`);
-    this.name = "OrganizationNotFoundForTeamError";
-  }
-}
-
 export type UsageLimitResult =
   | { exceeded: false }
   | {
@@ -90,10 +78,7 @@ export class UsageService {
   }
 
   async checkLimit({ teamId }: { teamId: string }): Promise<UsageLimitResult> {
-    const organizationId = await this.organizations.tryGetOrganizationIdByTeamId({ teamId });
-    if (!organizationId) {
-      throw new OrganizationNotFoundForTeamError(teamId);
-    }
+    const organizationId = await this.organizations.getOrganizationIdByTeamId({ teamId });
 
     const plan = await this.planResolver(organizationId);
     const count = await this.getCurrentMonthCount({ organizationId, plan });
@@ -276,7 +261,7 @@ export class UsageService {
     organizationId: string,
     resolvedPlan?: PlanInfo,
   ): Promise<UsageMeterReading> {
-    const pricingModel = await this.organizations.tryGetPricingModel(organizationId);
+    const { pricingModel } = await this.organizations.getPricingModel(organizationId);
     const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 

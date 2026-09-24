@@ -62,7 +62,7 @@ class SchedulerRepositoryStub implements SchedulerOpsRepository {
 
 class SchedulerAuditRepositoryStub extends SchedulerAuditRepository {
   readonly append = vi.fn().mockResolvedValue(void 0);
-  readonly listRecent = vi.fn().mockResolvedValue([]);
+  readonly findRecent = vi.fn().mockResolvedValue([]);
 }
 
 const makeService = (row: ScheduledJobRecord | null) => {

@@ -8,7 +8,6 @@ import { createLogger } from "@langwatch/observability";
 import {
   MigrationEnrolledAutomaticallyError,
   MigrationEnrollmentCloudOnlyError,
-  MigrationEnrollmentOrganizationNotFoundError,
 } from "@langwatch/ops-contract";
 
 import {
@@ -79,12 +78,7 @@ export class SystemMigrationEnrollmentService {
 
     systemMigrationLookup.registeredMigration(this.deps, migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
-    const organization = await this.deps.enrollments.tryFindOrganizationById({
-      organizationId,
-    });
-    if (!organization) {
-      throw new MigrationEnrollmentOrganizationNotFoundError();
-    }
+    await this.deps.enrollments.getOrganizationById({ organizationId });
 
     await this.deps.enrollments.create({
       organizationId,

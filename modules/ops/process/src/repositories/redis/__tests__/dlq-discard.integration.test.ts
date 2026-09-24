@@ -71,7 +71,7 @@ describe.skipIf(!hasRedis)("DLQ discard and explicit-id redrive", () => {
         expect(await redis.exists(`${prefix}dlq:group-a:data`)).toBe(0);
         expect(await redis.exists(`${prefix}dlq:group-a:error`)).toBe(0);
         expect(await redis.smembers(`${prefix}dlq`)).toEqual([]);
-        expect(await repo.listDlqGroups({ queueName })).toEqual([]);
+        expect(await repo.findDlqGroups({ queueName })).toEqual([]);
       });
 
       /** @scenario A discarded DLQ group cannot be redriven afterwards */

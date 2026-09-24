@@ -27,7 +27,7 @@ function contractCases(backend: Backend): void {
         processKey: "endpoint:whep_1",
       });
 
-      const listed = await backend.processes().listRecent({ limit: 10 });
+      const listed = await backend.processes().findRecent({ limit: 10 });
 
       expect(listed).toHaveLength(1);
       expect(listed[0]).toMatchObject({
@@ -47,11 +47,11 @@ function contractCases(backend: Backend): void {
         metadata: { moved: 12 },
       });
 
-      expect(await backend.processes().listRecent({ limit: 10 })).toHaveLength(1);
+      expect(await backend.processes().findRecent({ limit: 10 })).toHaveLength(1);
     });
 
     it("answers an empty trail before anything is recorded", async () => {
-      expect(await backend.processes().listRecent({ limit: 10 })).toEqual([]);
+      expect(await backend.processes().findRecent({ limit: 10 })).toEqual([]);
     });
 
     it("returns at most the limit asked for", async () => {
@@ -65,7 +65,7 @@ function contractCases(backend: Backend): void {
         });
       }
 
-      expect(await backend.processes().listRecent({ limit: 2 })).toHaveLength(2);
+      expect(await backend.processes().findRecent({ limit: 2 })).toHaveLength(2);
     });
   });
 
@@ -79,14 +79,14 @@ function contractCases(backend: Backend): void {
         slot: null,
       });
 
-      const listed = await backend.schedules().listRecent({ limit: 10 });
+      const listed = await backend.schedules().findRecent({ limit: 10 });
 
       expect(listed).toHaveLength(1);
       expect(listed[0]).toMatchObject({ scheduleId: "sched_1", projectId: "project-1" });
     });
 
     it("answers an empty trail before anything is recorded", async () => {
-      expect(await backend.schedules().listRecent({ limit: 10 })).toEqual([]);
+      expect(await backend.schedules().findRecent({ limit: 10 })).toEqual([]);
     });
   });
 }

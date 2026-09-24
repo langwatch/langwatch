@@ -5,8 +5,8 @@ import {
   LATENCY_HISTOGRAM_OVERFLOW_FIELD,
   latencyBucketField,
   mergeHistogramCounts,
-  percentileFromHistogram,
-  windowPercentiles,
+  computePercentileFromHistogram,
+  computeWindowPercentiles,
 } from "../ops-latency.ts";
 
 describe("latencyBucketField", () => {
@@ -30,7 +30,7 @@ describe("latencyBucketField", () => {
   });
 });
 
-describe("percentileFromHistogram", () => {
+describe("computePercentileFromHistogram", () => {
   describe("when a percentile is computed from bucketed counts", () => {
     /** @scenario "A quantile reads from bucketed counts as a slight overestimate" */
     it("reports the upper bound of the bucket the rank falls in", () => {
@@ -40,14 +40,14 @@ describe("percentileFromHistogram", () => {
         ["256", 90],
         ["1536", 10],
       ]);
-      expect(percentileFromHistogram(counts, 0.5)).toBe(256);
-      expect(percentileFromHistogram(counts, 0.99)).toBe(1536);
+      expect(computePercentileFromHistogram(counts, 0.5)).toBe(256);
+      expect(computePercentileFromHistogram(counts, 0.99)).toBe(1536);
     });
   });
 
   it("reports the largest finite bound for overflow-bucket ranks", () => {
     const counts = new Map([[LATENCY_HISTOGRAM_OVERFLOW_FIELD, 5]]);
-    expect(percentileFromHistogram(counts, 0.99)).toBe(
+    expect(computePercentileFromHistogram(counts, 0.99)).toBe(
       LATENCY_HISTOGRAM_BOUNDS_MS[LATENCY_HISTOGRAM_BOUNDS_MS.length - 1],
     );
   });
@@ -55,8 +55,8 @@ describe("percentileFromHistogram", () => {
   describe("given a window holding no completions", () => {
     /** @scenario "A quiet window reports nothing rather than zero" */
     it("reports null, never a fabricated zero", () => {
-      expect(percentileFromHistogram(new Map(), 0.5)).toBeNull();
-      expect(windowPercentiles(new Map())).toBeNull();
+      expect(computePercentileFromHistogram(new Map(), 0.5)).toBeNull();
+      expect(computeWindowPercentiles(new Map())).toBeNull();
     });
   });
 });

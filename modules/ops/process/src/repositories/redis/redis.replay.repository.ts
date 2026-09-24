@@ -2,7 +2,7 @@ import { IDLE_STATUS, type ReplayHistoryEntry, type ReplayStatus } from "@langwa
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
-import { type ReplayRepository } from "../replay.repository.ts";
+import { type ReplayLockHolder, type ReplayRepository } from "../replay.repository.ts";
 
 const REPLAY_LOCK_KEY = "ops:replay:lock";
 const REPLAY_STATUS_KEY = "ops:replay:status";
@@ -80,8 +80,9 @@ export class ReplayRedisRepository implements ReplayRepository {
     );
   }
 
-  async tryGetLockHolder(): Promise<string | null> {
-    return this.redis.get(REPLAY_LOCK_KEY);
+  async getLockHolder(): Promise<ReplayLockHolder> {
+    const runId = await this.redis.get(REPLAY_LOCK_KEY);
+    return runId === null ? { kind: "free" } : { kind: "held", runId };
   }
 
   async isCancelled(): Promise<boolean> {
@@ -102,7 +103,7 @@ export class ReplayRedisRepository implements ReplayRepository {
     await this.redis.ltrim(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
   }
 
-  async getHistory(): Promise<ReplayHistoryEntry[]> {
+  async findHistory(): Promise<ReplayHistoryEntry[]> {
     const raw = await this.redis.lrange(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
     const entries: ReplayHistoryEntry[] = [];
     for (const item of raw) {

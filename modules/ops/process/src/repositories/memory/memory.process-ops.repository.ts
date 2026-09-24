@@ -8,7 +8,13 @@ import type {
   ProcessWakeRow,
 } from "@langwatch/ops-contract";
 
-import { ProcessOpsRepository, type ProcessNameCounts } from "../process-ops.repository.ts";
+import {
+  type DeadMessageDiscard,
+  type DeadMessageRedrive,
+  type LapsedLeaseRelease,
+  ProcessOpsRepository,
+  type ProcessNameCounts,
+} from "../process-ops.repository.ts";
 import type { MemoryOpsStore, MemoryOutboxRow } from "./memory.ops.store.ts";
 
 /** One redrive or discard sweep moves at most this many rows, as the stored one does. */
@@ -186,13 +192,13 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
     return { woke: true, previousWakeAt };
   }
 
-  async tryRedriveDeadMessage(params: {
+  async redriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null> {
+  }): Promise<DeadMessageRedrive> {
     const row = this.#deadMessage(params);
-    if (!row) return null;
+    if (!row) return { kind: "not_dead" };
 
     row.status = "pending";
     row.attempts = 0;
@@ -200,21 +206,21 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
     row.leasedUntil = null;
     row.updatedAt = params.now;
 
-    return { messageKey: row.messageKey };
+    return { kind: "redriven", messageKey: row.messageKey };
   }
 
-  async tryDiscardDeadMessage(params: {
+  async discardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null> {
+  }): Promise<DeadMessageDiscard> {
     const row = this.#deadMessage(params);
-    if (!row) return null;
+    if (!row) return { kind: "not_dead" };
 
     row.status = "discarded";
     row.updatedAt = params.now;
 
-    return { messageKey: row.messageKey };
+    return { kind: "discarded", messageKey: row.messageKey };
   }
 
   async redriveAllDeadMessages({
@@ -261,7 +267,7 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
     return [];
   }
 
-  async tryReleaseLapsedLease({
+  async releaseLapsedLease({
     ref,
     messageId,
     now,
@@ -269,7 +275,7 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null> {
+  }): Promise<LapsedLeaseRelease> {
     const row = this.store.outbox.find(
       (candidate) =>
         candidate.id === messageId &&
@@ -278,12 +284,12 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
         candidate.leasedUntil !== null &&
         candidate.leasedUntil < now,
     );
-    if (!row) return null;
+    if (!row) return { kind: "not_lapsed" };
 
     row.leasedUntil = null;
     row.updatedAt = now;
 
-    return { messageKey: row.messageKey };
+    return { kind: "released", messageKey: row.messageKey };
   }
 
   #messagesFor(ref: ProcessRef): MemoryOutboxRow[] {

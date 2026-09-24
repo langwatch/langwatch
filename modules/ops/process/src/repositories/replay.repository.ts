@@ -2,6 +2,8 @@
 // shared by the repository here and by the port the operator transport calls.
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 
+export type ReplayLockHolder = { kind: "held"; runId: string } | { kind: "free" };
+
 export abstract class ReplayRepository {
   abstract getStatus(): Promise<ReplayStatus>;
   abstract writeStatus(params: { status: ReplayStatus }): Promise<void>;
@@ -14,12 +16,12 @@ export abstract class ReplayRepository {
    */
   abstract refreshLock(params: { runId: string; ttlSeconds: number }): Promise<boolean>;
   abstract releaseLock(params: { runId: string }): Promise<void>;
-  abstract tryGetLockHolder(): Promise<string | null>;
+  abstract getLockHolder(): Promise<ReplayLockHolder>;
 
   abstract isCancelled(): Promise<boolean>;
   abstract setCancelled(params: { ttlSeconds: number }): Promise<void>;
   abstract clearCancelFlag(): Promise<void>;
 
   abstract pushToHistory(params: { entry: ReplayHistoryEntry }): Promise<void>;
-  abstract getHistory(): Promise<ReplayHistoryEntry[]>;
+  abstract findHistory(): Promise<ReplayHistoryEntry[]>;
 }

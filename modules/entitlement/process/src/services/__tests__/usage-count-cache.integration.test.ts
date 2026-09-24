@@ -29,14 +29,14 @@ const PLAN: PlanInfo = {
 };
 
 class TestOrganizations implements UsageOrganization {
-  tryGetOrganizationIdByTeamId(): Promise<string | null> {
+  getOrganizationIdByTeamId(): Promise<string> {
     return Promise.resolve("org-1");
   }
   getProjectIds(): Promise<string[]> {
     return Promise.resolve(["project-1"]);
   }
-  tryGetPricingModel(): Promise<null> {
-    return Promise.resolve(null);
+  getPricingModel(): Promise<{ pricingModel: null }> {
+    return Promise.resolve({ pricingModel: null });
   }
 }
 

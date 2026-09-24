@@ -36,14 +36,14 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
     getGroupJobs: vi.fn().mockResolvedValue({ jobs: [], total: 0 }),
     getBlockedSummary: vi.fn().mockResolvedValue({ totalBlocked: 0, clusters: [] }),
     enumerateParkedTenants: vi.fn().mockResolvedValue({ tenants: [], total: 0 }),
-    listParkedGroups: vi.fn().mockResolvedValue({ groups: [], total: 0 }),
+    findParkedGroups: vi.fn().mockResolvedValue({ groups: [], total: 0 }),
     unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: false }),
     unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 0 }),
     drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 0 }),
     pausePipeline: vi.fn().mockResolvedValue(undefined),
     unpausePipeline: vi.fn().mockResolvedValue(undefined),
     retryBlocked: vi.fn().mockResolvedValue({ wasBlocked: false }),
-    listPausedKeys: vi.fn().mockResolvedValue([]),
+    findPausedKeys: vi.fn().mockResolvedValue([]),
     moveToDlq: vi.fn().mockResolvedValue({ jobsMoved: 0 }),
     moveAllBlockedToDlq: vi.fn().mockResolvedValue({ movedCount: 0, jobsMoved: 0 }),
     replayFromDlq: vi.fn().mockResolvedValue({ jobsReplayed: 0 }),
@@ -56,13 +56,13 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
     }),
     canaryRedrive: vi.fn().mockResolvedValue({ redrivenCount: 0, groupIds: [] }),
     canaryUnblock: vi.fn().mockResolvedValue({ unblockedCount: 0, groupIds: [] }),
-    listDlqGroups: vi.fn().mockResolvedValue([]),
+    findDlqGroups: vi.fn().mockResolvedValue([]),
     drainAllBlockedPreview: vi
       .fn()
       .mockResolvedValue({ totalAffected: 0, byPipeline: [], byError: [] }),
     pauseTenant: vi.fn().mockResolvedValue(undefined),
     unpauseTenant: vi.fn().mockResolvedValue(undefined),
-    listPausedTenants: vi.fn().mockResolvedValue([]),
+    findPausedTenants: vi.fn().mockResolvedValue([]),
     drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
     tryReconcileTotalPending: vi.fn().mockResolvedValue(null),
     readPublishedPendingDrift: vi.fn().mockResolvedValue(0),
@@ -648,7 +648,7 @@ describe("QueueService", () => {
         ];
         const repo = createMockRepo({
           discoverQueueNames: vi.fn().mockResolvedValue(["q1:gq", "q2:gq"]),
-          listDlqGroups: vi.fn().mockResolvedValueOnce(dlq1).mockResolvedValueOnce(dlq2),
+          findDlqGroups: vi.fn().mockResolvedValueOnce(dlq1).mockResolvedValueOnce(dlq2),
         });
         const service = QueueService.create({ repo });
 
@@ -664,7 +664,7 @@ describe("QueueService", () => {
       it("strips them for display name", async () => {
         const repo = createMockRepo({
           discoverQueueNames: vi.fn().mockResolvedValue(["{prefix}:events:gq"]),
-          listDlqGroups: vi.fn().mockResolvedValue([
+          findDlqGroups: vi.fn().mockResolvedValue([
             {
               groupId: "g1",
               error: null,
@@ -706,7 +706,7 @@ describe("QueueService", () => {
         ];
         const repo = createMockRepo({
           discoverQueueNames: vi.fn().mockResolvedValue(["q:gq"]),
-          listDlqGroups: vi.fn().mockResolvedValue(dlq),
+          findDlqGroups: vi.fn().mockResolvedValue(dlq),
         });
         const service = QueueService.create({ repo });
 
@@ -909,7 +909,7 @@ describe("QueueService", () => {
     describe("when listPausedTenants is called", () => {
       it("returns the repository's list of paused tenant ids", async () => {
         const repo = createMockRepo({
-          listPausedTenants: vi.fn().mockResolvedValue(["project_A", "project_B"]),
+          findPausedTenants: vi.fn().mockResolvedValue(["project_A", "project_B"]),
         });
         const service = QueueService.create({ repo });
 

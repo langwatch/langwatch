@@ -57,7 +57,7 @@ export class PrismaProcessAuditRepository extends ProcessAuditRepository {
     });
   }
 
-  async listRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]> {
+  async findRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]> {
     const rows = await this.prisma.auditLog.findMany({
       where: { targetKind: TARGET_KIND },
       orderBy: { createdAt: "desc" },

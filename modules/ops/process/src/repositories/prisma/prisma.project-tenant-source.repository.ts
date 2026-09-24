@@ -23,7 +23,7 @@ export class PrismaProjectTenantSourceRepository implements TenantSource {
     return projects.map((project) => project.id);
   }
 
-  async getOrganizationId(projectId: string) {
+  async getOrganizationId(projectId: string): Promise<string> {
     const project = await this.#prisma.project.findUniqueOrThrow({
       where: { id: projectId },
       select: { team: { select: { organizationId: true } } },

@@ -28,6 +28,10 @@ export interface ProcessNameCounts {
   deadMessages: number;
 }
 
+export type DeadMessageRedrive = { kind: "redriven"; messageKey: string } | { kind: "not_dead" };
+export type DeadMessageDiscard = { kind: "discarded"; messageKey: string } | { kind: "not_dead" };
+export type LapsedLeaseRelease = { kind: "released"; messageKey: string } | { kind: "not_lapsed" };
+
 export abstract class ProcessOpsRepository {
   abstract countByProcessName(params: {
     now: number;
@@ -78,24 +82,24 @@ export abstract class ProcessOpsRepository {
   /**
    * One dead message back to pending, due immediately, attempts reset -
    * mirroring the store's instance-level requeue. Returns the message key
-   * for the audit trail, or null when it was not dead (or not that instance's).
+   * for the audit trail, or `not_dead` when it was not dead (or not that instance's).
    */
-  abstract tryRedriveDeadMessage(params: {
+  abstract redriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null>;
+  }): Promise<DeadMessageRedrive>;
 
   /**
    * One dead message marked never-to-be-sent. A mark, not a delete: the row
    * is retained as its own audit trail and the dispatcher never leases a
-   * discarded row. Returns the message key, or null when it was not dead.
+   * discarded row. Returns the message key, or `not_dead` when it was not dead.
    */
-  abstract tryDiscardDeadMessage(params: {
+  abstract discardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null>;
+  }): Promise<DeadMessageDiscard>;
 
   /** Redrive dead messages with fresh budget, BOUNDED per batch to avoid
    * row-lock contention on the highest-volume table. */
@@ -117,9 +121,9 @@ export abstract class ProcessOpsRepository {
    * Guarded in the write itself: only a pending message whose lease already
    * expired is touched, so a live delivery's lease can never be released.
    */
-  abstract tryReleaseLapsedLease(params: {
+  abstract releaseLapsedLease(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null>;
+  }): Promise<LapsedLeaseRelease>;
 }

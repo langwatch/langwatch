@@ -31,7 +31,10 @@ export class ManagedProviderService implements ManagedProviderApi {
     organizationId: string;
     provider: string;
   }): boolean {
-    return provider === "bedrock" && this.configuration.tryForOrganization(organizationId) !== null;
+    return (
+      provider === "bedrock" &&
+      this.configuration.getBedrockDeployment(organizationId).kind === "managed"
+    );
   }
 
   async buildLitellmParameters(
@@ -47,11 +50,13 @@ export class ManagedProviderService implements ManagedProviderApi {
       return input.params;
     }
 
-    const config = this.configuration.tryForOrganization(organizationId);
+    const deployment = this.configuration.getBedrockDeployment(organizationId);
 
-    if (!config) {
+    if (deployment.kind === "unmanaged") {
       return input.params;
     }
+
+    const { config } = deployment;
 
     const credentials = await this.credentials.assumeCustomerRole(config);
     input.params.aws_access_key_id = credentials.accessKeyId;

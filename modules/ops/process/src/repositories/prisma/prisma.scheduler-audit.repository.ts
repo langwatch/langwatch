@@ -72,7 +72,7 @@ export class PrismaSchedulerAuditRepository extends SchedulerAuditRepository {
     });
   }
 
-  async listRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
+  async findRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
     const rows = await this.database.auditLog.findMany({
       where: { targetKind: "scheduled_job" },
       orderBy: { createdAt: "desc" },

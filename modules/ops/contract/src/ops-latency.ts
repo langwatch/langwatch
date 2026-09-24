@@ -66,7 +66,7 @@ export function mergeHistogramCounts(
  * cumulative count crosses the rank - a deliberate overestimate, the honest
  * direction for latency. Null means the window holds nothing, never zero.
  */
-export function percentileFromHistogram(
+export function computePercentileFromHistogram(
   counts: Map<string, number>,
   quantile: number,
 ): number | null {
@@ -100,9 +100,11 @@ export const latencyWindowsSchema = z.object({
 });
 export type LatencyWindows = z.infer<typeof latencyWindowsSchema>;
 
-export function windowPercentiles(counts: Map<string, number>): LatencyWindowPercentiles | null {
-  const p50Ms = percentileFromHistogram(counts, 0.5);
-  const p99Ms = percentileFromHistogram(counts, 0.99);
+export function computeWindowPercentiles(
+  counts: Map<string, number>,
+): LatencyWindowPercentiles | null {
+  const p50Ms = computePercentileFromHistogram(counts, 0.5);
+  const p99Ms = computePercentileFromHistogram(counts, 0.99);
   if (p50Ms === null || p99Ms === null) return null;
   let count = 0;
   for (const c of counts.values()) count += c;

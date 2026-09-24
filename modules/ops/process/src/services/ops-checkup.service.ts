@@ -269,7 +269,7 @@ async function probeControlPlane({
     if (answer.status < 200 || answer.status >= 300) {
       return { kind: "unreachable", reason: `answered ${answer.status}` };
     }
-    const named = controlPlaneNamedBy(answer.body);
+    const named = extractControlPlaneUrl(answer.body);
     return named
       ? { kind: "ok", controlPlaneBaseUrl: named }
       : { kind: "unreachable", reason: "the answer named no control plane" };
@@ -278,7 +278,7 @@ async function probeControlPlane({
   }
 }
 
-function controlPlaneNamedBy(body: unknown): string | undefined {
+function extractControlPlaneUrl(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null || !("control_plane_base_url" in body)) {
     return undefined;
   }

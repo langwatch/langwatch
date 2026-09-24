@@ -30,9 +30,8 @@ export type MigrationEnrollmentRecord = OpsMigrationEnrollmentRecord;
  */
 export interface SystemMigrationEnrollmentStore {
   findAll(): Promise<MigrationEnrollmentRecord[]>;
-  tryFindOrganizationById(args: {
-    organizationId: string;
-  }): Promise<{ id: string; name: string } | null>;
+  /** Throws `organization_not_found` when the id names no organization. */
+  getOrganizationById(args: { organizationId: string }): Promise<{ id: string; name: string }>;
   isEnrolled(args: { organizationId: string; migrationName: string }): Promise<boolean>;
   countEnrolledByMigration(): Promise<Map<string, number>>;
   countOrganizations(): Promise<number>;
@@ -174,7 +173,9 @@ export function sample<T>({ pool, count }: { pool: T[]; count: number }): T[] {
  * the operator is deciding whether the organization needs attention, and null when no member was
  * in the cohort. Members already terminal before the run keep their terminal colour.
  */
-export function statusOfMemberSummary(summary: MigrationPassSummary): TenantMigrationStatus | null {
+export function deriveStatusOfMemberSummary(
+  summary: MigrationPassSummary,
+): TenantMigrationStatus | null {
   if (summary.parked > 0) {
     return "parked";
   }

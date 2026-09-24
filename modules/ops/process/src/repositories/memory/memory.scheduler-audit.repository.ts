@@ -34,7 +34,7 @@ export class MemorySchedulerAuditRepository extends SchedulerAuditRepository {
     });
   }
 
-  async listRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
+  async findRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
     return [...this.store.schedulerAudit].reverse().slice(0, limit);
   }
 }

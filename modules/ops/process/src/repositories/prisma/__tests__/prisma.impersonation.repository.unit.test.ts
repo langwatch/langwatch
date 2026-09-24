@@ -41,21 +41,20 @@ describe("PrismaImpersonationRepository", () => {
         },
       });
 
-      const target =
-        await PrismaImpersonationRepository.create(database).tryFindTarget("user_target");
+      const target = await PrismaImpersonationRepository.create(database).getTarget("user_target");
 
-      expect(target?.mfaRequiredOrganizationSlugs).toEqual(["acme"]);
+      expect(target.mfaRequiredOrganizationSlugs).toEqual(["acme"]);
       expect(organizationUserFindMany).not.toHaveBeenCalled();
       const [read] = userFindUnique.mock.calls[0]!;
       expect(read.select).toHaveProperty("orgMemberships");
     });
 
-    it("answers null for a target that does not exist", async () => {
+    it("throws user_to_impersonate_not_found for a target that does not exist", async () => {
       const { database } = stubDatabase({ row: null });
 
       await expect(
-        PrismaImpersonationRepository.create(database).tryFindTarget("user_missing"),
-      ).resolves.toBeNull();
+        PrismaImpersonationRepository.create(database).getTarget("user_missing"),
+      ).rejects.toMatchObject({ code: "user_to_impersonate_not_found" });
     });
   });
 

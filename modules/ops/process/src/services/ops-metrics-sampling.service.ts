@@ -5,7 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { mergeHistogramCounts, windowPercentiles } from "@langwatch/ops-contract";
+import { mergeHistogramCounts, computeWindowPercentiles } from "@langwatch/ops-contract";
 import type {
   DashboardData,
   JobNameMetrics,
@@ -90,10 +90,10 @@ export class OpsMetricsSamplingService {
     const dayHashes = hourByQueue.flatMap((hours) => hours.slice(0, 24));
 
     return {
-      hour: windowPercentiles(mergeHistogramCounts(minute)),
-      day: windowPercentiles(mergeHistogramCounts(dayHashes)),
-      week: windowPercentiles(mergeHistogramCounts(hourByQueue.flat())),
-      allTime: windowPercentiles(mergeHistogramCounts(allTime)),
+      hour: computeWindowPercentiles(mergeHistogramCounts(minute)),
+      day: computeWindowPercentiles(mergeHistogramCounts(dayHashes)),
+      week: computeWindowPercentiles(mergeHistogramCounts(hourByQueue.flat())),
+      allTime: computeWindowPercentiles(mergeHistogramCounts(allTime)),
     };
   }
 

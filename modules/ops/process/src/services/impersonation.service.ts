@@ -5,7 +5,6 @@ import {
   CannotReimpersonateWhileImpersonatingError,
   type StartImpersonationInput,
   type StopImpersonationInput,
-  UserToImpersonateNotFoundError,
   type AdminAuditRequest,
 } from "@langwatch/ops-contract";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
@@ -54,10 +53,7 @@ export class ImpersonationService {
   async start(input: StartImpersonationInput): Promise<void> {
     await this.assertSessionIsNotAlreadyImpersonating(input);
 
-    const target = await this.repository.tryFindTarget(input.userIdToImpersonate);
-    if (!target) {
-      throw new UserToImpersonateNotFoundError(input.userIdToImpersonate);
-    }
+    const target = await this.repository.getTarget(input.userIdToImpersonate);
 
     if (target.deactivatedAt) {
       throw new CannotImpersonateDeactivatedUserError(target.id);

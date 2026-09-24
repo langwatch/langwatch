@@ -32,11 +32,15 @@ export interface UsageCounter {
  * another feature's, so this is the shape rather than its repository.
  */
 export interface UsageOrganization {
-  tryGetOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null>;
+  /**
+   * Throws `organization_not_found_for_team`: enforcement refuses a tenant that does not
+   * resolve rather than metering traffic against nobody's plan.
+   */
+  getOrganizationIdByTeamId(input: { teamId: string }): Promise<string>;
 
   getProjectIds(organizationId: string): Promise<string[]>;
 
-  tryGetPricingModel(organizationId: string): Promise<PricingModel | null>;
+  getPricingModel(organizationId: string): Promise<{ pricingModel: PricingModel | null }>;
 }
 
 /** Which unit an organization is metered in, once resolved. */

@@ -2,7 +2,7 @@ import { type ReplayHistoryEntry, type ReplayStatus } from "@langwatch/ops-contr
 import { describe, expect, it, vi } from "vitest";
 
 import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../../app/ops.app.ts";
-import { ReplayRepository } from "../../repositories/replay.repository.ts";
+import { type ReplayLockHolder, ReplayRepository } from "../../repositories/replay.repository.ts";
 import { ReplayService } from "../replay.service.ts";
 
 class ReplayRepositoryStub extends ReplayRepository {
@@ -13,12 +13,12 @@ class ReplayRepositoryStub extends ReplayRepository {
   readonly refreshLock =
     vi.fn<(params: { runId: string; ttlSeconds: number }) => Promise<boolean>>();
   readonly releaseLock = vi.fn<(params: { runId: string }) => Promise<void>>();
-  readonly tryGetLockHolder = vi.fn<() => Promise<string | null>>();
+  readonly getLockHolder = vi.fn<() => Promise<ReplayLockHolder>>();
   readonly isCancelled = vi.fn<() => Promise<boolean>>();
   readonly setCancelled = vi.fn<(params: { ttlSeconds: number }) => Promise<void>>();
   readonly clearCancelFlag = vi.fn<() => Promise<void>>();
   readonly pushToHistory = vi.fn<(params: { entry: ReplayHistoryEntry }) => Promise<void>>();
-  readonly getHistory = vi.fn<() => Promise<ReplayHistoryEntry[]>>();
+  readonly findHistory = vi.fn<() => Promise<ReplayHistoryEntry[]>>();
 }
 
 const request = {

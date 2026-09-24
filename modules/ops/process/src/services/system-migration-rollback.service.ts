@@ -57,7 +57,7 @@ export class SystemMigrationRollbackService {
     // reuse the old moment (and so must not dedupe against the old event).
     const isRetry = record?.status === "rolled_back";
     const decidedAt =
-      (isRetry ? rollbackDecidedAt(priorReport) : null) ??
+      (isRetry ? extractRollbackDecidedAt(priorReport) : null) ??
       nowInstant().toString({ fractionalSecondDigits: 3 });
     const pin = {
       migrationName,
@@ -107,7 +107,7 @@ export class SystemMigrationRollbackService {
     actorUserId: string;
   }): Promise<void> {
     if (isRetry) {
-      if (rollbackDecidedAt(priorReport) === null) {
+      if (extractRollbackDecidedAt(priorReport) === null) {
         await this.deps.state.upsertRecord(pin);
       }
 
@@ -144,7 +144,7 @@ export class SystemMigrationRollbackService {
  * usable stamp (pinned by other method or older version), in which case
  * caller falls back to now and retry does not dedupe.
  */
-function rollbackDecidedAt(report: Record<string, unknown>): string | null {
+function extractRollbackDecidedAt(report: Record<string, unknown>): string | null {
   const rolledBack = report.rolledBack;
   if (rolledBack == null || typeof rolledBack !== "object") {
     return null;

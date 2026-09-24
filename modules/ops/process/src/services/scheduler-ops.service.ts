@@ -81,7 +81,7 @@ export class SchedulerOpsService {
 
   /** Recent operator actions, newest first. Empty when nothing is recorded. */
   async listRecentActions({ limit = 20 }: { limit?: number }): Promise<SchedulerAuditEntryView[]> {
-    return this.audit.listRecent({ limit: Math.min(Math.max(limit, 1), 100) });
+    return this.audit.findRecent({ limit: Math.min(Math.max(limit, 1), 100) });
   }
 
   // ── Controls (ADR-091) ────────────────────────────────────────────────

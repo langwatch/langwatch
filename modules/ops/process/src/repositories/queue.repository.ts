@@ -48,7 +48,7 @@ export abstract class QueueRepository {
    * One parked tenant's groups, ordered by dispatch eligibility.
    * every pod reads would recreate the size problem ADR-090 removes.
    */
-  abstract listParkedGroups(params: {
+  abstract findParkedGroups(params: {
     queueName: string;
     tenantId: string;
     page: number;
@@ -77,13 +77,13 @@ export abstract class QueueRepository {
     jobId: string;
   }): Promise<{ wasBlocked: boolean }>;
 
-  abstract listPausedKeys(params: { queueName: string }): Promise<string[]>;
+  abstract findPausedKeys(params: { queueName: string }): Promise<string[]>;
 
   abstract pauseTenant: (params: { queueName: string; tenantId: string }) => Promise<void>;
 
   abstract unpauseTenant: (params: { queueName: string; tenantId: string }) => Promise<void>;
 
-  abstract listPausedTenants(params: { queueName: string }): Promise<string[]>;
+  abstract findPausedTenants(params: { queueName: string }): Promise<string[]>;
 
   abstract drainTenant: (params: {
     queueName: string;
@@ -141,7 +141,7 @@ export abstract class QueueRepository {
     pipelineFilter?: string;
   }) => Promise<{ unblockedCount: number; groupIds: string[] }>;
 
-  abstract listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]>;
+  abstract findDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]>;
 
   abstract drainAllBlockedPreview(params: {
     queueName: string;
@@ -187,7 +187,7 @@ export class NullQueueRepository extends QueueRepository {
     return { tenants: [], total: 0 };
   }
 
-  async listParkedGroups(): Promise<{
+  async findParkedGroups(): Promise<{
     groups: ParkedGroupInfo[];
     total: number;
   }> {
@@ -217,7 +217,7 @@ export class NullQueueRepository extends QueueRepository {
     return { wasBlocked: false };
   }
 
-  async listPausedKeys(): Promise<string[]> {
+  async findPausedKeys(): Promise<string[]> {
     return [];
   }
 
@@ -225,7 +225,7 @@ export class NullQueueRepository extends QueueRepository {
 
   unpauseTenant = async (): Promise<void> => {};
 
-  async listPausedTenants(): Promise<string[]> {
+  async findPausedTenants(): Promise<string[]> {
     return [];
   }
 
@@ -284,7 +284,7 @@ export class NullQueueRepository extends QueueRepository {
     return { unblockedCount: 0, groupIds: [] };
   };
 
-  async listDlqGroups(): Promise<DlqGroupInfo[]> {
+  async findDlqGroups(): Promise<DlqGroupInfo[]> {
     return [];
   }
 

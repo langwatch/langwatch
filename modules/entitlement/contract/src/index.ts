@@ -39,8 +39,4 @@ export {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
 } from "./plan-gate.errors.ts";
-export {
-  assertEnterprisePlan,
-  assertEnterprisePlanType,
-  requireEnterprisePlan,
-} from "./plan-gate.ts";
+export { assertEnterprisePlan, assertEnterprisePlanType } from "./plan-gate.ts";

@@ -24,6 +24,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
+import type {
+  DeadMessageDiscard,
+  DeadMessageRedrive,
+} from "../repositories/process-ops.repository.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { raceOnOneRow } from "./support/row-lock-race.ts";
 
@@ -387,25 +391,25 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       });
       const ref = { processName: ns, projectId: PROJECT, processKey: "stuck-both" };
 
-      const acts = await raceOnOneRow({
+      const acts = await raceOnOneRow<DeadMessageRedrive | DeadMessageDiscard>({
         prisma,
         table: "ProcessManagerOutbox",
         first: (tx) =>
-          ProcessOpsPrismaRepository.create({ prisma: tx }).tryRedriveDeadMessage({
+          ProcessOpsPrismaRepository.create({ prisma: tx }).redriveDeadMessage({
             ref,
             messageId: id,
             now: NOW,
           }),
         second: (tx) =>
-          ProcessOpsPrismaRepository.create({ prisma: tx }).tryDiscardDeadMessage({
+          ProcessOpsPrismaRepository.create({ prisma: tx }).discardDeadMessage({
             ref,
             messageId: id,
             now: NOW,
           }),
       });
 
-      expect(acts.first).toEqual({ messageKey: "dead-both" });
-      expect(acts.second).toBeNull();
+      expect(acts.first).toEqual({ kind: "redriven", messageKey: "dead-both" });
+      expect(acts.second).toEqual({ kind: "not_dead" });
       const row = await prisma.processManagerOutbox.findFirstOrThrow({
         where: { id, projectId: PROJECT },
       });

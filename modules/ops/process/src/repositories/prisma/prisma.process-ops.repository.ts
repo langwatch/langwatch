@@ -9,12 +9,18 @@ import type {
 } from "@langwatch/ops-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { ProcessNameCounts, ProcessOpsRepository } from "../process-ops.repository.ts";
+import type {
+  DeadMessageDiscard,
+  DeadMessageRedrive,
+  LapsedLeaseRelease,
+  ProcessNameCounts,
+  ProcessOpsRepository,
+} from "../process-ops.repository.ts";
 
 /** `00-<32 hex trace id>-<16 hex span id>-<flags>` per W3C traceparent. */
 const TRACEPARENT_RE = /^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;
 
-function traceIdFromCarrier(carrier: unknown): string | null {
+function extractTraceIdFromCarrier(carrier: unknown): string | null {
   if (!carrier || typeof carrier !== "object") return null;
   const traceparent = (carrier as Record<string, unknown>).traceparent;
   if (typeof traceparent !== "string") return null;
@@ -286,7 +292,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         leasedUntil: r.leasedUntil?.getTime() ?? null,
         createdAt: r.createdAt.getTime(),
         sourceEventId: r.sourceEventId,
-        traceId: traceIdFromCarrier(r.traceCarrier),
+        traceId: extractTraceIdFromCarrier(r.traceCarrier),
         payload: r.payload,
       })),
     };
@@ -359,7 +365,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         createdAt: r.createdAt.getTime(),
         updatedAt: r.updatedAt.getTime(),
         sourceEventId: r.sourceEventId,
-        traceId: traceIdFromCarrier(r.traceCarrier),
+        traceId: extractTraceIdFromCarrier(r.traceCarrier),
         payload: r.payload,
       })),
     };
@@ -413,11 +419,11 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     };
   }
 
-  async tryRedriveDeadMessage(params: {
+  async redriveDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null> {
+  }): Promise<DeadMessageRedrive> {
     const message = await this.prisma.processManagerOutbox.findFirst({
       where: {
         id: params.messageId,
@@ -428,7 +434,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       },
       select: { messageKey: true },
     });
-    if (!message) return null;
+    if (!message) return { kind: "not_dead" };
     // Guarded on status in the WHERE too: a dispatch racing this click must
     // not have its bookkeeping clobbered by the reset. As SQL, so a write
     // parked on the row lock re-checks the committed status.
@@ -445,15 +451,15 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
          AND "projectId" = ${params.ref.projectId}
          AND "status" = 'dead'
     `;
-    if (updated === 0) return null;
-    return { messageKey: message.messageKey };
+    if (updated === 0) return { kind: "not_dead" };
+    return { kind: "redriven", messageKey: message.messageKey };
   }
 
-  async tryDiscardDeadMessage(params: {
+  async discardDeadMessage(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null> {
+  }): Promise<DeadMessageDiscard> {
     const message = await this.prisma.processManagerOutbox.findFirst({
       where: {
         id: params.messageId,
@@ -464,7 +470,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       },
       select: { messageKey: true },
     });
-    if (!message) return null;
+    if (!message) return { kind: "not_dead" };
     // A mark, not a delete: the row is retained as its own audit trail.
     // Guarded on status in the WHERE, same as the redrive: only a dead row
     // can be discarded, so a racing redrive keeps its win.
@@ -476,8 +482,8 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
          AND "projectId" = ${params.ref.projectId}
          AND "status" = 'dead'
     `;
-    if (updated === 0) return null;
-    return { messageKey: message.messageKey };
+    if (updated === 0) return { kind: "not_dead" };
+    return { kind: "discarded", messageKey: message.messageKey };
   }
 
   async redriveAllDeadMessages(params: { processName?: string; now: number }): Promise<number> {
@@ -563,11 +569,11 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     }));
   }
 
-  async tryReleaseLapsedLease(params: {
+  async releaseLapsedLease(params: {
     ref: ProcessRef;
     messageId: string;
     now: number;
-  }): Promise<{ messageKey: string } | null> {
+  }): Promise<LapsedLeaseRelease> {
     const now = new Date(params.now);
     const message = await this.prisma.processManagerOutbox.findFirst({
       where: {
@@ -578,7 +584,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
       },
       select: { messageKey: true },
     });
-    if (!message) return null;
+    if (!message) return { kind: "not_lapsed" };
     // The lapsed check lives in the WHERE, not just in the read above: a
     // delivery that renews or completes between the read and this write must
     // win the race.
@@ -596,7 +602,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
         updatedAt: now,
       },
     });
-    if (updated.count === 0) return null;
-    return { messageKey: message.messageKey };
+    if (updated.count === 0) return { kind: "not_lapsed" };
+    return { kind: "released", messageKey: message.messageKey };
   }
 }

@@ -28,8 +28,9 @@ class InMemoryImpersonationRepository extends ImpersonationRepository {
     super();
   }
 
-  tryFindTarget(userId: string): Promise<ImpersonationTarget | null> {
+  getTarget(userId: string): Promise<ImpersonationTarget> {
     this.targetsAsked.push(userId);
+    if (!this.target) return Promise.reject(new UserToImpersonateNotFoundError(userId));
     return Promise.resolve(this.target);
   }
 

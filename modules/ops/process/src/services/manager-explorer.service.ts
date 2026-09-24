@@ -218,12 +218,12 @@ export class ManagerExplorerService {
     messageId: string;
     actorUserId: string;
   }): Promise<{ redriven: boolean }> {
-    const result = await this.fleet.tryRedriveDeadMessage({
+    const result = await this.fleet.redriveDeadMessage({
       ref: params.ref,
       messageId: params.messageId,
       now: nowInstant().epochMilliseconds,
     });
-    if (!result) {
+    if (result.kind === "not_dead") {
       return { redriven: false };
     }
 
@@ -247,12 +247,12 @@ export class ManagerExplorerService {
     messageId: string;
     actorUserId: string;
   }): Promise<{ discarded: boolean }> {
-    const result = await this.fleet.tryDiscardDeadMessage({
+    const result = await this.fleet.discardDeadMessage({
       ref: params.ref,
       messageId: params.messageId,
       now: nowInstant().epochMilliseconds,
     });
-    if (!result) {
+    if (result.kind === "not_dead") {
       return { discarded: false };
     }
 
@@ -336,12 +336,12 @@ export class ManagerExplorerService {
     messageId: string;
     actorUserId: string;
   }): Promise<{ released: boolean }> {
-    const result = await this.fleet.tryReleaseLapsedLease({
+    const result = await this.fleet.releaseLapsedLease({
       ref: params.ref,
       messageId: params.messageId,
       now: nowInstant().epochMilliseconds,
     });
-    if (!result) {
+    if (result.kind === "not_lapsed") {
       return { released: false };
     }
 
@@ -357,7 +357,7 @@ export class ManagerExplorerService {
 
   /** Recent process control actions, so the page explains its own history. */
   async listRecentActions(params: { limit: number }): Promise<ProcessAuditEntryView[]> {
-    return this.audit.listRecent(params);
+    return this.audit.findRecent(params);
   }
 
   /**

@@ -418,7 +418,7 @@ function stripHashTag(name: string): string {
 }
 
 /** Read the retry count from the group's canonical attempt key. */
-function resolveRetryCount(attemptRaw: string | null): number | null {
+function parseRetryCount(attemptRaw: string | null): number | null {
   const attempt = attemptRaw === null ? Number.NaN : parseInt(attemptRaw, 10);
   if (Number.isInteger(attempt) && attempt > 0) return attempt;
   return null;
@@ -698,7 +698,7 @@ export class QueueRedisRepository extends QueueRepository {
         errorMessage: errorInfo?.message ?? null,
         errorStack: errorInfo?.stack ?? null,
         errorTimestamp: errorInfo?.timestamp ? parseFloat(errorInfo.timestamp) : null,
-        retryCount: resolveRetryCount(attemptRaw),
+        retryCount: parseRetryCount(attemptRaw),
         activeKeyTtlSec: activeKeyTtlSec > 0 ? activeKeyTtlSec : null,
         processingDurationMs: null,
       });
@@ -991,7 +991,7 @@ export class QueueRedisRepository extends QueueRepository {
     return ageMs;
   }
 
-  async listParkedGroups(params: {
+  async findParkedGroups(params: {
     queueName: string;
     tenantId: string;
     page: number;
@@ -1190,7 +1190,7 @@ export class QueueRedisRepository extends QueueRepository {
     });
   }
 
-  async listPausedKeys(params: { queueName: string }): Promise<string[]> {
+  async findPausedKeys(params: { queueName: string }): Promise<string[]> {
     return this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
   }
 
@@ -1217,7 +1217,7 @@ export class QueueRedisRepository extends QueueRepository {
     await this.redis.lpush(`${params.queueName}:gq:signal`, "1");
   };
 
-  async listPausedTenants(params: { queueName: string }): Promise<string[]> {
+  async findPausedTenants(params: { queueName: string }): Promise<string[]> {
     const all = await this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
     const prefix = QueueRedisRepository.TENANT_PAUSE_PREFIX;
     return all.filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length));
@@ -1726,7 +1726,7 @@ export class QueueRedisRepository extends QueueRepository {
 
   // ── DLQ Listing ─────────────────────────────────────────────────
 
-  async listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
+  async findDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
     const prefix = `${params.queueName}:gq:`;
     const dlqIndexKey = `${prefix}dlq`;
     const groups: DlqGroupInfo[] = [];

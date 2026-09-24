@@ -5,7 +5,6 @@
  */
 
 import {
-  MigrationEnrollmentOrganizationNotFoundError,
   MigrationNotAvailableOnInstallationError,
   MigrationPassAlreadyRunningError,
   MigrationRunRequiresEnrollmentError,
@@ -13,7 +12,7 @@ import {
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 
 import {
-  statusOfMemberSummary,
+  deriveStatusOfMemberSummary,
   type SystemMigrationsServiceDependencies,
 } from "../rules/system-migration-support.rules.ts";
 import { systemMigrationLookup } from "./system-migration-lookup.service.ts";
@@ -63,7 +62,7 @@ export class SystemMigrationRunService {
       // record to read back: the pass summary is the answer. Any held,
       // parked or still-contended member keeps the organization on the
       // operator's list.
-      return { status: statusOfMemberSummary(summary), waiting: false };
+      return { status: deriveStatusOfMemberSummary(summary), waiting: false };
     }
 
     return this.organizationRecordStatus({ migrationName, organizationId });
@@ -85,12 +84,7 @@ export class SystemMigrationRunService {
       throw new MigrationNotAvailableOnInstallationError();
     }
 
-    const organization = await this.deps.enrollments.tryFindOrganizationById({
-      organizationId,
-    });
-    if (!organization) {
-      throw new MigrationEnrollmentOrganizationNotFoundError();
-    }
+    await this.deps.enrollments.getOrganizationById({ organizationId });
 
     if (!this.deps.isSaaS()) {
       return;

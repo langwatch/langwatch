@@ -1,6 +1,6 @@
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 
-import { ReplayRepository } from "../replay.repository.ts";
+import { ReplayRepository, type ReplayLockHolder } from "../replay.repository.ts";
 import type { MemoryOpsStore } from "./memory.ops.store.ts";
 
 const HISTORY_LIMIT = 20;
@@ -41,8 +41,9 @@ export class MemoryReplayRepository extends ReplayRepository {
     if (this.store.replayLockHolder === runId) this.store.replayLockHolder = null;
   }
 
-  async tryGetLockHolder(): Promise<string | null> {
-    return this.store.replayLockHolder;
+  async getLockHolder(): Promise<ReplayLockHolder> {
+    const runId = this.store.replayLockHolder;
+    return runId === null ? { kind: "free" } : { kind: "held", runId };
   }
 
   async isCancelled(): Promise<boolean> {
@@ -62,7 +63,7 @@ export class MemoryReplayRepository extends ReplayRepository {
     this.store.replayHistory.splice(HISTORY_LIMIT);
   }
 
-  async getHistory(): Promise<ReplayHistoryEntry[]> {
+  async findHistory(): Promise<ReplayHistoryEntry[]> {
     return [...this.store.replayHistory];
   }
 }

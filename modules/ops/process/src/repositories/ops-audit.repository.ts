@@ -32,7 +32,7 @@ export abstract class ProcessAuditRepository {
     metadata?: Record<string, unknown>;
   }): Promise<void>;
 
-  abstract listRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]>;
+  abstract findRecent(params: { limit: number }): Promise<ProcessAuditEntryView[]>;
 }
 
 /** Durable audit trail for Ops scheduler controls. */
@@ -45,5 +45,5 @@ export abstract class SchedulerAuditRepository {
     slot: Date | null;
   }): Promise<void>;
 
-  abstract listRecent(params: { limit: number }): Promise<SchedulerAuditEntryView[]>;
+  abstract findRecent(params: { limit: number }): Promise<SchedulerAuditEntryView[]>;
 }

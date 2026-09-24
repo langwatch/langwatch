@@ -23,7 +23,8 @@ export interface ImpersonationWindow {
 }
 
 export abstract class ImpersonationRepository {
-  abstract tryFindTarget(userId: string): Promise<ImpersonationTarget | null>;
+  /** Throws `user_to_impersonate_not_found` when no such person exists. */
+  abstract getTarget(userId: string): Promise<ImpersonationTarget>;
   /** Whether this person can prove a second factor on their own account. */
   abstract hasSecondFactor(userId: string): Promise<boolean>;
   /** The window this session carries, expired or not — the service decides. */

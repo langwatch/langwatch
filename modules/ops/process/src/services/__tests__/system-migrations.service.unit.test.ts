@@ -44,8 +44,8 @@ function migrationOf({
 function enrollmentStoreStub() {
   return {
     findAll: vi.fn<SystemMigrationEnrollmentStore["findAll"]>().mockResolvedValue([]),
-    tryFindOrganizationById: vi
-      .fn<SystemMigrationEnrollmentStore["tryFindOrganizationById"]>()
+    getOrganizationById: vi
+      .fn<SystemMigrationEnrollmentStore["getOrganizationById"]>()
       .mockResolvedValue({ id: "org_acme", name: "Acme" }),
     isEnrolled: vi.fn<SystemMigrationEnrollmentStore["isEnrolled"]>().mockResolvedValue(true),
     countEnrolledByMigration: vi
@@ -539,7 +539,9 @@ describe("SystemMigrationsService enrollment", () => {
       /** @scenario "Enrolling an organization that does not exist is refused" */
       it("refuses with organization_not_found and writes nothing", async () => {
         const enrollments = enrollmentStoreStub();
-        enrollments.tryFindOrganizationById.mockResolvedValue(null);
+        enrollments.getOrganizationById.mockRejectedValue(
+          new MigrationEnrollmentOrganizationNotFoundError(),
+        );
         const { service } = serviceWith({ record: null, enrollments });
 
         const attempt = service.enroll({

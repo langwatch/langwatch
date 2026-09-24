@@ -145,7 +145,7 @@ export class QueueService {
     page: number;
     pageSize: number;
   }> {
-    const result = await this.repository.listParkedGroups(params);
+    const result = await this.repository.findParkedGroups(params);
 
     return { ...result, page: params.page, pageSize: params.pageSize };
   }
@@ -175,7 +175,7 @@ export class QueueService {
     }[] = [];
 
     for (const queueName of queueNames) {
-      const groups = await this.repository.listDlqGroups({ queueName });
+      const groups = await this.repository.findDlqGroups({ queueName });
       const displayName = queueName.replace(/:gq$/, "").replace(/^.*:/, "");
       for (const group of groups) {
         allGroups.push({
@@ -269,7 +269,7 @@ export class QueueService {
   }
 
   async listPausedKeys(params: { queueName: string }): Promise<string[]> {
-    return this.repository.listPausedKeys(params);
+    return this.repository.findPausedKeys(params);
   }
 
   async pauseTenant(params: { queueName: string; tenantId: string }): Promise<void> {
@@ -281,7 +281,7 @@ export class QueueService {
   }
 
   async listPausedTenants(params: { queueName: string }): Promise<string[]> {
-    return this.repository.listPausedTenants(params);
+    return this.repository.findPausedTenants(params);
   }
 
   async drainTenant(params: {
@@ -447,7 +447,7 @@ export class QueueService {
   }
 
   async listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
-    return this.repository.listDlqGroups(params);
+    return this.repository.findDlqGroups(params);
   }
 
   async getDrainPreview(params: {

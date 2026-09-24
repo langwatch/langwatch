@@ -56,11 +56,11 @@ export class ReplayService {
   }
 
   async getHistory(): Promise<ReplayHistoryEntry[]> {
-    return this.repo.getHistory();
+    return this.repo.findHistory();
   }
 
   async findHistoryEntry(params: { runId: string }): Promise<ReplayHistoryEntry | null> {
-    const history = await this.repo.getHistory();
+    const history = await this.repo.findHistory();
 
     return history.find((entry) => entry.runId === params.runId) ?? null;
   }
@@ -185,11 +185,11 @@ export class ReplayService {
 
       const result = await this.runWithHeartbeat({ runtime, params, selection });
 
-      // Mirror the catch-path guard: only a takeover by another run skips finalization. A null
-      // holder — lock expired, no successor — still finalizes, so a completed run is never left
+      // Mirror the catch-path guard: only a takeover by another run skips finalization. A free
+      // lock — expired, no successor — still finalizes, so a completed run is never left
       // stuck as running.
-      const lockHolder = await this.repo.tryGetLockHolder();
-      if (lockHolder !== null && lockHolder !== params.runId) {
+      const lockHolder = await this.repo.getLockHolder();
+      if (lockHolder.kind === "held" && lockHolder.runId !== params.runId) {
         return;
       }
 
@@ -206,12 +206,12 @@ export class ReplayService {
       await this.finalizeCompleted({ params, result });
     } catch (err) {
       // A run that has lost the lock owns nothing: finalizing would overwrite the successor's
-      // running status with this stale run's end state. A null holder still finalizes, so the
+      // running status with this stale run's end state. A free lock still finalizes, so the
       // run's end state stays observable.
-      const lockHolder = await this.repo.tryGetLockHolder();
-      if (lockHolder !== null && lockHolder !== params.runId) {
+      const lockHolder = await this.repo.getLockHolder();
+      if (lockHolder.kind === "held" && lockHolder.runId !== params.runId) {
         logger.warn(
-          { runId: params.runId, lockHolder },
+          { runId: params.runId, lockHolder: lockHolder.runId },
           "Skipping replay finalization: lock now held by another run",
         );
       } else if (err instanceof ReplayCancelledError) {
@@ -373,8 +373,8 @@ export class ReplayService {
   }
 
   private async updateProgress(params: { runId: string; progress: ReplayProgress }): Promise<void> {
-    const lockHolder = await this.repo.tryGetLockHolder();
-    if (lockHolder !== params.runId) {
+    const lockHolder = await this.repo.getLockHolder();
+    if (lockHolder.kind === "free" || lockHolder.runId !== params.runId) {
       return;
     }
 

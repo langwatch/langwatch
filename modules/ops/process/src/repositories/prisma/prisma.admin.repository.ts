@@ -1,4 +1,5 @@
 import { browserSessionImpersonationSchema } from "@langwatch/auth-contract";
+import { UserToImpersonateNotFoundError } from "@langwatch/ops-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate } from "@langwatch/time";
@@ -25,7 +26,7 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
    * `organizationUser.findMany` carries no single-organization predicate,
    * so the tenancy guard (ADR-021) refuses it outright.
    */
-  async tryFindTarget(userId: string): Promise<ImpersonationTarget | null> {
+  async getTarget(userId: string): Promise<ImpersonationTarget> {
     const row = await this.database.user.findUnique({
       where: { id: userId },
       select: {
@@ -40,7 +41,7 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
         },
       },
     });
-    if (!row) return null;
+    if (!row) throw new UserToImpersonateNotFoundError(userId);
 
     const { orgMemberships, deactivatedAt, ...target } = row;
     return {

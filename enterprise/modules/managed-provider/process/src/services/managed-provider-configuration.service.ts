@@ -3,8 +3,12 @@ import type {
   ManagedBedrockDirectory,
 } from "@langwatch/enterprise-managed-provider-contract";
 
+export type ManagedBedrockDeployment =
+  | { kind: "managed"; config: ManagedBedrockConfig }
+  | { kind: "unmanaged" };
+
 export abstract class ManagedProviderConfiguration {
-  abstract tryForOrganization(organizationId: string): ManagedBedrockConfig | null;
+  abstract getBedrockDeployment(organizationId: string): ManagedBedrockDeployment;
 }
 
 /**
@@ -23,7 +27,8 @@ export class ManagedProviderConfigurationService extends ManagedProviderConfigur
     return new ManagedProviderConfigurationService(options.bedrock);
   }
 
-  tryForOrganization(organizationId: string): ManagedBedrockConfig | null {
-    return this.directory[organizationId] ?? null;
+  getBedrockDeployment(organizationId: string): ManagedBedrockDeployment {
+    const config = this.directory[organizationId];
+    return config ? { kind: "managed", config } : { kind: "unmanaged" };
   }
 }

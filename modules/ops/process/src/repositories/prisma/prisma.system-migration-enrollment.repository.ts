@@ -1,6 +1,7 @@
 import {
   MigrationEnrollmentAlreadyExistsError,
   MigrationEnrollmentNotFoundError,
+  MigrationEnrollmentOrganizationNotFoundError,
 } from "@langwatch/ops-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -99,15 +100,17 @@ export class PrismaSystemMigrationEnrollmentRepository {
   }
 
   /** The service's existence check for the organization being enrolled. */
-  async tryFindOrganizationById({
+  async getOrganizationById({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<{ id: string; name: string } | null> {
-    return this.prisma.organization.findUnique({
+  }): Promise<{ id: string; name: string }> {
+    const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true },
     });
+    if (!organization) throw new MigrationEnrollmentOrganizationNotFoundError();
+    return organization;
   }
 
   /**
