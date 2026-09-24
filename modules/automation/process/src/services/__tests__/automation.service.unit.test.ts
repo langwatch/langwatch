@@ -284,7 +284,6 @@ const makeService = (
       logger: runtime.logger,
       slackTokens: runtime.slackTokens,
       dispatchErrors: runtime.dispatchErrors,
-      heartbeat: runtime.heartbeat,
       runaway: runtime.runaway,
       clock,
       baseHost: runtime.baseHost,

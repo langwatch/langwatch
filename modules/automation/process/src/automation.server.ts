@@ -1,4 +1,4 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi, AnalyticsService } from "@langwatch/analytics-contract";
 import type {
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
@@ -20,7 +20,6 @@ import type {
   AutomationEvaluationQueryClassification,
   AutomationEvaluationTraceSummary,
   AutomationGraphActivity,
-  AutomationHeartbeat,
   AutomationLogger,
   AutomationProjectDirectory,
   AutomationTriggerMatchRecorder,
@@ -406,7 +405,7 @@ export function createAutomationSettlement(input: {
    */
   breach: AutomationSettlementBreach;
   /** Reads the recency the heartbeat sweep decides absence from. */
-  heartbeat: AutomationHeartbeat;
+  analytics: Pick<AnalyticsApi, "findLastOccurredAt">;
   logger: AutomationLogger;
   /** The graph half, when this process composed one. */
   graphActivity?: AutomationGraphActivity | undefined;
@@ -493,7 +492,7 @@ export function createAutomationSettlement(input: {
       GraphTriggerHeartbeatService.create({
         triggers: PrismaTriggerRepository.create(prisma, clock),
         triggerSent: PrismaGraphTriggerSentRepository.create(prisma),
-        heartbeat: input.heartbeat,
+        analytics: input.analytics,
         logger: input.logger,
       }),
       PrismaWebhookDeliveryRepository.create(prisma),

@@ -1,4 +1,11 @@
-import type { ClickHouseClient } from "./graph-trigger-heartbeat.service.ts";
+/** The ClickHouse query surface the runaway count reads through. */
+export type ClickHouseClient = {
+  query(input: {
+    query: string;
+    query_params: Record<string, string | number>;
+    format: "JSONEachRow";
+  }): Promise<{ json(): Promise<unknown> }>;
+};
 
 /** Process logger used by graph evaluation and heartbeat isolation. */
 export abstract class AutomationLogger {

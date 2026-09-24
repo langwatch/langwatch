@@ -3,6 +3,7 @@
  * by data window and evaluates survivors that event-driven path cannot reach.
  */
 
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { isNoDataPredicate, type GraphTriggerSweepCandidate } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
@@ -12,16 +13,9 @@ import type {
   GraphTriggerSentRepository,
 } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { AutomationHeartbeat, AutomationLogger } from "./automation-graph-runtime.service.ts";
+import type { AutomationLogger } from "./automation-graph-runtime.service.ts";
 
 export type AnalyticsMetricSource = RepositoryMetricSource;
-export type ClickHouseClient = {
-  query(input: {
-    query: string;
-    query_params: Record<string, string | number>;
-    format: "JSONEachRow";
-  }): Promise<{ json(): Promise<unknown> }>;
-};
 
 export const GRAPH_TRIGGER_HEARTBEAT_NAME = "graphTriggerHeartbeat" as const;
 export const GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS = 30_000;
@@ -52,7 +46,8 @@ interface CandidateTrigger {
 export interface GraphTriggerHeartbeatDeps {
   triggers: TriggerRepository;
   triggerSent: GraphTriggerSentRepository;
-  heartbeat: AutomationHeartbeat;
+  /** Each source's last event, read from the analytics module's own tables. */
+  analytics: Pick<AnalyticsApi, "findLastOccurredAt">;
   logger: AutomationLogger;
 }
 
@@ -69,20 +64,6 @@ interface ProjectRecency {
 
 /** Min window so the heartbeat doesn't issue a degenerate `now - 0` filter. */
 const MIN_BOUND_WINDOW_MS = 60_000;
-
-/** Slim table name per source (ADR-034 Phase 6). */
-const SLIM_TABLE_BY_SOURCE: Record<AnalyticsMetricSource, string> = {
-  trace: "trace_analytics",
-  evaluation: "evaluation_analytics",
-};
-
-/** Aggregate-id column per source. The IN-tuple dedup pattern uses this
- *  as the (TenantId, <id>, UpdatedAt) grouping key for the slim
- *  `ReplacingMergeTree(UpdatedAt)` table. */
-const SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE: Record<AnalyticsMetricSource, string> = {
-  trace: "TraceId",
-  evaluation: "EvaluationId",
-};
 
 /** One surviving sweep candidate: evaluate this trigger with this reason. */
 /**
@@ -306,68 +287,18 @@ export class GraphTriggerHeartbeatService {
     boundWindowMs: number;
     now: Instant;
   }): Promise<ProjectRecency> {
-    let client: ClickHouseClient | null;
     try {
-      client = await deps.heartbeat.findClickHouseClient(projectId);
-    } catch (error) {
-      deps.logger.warn(
-        {
-          projectId,
-          source,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "graphTriggerHeartbeat: ClickHouse client unavailable, treating recency as unknown (no skip)",
-      );
-
-      return { projectId, source, lastOccurredAtMs: null };
-    }
-
-    if (!client) {
-      return { projectId, source, lastOccurredAtMs: null };
-    }
-
-    const startMs = now.epochMilliseconds - boundWindowMs;
-    const table = SLIM_TABLE_BY_SOURCE[source];
-    const idColumn = SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE[source];
-    // One IN-tuple dedup pattern (slim is ReplacingMergeTree(UpdatedAt)),
-    // bounded on the partition column (OccurredAt) for partition pruning.
-    // TenantId is the first WHERE predicate per multitenancy rules.
-    const query = `
-      SELECT max(toUnixTimestamp64Milli(OccurredAt)) AS lastMs
-      FROM (
-        SELECT OccurredAt
-        FROM ${table}
-        WHERE TenantId = {tenantId:String}
-          AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
-          AND (TenantId, ${idColumn}, UpdatedAt) IN (
-            SELECT TenantId, ${idColumn}, max(UpdatedAt)
-            FROM ${table}
-            WHERE TenantId = {tenantId:String}
-              AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
-            GROUP BY TenantId, ${idColumn}
-          )
-      )
-    `;
-    try {
-      const result = await client.query({
-        query,
-        query_params: { tenantId: projectId, startMs },
-        format: "JSONEachRow",
+      const [lastOccurredAt] = await deps.analytics.findLastOccurredAt({
+        projectId,
+        source,
+        since: now.subtract({ milliseconds: boundWindowMs }),
       });
-      const rows = (await result.json()) as {
-        lastMs: string | number | null;
-      }[];
-      const row = rows[0];
-      if (!row || row.lastMs === null || row.lastMs === undefined) {
-        return { projectId, source, lastOccurredAtMs: null };
-      }
 
-      const ms = typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
-      if (!Number.isFinite(ms) || ms <= 0) {
-        return { projectId, source, lastOccurredAtMs: null };
-      }
-
-      return { projectId, source, lastOccurredAtMs: ms };
+      return {
+        projectId,
+        source,
+        lastOccurredAtMs: lastOccurredAt ? lastOccurredAt.epochMilliseconds : null,
+      };
     } catch (error) {
       deps.logger.warn(
         {
@@ -375,7 +306,7 @@ export class GraphTriggerHeartbeatService {
           source,
           error: error instanceof Error ? error.message : String(error),
         },
-        "graphTriggerHeartbeat: ClickHouse recency query failed, treating recency as unknown",
+        "graphTriggerHeartbeat: recency read failed, treating recency as unknown",
       );
 
       return { projectId, source, lastOccurredAtMs: null };

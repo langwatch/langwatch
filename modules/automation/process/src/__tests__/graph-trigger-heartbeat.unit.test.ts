@@ -1,3 +1,5 @@
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +11,6 @@ import {
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import {
   type GraphTriggerHeartbeatDeps,
-  type ClickHouseClient,
   GraphTriggerHeartbeatService,
 } from "../services/graph-trigger-heartbeat.service.ts";
 
@@ -100,34 +101,31 @@ function makeTriggerSentStub(
   };
 }
 
-function makeClickHouseStub(maxOccurredAtMsByProject: Record<string, number | null>): {
-  client: ClickHouseClient;
+function makeRecencyStub(maxOccurredAtMsByProject: Record<string, number | null>): {
+  analytics: AnalyticsApi;
   callsByProject: Record<string, number>;
 } {
   const callsByProject: Record<string, number> = {};
-  const client: ClickHouseClient = {
-    query: vi.fn(async (params: Parameters<ClickHouseClient["query"]>[0]) => {
-      const projectId = String(params.query_params.tenantId);
-      callsByProject[projectId] = (callsByProject[projectId] ?? 0) + 1;
-      const ms = maxOccurredAtMsByProject[projectId];
-      return {
-        json: async () => [{ lastMs: ms ?? null }],
-      };
+  const analytics = createApiFixture<AnalyticsApi>({
+    findLastOccurredAt: vi.fn(async (input: Parameters<AnalyticsApi["findLastOccurredAt"]>[0]) => {
+      callsByProject[input.projectId] = (callsByProject[input.projectId] ?? 0) + 1;
+      const ms = maxOccurredAtMsByProject[input.projectId];
+      return ms === null || ms === undefined ? [] : [Temporal.Instant.fromEpochMilliseconds(ms)];
     }),
-  };
-  return { client, callsByProject };
+  });
+  return { analytics, callsByProject };
 }
 
 describe("decideGraphTriggerHeartbeat", () => {
   const now = Temporal.Instant.from("2026-06-20T12:00:00Z");
 
   let triggerSentStub: GraphTriggerSentRepository;
-  let chStub: ReturnType<typeof makeClickHouseStub>;
+  let chStub: ReturnType<typeof makeRecencyStub>;
   let deps: GraphTriggerHeartbeatDeps;
 
   beforeEach(() => {
     triggerSentStub = makeTriggerSentStub({});
-    chStub = makeClickHouseStub({});
+    chStub = makeRecencyStub({});
   });
 
   describe("given no candidate projects", () => {
@@ -136,7 +134,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { findClickHouseClient: async () => chStub.client },
+        analytics: chStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -164,7 +162,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { findClickHouseClient: async () => chStub.client },
+        analytics: chStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -180,7 +178,7 @@ describe("decideGraphTriggerHeartbeat", () => {
 
   describe("given a no-data trigger with no recent activity", () => {
     it("enqueues a heartbeat-absence eval", async () => {
-      chStub = makeClickHouseStub({ [PROJECT_A]: null });
+      chStub = makeRecencyStub({ [PROJECT_A]: null });
       const triggers = makeTriggersService({
         [PROJECT_A]: [
           makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
@@ -193,7 +191,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { findClickHouseClient: async () => chStub.client },
+        analytics: chStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -213,7 +211,7 @@ describe("decideGraphTriggerHeartbeat", () => {
   describe("given a no-data trigger but the project has very recent activity", () => {
     it("skips the enqueue — real-time path handles it", async () => {
       const recentMs = now.epochMilliseconds - 30_000;
-      chStub = makeClickHouseStub({ [PROJECT_A]: recentMs });
+      chStub = makeRecencyStub({ [PROJECT_A]: recentMs });
       const triggers = makeTriggersService({
         [PROJECT_A]: [
           makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
@@ -226,7 +224,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { findClickHouseClient: async () => chStub.client },
+        analytics: chStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -243,7 +241,7 @@ describe("decideGraphTriggerHeartbeat", () => {
 
   describe("given an open TriggerSent and the project has gone silent", () => {
     it("enqueues a heartbeat-resolve eval", async () => {
-      chStub = makeClickHouseStub({ [PROJECT_B]: null });
+      chStub = makeRecencyStub({ [PROJECT_B]: null });
       triggerSentStub = makeTriggerSentStub({ [PROJECT_B]: [TRIGGER_OPEN] });
       const triggers = makeTriggersService({
         [PROJECT_B]: [
@@ -257,7 +255,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { findClickHouseClient: async () => chStub.client },
+        analytics: chStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -277,7 +275,7 @@ describe("decideGraphTriggerHeartbeat", () => {
 
   describe("given multiple projects, batched ClickHouse pre-filter", () => {
     it("issues one CH query per project per tick", async () => {
-      chStub = makeClickHouseStub({
+      chStub = makeRecencyStub({
         [PROJECT_A]: null,
         [PROJECT_B]: null,
       });
@@ -300,7 +298,7 @@ describe("decideGraphTriggerHeartbeat", () => {
       deps = {
         triggers,
         triggerSent: triggerSentStub,
-        heartbeat: { findClickHouseClient: async () => chStub.client },
+        analytics: chStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 

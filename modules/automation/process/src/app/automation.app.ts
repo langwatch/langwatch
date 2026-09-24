@@ -328,7 +328,6 @@ export class AutomationApp implements AutomationApi {
       logger: members.logger,
       slackTokens: members.slackTokens,
       dispatchErrors: members.dispatchErrors,
-      heartbeat: members.heartbeat,
       runaway: members.runaway,
       clock: members.clock,
       baseHost: members.publicBaseUrl ?? "",
@@ -423,18 +422,24 @@ export class AutomationApp implements AutomationApi {
   // -- evaluation reactions ----------------------------------------------------
 
   /** Records a match for each trace trigger whose filter reads evaluations. */
-  handleEvaluationTriggerMatch(
-    event: AutomationEvaluationSubscriberEvent,
-    context: AutomationEvaluationSubscriberContext,
-  ): Promise<void> {
+  handleEvaluationTriggerMatch({
+    event,
+    context,
+  }: {
+    event: AutomationEvaluationSubscriberEvent;
+    context: AutomationEvaluationSubscriberContext;
+  }): Promise<void> {
     return this.#evaluations.handleEvaluationTriggerMatch(event, context);
   }
 
   /** Re-evaluates the project's graph alerts after an evaluation finished. */
-  handleEvaluationGraphTriggerActivity(
-    event: AutomationEvaluationSubscriberEvent,
-    context: AutomationEvaluationActivityContext,
-  ): Promise<void> {
+  handleEvaluationGraphTriggerActivity({
+    event,
+    context,
+  }: {
+    event: AutomationEvaluationSubscriberEvent;
+    context: AutomationEvaluationActivityContext;
+  }): Promise<void> {
     return this.#evaluations.handleEvaluationGraphTriggerActivity(event, context);
   }
 

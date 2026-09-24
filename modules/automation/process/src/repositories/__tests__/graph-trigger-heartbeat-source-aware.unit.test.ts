@@ -1,17 +1,17 @@
 /**
  * Source-awareness tests for the graph-trigger heartbeat: it groups
  * triggers per (project, source), issuing one batched recency query per
- * pair per tick -- trace queries `trace_analytics`, eval queries `evaluation_analytics`.
+ * pair per tick, each naming its source to the analytics module's recency read.
  */
 
-import type { AnalyticsMetricSource } from "@langwatch/analytics-contract";
+import type { AnalyticsApi, AnalyticsMetricSource } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type GraphTriggerHeartbeatDeps,
-  type ClickHouseClient,
   GraphTriggerHeartbeatService,
 } from "../../services/graph-trigger-heartbeat.service.ts";
 import type { GraphTriggerSentRepository } from "../graph-trigger-sent.repository.ts";
@@ -100,41 +100,38 @@ function makeTriggerSentStub(
   };
 }
 
-interface QueryCall {
-  query: string;
+interface RecencyCall {
+  source: AnalyticsMetricSource;
   tenantId: string;
 }
 
-function makeClickHouseStub(): {
-  client: ClickHouseClient;
-  calls: QueryCall[];
+function makeAnalyticsStub(): {
+  analytics: AnalyticsApi;
+  calls: RecencyCall[];
 } {
-  const calls: QueryCall[] = [];
-  const client: ClickHouseClient = {
-    query: vi.fn(async (params: Parameters<ClickHouseClient["query"]>[0]) => {
-      calls.push({
-        query: params.query,
-        tenantId: String(params.query_params.tenantId),
-      });
-      // Return null recency so EVERY candidate enqueues (the test cares
-      // about query routing, not enqueue filtering).
-      return { json: async () => [{ lastMs: null }] };
+  const calls: RecencyCall[] = [];
+  const analytics = createApiFixture<AnalyticsApi>({
+    findLastOccurredAt: vi.fn(async (input: Parameters<AnalyticsApi["findLastOccurredAt"]>[0]) => {
+      calls.push({ source: input.source, tenantId: input.projectId });
+      // No recency so EVERY candidate enqueues (the test cares about
+      // source routing, not enqueue filtering).
+      return [];
     }),
-  };
-  return { client, calls };
+  });
+  return { analytics, calls };
 }
 
 describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () => {
   const now = Temporal.Instant.from("2026-06-20T12:00:00Z");
-  let clickHouseStub: ReturnType<typeof makeClickHouseStub>;
+  let analyticsStub: ReturnType<typeof makeAnalyticsStub>;
 
   beforeEach(() => {
-    clickHouseStub = makeClickHouseStub();
+    analyticsStub = makeAnalyticsStub();
   });
 
   describe("given a project with one trace-source and one eval-source graph trigger", () => {
     /** @scenario "Graph heartbeat isolates projects and metric sources" */
-    it("issues one query against trace_analytics and one against evaluation_analytics", async () => {
+    it("reads trace recency once and evaluation recency once", async () => {
       // Both triggers are no-data shapes (operator: lt, threshold: 1) so
       // both qualify as candidates.
       const noDataParams = {
@@ -158,7 +155,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       const deps: GraphTriggerHeartbeatDeps = {
         triggers,
         triggerSent: makeTriggerSentStub(sourceByTrigger),
-        heartbeat: { findClickHouseClient: async () => clickHouseStub.client },
+        analytics: analyticsStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -171,12 +168,10 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       // Both triggers enqueued (recency null → no skip).
       expect(requests).toHaveLength(2);
 
-      // Exactly two queries — one per source.
-      expect(clickHouseStub.calls).toHaveLength(2);
-      const traceCall = clickHouseStub.calls.find((c) => c.query.includes("FROM trace_analytics"));
-      const evalCall = clickHouseStub.calls.find((c) =>
-        c.query.includes("FROM evaluation_analytics"),
-      );
+      // Exactly two reads — one per source.
+      expect(analyticsStub.calls).toHaveLength(2);
+      const traceCall = analyticsStub.calls.find((c) => c.source === "trace");
+      const evalCall = analyticsStub.calls.find((c) => c.source === "evaluation");
       expect(traceCall).toBeDefined();
       expect(evalCall).toBeDefined();
       expect(traceCall?.tenantId).toBe(PROJECT);
@@ -185,7 +180,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
   });
 
   describe("given a project with only an eval-source trigger", () => {
-    it("issues exactly one query against evaluation_analytics, none against trace_analytics", async () => {
+    it("reads evaluation recency only, never trace recency", async () => {
       const noDataParams = {
         operator: "lt",
         threshold: 1,
@@ -199,7 +194,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       const deps: GraphTriggerHeartbeatDeps = {
         triggers,
         triggerSent: makeTriggerSentStub({ [TRIGGER_EVAL]: "evaluation" }),
-        heartbeat: { findClickHouseClient: async () => clickHouseStub.client },
+        analytics: analyticsStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -210,14 +205,12 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       });
 
       expect(requests).toHaveLength(1);
-      expect(clickHouseStub.calls).toHaveLength(1);
-      expect(clickHouseStub.calls[0]?.query).toContain("FROM evaluation_analytics");
-      expect(clickHouseStub.calls[0]?.query).not.toContain("FROM trace_analytics");
+      expect(analyticsStub.calls).toEqual([{ source: "evaluation", tenantId: PROJECT }]);
     });
   });
 
   describe("given an unknown-source trigger (no field-availability mapping)", () => {
-    it("defaults to trace and queries trace_analytics", async () => {
+    it("defaults to trace and reads trace recency", async () => {
       const noDataParams = {
         operator: "lt",
         threshold: 1,
@@ -231,7 +224,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
       const deps: GraphTriggerHeartbeatDeps = {
         triggers,
         triggerSent: makeTriggerSentStub(),
-        heartbeat: { findClickHouseClient: async () => clickHouseStub.client },
+        analytics: analyticsStub.analytics,
         logger: new SilentAutomationLogger(),
       };
 
@@ -241,8 +234,7 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
         now,
       });
 
-      expect(clickHouseStub.calls).toHaveLength(1);
-      expect(clickHouseStub.calls[0]?.query).toContain("FROM trace_analytics");
+      expect(analyticsStub.calls).toEqual([{ source: "trace", tenantId: PROJECT }]);
     });
   });
 });

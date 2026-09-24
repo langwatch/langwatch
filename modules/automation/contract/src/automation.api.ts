@@ -170,15 +170,15 @@ export interface AutomationApi {
     since?: number;
   }): Promise<AutomationUsageCount>;
   /** A terminal evaluation: records a match per trace trigger whose filter reads evaluations. */
-  handleEvaluationTriggerMatch(
-    event: AutomationEvaluationSubscriberEvent,
-    context: AutomationEvaluationSubscriberContext,
-  ): Promise<void>;
+  handleEvaluationTriggerMatch(input: {
+    event: AutomationEvaluationSubscriberEvent;
+    context: AutomationEvaluationSubscriberContext;
+  }): Promise<void>;
   /** A terminal evaluation: re-evaluates the project's graph alerts in real time. */
-  handleEvaluationGraphTriggerActivity(
-    event: AutomationEvaluationSubscriberEvent,
-    context: AutomationEvaluationActivityContext,
-  ): Promise<void>;
+  handleEvaluationGraphTriggerActivity(input: {
+    event: AutomationEvaluationSubscriberEvent;
+    context: AutomationEvaluationActivityContext;
+  }): Promise<void>;
 }
 
 export const AutomationApi = moduleApi<AutomationApi>()("automation");

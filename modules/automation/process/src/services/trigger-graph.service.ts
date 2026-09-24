@@ -1,4 +1,4 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { AnalyticsApi, AnalyticsService } from "@langwatch/analytics-contract";
 import type {
   AutomationPersistCapBreach,
   GraphTriggerEvaluationReason,
@@ -12,7 +12,6 @@ import type {
   AutomationDispatchError,
   AutomationGraphNotifier,
   AutomationLogger,
-  AutomationHeartbeat,
   AutomationSlackBotTokenDecryptor,
   AutomationClock,
 } from "../app/automation.members.ts";
@@ -38,13 +37,12 @@ export class AutomationGraphService {
     triggers: TriggerRepository;
     customGraphs: CustomGraphRepository;
     projects: ProjectApi;
-    analytics: AnalyticsService;
+    analytics: AnalyticsService & Pick<AnalyticsApi, "findLastOccurredAt">;
     triggerSent: GraphTriggerSentRepository;
     notifier: AutomationGraphNotifier;
     logger: AutomationLogger;
     slackTokens: AutomationSlackBotTokenDecryptor;
     dispatchErrors: AutomationDispatchError;
-    heartbeat: AutomationHeartbeat;
     runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals;
     clock: AutomationClock;
     baseHost: string;
@@ -66,7 +64,7 @@ export class AutomationGraphService {
       GraphTriggerHeartbeatService.create({
         triggers: input.triggers,
         triggerSent: input.triggerSent,
-        heartbeat: input.heartbeat,
+        analytics: input.analytics,
         logger: input.logger,
       }),
       RunawayContainmentService.create({

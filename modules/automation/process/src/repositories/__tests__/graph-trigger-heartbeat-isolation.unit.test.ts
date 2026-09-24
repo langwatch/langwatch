@@ -1,6 +1,8 @@
 // Per-project error isolation for the heartbeat; a failure must not silence
 // no-data alerts for all projects.
 
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -54,9 +56,6 @@ function makeDeps({
 }: {
   getActiveGraphTriggersForProject: (p: string) => Promise<TriggerSummary[]>;
 }): GraphTriggerHeartbeatDeps {
-  const clickHouse = {
-    query: vi.fn(async () => ({ json: async () => [{ lastMs: null }] })),
-  };
   const triggers = new HeartbeatTriggerRepository({});
   triggers.findActiveForProject = getActiveGraphTriggersForProject;
 
@@ -73,7 +72,7 @@ function makeDeps({
       deleteOpenClaim: async () => undefined,
       markResolvedById: async () => undefined,
     } satisfies GraphTriggerSentRepository,
-    heartbeat: { findClickHouseClient: async () => clickHouse },
+    analytics: createApiFixture<AnalyticsApi>({ findLastOccurredAt: async () => [] }),
     logger: new SilentAutomationLogger(),
   };
 }
