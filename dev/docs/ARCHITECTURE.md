@@ -867,6 +867,8 @@ a config object a module reads. Every refusal in both packages is a
    that same leaf — one meaning shared N ways passes, a second meaning for
    the same variable still refuses at boot (that refusal caught a real bug
    the night it landed).
+   A shared secret follows the same rule: one exported `Secret.load` handle, and a double claim
+   passes only when every claimant holds that same handle (Alex, 2026-09-25).
 
 **Config is drilled, never ambient.** There is no async context and no
 dependency-injection container. The process config is one object composed of
