@@ -8,6 +8,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
@@ -217,6 +218,7 @@ export function createCanonicalAutomationApp(): {
           resolvePlanNextStep: vi.fn<EntitlementApiContract["resolvePlanNextStep"]>(),
         },
         auditLog,
+        traces: createApiFixture<TraceApi>({}),
       },
       infrastructure: members,
       config: {

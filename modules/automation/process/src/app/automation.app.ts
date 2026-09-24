@@ -20,6 +20,9 @@ import {
   type AutomationApiUpsertInput,
   type AutomationAction,
   type AutomationAuthor,
+  type AutomationEvaluationActivityContext,
+  type AutomationEvaluationSubscriberContext,
+  type AutomationEvaluationSubscriberEvent,
   type AutomationTestFireAuthor,
   type UnsubscribeChannel,
   type AutomationListRow,
@@ -43,6 +46,7 @@ import {
   type AutomationUsageCount,
 } from "@langwatch/automation-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import {
@@ -52,17 +56,21 @@ import {
 } from "@langwatch/monitor-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
+import type { AutomationsPipeline } from "../eventing/automation.pipeline.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
+import { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
+import { AutomationEvaluationTriggerFilterService } from "../services/automation-evaluation-trigger-filter.service.ts";
 import type {
   AutomationDispatchError,
   AutomationHeartbeat,
@@ -75,6 +83,8 @@ import {
 import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
+import { AutomationTraceTriggerCatalogueService } from "../services/automation-trace-trigger-catalogue.service.ts";
+import { AutomationTriggerMatchDispatcherService } from "../services/automation-trigger-match-dispatcher.service.ts";
 import type { AutomationWebhookStoredParams } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationService } from "../services/automation.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
@@ -212,6 +222,8 @@ type AutomationDependencies = Readonly<{
   projects: typeof ProjectApi;
   /** The SAME trail every other completed mutation on this process is recorded on. */
   auditLog: typeof AuditLogApi;
+  /** The trace summary an evaluation match is confirmed against, and how its query is read. */
+  traces: typeof TraceApi;
 }>;
 
 /** {@link AutomationDependencies}, resolved to the peer Apps `fromInfrastructure` itself reads. */
@@ -233,6 +245,8 @@ interface AutomationAppCollaborators {
   audit: AutomationAuditSink;
   limits: AutomationCallCounter;
   publicBaseUrl: string | undefined;
+  evaluations: AutomationEvaluationSubscriberService;
+  triggerMatches: AutomationTriggerMatchDispatcherService;
 }
 
 export class AutomationApp implements AutomationApi {
@@ -244,6 +258,7 @@ export class AutomationApp implements AutomationApi {
     entitlement: EntitlementApi,
     projects: ProjectApi,
     auditLog: AuditLogApi,
+    traces: TraceApi,
   };
   static readonly config = automationServerConfig;
   /** `secrets` carries the cipher key `stores` owns: one owner declares
@@ -346,6 +361,8 @@ export class AutomationApp implements AutomationApi {
       featureFlags: dependencies.featureFlags,
     });
 
+    const triggerMatches = AutomationTriggerMatchDispatcherService.create();
+
     return new AutomationApp({
       automation,
       rules,
@@ -362,6 +379,17 @@ export class AutomationApp implements AutomationApi {
       audit: members.audit,
       limits: members.limits,
       publicBaseUrl: members.publicBaseUrl,
+      evaluations: AutomationEvaluationSubscriberService.create({
+        triggers: AutomationTraceTriggerCatalogueService.create({
+          triggers: repositories.triggers,
+          clock: members.clock,
+        }),
+        graphActivity: automation,
+        traces: dependencies.traces,
+        evaluationFilters: AutomationEvaluationTriggerFilterService.create(dependencies.traces),
+        triggerMatches,
+      }),
+      triggerMatches,
     });
   }
 
@@ -372,6 +400,8 @@ export class AutomationApp implements AutomationApi {
   #audit: AutomationAuditSink;
   #limits: AutomationCallCounter;
   readonly #publicBaseUrl: string | undefined;
+  readonly #evaluations: AutomationEvaluationSubscriberService;
+  readonly #triggerMatches: AutomationTriggerMatchDispatcherService;
 
   private constructor(collaborators: AutomationAppCollaborators) {
     this.#automation = collaborators.automation;
@@ -381,6 +411,31 @@ export class AutomationApp implements AutomationApi {
     this.#audit = collaborators.audit;
     this.#limits = collaborators.limits;
     this.#publicBaseUrl = collaborators.publicBaseUrl;
+    this.#evaluations = collaborators.evaluations;
+    this.#triggerMatches = collaborators.triggerMatches;
+  }
+
+  /** Binds the registered `automations` pipeline's own senders. */
+  connectCommands(commands: EventingCommands<AutomationsPipeline>): void {
+    this.#triggerMatches.connect(commands);
+  }
+
+  // -- evaluation reactions ----------------------------------------------------
+
+  /** Records a match for each trace trigger whose filter reads evaluations. */
+  handleEvaluationTriggerMatch(
+    event: AutomationEvaluationSubscriberEvent,
+    context: AutomationEvaluationSubscriberContext,
+  ): Promise<void> {
+    return this.#evaluations.handleEvaluationTriggerMatch(event, context);
+  }
+
+  /** Re-evaluates the project's graph alerts after an evaluation finished. */
+  handleEvaluationGraphTriggerActivity(
+    event: AutomationEvaluationSubscriberEvent,
+    context: AutomationEvaluationActivityContext,
+  ): Promise<void> {
+    return this.#evaluations.handleEvaluationGraphTriggerActivity(event, context);
   }
 
   // -- reads -----------------------------------------------------------------

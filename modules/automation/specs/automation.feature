@@ -113,3 +113,15 @@ Feature: Automation ownership
     Given a project whose organization buys from the tiered ladder
     When the upgrade line of an automation ceiling notice is resolved
     Then it links the checkout of the rung the entitlement capability names next
+
+  @unit
+  Scenario: A trigger match refuses by name when this process hosts no automations pipeline
+    Given a process that registered no automations pipeline
+    When an evaluation reaction records a trigger match
+    Then the match is refused naming the missing recordTriggerMatch sender
+
+  @unit
+  Scenario: A trigger match is recorded through the automations pipeline's own sender
+    Given the automations pipeline registered and its senders connected
+    When an evaluation reaction records a trigger match
+    Then the match is sent through recordTriggerMatch

@@ -3,6 +3,11 @@ import type { Monitor } from "@langwatch/monitor-contract";
 import type { Instant } from "@langwatch/time";
 
 import type {
+  AutomationEvaluationActivityContext,
+  AutomationEvaluationSubscriberContext,
+  AutomationEvaluationSubscriberEvent,
+} from "./automation-evaluation-subscriber.service.ts";
+import type {
   AutomationListRow,
   AutomationPersistCapStatus,
   SlackChannelListing,
@@ -164,6 +169,16 @@ export interface AutomationApi {
     projectIds: readonly string[];
     since?: number;
   }): Promise<AutomationUsageCount>;
+  /** A terminal evaluation: records a match per trace trigger whose filter reads evaluations. */
+  handleEvaluationTriggerMatch(
+    event: AutomationEvaluationSubscriberEvent,
+    context: AutomationEvaluationSubscriberContext,
+  ): Promise<void>;
+  /** A terminal evaluation: re-evaluates the project's graph alerts in real time. */
+  handleEvaluationGraphTriggerActivity(
+    event: AutomationEvaluationSubscriberEvent,
+    context: AutomationEvaluationActivityContext,
+  ): Promise<void>;
 }
 
 export const AutomationApi = moduleApi<AutomationApi>()("automation");
