@@ -51,7 +51,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
     config: {
       codeBlockTimeoutSeconds: undefined,
       stagingThresholdBytes: undefined,
-      stagingTtlSeconds: undefined,
+      stagingTtlSeconds: 600,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

@@ -55,6 +55,8 @@ export interface ObjectDigest {
 
 /** What a writer states about an upload a client will PUT, and when its URL lapses. */
 export type UploadFacts = ObjectBodyFacts & Readonly<{ expiresAt: Instant }>;
+/** When a signed download URL lapses. */
+export type DownloadFacts = Readonly<{ expiresAt: Instant }>;
 
 /** Where a client PUTs an upload: a URL the backend signed, or the process's own signed route. */
 export type SignedObjectUpload =
@@ -86,6 +88,8 @@ export interface ObjectStorage {
   /** Removes the object; an absent one is already removed. */
   remove(at: StoredObjectAddress): Promise<void>;
   signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
+  /** A GET URL a remote reader fetches the object from; a backend with no URL to sign refuses. */
+  signDownload(at: StoredObjectAddress, facts: DownloadFacts): Promise<string>;
   destination(projectId: string): Promise<ObjectStorageDestination>;
   /** Resolves when the project's destination answers with its credentials, and throws otherwise. */
   probe(projectId: string): Promise<void>;
@@ -97,11 +101,17 @@ export interface MailMessage {
   readonly subject: string;
   readonly html: string;
   readonly from?: string;
+  /** Delivered without appearing in the headers, so recipients cannot see each other. */
+  readonly bcc?: readonly string[];
+  /** Extra MIME headers, such as `List-Unsubscribe`. */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 /** Transactional mail. Rendering belongs to @langwatch/mail, sending here. */
 export interface Mail {
   send(message: MailMessage): Promise<void>;
+  /** The address a send without its own `from` goes out from. */
+  defaultFrom(): string;
 }
 
 /**

@@ -22,9 +22,7 @@ describe("workflow server configuration", () => {
   describe("given a deployment fronts the engine with a staging threshold", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("carries it as written", () => {
-      expect(read({ LANGEVALS_STAGING_THRESHOLD_BYTES: "1024" }).stagingThresholdBytes).toBe(
-        "1024",
-      );
+      expect(read({ LANGEVALS_STAGING_THRESHOLD_BYTES: "1024" }).stagingThresholdBytes).toBe(1024);
     });
   });
 });

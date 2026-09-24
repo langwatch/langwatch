@@ -144,7 +144,7 @@ function refuseCrossClaims(
     if (secretOwner !== undefined) throw new ConfigClaimsSecretError(leaf.env, owner, secretOwner);
 
     const held = claimed.get(leaf.env);
-    if (held && held.owner !== owner) {
+    if (held && held.owner !== owner && held.leaf !== leaf) {
       throw new ConfigCollisionError(leaf.env, [held.owner, owner]);
     }
     claimed.set(leaf.env, { leaf, owner });

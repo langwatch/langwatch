@@ -103,10 +103,13 @@ export interface MailMessage {
   readonly subject: string;
   readonly html: string;
   readonly from?: string;
+  readonly bcc?: readonly string[];
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 export interface Mail {
   send(message: MailMessage): Promise<void>;
+  defaultFrom(): string;
 }
 
 /** Mail a test reads back, rather than a provider a test cannot see. */
@@ -122,6 +125,7 @@ export function recordingMail(): RecordingMail {
       sent.push(message);
       return Promise.resolve();
     },
+    defaultFrom: () => "LangWatch <contact@langwatch.ai>",
   };
 }
 

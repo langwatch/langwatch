@@ -1,4 +1,9 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  langevalsStagingThresholdBytes,
+  langevalsStagingTtlSeconds,
+  type ConfigOf,
+} from "@langwatch/config";
 import { z } from "zod";
 
 const positiveInteger = z.coerce.number().int().positive();
@@ -10,9 +15,8 @@ const positiveInteger = z.coerce.number().int().positive();
  */
 export const evaluationConfig = Config.define((c) => ({
   langevalsEndpoint: c.env("LANGEVALS_ENDPOINT", z.string().optional()),
-  /** Unset keeps every payload inline: only a Lambda-fronted langevals has a body cap to dodge. */
-  stagingThresholdBytes: c.env("LANGEVALS_STAGING_THRESHOLD_BYTES", positiveInteger.optional()),
-  stagingTtlSeconds: c.env("LANGEVALS_STAGING_TTL_SECONDS", positiveInteger.default(600)),
+  stagingThresholdBytes: langevalsStagingThresholdBytes,
+  stagingTtlSeconds: langevalsStagingTtlSeconds,
   evaluationMaxPayloadBytes: c.env("EVAL_MAX_PAYLOAD_BYTES", positiveInteger.default(16_000_000)),
   topicClusteringMaxPayloadBytes: c.env(
     "TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES",

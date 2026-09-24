@@ -120,7 +120,7 @@ describe("given object storage on S3", () => {
       expect(signed.headers).toEqual({ "content-type": "text/csv" });
     });
 
-    it("refuses to sign a URL that has already expired", async () => {
+    it("refuses to sign an upload URL that has already expired", async () => {
       const backend = s3Backend({ client: s3Client(account), bucket: "objects", clock });
 
       await expect(
@@ -129,6 +129,32 @@ describe("given object storage on S3", () => {
           contentType: "text/csv",
           expiresAt: Temporal.Instant.from("2026-09-24T11:59:00Z"),
         }),
+      ).rejects.toThrow(RangeError);
+    });
+  });
+
+  describe("when a download URL is signed", () => {
+    /** @scenario "An S3 download URL is a presigned GET that lapses when asked" */
+    it("presigns a GET for the one key, lapsing when asked", async () => {
+      const backend = s3Backend({ client: s3Client(account), bucket: "objects", clock });
+
+      const url = new URL(
+        await backend.signDownload(at, {
+          expiresAt: Temporal.Instant.from("2026-09-24T12:15:00Z"),
+        }),
+      );
+
+      expect(url.pathname).toBe(`/objects/${at.key}`);
+      expect(url.searchParams.get("X-Amz-Expires")).toBe("900");
+      expect(url.searchParams.get("X-Amz-SignedHeaders")).toBe("host");
+      expect(url.searchParams.get("x-id")).toBe("GetObject");
+    });
+
+    it("refuses to sign a download URL that has already expired", async () => {
+      const backend = s3Backend({ client: s3Client(account), bucket: "objects", clock });
+
+      await expect(
+        backend.signDownload(at, { expiresAt: Temporal.Instant.from("2026-09-24T11:59:00Z") }),
       ).rejects.toThrow(RangeError);
     });
   });

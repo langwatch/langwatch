@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { ConfigCollisionError, ConfigParseError } from "../config.errors.ts";
 import { Config, parseProcessConfig } from "../config.ts";
+import { langevalsStagingTtlSeconds } from "../deployment-facts.ts";
 
 const github = {
   name: "github",
@@ -61,6 +62,38 @@ describe("parseProcessConfig", () => {
     expect(() => parseProcessConfig({ owners: [a, b], environment: {} })).toThrowError(
       ConfigCollisionError,
     );
+  });
+
+  describe("given two owners holding the one exported deployment-fact leaf", () => {
+    /** @scenario "Owners sharing one deployment-fact leaf both parse it" */
+    it("admits both claims and hands each owner the same parsed value", () => {
+      const evaluation = {
+        name: "evaluation",
+        config: { ttl: langevalsStagingTtlSeconds },
+      } as const;
+      const workflow = { name: "workflow", config: { ttl: langevalsStagingTtlSeconds } } as const;
+
+      const config = parseProcessConfig({
+        owners: [evaluation, workflow],
+        environment: { LANGEVALS_STAGING_TTL_SECONDS: "120" },
+      });
+
+      expect(config.evaluation.ttl).toBe(120);
+      expect(config.workflow.ttl).toBe(120);
+    });
+
+    /** @scenario "A second leaf for a shared deployment fact still refuses" */
+    it("refuses an owner declaring its own leaf for the same variable", () => {
+      const evaluation = { name: "evaluation", config: { ttl: langevalsStagingTtlSeconds } };
+      const rogue = {
+        name: "rogue",
+        config: Config.define((c) => ({ ttl: c.env("LANGEVALS_STAGING_TTL_SECONDS", z.string()) })),
+      };
+
+      expect(() => parseProcessConfig({ owners: [evaluation, rogue], environment: {} })).toThrow(
+        expect.objectContaining({ code: "config_collision" }),
+      );
+    });
   });
 
   it("returns frozen slices — the parse's answer is what the process holds", () => {

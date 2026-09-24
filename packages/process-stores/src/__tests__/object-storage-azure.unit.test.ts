@@ -128,6 +128,27 @@ describe("given object storage on Azure Blob with an account key", () => {
       expect(received).toEqual([]);
     });
   });
+
+  describe("when a download URL is signed", () => {
+    /** @scenario "An Azure download URL is a SAS that may only read the one blob" */
+    it("answers a blob SAS with read permission only", async () => {
+      const url = new URL(
+        await backend().signDownload(at, {
+          expiresAt: Temporal.Instant.from("2026-09-24T12:15:00Z"),
+        }),
+      );
+
+      expect(url.pathname).toBe(`/devstoreaccount1/objects/${at.key}`);
+      expect(Object.fromEntries(url.searchParams)).toMatchObject({
+        sv: "2021-12-02",
+        sr: "b",
+        sp: "r",
+        se: "2026-09-24T12:15:00Z",
+      });
+      expect(url.searchParams.get("sig")).toBeTruthy();
+      expect(received).toEqual([]);
+    });
+  });
 });
 
 describe("given STORED_OBJECTS_BACKEND=azure with an incomplete block", () => {

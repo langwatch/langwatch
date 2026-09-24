@@ -3,11 +3,12 @@
  * before a socket: routing and refusal are decided from the directory read and the config alone,
  * which is the point of both.
  */
+import { EmailDelivery, type EmailContent } from "@langwatch/mail/gateway";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { MailConfig } from "../src/config.ts";
-import { buildMail } from "../src/mail-member.ts";
+import { buildMail, mailOver } from "../src/mail-member.ts";
 import { UnknownStorageProjectError } from "../src/object-storage-backend.ts";
 import { buildObjectStorage } from "../src/object-storage-member.ts";
 import { cachedTenantDirectory } from "../src/tenant-directory.ts";
@@ -172,6 +173,17 @@ describe("given the mail gateway this deployment named", () => {
       expect(mail.close).toBeTypeOf("function");
     });
 
+    /** @scenario "A configured gateway answers its sending address as the default from" */
+    it("answers the declared address as its default from", () => {
+      const mail = buildMail({
+        provider: "resend",
+        defaultFrom: "LangWatch <a@b.test>",
+        apiKey: "k",
+      });
+
+      expect(mail.value.defaultFrom()).toBe("LangWatch <a@b.test>");
+    });
+
     it("refuses a gateway with no sending address", () => {
       expect(() => buildMail({ provider: "resend", defaultFrom: "   ", apiKey: "key" })).toThrow(
         "without a sending address",
@@ -196,6 +208,44 @@ describe("given the mail gateway this deployment named", () => {
       };
 
       expect([missingRegion, wrongLeaf]).toHaveLength(2);
+    });
+  });
+});
+
+describe("given the mail member over one delivery", () => {
+  describe("when a module sends to hidden recipients with extra headers", () => {
+    /** @scenario "A send carries its BCC recipients and headers to the gateway" */
+    it("hands the gateway the BCC list and the headers as sent", async () => {
+      const handed: EmailContent[] = [];
+      const mail = mailOver(
+        new (class extends EmailDelivery {
+          defaultFrom() {
+            return "LangWatch <a@b.test>";
+          }
+          send(content: EmailContent) {
+            handed.push(content);
+            return Promise.resolve();
+          }
+        })(),
+      );
+
+      await mail.send({
+        to: "no-reply@b.test",
+        subject: "Alert",
+        html: "<p>alert</p>",
+        bcc: ["ada@example.com", "grace@example.com"],
+        headers: { "List-Unsubscribe": "<https://b.test/unsubscribe>" },
+      });
+
+      expect(handed).toEqual([
+        {
+          to: "no-reply@b.test",
+          subject: "Alert",
+          html: "<p>alert</p>",
+          bcc: ["ada@example.com", "grace@example.com"],
+          headers: { "List-Unsubscribe": "<https://b.test/unsubscribe>" },
+        },
+      ]);
     });
   });
 });

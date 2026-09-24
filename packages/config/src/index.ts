@@ -12,6 +12,7 @@ export {
   type ConfigSlice,
   type ProcessConfigOf,
 } from "./config.ts";
+export { langevalsStagingThresholdBytes, langevalsStagingTtlSeconds } from "./deployment-facts.ts";
 export {
   environmentBooleanSchema,
   environmentExactOneSchema,

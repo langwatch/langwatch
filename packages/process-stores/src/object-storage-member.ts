@@ -168,6 +168,7 @@ export function buildObjectStorage(options: {
     digest: async (at) => (await locate(at)).digest(at),
     remove: async (at) => (await locate(at)).remove(at),
     signUpload: async (at, facts) => (await place(at.projectId)).signUpload(at, facts),
+    signDownload: async (at, facts) => (await locate(at)).signDownload(at, facts),
     destination: async (projectId) => (await place(projectId)).destination,
     probe: async (projectId) => (await place(projectId)).probe(),
   };

@@ -1,8 +1,8 @@
 import type { SecretHandle } from "./secret.ts";
 /**
- * Refuses one credential declared by two owners (§6). A credential has one
- * owner: it declares the handle, builds the collaborator, and the process
- * injects THAT into whoever else needs it (ADR-132).
+ * Refuses one credential declared by two owners (§6, ADR-132). A shared secret
+ * is one exported handle: a second claim passes only when it holds that same
+ * handle instance, never a fresh `Secret.load` of the same id.
  */
 import { SecretClaimedTwiceError } from "./secrets.errors.ts";
 
@@ -19,11 +19,11 @@ export function refuseDoubleClaims(owners: readonly SecretsOwner[]): void {
     for (const handle of Object.values(owner.secrets ?? {})) {
       const held = claimed.get(handle.id);
 
-      if (held) {
+      if (!held) {
+        claimed.set(handle.id, { handle, owner: owner.name });
+      } else if (held.handle !== handle) {
         throw new SecretClaimedTwiceError(handle.id, [held.owner, owner.name]);
       }
-
-      claimed.set(handle.id, { handle, owner: owner.name });
     }
   }
 }

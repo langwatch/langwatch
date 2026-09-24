@@ -14,6 +14,7 @@ import { toDate, type Instant } from "@langwatch/time";
 
 import type {
   Clock,
+  DownloadFacts,
   ObjectBodyFacts,
   ObjectDigest,
   SignedObjectUpload,
@@ -35,6 +36,7 @@ import {
 
 const API_VERSION = "2021-12-02";
 const UPLOAD_PERMISSIONS = "cw";
+const DOWNLOAD_PERMISSIONS = "r";
 
 type Body = Iterable<Uint8Array> | AsyncIterable<Uint8Array>;
 type SharedKeyCredentials = Extract<AzureCredentials, { mode: "sharedKey" }>;
@@ -250,8 +252,9 @@ function sasTime(instant: Instant): string {
     .replace(/\.\d{3}Z$/, "Z");
 }
 
-/** What every blob SAS states: create-and-write on one blob, until it lapses. */
+/** What every blob SAS states: its permissions on one blob, until it lapses. */
 interface SasTerms {
+  readonly permissions: string;
   readonly resource: string;
   readonly expiry: string;
   readonly protocol: string;
@@ -261,12 +264,12 @@ interface SasTerms {
 const UNUSED_SAS_TAIL = ["", "", "", "", "", "", ""];
 
 function serviceSas(credentials: SharedKeyCredentials, terms: SasTerms): Record<string, string> {
-  const { resource, expiry, protocol } = terms;
-  const head = [UPLOAD_PERMISSIONS, "", expiry, resource, "", "", protocol, API_VERSION, "b"];
+  const { permissions, resource, expiry, protocol } = terms;
+  const head = [permissions, "", expiry, resource, "", "", protocol, API_VERSION, "b"];
   return {
     sv: API_VERSION,
     sr: "b",
-    sp: UPLOAD_PERMISSIONS,
+    sp: permissions,
     se: expiry,
     spr: protocol,
     sig: sign(credentials.accountKey, [...head, ...UNUSED_SAS_TAIL]),
@@ -300,7 +303,7 @@ async function userDelegationKey(place: AzurePlace, expiry: string): Promise<str
 }
 
 async function delegationSas(place: AzurePlace, terms: SasTerms): Promise<Record<string, string>> {
-  const { resource, expiry, protocol } = terms;
+  const { permissions, resource, expiry, protocol } = terms;
   const xml = await userDelegationKey(place, expiry);
   const key = {
     skoid: xmlValue(xml, "SignedOid"),
@@ -311,7 +314,7 @@ async function delegationSas(place: AzurePlace, terms: SasTerms): Promise<Record
     skv: xmlValue(xml, "SignedVersion"),
   };
   const fields = [
-    UPLOAD_PERMISSIONS,
+    permissions,
     "",
     expiry,
     resource,
@@ -328,7 +331,7 @@ async function delegationSas(place: AzurePlace, terms: SasTerms): Promise<Record
   return {
     sv: API_VERSION,
     sr: "b",
-    sp: UPLOAD_PERMISSIONS,
+    sp: permissions,
     se: expiry,
     spr: protocol,
     ...key,
@@ -336,16 +339,19 @@ async function delegationSas(place: AzurePlace, terms: SasTerms): Promise<Record
   };
 }
 
-async function signBlobUpload(
-  place: AzurePlace,
-  at: StoredObjectAddress,
-  facts: UploadFacts,
-): Promise<SignedObjectUpload> {
-  secondsUntil({ expiresAt: facts.expiresAt, now: place.clock.now() });
+async function signedBlobUrl(options: {
+  place: AzurePlace;
+  at: StoredObjectAddress;
+  permissions: string;
+  expiresAt: Instant;
+}): Promise<string> {
+  const { place, at, permissions, expiresAt } = options;
+  secondsUntil({ expiresAt, now: place.clock.now() });
   const { credentials } = place;
   const terms: SasTerms = {
+    permissions,
     resource: `/blob/${credentials.accountName}/${credentials.container}/${at.key}`,
-    expiry: sasTime(facts.expiresAt),
+    expiry: sasTime(expiresAt),
     protocol: credentials.endpoint.startsWith("https:") ? "https" : "https,http",
   };
   const query =
@@ -354,11 +360,38 @@ async function signBlobUpload(
       : await delegationSas(place, terms);
   const url = new URL(`${credentials.endpoint}${blobPath(place, at)}`);
   for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
+  return url.toString();
+}
+
+async function signBlobUpload(
+  place: AzurePlace,
+  at: StoredObjectAddress,
+  facts: UploadFacts,
+): Promise<SignedObjectUpload> {
+  const url = await signedBlobUrl({
+    place,
+    at,
+    permissions: UPLOAD_PERMISSIONS,
+    expiresAt: facts.expiresAt,
+  });
   return {
     kind: "direct",
-    url: url.toString(),
+    url,
     headers: { "content-type": facts.contentType, "x-ms-blob-type": "BlockBlob" },
   };
+}
+
+function signBlobDownload(
+  place: AzurePlace,
+  at: StoredObjectAddress,
+  facts: DownloadFacts,
+): Promise<string> {
+  return signedBlobUrl({
+    place,
+    at,
+    permissions: DOWNLOAD_PERMISSIONS,
+    expiresAt: facts.expiresAt,
+  });
 }
 
 export function azureBackend(options: {
@@ -374,6 +407,7 @@ export function azureBackend(options: {
     digest: async (at) => digestOf(await readBlob(place, at)),
     remove: (at) => removeBlob(place, at),
     signUpload: (at, facts) => signBlobUpload(place, at, facts),
+    signDownload: (at, facts) => signBlobDownload(place, at, facts),
     probe: () => probeContainer(place),
   };
 }

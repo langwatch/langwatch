@@ -3,7 +3,11 @@
  * only which gateway and address a send uses; `MAIL_PROVIDER` is the sole
  * discriminant (ADR-144 §13a) — no inference from a leftover credential.
  */
-import { directSesClientConfiguration, MailerAdapter } from "@langwatch/mail/gateway";
+import {
+  directSesClientConfiguration,
+  MailerAdapter,
+  type EmailDelivery,
+} from "@langwatch/mail/gateway";
 import type { Logger } from "@langwatch/observability";
 
 import type { MailConfig, OutboundProxyConfig } from "./config.ts";
@@ -55,23 +59,33 @@ export function buildMail(config: Exclude<MailConfig, { provider: "off" }>): Bui
     outboundProxy: proxy,
   });
 
-  const mail: Mail = {
+  return { value: mailOver(adapter), close: () => adapter.close() };
+}
+
+/** The member over one delivery: what a module sends is what the gateway is handed. */
+export function mailOver(delivery: EmailDelivery): Mail {
+  return {
+    defaultFrom: () => delivery.defaultFrom(),
     async send(message) {
-      await adapter.send({
+      await delivery.send({
         to: message.to,
         subject: message.subject,
         html: message.html,
         ...(message.from === undefined ? {} : { from: message.from }),
+        ...(message.bcc === undefined ? {} : { bcc: [...message.bcc] }),
+        ...(message.headers === undefined ? {} : { headers: { ...message.headers } }),
       });
     },
   };
-
-  return { value: mail, close: () => adapter.close() };
 }
+
+/** The sender main answered when no address was configured and no public host was named. */
+const PLATFORM_DEFAULT_FROM = "LangWatch <contact@langwatch.ai>";
 
 /** Mail off is a state (ARCHITECTURE.md §6): each send is skipped with one line naming it. */
 export function skippedMail(logger: Logger): BuiltMember<Mail> {
   const mail: Mail = {
+    defaultFrom: () => PLATFORM_DEFAULT_FROM,
     async send(message) {
       logger.warn(
         { subject: message.subject },

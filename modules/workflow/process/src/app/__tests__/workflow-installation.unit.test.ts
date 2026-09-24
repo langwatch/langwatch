@@ -42,7 +42,7 @@ function process_() {
       workflow: {
         codeBlockTimeoutSeconds: undefined,
         stagingThresholdBytes: undefined,
-        stagingTtlSeconds: undefined,
+        stagingTtlSeconds: 600,
       },
     })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))

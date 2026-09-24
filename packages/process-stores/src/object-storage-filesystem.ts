@@ -16,6 +16,7 @@ import {
   measureBody,
   StorageNotWritableError,
   StoredObjectNotFoundError,
+  UnsignableDownloadError,
   type ObjectBackend,
 } from "./object-storage-backend.ts";
 
@@ -123,6 +124,7 @@ export function filesystemBackend(options: { root: string }): ObjectBackend {
     },
 
     signUpload: () => Promise.resolve({ kind: "through-process" }),
+    signDownload: (at) => Promise.reject(new UnsignableDownloadError("file", at.key)),
 
     async probe() {
       await fs.mkdir(root, { recursive: true });

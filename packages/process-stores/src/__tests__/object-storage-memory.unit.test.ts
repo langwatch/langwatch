@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { memoryObjectStorage } from "../object-storage-memory.ts";
@@ -32,6 +33,22 @@ describe("given the memory object storage", () => {
       await expect(
         readAll(await storage.read({ projectId: "two", key: "report" })),
       ).resolves.toEqual([2]);
+    });
+  });
+
+  describe("when a download URL is asked for", () => {
+    /** @scenario "The memory twin answers a deterministic download URL" */
+    it("answers the same URL for the same address and expiry", async () => {
+      const storage = memoryObjectStorage();
+      const at = { projectId: "project-1", key: "staged/payload.json" };
+      const facts = { expiresAt: Temporal.Instant.from("2026-09-24T12:15:00Z") };
+
+      const url = await storage.signDownload(at, facts);
+
+      await expect(storage.signDownload(at, facts)).resolves.toBe(url);
+      expect(url).toBe(
+        "memory://object-storage/project-1/staged/payload.json?expires=2026-09-24T12%3A15%3A00Z",
+      );
     });
   });
 });

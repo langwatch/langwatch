@@ -8,6 +8,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 
 import type {
+  DownloadFacts,
   ObjectBodyFacts,
   ObjectDigest,
   ObjectStorageDestination,
@@ -28,6 +29,7 @@ export interface ObjectBackend {
   digest(at: StoredObjectAddress): Promise<ObjectDigest>;
   remove(at: StoredObjectAddress): Promise<void>;
   signUpload(at: StoredObjectAddress, facts: UploadFacts): Promise<SignedObjectUpload>;
+  signDownload(at: StoredObjectAddress, facts: DownloadFacts): Promise<string>;
   probe(): Promise<void>;
 }
 
@@ -67,6 +69,20 @@ export class UnreachableStorageLocationError extends Error {
         "this deployment is not configured for.",
     );
     this.name = "UnreachableStorageLocationError";
+  }
+}
+
+/** A backend no remote reader can reach by URL, such as a local directory. */
+export class UnsignableDownloadError extends Error {
+  constructor(
+    readonly locationKind: ObjectStorageDestination["kind"],
+    readonly key: string,
+  ) {
+    super(
+      `Cannot sign a download URL for "${key}": ${locationKind} storage has no URL a remote ` +
+        "reader can fetch. Configure S3 or Azure storage to hand objects to another service.",
+    );
+    this.name = "UnsignableDownloadError";
   }
 }
 
@@ -170,11 +186,11 @@ export async function digestOf(stream: AsyncIterable<Uint8Array>): Promise<Objec
   return { byteLength, sha256: hash.digest("hex") };
 }
 
-/** Seconds until an upload URL lapses; one that has already lapsed is refused, never signed. */
+/** Seconds until a signed URL lapses; one that has already lapsed is refused, never signed. */
 export function secondsUntil(options: { expiresAt: Instant; now: Instant }): number {
   const seconds = Math.ceil(options.now.until(options.expiresAt).total("seconds"));
   if (seconds <= 0) {
-    throw new RangeError("An upload URL cannot be signed to expire in the past.");
+    throw new RangeError("A URL cannot be signed to expire in the past.");
   }
   return seconds;
 }

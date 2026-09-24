@@ -1,4 +1,9 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  langevalsStagingThresholdBytes,
+  langevalsStagingTtlSeconds,
+  type ConfigOf,
+} from "@langwatch/config";
 import { z } from "zod";
 
 /**
@@ -56,8 +61,8 @@ export const workflowConfig = Config.define((c) => ({
   /** How long a code block may run inside the engine, as the engine reads it. */
   codeBlockTimeoutSeconds: c.env("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", z.string().optional()),
   /** Above this many bytes a payload is staged rather than sent inline. */
-  stagingThresholdBytes: c.env("LANGEVALS_STAGING_THRESHOLD_BYTES", z.string().optional()),
-  stagingTtlSeconds: c.env("LANGEVALS_STAGING_TTL_SECONDS", z.string().optional()),
+  stagingThresholdBytes: langevalsStagingThresholdBytes,
+  stagingTtlSeconds: langevalsStagingTtlSeconds,
 }));
 
 export type WorkflowServerConfig = ConfigOf<typeof workflowConfig>;

@@ -46,7 +46,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import { Secret } from "@langwatch/secrets";
+import { sessionSecret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -211,7 +211,7 @@ export class AuthApp implements AuthApiContract {
   ] as const;
   /** The browser-session key. Only the identity built from it ever escapes (ADR-132). */
   static readonly secrets = {
-    session: Secret.load("NEXTAUTH_SECRET", { optional: true }),
+    session: sessionSecret,
   } as const;
 
   readonly #sessions: BrowserSessionService;

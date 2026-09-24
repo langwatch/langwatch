@@ -117,6 +117,16 @@ describe("given a process started with mail off", () => {
         expect.stringContaining('"Trigger - Errors above threshold" was not sent'),
       );
     });
+
+    /** @scenario "Mail off still names the sender main answered" */
+    it("answers main's platform sender as its default from", () => {
+      const members = createProcessMembers({
+        config: config(),
+        members: { logger: createLogger("process-members-test") },
+      });
+
+      expect(members.read("mail").defaultFrom()).toBe("LangWatch <contact@langwatch.ai>");
+    });
   });
 });
 

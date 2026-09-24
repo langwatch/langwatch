@@ -18,6 +18,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { ObjectStorageAccount } from "./config.ts";
 import type {
   Clock,
+  DownloadFacts,
   ObjectBodyFacts,
   ObjectDigest,
   SignedObjectUpload,
@@ -141,6 +142,17 @@ async function signObjectUpload(
   return { kind: "direct", url, headers: { "content-type": facts.contentType } };
 }
 
+async function signObjectDownload(
+  place: S3Place & { clock: Clock },
+  at: StoredObjectAddress,
+  facts: DownloadFacts,
+): Promise<string> {
+  const expiresIn = secondsUntil({ expiresAt: facts.expiresAt, now: place.clock.now() });
+  return getSignedUrl(place.client, new GetObjectCommand({ Bucket: place.bucket, Key: at.key }), {
+    expiresIn,
+  });
+}
+
 export function s3Backend(options: {
   client: S3Client;
   bucket: string;
@@ -156,6 +168,7 @@ export function s3Backend(options: {
       await place.client.send(new DeleteObjectCommand({ Bucket: place.bucket, Key: at.key }));
     },
     signUpload: (at, facts) => signObjectUpload({ ...place, clock: options.clock }, at, facts),
+    signDownload: (at, facts) => signObjectDownload({ ...place, clock: options.clock }, at, facts),
     async probe() {
       await place.client.send(new HeadBucketCommand({ Bucket: place.bucket }));
     },

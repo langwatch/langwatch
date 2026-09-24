@@ -45,6 +45,30 @@ Feature: The object-storage member
     Then it is a blob SAS with create and write permission and the BlockBlob header to send
 
   @unit
+  Scenario: An S3 download URL is a presigned GET that lapses when asked
+    Given an object stored on S3
+    When a module asks for its download URL to lapse in fifteen minutes
+    Then the answer is a presigned GET for that one key, valid for 900 seconds
+
+  @unit
+  Scenario: An Azure download URL is a SAS that may only read the one blob
+    Given an object stored on Azure
+    When a module asks for its download URL
+    Then the answer is a blob SAS with read permission and nothing more
+
+  @unit
+  Scenario: Filesystem storage refuses to sign a download URL
+    Given objects stored on the local filesystem
+    When a module asks for a download URL
+    Then it refuses, because no remote reader can reach a local directory
+
+  @unit
+  Scenario: The memory twin answers a deterministic download URL
+    Given the memory object storage
+    When a module asks for a download URL for one project's key
+    Then the same address and expiry answer the same URL, naming the project and the key
+
+  @unit
   Scenario: An incomplete Azure block is refused naming every missing variable
     Given STORED_OBJECTS_BACKEND=azure with no account name, container or key
     When the member is built

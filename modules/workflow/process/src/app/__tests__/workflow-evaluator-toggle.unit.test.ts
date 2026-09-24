@@ -59,7 +59,7 @@ function appWith({
     config: {
       codeBlockTimeoutSeconds: void 0,
       stagingThresholdBytes: void 0,
-      stagingTtlSeconds: void 0,
+      stagingTtlSeconds: 600,
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

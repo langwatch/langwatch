@@ -16,6 +16,7 @@ import {
   SecretsPreflightError,
   UndeclaredSecretError,
 } from "../secrets.errors.ts";
+import { sessionSecret } from "../shared-secrets.ts";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "secrets-"));
 const dotenv = path.join(dir, ".env");
@@ -115,6 +116,37 @@ describe("one credential, declared by two owners", () => {
     expect(failure).toBeInstanceOf(SecretClaimedTwiceError);
     expect((failure as SecretClaimedTwiceError).id).toBe("CREDENTIALS_SECRET");
     expect((failure as SecretClaimedTwiceError).owners).toEqual(["github", "secret"]);
+  });
+
+  /** @scenario "Two owners holding the one shared handle both boot" */
+  it("admits two owners holding the one exported handle", () => {
+    const owners: readonly SecretsOwner[] = [
+      { name: "auth", secrets: { session: sessionSecret } },
+      { name: "automation", secrets: { unsubscribeSigning: sessionSecret } },
+    ];
+
+    expect(() => refuseDoubleClaims(owners)).not.toThrow();
+  });
+
+  /** @scenario "A fresh handle for a shared id still refuses, naming both owners" */
+  it("refuses a fresh handle for a shared id, naming the holder and the newcomer", () => {
+    const owners: readonly SecretsOwner[] = [
+      { name: "auth", secrets: { session: sessionSecret } },
+      { name: "automation", secrets: { signing: sessionSecret } },
+      { name: "rogue", secrets: { session: Secret.load("NEXTAUTH_SECRET", { optional: true }) } },
+    ];
+
+    const failure = (() => {
+      try {
+        refuseDoubleClaims(owners);
+        return undefined;
+      } catch (error: unknown) {
+        return error;
+      }
+    })();
+
+    expect(failure).toBeInstanceOf(SecretClaimedTwiceError);
+    expect(failure).toMatchObject({ id: "NEXTAUTH_SECRET", owners: ["auth", "rogue"] });
   });
 
   it("admits one owner declaring many secrets of its own", () => {

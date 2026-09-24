@@ -3,6 +3,7 @@ export { refuseDoubleClaims, type SecretsOwner } from "./claims.ts";
 export { REDACTED, secretLogRedactPaths } from "./redact.ts";
 export { ScopedSecrets, SecretsResolver } from "./resolver.ts";
 export { Secret, SecretHandle, type SecretSchema } from "./secret.ts";
+export { openAiApiKey, sessionSecret } from "./shared-secrets.ts";
 export {
   AbsentSecretError,
   OnePasswordInProductionError,

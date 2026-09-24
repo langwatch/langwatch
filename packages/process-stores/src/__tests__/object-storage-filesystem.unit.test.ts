@@ -138,6 +138,17 @@ describe("given object storage on the local filesystem", () => {
     });
   });
 
+  describe("when a download URL is asked for", () => {
+    /** @scenario "Filesystem storage refuses to sign a download URL" */
+    it("refuses, since no remote reader can reach the directory", async () => {
+      const backend = filesystemBackend({ root });
+
+      await expect(
+        backend.signDownload(at, { expiresAt: Temporal.Now.instant().add({ seconds: 60 }) }),
+      ).rejects.toMatchObject({ name: "UnsignableDownloadError", locationKind: "file" });
+    });
+  });
+
   describe("when the root refuses writes", () => {
     const runsAsRoot = process.getuid?.() === 0;
 
