@@ -2,6 +2,7 @@ import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/r
 import { defineServerModule } from "@langwatch/kernel";
 
 import { TraceApp } from "./app/trace.app.ts";
+import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { ClickHouseTraceEventPayloadRepository } from "./repositories/clickhouse/trace-event-payload.repository.ts";
 import {
   TraceLegacyReadClickHouseRepository,
@@ -93,4 +94,5 @@ export const traceServer = defineServerModule("trace")
         userId: credential.type === "apiKey" ? credential.userId : null,
       };
     }),
-  ]);
+  ])
+  .withEventing(traceProcessingEventing);

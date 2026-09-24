@@ -14,12 +14,12 @@ import type { TraceSummaryProjectionRepository } from "../repositories/projectio
 export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> {
   private constructor(
     private readonly storage: TraceSummaryProjectionRepository,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   static create(options: {
     storage: TraceSummaryProjectionRepository;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): TraceSummaryStore {
     return new TraceSummaryStore(options.storage, options.defaultRetentionDays);
   }
@@ -31,7 +31,7 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
   async store(state: TraceSummaryData, context: ProjectionStoreContext): Promise<void> {
     if (!hasPersistableSignal(state)) return;
     const stateWithId = state.traceId ? state : { ...state, traceId: String(context.aggregateId) };
-    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays;
+    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays();
     await this.storage.upsert({
       data: stateWithId,
       tenantId: String(context.tenantId),
@@ -55,7 +55,7 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
       .map(({ state, context }) => ({
         data: state.traceId ? state : { ...state, traceId: String(context.aggregateId) },
         tenantId: String(context.tenantId),
-        retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays,
+        retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays(),
       }));
 
     if (batchEntries.length === 0) return;

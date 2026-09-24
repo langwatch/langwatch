@@ -79,10 +79,10 @@ describe("given a payload", () => {
     /** @scenario "An explorer payload the schema refuses never reaches the page" */
     it("is refused by the schema", () => {
       const schema = EXPLORER_ACTIONS["explorer.setTimeRange"].payloadSchema;
-      expect(schema.safeParse({}).success).toBe(false);
-      expect(schema.safeParse({ from: 1 }).success).toBe(false);
-      expect(schema.safeParse({ preset: "7d" }).success).toBe(true);
-      expect(schema.safeParse({ from: 1, to: 2 }).success).toBe(true);
+      expect(schema.validate({})).toBe(false);
+      expect(schema.validate({ from: 1 })).toBe(false);
+      expect(schema.validate({ preset: "7d" })).toBe(true);
+      expect(schema.validate({ from: 1, to: 2 })).toBe(true);
     });
   });
 
@@ -98,7 +98,7 @@ describe("given a payload", () => {
   describe("when explorer.runInstantEval is given one criterion", () => {
     it("is refused, because a judge needs what counts as yes and as no", () => {
       const schema = EXPLORER_ACTIONS["explorer.runInstantEval"].payloadSchema;
-      expect(schema.safeParse({ instructions: "Annoyed?", criteria: ["yes"] }).success).toBe(false);
+      expect(schema.validate({ instructions: "Annoyed?", criteria: ["yes"] })).toBe(false);
     });
   });
 });

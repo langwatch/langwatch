@@ -13,13 +13,14 @@ import {
   type EvaluationRunData,
   type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import type {
   InstantEvalApi,
   InstantEvalEstimateWire,
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -30,6 +31,7 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
+  TraceCapabilityUnavailableError,
   type Protections,
   type TraceEditOverlayPatch,
   TraceIngestionUnavailableError,
@@ -172,6 +174,8 @@ import type { TraceIngestCredentialService } from "../services/trace-ingest-cred
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
+import { TraceProcessingPipelineService } from "../services/trace-processing-pipeline.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
 import type { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
@@ -185,7 +189,11 @@ import type {
 import { buildTraceCollaborators } from "./trace-composition.build.ts";
 import { traceDependencies } from "./trace-composition.types.ts";
 import { composeTraceAppDependencies } from "./trace-read.composition.ts";
-import { type TraceSpanIngest, type TraceLegacyRead } from "./trace.members.ts";
+import {
+  type TraceProcessingPipelineDefinition,
+  type TraceSpanIngest,
+  type TraceLegacyRead,
+} from "./trace.members.ts";
 
 /**
  * The app's KSUID resource for a tracked event (`KSUID_RESOURCES.TRACKED_EVENT`).
@@ -616,20 +624,23 @@ export class TraceApp implements TraceApi, CollectorApp {
   static create(input: TraceAppDependencies | TraceSetup): TraceApp {
     if (!("members" in input)) return new TraceApp(input);
 
+    const commands = TraceProcessingCommandsService.create({
+      processName: input.members.processName,
+    });
     const collaborators = buildTraceCollaborators({
       members: input.members,
       config: {
         processName: input.members.processName,
         fallbackVisibilityDays: TRACE_FALLBACK_VISIBILITY_DAYS,
         publicBaseUrl: input.members.publicBaseUrl,
-        registersProcessingPipeline: input.members.producesPipelines,
       },
+      commands,
       dedup: RedisTraceSpanDedupRepository.create({
         connection: input.members.redis,
         logger: input.members.logger,
       }),
     });
-    return new TraceApp(
+    const app = new TraceApp(
       composeTraceAppDependencies({
         ...collaborators,
         ...input.dependencies,
@@ -653,6 +664,38 @@ export class TraceApp implements TraceApi, CollectorApp {
         },
       }),
     );
+    app.#processingCommands = commands;
+    app.#processing = TraceProcessingPipelineService.create({
+      processName: input.members.processName,
+      peers: input.dependencies,
+      repositories: input.repositories,
+      canonicalisation: collaborators.canonicalisation,
+      commands,
+      findSummary: (lookup) => app.findSummary(lookup),
+      recordTrackedEvent: ({ tenantId, body, eventId }) =>
+        app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
+    });
+    return app;
+  }
+
+  #processing: TraceProcessingPipelineService | null = null;
+  #processingCommands: TraceProcessingCommandsService | null = null;
+
+  /** trace_processing for this process's role: producers send, consumers fold and react. */
+  traceProcessingPipeline(setup: {
+    participation: EventingParticipation;
+  }): TraceProcessingPipelineDefinition {
+    if (!this.#processing) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace_processing pipeline");
+    }
+    return this.#processing.build(setup);
+  }
+
+  /** Binds trace_processing's own senders; every trace write goes through them. */
+  connectTraceProcessingCommands(
+    commands: EventingCommands<TraceProcessingPipelineDefinition>,
+  ): void {
+    this.#processingCommands?.connect(commands);
   }
 
   #contentReader: TraceContentReadService;

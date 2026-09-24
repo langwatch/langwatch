@@ -56,7 +56,7 @@ function storeOver(row: TraceAnalyticsRow): TraceAnalyticsStore {
       return { row, appliedEventIds: ["evt-1", "evt-2"] };
     }
   })();
-  return TraceAnalyticsStore.create({ storage, defaultRetentionDays: 90 });
+  return TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
 }
 
 const context = {
@@ -190,7 +190,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
       it("resumes the classification from the committed row instead of losing it", async () => {
         const { storage, rows } = recordingPort();
         const fold = TraceAnalyticsFoldProjection.create({
-          store: TraceAnalyticsStore.create({ storage, defaultRetentionDays: 90 }),
+          store: TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 }),
           traceCanonicalisation: TraceCanonicalisationService.create(),
           runtime: createTestRuntime(),
         });

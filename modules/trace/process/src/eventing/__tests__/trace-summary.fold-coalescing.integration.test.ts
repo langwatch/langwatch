@@ -55,7 +55,7 @@ describe("trace summary fold coalescing", () => {
 
   beforeEach(() => {
     storage = new MemoryProjection();
-    store = TraceSummaryStore.create({ storage, defaultRetentionDays: 90 });
+    store = TraceSummaryStore.create({ storage, defaultRetentionDays: () => 90 });
   });
 
   describe("given many spans for one trace folded as one coalesced batch", () => {

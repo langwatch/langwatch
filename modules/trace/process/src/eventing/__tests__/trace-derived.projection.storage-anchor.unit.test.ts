@@ -163,7 +163,7 @@ describe("traceAnalytics storage anchor", () => {
             return null;
           }
         })();
-        const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: 90 });
+        const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
 
         await store.store(state, {
           aggregateId: TRACE_ID,

@@ -331,6 +331,8 @@ const isCohereFormat = (msg: Record<string, unknown>): boolean =>
  */
 const ANTHROPIC_BLOCK_TYPES = ["image", "tool_use", "tool_result"] as const;
 
+const typedContentBlockSchema = z.object({ type: z.string() });
+
 /**
  * Checks if a message has Anthropic-specific content blocks
  */
@@ -340,7 +342,7 @@ const hasAnthropicContentBlocks = (msg: Record<string, unknown>): boolean => {
   }
 
   return msg.content.some((block: unknown) => {
-    const parsed = z.object({ type: z.string() }).safeParse(block);
+    const parsed = typedContentBlockSchema.safeParse(block);
     if (!parsed.success) {
       return false;
     }

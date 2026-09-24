@@ -239,7 +239,7 @@ export class TrackedEventSync {
       event_details: event.event_details,
     };
 
-    if (!trackEventRESTParamsValidatorSchema.safeParse(payload).success) {
+    if (!trackEventRESTParamsValidatorSchema.validate(payload)) {
       return false;
     }
 
@@ -247,7 +247,7 @@ export class TrackedEventSync {
       return true;
     }
 
-    return predefinedEventsSchemas.safeParse(payload).success;
+    return predefinedEventsSchemas.validate(payload);
   }
 
   private static toError(error: unknown): Error {

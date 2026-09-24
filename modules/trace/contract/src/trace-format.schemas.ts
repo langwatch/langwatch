@@ -511,24 +511,21 @@ export const langWatchEventSchema = z.object({
 
 export type Event = z.infer<typeof langWatchEventSchema>;
 
-export const elasticSearchEventSchema = langWatchEventSchema
-  .omit({ metrics: true, event_details: true })
-  .and(
+export const elasticSearchEventSchema = z.object({
+  ...langWatchEventSchema.omit({ metrics: true, event_details: true }).shape,
+  metrics: z.array(
     z.object({
-      metrics: z.array(
-        z.object({
-          key: z.string(),
-          value: z.number(),
-        }),
-      ),
-      event_details: z.array(
-        z.object({
-          key: z.string(),
-          value: z.string(),
-        }),
-      ),
+      key: z.string(),
+      value: z.number(),
     }),
-  );
+  ),
+  event_details: z.array(
+    z.object({
+      key: z.string(),
+      value: z.string(),
+    }),
+  ),
+});
 
 export type ElasticSearchEvent = z.infer<typeof elasticSearchEventSchema>;
 
@@ -600,31 +597,28 @@ export const elasticSearchEvaluationSchema = evaluationSchema;
 
 export type ElasticSearchEvaluation = z.infer<typeof elasticSearchEvaluationSchema>;
 
-export const rESTEvaluationSchema = evaluationSchema
-  .omit({
+export const rESTEvaluationSchema = z.object({
+  ...evaluationSchema.omit({
     evaluation_id: true,
     evaluator_id: true,
     status: true,
     timestamps: true,
     retries: true,
-  })
-  .and(
-    z.object({
-      evaluation_id: z.string().optional().nullable(),
-      evaluator_id: z.string().optional().nullable(),
-      status: z
-        .union([z.literal("processed"), z.literal("skipped"), z.literal("error")])
-        .optional()
-        .nullable(),
-      timestamps: z
-        .object({
-          started_at: z.number().optional().nullable(),
-          finished_at: z.number().optional().nullable(),
-        })
-        .optional()
-        .nullable(),
-    }),
-  );
+  }).shape,
+  evaluation_id: z.string().optional().nullable(),
+  evaluator_id: z.string().optional().nullable(),
+  status: z
+    .union([z.literal("processed"), z.literal("skipped"), z.literal("error")])
+    .optional()
+    .nullable(),
+  timestamps: z
+    .object({
+      started_at: z.number().optional().nullable(),
+      finished_at: z.number().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+});
 
 export type RESTEvaluation = z.infer<typeof rESTEvaluationSchema>;
 
@@ -685,16 +679,15 @@ export const traceSchema = z.object({
 
 export type Trace = z.infer<typeof traceSchema>;
 
-export const lLMModeTraceSchema = traceSchema.omit({ timestamps: true, indexing_md5s: true }).and(
-  z.object({
-    timestamps: z.object({
-      started_at: z.string(),
-      inserted_at: z.string(),
-      updated_at: z.string(),
-    }),
-    ascii_tree: z.string(),
+export const lLMModeTraceSchema = z.object({
+  ...traceSchema.omit({ timestamps: true, indexing_md5s: true }).shape,
+  timestamps: z.object({
+    started_at: z.string(),
+    inserted_at: z.string(),
+    updated_at: z.string(),
   }),
-);
+  ascii_tree: z.string(),
+});
 
 export type LLMModeTrace = z.infer<typeof lLMModeTraceSchema>;
 
@@ -744,20 +737,17 @@ export const collectorRESTParamsValidatorSchema = collectorRESTParamsSchema.omit
 
 export type CollectorRESTParamsValidator = z.infer<typeof collectorRESTParamsValidatorSchema>;
 
-export const trackEventRESTParamsValidatorSchema = langWatchEventSchema
-  .omit({
+export const trackEventRESTParamsValidatorSchema = z.object({
+  ...langWatchEventSchema.omit({
     event_id: true,
     project_id: true,
     timestamps: true,
     event_details: true,
-  })
-  .and(
-    z.object({
-      event_id: z.string().optional(), // auto generated unless you want to guarantee idempotency
-      event_details: z.record(z.string(), z.string().nullable()).optional(),
-      timestamp: z.number().optional(), // The timestamp when the event occurred
-    }),
-  );
+  }).shape,
+  event_id: z.string().optional(), // auto generated unless you want to guarantee idempotency
+  event_details: z.record(z.string(), z.string().nullable()).optional(),
+  timestamp: z.number().optional(), // The timestamp when the event occurred
+});
 
 export type TrackEventRESTParamsValidator = z.infer<typeof trackEventRESTParamsValidatorSchema>;
 

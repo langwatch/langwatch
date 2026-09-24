@@ -8,9 +8,12 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FoldProjectionStore } from "@langwatch/eventing";
+import { ExperimentApi } from "@langwatch/experiment-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
@@ -37,9 +40,12 @@ export const traceDependencies = {
   dataRetention: DataRetentionApi,
   plans: EntitlementApi,
   evaluations: EvaluationApi,
+  experiments: ExperimentApi,
+  featureFlags: FeatureFlagApi,
   instantEvals: InstantEvalApi,
   logs: LogApi,
   modelProviders: ModelProviderApi,
+  monitors: MonitorApi,
   presence: PresenceApi,
   projects: ProjectApi,
   share: ShareApi,

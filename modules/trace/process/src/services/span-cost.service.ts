@@ -9,6 +9,8 @@ const numericValueSchema = z.union([
   z.string().trim().min(1).transform(Number).pipe(z.number().finite()),
 ]);
 
+const langWatchTimestampsSchema = z.object({ first_token_at: z.unknown() });
+
 export const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "llm.content.completion.chunk",
@@ -323,7 +325,7 @@ export class SpanCostService {
       }
     }
 
-    const object = z.object({ first_token_at: z.unknown() }).safeParse(parsed);
+    const object = langWatchTimestampsSchema.safeParse(parsed);
     if (!object.success) {
       return null;
     }

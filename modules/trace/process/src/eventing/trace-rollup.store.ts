@@ -11,18 +11,18 @@ import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
 export class TraceAnalyticsRollupStore implements AppendStore<TraceAnalyticsRollupRow> {
   private constructor(
     private readonly storage: TraceAnalyticsRollupRepository,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   static create(options: {
     storage: TraceAnalyticsRollupRepository;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): TraceAnalyticsRollupStore {
     return new TraceAnalyticsRollupStore(options.storage, options.defaultRetentionDays);
   }
 
   async append(record: TraceAnalyticsRollupRow, context: ProjectionStoreContext): Promise<void> {
-    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays;
+    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays();
     await this.storage.insertRow({ row: record, retentionDays });
   }
 }

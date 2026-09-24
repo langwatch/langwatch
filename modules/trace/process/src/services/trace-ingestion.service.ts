@@ -29,6 +29,10 @@ export type SpanIngestionResult = {
 
 export type TraceRequestCollectionResult = {
   rejectedSpans: number;
+  /** The dispatch failures within `rejectedSpans`: transient, so a durable-cursor caller retries. */
+  ingestionFailures: number;
+  /** Only the dispatch failures' messages, without the drop reasons `errorMessage` carries. */
+  ingestionFailureMessage: string;
   errorMessage: string;
 };
 
@@ -56,9 +60,13 @@ class SpanIngestionTally {
     filtered: 0,
   };
   private readonly errors: string[] = [];
+  private readonly failureErrors: string[] = [];
 
   record(result: SpanIngestionResult): void {
     this.counts[result.status]++;
+    if (result.status === "failed" && result.error) {
+      this.failureErrors.push(result.error);
+    }
     if (result.error) {
       this.errors.push(result.error);
     }
@@ -75,6 +83,8 @@ class SpanIngestionTally {
   collectionResult(): TraceRequestCollectionResult {
     return {
       rejectedSpans: this.counts.dropped + this.counts.failed,
+      ingestionFailures: this.counts.failed,
+      ingestionFailureMessage: this.failureErrors.join("; "),
       errorMessage: this.errors.join("; "),
     };
   }

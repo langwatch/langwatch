@@ -37,7 +37,7 @@ function storeWithRecorder() {
     findByTraceId: async () => null,
   };
   return {
-    store: TraceSummaryStore.create({ storage, defaultRetentionDays: 30 }),
+    store: TraceSummaryStore.create({ storage, defaultRetentionDays: () => 30 }),
     upsert,
     upsertBatch,
   };

@@ -69,6 +69,10 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: recordPullRequestUsageRead.");
   }
 
+  contributeSpanFacts(): never {
+    throw new Error("Not used by session group tests: contributeSpanFacts.");
+  }
+
   getSessionEvents(): never {
     throw new Error("Not used by session group tests: getSessionEvents.");
   }

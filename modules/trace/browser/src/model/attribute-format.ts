@@ -26,6 +26,7 @@ export interface InlineDescriptor {
   hint?: string;
 }
 
+const unknownArraySchema = z.array(z.unknown());
 const chatEntrySchema = z.object({ role: z.string(), content: z.unknown() }).passthrough();
 const chatMessageSchema = z
   .object({ role: z.string().optional(), content: z.unknown().optional() })
@@ -108,14 +109,14 @@ export function tryParseJson(s: string): unknown {
 }
 
 function looksLikeChatArray(value: unknown): boolean {
-  const parsed = z.array(z.unknown()).safeParse(value);
+  const parsed = unknownArraySchema.safeParse(value);
   if (!parsed.success || parsed.data.length === 0) {
     return false;
   }
 
   let hits = 0;
   for (const item of parsed.data) {
-    if (chatEntrySchema.safeParse(item).success) {
+    if (chatEntrySchema.validate(item)) {
       hits += 1;
     }
   }
@@ -212,7 +213,7 @@ function extractMessageParts(parts: unknown[], depth: number): string {
       continue;
     }
 
-    const nestedParts = z.array(z.unknown()).safeParse(parsedPart.data.content);
+    const nestedParts = unknownArraySchema.safeParse(parsedPart.data.content);
     if (nestedParts.success) {
       text.push(extractMessageContent(nestedParts.data, depth + 1));
     }
@@ -236,6 +237,6 @@ function extractMessageContent(content: unknown, depth: number): string {
     }
     return content;
   }
-  const parsedParts = z.array(z.unknown()).safeParse(content);
+  const parsedParts = unknownArraySchema.safeParse(content);
   return parsedParts.success ? extractMessageParts(parsedParts.data, depth) : "";
 }

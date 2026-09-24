@@ -29,12 +29,12 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
 export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
   private constructor(
     private readonly storage: TraceAnalyticsProjectionRepository,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   static create(options: {
     storage: TraceAnalyticsProjectionRepository;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): TraceAnalyticsStore {
     return new TraceAnalyticsStore(options.storage, options.defaultRetentionDays);
   }
@@ -80,7 +80,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
         tenantId: String(context.tenantId),
         version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays,
+      retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays(),
       // The executor's redelivery-dedup watermark, persisted next to the row so
       // a retry with a cold cache still recognises a batch it committed.
       appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],

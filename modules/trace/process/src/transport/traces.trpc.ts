@@ -56,6 +56,8 @@ import {
   withoutHiddenResourceAttrs,
 } from "./api-trpc/trace-view-gates.api.ts";
 
+const evaluationsSchema = evaluationSchema.array();
+
 export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
   .procedure("getAllForProject")
   .withPermission("traces:view")
@@ -132,7 +134,7 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     return Object.fromEntries(
       Object.entries(evaluations).map(([traceId, traceEvaluations]) => [
         traceId,
-        evaluationSchema.array().parse(traceEvaluations),
+        evaluationsSchema.parse(traceEvaluations),
       ]),
     );
   })

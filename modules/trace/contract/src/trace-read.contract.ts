@@ -159,7 +159,9 @@ export type TraceLegacyListInput = TraceLegacyFilterInput & {
  */
 export const traceWithGuardrailSchema = z.object({
   ...traceSchema.shape,
-  lastGuardrail: evaluationResultSchema.and(z.object({ name: z.string().optional() })).optional(),
+  lastGuardrail: z
+    .object({ ...evaluationResultSchema.shape, name: z.string().optional() })
+    .optional(),
   annotations: z.object({ hasAnnotation: z.boolean(), count: z.number() }).optional(),
 });
 

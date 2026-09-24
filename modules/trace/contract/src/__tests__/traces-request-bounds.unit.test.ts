@@ -30,14 +30,14 @@ describe("traces request-bound schemas", () => {
 
     it("refuses a page size above the enterprise ceiling", () => {
       expect(
-        traceFilterInputSchema.safeParse({ ...filter, pageSize: ENTERPRISE_PAGE_SIZE + 1 }).success,
+        traceFilterInputSchema.validate({ ...filter, pageSize: ENTERPRISE_PAGE_SIZE + 1 }),
       ).toBe(false);
     });
 
     it("accepts a page size at the enterprise ceiling", () => {
-      expect(
-        traceFilterInputSchema.safeParse({ ...filter, pageSize: ENTERPRISE_PAGE_SIZE }).success,
-      ).toBe(true);
+      expect(traceFilterInputSchema.validate({ ...filter, pageSize: ENTERPRISE_PAGE_SIZE })).toBe(
+        true,
+      );
     });
   });
 
@@ -46,21 +46,15 @@ describe("traces request-bound schemas", () => {
     (procedure) => {
       const input = inputOf(procedure);
 
-      expect(input.safeParse({ projectId: "p1", traceIds: ids(ENTERPRISE_IDS + 1) }).success).toBe(
-        false,
-      );
-      expect(input.safeParse({ projectId: "p1", traceIds: ids(ENTERPRISE_IDS) }).success).toBe(
-        true,
-      );
+      expect(input.validate({ projectId: "p1", traceIds: ids(ENTERPRISE_IDS + 1) })).toBe(false);
+      expect(input.validate({ projectId: "p1", traceIds: ids(ENTERPRISE_IDS) })).toBe(true);
     },
   );
 
   it("refuses getTracesWithSpansByThreadIds threadIds above the enterprise ceiling", () => {
     const input = inputOf("getTracesWithSpansByThreadIds");
 
-    expect(input.safeParse({ projectId: "p1", threadIds: ids(ENTERPRISE_IDS + 1) }).success).toBe(
-      false,
-    );
-    expect(input.safeParse({ projectId: "p1", threadIds: ids(ENTERPRISE_IDS) }).success).toBe(true);
+    expect(input.validate({ projectId: "p1", threadIds: ids(ENTERPRISE_IDS + 1) })).toBe(false);
+    expect(input.validate({ projectId: "p1", threadIds: ids(ENTERPRISE_IDS) })).toBe(true);
   });
 });

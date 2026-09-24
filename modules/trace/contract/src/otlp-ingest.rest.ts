@@ -37,6 +37,9 @@ export type OtlpIngestCredential = Readonly<{
 
 export type OtlpTraceCollectionResult = Readonly<{
   rejectedSpans?: number;
+  /** Spans that failed to dispatch (queue outage) — transient, unlike drops. */
+  ingestionFailures?: number;
+  ingestionFailureMessage?: string;
   errorMessage?: string;
 }>;
 

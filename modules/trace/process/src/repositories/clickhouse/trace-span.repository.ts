@@ -1,10 +1,12 @@
 import { EventUtils } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
-import type {
-  EvaluationTraceEvent,
-  EvaluationTraceReadInput,
-  EvaluationTraceSpan,
-  SpanTreeCursor,
+import {
+  evaluationTraceEventSchema,
+  evaluationTraceSpanSchema,
+  type EvaluationTraceEvent,
+  type EvaluationTraceReadInput,
+  type EvaluationTraceSpan,
+  type SpanTreeCursor,
 } from "@langwatch/trace-contract";
 
 import type { TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
@@ -16,6 +18,8 @@ import {
 } from "../trace-projected-read.repository.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";
+const evaluationTraceSpansSchema = evaluationTraceSpanSchema.array();
+const evaluationTraceEventsSchema = evaluationTraceEventSchema.array();
 const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
@@ -155,7 +159,9 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         traceId: input.traceId,
       });
     }
-    return rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationSpan(row));
+    return evaluationTraceSpansSchema.parse(
+      rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationSpan(row)),
+    );
   }
 
   async findEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]> {
@@ -208,7 +214,9 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         traceId: input.traceId,
       });
     }
-    return rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationEvent(row));
+    return evaluationTraceEventsSchema.parse(
+      rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationEvent(row)),
+    );
   }
 
   async findIngestLag(input: { tenantId: string }): Promise<TraceIngestLagSample | null> {

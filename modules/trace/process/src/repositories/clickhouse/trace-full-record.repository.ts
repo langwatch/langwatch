@@ -2,6 +2,7 @@ import { EventUtils } from "@langwatch/eventing";
 import {
   EVENTREF_ATTR_PREFIX,
   TraceNotFoundError,
+  traceFullRecordSchema,
   type NormalizedSpan,
   type TraceFullRecord,
   type TraceFullReadInput,
@@ -117,7 +118,9 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       ...(events.length > 0 ? { events } : {}),
       ...(droppedCategories.length > 0 ? { privacy: { droppedCategories } } : {}),
     };
-    return TraceFullProtectionMapper.apply(record, internalTraceFullReadProtections);
+    return traceFullRecordSchema.parse(
+      TraceFullProtectionMapper.apply(record, internalTraceFullReadProtections),
+    );
   }
 
   async getThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {

@@ -53,24 +53,24 @@ function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData
 export class SpanStorageStore implements AppendStore<NormalizedSpan> {
   private constructor(
     private readonly storage: TraceSpanStorageRepository,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   static create(options: {
     storage: TraceSpanStorageRepository;
-    defaultRetentionDays: number;
+    defaultRetentionDays: () => number;
   }): SpanStorageStore {
     return new SpanStorageStore(options.storage, options.defaultRetentionDays);
   }
 
   async append(record: NormalizedSpan, context: ProjectionStoreContext): Promise<void> {
-    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays;
+    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays();
     await this.storage.insertSpan(toAppLayer(record, retentionDays));
   }
 
   async bulkAppend(records: NormalizedSpan[], context: BulkAppendContext): Promise<void> {
     if (records.length === 0) return;
-    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays;
+    const retentionDays = context.retentionPolicy?.traces ?? this.defaultRetentionDays();
     await this.storage.insertSpans(records.map((record) => toAppLayer(record, retentionDays)));
   }
 }

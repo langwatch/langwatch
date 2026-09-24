@@ -1,20 +1,15 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
 import {
-  spanTreeDeltaInputSchema,
   spanTreeInputSchema,
   spanTreeNodeSchema,
   spanTreePageSchema,
-  evaluationTraceEventSchema,
   evaluationTraceReadInputSchema,
-  evaluationTraceSpanSchema,
   traceIngestWaitInputSchema,
   traceByIdInputSchema,
   traceDerivedEventsInputSchema,
   traceFullReadInputSchema,
-  traceFullRecordSchema,
   traceFullThreadReadInputSchema,
-  traceRecordSchema,
   traceQueryClassificationInputSchema,
   traceQueryClassificationSchema,
   traceQueryFieldCatalogueInputSchema,
@@ -52,6 +47,8 @@ import {
 import type { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import { TraceQueryFieldCatalogueService } from "./trace-query-field-catalogue.service.ts";
+
+const spanTreeNodesSchema = spanTreeNodeSchema.array();
 
 type TraceComposition = {
   repository: TraceProjectedReadRepository;
@@ -92,22 +89,20 @@ export class TraceService {
 
   async getById(input: TraceByIdInput): Promise<TraceRecord> {
     const parsed = traceByIdInputSchema.parse(input);
-    const trace = await this.composition.records.getById(parsed);
 
-    return traceRecordSchema.parse(trace);
+    return this.composition.records.getById(parsed);
   }
 
   async getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
     const parsed = traceFullReadInputSchema.parse(input);
 
-    return traceFullRecordSchema.parse(await this.composition.fullRecords.get(parsed));
+    return this.composition.fullRecords.get(parsed);
   }
 
   async getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
     const parsed = traceFullThreadReadInputSchema.parse(input);
-    const records = await this.composition.fullRecords.getThread(parsed);
 
-    return traceFullRecordSchema.array().parse(records);
+    return this.composition.fullRecords.getThread(parsed);
   }
 
   async deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {
@@ -118,16 +113,14 @@ export class TraceService {
 
   async getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]> {
     const parsed = evaluationTraceReadInputSchema.parse(input);
-    const spans = await this.composition.repository.findEvaluationSpans(parsed);
 
-    return evaluationTraceSpanSchema.array().parse(spans);
+    return this.composition.repository.findEvaluationSpans(parsed);
   }
 
   async getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]> {
     const parsed = evaluationTraceReadInputSchema.parse(input);
-    const events = await this.composition.repository.findEvaluationEvents(parsed);
 
-    return evaluationTraceEventSchema.array().parse(events);
+    return this.composition.repository.findEvaluationEvents(parsed);
   }
 
   async getSpanTreePage(input: SpanTreeInput): Promise<SpanTreePage> {
@@ -157,17 +150,16 @@ export class TraceService {
   }
 
   async getSpanTreeDelta(input: SpanTreeDeltaInput): Promise<SpanTreeNode[]> {
-    const parsed = spanTreeDeltaInputSchema.parse(input);
     const rows = await this.composition.repository.findSummarySince({
-      tenantId: parsed.projectId,
-      traceId: parsed.traceId,
-      sinceUpdatedAtMs: parsed.sinceUpdatedAtMs,
+      tenantId: input.projectId,
+      traceId: input.traceId,
+      sinceUpdatedAtMs: input.sinceUpdatedAtMs,
     });
 
-    return spanTreeNodeSchema.array().parse(
+    return spanTreeNodesSchema.parse(
       gateCosts(
         rows.map((row) => this.price(row)),
-        parsed.canSeeCosts,
+        input.canSeeCosts,
       ),
     );
   }

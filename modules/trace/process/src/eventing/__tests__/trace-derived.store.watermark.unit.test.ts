@@ -63,7 +63,7 @@ describe("TraceAnalyticsStore — redelivery watermark", () => {
     /** @scenario the redelivery watermark survives the write path */
     it("persists the applied-event-id watermark next to the row", async () => {
       const { storage, written } = recordingPort();
-      const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: 90 });
+      const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
 
       await store.store(signalState(), context(["evt-1", "evt-2"]));
 
@@ -74,7 +74,7 @@ describe("TraceAnalyticsStore — redelivery watermark", () => {
     /** @scenario the watermark round-trips through the read-back */
     it("reads the same watermark back with the state", async () => {
       const { storage } = recordingPort();
-      const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: 90 });
+      const store = TraceAnalyticsStore.create({ storage, defaultRetentionDays: () => 90 });
       await store.store(signalState(), context(["evt-1"]));
 
       const back = await store.getWithApplied(TRACE_ID, context());

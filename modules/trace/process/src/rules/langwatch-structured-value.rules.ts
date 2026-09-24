@@ -12,7 +12,7 @@ const messageRoleSchema = z.looseObject({
 export type LangWatchStructuredValue = z.infer<typeof structuredValueSchema>;
 
 export const isLangWatchStructuredValue = (value: unknown): value is LangWatchStructuredValue =>
-  structuredValueSchema.safeParse(value).success;
+  structuredValueSchema.validate(value);
 
 export function safeStringify(value: unknown): string {
   try {
