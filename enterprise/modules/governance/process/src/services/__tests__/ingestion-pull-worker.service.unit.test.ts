@@ -4,6 +4,7 @@ import type {
   PulledUsageObservedEventData,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
+import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
 import type {
   InternalProject,
   InternalProjectQuery,
@@ -196,6 +197,9 @@ function worker(input: {
     usageRecords: PulledUsageRecordService.create(
       PulledUsagePricingService.create(new FakeRates()),
     ),
+    suppression: { loadForProvider: async () => NO_SUPPRESSION },
+    discovery: { recordFromPulledEvents: async () => ({ discovered: 0 }) },
+    identityMatch: { runFor: async () => undefined },
     diagnostics,
     traceIngestion: input.traceIngestion,
     configuration: IngestionPullWorkerConfiguration.create({

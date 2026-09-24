@@ -645,7 +645,11 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   /** Main's boot reconciliation (`pipelineSet.ts:132-150`): every source's schedule sent to its pull process. */
-  reconcileIngestionPulls(): Promise<{ reconciled: number; failed: number }> {
+  reconcileIngestionPulls({
+    findPullProcessKeys,
+  }: {
+    findPullProcessKeys: (input: { projectIds: string[] }) => Promise<string[]>;
+  }): Promise<{ reconciled: number; failed: number }> {
     const { projects } = this.dependencies;
     return IngestionPullLifecycleService.create({
       repository: this.repositories.ingestionPullLifecycle,
@@ -663,7 +667,7 @@ export class GovernanceApp implements GovernanceRestApi {
         configure: (input) => this.ingestionPullSender("configure").send(input),
         disable: (input) => this.ingestionPullSender("disable").send(input),
       },
-    }).reconcile();
+    }).reconcile({ findPullProcessKeys });
   }
 
   connectPulledUsage(commands: EventingSenders): void {
@@ -713,6 +717,15 @@ export class GovernanceApp implements GovernanceRestApi {
       usageRecords: PulledUsageRecordService.create(
         PulledUsagePricingService.create({ rate: ratePulledUsage }),
       ),
+      suppression: this.erasureSuppression,
+      discovery: PersonDiscoveryService.create({ people: this.repositories.discoveredPeople }),
+      // Main `presets.ts:1566-1576`: proof before guesses, the order the engine spec fixes.
+      identityMatch: {
+        runFor: async ({ organizationId }) => {
+          await this.identityMatches.linkProvenMatches({ organizationId });
+          await this.identityMatchSuggestions.recompute({ organizationId });
+        },
+      },
       diagnostics,
       traceIngestion: {
         ingest: async ({ projectId, request }) => {

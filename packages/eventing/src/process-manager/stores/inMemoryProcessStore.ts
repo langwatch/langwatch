@@ -296,6 +296,20 @@ export class InMemoryProcessStore implements ProcessStore {
     return { applied: true };
   }
 
+  async findProcessKeys(params: {
+    processName: string;
+    projectIds: readonly string[];
+  }): Promise<string[]> {
+    const projectIds = new Set(params.projectIds);
+    const keys: string[] = [];
+    for (const instance of this.instances.values()) {
+      if (instance.ref.processName !== params.processName) continue;
+      if (!projectIds.has(instance.ref.projectId)) continue;
+      keys.push(instance.ref.processKey);
+    }
+    return keys;
+  }
+
   async findDueWakes(params: {
     now: number;
     limit: number;

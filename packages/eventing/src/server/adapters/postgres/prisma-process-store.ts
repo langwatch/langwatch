@@ -592,6 +592,18 @@ export class PrismaProcessStore implements ProcessStore {
     return { applied: result.count === 1 };
   }
 
+  async findProcessKeys(params: {
+    processName: string;
+    projectIds: readonly string[];
+  }): Promise<string[]> {
+    if (params.projectIds.length === 0) return [];
+    const rows = await this.#prisma.processManagerInstance.findMany({
+      where: { processName: params.processName, projectId: { in: [...params.projectIds] } },
+      select: { processKey: true },
+    });
+    return rows.map(({ processKey }) => processKey);
+  }
+
   async findDueWakes(params: {
     now: number;
     limit: number;

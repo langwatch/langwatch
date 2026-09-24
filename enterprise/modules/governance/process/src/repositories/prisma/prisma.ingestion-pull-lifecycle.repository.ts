@@ -6,8 +6,6 @@ import {
   type IngestionPullLifecycleSource,
 } from "../ingestion-pull-lifecycle.repository.ts";
 
-const INGESTION_PULL_PROCESS_NAME = "ingestionPull";
-
 export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecycleRepository {
   private constructor(private readonly database: IngestionPullLifecycleDatabase) {
     super();
@@ -18,28 +16,12 @@ export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecyc
   }
 
   async findForReconciliation({
-    governanceProjectIds,
+    processKeys,
   }: {
-    governanceProjectIds: string[];
+    processKeys: string[];
   }): Promise<IngestionPullLifecycleSource[]> {
-    const processes =
-      governanceProjectIds.length === 0
-        ? []
-        : await this.database.processManagerInstance.findMany({
-            where: {
-              processName: INGESTION_PULL_PROCESS_NAME,
-              projectId: { in: governanceProjectIds },
-            },
-            select: { processKey: true },
-          });
-
     const sources = await this.database.ingestionSource.findMany({
-      where: {
-        OR: [
-          { pullSchedule: { not: null } },
-          { id: { in: processes.map(({ processKey }) => processKey) } },
-        ],
-      },
+      where: { OR: [{ pullSchedule: { not: null } }, { id: { in: processKeys } }] },
     });
     return sources.map((source) => ({
       ...source,

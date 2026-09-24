@@ -641,6 +641,19 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     expect(wakes).toEqual([{ ref: selected, revision: 1, wakeAt: 1_500 }]);
   });
 
+  it("lists one process's instance keys across the named projects only", async () => {
+    await store.commit(commit({ target: ref("in-one", "project-1"), messages: [] }));
+    await store.commit(commit({ target: ref("in-two", "project-2"), messages: [] }));
+    await store.commit(
+      commit({ target: { ...ref("other-name"), processName: `${processName}-other` }, messages: [] }),
+    );
+
+    const keys = await store.findProcessKeys({ processName, projectIds: ["project-1", "project-2"] });
+    expect(keys.toSorted()).toEqual(["in-one", "in-two"]);
+    expect(await store.findProcessKeys({ processName, projectIds: ["project-2"] })).toEqual(["in-two"]);
+    expect(await store.findProcessKeys({ processName, projectIds: [] })).toEqual([]);
+  });
+
   it("isolates identical process and message keys by project", async () => {
     const projectOne = ref("same-conversation", "project-1");
     const projectTwo = ref("same-conversation", "project-2");

@@ -88,11 +88,16 @@ export class IngestionPullLifecycleService {
     });
   }
 
-  async reconcile(): Promise<{ reconciled: number; failed: number }> {
-    const governanceProjectIds = await this.projects.findInternalIds({
+  async reconcile({
+    findPullProcessKeys,
+  }: {
+    findPullProcessKeys: (input: { projectIds: string[] }) => Promise<string[]>;
+  }): Promise<{ reconciled: number; failed: number }> {
+    const projectIds = await this.projects.findInternalIds({
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
     });
-    const sources = await this.repository.findForReconciliation({ governanceProjectIds });
+    const processKeys = projectIds.length === 0 ? [] : await findPullProcessKeys({ projectIds });
+    const sources = await this.repository.findForReconciliation({ processKeys });
     let reconciled = 0;
     let failed = 0;
 

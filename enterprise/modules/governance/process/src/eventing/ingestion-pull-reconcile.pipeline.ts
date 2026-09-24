@@ -12,6 +12,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { GovernanceApp } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
+import { INGESTION_PULL_PROCESS_NAME } from "./ingestion-pull.process.ts";
 import {
   INGESTION_PULL_RECONCILE_PROCESS_NAME,
   runIngestionPullReconcile,
@@ -48,7 +49,11 @@ export function buildIngestionPullReconcile({
           "reconcile",
           ingestionPullReconcileSchema,
           runIngestionPullReconcile({
-            reconcile: () => app.reconcileIngestionPulls(),
+            reconcile: () =>
+              app.reconcileIngestionPulls({
+                findPullProcessKeys: ({ projectIds }) =>
+                  processStore.findProcessKeys({ processName: INGESTION_PULL_PROCESS_NAME, projectIds }),
+              }),
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
             now: () => nowInstant().epochMilliseconds,
           }),

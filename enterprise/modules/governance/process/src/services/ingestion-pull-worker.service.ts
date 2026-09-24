@@ -7,6 +7,7 @@ import { PROJECT_KIND } from "@langwatch/project-contract";
 import { Temporal, toEpochMs } from "@langwatch/time";
 
 import type {
+  DiscoveredPeopleMatcher,
   GovernanceProjectDirectory,
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSink,
@@ -26,8 +27,11 @@ import { COPILOT_ROUTING_PROFILE } from "../rules/copilot-studio-trace-mapper-se
 import * as CopilotStudioTraceMapperService from "../rules/copilot-studio-trace-mapper-service.rules.ts";
 import { GENIE_ROUTING_PROFILE } from "../rules/genie-trace-mapper-service.rules.ts";
 import * as GenieTraceMapperService from "../rules/genie-trace-mapper-service.rules.ts";
+import { partitionSuppressedEvents } from "../rules/erasure-suppression.rules.ts";
 import { pullReadThrough } from "../rules/pull-read-through.rules.ts";
+import type { ErasureSuppressionService } from "./erasure-suppression.service.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
+import type { PersonDiscoveryService } from "./person-discovery.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
 import type { PullerRegistryService } from "./puller-registry.service.ts";
 
@@ -82,6 +86,9 @@ export class IngestionPullWorkerService {
   private readonly sink: GovernanceOcsfEventSink;
   private readonly usageEntitlement: PulledUsageEntitlements;
   private readonly usageRecords: PulledUsageRecordService;
+  private readonly suppression: Pick<ErasureSuppressionService, "loadForProvider">;
+  private readonly discovery: Pick<PersonDiscoveryService, "recordFromPulledEvents">;
+  private readonly identityMatch: DiscoveredPeopleMatcher;
   private readonly diagnostics: IngestionPullDiagnosticsSink;
   private readonly traceIngestion: GovernanceTraceIngestionClient | undefined;
   private readonly configuration: IngestionPullWorkerConfiguration;
@@ -95,6 +102,9 @@ export class IngestionPullWorkerService {
     sink,
     usageEntitlement,
     usageRecords,
+    suppression,
+    discovery,
+    identityMatch,
     diagnostics,
     traceIngestion,
     configuration,
@@ -107,6 +117,9 @@ export class IngestionPullWorkerService {
     sink: GovernanceOcsfEventSink;
     usageEntitlement: PulledUsageEntitlements;
     usageRecords: PulledUsageRecordService;
+    suppression: Pick<ErasureSuppressionService, "loadForProvider">;
+    discovery: Pick<PersonDiscoveryService, "recordFromPulledEvents">;
+    identityMatch: DiscoveredPeopleMatcher;
     diagnostics: IngestionPullDiagnosticsSink;
     traceIngestion: GovernanceTraceIngestionClient | undefined;
     configuration: IngestionPullWorkerConfiguration;
@@ -119,6 +132,9 @@ export class IngestionPullWorkerService {
     this.sink = sink;
     this.usageEntitlement = usageEntitlement;
     this.usageRecords = usageRecords;
+    this.suppression = suppression;
+    this.discovery = discovery;
+    this.identityMatch = identityMatch;
     this.diagnostics = diagnostics;
     this.traceIngestion = traceIngestion;
     this.configuration = configuration;
@@ -133,6 +149,9 @@ export class IngestionPullWorkerService {
     sink: GovernanceOcsfEventSink;
     usageEntitlement: PulledUsageEntitlements;
     usageRecords: PulledUsageRecordService;
+    suppression: Pick<ErasureSuppressionService, "loadForProvider">;
+    discovery: Pick<PersonDiscoveryService, "recordFromPulledEvents">;
+    identityMatch: DiscoveredPeopleMatcher;
     diagnostics: IngestionPullDiagnosticsSink;
     traceIngestion?: GovernanceTraceIngestionClient;
     configuration?: IngestionPullWorkerConfiguration;
@@ -146,6 +165,9 @@ export class IngestionPullWorkerService {
       sink: options.sink,
       usageEntitlement: options.usageEntitlement,
       usageRecords: options.usageRecords,
+      suppression: options.suppression,
+      discovery: options.discovery,
+      identityMatch: options.identityMatch,
       diagnostics: options.diagnostics,
       traceIngestion: options.traceIngestion,
       configuration: options.configuration ?? IngestionPullWorkerConfiguration.create(),
@@ -240,12 +262,11 @@ export class IngestionPullWorkerService {
     }
 
     if (result.events.length > 0) {
-      await this.writeEvents({
+      await this.writePulledEvents({
         events: result.events,
         source,
         pulledUsage: input.pulledUsage,
       });
-      await this.routeConversations({ events: result.events, source });
     }
 
     const readThrough = pullReadThrough({ result, nowMs: this.now() });
@@ -257,6 +278,67 @@ export class IngestionPullWorkerService {
       ...(result.unreadPage === true ? { unreadPage: true as const } : {}),
       readThroughAt: readThrough.outcome === "read-through" ? readThrough.at : null,
     };
+  }
+
+  /** Main `pullerWorker.ts:562-667`: suppressed actors are never written, discovered or routed. */
+  private async writePulledEvents(input: {
+    events: NormalizedPullEvent[];
+    source: GovernanceIngestionSource;
+    pulledUsage?: PulledUsageDispatcher;
+  }): Promise<void> {
+    const { source } = input;
+    const suppression = await this.suppression.loadForProvider({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+    });
+    const { kept, suppressedCount } = partitionSuppressedEvents({
+      events: input.events,
+      actorOf: (event) => event.actor,
+      suppression,
+    });
+    await this.writeEvents({ events: kept, source, pulledUsage: input.pulledUsage });
+    if (suppressedCount > 0) {
+      this.diagnostics.info("skipped pulled events naming an erased identifier", {
+        ingestionSourceId: source.id,
+        suppressedCount,
+      });
+    }
+    const { discovered } = await this.syncPeopleFactsFromPull({ source, events: kept });
+    await this.routeConversations({ events: kept, source });
+    if (discovered > 0) {
+      try {
+        await this.identityMatch.runFor({ organizationId: source.organizationId });
+      } catch (error) {
+        this.diagnostics.error(
+          "identity match pass failed; the discovered people are kept and the next pull retries",
+          { ingestionSourceId: source.id, error: toErrorMessage(error) },
+        );
+      }
+    }
+  }
+
+  /** Main `pullerWorker.ts:740-776`; `events` is the post-partition list (ADR-128 §9 step 1). */
+  private async syncPeopleFactsFromPull({
+    source,
+    events,
+  }: {
+    source: GovernanceIngestionSource;
+    events: NormalizedPullEvent[];
+  }): Promise<{ discovered: number }> {
+    let discovered = 0;
+    try {
+      ({ discovered } = await this.discovery.recordFromPulledEvents({
+        organizationId: source.organizationId,
+        provider: source.sourceType,
+        events,
+      }));
+    } catch (error) {
+      this.diagnostics.error(
+        "could not record discovered people; the pulled events are still delivered",
+        { ingestionSourceId: source.id, error: toErrorMessage(error) },
+      );
+    }
+    return { discovered };
   }
 
   private async routeConversations(input: {
@@ -466,4 +548,8 @@ export class IngestionPullWorkerService {
       rawOcsfJson,
     };
   }
+}
+
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

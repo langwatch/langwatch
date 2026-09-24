@@ -34,6 +34,7 @@ function makeStubStore(overrides: Partial<ProcessStore> = {}): ProcessStore {
     recordFailedAttempt: async () => undefined,
     releaseLease: async () => ({ applied: true }),
     findDueWakes: async () => [],
+    findProcessKeys: async () => [],
     requeueDeadMessages: async () => 0,
     deleteDispatchedBefore: async () => 0,
     deleteDispatchedOutboxBatch: async () => 0,

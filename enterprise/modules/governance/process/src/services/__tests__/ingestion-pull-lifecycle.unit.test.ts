@@ -35,11 +35,11 @@ class MemoryLifecycleRepository extends IngestionPullLifecycleRepository {
   readonly askedFor: string[][] = [];
 
   async findForReconciliation({
-    governanceProjectIds,
+    processKeys,
   }: {
-    governanceProjectIds: string[];
+    processKeys: string[];
   }): Promise<IngestionPullLifecycleSource[]> {
-    this.askedFor.push(governanceProjectIds);
+    this.askedFor.push(processKeys);
     return this.sources;
   }
 }
@@ -123,7 +123,7 @@ describe("IngestionPullLifecycleService", () => {
       diagnostics,
     });
 
-    await expect(service.reconcile()).resolves.toEqual({
+    await expect(service.reconcile({ findPullProcessKeys: async () => [] })).resolves.toEqual({
       reconciled: 1,
       failed: 1,
     });
@@ -141,9 +141,27 @@ describe("IngestionPullLifecycleService", () => {
       tenant: new FixedTenant(),
       commands: new RecordingCommand(),
     });
+    const findPullProcessKeys = vi.fn(async () => ["source-with-removed-schedule"]);
 
-    await service.reconcile();
+    await service.reconcile({ findPullProcessKeys });
 
-    expect(repository.askedFor).toEqual([["gov-1"]]);
+    expect(findPullProcessKeys).toHaveBeenCalledWith({ projectIds: ["gov-1"] });
+    expect(repository.askedFor).toEqual([["source-with-removed-schedule"]]);
+  });
+
+  it("asks for no process keys when no Governance project exists", async () => {
+    const repository = new MemoryLifecycleRepository([]);
+    const service = IngestionPullLifecycleService.create({
+      repository,
+      projects: createApiFixture<ProjectApi>({ findInternalIds: async () => [] }),
+      tenant: new FixedTenant(),
+      commands: new RecordingCommand(),
+    });
+    const findPullProcessKeys = vi.fn(async () => []);
+
+    await service.reconcile({ findPullProcessKeys });
+
+    expect(findPullProcessKeys).not.toHaveBeenCalled();
+    expect(repository.askedFor).toEqual([[]]);
   });
 });

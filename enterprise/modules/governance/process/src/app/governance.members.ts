@@ -448,6 +448,11 @@ export interface PulledUsageEntitlements {
   isEnabled(organizationId: string): Promise<boolean>;
 }
 
+/** ADR-128 §12: the discovery feed's trigger for the identity match engine (main `pullerWorker.ts:156`). */
+export interface DiscoveredPeopleMatcher {
+  runFor(input: { organizationId: string }): Promise<void>;
+}
+
 export interface IngestionPullDiagnosticsSink {
   info(message: string, context: Record<string, unknown>): void;
   warn(message: string, context: Record<string, unknown>): void;

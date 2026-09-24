@@ -4,6 +4,7 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 
+import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
 import type {
   GovernanceEncryptor,
   GovernanceHttpClient,
@@ -187,6 +188,9 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
     sink: new TestSink(doubles.insertEvent),
     usageEntitlement: new TestEntitlement(doubles.usageEnabled),
     usageRecords: PulledUsageRecordService.create(pricing),
+    suppression: { loadForProvider: async () => NO_SUPPRESSION },
+    discovery: { recordFromPulledEvents: async () => ({ discovered: 0 }) },
+    identityMatch: { runFor: async () => undefined },
     diagnostics,
   });
 }

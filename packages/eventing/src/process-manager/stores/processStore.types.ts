@@ -213,6 +213,9 @@ export interface ProcessStore {
     now: number;
   }): Promise<{ applied: boolean }>;
 
+  /** Every instance key of one process across the named projects; empty when none exist. */
+  findProcessKeys(params: { processName: string; projectIds: readonly string[] }): Promise<string[]>;
+
   /** Processes whose nextWakeAt is due, with the revision to guard against staleness. */
   findDueWakes(params: {
     now: number;

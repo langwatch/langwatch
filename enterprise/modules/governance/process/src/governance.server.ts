@@ -32,28 +32,16 @@ import {
 import { GovernanceApp } from "./app/governance.app.ts";
 import type {
   GovernanceDiagnosticsSink,
-  GovernanceEncryptor,
-  GovernanceHttpClient,
-  GovernanceObjectStore,
-  GovernanceOcsfEventSink,
-  GovernanceProjectDirectory,
   GovernanceSignalChannel,
-  IngestionPullDiagnosticsSink,
   IngestionPullLifecycleChannel,
   IngestionPullMetricsSink,
   IngestionPullOutcomeChannel,
   IngestionPullRunner,
   IngestionPullSourceReader,
   IngestionPullTenantResolver,
-  PulledUsageEntitlements,
-  PulledUsageRateReader,
   AnomalyAlertHttpClient,
   AnomalySpendReader,
 } from "./app/governance.members.ts";
-import { ClaudeComplianceReferencePullerAdapter } from "./channels/http/http.claude-compliance.channel.ts";
-import { HttpCopilotStudioDataverseChannel } from "./channels/http/http.copilot-studio-dataverse.channel.ts";
-import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.channel.ts";
-import { HttpPollingPullerAdapter } from "./channels/http/http.polling.channel.ts";
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
 import { governanceEventsEventing } from "./eventing/governance-events.pipeline.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
@@ -82,27 +70,16 @@ import {
 } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 import type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
 import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
-import { AnthropicAdminPullerAdapter } from "./services/anthropic-admin-puller.service.ts";
-import { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service.ts";
-import { DatabricksGeniePullerService } from "./services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "./services/department.service.ts";
 import {
   GovernanceEventsAdapter,
   type GovernanceEventsPipelineDeps,
 } from "./services/governance-events.service.ts";
 import { GovernanceSignalService } from "./services/governance-signal.service.ts";
-import { IngestionCredentialsService } from "./services/ingestion-credentials.service.ts";
 import { IngestionPullEventingAdapter } from "./services/ingestion-pull-eventing.service.ts";
 import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
-import { IngestionPullWorkerService } from "./services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
-import { OpenAiAdminPullerAdapter } from "./services/openai-admin-puller.service.ts";
-import { OpenAiComplianceReferencePullerService } from "./services/openai-compliance-puller.service.ts";
 import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
-import { PulledUsagePricingService } from "./services/pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "./services/pulled-usage-record.service.ts";
-import { PullerRegistryService } from "./services/puller-registry.service.ts";
-import { S3PollingPullerService } from "./services/s3-puller.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 import {
   governanceRest,
@@ -141,66 +118,6 @@ export const governanceServer = defineServerModule("governance")
   .withEventing(pulledUsageEventing)
   .withEventing(ingestionPullEventing)
   .withEventing(ingestionPullReconcileEventing);
-
-/** The substrates one ingestion-pull worker installation is built over. */
-export type IngestionPullWorkerSubstrates = Readonly<{
-  /** The sources this installation pulls. */
-  sources: IngestionPullSourceReader;
-  /** Where a pulled tenant's internal governance project is resolved. */
-  projects: GovernanceProjectDirectory;
-  /** The egress-guarded HTTP client every polling puller reaches through. */
-  http: GovernanceHttpClient;
-  /** The object store the file-drop pullers list and read. */
-  objects: GovernanceObjectStore;
-  /** Where a normalized pull event is written as an OCSF fact. */
-  sink: GovernanceOcsfEventSink;
-  /** How a stored source credential is sealed and opened. */
-  encryptor: GovernanceEncryptor;
-  /** Whether this organization's pulled usage carries a cost. */
-  usageEntitlement: PulledUsageEntitlements;
-  /** The rate one pulled usage record is priced at. */
-  usageRate: PulledUsageRateReader;
-  /** Where a run's progress and its failures are reported. */
-  diagnostics: IngestionPullDiagnosticsSink;
-}>;
-
-/** Every built-in puller, registered on one registry in a fixed order. */
-function builtInPullers(
-  substrates: Pick<IngestionPullWorkerSubstrates, "http" | "objects" | "diagnostics">,
-): PullerRegistryService {
-  const { http, objects, diagnostics } = substrates;
-  const pullers = PullerRegistryService.create();
-
-  pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
-  pullers.register(S3PollingPullerService.create({ objects, diagnostics }));
-  pullers.register(HttpCopilotStudioChannel.create({ http }));
-  pullers.register(HttpCopilotStudioDataverseChannel.create(http));
-  pullers.register(OpenAiComplianceReferencePullerService.create({ objects, diagnostics }));
-  pullers.register(OpenAiAdminPullerAdapter.create(http));
-  pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
-  pullers.register(AnthropicAdminPullerAdapter.create(http));
-  pullers.register(DatabricksGeniePullerService.create(http));
-
-  return BuiltInPullerRegistryService.create(pullers).build();
-}
-
-/** One ingestion-pull worker, over the substrates the process owns. */
-export function createIngestionPullWorker(
-  substrates: IngestionPullWorkerSubstrates,
-): IngestionPullWorkerService {
-  return IngestionPullWorkerService.create({
-    sources: substrates.sources,
-    registry: builtInPullers(substrates),
-    credentials: IngestionCredentialsService.create(substrates.encryptor),
-    projects: substrates.projects,
-    sink: substrates.sink,
-    usageEntitlement: substrates.usageEntitlement,
-    usageRecords: PulledUsageRecordService.create(
-      PulledUsagePricingService.create(substrates.usageRate),
-    ),
-    diagnostics: substrates.diagnostics,
-  });
-}
 
 /**
  * The ingestion-pull pipeline: its run-status projection over the process's own

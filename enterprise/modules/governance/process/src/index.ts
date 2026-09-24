@@ -89,13 +89,11 @@ export {
   createIngestionPullEventing,
   createIngestionPullExecution,
   createIngestionPullLifecycle,
-  createIngestionPullWorker,
   createGovernanceServices,
   createIngestionPullSources,
   createPulledUsageEventing,
   createSpendSpikeAnomalyEvaluator,
   findAgentsListings,
-  type IngestionPullWorkerSubstrates,
 } from "./governance.server.ts";
 export type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
 export { deriveAgentsListingOutcome } from "./rules/agents-listing-outcome.rules.ts";
