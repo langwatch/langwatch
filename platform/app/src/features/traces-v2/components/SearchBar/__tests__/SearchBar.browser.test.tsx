@@ -35,6 +35,13 @@ vi.mock("~/utils/api", () => ({
         },
       },
     },
+    // The Instant Evals gate reads this flag; stub it enabled so nothing
+    // in this suite depends on the tRPC provider this suite doesn't mount.
+    featureFlag: {
+      isEnabled: {
+        useQuery: () => ({ data: { enabled: true }, isLoading: false }),
+      },
+    },
   },
 }));
 
