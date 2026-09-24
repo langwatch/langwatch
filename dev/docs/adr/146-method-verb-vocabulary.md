@@ -49,6 +49,14 @@ that may not exist throws the module's not-found `HandledError`; a caller for
 whom absence is normal catches that error's `code` and nothing else. It is never
 a `find*` returning an array of at most one for the caller to destructure.
 
+A read whose miss **means something other than not-found** — "keep the legacy address" when a resolver
+deliberately swallows its failures — answers an explicit result union naming that outcome, never null
+(Alex, 2026-09-24). A swallow that only hides an infrastructure failure is removed instead: the failure
+propagates and degrades to "unknown" (ARCHITECTURE §12).
+
+A method whose name and return shape are **dictated by a vendor's callback interface** (better-auth's
+`beforeUserCreate`, …) is exempt from the naming rules (Alex, 2026-09-24); the exemption lives in the rule.
+
 **Writes.** `create`, `update`, `delete`, `upsert`, `archive` — the five the
 tree already uses. A write whose target may normally be absent returns an
 explicit result union rather than null.
