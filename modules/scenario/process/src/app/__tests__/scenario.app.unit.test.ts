@@ -27,7 +27,6 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import type { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
@@ -44,7 +43,7 @@ function harness() {
   };
 
   const app = ScenarioApp.create({
-    repositories: { ...MemoryScenarioRepositories.create(), scenarios: {} as ScenarioRepository },
+    repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
       users: {} as UserApi,
@@ -344,7 +343,6 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
       const app = ScenarioApp.create({
         repositories: {
           ...MemoryScenarioRepositories.create(),
-          scenarios: {} as ScenarioRepository,
         },
         dependencies: {
           agents: createApiFixture<AgentApi>(),
@@ -397,7 +395,7 @@ describe("given a process that supplies no simulations member but does read Clic
   it("serves the read from ClickHouse instead of refusing", async () => {
     const asked: { tenantId: string }[] = [];
     const app = ScenarioApp.create({
-      repositories: { ...MemoryScenarioRepositories.create(), scenarios: {} as ScenarioRepository },
+      repositories: MemoryScenarioRepositories.create(),
       dependencies: {
         agents: createApiFixture<AgentApi>(),
         users: createApiFixture<UserApi>(),
