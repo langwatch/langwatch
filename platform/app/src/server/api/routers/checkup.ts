@@ -1,15 +1,10 @@
-import {
-  acknowledgeStartupNotice,
-  readInstanceIdentityRow,
-  setUsageReportSwitches,
-} from "@ee/licensing/connect/install/instanceIdentity";
+import { setUsageReportSwitches } from "@ee/licensing/connect/install/instanceIdentity";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
   checkupFor,
   realUsageReportPreview,
 } from "~/server/checkup/checkup.deps";
-import { startupNoticeState } from "~/server/checkup/startupNotice";
 import { CHECK_IDS } from "~/server/checkup/verdict";
 import { prisma } from "~/server/db";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -95,30 +90,5 @@ export const checkupRouter = createTRPCRouter({
       });
       const preview = await realUsageReportPreview(prisma);
       return { deployment: "self-hosted" as const, ...preview };
-    }),
-
-  startupNotice: protectedProcedure
-    .input(organizationInput)
-    .permission("organization:manage")
-    .query(async () => {
-      const row = env.IS_SAAS ? null : await readInstanceIdentityRow(prisma);
-      return startupNoticeState({
-        isSaas: Boolean(env.IS_SAAS),
-        usageReportsDisabled: Boolean(env.DISABLE_USAGE_STATS),
-        acknowledgedSchemaVersion:
-          row?.startupNoticeAcknowledgedSchemaVersion ?? null,
-      });
-    }),
-
-  dismissStartupNotice: protectedProcedure
-    .input(organizationInput.extend({ schemaVersion: z.number().int().min(1) }))
-    .permission("organization:manage")
-    .mutation(async ({ input }) => {
-      if (env.IS_SAAS) return { dismissed: false };
-      await acknowledgeStartupNotice({
-        prisma,
-        schemaVersion: input.schemaVersion,
-      });
-      return { dismissed: true };
     }),
 });

@@ -61737,7 +61737,7 @@ The switches on the Checkup page are stored in the install's own database, so th
 
 ## When the report starts
 
-The first report goes out at the next 12:00 UTC after boot, and one a day after that. An install shows its administrators a notice once, in the app, when it starts reporting and again whenever the report changes shape. The notice links this page and the Checkup page, and dismissing it records the dismissal in the database so it stays dismissed for everyone.
+The first report goes out at the next 12:00 UTC after boot, and one a day after that.
 
 ## What is never collected
 
@@ -61749,7 +61749,7 @@ The report lands in a database at LangWatch, one row per install and one per rep
 
 ## Existing installs
 
-An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, which is what the startup notice tells you, and the switches above are how to trim it.
+An install on an offline license, upgraded to a release with this page, behaves as before: the same seat cap, the same screens, the same license check with no network on the path, and the usage report going where it always went. The report gains fields with the release, and the switches above are how to trim it.
 
 ---
 
