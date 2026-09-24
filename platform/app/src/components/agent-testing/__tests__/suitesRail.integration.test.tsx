@@ -55,12 +55,6 @@ vi.mock("~/utils/formatTimeAgo", () => ({
 const suiteRunDataQuery = vi.fn();
 const suitesGetAllQuery = vi.fn();
 
-// SuiteRail and RunsSidebar mount the simulations welcome card, which reads
-// whether a guided onboarding path is active; no path is in these tests.
-vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
-  useGuidedPathActive: () => false,
-}));
-
 vi.mock("~/utils/api", () => ({
   api: {
     checkup: {
@@ -734,26 +728,5 @@ describe("the test suites rail", () => {
     // the tab is keyed by that window, so the cells and the runs come back for
     // the shorter period.
     expect(props.setRelativePeriod).toHaveBeenCalledWith("7d");
-  });
-
-  /** @scenario "The rail carries the new-simulations announcement" */
-  it("carries the new-simulations announcement", () => {
-    // The card retires on 2026-09-22 and reads the retirement per render, so
-    // the rail is checked at a moment the card still shows, whatever the
-    // machine's clock says. The callout's own suite pins the clock the same
-    // way. Closes langwatch#8254, which skipped this case when the date passed.
-    vi.useFakeTimers({
-      toFake: ["Date"],
-      now: new Date("2026-09-05T12:00:00Z"),
-    });
-    try {
-      renderRail();
-
-      expect(
-        screen.getByText("Welcome to the new simulations screen"),
-      ).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
   });
 });
