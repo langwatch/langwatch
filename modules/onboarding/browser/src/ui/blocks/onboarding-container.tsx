@@ -32,6 +32,9 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
 /** The card width each narrow variant holds from `md` up. */
 const CARD_WIDTHS = { narrow: "540px", guided: "560px", full: "540px" } as const;
 
+const insideLogoTopPadding = (compressedHeader: boolean | undefined) =>
+  compressedHeader ? "8vh" : "14vh";
+
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   children,
   boundary,
@@ -213,7 +216,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
       <Container
         width="full"
         mx="auto"
-        pt={isLogoInside ? (compressedHeader ? "8vh" : "14vh") : undefined}
+        pt={isLogoInside ? insideLogoTopPadding(compressedHeader) : undefined}
         pb={16}
         maxW={
           isFullWidth

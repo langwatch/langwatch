@@ -24,6 +24,12 @@ import { getSafeReturnToPath } from "../../../model/get-safe-return-to-path.ts";
 import ErrorPage from "../../../ui/elements/compat/next-error.tsx";
 import { SetupLayout } from "../../../ui/elements/setup-layout.tsx";
 
+function submitButtonLabel({ isSuccess, isPending }: { isSuccess: boolean; isPending: boolean }) {
+  if (isSuccess) return "Created";
+  if (isPending) return "Loading...";
+  return "Next";
+}
+
 export default function ProjectOnboarding() {
   useRequiredSession();
 
@@ -140,11 +146,7 @@ export default function ProjectOnboarding() {
               type="submit"
               disabled={createProject.isPending || createProject.isSuccess}
             >
-              {createProject.isSuccess
-                ? "Created"
-                : createProject.isPending
-                  ? "Loading..."
-                  : "Next"}
+              {submitButtonLabel(createProject)}
             </Button>
           </HStack>
         </VStack>

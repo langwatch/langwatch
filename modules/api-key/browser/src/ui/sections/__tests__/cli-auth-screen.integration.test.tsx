@@ -55,9 +55,10 @@ vi.mock("@langwatch/authz-browser-kit", () => ({
       <span data-testid="selected-scopes">
         {value.map((entry) => `${entry.scopeType}:${entry.scopeId}`).join(",")}
       </span>
-      <button data-testid="clear-scopes" onClick={() => onChange([])} />
+      <button data-testid="clear-scopes" aria-label="Clear scopes" onClick={() => onChange([])} />
       <button
         data-testid="pick-personal"
+        aria-label="Pick the personal project"
         onClick={() => onChange([{ scopeType: "PROJECT", scopeId: "proj-personal" }])}
       />
     </div>

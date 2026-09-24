@@ -15,6 +15,8 @@ export function PersonalSessionsScreen() {
   const { ready, isPersonalProjectResolved, personalProjectId, personalProjectSlug } =
     usePersonalContext();
 
+  const isWorkspaceResolved = ready && isPersonalProjectResolved;
+
   return (
     <PersonalWorkspaceLayout>
       <VStack align="stretch" gap={6} width="full">
@@ -33,11 +35,11 @@ export function PersonalSessionsScreen() {
             `ready` alone still leaves a window with no project id yet. Saying
             "no sessions" in that window states a fact that is not known to be
             true. */}
-        {!ready || !isPersonalProjectResolved ? (
-          <Skeleton height="180px" borderRadius="md" />
-        ) : personalProjectId ? (
+        {!isWorkspaceResolved && <Skeleton height="180px" borderRadius="md" />}
+        {isWorkspaceResolved && personalProjectId ? (
           <SessionsTable projectId={personalProjectId} projectSlug={personalProjectSlug} />
-        ) : (
+        ) : null}
+        {isWorkspaceResolved && !personalProjectId && (
           <Text fontSize="sm" color="fg.muted">
             No sessions yet
           </Text>
