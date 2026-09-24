@@ -1,14 +1,13 @@
 /**
  * @vitest-environment node
- * The three namespaces the project mounts: wire names, kinds, declared answers
+ * The two namespaces the project mounts: wire names, kinds, declared answers
  * and the access each procedure carries. Read back off the declaration itself,
  * so nothing here depends on the shape of a tRPC internal.
  */
 import type { TrpcAccess, TrpcProcedureRequest } from "@langwatch/api/trpc";
-import { homeTrpc, integrationsChecksTrpc, projectTrpc } from "@langwatch/project-contract";
+import { integrationsChecksTrpc, projectTrpc } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
-import { homeTrpcTransport } from "../home.trpc.ts";
 import { integrationsChecksTrpcTransport } from "../integrations-checks.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
 
@@ -45,8 +44,6 @@ describe("the project tRPC declarations", () => {
         "triggerTopicClustering",
         "update",
       ]);
-      expect(homeTrpc.namespace).toBe("home");
-      expect(Object.keys(homeTrpc.members)).toEqual(["getRecentItems"]);
       expect(integrationsChecksTrpc.namespace).toBe("integrationsChecks");
       expect(Object.keys(integrationsChecksTrpc.members)).toEqual(["getCheckStatus"]);
     });
@@ -66,7 +63,6 @@ describe("the project tRPC declarations", () => {
         archiveById: "mutation",
         triggerTopicClustering: "mutation",
       });
-      expect(homeTrpc.members.getRecentItems?.kind).toBe("query");
       expect(integrationsChecksTrpc.members.getCheckStatus?.kind).toBe("query");
     });
 
@@ -74,7 +70,6 @@ describe("the project tRPC declarations", () => {
       for (const [name, member] of Object.entries(projectTrpc.members)) {
         expect([name, member.output !== undefined]).toEqual([name, true]);
       }
-      expect(homeTrpc.members.getRecentItems?.output).toBeDefined();
       expect(integrationsChecksTrpc.members.getCheckStatus?.output).toBeDefined();
     });
   });
@@ -101,12 +96,6 @@ describe("the project tRPC declarations", () => {
         "project.getFieldRedactionStatus": { kind: "permission", permission: "project:view" },
         "project.archiveById": { kind: "permission", permission: "project:delete" },
         "project.triggerTopicClustering": { kind: "permission", permission: "project:update" },
-      });
-    });
-
-    it("gates the recent-items strip on project:view", () => {
-      expect(declaredAccess(homeTrpcTransport)).toEqual({
-        "home.getRecentItems": { kind: "permission", permission: "project:view" },
       });
     });
 

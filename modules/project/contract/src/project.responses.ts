@@ -54,18 +54,6 @@ export const topicClusteringRequestSchema = z.union([
 ]);
 export type TopicClusteringRequest = z.infer<typeof topicClusteringRequestSchema>;
 
-/** One entity the caller touched recently, as the home strip renders it. */
-export const recentItemSchema = z
-  .object({
-    id: z.string().min(1),
-    type: z.enum(["prompt", "workflow", "dataset", "evaluation", "annotation", "simulation"]),
-    name: z.string(),
-    href: z.string(),
-    updatedAt: z.date(),
-  })
-  .strict();
-export type RecentItem = z.infer<typeof recentItemSchema>;
-
 /**
  * How far a project has been set up. Nine of the eleven figures belong to
  * other verticals and arrive already counted; the last two are the project's

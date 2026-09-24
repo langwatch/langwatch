@@ -529,9 +529,11 @@ transport internals.
 
 **Deployment-choice modules are one line in the main.** A module whose
 implementation is a deployment choice is composed by one `.withModules`
-line, no conditional wiring. The audit sink is **not** one (Alex,
-2026-09-24): every deployment records audit entries, as main did, so api
-and worker compose the real audit-log module; the null sink is for tests.
+line, no conditional wiring. The audit log is **not** one (Alex,
+2026-09-24): every module is always installed and entitlement refuses per
+organization (§11), so audit-log's process half is core
+(`modules/audit-log/process`) and the generated list installs it in every
+deployment, as main recorded in every deployment. No app names it.
 
 **The worker** is the same file with `role: "worker"` and `server.run()`
 instead of `serve()`. The role decides what `boot()` hosts: jobs and

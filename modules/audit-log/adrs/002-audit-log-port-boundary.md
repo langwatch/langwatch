@@ -13,9 +13,11 @@ was recorded, and no process could answer "which audit log is this".
 ## Decision
 
 `AuditLogApi` stays a portable contract in this package. The implementation is
-Enterprise and lives in `enterprise/modules/audit-log/process`. An
-installation without it installs `@langwatch/audit-log-null` under the same
-token. A process installs exactly one of the two.
+core and lives in `modules/audit-log/process` (`@langwatch/audit-log-process`).
+Amended 2026-09-24 (ARCHITECTURE.md sections 4 and 11): every module is always
+installed, so the generated list installs it in every deployment, as main
+recorded in every deployment. The same module serves `home.getRecentItems`,
+read from the caller's own entries.
 
 ## Public surfaces and transports
 
@@ -29,30 +31,28 @@ organization package's own tRPC and REST doors.
 
 Zod 4 and `moduleApi` from `@langwatch/runtime-composition`, and nothing else. The
 package is browser-safe and Apache-licensed, so an OSS feature may depend on the
-capability without depending on the Enterprise implementation.
+capability without depending on its process implementation.
 
 ## Persistence
 
-None. The contract owns no table, no client and no repository; the Enterprise
-server owns the `AuditLog` reads and writes behind `AuditLogRepository`, and the
-null implementation owns nothing at all.
+None. The contract owns no table, no client and no repository; the process
+half owns the `AuditLog` reads and writes behind `AuditLogRepository`.
 
 ## Runtime and registration
 
-`apps/api` and `apps/worker` install `auditLogNullServer`. A deployment with the
-Enterprise composition installs `auditLogServer` through
-`EnterpriseApiAuditLog` or `EnterpriseWorkerAuditLog` instead. Boot fails by
-name when a feature that depends on `AuditLogApi` finds neither installed.
+`apps/api` and `apps/worker` install `auditLogServer` through the generated
+module list, like every other module. Boot fails by name when a feature that
+depends on `AuditLogApi` finds it not installed.
 
 ## Environment and configuration
 
 The contract reads no environment variable and takes no configuration. The
-Enterprise implementation's argument byte limit is its own feature config.
+process half's argument byte limit is its own feature config.
 
 ## Errors
 
-An invalid command fails Zod validation at the boundary and throws. Neither
-implementation carries a `HandledError`: a caller records as a side effect of an
+An invalid command fails Zod validation at the boundary and throws. The
+implementation carries no `HandledError`: a caller records as a side effect of an
 act it has already authorized, and has no remedial action to offer.
 
 ## Contracts and validation
@@ -62,8 +62,8 @@ is portable, and argument and metadata payloads must be JSON-compatible values.
 
 ## Consequences
 
-An OSS installation records no audit history, and every surface that renders
-history shows an empty list rather than failing.
+Every installation records audit history. Nothing in the module is
+entitlement-gated: recording and the recent-items strip serve every organization.
 
 Writes the two operations cannot express — a row inside another feature's
 transaction, a governance diff in `before`/`after`, an idempotent insert keyed

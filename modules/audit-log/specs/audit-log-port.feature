@@ -1,8 +1,6 @@
 Feature: The audit log port
   Every writer and reader of the audit trail reaches it through one portable
-  capability, so an installation decides once what is recorded. The
-  implementation is Enterprise; an installation without it answers with the
-  null one under the same token.
+  capability. The implementation is core and every process installs it.
 
   @unit
   Scenario: An installation without the Enterprise audit log records nothing

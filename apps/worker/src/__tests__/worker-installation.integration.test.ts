@@ -4,7 +4,6 @@
  * @see specs/platform/process-installation.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
@@ -33,8 +32,6 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 const ROLE = "worker";
-const installed = [...serverModules, auditLogNullServer] as const;
-
 /** Every value is harmless and invented: nothing here is read from `.env`. */
 const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   NODE_ENV: "test",
@@ -50,7 +47,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 async function bootWorker() {
-  const owners = processConfig(installed, ROLE);
+  const owners = processConfig(serverModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -84,7 +81,7 @@ async function bootWorker() {
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: installed.map(overMemory),
+    modules: serverModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -120,7 +117,7 @@ async function bootWorker() {
   return { runtime, eventing };
 }
 
-const moduleApis = installed.flatMap((module) =>
+const moduleApis = serverModules.flatMap((module) =>
   module.apiContract instanceof ModuleApiToken ? [module.apiContract] : [],
 );
 

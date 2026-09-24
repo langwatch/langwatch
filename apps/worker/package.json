@@ -40,7 +40,6 @@
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/api-key-process": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
-    "@langwatch/audit-log-null": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/auth-process": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",

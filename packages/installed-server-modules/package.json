@@ -21,6 +21,7 @@
     "@langwatch/analytics-process": "workspace:*",
     "@langwatch/annotation-process": "workspace:*",
     "@langwatch/api-key-process": "workspace:*",
+    "@langwatch/audit-log-process": "workspace:*",
     "@langwatch/auth-process": "workspace:*",
     "@langwatch/authz-process": "workspace:*",
     "@langwatch/automation-process": "workspace:*",

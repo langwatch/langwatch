@@ -5,6 +5,7 @@ import { agentServer } from "@langwatch/agent-process";
 import { analyticsServer } from "@langwatch/analytics-process";
 import { annotationServer } from "@langwatch/annotation-process";
 import { apiKeyServer } from "@langwatch/api-key-process";
+import { auditLogServer } from "@langwatch/audit-log-process";
 import { authServer } from "@langwatch/auth-process";
 import { authzServer } from "@langwatch/authz-process";
 import { automationServer } from "@langwatch/automation-process";
@@ -61,6 +62,7 @@ export const serverModules = [
   analyticsServer,
   annotationServer,
   apiKeyServer,
+  auditLogServer,
   authServer,
   authzServer,
   automationServer,
