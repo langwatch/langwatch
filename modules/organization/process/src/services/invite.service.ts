@@ -1,5 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import {
   type OrganizationInvite,
@@ -207,7 +208,8 @@ export class InviteService {
     return { success: true };
   }
 
-  async tryFindLandingProjectSlug(invite: OrganizationInvite): Promise<string | null> {
+  /** Candidate landing projects' slugs for the invitee, the invited teams' first. */
+  async findLandingProjectSlugs(invite: OrganizationInvite): Promise<string[]> {
     // Collect all invited team IDs from either format
     const invitedTeamIds = (() => {
       if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
@@ -222,19 +224,18 @@ export class InviteService {
         .filter(Boolean);
     })();
 
-    // Look for a project in any of the invited teams
-    const project =
-      (invitedTeamIds.length > 0
-        ? await this.invites.tryFindProjectSlugForTeams({ teamIds: invitedTeamIds })
-        : null) ??
-      // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
-      (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER
-        ? await this.invites.tryFindProjectSlugInOrganization({
-            organizationId: invite.organizationId,
-          })
-        : null);
+    const teamSlugs =
+      invitedTeamIds.length > 0
+        ? await this.invites.findProjectSlugsForTeams({ teamIds: invitedTeamIds })
+        : [];
+    if (teamSlugs.length > 0) return teamSlugs;
 
-    return project;
+    // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
+    if (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER) {
+      return this.invites.findProjectSlugsInOrganization({ organizationId: invite.organizationId });
+    }
+
+    return [];
   }
 
   /**
@@ -285,7 +286,12 @@ export class InviteService {
     organizationId: string;
     email: string;
   }): Promise<OrganizationPendingInviteApplied> {
-    const pending = await this.invites.tryFindPendingInviteForEmail({ organizationId, email });
+    const pending = await this.invites
+      .getPendingInviteForEmail({ organizationId, email })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "invite_not_found") return undefined;
+        throw error;
+      });
     if (!pending) return { applied: false };
 
     await this.applyInvite({ userId, invite: pending });

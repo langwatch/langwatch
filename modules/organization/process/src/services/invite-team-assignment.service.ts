@@ -16,7 +16,7 @@ import {
   type CreateInvitesInviteInput,
   type InviteAssignableRoles,
   type InviteServiceDependencies,
-  type ResolvedInviteTeams,
+  type InviteTeamsResolution,
   type TeamAssignmentInput,
 } from "../rules/invite-contracts.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
@@ -50,11 +50,8 @@ export class InviteTeamAssignmentService {
     return this.invites.findTeamIdsInOrganization({ teamIds, organizationId });
   }
 
-  /**
-   * The teams an invite should join, or null when the invite names none and the organization
-   * has no default team to fall back on.
-   */
-  async tryResolveInviteTeams({
+  /** The teams an invite should join, or `dropped` when it names none that it may join. */
+  async resolveInviteTeams({
     organizationId,
     invite,
     isStrict,
@@ -62,7 +59,7 @@ export class InviteTeamAssignmentService {
     organizationId: string;
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
-  }): Promise<ResolvedInviteTeams | null> {
+  }): Promise<InviteTeamsResolution> {
     if (invite.teams && invite.teams.length > 0) {
       return this.resolveExplicitInviteTeams({
         organizationId,
@@ -80,12 +77,12 @@ export class InviteTeamAssignmentService {
       });
     }
 
-    return null;
+    return { kind: "dropped" };
   }
 
   /**
    * Resolves explicit team role entries: the teams must belong to the organization,
-   * custom-role forms are normalized, and the custom roles must be assignable. Returns null
+   * custom-role forms are normalized, and the custom roles must be assignable. Answers `dropped`
    * when lenient validation drops the invite (no valid teams, or an invalid custom role).
    */
   private async resolveExplicitInviteTeams({
@@ -96,7 +93,7 @@ export class InviteTeamAssignmentService {
     organizationId: string;
     teams: NonNullable<CreateInvitesInviteInput["teams"]>;
     isStrict: boolean;
-  }): Promise<ResolvedInviteTeams | null> {
+  }): Promise<InviteTeamsResolution> {
     const teamIds = teams.map((team) => team.teamId);
     const validTeamIds = await this.validateTeamIds({
       teamIds,
@@ -108,7 +105,7 @@ export class InviteTeamAssignmentService {
     }
 
     if (validTeamIds.length === 0) {
-      return null;
+      return { kind: "dropped" };
     }
 
     const teamAssignments = this.normalizeTeamAssignments({
@@ -123,15 +120,15 @@ export class InviteTeamAssignmentService {
       isStrict,
     });
     if (!customRolesValid) {
-      return null;
+      return { kind: "dropped" };
     }
 
-    return { teamAssignments, teamIdsString: validTeamIds.join(",") };
+    return { kind: "teams", teamAssignments, teamIdsString: validTeamIds.join(",") };
   }
 
   /**
    * Resolves the legacy comma-separated team id form: each valid team gets
-   * the default team role for the invite's organization role. Returns null
+   * the default team role for the invite's organization role. Answers `dropped`
    * when lenient validation leaves no valid teams.
    */
   private async resolveLegacyInviteTeams({
@@ -144,7 +141,7 @@ export class InviteTeamAssignmentService {
     teamIds: string;
     role: OrganizationUserRole;
     isStrict: boolean;
-  }): Promise<ResolvedInviteTeams | null> {
+  }): Promise<InviteTeamsResolution> {
     const teamIdArray = teamIds
       .split(",")
       .map((teamId) => teamId.trim())
@@ -163,10 +160,11 @@ export class InviteTeamAssignmentService {
     }
 
     if (validTeamIds.length === 0) {
-      return null;
+      return { kind: "dropped" };
     }
 
     return {
+      kind: "teams",
       teamAssignments: validTeamIds.map((teamId) => ({
         teamId,
         role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],

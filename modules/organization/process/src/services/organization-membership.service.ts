@@ -187,7 +187,13 @@ export class OrganizationMembershipService {
    * (legacy org). Consumed by the home resolver to pin the "/" landing.
    */
   async findPrimaryIntent(organizationId: string): Promise<OrganizationIntent | null> {
-    return this.repo.tryFindPrimaryIntentById(organizationId);
+    try {
+      const { primaryIntent } = await this.repo.getOrganizationIntent(organizationId);
+      return primaryIntent;
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "organization_not_found") return null;
+      throw error;
+    }
   }
 
   /**
@@ -348,7 +354,12 @@ export class OrganizationMembershipService {
   async findProvisioningSummary(
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null> {
-    return this.repo.tryFindProvisioningSummaryById(organizationId);
+    try {
+      return await this.repo.getProvisioningSummaryById(organizationId);
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "organization_not_found") return null;
+      throw error;
+    }
   }
 
   /**

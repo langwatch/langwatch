@@ -1,5 +1,7 @@
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
+import { UserNotFoundError } from "@langwatch/user-contract";
 
 import {
   BetterAuthHooksRepository,
@@ -18,7 +20,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     super();
   }
 
-  async tryFindUserForHooks({ userId }: { userId: string }): Promise<BetterAuthHookUser | null> {
+  async getUserForHooks({ userId }: { userId: string }): Promise<BetterAuthHookUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -30,7 +32,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
         signupConfirmationPending: true,
       },
     });
-    if (user === null) return null;
+    if (user === null) throw new UserNotFoundError(userId);
 
     return {
       ...user,
@@ -38,15 +40,17 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     };
   }
 
-  async tryFindOrganizationBySsoDomain({
+  async getOrganizationBySsoDomain({
     domain,
   }: {
     domain: string;
-  }): Promise<BetterAuthHookOrganization | null> {
-    return this.prisma.organization.findUnique({
+  }): Promise<BetterAuthHookOrganization> {
+    const organization = await this.prisma.organization.findUnique({
       where: { ssoDomain: domain },
       select: { id: true, name: true, ssoProvider: true },
     });
+    if (organization === null) throw new OrganizationNotFoundError();
+    return organization;
   }
 
   async countAccountsForUser({ userId }: { userId: string }): Promise<number> {

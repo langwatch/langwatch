@@ -15,9 +15,9 @@ function serviceWithRecordingOrder() {
   const order: string[] = [];
 
   const invites = {
-    tryFindOrganizationWithMembers: async () => ORGANIZATION,
-    tryFindMemberEmail: async () => null,
-    tryFindOpenInviteForEmail: async () => null,
+    getOrganizationWithMembers: async () => ORGANIZATION,
+    findMemberEmails: async () => [],
+    hasOpenInviteForEmail: async () => false,
     findTeamIdsInOrganization: async ({ teamIds }: { teamIds: string[] }) => teamIds,
     findCustomRolePermissions: async () => [],
     findPersonalTeamsInScopes: async () => [],

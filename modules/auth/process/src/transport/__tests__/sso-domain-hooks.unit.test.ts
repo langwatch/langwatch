@@ -10,6 +10,7 @@ import type {
  * arriving through the wrong provider.
  * @see specs/auth/phase-1-better-auth-config.feature
  */
+import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -40,8 +41,8 @@ class LicensedFederation implements BetterAuthFederation {
 }
 
 class NoInvites implements BetterAuthPendingInvite {
-  tryFindPendingByOrganizationAndEmail(): Promise<null> {
-    return Promise.resolve(null);
+  getPendingByOrganizationAndEmail(): Promise<never> {
+    return Promise.reject(new InviteNotFoundError());
   }
   applyInvite(): Promise<void> {
     return Promise.reject(new Error("unused"));
@@ -51,8 +52,10 @@ class NoInvites implements BetterAuthPendingInvite {
 class StubPendingInvites implements BetterAuthPendingInvite {
   readonly applyInvite = vi.fn().mockResolvedValue(undefined);
   constructor(private readonly pending: { id: string } | null) {}
-  tryFindPendingByOrganizationAndEmail(): Promise<{ id: string } | null> {
-    return Promise.resolve(this.pending);
+  getPendingByOrganizationAndEmail(): Promise<{ id: string }> {
+    return this.pending === null
+      ? Promise.reject(new InviteNotFoundError())
+      : Promise.resolve(this.pending);
   }
 }
 
@@ -71,8 +74,8 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     throw new Error("this repository member is not used by this test");
   };
   return {
-    tryFindUserForHooks: unused,
-    tryFindOrganizationBySsoDomain: unused,
+    getUserForHooks: unused,
+    getOrganizationBySsoDomain: unused,
     countAccountsForUser: unused,
     findFederatedAccountsForUser: unused,
     findFederatedAccountsForUsers: unused,
@@ -88,9 +91,12 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
 
 function signupRepo(organization: BetterAuthHookOrganization | null) {
   const mocks = {
-    tryFindOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
-      .mockResolvedValue(organization),
+    getOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
+      .mockImplementation(async () => {
+        if (organization === null) throw new OrganizationNotFoundError();
+        return organization;
+      }),
     createOrganizationMembership: vi
       .fn<BetterAuthHooksRepository["createOrganizationMembership"]>()
       .mockResolvedValue("created"),
@@ -108,17 +114,18 @@ function accountRepo({
   user?: Pick<BetterAuthHookUser, "id" | "email" | "deactivatedAt">;
 }) {
   const mocks = {
-    tryFindUserForHooks: vi
-      .fn<BetterAuthHooksRepository["tryFindUserForHooks"]>()
-      .mockResolvedValue({
-        ...user,
-        name: null,
-        pendingSsoSetup: false,
-        signupConfirmationPending: false,
+    getUserForHooks: vi.fn<BetterAuthHooksRepository["getUserForHooks"]>().mockResolvedValue({
+      ...user,
+      name: null,
+      pendingSsoSetup: false,
+      signupConfirmationPending: false,
+    }),
+    getOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
+      .mockImplementation(async () => {
+        if (organization === null) throw new OrganizationNotFoundError();
+        return organization;
       }),
-    tryFindOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
-      .mockResolvedValue(organization),
     countAccountsForUser: vi
       .fn<BetterAuthHooksRepository["countAccountsForUser"]>()
       .mockResolvedValue(accountCount),
@@ -193,7 +200,7 @@ describe("signing in through a domain-matched organization's identity provider",
         },
       });
 
-      expect(mocks.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
+      expect(mocks.getOrganizationBySsoDomain).not.toHaveBeenCalled();
       expect(mocks.createOrganizationMembership).not.toHaveBeenCalled();
       expect(attachBindings).not.toHaveBeenCalled();
     });

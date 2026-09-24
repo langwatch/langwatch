@@ -100,10 +100,9 @@ export class PersonalWorkspaceService {
     return { ...result.workspace, created: result.created };
   }
 
-  tryFindPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace | null> {
-    return this.deps.repository.tryFindPersonalWorkspace(
-      findPersonalWorkspaceInputSchema.parse(input),
-    );
+  /** Throws `TeamNotFoundError` when the user has no personal workspace there. */
+  getPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace> {
+    return this.deps.repository.getPersonalWorkspace(findPersonalWorkspaceInputSchema.parse(input));
   }
 
   async getPersonalWorkspaceFeatures(

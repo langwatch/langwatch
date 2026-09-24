@@ -5,7 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @see specs/organizations/organization-members-rest-api.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { OrganizationInvite } from "@langwatch/organization-contract";
+import { InviteNotFoundError, type OrganizationInvite } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -39,12 +39,12 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
   const teamsInOrganization = options.teamsInOrganization;
 
   const repository: OrganizationInviteRepository = createApiFixture<OrganizationInviteRepository>({
-    tryFindOrganizationWithMembers: async () => ({
+    getOrganizationWithMembers: async () => ({
       ...makeOrganization({ id: ORGANIZATION_ID }),
       members: [],
     }),
-    tryFindMemberEmail: async () => null,
-    tryFindOpenInviteForEmail: async () => null,
+    findMemberEmails: async () => [],
+    hasOpenInviteForEmail: async () => false,
     findCustomRolePermissions: async () => [],
     findPersonalTeamsInScopes: async () => [],
     findTeamIdsInOrganization: async ({
@@ -96,11 +96,11 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
 
       return 1;
     },
-    tryFindInviteByCodeWithOrganization: async ({ inviteCode }: { inviteCode: string }) => {
+    getInviteByCodeWithOrganization: async ({ inviteCode }: { inviteCode: string }) => {
       const invite = Array.from(invites.values()).find(
         (candidate) => candidate.inviteCode === inviteCode,
       );
-      if (!invite) return null;
+      if (!invite) throw new InviteNotFoundError("Invitation not found");
 
       return { ...invite, organization: makeOrganization({ id: invite.organizationId }) };
     },

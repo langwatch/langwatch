@@ -264,7 +264,10 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
     teamId: string;
   }): Promise<OrganizationUserRole | null>;
-  abstract tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null>;
+  /** Throws `OrganizationNotFoundError`; a null intent is a legacy organization. */
+  abstract getOrganizationIntent(
+    organizationId: string,
+  ): Promise<{ primaryIntent: OrganizationIntent | null }>;
 
   // --- New methods for router delegation ---
 
@@ -280,9 +283,10 @@ export abstract class OrganizationMembershipRepository {
   /** Every organization on the instance, newest first. Instance-admin only. */
   abstract findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
 
-  abstract tryFindProvisioningSummaryById(
+  /** Throws `OrganizationNotFoundError`. */
+  abstract getProvisioningSummaryById(
     organizationId: string,
-  ): Promise<OrganizationProvisioningSummary | null>;
+  ): Promise<OrganizationProvisioningSummary>;
 
   /**
    * Removes an organization a provisioning run created but could not finish.

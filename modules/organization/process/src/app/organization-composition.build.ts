@@ -15,6 +15,7 @@ import {
   PrismaUsageMembershipRepository,
   type UsageMembershipRepository,
 } from "@langwatch/entitlement-process";
+import { HandledError } from "@langwatch/handled-error";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import {
@@ -286,8 +287,13 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
   async findByCode(
     input: Readonly<{ inviteCode: string }>,
   ): Promise<OrganizationInviteWithOrganization | null> {
-    const found = await this.options.repository.tryFindInviteByCodeWithOrganization(input);
-    if (found === null || found.organization === null) return null;
+    const found = await this.options.repository
+      .getInviteByCodeWithOrganization(input)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "invite_not_found") return undefined;
+        throw error;
+      });
+    if (found === undefined || found.organization === null) return null;
 
     const { organization, ...invite } = found;
     return { ...invite, organization: { id: organization.id, name: organization.name } };
@@ -320,10 +326,11 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     return this.options.invites.applyPendingInvite(input);
   }
 
-  findLandingProjectSlug(
+  async findLandingProjectSlug(
     input: Readonly<{ invite: OrganizationInviteWithOrganization }>,
   ): Promise<string | null> {
-    return this.options.invites.tryFindLandingProjectSlug(input.invite);
+    const [slug] = await this.options.invites.findLandingProjectSlugs(input.invite);
+    return slug ?? null;
   }
 
   acceptUrl(inviteCode: string): string {

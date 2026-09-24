@@ -34,9 +34,9 @@ export class BetterAuthIdentityBirthAdapter {
     return BetterAuthIdentityBirthAdapter.scope.run({ born: new Set<string>() }, run);
   }
 
-  /** The entrance, if this request is inside one. */
-  static currentIdentityBirth(): IdentityBirthScope | undefined {
-    return BetterAuthIdentityBirthAdapter.scope.getStore();
+  /** Whether this request is inside an entrance. */
+  static isInsideIdentityBirth(): boolean {
+    return BetterAuthIdentityBirthAdapter.scope.getStore() !== undefined;
   }
 
   /** A user borne on the identity branch: every later routed write in this

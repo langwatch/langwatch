@@ -99,10 +99,11 @@ export abstract class OrganizationRepository {
     organizationId: string;
     billingCustomerId: string;
   }): Promise<boolean>;
-  abstract tryFindPersonalWorkspace(input: {
+  /** The user's personal team in the organization; throws `TeamNotFoundError`. */
+  abstract getPersonalWorkspace(input: {
     userId: string;
     organizationId: string;
-  }): Promise<PersonalWorkspace | null>;
+  }): Promise<PersonalWorkspace>;
   abstract ensurePersonalWorkspace(input: {
     workspace: PersonalWorkspaceInput;
     resources: PersonalWorkspaceResourceIds;

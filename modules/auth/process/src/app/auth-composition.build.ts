@@ -15,6 +15,7 @@ import {
   type SsoProviderConfigCipher,
 } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
+import { InviteNotFoundError } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
@@ -160,15 +161,15 @@ export class AbsentBetterAuthPendingInvites extends BetterAuthPendingInvite {
     super();
   }
 
-  async tryFindPendingByOrganizationAndEmail(input: {
+  async getPendingByOrganizationAndEmail(input: {
     organizationId: string;
     email: string;
-  }): Promise<PendingOrganizationInvite | null> {
+  }): Promise<PendingOrganizationInvite> {
     this.logger.warn(
       { organizationId: input.organizationId },
       "No invitation service in this process: a domain auto-join applies the default membership rather than a pending invite",
     );
-    return null;
+    throw new InviteNotFoundError();
   }
 
   async applyInvite(): Promise<void> {

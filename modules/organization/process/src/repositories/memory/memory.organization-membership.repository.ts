@@ -3,6 +3,7 @@ import {
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
   MemberNotFoundError,
+  OrganizationNotFoundError,
   OrganizationSlugTakenError,
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -124,8 +125,12 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return row && !row.disabledAt ? row.role : null;
   }
 
-  async tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null> {
-    return this.memory.organizations.get(organizationId)?.primaryIntent ?? null;
+  async getOrganizationIntent(
+    organizationId: string,
+  ): Promise<{ primaryIntent: OrganizationIntent | null }> {
+    const organization = this.memory.organizations.get(organizationId);
+    if (!organization) throw new OrganizationNotFoundError(organizationId);
+    return { primaryIntent: organization.primaryIntent ?? null };
   }
 
   async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
@@ -223,11 +228,11 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       }));
   }
 
-  async tryFindProvisioningSummaryById(
+  async getProvisioningSummaryById(
     organizationId: string,
-  ): Promise<OrganizationProvisioningSummary | null> {
+  ): Promise<OrganizationProvisioningSummary> {
     const organization = this.memory.organizations.get(organizationId);
-    if (!organization) return null;
+    if (!organization) throw new OrganizationNotFoundError(organizationId);
     return {
       id: organization.id,
       name: organization.name,

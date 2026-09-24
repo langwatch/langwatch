@@ -10,7 +10,6 @@ import {
   DuplicateInviteError,
   LiteMemberViewerOnlyError,
   MemberSeatLimitReachedError,
-  OrganizationNotFoundError,
   OrganizationUserRole,
   PersonalWorkspaceNotManagedHereError,
   RoleBindingScopeType,
@@ -85,7 +84,7 @@ export class InviteCreationService {
     email: string;
     organizationId: string;
   }): Promise<boolean> {
-    return (await this.invites.tryFindOpenInviteForEmail({ email, organizationId })) !== null;
+    return this.invites.hasOpenInviteForEmail({ email, organizationId });
   }
 
   /**
@@ -104,8 +103,8 @@ export class InviteCreationService {
 
     // The stored address, not the typed one: it is the one shown in the
     // members table the admin is being sent back to.
-    const memberEmail = await this.invites.tryFindMemberEmail({ organizationId, emails });
-    if (memberEmail !== null) {
+    const [memberEmail] = await this.invites.findMemberEmails({ organizationId, emails });
+    if (memberEmail !== undefined) {
       throw new AlreadyOrganizationMemberError(memberEmail);
     }
   }
@@ -195,13 +194,9 @@ export class InviteCreationService {
   async createAdminInviteRecord(
     input: CreateAdminInviteInput,
   ): Promise<{ invite: OrganizationInvite; organization: Organization }> {
-    const organization = await this.invites.tryFindOrganization({
+    const organization = await this.invites.getOrganization({
       organizationId: input.organizationId,
     });
-
-    if (!organization) {
-      throw new OrganizationNotFoundError();
-    }
 
     return { invite: await this.createInviteRow(input), organization };
   }
@@ -309,10 +304,7 @@ export class InviteCreationService {
   }> {
     const isStrict = validation === "strict";
 
-    const organization = await this.invites.tryFindOrganizationWithMembers({ organizationId });
-    if (!organization) {
-      throw new OrganizationNotFoundError();
-    }
+    const organization = await this.invites.getOrganizationWithMembers({ organizationId });
 
     // Before anything is written, and ahead of the licence limit: inviting
     // someone who is already a member is refused rather than silently
@@ -462,12 +454,12 @@ export class InviteCreationService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<CreateAdminInviteInput | null> {
-    const resolvedTeams = await this.teams.tryResolveInviteTeams({
+    const resolvedTeams = await this.teams.resolveInviteTeams({
       organizationId,
       invite,
       isStrict,
     });
-    if (!resolvedTeams) {
+    if (resolvedTeams.kind === "dropped") {
       return null;
     }
 

@@ -14,6 +14,7 @@ import {
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
   MemberNotFoundError,
+  OrganizationNotFoundError,
   OrganizationSlugTakenError,
 } from "@langwatch/organization-contract";
 import type {
@@ -354,12 +355,15 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return orgUser?.role ?? null;
   }
 
-  async tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null> {
-    const org = await this.prisma.organization.findUnique({
+  async getOrganizationIntent(
+    organizationId: string,
+  ): Promise<{ primaryIntent: OrganizationIntent | null }> {
+    const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { primaryIntent: true },
     });
-    return org?.primaryIntent ?? null;
+    if (organization === null) throw new OrganizationNotFoundError(organizationId);
+    return organization;
   }
 
   async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
@@ -537,13 +541,15 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     ]);
   }
 
-  async tryFindProvisioningSummaryById(
+  async getProvisioningSummaryById(
     organizationId: string,
-  ): Promise<OrganizationProvisioningSummary | null> {
-    return this.prisma.organization.findUnique({
+  ): Promise<OrganizationProvisioningSummary> {
+    const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { id: true, name: true, slug: true, createdAt: true },
     });
+    if (organization === null) throw new OrganizationNotFoundError(organizationId);
+    return organization;
   }
 
   async findAllForUser(params: {

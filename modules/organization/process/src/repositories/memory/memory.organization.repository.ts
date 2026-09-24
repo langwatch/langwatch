@@ -8,6 +8,7 @@ import {
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
+  TeamNotFoundError,
   type OrganizationBillingProfile,
   type PersonalFeatures,
   type PersonalWorkspace,
@@ -186,11 +187,13 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return true;
   }
 
-  async tryFindPersonalWorkspace(input: {
+  async getPersonalWorkspace(input: {
     userId: string;
     organizationId: string;
-  }): Promise<PersonalWorkspace | null> {
-    return this.findWorkspace(input);
+  }): Promise<PersonalWorkspace> {
+    const workspace = this.findWorkspace(input);
+    if (!workspace) throw new TeamNotFoundError();
+    return workspace;
   }
 
   async ensurePersonalWorkspace(input: {

@@ -5,6 +5,7 @@ import {
   TeamUserRole,
   type AuthzGrantsService,
 } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type {
   SsoArrivalApi,
   SsoAuthenticationActivityApi,
@@ -151,10 +152,9 @@ const joinSsoOrganization = async ({
   org: { id: string; name: string };
 }): Promise<void> => {
   const { announcements, invites, authzGrants: writer } = collaborators;
-  const pendingInvite = await invites.tryFindPendingByOrganizationAndEmail({
-    organizationId: org.id,
-    email: user.email,
-  });
+  const pendingInvite = await invites
+    .getPendingByOrganizationAndEmail({ organizationId: org.id, email: user.email })
+    .catch(skipOn("invite_not_found"));
 
   if (pendingInvite) {
     await invites.applyInvite({ userId: user.id, invite: pendingInvite });
@@ -240,7 +240,9 @@ export const afterUserCreate = async ({
   }
 
   try {
-    const org = await repo.tryFindOrganizationBySsoDomain({ domain });
+    const org = await repo
+      .getOrganizationBySsoDomain({ domain })
+      .catch(skipOn("organization_not_found"));
     if (!org) return;
 
     await joinSsoOrganization({ repo, collaborators, user, org });
@@ -269,7 +271,9 @@ export const tryBeforeAccountCreate = async ({
   };
   federation: BetterAuthFederation;
 }): Promise<void> => {
-  const user = await repo.tryFindUserForHooks({ userId: account.userId });
+  const user = await repo
+    .getUserForHooks({ userId: account.userId })
+    .catch(skipOn("user_not_found"));
   if (!user?.email) return;
 
   if (user.deactivatedAt) {
@@ -298,7 +302,9 @@ export const tryBeforeAccountCreate = async ({
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
 
-  const org = await repo.tryFindOrganizationBySsoDomain({ domain });
+  const org = await repo
+    .getOrganizationBySsoDomain({ domain })
+    .catch(skipOn("organization_not_found"));
   if (!org) return;
 
   const matchesSso = isSsoProviderMatch(org, {
@@ -427,7 +433,9 @@ export const afterAccountCreate = async ({
   try {
     if (account.providerId === "credential") return;
 
-    const user = await repo.tryFindUserForHooks({ userId: account.userId });
+    const user = await repo
+      .getUserForHooks({ userId: account.userId })
+      .catch(skipOn("user_not_found"));
     const email = user?.email;
     if (!user || !email) return;
 
@@ -439,7 +447,9 @@ export const afterAccountCreate = async ({
     // `ssoDomain` branch below would reconcile away the other side's account.
     if (migration.kind !== "not_migrating") return;
 
-    const org = await repo.tryFindOrganizationBySsoDomain({ domain });
+    const org = await repo
+      .getOrganizationBySsoDomain({ domain })
+      .catch(skipOn("organization_not_found"));
     if (!org) return;
 
     const matchesSso = isSsoProviderMatch(org, {
@@ -476,7 +486,9 @@ export const afterAccountUpdate = async ({
   collaborators: BetterAuthHookCollaborators;
 }): Promise<void> => {
   try {
-    const user = await repo.tryFindUserForHooks({ userId: account.userId });
+    const user = await repo
+      .getUserForHooks({ userId: account.userId })
+      .catch(skipOn("user_not_found"));
     const email = user?.email;
     if (!user || !email) return;
 
@@ -490,7 +502,9 @@ export const afterAccountUpdate = async ({
     if (migration.kind !== "not_migrating") return;
     if (!user.pendingSsoSetup) return;
 
-    const org = await repo.tryFindOrganizationBySsoDomain({ domain });
+    const org = await repo
+      .getOrganizationBySsoDomain({ domain })
+      .catch(skipOn("organization_not_found"));
     if (!org) return;
 
     const matchesSso = isSsoProviderMatch(org, {
@@ -534,7 +548,9 @@ export const beforeSessionCreate = async ({
   path: string | undefined;
   collaborators: BetterAuthHookCollaborators;
 }): Promise<boolean | undefined> => {
-  const user = await repo.tryFindUserForHooks({ userId: session.userId });
+  const user = await repo
+    .getUserForHooks({ userId: session.userId })
+    .catch(skipOn("user_not_found"));
   if (user?.deactivatedAt) {
     logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
     return false;
@@ -599,3 +615,11 @@ export const afterSessionCreate = async ({
       logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");
     });
 };
+
+/** Rethrows every failure but the one read's not-found `code`, which the hook skips past. */
+function skipOn(code: string): (error: unknown) => undefined {
+  return (error) => {
+    if (HandledError.isHandled(error) && error.code === code) return undefined;
+    throw error;
+  };
+}

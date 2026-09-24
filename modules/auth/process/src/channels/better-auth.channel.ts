@@ -75,10 +75,11 @@ export type PendingOrganizationInvite = Readonly<{
  * because its role/team assignments carry their own grants.
  */
 export abstract class BetterAuthPendingInvite {
-  abstract tryFindPendingByOrganizationAndEmail(input: {
+  /** Throws `InviteNotFoundError` when the address holds no pending invite there. */
+  abstract getPendingByOrganizationAndEmail(input: {
     organizationId: string;
     email: string;
-  }): Promise<PendingOrganizationInvite | null>;
+  }): Promise<PendingOrganizationInvite>;
 
   abstract applyInvite(input: { userId: string; invite: PendingOrganizationInvite }): Promise<void>;
 }

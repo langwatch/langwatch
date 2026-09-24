@@ -18,7 +18,7 @@ describe("given an organization id that names no organization", () => {
     /** @scenario "Creating an invitation for an organization that no longer exists is refused" */
     it("refuses with a not-found error and writes no invite row", async () => {
       const invites = new FakeOrganizationInviteRepository();
-      // Deliberately not seeded: `tryFindOrganization` answers null for it.
+      // Deliberately not seeded: `getOrganization` throws for it.
       const service = InviteCreationService.create(makeInviteDeps({ invites }));
 
       await expect(

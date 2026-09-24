@@ -58,8 +58,8 @@ export class InviteLifecycleService {
     organizationId: string;
     inviteId: string;
   }): Promise<{ invite: OrganizationInvite; emailNotSent: boolean }> {
-    const existing = await this.invites.tryFindInviteWithOrganization({ inviteId, organizationId });
-    if (existing?.status !== "PENDING") {
+    const existing = await this.invites.getInviteWithOrganization({ inviteId, organizationId });
+    if (existing.status !== "PENDING") {
       throw new InviteNotFoundError("Invitation not found");
     }
 
@@ -112,8 +112,8 @@ export class InviteLifecycleService {
     organizationId: string;
     inviteId: string;
   }): Promise<{ invite: OrganizationInvite }> {
-    const existing = await this.invites.tryFindInviteWithOrganization({ inviteId, organizationId });
-    if (existing?.status !== "PENDING") {
+    const existing = await this.invites.getInviteWithOrganization({ inviteId, organizationId });
+    if (existing.status !== "PENDING") {
       throw new InviteNotFoundError("Invitation not found");
     }
 
@@ -146,8 +146,8 @@ export class InviteLifecycleService {
       return { notifiedAdmins: 0 };
     }
 
-    const existing = await this.invites.tryFindInviteByCodeWithOrganization({ inviteCode });
-    if (existing?.status !== "PENDING" || !existing.organization) {
+    const existing = await this.invites.getInviteByCodeWithOrganization({ inviteCode });
+    if (existing.status !== "PENDING" || !existing.organization) {
       throw new InviteNotFoundError("Invitation not found");
     }
 

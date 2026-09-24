@@ -31,6 +31,7 @@ import type {
   SsoAuthenticationActivityApi,
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
+import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -97,8 +98,8 @@ class StubFederation implements BetterAuthFederation {
 }
 
 class StubInvites implements BetterAuthPendingInvite {
-  tryFindPendingByOrganizationAndEmail(): Promise<null> {
-    return Promise.resolve(null);
+  getPendingByOrganizationAndEmail(): Promise<never> {
+    return Promise.reject(new InviteNotFoundError());
   }
   applyInvite(): Promise<void> {
     return Promise.reject(new Error("unused"));
@@ -124,8 +125,8 @@ function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooks
     throw new Error("this repository member is not used by this test");
   };
   return {
-    tryFindUserForHooks: unused,
-    tryFindOrganizationBySsoDomain: unused,
+    getUserForHooks: unused,
+    getOrganizationBySsoDomain: unused,
     countAccountsForUser: unused,
     findFederatedAccountsForUser: unused,
     findFederatedAccountsForUsers: unused,
@@ -143,9 +144,12 @@ function organizationRepo(
   organization: BetterAuthHookOrganization | null,
 ): BetterAuthHooksRepository {
   return hooksRepo({
-    tryFindOrganizationBySsoDomain: vi
-      .fn<BetterAuthHooksRepository["tryFindOrganizationBySsoDomain"]>()
-      .mockResolvedValue(organization),
+    getOrganizationBySsoDomain: vi
+      .fn<BetterAuthHooksRepository["getOrganizationBySsoDomain"]>()
+      .mockImplementation(async () => {
+        if (organization === null) throw new OrganizationNotFoundError();
+        return organization;
+      }),
     createOrganizationMembership: vi
       .fn<BetterAuthHooksRepository["createOrganizationMembership"]>()
       .mockResolvedValue("created"),

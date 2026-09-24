@@ -118,8 +118,8 @@ class StubRepository extends OrganizationRepository {
     return true;
   }
 
-  tryFindPersonalWorkspace(): Promise<PersonalWorkspace | null> {
-    return Promise.resolve(null);
+  getPersonalWorkspace(): Promise<PersonalWorkspace> {
+    return Promise.reject(new TeamNotFoundError());
   }
 
   ensurePersonalWorkspace(): Promise<{
