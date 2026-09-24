@@ -34,6 +34,7 @@ function installation(role: "api" | "worker" | "tasks") {
       },
     })
     .withStores(memoryStores())
+    .withMember("isSaas", false)
     .withMember("encryption", {
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,

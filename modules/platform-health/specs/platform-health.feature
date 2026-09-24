@@ -102,3 +102,27 @@ Feature: One platform health answer for an external monitor
     Given a deployment that configured no platform health key
     When a monitor asks for the platform health
     Then there is no such route
+
+  Rule: /api/health/* answers an orchestrator's project-keyed probe in main's words
+
+    @integration
+    Scenario: A project-keyed probe with no token is refused with main's sentence
+      When an orchestrator asks /api/health/collector without X-Auth-Token or a Bearer token
+      Then it answers 401 with {"message":"Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token."}
+
+    @integration
+    Scenario: A project-keyed probe with an unknown key is refused
+      When an orchestrator asks /api/health/evaluations with a key that resolves to no project
+      Then it answers 401 with {"message":"Invalid auth token."}
+
+    @integration
+    Scenario: A project-keyed probe accepts an API key as a Bearer token and forwards it
+      Given an API key that resolves to a project
+      When an orchestrator asks /api/health/evaluations with that key as a Bearer token
+      Then the sample evaluation is sent with the same key and the project id
+      And it answers 200 with the canary's status and body
+
+    @integration
+    Scenario: A project-keyed probe reports a missing trigger as main did
+      When an orchestrator asks /api/health/triggers for a trigger the project does not have
+      Then it answers 404 with {"message":"Trigger not found."}

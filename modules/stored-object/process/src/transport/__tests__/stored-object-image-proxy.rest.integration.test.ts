@@ -27,6 +27,7 @@ function proxy() {
     "https://pics.test/evil.svg": answered({ contentType: "image/svg+xml" }),
     "https://pics.test/page": answered({ contentType: "text/html" }),
     "https://pics.test/gone": answered({ ok: false, status: 404, statusText: "Not Found" }),
+    "https://pics.test/origin-down": answered({ ok: false, status: 520, statusText: "" }),
   });
   const app = createStoredObjectTestApp({ images });
   const runtime = createRestRuntime({
@@ -91,6 +92,15 @@ describe("GET /api/image-proxy", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "Failed to fetch image: Not Found" });
+  });
+
+  /** @scenario "the image proxy passes on an outside refusal" */
+  it("echoes an upstream status no registry names, as main did", async () => {
+    const response = await proxy()(at("https://pics.test/origin-down"));
+
+    expect(response.status).toBe(520);
+    expect(await response.json()).toEqual({ error: "Failed to fetch image: " });
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
   /** @scenario "the image proxy answers 500 when the address cannot be reached" */

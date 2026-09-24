@@ -1,26 +1,23 @@
-import {
-  IMAGE_PROXY_UPSTREAM_STATUSES,
-  type ImageProxyAnswer,
-  type ImageProxyRequest,
-  type ImageProxyStatus,
-} from "@langwatch/stored-object-contract";
+import { STORED_OBJECT_RESPONSE_BASE_HEADERS } from "@langwatch/api/rest";
+import type { ImageProxyRequest } from "@langwatch/stored-object-contract";
 
 import type { ExternalImageChannel } from "../channels/external-image.channel.ts";
 
 /** Pictures are immutable at their address, so the browser may keep one for a year. */
 const IMAGE_CACHE_CONTROL = "public, max-age=31536000";
 
-/** The whole answer, already in hand, as the one chunk of a stream. */
-async function* once(bytes: Uint8Array): AsyncIterable<Uint8Array> {
-  yield bytes;
-}
+/** Every answer carries stored-object's read headers, so relayed bytes cannot run as a page. */
+const relayed = (
+  body: Uint8Array<ArrayBuffer>,
+  status: number,
+  headers: Readonly<Record<string, string>>,
+): Response =>
+  new Response(body, { status, headers: { ...STORED_OBJECT_RESPONSE_BASE_HEADERS, ...headers } });
 
-const refusal = (status: ImageProxyStatus, error: string): ImageProxyAnswer => ({
-  status,
-  mediaType: "application/json",
-  body: once(new TextEncoder().encode(JSON.stringify({ error }))),
-  headers: {},
-});
+const refusal = (status: number, error: string): Response =>
+  relayed(new TextEncoder().encode(JSON.stringify({ error })), status, {
+    "Content-Type": "application/json",
+  });
 
 /** `GET /api/image-proxy`, answering each outcome with main's status and body. */
 export class ImageProxyService {
@@ -34,16 +31,13 @@ export class ImageProxyService {
     return new ImageProxyService(options.images);
   }
 
-  async proxy({ url }: ImageProxyRequest): Promise<ImageProxyAnswer> {
+  async proxy({ url }: ImageProxyRequest): Promise<Response> {
     if (!url) return refusal(400, "Missing url");
 
     try {
       const response = await this.#images.fetch(url);
       if (!response.ok) {
-        return refusal(
-          upstreamStatus(response.status),
-          `Failed to fetch image: ${response.statusText}`,
-        );
+        return refusal(response.status, `Failed to fetch image: ${response.statusText}`);
       }
 
       const contentType = response.contentType;
@@ -51,18 +45,12 @@ export class ImageProxyService {
         return refusal(400, "URL does not point to an image");
       }
 
-      return {
-        status: 200,
-        mediaType: contentType,
-        body: once(await response.bytes()),
-        headers: { "Cache-Control": IMAGE_CACHE_CONTROL },
-      };
+      return relayed(await response.bytes(), 200, {
+        "Content-Type": contentType,
+        "Cache-Control": IMAGE_CACHE_CONTROL,
+      });
     } catch {
       return refusal(500, "Failed to fetch image");
     }
   }
-}
-
-function upstreamStatus(status: number): ImageProxyStatus {
-  return IMAGE_PROXY_UPSTREAM_STATUSES.find((known) => known === status) ?? 502;
 }

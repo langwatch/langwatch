@@ -6,9 +6,6 @@
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023", "dom"],
-    "paths": {
-      "zod": ["../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"]
-    },
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "types": ["node", "vitest/globals"]
@@ -20,6 +17,9 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
       "path": "../../automation/contract/tsconfig.build.json"

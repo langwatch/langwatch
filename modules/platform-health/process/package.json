@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",

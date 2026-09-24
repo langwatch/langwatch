@@ -1,3 +1,4 @@
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -7,6 +8,7 @@ import {
   type PlatformHealthQuery,
   type PlatformHealthReport,
   PLATFORM_HEALTH_CHECK_NAMES,
+  type ProjectKeyedProbeRequest,
 } from "@langwatch/platform-health-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate } from "@langwatch/time";
@@ -15,6 +17,7 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import { HttpSubsystemProbeChannel } from "../channels/http/http.subsystem-probe.channel.ts";
 import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
+import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
 import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
 import {
   SubsystemProbeService,
@@ -46,16 +49,23 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     automation: AutomationApi,
     workflow: WorkflowApi,
     projects: ProjectApi,
+    apiKeys: ApiKeyApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["secrets", "publicBaseUrl"] as const;
 
   readonly #health: PlatformHealthService;
   readonly #key: PlatformHealthKeyService;
+  readonly #projectKeyed: ProjectKeyedProbeService;
 
-  private constructor(health: PlatformHealthService, key: PlatformHealthKeyService) {
+  private constructor(
+    health: PlatformHealthService,
+    key: PlatformHealthKeyService,
+    projectKeyed: ProjectKeyedProbeService,
+  ) {
     this.#health = health;
     this.#key = key;
+    this.#projectKeyed = projectKeyed;
   }
 
   static create({ dependencies, members }: PlatformHealthSetup): PlatformHealthApp {
@@ -88,7 +98,17 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
       PlatformHealthKeyService.create({
         apiKey: members.secrets.find("PLATFORM_HEALTH_API_KEY") ?? "",
       }),
+      ProjectKeyedProbeService.create({
+        probes,
+        resolveProject: async (input) =>
+          (await dependencies.apiKeys.findResolvedToken(input))?.project.id ?? null,
+      }),
     );
+  }
+
+  /** `/api/health/*`: one probe, run as the caller's own project key, answered in main's words. */
+  probeWithProjectKey(request: ProjectKeyedProbeRequest): Promise<Response> {
+    return this.#projectKeyed.probe(request);
   }
 
   checkAll(query: PlatformHealthQuery): Promise<PlatformHealthReport> {

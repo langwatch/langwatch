@@ -4,7 +4,7 @@ export type ExternalImageResponse = Readonly<{
   status: number;
   statusText: string;
   contentType: string | null;
-  bytes(): Promise<Uint8Array>;
+  bytes(): Promise<Uint8Array<ArrayBuffer>>;
 }>;
 
 /** Pictures at addresses this deployment does not own, fetched behind the egress fence. */

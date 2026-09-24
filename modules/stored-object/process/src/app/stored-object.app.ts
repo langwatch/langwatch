@@ -12,7 +12,6 @@ import {
   storedObjectConfig,
   type WriteStoredObjectUploadInput,
   type DeleteProjectStoredObjectsResult,
-  type ImageProxyAnswer,
   type ImageProxyRequest,
   type ReadStoredObjectResult,
   type StoreStoredObjectFromBytesInput,
@@ -76,7 +75,7 @@ type StoredObjectMembers = Pick<
   ProcessMembers,
   "clickhouse" | "logger" | "objectStorage" | "encryption" | "rateLimiter"
 > &
-  Readonly<{ publicBaseUrl: string | undefined }>;
+  Readonly<{ publicBaseUrl: string | undefined; isSaas: boolean }>;
 
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
@@ -96,6 +95,7 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     "encryption",
     "rateLimiter",
     "publicBaseUrl",
+    "isSaas",
   ] as const;
 
   /**
@@ -115,6 +115,7 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
         policy: {
           blockLocal: setup.config.blockLocalHttpCalls,
           allowedHosts: setup.config.allowedProxyHosts,
+          verifyTls: setup.members.isSaas,
         },
       }),
     });
@@ -173,7 +174,7 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
   }
 
   /** `GET /api/image-proxy`: an outside picture fetched behind the egress fence. */
-  proxyImage(input: ImageProxyRequest): Promise<ImageProxyAnswer> {
+  proxyImage(input: ImageProxyRequest): Promise<Response> {
     return this.#images.proxy(input);
   }
 

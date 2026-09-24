@@ -60,3 +60,20 @@ export const platformHealthQuerySchema = z.object({
 });
 
 export type PlatformHealthQuery = z.infer<typeof platformHealthQuerySchema>;
+
+/** The headers a project-keyed `/api/health/*` probe reads its caller's key from. */
+export const healthProbeHeadersSchema = z.object({
+  "x-auth-token": z.string().optional(),
+  authorization: z.string().optional(),
+  "x-project-id": z.string().optional(),
+});
+
+export type HealthProbeHeaders = z.infer<typeof healthProbeHeadersSchema>;
+
+/** One project-keyed probe: which subsystem, and what the caller presented. */
+export type ProjectKeyedProbeRequest = Readonly<{
+  check: PlatformHealthCheckName;
+  headers: HealthProbeHeaders;
+  triggerId?: string | undefined;
+  workflowId?: string | undefined;
+}>;

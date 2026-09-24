@@ -38,6 +38,7 @@ function installed({ authz, allowed = true }: Scripted) {
       },
     })
     .withStores(memoryStores())
+    .withMember("isSaas", false)
     .withMember("encryption", {
       encrypt: (value: string) => value,
       decrypt: (value: string) => value,

@@ -14,6 +14,8 @@ export const EXTERNAL_IMAGE_TIMEOUT_MS = 30_000;
 export type ExternalImageEgressPolicy = Readonly<{
   blockLocal: boolean;
   allowedHosts: readonly string[];
+  /** Main verified certificates only on the hosted product, so on-prem self-signed hosts load. */
+  verifyTls: boolean;
 }>;
 
 /** Every hop, redirects included, is validated and fetched at its validated address. */
@@ -32,7 +34,7 @@ export class HttpExternalImageChannel implements ExternalImageChannel {
         blockLocal: options.policy.blockLocal,
         allowedHosts: [...options.policy.allowedHosts],
       }),
-      { rejectUnauthorized: true },
+      { rejectUnauthorized: options.policy.verifyTls },
     );
   }
 
