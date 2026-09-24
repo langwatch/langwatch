@@ -1,4 +1,4 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, gatewayLegacyUrl, gatewayPublicUrl, type ConfigOf } from "@langwatch/config";
 import { z } from "zod";
 
 import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
@@ -17,9 +17,9 @@ export const gatewayConfig = Config.define((c) => ({
   /** Where the gateway is told to reach this control plane; the public base URL otherwise. */
   controlPlaneUrl: c.env("GATEWAY_CONTROL_PLANE_URL", z.string().optional()),
   /** Where apps reach the gateway, when no internal address is set. Legacy name, still honoured. */
-  baseUrl: c.env("LW_GATEWAY_BASE_URL", z.string().optional()),
+  baseUrl: gatewayLegacyUrl,
   /** Where apps outside the deployment reach the gateway. */
-  publicUrl: c.env("LW_GATEWAY_PUBLIC_URL", z.string().optional()),
+  publicUrl: gatewayPublicUrl,
 }));
 
 export type GatewayServerConfig = ConfigOf<typeof gatewayConfig>;

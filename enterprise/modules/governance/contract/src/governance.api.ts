@@ -122,6 +122,7 @@ import type {
   EnsureDefaultPersonalVirtualKeyInput,
   IssuePersonalVirtualKeyInput,
   IssuedPersonalVirtualKey,
+  IssuedPersonalVirtualKeyAnswer,
   ListPersonalVirtualKeysInput,
   PersonalVirtualKey,
   RevokeAllPersonalVirtualKeysInput,
@@ -391,6 +392,13 @@ export interface GovernanceTemplateDraft {
   ottlRules?: string;
 }
 
+/** Who a call is attributed to, and (for a lazy backfill) what to name them. */
+export interface GovernanceCaller {
+  readonly id: string;
+  readonly displayName?: string | null;
+  readonly displayEmail?: string | null;
+}
+
 /** The ingestion-template operations the governance REST family calls. */
 export interface GovernanceRestApi {
   cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer>;
@@ -461,6 +469,33 @@ export interface GovernanceRestApi {
   templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
   templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;
   templateCloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate>;
+  listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
+  getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
+  createRoutingPolicy(
+    input: Omit<CreateRoutingPolicyInput, "actorUserId">,
+    by: GovernanceCaller,
+  ): Promise<RoutingPolicy>;
+  updateRoutingPolicy(
+    input: Omit<UpdateRoutingPolicyInput, "actorUserId">,
+    by: GovernanceCaller,
+  ): Promise<RoutingPolicy>;
+  setDefaultRoutingPolicy(
+    input: Omit<SetDefaultRoutingPolicyInput, "actorUserId">,
+    by: GovernanceCaller,
+  ): Promise<RoutingPolicy>;
+  deleteRoutingPolicy(input: DeleteRoutingPolicyInput): Promise<void>;
+  listPersonalVirtualKeys(
+    input: { organizationId: string; targetUserId?: string },
+    by: GovernanceCaller,
+  ): Promise<PersonalVirtualKey[]>;
+  issuePersonalVirtualKey(
+    input: { organizationId: string; label: string; routingPolicyId?: string },
+    by: GovernanceCaller,
+  ): Promise<IssuedPersonalVirtualKeyAnswer>;
+  revokePersonalVirtualKey(
+    input: { organizationId: string; id: string },
+    by: GovernanceCaller,
+  ): Promise<void>;
   cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
   cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;

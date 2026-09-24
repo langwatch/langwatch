@@ -48,7 +48,7 @@ type RoutingPolicy = {
 export class DefaultGovernancePersonalVirtualKeyService {
   private readonly repository: PersonalVirtualKeyRepository;
   private readonly issuer: PersonalVirtualKeyIssuer;
-  private readonly organizations: OrganizationService;
+  private readonly organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
   private readonly policies: RoutingPolicyReader;
   private readonly gatewayBaseUrl: string;
 
@@ -61,7 +61,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
   }: {
     repository: PersonalVirtualKeyRepository;
     issuer: PersonalVirtualKeyIssuer;
-    organizations: OrganizationService;
+    organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }) {
@@ -75,7 +75,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
   static create(options: {
     repository: PersonalVirtualKeyRepository;
     issuer: PersonalVirtualKeyIssuer;
-    organizations: OrganizationService;
+    organizations: Pick<OrganizationService, "ensurePersonalWorkspace">;
     policies: RoutingPolicyReader;
     gatewayBaseUrl: string;
   }): DefaultGovernancePersonalVirtualKeyService {

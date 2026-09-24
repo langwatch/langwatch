@@ -5,6 +5,8 @@
  * The process parses the schema once and hands the result down; a secret is
  * resolved only through its handle, never read from `process.env`.
  */
+import { Config, gatewayLegacyUrl, gatewayPublicUrl, type ConfigOf } from "@langwatch/config";
+import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -45,3 +47,22 @@ export type GovernanceAppConfig = z.infer<typeof governanceAppConfigSchema>;
 export const governanceSecrets = {
   erasurePseudonymSecret: Secret.load("GOVERNANCE_ERASURE_PSEUDONYM_SECRET", { optional: true }),
 } as const;
+
+/** The deployment facts governance reads: where issued personal keys send traffic. */
+export const governanceConfig = Config.define(() => ({ gatewayPublicUrl, gatewayLegacyUrl }));
+export type GovernanceConfig = ConfigOf<typeof governanceConfig>;
+
+/** Main's precedence: the public URL, the legacy base URL, then the SaaS or local default. */
+export function governanceGatewayBaseUrl({
+  config,
+  isSaas,
+}: {
+  config: GovernanceConfig | undefined;
+  isSaas: boolean;
+}): string {
+  return resolveGatewayBaseUrl({
+    LW_GATEWAY_PUBLIC_URL: config?.gatewayPublicUrl,
+    LW_GATEWAY_BASE_URL: config?.gatewayLegacyUrl,
+    IS_SAAS: isSaas,
+  });
+}

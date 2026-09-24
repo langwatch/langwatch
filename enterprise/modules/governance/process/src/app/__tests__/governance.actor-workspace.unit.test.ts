@@ -10,6 +10,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import {
   type OrganizationApi,
@@ -83,8 +84,9 @@ async function buildApp(options: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
+      gateway: createApiFixture<GatewayApi>(),
     },
-    members: { prisma, encryption: createApiFixture<GovernanceEncryptor>() },
+    members: { prisma, encryption: createApiFixture<GovernanceEncryptor>(), isSaas: false },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });

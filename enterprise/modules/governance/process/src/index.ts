@@ -32,7 +32,6 @@ export type {
   GovernanceActorUser,
   GovernanceAppDependencies,
   GovernanceBespokeMembers,
-  GovernanceCaller,
   GovernancePersonalVirtualKeyMembers,
 } from "./app/governance.app.ts";
 

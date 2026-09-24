@@ -11,6 +11,7 @@ import { DEFAULT_SPEND_SPIKE_CONFIG } from "@langwatch/enterprise-governance-con
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -59,10 +60,12 @@ async function buildApp(planType: string) {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
+      gateway: createApiFixture<GatewayApi>(),
     },
     members: {
       prisma: createApiFixture<GovernanceMemberDatabase>(),
       encryption: createApiFixture<GovernanceEncryptor>(),
+      isSaas: false,
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

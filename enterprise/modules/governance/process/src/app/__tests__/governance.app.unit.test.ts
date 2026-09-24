@@ -14,6 +14,7 @@ import type {
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -66,8 +67,13 @@ async function buildApp() {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
+      gateway: createApiFixture<GatewayApi>(),
     },
-    members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
+    members: {
+      prisma: unreachablePrisma,
+      encryption: createApiFixture<GovernanceEncryptor>(),
+      isSaas: false,
+    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
@@ -104,10 +110,12 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
+      gateway: createApiFixture<GatewayApi>(),
     },
     members: {
       prisma: unreachablePrisma,
       encryption: createApiFixture<GovernanceEncryptor>(),
+      isSaas: false,
       governance,
       cli: {
         members: unreachable<GovernanceCliMembers["members"]>(),
@@ -272,6 +280,8 @@ describe("GovernanceApp as the module a process installs", () => {
 
       expect(governanceServer.transports.map((transport) => transport.protocol)).toEqual([
         "rest",
+        "trpc",
+        "trpc",
         "trpc",
         "trpc",
         "trpc",

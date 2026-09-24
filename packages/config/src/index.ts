@@ -15,6 +15,8 @@ export {
 export {
   allowedProxyHosts,
   blockLocalHttpCalls,
+  gatewayLegacyUrl,
+  gatewayPublicUrl,
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,
   langwatchDefaultModel,

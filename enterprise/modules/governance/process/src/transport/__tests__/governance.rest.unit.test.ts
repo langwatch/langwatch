@@ -22,6 +22,7 @@ import {
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -136,8 +137,13 @@ async function buildApi(
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
+      gateway: createApiFixture<GatewayApi>(),
     },
-    members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
+    members: {
+      prisma: unreachablePrisma,
+      encryption: createApiFixture<GovernanceEncryptor>(),
+      isSaas: false,
+    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });

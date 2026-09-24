@@ -80,6 +80,11 @@ import {
   GovernanceRestApi,
   type IngestionTemplate,
   type CliSessionCard,
+  type IssuedPersonalVirtualKeyAnswer,
+  type GovernanceCaller,
+  type GovernanceConfig,
+  governanceConfig,
+  governanceGatewayBaseUrl,
   type CliSessionRevocation,
   type CliUserInput,
   type RevokeCliSessionInput,
@@ -90,7 +95,6 @@ import {
   type CloneIngestionTemplateInput,
   type CreateIngestionTemplateInput,
   type UpdateIngestionTemplateOttlInput,
-  type IssuedPersonalVirtualKey,
   type ListPersonalVirtualKeysInput,
   type ListRoutingPoliciesInput,
   type GovernanceActorWorkspace,
@@ -112,6 +116,7 @@ import {
 } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import {
@@ -119,7 +124,6 @@ import {
   type OrganizationService,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
-import { reads } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 
@@ -168,6 +172,8 @@ import {
   type GovernanceIngestTraceCollection,
 } from "../services/governance-ingest-receiver.service.ts";
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
+import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
+import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
@@ -191,6 +197,7 @@ import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
 } from "../services/personal-usage-dashboard.service.ts";
+import { GatewayPersonalVirtualKeyIssuerService } from "../services/personal-virtual-key-issuer.service.ts";
 import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../services/puller-registry.service.ts";
@@ -332,6 +339,7 @@ export interface GovernanceAppDependencies {
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
   traces: Pick<TraceApi, "otlpTraces">;
   apiKeys: Pick<ApiKeyApi, "revokeCliSessionKey">;
+  gateway: Pick<GatewayApi, "createVirtualKey" | "revokeVirtualKey">;
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<
     AuthApi,
@@ -382,13 +390,6 @@ export interface GovernanceAppDependencies {
   ingest?: GovernanceIngestMembers;
 }
 
-/** Who a call is attributed to, and (for a lazy backfill) what to name them. */
-export interface GovernanceCaller {
-  readonly id: string;
-  readonly displayName?: string | null;
-  readonly displayEmail?: string | null;
-}
-
 /**
  * What a process cannot hand this application from a peer's API: the
  * governance capability itself and the four bespoke directories behind it.
@@ -421,17 +422,21 @@ export type GovernanceBespokeMembers = Omit<
  */
 type GovernanceSetup = Readonly<{
   dependencies: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["dependencies"];
-  config: undefined;
+  config: GovernanceConfig | undefined;
   resources: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["resources"];
   secrets: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["secrets"];
-  members: Readonly<{ prisma: GovernanceMemberDatabase; encryption: GovernanceEncryptor }> &
+  members: Readonly<{
+    prisma: GovernanceMemberDatabase;
+    encryption: GovernanceEncryptor;
+    isSaas: boolean;
+  }> &
     Pick<GovernanceBespokeMembers, "governance" | "cli" | "ingest">;
   repositories: GovernanceRepositories;
 }>;
 
 export class GovernanceApp implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = reads("prisma", "encryption");
+  static readonly reads = ["prisma", "encryption", "isSaas"] as const;
   /**
    * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -448,10 +453,13 @@ export class GovernanceApp implements GovernanceRestApi {
     featureFlags: FeatureFlagApi,
     traces: TraceApi,
     apiKeys: ApiKeyApi,
+    gateway: GatewayApi,
   };
+  static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
 
   static async create({
+    config,
     members,
     dependencies,
     repositories,
@@ -483,10 +491,12 @@ export class GovernanceApp implements GovernanceRestApi {
         featureFlags: dependencies.featureFlags,
         traces: dependencies.traces,
         apiKeys: dependencies.apiKeys,
+        gateway: dependencies.gateway,
       },
       repositories,
       erasureSuppression,
       encryption: members.encryption,
+      gatewayBaseUrl: governanceGatewayBaseUrl({ config, isSaas: members.isSaas }),
     });
   }
 
@@ -495,16 +505,28 @@ export class GovernanceApp implements GovernanceRestApi {
     repositories,
     erasureSuppression,
     encryption,
+    gatewayBaseUrl,
   }: {
     dependencies: GovernanceAppDependencies;
     repositories: GovernanceRepositories;
     erasureSuppression: ErasureSuppressionService;
     encryption: GovernanceEncryptor;
+    gatewayBaseUrl: string;
   }) {
     this.dependencies = dependencies;
     this.repositories = repositories;
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
+    this.routingPolicies = DefaultGovernanceRoutingPolicyService.create({
+      repository: repositories.routingPolicies,
+    });
+    this.personalKeys = DefaultGovernancePersonalVirtualKeyService.create({
+      repository: repositories.personalVirtualKeys,
+      issuer: GatewayPersonalVirtualKeyIssuerService.create(dependencies.gateway),
+      organizations: dependencies.organizations,
+      policies: this.routingPolicies,
+      gatewayBaseUrl,
+    });
     this.cliSessions = DefaultGovernanceCliSessionInventoryService.create({
       auth: dependencies.auth,
       loginKeys: dependencies.apiKeys,
@@ -623,6 +645,8 @@ export class GovernanceApp implements GovernanceRestApi {
 
   private readonly dependencies: GovernanceAppDependencies;
   private readonly anomalyRules: AnomalyRuleService;
+  private readonly routingPolicies: DefaultGovernanceRoutingPolicyService;
+  private readonly personalKeys: DefaultGovernancePersonalVirtualKeyService;
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly departments: DepartmentService;
   private readonly agentDiscovery: AgentDiscoveryService;
@@ -1273,7 +1297,7 @@ export class GovernanceApp implements GovernanceRestApi {
       organizationId: input.organizationId,
       ...(principalUserId === undefined ? {} : { userId: principalUserId }),
     };
-    return this.governanceApi.personalVirtualKeyList(query);
+    return this.personalKeys.list(query);
   }
 
   /**
@@ -1284,7 +1308,7 @@ export class GovernanceApp implements GovernanceRestApi {
   async issuePersonalVirtualKey(
     input: { organizationId: string; label: string; routingPolicyId?: string },
     by: GovernanceCaller,
-  ): Promise<IssuedPersonalVirtualKey> {
+  ): Promise<IssuedPersonalVirtualKeyAnswer> {
     await this.assertOrganizationMembership({
       organizationId: input.organizationId,
       userId: by.id,
@@ -1306,7 +1330,7 @@ export class GovernanceApp implements GovernanceRestApi {
     if (duplicate) throw new PersonalVirtualKeyLabelTakenError(input.label);
 
     try {
-      return await this.governanceApi.personalVirtualKeyIssue({
+      const issued = await this.personalKeys.issue({
         userId: by.id,
         organizationId: input.organizationId,
         personalProjectId: workspace.project.id,
@@ -1314,6 +1338,14 @@ export class GovernanceApp implements GovernanceRestApi {
         label: input.label,
         routingPolicyId: input.routingPolicyId,
       });
+      return {
+        id: issued.id,
+        label: issued.label,
+        secret: issued.secret,
+        baseUrl: issued.baseUrl,
+        displayPrefix: issued.virtualKey.displayPrefix,
+        routingPolicyId: issued.routingPolicyId,
+      };
     } catch (error) {
       if (error instanceof NoEligibleProvidersError) {
         throw new NoEligibleModelProvidersError(error.organizationId);
@@ -1336,7 +1368,7 @@ export class GovernanceApp implements GovernanceRestApi {
     });
 
     try {
-      await this.governanceApi.personalVirtualKeyRevoke({
+      await this.personalKeys.revoke({
         userId: by.id,
         organizationId: input.organizationId,
         virtualKeyId: input.id,
@@ -1470,12 +1502,12 @@ export class GovernanceApp implements GovernanceRestApi {
 
   /** Policies in an organization, optionally narrowed to one scope's choices. */
   listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
-    return this.governanceApi.routingPolicyList(input);
+    return this.routingPolicies.list(input);
   }
 
   /** One policy by id, including its scope rows. */
   getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy> {
-    return this.governanceApi.routingPolicyGetById(input);
+    return this.routingPolicies.getById(input);
   }
 
   /** Creates a policy, attributed to the caller who asked for it. */
@@ -1484,7 +1516,7 @@ export class GovernanceApp implements GovernanceRestApi {
     by: GovernanceCaller,
   ): Promise<RoutingPolicy> {
     try {
-      return await this.governanceApi.routingPolicyCreate({
+      return await this.routingPolicies.create({
         ...input,
         actorUserId: by.id,
       });
@@ -1499,7 +1531,7 @@ export class GovernanceApp implements GovernanceRestApi {
     by: GovernanceCaller,
   ): Promise<RoutingPolicy> {
     try {
-      return await this.governanceApi.routingPolicyUpdate({
+      return await this.routingPolicies.update({
         ...input,
         actorUserId: by.id,
       });
@@ -1513,7 +1545,7 @@ export class GovernanceApp implements GovernanceRestApi {
     input: Omit<SetDefaultRoutingPolicyInput, "actorUserId">,
     by: GovernanceCaller,
   ): Promise<RoutingPolicy> {
-    return this.governanceApi.routingPolicySetDefault({
+    return this.routingPolicies.setDefault({
       ...input,
       actorUserId: by.id,
     });
@@ -1521,7 +1553,7 @@ export class GovernanceApp implements GovernanceRestApi {
 
   /** Removes one policy from the organization. */
   deleteRoutingPolicy(input: DeleteRoutingPolicyInput): Promise<void> {
-    return this.governanceApi.routingPolicyDelete(input);
+    return this.routingPolicies.delete(input);
   }
 
   // ── Internals ─────────────────────────────────────────────────────────────

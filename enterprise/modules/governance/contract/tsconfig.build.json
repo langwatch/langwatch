@@ -28,6 +28,9 @@
       "path": "../../../../modules/api-key/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
     },
     {
