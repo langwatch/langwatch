@@ -13,6 +13,8 @@ import {
   updateUserProfileInputSchema,
   userEmailInputSchema,
   userIdInputSchema,
+  userNotificationTopicInputSchema,
+  setUserNotificationPreferenceInputSchema,
   userProfilesInputSchema,
   type CreateUserInput,
   type CreateCredentialUserInput,
@@ -35,6 +37,9 @@ import {
   type UserSsoStatus,
   type UserTourPreference,
   type UserCodeAccessPreference,
+  type UserNotificationPreference,
+  type UserNotificationTopicInput,
+  type SetUserNotificationPreferenceInput,
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
@@ -276,6 +281,24 @@ export class UserService {
       id: parsed.id,
       dismissedAt: this.now(),
     });
+  }
+
+  async getNotificationPreference(
+    input: UserNotificationTopicInput,
+  ): Promise<UserNotificationPreference> {
+    const parsed = userNotificationTopicInputSchema.parse(input);
+    const stored = await this.repository.findNotificationPreferences(parsed.id);
+
+    return { topic: parsed.topic, choice: stored[parsed.topic] ?? null };
+  }
+
+  async setNotificationPreference(
+    input: SetUserNotificationPreferenceInput,
+  ): Promise<UserNotificationPreference> {
+    const parsed = setUserNotificationPreferenceInputSchema.parse(input);
+    await this.repository.setNotificationPreference(parsed);
+
+    return { topic: parsed.topic, choice: parsed.choice };
   }
 
   async updateLastLogin(input: UserIdInput): Promise<void> {

@@ -12,6 +12,7 @@ import {
   userCredentialAccountRowSchema,
   userCredentialAccountSchema,
   userPasskeyNudgeStatusSchema,
+  userNotificationChoiceSchema,
   type CreateUserInput,
   type UpdateUserProfileInput,
   type UserAccountInfo,
@@ -20,6 +21,8 @@ import {
   type UserProfile,
   type UserTourPreference,
   type UserCodeAccessPreference,
+  type UserNotificationChoice,
+  type UserNotificationTopic,
   type CreatedUser,
   type SetFirstUserPasswordResult,
   type UserUsageCount,
@@ -31,6 +34,20 @@ import type {
   SetFirstUserPasswordRow,
   UserRepository,
 } from "../user.repository.ts";
+
+/**
+ * The stored map, read leniently: a choice this release does not know (one a
+ * newer release wrote) is dropped rather than failing the read.
+ */
+function readNotificationPreferences(value: unknown): Record<string, UserNotificationChoice> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  const known: Record<string, UserNotificationChoice> = {};
+  for (const [topic, choice] of Object.entries(value)) {
+    const parsed = userNotificationChoiceSchema.safeParse(choice);
+    if (parsed.success) known[topic] = parsed.data;
+  }
+  return known;
+}
 
 /** The three models and the transaction runner these statements need. */
 export type UserDatabase = Pick<PrismaClient, "user" | "account" | "passkey" | "$transaction">;
@@ -310,6 +327,28 @@ export class PrismaUserRepository
     return userTourPreferenceSchema.parse({
       dismissed: true,
       dismissedAt: userTourPreferenceRowSchema.parse(row).tracesExplorerTourDismissedAt,
+    });
+  }
+
+  async findNotificationPreferences(id: string): Promise<Record<string, UserNotificationChoice>> {
+    const row = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      select: { notificationPreferences: true },
+    });
+
+    return readNotificationPreferences(row.notificationPreferences);
+  }
+
+  /** One topic is merged into the stored map; the other topics keep their answers. */
+  async setNotificationPreference(input: {
+    id: string;
+    topic: UserNotificationTopic;
+    choice: UserNotificationChoice;
+  }): Promise<void> {
+    const stored = await this.findNotificationPreferences(input.id);
+    await this.prisma.user.update({
+      where: { id: input.id },
+      data: { notificationPreferences: { ...stored, [input.topic]: input.choice } },
     });
   }
 

@@ -72,6 +72,9 @@ import type {
   UserSsoStatus,
   UserTourPreference,
   UserCodeAccessPreference,
+  UserNotificationPreference,
+  UserNotificationTopicInput,
+  SetUserNotificationPreferenceInput,
   UpdateUserProfileInput,
   UserApiBudgetOverviewInput,
   UserApiPersonalUsageInput,
@@ -369,6 +372,20 @@ export class UserApp implements UserApi {
 
   setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
     return this.#users.setLangyCodeAccessPreference(input);
+  }
+
+  /** The person's own answer about one topic's browser notifications. */
+  getNotificationPreference(
+    input: UserNotificationTopicInput,
+  ): Promise<UserNotificationPreference> {
+    return this.#users.getNotificationPreference(input);
+  }
+
+  /** Records the person's answer about one topic's browser notifications. */
+  setNotificationPreference(
+    input: SetUserNotificationPreferenceInput,
+  ): Promise<UserNotificationPreference> {
+    return this.#users.setNotificationPreference(input);
   }
 
   /**

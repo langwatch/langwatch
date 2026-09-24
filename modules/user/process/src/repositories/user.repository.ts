@@ -11,6 +11,8 @@ import type {
   UserFullProfile,
   UserPasskeyNudgeStatus,
   UserProfile,
+  UserNotificationChoice,
+  UserNotificationTopic,
   UserTourPreference,
   UserCodeAccessPreference,
   UserUsageCount,
@@ -58,6 +60,13 @@ export interface UserRepository {
     id: string;
     dismissedAt: Instant;
   }): Promise<UserTourPreference>;
+  /** The stored topic-to-choice map; a topic that is absent was never answered. */
+  findNotificationPreferences(id: string): Promise<Record<string, UserNotificationChoice>>;
+  setNotificationPreference(input: {
+    id: string;
+    topic: UserNotificationTopic;
+    choice: UserNotificationChoice;
+  }): Promise<void>;
   setLastLoginAt(input: { id: string; lastLoginAt: Instant }): Promise<void>;
   findLastHomePath(id: string): Promise<string | null>;
   setLastHomePath(input: { id: string; path: string | null }): Promise<void>;

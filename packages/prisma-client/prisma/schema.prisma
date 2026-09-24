@@ -230,6 +230,11 @@ model User {
   /// employer's organization, not silenced forever by a decision they made
   /// about the old one. Empty means never dismissed anything.
   joinOfferDismissedDomains     String[]                 @default([])
+  /// This person's answer about browser notifications, one entry per topic:
+  /// { "langy": "enabled" | "declined" }. A topic that is absent was never
+  /// answered. The browser's own permission is not stored here.
+  /// Spec: specs/langy/langy-notifications.feature
+  notificationPreferences       Json                     @default("{}")
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]

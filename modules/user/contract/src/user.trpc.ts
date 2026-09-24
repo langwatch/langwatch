@@ -30,12 +30,14 @@ import {
   userApiChangePasswordInputSchema,
   userApiEmptyInputSchema,
   userApiEndBrowserSessionInputSchema,
+  userApiNotificationTopicInputSchema,
   userApiOrganizationInputSchema,
   userApiPersonalUsageInputSchema,
   userApiRegisterInputSchema,
   userApiRequestBudgetIncreaseInputSchema,
   userApiSetAvatarInputSchema,
   userApiSetLastHomePathInputSchema,
+  userApiSetNotificationPreferenceInputSchema,
   userApiSetPasswordInputSchema,
   userApiUnlinkAccountInputSchema,
   userApiUpdateNameInputSchema,
@@ -44,6 +46,7 @@ import {
 import {
   createdUserSchema,
   userAccountInfoSchema,
+  userNotificationPreferenceSchema,
   userSecureAccountOfferSchema,
   userAvatarResultSchema,
   userAvatarUrlSchema,
@@ -71,6 +74,16 @@ export const userTrpc = defineTrpcContract("user")
   .mutation("dismissTraceExplorerTour")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userTourPreferenceSchema)
+
+  // Whether the caller wants browser notifications for one topic. The browser
+  // permission is a separate fact the browser holds; this is the person's answer.
+  .query("getNotificationPreference")
+  .withInput(userApiNotificationTopicInputSchema)
+  .withOutput(userNotificationPreferenceSchema)
+
+  .mutation("setNotificationPreference")
+  .withInput(userApiSetNotificationPreferenceInputSchema)
+  .withOutput(userNotificationPreferenceSchema)
 
   // Whether to render admin-only surfaces. NOT an authorization gate: every
   // operator route asks the same question again on the server.

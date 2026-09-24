@@ -69,6 +69,8 @@ class StubRepository implements UserRepository {
       dismissedAt: toDate(dismissedAt),
     }),
   );
+  findNotificationPreferences = vi.fn(async () => ({}));
+  setNotificationPreference = vi.fn(async () => undefined);
   setLastLoginAt = vi.fn(async () => undefined);
   findLastHomePath = vi.fn(async () => null);
   setLastHomePath = vi.fn(async () => undefined);

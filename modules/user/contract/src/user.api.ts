@@ -64,6 +64,9 @@ import type {
   UserProfile,
   UserSsoStatus,
   UserTourPreference,
+  UserNotificationPreference,
+  UserNotificationTopicInput,
+  SetUserNotificationPreferenceInput,
 } from "./user.ts";
 
 /**
@@ -93,6 +96,11 @@ export interface UserApi {
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference>;
   getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference>;
   setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void>;
+  /** The person's own answer about one topic's browser notifications. */
+  getNotificationPreference(input: UserNotificationTopicInput): Promise<UserNotificationPreference>;
+  setNotificationPreference(
+    input: SetUserNotificationPreferenceInput,
+  ): Promise<UserNotificationPreference>;
   isAdmin(identity: Readonly<{ email?: string | null }>): boolean;
   /** Whether the account behind an id is a platform operator, by its own address. */
   isOperator(input: { userId: string }): Promise<boolean>;
