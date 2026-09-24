@@ -308,7 +308,10 @@ export function hiddenContentCategoryRules(protections: {
       ? []
       : CONTENT_KEY_CATALOG[category].map((pattern) => ({
           pattern,
-          visibleTo: categories[category].visibleTo ?? "no one",
+          // No restrict label means the content is hidden by membership
+          // (or a fail-closed policy read), not by an audience rule.
+          visibleTo:
+            categories[category].visibleTo ?? "members of this project",
         })),
   );
 }

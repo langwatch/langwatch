@@ -739,14 +739,19 @@ export function redactV2Content<
   ];
   if (hidden.length > 0) {
     const matchers = compileHiddenAttributeMatchers(hidden);
-    if (dto.attributes) {
+    // Build on the already-redacted records: starting again from `dto` would
+    // put back the media-ref attributes dropped above.
+    if (redacted.attributes) {
       redacted.attributes = redactHiddenAttributesCompiled(
-        dto.attributes,
+        redacted.attributes,
         matchers,
       );
     }
-    if (dto.params) {
-      redacted.params = redactHiddenAttributesCompiled(dto.params, matchers);
+    if (redacted.params) {
+      redacted.params = redactHiddenAttributesCompiled(
+        redacted.params,
+        matchers,
+      );
     }
     // Span-detail events carry their own attribute records (list-item events
     // do not, hence the localized cast instead of a constraint field).
