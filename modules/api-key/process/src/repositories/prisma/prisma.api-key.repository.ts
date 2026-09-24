@@ -62,7 +62,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       where: { id: input.id, organizationId: input.organizationId },
     });
   }
-  listForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]> {
+  findForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]> {
     return this.database.apiKey.findMany({
       where: {
         organizationId: input.organizationId,
@@ -73,7 +73,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       orderBy: { createdAt: "desc" },
     });
   }
-  listForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]> {
+  findForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]> {
     return this.database.apiKey.findMany({
       where: {
         organizationId: input.organizationId,

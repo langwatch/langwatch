@@ -92,7 +92,7 @@ export class PrismaAuthSessionRepository
     }));
   }
 
-  async listTokensForUser({ userId }: { userId: string }): Promise<string[]> {
+  async findTokensForUser({ userId }: { userId: string }): Promise<string[]> {
     const sessions = await this.prisma.session.findMany({
       where: { userId },
       select: { sessionToken: true },

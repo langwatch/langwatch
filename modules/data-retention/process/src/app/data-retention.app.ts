@@ -79,7 +79,7 @@ export interface DataRetentionDirectoryReader {
   /** The project the settings page was opened from, or null when there is none. */
   findProjectLineage(input: { projectId: string }): Promise<RetentionProjectLineage | null>;
 
-  listOrganizationDirectory(input: {
+  findOrganizationDirectory(input: {
     organizationId: string;
   }): Promise<RetentionOrganizationDirectory>;
 
@@ -95,7 +95,7 @@ export interface DataRetentionDirectoryReader {
    * so a foreign id resolves to no rows. Archived projects are excluded: the
    * storage card must not count what the reader cannot see.
    */
-  listScopeProjects(input: {
+  findScopeProjects(input: {
     organizationId: string;
     scope: ScopeAssignment;
   }): Promise<readonly { id: string; teamId: string }[]>;

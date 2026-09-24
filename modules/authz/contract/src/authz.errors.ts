@@ -155,6 +155,20 @@ export class RoleBindingNotFoundError extends NotFoundError {
   }
 }
 
+/** A project, team or organization id that names no live scope. */
+export class AuthzScopeNotFoundError extends NotFoundError {
+  declare readonly code: "authz_scope_not_found";
+
+  constructor(ids: { projectId?: string; teamId?: string; organizationId?: string }) {
+    super(
+      "authz_scope_not_found",
+      "Scope",
+      ids.projectId ?? ids.teamId ?? ids.organizationId ?? "",
+    );
+    this.name = "AuthzScopeNotFoundError";
+  }
+}
+
 export class RoleBindingPrincipalInvalidError extends HandledError {
   declare readonly code: "role_binding_principal_invalid";
 

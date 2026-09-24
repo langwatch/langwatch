@@ -83,7 +83,7 @@ export class OrganizationGroupService {
     const parsed = getOrganizationGroupInputSchema.parse(input);
     const [group, members, bindings] = await Promise.all([
       this.groups.get(parsed),
-      this.groups.listMembers(parsed),
+      this.groups.findMembers(parsed),
       this.bindings.readGroupBindings(parsed),
     ]);
 
@@ -93,7 +93,7 @@ export class OrganizationGroupService {
   async listGroups(input: ListOrganizationGroupsInput): Promise<OrganizationGroupPage> {
     const parsed = listOrganizationGroupsInputSchema.parse(input);
     const [page, bindings] = await Promise.all([
-      this.groups.list(parsed),
+      this.groups.findAll(parsed),
       this.authz.listOrganizationBindings({
         organizationId: parsed.organizationId,
       }),
@@ -114,7 +114,7 @@ export class OrganizationGroupService {
   ): Promise<OrganizationGroupSummary[]> {
     const parsed = listMemberOrganizationGroupsInputSchema.parse(input);
     const [groups, bindings] = await Promise.all([
-      this.groups.listForMember(parsed),
+      this.groups.findForMember(parsed),
       this.authz.listOrganizationBindings({
         organizationId: parsed.organizationId,
       }),

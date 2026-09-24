@@ -1,5 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
+import { OrganizationNotFoundForTeamError } from "@langwatch/organization-contract";
 import {
   OrgExclusivePermissionScopeError,
   RoleInUseError,
@@ -132,7 +133,7 @@ describe("given a role that carries an organization-exclusive permission", () =>
       roles.save(role({ permissions: ["organization:manage"] }));
       const { app } = createRoleTestApp({
         roles,
-        organizations: { tryGetOrganizationIdByTeamId: async () => ORGANIZATION_ID },
+        organizations: { getOrganizationIdByTeamId: async () => ORGANIZATION_ID },
         permissions: { attachBindings },
       });
 
@@ -151,11 +152,12 @@ describe("given a team assignment being authorized", () => {
   describe("when the organization is resolved from the team identifier", () => {
     /** @scenario "A transport authorizes a team assignment" */
     it("reads the organization directory, and an absent team is a refusal", async () => {
-      const tryGetOrganizationIdByTeamId = vi.fn(async (input: { teamId: string }) =>
-        input.teamId === "team-1" ? ORGANIZATION_ID : null,
-      );
+      const getOrganizationIdByTeamId = vi.fn(async (input: { teamId: string }) => {
+        if (input.teamId !== "team-1") throw new OrganizationNotFoundForTeamError(input.teamId);
+        return ORGANIZATION_ID;
+      });
       const { app } = createRoleTestApp({
-        organizations: { tryGetOrganizationIdByTeamId },
+        organizations: { getOrganizationIdByTeamId },
       });
 
       await expect(app.getAssignmentOrganization({ teamId: "team-1" })).resolves.toBe(

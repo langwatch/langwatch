@@ -42,7 +42,7 @@ export interface AuthSessionRepository {
   findForUser(input: { userId: string }): Promise<readonly BrowserSessionRecord[]>;
   /** Every session this person holds, in the shape a window is judged on. */
   findStoredForUser(input: { userId: string }): Promise<readonly StoredBrowserSession[]>;
-  listTokensForUser(input: { userId: string }): Promise<string[]>;
+  findTokensForUser(input: { userId: string }): Promise<string[]>;
   deleteAllForUser(input: { userId: string }): Promise<number>;
   deleteById(input: { id: string }): Promise<number>;
   deleteOthersForUser(input: { userId: string; keepSessionId: string }): Promise<number>;

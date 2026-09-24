@@ -62,7 +62,8 @@ export interface AuthzApi {
   canBatchPermissionsByIds(
     args: Queries.AuthzCanBatchPermissionsByIdsInput,
   ): Promise<Queries.AuthzCanBatchPermissionsByIdsOutput>;
-  tryResolveScope(args: Queries.AuthzResolveScopeInput): Promise<AuthzScopeRef | null>;
+  /** Throws `AuthzScopeNotFoundError` when no id names a live scope. */
+  getScope(args: Queries.AuthzResolveScopeInput): Promise<AuthzScopeRef>;
   checkScopeLineage(
     args: authzScopeLineageModule.AuthzScopeLineageInput,
   ): Promise<authzScopeLineageModule.AuthzScopeLineageResult>;

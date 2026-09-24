@@ -1,11 +1,12 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminIdentity, OpsApi } from "@langwatch/ops-contract";
-import type {
-  EnsuredPersonalWorkspace,
-  FindPersonalWorkspaceInput,
-  OrganizationApi,
-  PersonalWorkspace,
-  PersonalWorkspaceInput,
+import {
+  type EnsuredPersonalWorkspace,
+  type FindPersonalWorkspaceInput,
+  type OrganizationApi,
+  OrganizationNotFoundForTeamError,
+  type PersonalWorkspace,
+  type PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 import {
   PersonalProjectKeyRequiredError,
@@ -74,7 +75,10 @@ export class UserAccountService {
 
   /** The organization a personal workspace's team belongs to. */
   findOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null> {
-    return this.organizations.tryGetOrganizationIdByTeamId(input);
+    return this.organizations.getOrganizationIdByTeamId(input).catch((error: unknown) => {
+      if (OrganizationNotFoundForTeamError.is(error)) return null;
+      throw error;
+    });
   }
 
   /**

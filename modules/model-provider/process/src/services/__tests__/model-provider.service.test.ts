@@ -190,7 +190,7 @@ class Authorization extends AuthzService {
     return this.notUsed();
   }
 
-  tryResolveScope(): Promise<never> {
+  getScope(): Promise<never> {
     return this.notUsed();
   }
 
@@ -408,7 +408,7 @@ class Organizations extends OrganizationService {
     return this.notUsed();
   }
 
-  tryGetOrganizationIdByTeamId() {
+  getOrganizationIdByTeamId() {
     return this.notUsed();
   }
 

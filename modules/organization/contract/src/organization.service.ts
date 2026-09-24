@@ -95,13 +95,10 @@ export abstract class OrganizationService {
   abstract getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
 
   /**
-   * The organization that owns one team, or null when no such team exists.
-   * Absence is an answer, not a refusal: usage metering and personal-workspace
-   * reads treat a since-deleted team as "no tenant to meter", not a broken lookup.
+   * The organization that owns one team. Throws `organization_not_found_for_team`
+   * when no such team exists; a caller for whom absence is normal catches that code.
    */
-  abstract tryGetOrganizationIdByTeamId(
-    input: GetOrganizationIdByTeamIdInput,
-  ): Promise<string | null>;
+  abstract getOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string>;
 
   /** Returns the billing-facing profile or throws OrganizationNotFoundError. */
   abstract getBillingProfile(

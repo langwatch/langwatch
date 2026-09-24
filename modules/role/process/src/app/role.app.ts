@@ -29,6 +29,7 @@ import { generate } from "@langwatch/ksuid";
 import {
   OrganizationApi,
   PersonalWorkspaceNotManagedHereError,
+  OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import {
@@ -268,10 +269,12 @@ export class RoleApp implements RoleApi {
 
   /** The organization a team assignment lands in. */
   async getAssignmentOrganization(input: { teamId: string }): Promise<string> {
-    const organizationId = await this.#organizations.tryGetOrganizationIdByTeamId(input);
-    if (!organizationId) throw new RoleTeamNotFoundError(input.teamId);
-
-    return organizationId;
+    try {
+      return await this.#organizations.getOrganizationIdByTeamId(input);
+    } catch (error) {
+      if (OrganizationNotFoundForTeamError.is(error)) throw new RoleTeamNotFoundError(input.teamId);
+      throw error;
+    }
   }
 
   /** Of the listed ids, the ones this organization may actually assign. */

@@ -32,7 +32,7 @@ function createStore() {
     repository: {
       findDirectoryUserId: async (input: { connectionId: string; externalId: string }) =>
         rows.find((row) => keyOf(row) === keyOf(input))?.userId ?? null,
-      listDirectoryConnectionsForUser: async ({ userId }: { userId: string }) =>
+      findDirectoryConnectionsForUser: async ({ userId }: { userId: string }) =>
         rows.filter((row) => row.userId === userId).map((row) => row.connectionId),
       rememberDirectoryIdentity: async (input: Row) => {
         const existing = rows.find((row) => keyOf(row) === keyOf(input));

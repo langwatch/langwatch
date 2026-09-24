@@ -42,7 +42,7 @@ export class StorageMeterScopeService {
       return { totalBytes, projectCount: 1 };
     }
 
-    const candidates = await directory.listScopeProjects({ organizationId, scope });
+    const candidates = await directory.findScopeProjects({ organizationId, scope });
     if (candidates.length === 0) {
       return { totalBytes: 0, projectCount: 0 };
     }

@@ -314,7 +314,7 @@ export class BrowserSessionService {
         }
       }
 
-      for (const token of await this.deps.sessions.listTokensForUser({ userId })) {
+      for (const token of await this.deps.sessions.findTokensForUser({ userId })) {
         if (token !== keepToken) {
           await cache.delete({ key: tokenCacheKey(token) });
         }

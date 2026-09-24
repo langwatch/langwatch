@@ -61,7 +61,7 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
     };
   }
 
-  async listOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
+  async findOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
     return {
       teams: [{ id: this.graph.teamId, name: "Payments" }],
       projects: [
@@ -84,7 +84,7 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
     return scope.scopeId === projectId ? organizationId : null;
   }
 
-  async listScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
+  async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return [{ id: this.graph.projectId, teamId: this.graph.teamId }];
   }
 }

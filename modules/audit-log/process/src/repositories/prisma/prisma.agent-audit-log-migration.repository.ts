@@ -23,7 +23,7 @@ export class PrismaAgentAuditLogMigrationRepository implements AgentAuditLogMigr
     return new PrismaAgentAuditLogMigrationRepository(database);
   }
 
-  async listLogs(input: { action: string; projectId?: string }): Promise<AgentAuditLogRow[]> {
+  async findLogs(input: { action: string; projectId?: string }): Promise<AgentAuditLogRow[]> {
     const logs = await this.#database.auditLog.findMany({
       where: { action: input.action, projectId: input.projectId },
       select: { id: true, projectId: true, createdAt: true, args: true },
@@ -37,7 +37,7 @@ export class PrismaAgentAuditLogMigrationRepository implements AgentAuditLogMigr
     }));
   }
 
-  listCandidates(input: AgentAuditLogCandidateQuery): Promise<{ id: string }[]> {
+  findCandidates(input: AgentAuditLogCandidateQuery): Promise<{ id: string }[]> {
     return this.#database.agent.findMany({
       where: {
         projectId: input.projectId,

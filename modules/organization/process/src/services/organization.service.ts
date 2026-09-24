@@ -56,6 +56,7 @@ import {
   type UpdateOrganizationSettingsInput,
   type UpdateOrganizationSettingsResult,
   type OrganizationUsageCount,
+  OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
 
 import type {
@@ -199,8 +200,11 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.teams.getOrganizationMembers(getOrganizationMembersInputSchema.parse(input));
   }
 
-  tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null> {
-    return this.teams.findOrganizationId(getOrganizationIdByTeamIdInputSchema.parse(input));
+  async getOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string> {
+    const parsed = getOrganizationIdByTeamIdInputSchema.parse(input);
+    const organizationId = await this.teams.findOrganizationId(parsed);
+    if (organizationId === null) throw new OrganizationNotFoundForTeamError(parsed.teamId);
+    return organizationId;
   }
 
   /** The stored row, decrypted: the cipher is this service's dependency, not the repository's. */

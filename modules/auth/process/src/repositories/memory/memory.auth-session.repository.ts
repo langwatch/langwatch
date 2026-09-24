@@ -80,7 +80,7 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
       .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt));
   }
 
-  async listTokensForUser({ userId }: { userId: string }): Promise<string[]> {
+  async findTokensForUser({ userId }: { userId: string }): Promise<string[]> {
     return [...this.memory.sessions.values()]
       .filter((session) => session.userId === userId)
       .map((session) => session.sessionToken);

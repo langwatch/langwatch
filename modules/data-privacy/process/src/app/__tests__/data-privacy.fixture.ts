@@ -45,7 +45,7 @@ export class MemoryDataPrivacyDirectory implements DataPrivacyDirectoryReader {
     return this.rows.lineage ?? null;
   }
 
-  async listOrganizationDirectory(): Promise<DataPrivacyOrganizationDirectory> {
+  async findOrganizationDirectory(): Promise<DataPrivacyOrganizationDirectory> {
     return this.rows.directory ?? { departments: [], teams: [], projects: [], groups: [] };
   }
 

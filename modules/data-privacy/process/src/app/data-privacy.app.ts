@@ -55,7 +55,7 @@ export interface DataPrivacyDirectoryReader {
   /** The project the settings page was opened from, or null when there is none. */
   findProjectLineage(input: { projectId: string }): Promise<DataPrivacyProjectLineage | null>;
 
-  listOrganizationDirectory(input: {
+  findOrganizationDirectory(input: {
     organizationId: string;
   }): Promise<DataPrivacyOrganizationDirectory>;
 

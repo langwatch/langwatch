@@ -26,7 +26,7 @@ export type DataPrivacySnapshotPolicies = Readonly<{
 }>;
 
 type DataPrivacyDirectory = Awaited<
-  ReturnType<DataPrivacyDirectoryReader["listOrganizationDirectory"]>
+  ReturnType<DataPrivacyDirectoryReader["findOrganizationDirectory"]>
 >;
 
 /** Reading a scope: whether this user may see its rule, and what the scope is called. */
@@ -83,7 +83,7 @@ export class DataPrivacySnapshotService {
   }): Promise<DataPrivacySnapshot> {
     const { userId, projectId, organizationId, organizationName } = input;
     const [directory, rows, canManageOrganization] = await Promise.all([
-      this.directory.listOrganizationDirectory({ organizationId }),
+      this.directory.findOrganizationDirectory({ organizationId }),
       this.policies.listOrganizationRules({ organizationId }),
       this.permissions.canManageOrganization({ userId, organizationId }),
     ]);

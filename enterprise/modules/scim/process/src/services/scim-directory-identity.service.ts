@@ -40,7 +40,7 @@ export class ScimDirectoryIdentityService {
       return;
     }
 
-    const claims = await this.repository.listDirectoryConnectionsForUser({
+    const claims = await this.repository.findDirectoryConnectionsForUser({
       userId: input.userId,
     });
     if (claims.length === 0 || claims.includes(input.connectionId)) {

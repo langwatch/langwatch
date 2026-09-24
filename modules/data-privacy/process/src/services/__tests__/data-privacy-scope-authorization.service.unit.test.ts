@@ -22,7 +22,7 @@ class FakeDirectory implements DataPrivacyDirectoryReader {
   async findProjectLineage() {
     return this.rows.lineage ?? null;
   }
-  async listOrganizationDirectory() {
+  async findOrganizationDirectory() {
     return { departments: [], teams: [], projects: [], groups: [] };
   }
   async findScopeOrganizationId() {

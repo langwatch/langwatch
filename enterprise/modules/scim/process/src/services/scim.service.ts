@@ -171,7 +171,7 @@ export class ScimService extends ScimServiceContract {
   }
 
   listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
-    return this.repository.listTokens(input.organizationId);
+    return this.repository.findTokens(input.organizationId);
   }
 
   async revokeToken(input: {

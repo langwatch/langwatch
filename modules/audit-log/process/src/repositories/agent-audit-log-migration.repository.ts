@@ -15,8 +15,8 @@ export type AgentAuditLogCandidateQuery = {
 };
 
 export interface AgentAuditLogMigrationRepository {
-  listLogs(input: { action: string; projectId?: string }): Promise<AgentAuditLogRow[]>;
-  listCandidates(input: AgentAuditLogCandidateQuery): Promise<{ id: string }[]>;
+  findLogs(input: { action: string; projectId?: string }): Promise<AgentAuditLogRow[]>;
+  findCandidates(input: AgentAuditLogCandidateQuery): Promise<{ id: string }[]>;
   updateArgs(input: {
     logId: string;
     projectId: string;

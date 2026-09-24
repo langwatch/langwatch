@@ -20,7 +20,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
   return {
     findOrganizationBySsoDomain: vi.fn(),
     createToken: vi.fn(async () => ({ id: "token_1" })),
-    listTokens: vi.fn(async () => []),
+    findTokens: vi.fn(async () => []),
     findToken: vi.fn(async () => null),
     revokeToken: vi.fn(async () => false),
     revokeTokensForConnection: vi.fn(async () => 0),
@@ -35,7 +35,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
-    listDirectoryConnectionsForUser: vi.fn(async () => []),
+    findDirectoryConnectionsForUser: vi.fn(async () => []),
     findMembership: vi.fn(async () => null),
     findOrganizationUsers: vi.fn(async () => ({ rows: [], total: 0 })),
     recordRequest: vi.fn(async () => undefined),
@@ -124,7 +124,7 @@ describe("SCIM characterization: token lifecycle", () => {
   /** @scenario "Token values are stored only as hashes" */
   it("mints only a hash, lists summaries, updates use only when asked after verification, and retains 404 revocation", async () => {
     const repo = repository({
-      listTokens: vi.fn(async () => [
+      findTokens: vi.fn(async () => [
         {
           id: "token_1",
           organizationId: "org_1",

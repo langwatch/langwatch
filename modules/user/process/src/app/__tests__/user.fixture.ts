@@ -2,7 +2,10 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { IdentityApi, RoutingDecision } from "@langwatch/identity-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  OrganizationNotFoundForTeamError,
+} from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { vi } from "vitest";
 
@@ -63,7 +66,9 @@ export function createUserTestOrganizations(projectId = "project-1") {
       team: { id: "team-1" },
     })),
     tryFindPersonalWorkspace: vi.fn(async () => null),
-    tryGetOrganizationIdByTeamId: vi.fn(async () => null),
+    getOrganizationIdByTeamId: vi.fn(async ({ teamId }: { teamId: string }) => {
+      throw new OrganizationNotFoundForTeamError(teamId);
+    }),
     isMember: vi.fn(async () => true),
   });
 }

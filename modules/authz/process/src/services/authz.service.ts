@@ -55,6 +55,7 @@ import {
   type PermissionScopeArg,
   type TierOfScopeArg,
   scopeOrganizationId,
+  AuthzScopeNotFoundError,
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
@@ -163,7 +164,7 @@ export class AuthzService extends AuthzServiceContract {
       engine: this.engine,
       collector,
       snapshots,
-      tryResolveScope: (ids) => this.tryResolveScope(ids),
+      getScope: (ids) => this.getScope(ids),
       recordDenial: (decision) => this.recordDenial(decision),
     });
     this.gate = AuthzPermissionGateService.create({
@@ -171,7 +172,7 @@ export class AuthzService extends AuthzServiceContract {
       can: (input) => this.can(input),
       canAnyByIds: (args) => this.canAnyByIds(args),
       checkByIds: (args) => this.checkByIds(args),
-      tryResolveScope: (ids) => this.tryResolveScope(ids),
+      getScope: (ids) => this.getScope(ids),
       tryScopeOf: (scope) => this.tryScopeOf(scope),
     });
   }
@@ -320,24 +321,16 @@ export class AuthzService extends AuthzServiceContract {
    * Most-specific-first, the order every seam resolves in: an explicit project or team wins over
    * the organization it sits in.
    */
-  async tryResolveScope({
-    projectId,
-    teamId,
-    organizationId,
-  }: ScopeIds): Promise<AuthzScopeRef | null> {
-    if (projectId) {
-      return this.collector.findScopeRef({ projectId });
-    }
-
-    if (teamId) {
-      return this.collector.findScopeRef({ teamId });
-    }
-
-    if (organizationId) {
-      return this.collector.findScopeRef({ organizationId });
-    }
-
-    return null;
+  async getScope({ projectId, teamId, organizationId }: ScopeIds): Promise<AuthzScopeRef> {
+    const scope = projectId
+      ? await this.collector.findScopeRef({ projectId })
+      : teamId
+        ? await this.collector.findScopeRef({ teamId })
+        : organizationId
+          ? await this.collector.findScopeRef({ organizationId })
+          : null;
+    if (!scope) throw new AuthzScopeNotFoundError({ projectId, teamId, organizationId });
+    return scope;
   }
 
   async checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult> {

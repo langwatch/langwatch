@@ -149,13 +149,13 @@ export class ApiKeyCatalogService {
   }
 
   async list(input: { userId: string; organizationId: string }): Promise<ApiKey[]> {
-    const rows = await this.repository.listForUser(input);
+    const rows = await this.repository.findForUser(input);
 
     return (await this.bindings.attach(rows)).map(publicApiKey);
   }
 
   async listAll({ organizationId }: { organizationId: string }): Promise<ApiKey[]> {
-    const rows = await this.repository.listForOrganization({ organizationId });
+    const rows = await this.repository.findForOrganization({ organizationId });
 
     return (await this.bindings.attach(rows)).map(publicApiKey);
   }

@@ -3,6 +3,7 @@
  * providers let this person in, and none of the rows behind them.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
@@ -50,8 +51,9 @@ describe("getSsoSetupStatus()", () => {
     const service = FederatedAccountReadsService.create({
       accounts: createApiFixture<BetterAuthHooksRepository>({
         findFederatedAccountsForUser: async () => rows,
-        tryFindOrganizationBySsoDomain: async ({ domain }: { domain: string }) => {
+        getOrganizationBySsoDomain: async ({ domain }: { domain: string }) => {
           lookups.push(domain);
+          if (organization === null) throw new OrganizationNotFoundError();
           return organization;
         },
       }),

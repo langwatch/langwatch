@@ -35,7 +35,7 @@ export class PrismaOrganizationUserDirectoryRepository {
   }
 
   /** Display names for a page of user ids the organization already vouches for. */
-  async listUserNames(
+  async findUserNames(
     userIds: readonly string[],
   ): Promise<readonly Readonly<{ id: string; name: string | null }>[]> {
     return this.database.user.findMany({

@@ -73,7 +73,7 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
     };
   }
 
-  async listOrganizationDirectory({
+  async findOrganizationDirectory({
     organizationId,
   }: {
     organizationId: string;
@@ -126,7 +126,7 @@ export class PrismaDataRetentionDirectoryRepository implements DataRetentionDire
     return project?.team?.organizationId ?? null;
   }
 
-  async listScopeProjects({
+  async findScopeProjects({
     organizationId,
     scope,
   }: {

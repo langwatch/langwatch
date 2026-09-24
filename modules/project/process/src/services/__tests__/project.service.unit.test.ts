@@ -181,7 +181,7 @@ class StubOrganizationService extends OrganizationServiceContract {
     throw new Error("not used by this test");
   }
 
-  tryGetOrganizationIdByTeamId(): never {
+  getOrganizationIdByTeamId(): never {
     throw new Error("not used by this test");
   }
 

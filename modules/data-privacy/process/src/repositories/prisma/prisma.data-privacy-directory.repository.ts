@@ -53,7 +53,7 @@ export class PrismaDataPrivacyDirectoryRepository implements DataPrivacyDirector
     };
   }
 
-  async listOrganizationDirectory({
+  async findOrganizationDirectory({
     organizationId,
   }: {
     organizationId: string;

@@ -21,7 +21,6 @@ import {
   LiteMemberViewerOnlyError,
   OrganizationApi,
   OrganizationCapabilityUnavailableError,
-  OrganizationNotFoundForTeamError,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationInviteCreated,
@@ -840,8 +839,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#dependencies.organizations.getOldestTeamId(input);
   }
 
-  tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null> {
-    return this.#dependencies.organizations.tryGetOrganizationIdByTeamId(input);
+  getOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string> {
+    return this.#dependencies.organizations.getOrganizationIdByTeamId(input);
   }
 
   /** One organization with its members and each member's teams. */
@@ -1350,10 +1349,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       scopes: [{ scopeType: "TEAM", scopeId: input.teamId }],
     });
 
-    const organizationId = await this.#dependencies.organizations.tryGetOrganizationIdByTeamId({
+    const organizationId = await this.#dependencies.organizations.getOrganizationIdByTeamId({
       teamId: input.teamId,
     });
-    if (!organizationId) throw new OrganizationNotFoundForTeamError(input.teamId);
 
     if (isOrganizationApiCustomRole(input.role)) {
       if (input.customRoleId) {

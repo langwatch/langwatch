@@ -56,7 +56,7 @@ function application(options: { enterprise: boolean }) {
     getTeamById: vi.fn(async () => TEAM),
     createTeamWithMembers: writes.createTeamWithMembers,
     updateTeamWithMembers: writes.updateTeamWithMembers,
-    tryGetOrganizationIdByTeamId: vi.fn(async () => ORGANIZATION_ID),
+    getOrganizationIdByTeamId: vi.fn(async () => ORGANIZATION_ID),
   };
 
   const membership = {

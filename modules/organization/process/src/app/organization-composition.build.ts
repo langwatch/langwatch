@@ -535,7 +535,7 @@ function organizationDirectory(options: {
     },
     // Names only: the local part of a requester's address is not the
     // organization's business until they are a member of it.
-    listUserNames: ({ userIds }) => options.userDirectory.listUserNames(userIds),
+    listUserNames: ({ userIds }) => options.userDirectory.findUserNames(userIds),
   };
 }
 

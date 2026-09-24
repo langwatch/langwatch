@@ -79,7 +79,7 @@ describe("given the memory API-key repository", () => {
       await keys.revoke({ id: revoked.id, cause: "user" });
       await keys.create(record({ name: "Live" }));
 
-      const listed = await keys.listForOrganization({ organizationId: ORGANIZATION });
+      const listed = await keys.findForOrganization({ organizationId: ORGANIZATION });
 
       expect(listed.map((key) => key.name)).toEqual(["Live"]);
     });
@@ -91,7 +91,7 @@ describe("given the memory API-key repository", () => {
       await keys.create(record({ name: "Shared" }));
       await keys.create(record({ name: "Ingest", ingestSourceType: "cli" }));
 
-      const listed = await keys.listForUser({ organizationId: ORGANIZATION, userId: "user_1" });
+      const listed = await keys.findForUser({ organizationId: ORGANIZATION, userId: "user_1" });
 
       expect(listed.map((key) => key.name).toSorted()).toEqual(["Mine", "Shared"]);
     });

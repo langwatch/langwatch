@@ -5,7 +5,12 @@ import type { TrpcContractHandlerArguments, TrpcProcedureFactory } from "@langwa
  * mounts on its own tRPC runtime.
  * Spec: modules/authz/specs/package-boundary.feature
  */
-import type { AuthzApi, AuthzScopeRef, AuthzService } from "@langwatch/authz-contract";
+import {
+  type AuthzApi,
+  AuthzScopeNotFoundError,
+  type AuthzScopeRef,
+  type AuthzService,
+} from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";
@@ -21,15 +26,15 @@ type Procedure = (input: unknown) => Promise<unknown>;
 /** The one procedure the declaration names, over a stated application. */
 function harness(
   overrides: {
-    tryResolveScope?: AuthzService["tryResolveScope"];
+    getScope?: AuthzService["getScope"];
     effectivePermissions?: AuthzService["effectivePermissions"];
   } = {},
 ) {
-  const tryResolveScope = vi.fn(overrides.tryResolveScope ?? (async () => PROJECT_SCOPE));
+  const getScope = vi.fn(overrides.getScope ?? (async () => PROJECT_SCOPE));
   const effectivePermissions = vi.fn(
     overrides.effectivePermissions ?? (async () => ["project:view" as const]),
   );
-  const app = createAuthzTestApp({ permissions: { tryResolveScope, effectivePermissions } });
+  const app = createAuthzTestApp({ permissions: { getScope, effectivePermissions } });
 
   const procedures: Record<string, Procedure> = {};
   const accesses: string[] = [];
@@ -54,18 +59,18 @@ function harness(
 
   authzTrpcTransport.router(runtime, () => app);
 
-  return { tryResolveScope, effectivePermissions, procedures, accesses };
+  return { getScope, effectivePermissions, procedures, accesses };
 }
 
 describe("the application's AuthZ tRPC adapter", () => {
   describe("when a procedure resolves effective permissions", () => {
     /** @scenario "Application tRPC remains a separate adapter" */
     it("delegates once to the composed contract service", async () => {
-      const { procedures, tryResolveScope, effectivePermissions } = harness();
+      const { procedures, getScope, effectivePermissions } = harness();
 
       const answer = await procedures.effectivePermissions!({ projectId: PROJECT_ID });
 
-      expect(tryResolveScope).toHaveBeenCalledTimes(1);
+      expect(getScope).toHaveBeenCalledTimes(1);
       expect(effectivePermissions).toHaveBeenCalledTimes(1);
       expect(effectivePermissions).toHaveBeenCalledWith({
         principal: { type: "user", id: USER_ID },
@@ -83,14 +88,14 @@ describe("the application's AuthZ tRPC adapter", () => {
      */
     /** @scenario "Application tRPC remains a separate adapter" */
     it("forwards the caller's input without deciding the scope itself", async () => {
-      const { procedures, tryResolveScope } = harness();
+      const { procedures, getScope } = harness();
 
       await procedures.effectivePermissions!({
         projectId: PROJECT_ID,
         organizationId: ORGANIZATION_ID,
       });
 
-      expect(tryResolveScope).toHaveBeenCalledWith({
+      expect(getScope).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         organizationId: undefined,
       });
@@ -98,7 +103,11 @@ describe("the application's AuthZ tRPC adapter", () => {
 
     /** @scenario "Application tRPC remains a separate adapter" */
     it("answers the empty set for a scope that does not resolve", async () => {
-      const { procedures, effectivePermissions } = harness({ tryResolveScope: async () => null });
+      const { procedures, effectivePermissions } = harness({
+        getScope: async ({ projectId }) => {
+          throw new AuthzScopeNotFoundError({ projectId });
+        },
+      });
 
       const answer = await procedures.effectivePermissions!({ projectId: "project_missing" });
 

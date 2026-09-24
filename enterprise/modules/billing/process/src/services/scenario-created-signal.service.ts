@@ -10,14 +10,17 @@ import {
   onboardingExperimentProperties,
   type OnboardingVariant,
 } from "@langwatch/onboarding-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  type OrganizationApi,
+  OrganizationNotFoundForTeamError,
+} from "@langwatch/organization-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
 
 /** The three organization reads between a project and its onboarding variant. */
 export type ScenarioSignalOrganizations = Pick<
   OrganizationApi,
-  "findProject" | "tryGetOrganizationIdByTeamId" | "readGuidedOnboardingState"
+  "findProject" | "getOrganizationIdByTeamId" | "readGuidedOnboardingState"
 >;
 
 export class ScenarioCreatedSignalService {
@@ -55,10 +58,13 @@ export class ScenarioCreatedSignalService {
   private async variantOf(projectId: string): Promise<OnboardingVariant | null> {
     const project = await this.organizations.findProject(projectId);
     if (!project) return null;
-    const organizationId = await this.organizations.tryGetOrganizationIdByTeamId({
-      teamId: project.teamId,
-    });
-    if (!organizationId) return null;
+    const organizationId = await this.organizations
+      .getOrganizationIdByTeamId({ teamId: project.teamId })
+      .catch((error: unknown) => {
+        if (OrganizationNotFoundForTeamError.is(error)) return null;
+        throw error;
+      });
+    if (organizationId === null) return null;
     const record = await this.organizations.readGuidedOnboardingState({ organizationId });
     return record.variant;
   }

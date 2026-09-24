@@ -126,19 +126,19 @@ class MemoryTeams extends TeamRepository {
 class MemoryGroups extends GroupRepository {
   members = new Map<string, OrganizationGroupMember[]>();
 
-  listMembersForGroups(): Promise<Map<string, OrganizationGroupMember[]>> {
+  findMembersForGroups(): Promise<Map<string, OrganizationGroupMember[]>> {
     return Promise.resolve(this.members);
   }
   get(): never {
     throw new Error("not used");
   }
-  list(): never {
+  findAll(): never {
     throw new Error("not used");
   }
-  listForMember(): never {
+  findForMember(): never {
     throw new Error("not used");
   }
-  listMembers(): never {
+  findMembers(): never {
     throw new Error("not used");
   }
   nextAvailableSlug(): never {

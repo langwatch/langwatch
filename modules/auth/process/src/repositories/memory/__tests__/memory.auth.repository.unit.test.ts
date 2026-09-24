@@ -23,7 +23,7 @@ describe("MemoryAuthSessionRepository", () => {
   describe("given three sessions across two people", () => {
     describe("when one person's sessions are listed", () => {
       it("names only that person's tokens", async () => {
-        await expect(sessions().listTokensForUser({ userId: "u1" })).resolves.toEqual(["t1", "t2"]);
+        await expect(sessions().findTokensForUser({ userId: "u1" })).resolves.toEqual(["t1", "t2"]);
       });
     });
 

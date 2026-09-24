@@ -49,7 +49,7 @@ export class TestOrganizationService extends OrganizationService {
     return unsupported();
   }
 
-  tryGetOrganizationIdByTeamId(): never {
+  getOrganizationIdByTeamId(): never {
     return unsupported();
   }
 

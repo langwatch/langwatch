@@ -25,7 +25,7 @@ export type DataRetentionSnapshotServiceOptions = Readonly<{
 }>;
 
 type OrganizationDirectory = Awaited<
-  ReturnType<DataRetentionDirectoryReader["listOrganizationDirectory"]>
+  ReturnType<DataRetentionDirectoryReader["findOrganizationDirectory"]>
 >;
 
 /** Reading a scope: whether this caller may see its row, and what the scope is called. */
@@ -112,7 +112,7 @@ export class DataRetentionSnapshotService {
 
     const [organizationDirectory, rows, canManageOrganization, canConfigureRetention] =
       await Promise.all([
-        directory.listOrganizationDirectory({ organizationId }),
+        directory.findOrganizationDirectory({ organizationId }),
         retention.listOrganizationRules({ organizationId }),
         permissions.canManageOrganization({ userId, organizationId }),
         policy.canConfigureRetention({ organizationId, actor }),

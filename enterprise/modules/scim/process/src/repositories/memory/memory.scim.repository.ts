@@ -436,7 +436,7 @@ export class MemoryScimRepository extends ScimRepository {
     return { id };
   };
 
-  async listTokens(organizationId: string): Promise<ScimTokenRecord[]> {
+  async findTokens(organizationId: string): Promise<ScimTokenRecord[]> {
     return this.tokens
       .filter((row) => row.organizationId === organizationId)
       .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
@@ -602,7 +602,7 @@ export class MemoryScimRepository extends ScimRepository {
     this.directoryIdentities.splice(0, this.directoryIdentities.length, ...kept);
   }
 
-  async listDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
+  async findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
     return this.directoryIdentities
       .filter((row) => row.userId === input.userId)
       .map((row) => row.connectionId);

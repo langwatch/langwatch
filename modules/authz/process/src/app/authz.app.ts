@@ -19,6 +19,8 @@ import {
   type AuthzService,
   type EffectivePermissions,
   type AuthzServerConfig,
+  AuthzScopeNotFoundError,
+  type AuthzScopeRef,
 } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -188,11 +190,16 @@ export class AuthzApp implements AuthzApi {
     input: Readonly<{ projectId?: string; organizationId?: string }>,
     by: AuthzCaller,
   ): Promise<EffectivePermissions> {
-    const scope = await this.tryResolveScope({
-      projectId: input.projectId,
-      organizationId: input.projectId ? undefined : input.organizationId,
-    });
-    if (!scope) return { scope: null, permissions: [] };
+    let scope: AuthzScopeRef;
+    try {
+      scope = await this.getScope({
+        projectId: input.projectId,
+        organizationId: input.projectId ? undefined : input.organizationId,
+      });
+    } catch (error) {
+      if (AuthzScopeNotFoundError.is(error)) return { scope: null, permissions: [] };
+      throw error;
+    }
     return {
       scope: { type: scope.type, id: scope.id },
       permissions: await this.effectivePermissions({
@@ -212,7 +219,7 @@ export class AuthzApp implements AuthzApi {
   canBatchByIds: AuthzApi["canBatchByIds"] = (a) => this.#permissions.canBatchByIds(a);
   canBatchPermissionsByIds: AuthzApi["canBatchPermissionsByIds"] = (a) =>
     this.#permissions.canBatchPermissionsByIds(a);
-  tryResolveScope: AuthzApi["tryResolveScope"] = (a) => this.#permissions.tryResolveScope(a);
+  getScope: AuthzApi["getScope"] = (a) => this.#permissions.getScope(a);
   checkScopeLineage: AuthzApi["checkScopeLineage"] = (a) => this.#permissions.checkScopeLineage(a);
   explainDecision: AuthzApi["explainDecision"] = (a) => this.#permissions.explainDecision(a);
   getDecision: AuthzApi["getDecision"] = (a) => this.#permissions.getDecision(a);

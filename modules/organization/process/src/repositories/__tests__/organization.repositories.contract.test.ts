@@ -261,7 +261,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         memberIds: [USER_ID, USER_ID_2],
       });
 
-      const members = await repositories.group.listMembers({
+      const members = await repositories.group.findMembers({
         groupId: GROUP_ID,
         organizationId: ORGANIZATION_ID,
       });
@@ -296,7 +296,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
         userId: USER_ID_2,
       });
 
-      const members = await repositories.group.listMembers({
+      const members = await repositories.group.findMembers({
         groupId: GROUP_ID,
         organizationId: ORGANIZATION_ID,
       });

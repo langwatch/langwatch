@@ -113,7 +113,7 @@ export abstract class AuthzService {
     args: AuthzCanBatchPermissionsByIdsInput,
   ): Promise<AuthzCanBatchPermissionsByIdsOutput>;
 
-  abstract tryResolveScope(args: AuthzResolveScopeInput): Promise<AuthzScopeRef | null>;
+  abstract getScope(args: AuthzResolveScopeInput): Promise<AuthzScopeRef>;
 
   /** Refuses mixed scope ids that do not resolve to one organization. */
   abstract checkScopeLineage(args: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult>;

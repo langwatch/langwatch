@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
@@ -33,7 +34,14 @@ export class ClearStalePendingSsoSetupTask extends Task {
     const hooks = PrismaBetterAuthHooksRepository.create(prisma);
     const result = await PendingSsoSetupCleanupService.create({
       candidates: PrismaPendingSsoSetupRepository.create(prisma),
-      organizations: { findByDomain: (input) => hooks.tryFindOrganizationBySsoDomain(input) },
+      organizations: {
+        findByDomain: (input) =>
+          hooks.getOrganizationBySsoDomain(input).catch((error: unknown) => {
+            if (HandledError.isHandled(error) && error.code === "organization_not_found")
+              return null;
+            throw error;
+          }),
+      },
     }).clearStale({ isDryRun: args.includes("--dry-run") });
 
     logger.info(result, "finished clearing stale pending SSO setup flags");

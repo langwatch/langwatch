@@ -52,13 +52,13 @@ function buildService(options?: {
   const storedGroup = options?.storedGroup ?? group;
   const groupRepository = {
     get: vi.fn().mockResolvedValue(storedGroup),
-    list: vi.fn().mockResolvedValue({
+    findAll: vi.fn().mockResolvedValue({
       data: [{ ...group, memberCount: 0 }],
       pagination: { page: 1, limit: 50, total: 1 },
     }),
-    listForMember: vi.fn().mockResolvedValue([{ ...group, memberCount: 1 }]),
-    listMembers: vi.fn().mockResolvedValue([]),
-    listMembersForGroups: vi.fn().mockResolvedValue(new Map()),
+    findForMember: vi.fn().mockResolvedValue([{ ...group, memberCount: 1 }]),
+    findMembers: vi.fn().mockResolvedValue([]),
+    findMembersForGroups: vi.fn().mockResolvedValue(new Map()),
     nextAvailableSlug: vi.fn().mockResolvedValue("reviewers"),
     create: vi.fn().mockResolvedValue(group),
     rename: vi.fn().mockResolvedValue(group),
@@ -76,7 +76,7 @@ function buildService(options?: {
   });
 
   const authz = {
-    tryResolveScope: vi.fn().mockImplementation((input) => {
+    getScope: vi.fn().mockImplementation((input) => {
       if (input.organizationId) {
         return Promise.resolve({ type: "organization", id: input.organizationId });
       }
@@ -194,7 +194,7 @@ describe("OrganizationService groups", () => {
     /** @scenario "Group access is listed on every plan" */
     it("lists the member's groups with the access each one grants", async () => {
       const { service, authz, groupRepository } = buildService();
-      groupRepository.listForMember.mockResolvedValue([{ ...group, memberCount: 1 }]);
+      groupRepository.findForMember.mockResolvedValue([{ ...group, memberCount: 1 }]);
       vi.mocked(authz.listOrganizationBindings).mockResolvedValue([
         {
           id: "binding_1",

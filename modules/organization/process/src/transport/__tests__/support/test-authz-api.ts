@@ -192,7 +192,7 @@ export class TestAuthzApi implements AuthzApi {
   canBatchPermissionsByIds = unsupported<AuthzApi["canBatchPermissionsByIds"]>(
     "canBatchPermissionsByIds",
   );
-  tryResolveScope = unsupported<AuthzApi["tryResolveScope"]>("tryResolveScope");
+  getScope = unsupported<AuthzApi["getScope"]>("getScope");
   checkScopeLineage = unsupported<AuthzApi["checkScopeLineage"]>("checkScopeLineage");
   explainDecision = unsupported<AuthzApi["explainDecision"]>("explainDecision");
   getDecision = unsupported<AuthzApi["getDecision"]>("getDecision");

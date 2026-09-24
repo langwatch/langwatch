@@ -69,7 +69,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     return this.#find((key) => key.id === input.id && key.organizationId === input.organizationId);
   }
 
-  async listForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]> {
+  async findForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]> {
     return this.#list(
       (key) =>
         key.organizationId === input.organizationId &&
@@ -79,7 +79,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
-  async listForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]> {
+  async findForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]> {
     return this.#list(
       (key) =>
         key.organizationId === input.organizationId &&

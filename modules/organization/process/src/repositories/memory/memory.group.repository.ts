@@ -42,7 +42,7 @@ export class MemoryGroupRepository extends GroupRepository {
     return toGroup(group);
   }
 
-  async list(input: { organizationId: string; page: number; limit: number }): Promise<{
+  async findAll(input: { organizationId: string; page: number; limit: number }): Promise<{
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }> {
@@ -58,7 +58,7 @@ export class MemoryGroupRepository extends GroupRepository {
     };
   }
 
-  async listForMember(input: {
+  async findForMember(input: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationGroupWithMemberCount[]> {
@@ -68,7 +68,7 @@ export class MemoryGroupRepository extends GroupRepository {
       .map((row) => ({ ...toGroup(row), memberCount: row.memberIds.size }));
   }
 
-  async listMembers(input: {
+  async findMembers(input: {
     groupId: string;
     organizationId: string;
   }): Promise<OrganizationGroupMember[]> {
@@ -82,7 +82,7 @@ export class MemoryGroupRepository extends GroupRepository {
     }));
   }
 
-  async listMembersForGroups(input: {
+  async findMembersForGroups(input: {
     groupIds: string[];
     organizationId: string;
   }): Promise<Map<string, OrganizationGroupMember[]>> {
@@ -90,7 +90,7 @@ export class MemoryGroupRepository extends GroupRepository {
     for (const groupId of input.groupIds) {
       result.set(
         groupId,
-        await this.listMembers({ groupId, organizationId: input.organizationId }),
+        await this.findMembers({ groupId, organizationId: input.organizationId }),
       );
     }
     return result;

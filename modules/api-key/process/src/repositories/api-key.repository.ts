@@ -47,8 +47,8 @@ export abstract class ApiKeyRepository {
     id: string;
     organizationId: string;
   }): Promise<ApiKeyRow | null>;
-  abstract listForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]>;
-  abstract listForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]>;
+  abstract findForUser(input: { organizationId: string; userId: string }): Promise<ApiKeyRow[]>;
+  abstract findForOrganization(input: { organizationId: string }): Promise<ApiKeyRow[]>;
   abstract update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow>;
   /**
    * Marks a key revoked, keeping the FIRST cause ever recorded: the fence

@@ -22,7 +22,7 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
   return {
     findOrganizationBySsoDomain: vi.fn(async () => null),
     createToken: vi.fn(async () => ({ id: "token-1" })),
-    listTokens: vi.fn(async () => []),
+    findTokens: vi.fn(async () => []),
     findToken: vi.fn(async () => null),
     revokeToken: vi.fn(async () => false),
     revokeTokensForConnection: vi.fn(async () => 0),
@@ -67,7 +67,7 @@ export function scimRepositoryFixture(overrides: Partial<ScimRepository> = {}): 
     rememberDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentity: vi.fn(async () => undefined),
     forgetDirectoryIdentitiesForUser: vi.fn(async () => undefined),
-    listDirectoryConnectionsForUser: vi.fn(async () => []),
+    findDirectoryConnectionsForUser: vi.fn(async () => []),
     ...overrides,
   };
 }

@@ -78,7 +78,7 @@ export class AgentAuditLogIdsMigration implements SystemMigration {
     repair: (typeof repairs)[number],
     input: { execute: boolean; projectId?: string; signal?: AbortSignal },
   ) {
-    const logs = await this.#repository.listLogs({
+    const logs = await this.#repository.findLogs({
       action: repair.action,
       projectId: input.projectId,
     });
@@ -113,7 +113,7 @@ export class AgentAuditLogIdsMigration implements SystemMigration {
       return "skipped";
     }
 
-    const matches = await this.#repository.listCandidates({
+    const matches = await this.#repository.findCandidates({
       projectId: log.projectId,
       window: {
         gte: log.createdAt.subtract({ milliseconds: WINDOW_MS }),

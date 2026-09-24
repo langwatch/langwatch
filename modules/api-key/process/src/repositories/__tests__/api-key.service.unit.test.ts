@@ -126,7 +126,7 @@ class MemoryApiKeys extends ApiKeyRepository {
       this.rows.find((row) => row.id === id && row.organizationId === organizationId) ?? null,
     );
   }
-  listForUser({
+  findForUser({
     organizationId,
     userId,
   }: {
@@ -142,7 +142,7 @@ class MemoryApiKeys extends ApiKeyRepository {
       ),
     );
   }
-  listForOrganization({ organizationId }: { organizationId: string }): Promise<ApiKeyRow[]> {
+  findForOrganization({ organizationId }: { organizationId: string }): Promise<ApiKeyRow[]> {
     return Promise.resolve(
       this.rows.filter((row) => row.organizationId === organizationId && row.revokedAt === null),
     );

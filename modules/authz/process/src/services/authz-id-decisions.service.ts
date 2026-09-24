@@ -11,6 +11,7 @@ import {
   type AuthzPrincipalRef,
   type AuthzScopeRef,
   type CollectedGrants,
+  AuthzScopeNotFoundError,
 } from "@langwatch/authz-contract";
 
 import type { AuthzCollectorService } from "./authz-collector.service.ts";
@@ -29,7 +30,7 @@ type AuthzIdDecisionsOptions = {
   collector: AuthzCollectorService;
   snapshots: AuthzGrantSnapshotService;
   /** The owning service's own resolution, so both seams read the same most-specific-first order. */
-  tryResolveScope: (ids: ScopeIds) => Promise<AuthzScopeRef | null>;
+  getScope: (ids: ScopeIds) => Promise<AuthzScopeRef>;
   recordDenial: (decision: AuthzDecision) => void;
 };
 
@@ -60,13 +61,12 @@ export class AuthzIdDecisionsService {
     organizationRole: OrganizationRoleOrNull;
     denialReason?: AuthzDecision["denialReason"];
   }> {
-    const scope = await this.deps.tryResolveScope({
-      projectId,
-      teamId,
-      organizationId,
-    });
-    if (!scope) {
-      return { allowed: false, organizationRole: null };
+    let scope: AuthzScopeRef;
+    try {
+      scope = await this.deps.getScope({ projectId, teamId, organizationId });
+    } catch (error) {
+      if (AuthzScopeNotFoundError.is(error)) return { allowed: false, organizationRole: null };
+      throw error;
     }
 
     const scopeOrg = scopeOrganizationId(scope);

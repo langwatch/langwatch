@@ -56,7 +56,7 @@ export class OrganizationTeamAccessService {
     const groupIds = [
       ...new Set(allBindings.flatMap((binding) => (binding.groupId ? [binding.groupId] : []))),
     ];
-    const groupMembers = await this.deps.groups.listMembersForGroups({
+    const groupMembers = await this.deps.groups.findMembersForGroups({
       organizationId: parsed.organizationId,
       groupIds,
     });

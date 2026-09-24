@@ -305,7 +305,8 @@ export interface OrganizationApi {
   organizationIdsForMember(input: Readonly<{ userId: string }>): Promise<string[]>;
   getOrganizationMembers(input: GetOrganizationMembersInput): Promise<string[]>;
   getOldestTeamId(input: GetOldestTeamInput): Promise<string>;
-  tryGetOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string | null>;
+  /** Throws `organization_not_found_for_team` when no organization owns the team. */
+  getOrganizationIdByTeamId(input: GetOrganizationIdByTeamIdInput): Promise<string>;
   findOrganizationWithMembers(
     input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
     by: OrganizationCaller,

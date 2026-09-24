@@ -39,7 +39,7 @@ export class PrismaGroupRepository extends GroupRepository {
     return group;
   }
 
-  async list(input: { organizationId: string; page: number; limit: number }): Promise<{
+  async findAll(input: { organizationId: string; page: number; limit: number }): Promise<{
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }> {
@@ -65,7 +65,7 @@ export class PrismaGroupRepository extends GroupRepository {
     };
   }
 
-  async listForMember(input: {
+  async findForMember(input: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationGroupWithMemberCount[]> {
@@ -109,7 +109,7 @@ export class PrismaGroupRepository extends GroupRepository {
     return new Map(counts.map((row) => [row.groupId, row._count.groupId]));
   }
 
-  async listMembers(input: {
+  async findMembers(input: {
     groupId: string;
     organizationId: string;
   }): Promise<OrganizationGroupMember[]> {
@@ -131,7 +131,7 @@ export class PrismaGroupRepository extends GroupRepository {
     return rows.map(({ userId, user }) => ({ userId, ...user }));
   }
 
-  async listMembersForGroups(input: {
+  async findMembersForGroups(input: {
     groupIds: string[];
     organizationId: string;
   }): Promise<Map<string, OrganizationGroupMember[]>> {

@@ -60,7 +60,7 @@ function build(variant: "guided" | "classic" | null) {
   const service = ScenarioCreatedSignalService.create({
     organizations: createApiFixture<ScenarioSignalOrganizations>({
       findProject: async () => project,
-      tryGetOrganizationIdByTeamId: async () => "org_1",
+      getOrganizationIdByTeamId: async () => "org_1",
       readGuidedOnboardingState: async () => ({ state: EMPTY_GUIDED_ONBOARDING_STATE, variant }),
     }),
     posthog,

@@ -228,7 +228,7 @@ export class ApiKeyCliService {
     exceptApiKeyId?: string;
     createdBefore?: Instant;
   }): Promise<void> {
-    const keys = await this.repository.listForUser({
+    const keys = await this.repository.findForUser({
       userId: input.userId,
       organizationId: input.organizationId,
     });

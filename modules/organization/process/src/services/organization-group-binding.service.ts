@@ -2,7 +2,7 @@
  * A group's bindings: what the group may reach, validated against the roles this organization
  * can assign and the scopes it owns.
  */
-import { bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
+import { AuthzScopeNotFoundError, bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
 import {
   GroupCustomRoleRequiredError,
   GroupRoleNotAssignableError,
@@ -110,10 +110,12 @@ export class OrganizationGroupBindingService {
     }[],
   ): Promise<void> {
     for (const binding of bindings) {
-      const scope = await this.authz.tryResolveScope(bindingScopeIds(binding));
+      const scope = await this.authz
+        .getScope(bindingScopeIds(binding))
+        .catch(refuseMissingScope(binding.scopeType));
       const resolvedOrganizationId =
-        scope?.type === "organization" ? scope.id : scope?.organizationId;
-      if (!scope || resolvedOrganizationId !== organizationId) {
+        scope.type === "organization" ? scope.id : scope.organizationId;
+      if (resolvedOrganizationId !== organizationId) {
         throw new GroupScopeNotInOrganizationError(binding.scopeType);
       }
 
@@ -194,4 +196,13 @@ export class OrganizationGroupBindingService {
 
     return result;
   }
+}
+
+function refuseMissingScope(
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT",
+): (error: unknown) => never {
+  return (error) => {
+    if (AuthzScopeNotFoundError.is(error)) throw new GroupScopeNotInOrganizationError(scopeType);
+    throw error;
+  };
 }

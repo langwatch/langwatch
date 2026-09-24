@@ -549,7 +549,7 @@ export class PrismaScimRepository extends ScimRepository {
   }): Promise<{ id: string }> => {
     return this.prisma.scimToken.create({ data: input, select: { id: true } });
   };
-  listTokens(organizationId: string): Promise<ScimTokenRecord[]> {
+  findTokens(organizationId: string): Promise<ScimTokenRecord[]> {
     return this.prisma.scimToken.findMany({
       where: { organizationId },
       select: {
@@ -702,7 +702,7 @@ export class PrismaScimRepository extends ScimRepository {
     await this.prisma.scimExternalId.deleteMany({ where: input });
   }
 
-  async listDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
+  async findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]> {
     const rows = await this.prisma.scimExternalId.findMany({
       where: input,
       select: { connectionId: true },

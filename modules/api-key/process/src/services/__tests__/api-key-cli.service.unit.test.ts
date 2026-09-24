@@ -40,7 +40,7 @@ function loginKey(overrides: Pick<StoredApiKey, "id" | "createdAt">): StoredApiK
 const OLD_KEY = loginKey({ id: "apikey-old", createdAt: new Date("2026-01-01T00:00:00Z") });
 
 function serviceWith(options: {
-  listForUser?: () => Promise<StoredApiKey[]>;
+  findForUser?: () => Promise<StoredApiKey[]>;
   createdKey?: { id: string; createdAt: Date };
   revoke?: (input: { id: string }) => Promise<unknown>;
   extendLoginKeyExpiry?: (input: unknown) => Promise<void>;
@@ -57,7 +57,7 @@ function serviceWith(options: {
   const repository = Object.assign(
     MemoryApiKeyRepository.create({ memory: MemoryApiKeyDatabase.create() }),
     {
-      listForUser: options.listForUser ?? (() => Promise.resolve([])),
+      findForUser: options.findForUser ?? (() => Promise.resolve([])),
       extendLoginKeyExpiry,
     },
   );
@@ -111,7 +111,7 @@ describe("given a CLI login key mint", () => {
     /** @scenario "A re-login from the same device retires the keys of the session it replaces" */
     it("revokes the previous key for that device label and keeps the new one", async () => {
       const { service, revoke, created } = serviceWith({
-        listForUser: () => Promise.resolve([OLD_KEY]),
+        findForUser: () => Promise.resolve([OLD_KEY]),
       });
 
       await service.mintCliLoginKey({
@@ -144,7 +144,7 @@ describe("given a CLI login key mint", () => {
       });
 
       const { service, revoke } = serviceWith({
-        listForUser: () => Promise.resolve([staleKey, firstKey, secondKey]),
+        findForUser: () => Promise.resolve([staleKey, firstKey, secondKey]),
       });
 
       // The first exchange's revoke, arriving after the second mint already
@@ -171,7 +171,7 @@ describe("given a CLI login key mint", () => {
     it("rolls back the just-created key without ever revoking the previous one", async () => {
       const deviceRevokeError = new Error("revoke failed");
       const { service, revoke, created } = serviceWith({
-        listForUser: () => Promise.resolve([OLD_KEY]),
+        findForUser: () => Promise.resolve([OLD_KEY]),
         revoke: (input: { id: string }) => {
           if (input.id === OLD_KEY.id) return Promise.reject(deviceRevokeError);
           return Promise.resolve();
@@ -205,7 +205,7 @@ describe("given a CLI login key mint", () => {
   describe("when the user logs in again from the same device", () => {
     it("revokes the previous key with cause rotation, not a person's own decision", async () => {
       const { service, revoke } = serviceWith({
-        listForUser: () => Promise.resolve([OLD_KEY]),
+        findForUser: () => Promise.resolve([OLD_KEY]),
       });
 
       await service.mintCliLoginKey({

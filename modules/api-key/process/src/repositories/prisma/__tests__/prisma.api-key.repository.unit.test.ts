@@ -38,7 +38,7 @@ describe("PrismaApiKeyRepository", () => {
     it("excludes every system-managed name the contract reserves", async () => {
       const { repository, findMany } = repositoryWithSpy();
 
-      await repository.listForOrganization({ organizationId: "org-1" });
+      await repository.findForOrganization({ organizationId: "org-1" });
 
       expect(excludedNames(findMany)).toEqual([...HIDDEN_SYSTEM_KEY_NAMES]);
     });
@@ -48,7 +48,7 @@ describe("PrismaApiKeyRepository", () => {
     it("excludes every system-managed name the contract reserves", async () => {
       const { repository, findMany } = repositoryWithSpy();
 
-      await repository.listForUser({ organizationId: "org-1", userId: "user-1" });
+      await repository.findForUser({ organizationId: "org-1", userId: "user-1" });
 
       expect(excludedNames(findMany)).toEqual([...HIDDEN_SYSTEM_KEY_NAMES]);
     });

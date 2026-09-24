@@ -318,7 +318,7 @@ function createService(
     repository,
     teams,
     groups: createApiFixture<groupRepositoryModule.GroupRepository>({
-      listMembersForGroups: () => Promise.resolve(new Map()),
+      findMembersForGroups: () => Promise.resolve(new Map()),
     }),
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
@@ -425,17 +425,19 @@ describe("OrganizationService", () => {
       new MemoryTeams(),
     );
 
-    await expect(service.tryGetOrganizationIdByTeamId({ teamId: "team" })).resolves.toBe("org");
+    await expect(service.getOrganizationIdByTeamId({ teamId: "team" })).resolves.toBe("org");
   });
 
-  it("answers null for a team nothing owns, rather than refusing", async () => {
+  it("refuses a team nothing owns with organization_not_found_for_team", async () => {
     const service = createService(
       new StubRepository("team"),
       new RecordingGrants(),
       new MemoryTeams(),
     );
 
-    await expect(service.tryGetOrganizationIdByTeamId({ teamId: "gone" })).resolves.toBeNull();
+    await expect(service.getOrganizationIdByTeamId({ teamId: "gone" })).rejects.toMatchObject({
+      code: "organization_not_found_for_team",
+    });
   });
 
   it("returns management settings through the canonical service", async () => {

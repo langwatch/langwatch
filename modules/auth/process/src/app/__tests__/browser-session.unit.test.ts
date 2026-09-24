@@ -80,7 +80,7 @@ class Sessions implements AuthSessionRepository {
     await this.touched(input);
   }
 
-  async listTokensForUser(): Promise<string[]> {
+  async findTokensForUser(): Promise<string[]> {
     return ["token-1", "token-2"];
   }
 

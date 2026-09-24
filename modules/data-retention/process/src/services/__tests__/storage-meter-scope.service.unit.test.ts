@@ -26,13 +26,13 @@ class StubDirectory implements DataRetentionDirectoryReader {
   async findProjectLineage(): Promise<RetentionProjectLineage | null> {
     return this.lineage;
   }
-  async listOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
+  async findOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
     return { teams: [], projects: [] };
   }
   async findScopeOrganizationId(): Promise<string | null> {
     return this.lineage?.organizationId ?? null;
   }
-  async listScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
+  async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return this.scopeProjects;
   }
 }

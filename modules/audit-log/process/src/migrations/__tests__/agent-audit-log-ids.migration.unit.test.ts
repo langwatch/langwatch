@@ -14,10 +14,10 @@ function fixture(
   logs: Record<string, AgentAuditLogRow[]>,
   candidates: (query: AgentAuditLogCandidateQuery) => { id: string }[],
 ) {
-  const listLogs = vi.fn(async ({ action, projectId }: { action: string; projectId?: string }) =>
+  const findLogs = vi.fn(async ({ action, projectId }: { action: string; projectId?: string }) =>
     (logs[action] ?? []).filter((log) => !projectId || log.projectId === projectId),
   );
-  const listCandidates = vi.fn(async (query: AgentAuditLogCandidateQuery) => candidates(query));
+  const findCandidates = vi.fn(async (query: AgentAuditLogCandidateQuery) => candidates(query));
   const updateArgs = vi.fn<AgentAuditLogMigrationRepository["updateArgs"]>(
     async ({ logId, args }) => {
       for (const entries of Object.values(logs)) {
@@ -27,19 +27,19 @@ function fixture(
     },
   );
   const repository = {
-    listLogs,
-    listCandidates,
+    findLogs,
+    findCandidates,
     updateArgs,
   } satisfies AgentAuditLogMigrationRepository;
 
-  return { migration: AgentAuditLogIdsMigration.create(repository), listCandidates, updateArgs };
+  return { migration: AgentAuditLogIdsMigration.create(repository), findCandidates, updateArgs };
 }
 
 describe("agent audit identifier migration", () => {
   /** @scenario "Legacy agent audit identifiers are repaired without guessing" */
   /** @scenario "The audit-log backfill fills in the agent id of a pre-fix record" */
   it("repairs unique create/copy candidates and leaves a repeated pass unchanged", async () => {
-    const { migration, listCandidates, updateArgs } = fixture(
+    const { migration, findCandidates, updateArgs } = fixture(
       {
         "agents.create": [{ id: "create", projectId: "project-1", args: {}, createdAt: at }],
         "agents.copy": [
@@ -54,7 +54,7 @@ describe("agent audit identifier migration", () => {
       { logId: "create", projectId: "project-1", args: { id: "created" } },
       { logId: "copy", projectId: "project-1", args: { agentId: "source", newAgentId: "copied" } },
     ]);
-    expect(listCandidates).toHaveBeenCalledWith({
+    expect(findCandidates).toHaveBeenCalledWith({
       projectId: "project-1",
       copiedFromAgentId: "source",
       window: { gte: at.subtract({ milliseconds: 60000 }), lte: at.add({ milliseconds: 60000 }) },
@@ -108,11 +108,11 @@ describe("agent audit identifier migration", () => {
   });
 
   it("does not query after cancellation", async () => {
-    const { migration, listCandidates, updateArgs } = fixture({}, () => []);
+    const { migration, findCandidates, updateArgs } = fixture({}, () => []);
     await expect(
       migration.migrateTenant({ tenantId: "project-1", signal: AbortSignal.abort() }),
     ).rejects.toMatchObject({ name: "AbortError" });
-    expect(listCandidates).not.toHaveBeenCalled();
+    expect(findCandidates).not.toHaveBeenCalled();
     expect(updateArgs).not.toHaveBeenCalled();
   });
 });

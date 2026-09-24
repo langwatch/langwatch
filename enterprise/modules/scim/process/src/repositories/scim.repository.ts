@@ -216,7 +216,7 @@ export abstract class ScimRepository extends ScimGrantRepository {
     hashedToken: string;
     description: string | null;
   }) => Promise<{ id: string }>;
-  abstract listTokens(organizationId: string): Promise<ScimTokenRecord[]>;
+  abstract findTokens(organizationId: string): Promise<ScimTokenRecord[]>;
   abstract findToken(input: {
     organizationId: string;
     tokenId: string;
@@ -270,7 +270,7 @@ export abstract class ScimRepository extends ScimGrantRepository {
     connectionId: string;
     userId: string;
   }): Promise<void>;
-  abstract listDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]>;
+  abstract findDirectoryConnectionsForUser(input: { userId: string }): Promise<string[]>;
   /** Whom these connections' directories have claimed, one row per identifier. */
   abstract findDirectoryOwnership(input: {
     connectionIds: string[];

@@ -295,7 +295,7 @@ export class OrganizationTeamMembersService {
     const adminGroupIds = input.bindings.flatMap((binding) =>
       binding.role === "ADMIN" && binding.groupId ? [binding.groupId] : [],
     );
-    const members = await this.deps.groups.listMembersForGroups({
+    const members = await this.deps.groups.findMembersForGroups({
       organizationId: input.organizationId,
       groupIds: [...new Set(adminGroupIds)],
     });

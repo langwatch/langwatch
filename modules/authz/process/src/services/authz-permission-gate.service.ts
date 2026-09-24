@@ -26,6 +26,7 @@ import {
   type PermissionDecision,
   type PermissionScopeArg,
   type TierOfScopeArg,
+  AuthzScopeNotFoundError,
 } from "@langwatch/authz-contract";
 
 type ScopeIds = {
@@ -48,11 +49,11 @@ type AuthzPermissionGateOptions = {
   }) => Promise<boolean>;
   canAnyByIds: (args: AuthzCanAnyByIdsInput) => Promise<AuthzCanAnyByIdsOutput>;
   checkByIds: (args: AuthzCheckByIdsInput) => Promise<AuthzCheckByIdsOutput>;
-  tryResolveScope: (ids: {
+  getScope: (ids: {
     projectId?: string | undefined;
     teamId?: string | undefined;
     organizationId?: string | undefined;
-  }) => Promise<AuthzScopeRef | null>;
+  }) => Promise<AuthzScopeRef>;
   tryScopeOf: (
     scope: Partial<Record<"projectId" | "teamId" | "organizationId", string>>,
   ) => AuthzDeclaredScopeId | null;
@@ -141,13 +142,17 @@ export class AuthzPermissionGateService {
     check: { userId: string; permission: Permission } & ScopeArg,
   ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>> {
     const declaredScope = this.deps.tryScopeOf(check);
-    let scope: AuthzScopeRef | null = null;
-    if (declaredScope?.tier === "project") {
-      scope = await this.deps.tryResolveScope({ projectId: declaredScope.id });
-    } else if (declaredScope?.tier === "team") {
-      scope = await this.deps.tryResolveScope({ teamId: declaredScope.id });
-    } else if (declaredScope?.tier === "organization") {
-      scope = await this.deps.tryResolveScope({ organizationId: declaredScope.id });
+    let scope: AuthzScopeRef | undefined;
+    try {
+      if (declaredScope?.tier === "project") {
+        scope = await this.deps.getScope({ projectId: declaredScope.id });
+      } else if (declaredScope?.tier === "team") {
+        scope = await this.deps.getScope({ teamId: declaredScope.id });
+      } else if (declaredScope?.tier === "organization") {
+        scope = await this.deps.getScope({ organizationId: declaredScope.id });
+      }
+    } catch (error) {
+      if (!AuthzScopeNotFoundError.is(error)) throw error;
     }
 
     if (!scope || scope.type === "resource") {
@@ -224,8 +229,14 @@ export class AuthzPermissionGateService {
     projectId,
     permission,
   }: AuthzGetApiKeyProjectDecisionInput): Promise<ApiKeyProjectDecision> {
-    const scope = await this.deps.tryResolveScope({ projectId });
-    if (scope?.type !== "project" || scope.organizationId !== organizationId) {
+    let scope: AuthzScopeRef;
+    try {
+      scope = await this.deps.getScope({ projectId });
+    } catch (error) {
+      if (AuthzScopeNotFoundError.is(error)) return { outcome: "project_not_found" };
+      throw error;
+    }
+    if (scope.type !== "project" || scope.organizationId !== organizationId) {
       return { outcome: "project_not_found" };
     }
 
