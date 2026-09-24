@@ -7,6 +7,7 @@ import {
 } from "../redaction";
 
 const PROMPT = "please summarise my overdue invoices";
+const SHORT_ANSWER = "fraud";
 
 const INPUT_HIDDEN: Protections = {
   canSeeCosts: true,
@@ -29,8 +30,10 @@ function makeSpan(params: Record<string, unknown>): Span {
           content: [
             { type: "text", text: "" },
             { type: "text", text: PROMPT },
+            { type: "text", text: SHORT_ANSWER },
           ],
         },
+        { role: "user", content: { type: "merger with Initech", body: "" } },
       ],
     },
     params,
@@ -92,6 +95,60 @@ describe("applySpanProtections", () => {
       );
 
       expect(params.app.echo).toBe("[REDACTED]");
+    });
+
+    /** @scenario "Hidden input copied into another attribute is still scrubbed" */
+    it("scrubs an attribute that quotes a short hidden word as a whole word", () => {
+      const params = protect(
+        makeSpan({ app: { verdict: `the model said ${SHORT_ANSWER}.` } }),
+      );
+
+      expect(params.app.verdict).toBe("[REDACTED]");
+    });
+
+    /** @scenario "Hidden input copied into another attribute is still scrubbed" */
+    it("scrubs content that sits under a type key but is not a message shape", () => {
+      const params = protect(
+        makeSpan({ app: { deal: "merger with Initech" } }),
+      );
+
+      expect(params.app.deal).toBe("[REDACTED]");
+    });
+
+    /** @scenario "Hiding input does not blank unrelated attributes" */
+    it("keeps a value that only contains a short hidden word inside a longer word", () => {
+      const params = protect(makeSpan({ app: { rule: "antifraud_v2" } }));
+
+      expect(params.app.rule).toBe("antifraud_v2");
+    });
+  });
+
+  describe("when the viewer cannot see a span's output", () => {
+    /** @scenario "Hidden input is replaced whole in the attributes that carry it" */
+    it("replaces the gen_ai output messages whole and leaves the input keys alone", () => {
+      const span = {
+        ...makeSpan({
+          gen_ai: {
+            input: { messages: "[visible prompt]" },
+            output: { messages: "[hidden answer]" },
+          },
+        }),
+        output: { type: "text", value: "hidden answer" },
+      } as unknown as Span;
+      const params = applySpanProtections(
+        span,
+        {
+          canSeeCosts: true,
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: false,
+        },
+        new Set(),
+      ).params as any;
+
+      expect(params.gen_ai.output.messages).toBe(
+        "[REDACTED] (visible to members of this project)",
+      );
+      expect(params.gen_ai.input.messages).toBe("[visible prompt]");
     });
   });
 });

@@ -108,6 +108,7 @@ function seedGrants(grants: ScopedGrant[]) {
         )
         .map((grant) => ({
           roleKey: grant.roleKey,
+          scopeType: grant.scopeType,
           principalType: "USER",
           principalId: "user-rolebinding-only",
         }));
@@ -116,6 +117,7 @@ function seedGrants(grants: ScopedGrant[]) {
 }
 
 const ADMINS: Audience = { admins: true };
+const MEMBERS: Audience = { members: true };
 const NO_ONE: Audience = {};
 
 describe("getUserProtectionsForProject", () => {
@@ -161,7 +163,12 @@ describe("getUserProtectionsForProject", () => {
           revokedAt: null,
           principalType: { in: ["USER", "GROUP"] },
         },
-        select: { roleKey: true, principalType: true, principalId: true },
+        select: {
+          roleKey: true,
+          scopeType: true,
+          principalType: true,
+          principalId: true,
+        },
       });
     });
 
@@ -245,6 +252,37 @@ describe("getUserProtectionsForProject", () => {
       const result = await protections();
       expect(result.canSeeCapturedInput).toBe(true);
       expect(result.canSeeCapturedOutput).toBe(true);
+    });
+
+    /** @scenario "A project-level role counts as project membership" */
+    it("is in the Members audience", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: MEMBERS },
+        }),
+      );
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(true);
+    });
+  });
+
+  describe("when a team viewer also holds the organization member grant every member has", () => {
+    beforeEach(() => {
+      seedGrants([
+        { scopeType: "ORGANIZATION", scopeId: "org-1", roleKey: "member" },
+        { scopeType: "TEAM", scopeId: "team-1", roleKey: "viewer" },
+      ]);
+    });
+
+    /** @scenario "Belonging to the organization does not put a viewer in the Members audience" */
+    it("hides input restricted to members", async () => {
+      mockPolicy(
+        policyRestricting({
+          input: { disposition: "restrict", audience: MEMBERS },
+        }),
+      );
+      const result = await protections();
+      expect(result.canSeeCapturedInput).toBe(false);
     });
   });
 

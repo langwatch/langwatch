@@ -61,17 +61,42 @@ export function collectDroppedCategories(spans: Span[] | undefined): string[] {
 }
 
 /**
- * Keys whose values describe a message's shape ("user", "text",
- * "image_url"), not what anyone wrote. They are left out of the redaction set,
- * or every attribute that mentions a role would be blanked along with the
- * content.
+ * The values a message's `role` or `type` takes to describe its shape, not
+ * what anyone wrote. They are left out of the redaction set, or every
+ * attribute that mentions a role would be blanked along with the content. Any
+ * other value under those keys is content and is kept.
  */
 const STRUCTURAL_KEYS: ReadonlySet<string> = new Set(["role", "type"]);
+const STRUCTURAL_VALUES: ReadonlySet<string> = new Set([
+  "user",
+  "assistant",
+  "system",
+  "developer",
+  "tool",
+  "function",
+  "text",
+  "json",
+  "raw",
+  "list",
+  "chat_messages",
+  "image",
+  "image_url",
+  "input_audio",
+  "audio",
+  "file",
+  "tool_call",
+  "tool_calls",
+  "tool_use",
+  "tool_result",
+  "thinking",
+  "reasoning",
+]);
 
 /**
- * Below this length a hidden string is only redacted where an attribute equals
- * it outright. Matching it anywhere inside another value blanks unrelated
- * attributes that merely contain a short word the content also used.
+ * Below this length a hidden string is redacted inside another value only
+ * where it stands as a whole word. Matching it as a bare substring blanks
+ * unrelated attributes that merely contain a short word the content also used
+ * ("user" in "user_selected").
  */
 const MIN_CONTAINED_REDACTION_LENGTH = 8;
 
@@ -108,28 +133,57 @@ export function extractRedactionsForObject(object: unknown): string[] {
   }
   if (typeof object === "object" && object !== null) {
     return Object.entries(object)
-      .filter(([key]) => !STRUCTURAL_KEYS.has(key))
+      .filter(
+        ([key, value]) =>
+          !(
+            STRUCTURAL_KEYS.has(key) &&
+            typeof value === "string" &&
+            STRUCTURAL_VALUES.has(value)
+          ),
+      )
       .flatMap(([, value]) => extractRedactionsForObject(value));
   }
 
   return [];
 }
 
+interface RedactionMatchers {
+  long: string[];
+  short: RegExp[];
+}
+
+const matchersByRedactions = new WeakMap<Set<string>, RedactionMatchers>();
+
+/** The redaction set split by how each string is matched, compiled once. */
+function matchersFor(redactions: Set<string>): RedactionMatchers {
+  const cached = matchersByRedactions.get(redactions);
+  if (cached) return cached;
+  const matchers: RedactionMatchers = { long: [], short: [] };
+  for (const redaction of redactions) {
+    if (redaction.length >= MIN_CONTAINED_REDACTION_LENGTH) {
+      matchers.long.push(redaction);
+    } else {
+      const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      matchers.short.push(
+        new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "u"),
+      );
+    }
+  }
+  matchersByRedactions.set(redactions, matchers);
+  return matchers;
+}
+
 /**
  * Whether a string leaf carries hidden content: it is one of the hidden
- * strings, or it quotes one long enough to mean something on its own.
+ * strings, quotes a long one anywhere, or holds a short one as a whole word.
  */
 function carriesRedaction(value: string, redactions: Set<string>): boolean {
   if (redactions.has(value)) return true;
-  for (const redaction of redactions) {
-    if (
-      redaction.length >= MIN_CONTAINED_REDACTION_LENGTH &&
-      value.includes(redaction)
-    ) {
-      return true;
-    }
-  }
-  return false;
+  const { long, short } = matchersFor(redactions);
+  return (
+    long.some((redaction) => value.includes(redaction)) ||
+    short.some((pattern) => pattern.test(value))
+  );
 }
 
 /**

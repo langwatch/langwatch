@@ -208,6 +208,13 @@ Feature: Restricting who can see trace content
     Then the trace input is visible to "pete"
 
   @unit
+  Scenario: Belonging to the organization does not put a viewer in the Members audience
+    Given a rule on "web-app" that restricts trace input to the Members role group
+    And "vera" holds a viewer role on the "platform" team and is an ordinary member of "acme"
+    When "vera" opens a trace for "web-app"
+    Then the trace input is redacted for "vera"
+
+  @unit
   Scenario: Someone the permission engine denies trace access is not a member
     Given no privacy rule restricts content on "web-app"
     And "xena" cannot view traces on "web-app"

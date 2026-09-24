@@ -326,9 +326,11 @@ export async function getUserProtectionsForProject(
   const groupIds = memberships.map((membership) => membership.groupId);
   const groupIdSet = new Set(groupIds);
   // A role reaches a project from its organization, its team or the project
-  // itself (the chain the permission engine walks), so the role groups an
-  // audience names are read from all three. Reading the team alone made an
-  // organization admin a non-member, and every trace a placeholder.
+  // itself (the chain the permission engine walks). Reading the team alone
+  // made an organization admin a non-member, and every trace a placeholder.
+  // Only an organization ADMIN grant means a role on the project, though:
+  // every organization member holds an organization "member" grant, which the
+  // engine reads as the organization floor, not as the Members role group.
   const scopeGrants = await ctx.prisma.grant.findMany({
     where: {
       organizationId,
@@ -340,14 +342,20 @@ export async function getUserProtectionsForProject(
       revokedAt: null,
       principalType: { in: ["USER", "GROUP"] },
     },
-    select: { roleKey: true, principalType: true, principalId: true },
+    select: {
+      roleKey: true,
+      scopeType: true,
+      principalType: true,
+      principalId: true,
+    },
   });
   const heldGrants = scopeGrants.filter(
     (grant) =>
-      (grant.principalType === "USER" && grant.principalId === userId) ||
-      (grant.principalType === "GROUP" &&
-        grant.principalId !== null &&
-        groupIdSet.has(grant.principalId)),
+      ((grant.principalType === "USER" && grant.principalId === userId) ||
+        (grant.principalType === "GROUP" &&
+          grant.principalId !== null &&
+          groupIdSet.has(grant.principalId))) &&
+      (grant.scopeType !== "ORGANIZATION" || grant.roleKey === "admin"),
   );
   const roleKeys = new Set(heldGrants.map((grant) => grant.roleKey));
   const isAdmin = roleKeys.has("admin");
