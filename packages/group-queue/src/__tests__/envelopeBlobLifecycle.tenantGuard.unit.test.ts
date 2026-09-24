@@ -1,4 +1,4 @@
-import type { Redis } from "ioredis";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle.ts";
@@ -10,19 +10,7 @@ import type { BlobRef } from "../tieredBlobStore.ts";
  * exercisable without Redis or an object store. The stub only satisfies
  * construction — any call on it is a test failure: the guard let a ref through.
  */
-const unreachableRedis = new Proxy(
-  {},
-  {
-    get(_target, prop) {
-      if (prop === "then") return undefined; // not a thenable
-      return () => {
-        throw new Error(
-          `Redis.${String(prop)}() reached — the tenant guard should have refused first`,
-        );
-      };
-    },
-  },
-) as unknown as Redis;
+const unreachableRedis = redisDouble();
 
 const QUEUE = "{test/tenantguard}";
 

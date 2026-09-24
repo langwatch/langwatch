@@ -1,3 +1,4 @@
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { SessionStateStoreFactory } from "../session-state.factory.ts";
@@ -6,7 +7,6 @@ import { SessionStateStoreFactory } from "../session-state.factory.ts";
  * starts receiving, and what a failed transaction command does.
  * @see specs/agents/connected-agents.feature
  */
-import type { RedisConnection } from "../types.ts";
 
 type MessageListener = (channel: string, message: string) => void;
 
@@ -19,29 +19,24 @@ function fakeSubscriberRedis() {
   const subscribed: string[] = [];
   let release: (() => void) | null = null;
 
-  const connection = {
-    on(event: string, handler: MessageListener) {
+  const connection = redisDouble({
+    on: (event: string | symbol, handler: MessageListener) => {
       if (event === "message") listener = handler;
+      return connection;
     },
-    async subscribe(channel: string) {
+    subscribe: async (channel: string) => {
       subscribed.push(channel);
       await new Promise<void>((resolve) => {
         release = resolve;
       });
       return 1;
     },
-    async unsubscribe() {
-      return 0;
-    },
-    async quit() {
-      return "OK";
-    },
-  };
+    unsubscribe: async () => 0,
+    quit: async () => "OK",
+  });
 
   return {
-    redis: {
-      duplicate: () => connection as unknown as RedisConnection,
-    } as unknown as RedisConnection,
+    redis: redisDouble({ duplicate: () => connection }),
     subscribed,
     deliver: (channel: string, message: string) => listener?.(channel, message),
     finishSubscribe: () => release?.(),
@@ -57,10 +52,10 @@ function fakeMultiRedis(tuples: [Error | null, unknown][] | null) {
       return tuples;
     },
   };
-  return {
-    duplicate: () => ({}) as RedisConnection,
+  return redisDouble({
+    duplicate: () => redisDouble(),
     multi: () => chain,
-  } as unknown as RedisConnection;
+  });
 }
 
 describe("SessionStateStoreFactory.redis", () => {

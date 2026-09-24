@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { RedisConnection } from "@langwatch/redis-client";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 /**
  * What a process builds, what it refuses, and what it closes. Nothing here opens a socket: every
  * test either hands the member in or reads one this process was not configured for, which is the
@@ -123,7 +123,7 @@ describe("given the members built over one Redis connection", () => {
   describe("when the cache, the idempotency store and the limiter are read", () => {
     it("builds all three over the single connection handed in", () => {
       const calls: string[] = [];
-      const redis = {
+      const redis = redisDouble({
         getBuffer: () => {
           calls.push("cache");
           return Promise.resolve(null);
@@ -137,7 +137,7 @@ describe("given the members built over one Redis connection", () => {
           return Promise.resolve(1);
         },
         expire: () => Promise.resolve(1),
-      } as unknown as RedisConnection;
+      });
       const members = createProcessMembers({ config: config(), members: { redis } });
 
       void members.read("cache").find("key");

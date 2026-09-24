@@ -1,10 +1,11 @@
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
 import { RedisShutdownService } from "./shutdown.ts";
 import type { RedisConnection } from "./types.ts";
 
 function connectionThat(disconnect: () => void): RedisConnection {
-  return { disconnect } as unknown as RedisConnection;
+  return redisDouble({ disconnect });
 }
 
 describe("RedisShutdownService", () => {
