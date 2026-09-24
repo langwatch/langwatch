@@ -48,7 +48,7 @@ export interface AzureBillReader {
  * anything reaching the service directly, without going through that form, is
  * under no such obligation.
  */
-export function readClaimedSubscription(
+export function extractClaimedSubscription(
   parserConfig: Record<string, unknown> | null | undefined,
 ): string | null {
   if (!parserConfig || typeof parserConfig !== "object") return null;
@@ -61,7 +61,7 @@ export function readClaimedSubscription(
 /**
  * The customer's own prepaid declaration, read off the stored config.
  *
- * A reader beside `readClaimedSubscription` for the same reason it exists:
+ * A reader beside `extractClaimedSubscription` for the same reason it exists:
  * the config is untyped JSON, and every caller hand-reading the key is a
  * caller that can quietly disagree with the others about what counts as
  * declared. Only a stored `true` does — the declaration is a checkbox an
@@ -132,7 +132,7 @@ export function assertAzureBillHasItsOwnCredential(params: {
   storedParserConfig?: Record<string, unknown> | null;
 }): void {
   const { parserConfig, storedParserConfig } = params;
-  if (readClaimedSubscription(parserConfig) === null) return;
+  if (extractClaimedSubscription(parserConfig) === null) return;
 
   const complaint =
     "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
@@ -143,7 +143,10 @@ export function assertAzureBillHasItsOwnCredential(params: {
     // carrying the sealed envelope across for a claim that was already
     // judged when it was made; a create, or an edit that ADDS the claim,
     // has never had its pair checked by anyone.
-    if (storedParserConfig !== undefined && readClaimedSubscription(storedParserConfig) !== null) {
+    if (
+      storedParserConfig !== undefined &&
+      extractClaimedSubscription(storedParserConfig) !== null
+    ) {
       return;
     }
     const editComplaint =
@@ -194,7 +197,7 @@ export function assertAzureBillNotAlreadyClaimed(params: {
 }): void {
   const { parserConfig, claimedBy, sourceId } = params;
 
-  const claimed = readClaimedSubscription(parserConfig);
+  const claimed = extractClaimedSubscription(parserConfig);
   if (claimed === null) return;
 
   const wanted = claimed.toLowerCase();

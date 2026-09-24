@@ -202,11 +202,12 @@ export class ClickHousePersonalUsageRepository implements PersonalUsageReader {
     };
   }
 
-  /** The single most-used model by request count in the window, or null. */
-  async tryFindTopModel(input: {
+  /** The most-used models by request count in the window, most first. */
+  async findTopModels(input: {
     tenantId: string;
     window: PersonalUsageWindow;
-  }): Promise<PersonalUsageTopModelRow | null> {
+    limit: number;
+  }): Promise<PersonalUsageTopModelRow[]> {
     const window = toInternalWindow(input.window);
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
@@ -227,22 +228,21 @@ export class ClickHousePersonalUsageRepository implements PersonalUsageReader {
         )
         GROUP BY Model
         ORDER BY Requests DESC
-        LIMIT 1
+        LIMIT {limit:UInt32}
         SETTINGS ${formatSettings(PERSONAL_USAGE_CLICKHOUSE_SETTINGS)}
       `,
       query_params: {
         tenantId: input.tenantId,
         fromMs: window.start.epochMilliseconds,
         toMs: window.end.epochMilliseconds,
+        limit: input.limit,
       },
       format: "JSONEachRow",
     });
 
     type RawTopModel = { Model: string; Requests: number };
     const rows = (await result.json()) as RawTopModel[];
-    const top = rows[0];
-    if (!top) return null;
-    return { model: top.Model, requests: Number(top.Requests) || 0 };
+    return rows.map((row) => ({ model: row.Model, requests: Number(row.Requests) || 0 }));
   }
 
   /** Daily spend buckets from `trace_summaries`, one row per day present. */
@@ -363,15 +363,15 @@ export class ClickHousePersonalUsageRepository implements PersonalUsageReader {
 
   /**
    * Per-user spend rollup from `gateway_budget_ledger_events`, PRINCIPAL
-   * scope only. Null when the collapsed request subquery has no rows for
+   * scope only. All zeroes when the collapsed request subquery has no rows for
    * this user in the window — see the class doc for what this misses
    * (events that only hit ORG/PROJECT-scope budgets).
    */
-  async tryFindIngestionPrincipalSummary(input: {
+  async getIngestionPrincipalSummary(input: {
     tenantId: string;
     userId: string;
     window: PersonalUsageWindow;
-  }): Promise<IngestionPrincipalSummaryRow | null> {
+  }): Promise<IngestionPrincipalSummaryRow> {
     const window = toInternalWindow(input.window);
     const client = await this.resolveClient(input.tenantId);
     const queryParams = {
@@ -402,7 +402,15 @@ export class ClickHousePersonalUsageRepository implements PersonalUsageReader {
       CompletionTokens: number | null;
     };
     const [row] = (await result.json()) as RawSummary[];
-    if (!row || !Number(row.RequestCount)) return null;
+    if (!row || !Number(row.RequestCount)) {
+      return {
+        totalCost: 0,
+        requestCount: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        topModel: null,
+      };
+    }
 
     const topModelResult = await client.query({
       query: `

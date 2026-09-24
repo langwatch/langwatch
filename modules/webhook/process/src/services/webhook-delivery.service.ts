@@ -35,7 +35,7 @@ import {
   type WebhookDispatchResult,
 } from "../rules/webhook-delivery-contract.rules.ts";
 import {
-  endpointFlushTarget,
+  deriveEndpointFlushTarget,
   onAdmission,
   onSpendOutcome,
   payloadToRow,
@@ -186,7 +186,7 @@ export class WebhookDeliveryService {
           }),
         )
         .onWake((state, context) => {
-          const target = endpointFlushTarget(state, context.key);
+          const target = deriveEndpointFlushTarget(state, context.key);
           if (!target) {
             return { state };
           }
@@ -314,7 +314,7 @@ export class WebhookDeliveryService {
     status: DeliverPayload["status"];
   }): Promise<WebhookEndpointView[]> {
     const eventType = deliveryEventType(status);
-    const endpoints = await this.deps.endpoints.getActiveByOrganization({ organizationId });
+    const endpoints = await this.deps.endpoints.findActiveByOrganization({ organizationId });
 
     return endpoints.filter((e) => eventMatches(e.enabledEvents, eventType));
   }

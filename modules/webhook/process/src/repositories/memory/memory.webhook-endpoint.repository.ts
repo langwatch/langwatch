@@ -265,7 +265,7 @@ function selects(value: string | null | undefined): boolean {
   return typeof value === "string" && value.trim() !== "";
 }
 
-function mergedCredentialField({
+function deriveMergedCredentialField({
   isCleared,
   sent,
   stored,
@@ -306,22 +306,22 @@ function assertValidSqsUpdate({
   }
   const merged: SqsDestinationInput = {
     queueUrl: sqs.queueUrl ?? endpoint.sqsQueueUrl ?? "",
-    roleArn: mergedCredentialField({
+    roleArn: deriveMergedCredentialField({
       isCleared: selectsStatic,
       sent: sqs.roleArn,
       stored: endpoint.sqsRoleArn,
     }),
-    externalId: mergedCredentialField({
+    externalId: deriveMergedCredentialField({
       isCleared: selectsStatic,
       sent: sqs.externalId,
       stored: endpoint.sqsExternalId,
     }),
-    accessKeyId: mergedCredentialField({
+    accessKeyId: deriveMergedCredentialField({
       isCleared: selectsRole,
       sent: sqs.accessKeyId,
       stored: endpoint.sqsAccessKeyId,
     }),
-    secretAccessKey: mergedCredentialField({
+    secretAccessKey: deriveMergedCredentialField({
       isCleared: selectsRole,
       sent: sqs.secretAccessKey,
       stored: endpoint.sqsSecretAccessKeyEncrypted ? KEPT_SECRET : null,
@@ -411,7 +411,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     return { endpoint: toView(row), secret };
   }
 
-  async getAll(params: { organizationId: string }): Promise<WebhookEndpointView[]> {
+  async findAll(params: { organizationId: string }): Promise<WebhookEndpointView[]> {
     return this.#database
       .endpoints()
       .filter((row) => row.organizationId === params.organizationId && row.archivedAt === null)
@@ -575,7 +575,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     return this.#options.secrets.decrypt(endpoint.secretEncrypted);
   }
 
-  async getSigningSecrets(params: {
+  async findSigningSecrets(params: {
     organizationId: string;
     endpointId: string;
     now?: Instant;
@@ -637,7 +637,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     };
   }
 
-  async getActiveByOrganization(params: {
+  async findActiveByOrganization(params: {
     organizationId: string;
   }): Promise<WebhookEndpointView[]> {
     return this.#database

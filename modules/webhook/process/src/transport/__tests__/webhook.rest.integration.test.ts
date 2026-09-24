@@ -328,7 +328,7 @@ describe("every list on the /api/webhooks/v1 surface", () => {
   it("answers under `data`, because next_cursor has nowhere to live beside a bare array", async () => {
     const { request } = mountWebhookRest({
       endpoints: createApiFixture<WebhookAppDependencies["endpoints"]>({
-        getAll: async () => [],
+        findAll: async () => [],
       }),
     });
 

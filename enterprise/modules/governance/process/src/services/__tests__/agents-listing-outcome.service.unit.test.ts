@@ -12,7 +12,7 @@
  * and a refusal never picks up a count it does not have.
  */
 
-import { agentsListingOutcome } from "@langwatch/enterprise-governance-process";
+import { deriveAgentsListingOutcome } from "@langwatch/enterprise-governance-process";
 import { describe, expect, it } from "vitest";
 
 const row = (outcome: string | null, reason: string | null) => ({
@@ -26,7 +26,7 @@ describe("given a source's last agents listing", () => {
       // The count is not read here on purpose: an empty list is a `listed`
       // outcome with a count of zero, and the outcome alone is what the page
       // branches on.
-      expect(agentsListingOutcome(row("listed", null))).toEqual({
+      expect(deriveAgentsListingOutcome(row("listed", null))).toEqual({
         outcome: "listed",
       });
     });
@@ -34,14 +34,14 @@ describe("given a source's last agents listing", () => {
 
   describe("when the provider refused", () => {
     it("reports a credential problem as one a person must fix", () => {
-      expect(agentsListingOutcome(row("refused", "unauthorized"))).toEqual({
+      expect(deriveAgentsListingOutcome(row("refused", "unauthorized"))).toEqual({
         outcome: "refused",
         cause: "access",
       });
     });
 
     it.each(["not_found", "not_configured"])("treats %s as a fix rather than a retry", (reason) => {
-      expect(agentsListingOutcome(row("refused", reason))).toEqual({
+      expect(deriveAgentsListingOutcome(row("refused", reason))).toEqual({
         outcome: "refused",
         cause: "access",
       });
@@ -50,7 +50,7 @@ describe("given a source's last agents listing", () => {
     it.each(["rate_limited", "unavailable", "unreachable", "malformed_response", "listing_failed"])(
       "treats %s as worth asking again rather than a permission to audit",
       (reason) => {
-        expect(agentsListingOutcome(row("refused", reason))).toEqual({
+        expect(deriveAgentsListingOutcome(row("refused", reason))).toEqual({
           outcome: "refused",
           cause: "unreachable",
         });
@@ -64,7 +64,7 @@ describe("given a source's last agents listing", () => {
      * a reader that a provider which answered every request did not answer.
      */
     it("treats our own page bound as neither a fault to fix nor a provider that went quiet", () => {
-      expect(agentsListingOutcome(row("refused", "too_many_pages"))).toEqual({
+      expect(deriveAgentsListingOutcome(row("refused", "too_many_pages"))).toEqual({
         outcome: "refused",
         cause: "incomplete",
       });
@@ -78,7 +78,7 @@ describe("given a source's last agents listing", () => {
      * send this reader round a loop.
      */
     it("treats a provider that stopped paginating as incomplete, not as one that went quiet", () => {
-      expect(agentsListingOutcome(row("refused", "pagination_stalled"))).toEqual({
+      expect(deriveAgentsListingOutcome(row("refused", "pagination_stalled"))).toEqual({
         outcome: "refused",
         cause: "incomplete",
       });
@@ -95,7 +95,7 @@ describe("given a source's last agents listing", () => {
      * other test in this file.
      */
     it("does not tell a reader to ask again when asking again reads the same pages", () => {
-      const outcome = agentsListingOutcome(row("refused", "too_many_pages"));
+      const outcome = deriveAgentsListingOutcome(row("refused", "too_many_pages"));
 
       expect(outcome).not.toEqual({
         outcome: "refused",
@@ -111,7 +111,7 @@ describe("given a source's last agents listing", () => {
      * fault.
      */
     it("falls to asking again for a reason this build has never heard of", () => {
-      expect(agentsListingOutcome(row("refused", "quota_exhausted_v2"))).toEqual({
+      expect(deriveAgentsListingOutcome(row("refused", "quota_exhausted_v2"))).toEqual({
         outcome: "refused",
         cause: "unreachable",
       });
@@ -149,7 +149,7 @@ describe("given a source's last agents listing", () => {
       "propertyIsEnumerable",
       "__proto__",
     ])("falls to asking again for %s, which is also a property name", (inherited) => {
-      expect(agentsListingOutcome(row("refused", inherited))).toEqual({
+      expect(deriveAgentsListingOutcome(row("refused", inherited))).toEqual({
         outcome: "refused",
         cause: "unreachable",
       });
@@ -170,14 +170,14 @@ describe("given a source's last agents listing", () => {
      * complete was not, and the next person writes the same passing test.
      */
     it("still falls to asking again for an ordinary unknown word (control)", () => {
-      expect(agentsListingOutcome(row("refused", "some_future_reason"))).toEqual({
+      expect(deriveAgentsListingOutcome(row("refused", "some_future_reason"))).toEqual({
         outcome: "refused",
         cause: "unreachable",
       });
     });
 
     it("carries no count, so nothing downstream can read one", () => {
-      const outcome = agentsListingOutcome(row("refused", "unauthorized"));
+      const outcome = deriveAgentsListingOutcome(row("refused", "unauthorized"));
 
       expect(outcome).not.toHaveProperty("count");
     });
@@ -190,8 +190,8 @@ describe("given a source's last agents listing", () => {
      * "we asked" flag, which each individual assertion above would survive.
      */
     it("does not report a refusal as a listing", () => {
-      expect(agentsListingOutcome(row("refused", "unauthorized"))).not.toEqual(
-        agentsListingOutcome(row("listed", null)),
+      expect(deriveAgentsListingOutcome(row("refused", "unauthorized"))).not.toEqual(
+        deriveAgentsListingOutcome(row("listed", null)),
       );
     });
   });
@@ -206,11 +206,11 @@ describe("given a source's last agents listing", () => {
       ["an absent row", undefined],
       ["a row with null columns", row(null, null)],
     ])("reports nothing known for %s", (_name, input) => {
-      expect(agentsListingOutcome(input)).toBeNull();
+      expect(deriveAgentsListingOutcome(input)).toBeNull();
     });
 
     it("reports nothing known for an outcome word it cannot read", () => {
-      expect(agentsListingOutcome(row("partially_listed", null))).toBeNull();
+      expect(deriveAgentsListingOutcome(row("partially_listed", null))).toBeNull();
     });
   });
 });

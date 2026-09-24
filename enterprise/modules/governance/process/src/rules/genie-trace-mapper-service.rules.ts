@@ -146,7 +146,7 @@ function isSettledForRouting(event: NormalizedPullEvent): boolean {
   const payload = GenieTraceMapperService.parsePayload(event);
   const status = (
     payload.status ??
-    GenieSpanAttributesService.tryExtraString(event, "status") ??
+    GenieSpanAttributesService.extractExtraString(event, "status") ??
     ""
   ).trim();
 
@@ -157,11 +157,11 @@ function frameOf(event: NormalizedPullEvent, origin: GenieRoutingOrigin): GenieM
   const payload = GenieTraceMapperService.parsePayload(event);
   const conversationId =
     payload.conversation_id ??
-    GenieSpanAttributesService.tryExtraString(event, "conversationId") ??
+    GenieSpanAttributesService.extractExtraString(event, "conversationId") ??
     "unknown_conversation";
   const messageId =
     payload.message_id ??
-    GenieSpanAttributesService.tryExtraString(event, "messageId") ??
+    GenieSpanAttributesService.extractExtraString(event, "messageId") ??
     event.source_event_id;
   const regenCount =
     typeof payload.auto_regenerate_count === "number" && payload.auto_regenerate_count > 0
@@ -185,11 +185,11 @@ function frameOf(event: NormalizedPullEvent, origin: GenieRoutingOrigin): GenieM
   // dropping the whole conversation — degrade to pull time instead.
   const eventMs = toEpochMs(event.event_timestamp);
   const startMs =
-    GenieSpanAttributesService.tryToMs(payload.created_timestamp) ??
+    GenieSpanAttributesService.normalizeTimestampMs(payload.created_timestamp) ??
     (Number.isFinite(eventMs) ? eventMs : nowInstant().epochMilliseconds);
   const status = (
     payload.status ??
-    GenieSpanAttributesService.tryExtraString(event, "status") ??
+    GenieSpanAttributesService.extractExtraString(event, "status") ??
     ""
   ).trim();
 
@@ -205,7 +205,7 @@ function frameOf(event: NormalizedPullEvent, origin: GenieRoutingOrigin): GenieM
     rootSpanId: identity.rootSpanId,
     startMs,
     endMs: Math.max(
-      GenieSpanAttributesService.tryToMs(payload.last_updated_timestamp) ?? startMs,
+      GenieSpanAttributesService.normalizeTimestampMs(payload.last_updated_timestamp) ?? startMs,
       startMs,
     ),
     status,
@@ -261,7 +261,7 @@ export function tryToTraceRequest({
     .filter((event) => GenieTraceMapperService.isSettledForRouting(event))
     .flatMap((event) => GenieTraceMapperService.mapMessage(event, origin));
 
-  return ConversationTraceAssemblyService.tryAssembleTraceRequest(spans, origin.profile);
+  return ConversationTraceAssemblyService.buildTraceRequest(spans, origin.profile);
 }
 
 const GenieTraceMapperService = {

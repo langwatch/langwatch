@@ -260,7 +260,7 @@ export interface AzureCostRead {
    * The next page, when the reply offers one.
    *
    * Null both when Azure sends `null` and when it sends `""` — see
-   * `nextPageMarker`, which is where the two are made to mean the same thing.
+   * `normalizeNextPageMarker`, which is where the two are made to mean the same thing.
    */
   nextLink: string | null;
   /**
@@ -305,7 +305,7 @@ const DEFAULT_CURRENCY_CODE = "USD";
  * refused rather than silently normalised into a neighbouring day and filed
  * under the wrong bill.
  */
-export function azureUsageDateToDay(packed: unknown): string | null {
+export function convertAzureUsageDateToDay(packed: unknown): string | null {
   const value = typeof packed === "number" ? packed : Number(packed);
   if (!Number.isInteger(value) || value < 1_000_101 || value > 99_991_231) {
     return null;
@@ -331,7 +331,7 @@ export function azureUsageDateToDay(packed: unknown): string | null {
  * Exponent notation is fine: `usdToNanoUsd` reads it, which matters because
  * the real reply carries amounts like 4.88476914290735e-06.
  */
-function amountToDecimalString(value: unknown): string | null {
+function formatAmountAsDecimalString(value: unknown): string | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return String(value);
 }
@@ -485,7 +485,7 @@ export function azureCostRequestBody({ fromDay, toDay }: { fromDay: string; toDa
  * keeps its only job: refusing a link that genuinely points somewhere else. A
  * non-empty foreign link is untouched and still refused there.
  */
-function nextPageMarker(nextLink: string | null): string | null {
+function normalizeNextPageMarker(nextLink: string | null): string | null {
   return nextLink !== null && nextLink.trim() !== "" ? nextLink : null;
 }
 
@@ -507,7 +507,7 @@ export function readAzureCostRows({ response }: { response: unknown }): AzureCos
     return { days: [], unreadableRows: 0, nextLink: null, malformed: true };
   }
   const { columns, rows } = parsed.data.properties;
-  const nextLink = nextPageMarker(parsed.data.properties.nextLink);
+  const nextLink = normalizeNextPageMarker(parsed.data.properties.nextLink);
 
   const indexOf = new Map(columns.map((column, at) => [column.name, at]));
   const at = (row: unknown[], name: string): unknown => {
@@ -519,8 +519,8 @@ export function readAzureCostRows({ response }: { response: unknown }): AzureCos
   let unreadableRows = 0;
 
   for (const row of rows) {
-    const day = azureUsageDateToDay(at(row, "UsageDate"));
-    const costMinor = amountToDecimalString(at(row, "Cost"));
+    const day = convertAzureUsageDateToDay(at(row, "UsageDate"));
+    const costMinor = formatAmountAsDecimalString(at(row, "Cost"));
     const meterCategory = at(row, "MeterCategory");
 
     if (day === null || costMinor === null || typeof meterCategory !== "string") {
@@ -535,7 +535,7 @@ export function readAzureCostRows({ response }: { response: unknown }): AzureCos
       costMinor,
       // Null rather than 0 when the column is absent or unreadable: absent is
       // "no dollar figure exists", and 0 would read as free.
-      costUsd: amountToDecimalString(at(row, "CostUSD")),
+      costUsd: formatAmountAsDecimalString(at(row, "CostUSD")),
       currencyCode:
         typeof currency === "string" && currency.length === 3
           ? currency.toUpperCase()

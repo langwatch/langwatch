@@ -117,7 +117,7 @@ export interface ProviderAccountReader {
 /** The config key naming which report of an account a source reads. */
 export const REPORT_FIELD = "report";
 
-function readReport(parserConfig: Record<string, unknown> | null | undefined): string | null {
+function extractReport(parserConfig: Record<string, unknown> | null | undefined): string | null {
   const value = parserConfig?.[REPORT_FIELD];
   if (typeof value !== "string") return null;
   const trimmed = value.trim().toLowerCase();
@@ -171,7 +171,7 @@ export async function assertProviderAccountIsFree(params: {
     );
   }
 
-  const wantedReport = readReport(parserConfig);
+  const wantedReport = extractReport(parserConfig);
   const owner = claimedBy.find(
     (reader) =>
       reader.id !== sourceId &&

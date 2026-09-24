@@ -109,7 +109,7 @@ const INGESTION_PULL_LISTING_OUTCOME = {
   REFUSED: "refused",
 } as const;
 
-export function agentsListingOutcome(
+export function deriveAgentsListingOutcome(
   row: AgentsListingSummary | null | undefined,
 ): AgentsListingOutcome | null {
   const outcome = row?.LastAgentsListingOutcome;

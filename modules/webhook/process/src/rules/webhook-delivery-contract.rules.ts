@@ -111,12 +111,12 @@ export type WebhookDispatchResult = {
 };
 
 export interface WebhookDeliveryEndpointService {
-  getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
+  findActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
   findDeliverable(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
-  getSigningSecrets(input: { organizationId: string; endpointId: string }): Promise<string[]>;
+  findSigningSecrets(input: { organizationId: string; endpointId: string }): Promise<string[]>;
   getDestinationConfig(input: {
     organizationId: string;
     endpointId: string;

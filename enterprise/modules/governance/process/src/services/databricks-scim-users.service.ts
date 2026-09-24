@@ -266,7 +266,7 @@ function walkStep({
  * `listMicrosoftPeople` refuses the same case with the same reason. A walk
  * that was served no rows at all is a genuinely empty directory and stays one.
  */
-function walkOutcome({
+function deriveWalkOutcome({
   step,
   people,
   rowsServed,
@@ -356,7 +356,7 @@ export async function listDatabricksPeople(params: {
 
       startIndex += read.returned;
 
-      const finished = walkOutcome({
+      const finished = deriveWalkOutcome({
         step: walkStep({
           returned: read.returned,
           parsed: read.users.length,

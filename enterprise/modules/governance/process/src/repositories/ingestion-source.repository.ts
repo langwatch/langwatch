@@ -31,8 +31,12 @@ export type UpdateIngestionSourceRecord = {
   lastEventAt?: Instant;
 };
 
+export type CursorPinnedUpdate =
+  | { outcome: "updated"; source: GovernanceIngestionSource }
+  | { outcome: "cursor_moved" };
+
 export abstract class IngestionSourceRepository {
-  abstract list(organizationId: string): Promise<GovernanceIngestionSource[]>;
+  abstract findAll(organizationId: string): Promise<GovernanceIngestionSource[]>;
   abstract findById(id: string): Promise<GovernanceIngestionSource | null>;
   abstract findByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null>;
   abstract findByPriorSecretHash(hash: string): Promise<GovernanceIngestionSource[]>;
@@ -46,5 +50,5 @@ export abstract class IngestionSourceRepository {
     id: string;
     cursor: unknown;
     update: UpdateIngestionSourceRecord;
-  }): Promise<GovernanceIngestionSource | null>;
+  }): Promise<CursorPinnedUpdate>;
 }

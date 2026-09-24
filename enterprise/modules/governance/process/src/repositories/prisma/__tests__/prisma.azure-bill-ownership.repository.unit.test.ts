@@ -5,7 +5,7 @@ import {
   type AzureBillReader,
   assertAzureBillHasItsOwnCredential,
   assertAzureBillNotAlreadyClaimed,
-  readClaimedSubscription,
+  extractClaimedSubscription,
 } from "../prisma.azure-bill-ownership.repository";
 
 const SUBSCRIPTION = "00000000-0000-4000-8000-000000000001";
@@ -305,7 +305,7 @@ describe("given a config that is not a config at all", () => {
       "reads no claim from %s",
       (parserConfig) => {
         expect(
-          readClaimedSubscription(parserConfig as Record<string, unknown> | null | undefined),
+          extractClaimedSubscription(parserConfig as Record<string, unknown> | null | undefined),
         ).toBe(null);
       },
     );

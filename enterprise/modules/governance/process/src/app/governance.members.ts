@@ -765,7 +765,7 @@ export type StoredIngestionKey = {
   createdAt?: Instant;
 };
 
-/** One key as `tryDescribePersonalKey` reads it, ownership included. */
+/** One key as `getPersonalKeyState` reads it, ownership included. */
 export type StoredIngestionKeyOwnership = StoredIngestionKey & {
   organizationId: string;
   userId: string | null;
@@ -865,10 +865,11 @@ export interface PersonalUsageReader {
     window: PersonalUsageWindow;
   }): Promise<PersonalUsageSummaryRow>;
 
-  tryFindTopModel(input: {
+  findTopModels(input: {
     tenantId: string;
     window: PersonalUsageWindow;
-  }): Promise<PersonalUsageTopModelRow | null>;
+    limit: number;
+  }): Promise<PersonalUsageTopModelRow[]>;
 
   findDailyBuckets(input: {
     tenantId: string;
@@ -881,11 +882,11 @@ export interface PersonalUsageReader {
     limit: number;
   }): Promise<PersonalUsageBreakdown[]>;
 
-  tryFindIngestionPrincipalSummary(input: {
+  getIngestionPrincipalSummary(input: {
     tenantId: string;
     userId: string;
     window: PersonalUsageWindow;
-  }): Promise<IngestionPrincipalSummaryRow | null>;
+  }): Promise<IngestionPrincipalSummaryRow>;
 
   findIngestionPrincipalBuckets(input: {
     tenantId: string;

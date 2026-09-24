@@ -72,8 +72,8 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
           endpointId: endpoint.id,
         }),
       ).toBe(secret);
-      expect(await repository.getAll({ organizationId: ORGANIZATION_ID })).toHaveLength(1);
-      await expect(repository.getAll({ organizationId: OTHER_ORGANIZATION_ID })).resolves.toEqual(
+      expect(await repository.findAll({ organizationId: ORGANIZATION_ID })).toHaveLength(1);
+      await expect(repository.findAll({ organizationId: OTHER_ORGANIZATION_ID })).resolves.toEqual(
         [],
       );
     });
@@ -109,7 +109,7 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
 
       await repository.archive({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id });
 
-      await expect(repository.getAll({ organizationId: ORGANIZATION_ID })).resolves.toEqual([]);
+      await expect(repository.findAll({ organizationId: ORGANIZATION_ID })).resolves.toEqual([]);
       await expect(
         repository.getById({ organizationId: ORGANIZATION_ID, endpointId: endpoint.id }),
       ).rejects.toThrow(WebhookEndpointNotFoundError);
@@ -131,14 +131,14 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
         now: rolledAt,
       });
 
-      const withinWindow = await repository.getSigningSecrets({
+      const withinWindow = await repository.findSigningSecrets({
         organizationId: ORGANIZATION_ID,
         endpointId: endpoint.id,
         now: rolledAt.add({ hours: 1 }),
       });
       expect(withinWindow).toEqual([rolled, original]);
 
-      const pastWindow = await repository.getSigningSecrets({
+      const pastWindow = await repository.findSigningSecrets({
         organizationId: ORGANIZATION_ID,
         endpointId: endpoint.id,
         now: rolledAt.add({ hours: 25 }),

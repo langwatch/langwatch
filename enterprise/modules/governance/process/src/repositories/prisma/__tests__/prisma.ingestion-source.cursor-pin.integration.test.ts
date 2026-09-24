@@ -62,7 +62,7 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.updateIfCursorUnc
             cursor: null,
             update: { parserConfig: { report: "cost" } },
           });
-          return updated ? "saved" : "refused";
+          return updated.outcome === "updated" ? "saved" : "refused";
         },
       });
 

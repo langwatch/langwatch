@@ -67,7 +67,7 @@ export class TestGovernanceService implements GovernanceApi {
     unsupported<GovernanceApi["ingestionKeyIssueForPersonalProject"]>();
   ingestionKeyListForPersonalProject =
     unsupported<GovernanceApi["ingestionKeyListForPersonalProject"]>();
-  tryDescribePersonalIngestionKey = unsupported<GovernanceApi["tryDescribePersonalIngestionKey"]>();
+  getPersonalIngestionKeyState = unsupported<GovernanceApi["getPersonalIngestionKeyState"]>();
   ingestionRecordRunCompleted = unsupported<GovernanceApi["ingestionRecordRunCompleted"]>();
   ingestionRecordRunFailed = unsupported<GovernanceApi["ingestionRecordRunFailed"]>();
   ingestionSourceArchive = unsupported<GovernanceApi["ingestionSourceArchive"]>();

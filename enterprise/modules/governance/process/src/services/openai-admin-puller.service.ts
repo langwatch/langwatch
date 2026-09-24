@@ -259,7 +259,9 @@ const pageSchema = z.object({
  * from this endpoint can echo a fragment of the key, so nothing it says is
  * quoted.
  */
-async function providerRefusal(response: GovernanceHttpResponse): Promise<DispatchError | null> {
+async function detectProviderRefusal(
+  response: GovernanceHttpResponse,
+): Promise<DispatchError | null> {
   if (response.status !== 429 && response.status !== 401 && response.status !== 403) return null;
   await response.body?.cancel().catch(() => void 0);
   if (response.status === 429) {
@@ -277,7 +279,7 @@ async function providerRefusal(response: GovernanceHttpResponse): Promise<Dispat
 }
 
 /**
- * A non-OK response that is not one of the refusals `providerRefusal` names,
+ * A non-OK response that is not one of the refusals `detectProviderRefusal` names,
  * carrying the status so the banking rule can tell an answer about the
  * request from a provider having a bad minute.
  *
@@ -301,7 +303,7 @@ class UnexpectedStatusError extends Error {
  * A 4xx is an answer: the same request earns the same answer on every page
  * and every retry, so there is no window to resume. 408 and 425 ask to be
  * sent again, which makes them bad minutes like a 5xx. 429, 401 and 403 never
- * reach here — `providerRefusal` names them first, because a rate limit
+ * reach here — `detectProviderRefusal` names them first, because a rate limit
  * carries a wait worth keeping.
  */
 function isRequestRefused(status: number): boolean {
@@ -718,7 +720,7 @@ export class OpenAiAdminPullerAdapter implements PullerAdapter<OpenAiAdminPullCo
     // classifies the same two statuses. Both leave as a DispatchError so the
     // caller can tell a window worth resuming from a key that will never be
     // allowed to finish one.
-    const refusal = await providerRefusal(response);
+    const refusal = await detectProviderRefusal(response);
     if (refusal) throw refusal;
     if (!response.ok) {
       const detail = await AdminUsageReportAdapter.safeResponseText(response);

@@ -3,7 +3,7 @@
 import { ValidationError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { readClaimedSubscription } from "./prisma.azure-bill-ownership.repository.ts";
+import { extractClaimedSubscription } from "./prisma.azure-bill-ownership.repository.ts";
 
 const SOURCE_FIELD = "_azureBillSourceId";
 const SUBSCRIPTION_FIELD = "_azureBillSubscriptionId";
@@ -15,9 +15,9 @@ export function azureBillSourceId(source: { id: string; parserConfig?: unknown }
   return typeof value === "string" && value !== "" ? value : source.id;
 }
 
-function subscriptionIdentity(config: Config | null): string | null {
+function deriveSubscriptionIdentity(config: Config | null): string | null {
   const value = config?.[SUBSCRIPTION_FIELD];
-  return typeof value === "string" ? value : readClaimedSubscription(config);
+  return typeof value === "string" ? value : extractClaimedSubscription(config);
 }
 
 /**
@@ -42,8 +42,8 @@ export async function withAzureBillIdentity({
   const config = { ...parserConfig };
   delete config[SOURCE_FIELD];
   delete config[SUBSCRIPTION_FIELD];
-  const claimed = readClaimedSubscription(config)?.toLowerCase();
-  const stored = subscriptionIdentity(storedConfig ?? null)?.toLowerCase();
+  const claimed = extractClaimedSubscription(config)?.toLowerCase();
+  const stored = deriveSubscriptionIdentity(storedConfig ?? null)?.toLowerCase();
 
   if (sourceId && stored && (!claimed || claimed === stored)) {
     config[SOURCE_FIELD] = azureBillSourceId({
@@ -64,7 +64,7 @@ export async function withAzureBillIdentity({
       .filter(
         (row) =>
           row.id !== sourceId &&
-          subscriptionIdentity(row.parserConfig as Config | null)?.toLowerCase() === claimed,
+          deriveSubscriptionIdentity(row.parserConfig as Config | null)?.toLowerCase() === claimed,
       )
       .map(azureBillSourceId),
   );

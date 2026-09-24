@@ -33,7 +33,7 @@ function sendBatchWith(options: {
   const deps = {
     endpoints: {
       findDeliverable: async () => ((options.deliverable ?? true) ? { id: "endpoint-1" } : null),
-      getSigningSecrets: async () => ["secret"],
+      findSigningSecrets: async () => ["secret"],
       getDestinationConfig: async () => ({ kind: "http" }),
       recordDeliveryAttempt: async (attempt: Recorded) => {
         recorded.push(attempt);

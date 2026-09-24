@@ -135,7 +135,7 @@ export class SubsystemProbeService {
       }),
     ]);
 
-    const refused = firstRefusal(restResponse, otelResponse);
+    const refused = detectFirstRefusal(restResponse, otelResponse);
     if (refused) return refused;
 
     return { ok: true, status: otelResponse.status, body: await otelResponse.json() };
@@ -193,7 +193,7 @@ export class SubsystemProbeService {
       "Canary traces sent",
     );
 
-    const refused = firstRefusal(restResponse, otelResponse);
+    const refused = detectFirstRefusal(restResponse, otelResponse);
     if (refused) return refused;
 
     const otelBody = await otelResponse.json();
@@ -412,7 +412,7 @@ export class SubsystemProbeService {
 }
 
 /** The first canary leg our own boundary refused, where either did. */
-function firstRefusal(rest: Response, otel: Response): SubsystemProbeOutcome | null {
+function detectFirstRefusal(rest: Response, otel: Response): SubsystemProbeOutcome | null {
   if (!rest.ok) {
     return failure(500, "Failed to send trace to LangWatch using REST", "canary_rest_refused");
   }

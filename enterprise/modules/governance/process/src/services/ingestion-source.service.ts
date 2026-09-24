@@ -108,7 +108,7 @@ export class IngestionSourceService {
   }
 
   list(organizationId: string): Promise<GovernanceIngestionSource[]> {
-    return this.repository.list(organizationId);
+    return this.repository.findAll(organizationId);
   }
 
   async findById({
@@ -187,7 +187,7 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       traceProjectId: input.traceProjectId,
     });
-    const parserConfig = this.credentials.encryptParserConfig(requestedParserConfig) ?? {};
+    const parserConfig = this.credentials.encryptParserConfig(requestedParserConfig);
     const source = await this.repository.create({
       organizationId: input.organizationId,
       teamId: input.teamId ?? null,
@@ -228,23 +228,12 @@ export class IngestionSourceService {
       this.validation.assertAdapterUnchanged(existing.parserConfig, incoming);
       cursorMustNotMove = this.validation.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
-      update.parserConfig = this.credentials.encryptParserConfig(incoming) ?? incoming;
+      update.parserConfig = this.credentials.encryptParserConfig(incoming);
     }
 
     const source = cursorMustNotMove
-      ? await this.repository.updateIfCursorUnchanged({
-          id: existing.id,
-          cursor: existing.pollerCursor,
-          update,
-        })
+      ? await this.updatePinnedToCursor({ existing, update })
       : await this.repository.update(existing.id, update);
-    if (source === null) {
-      const message =
-        "This source started pulling while the change was being saved, and the report " +
-        "can no longer be changed. Reload the source to see its current configuration.";
-
-      throw new GovernanceValidationError(message, { formErrors: [message] });
-    }
 
     if (existing.pullSchedule !== null || source.pullSchedule !== null) {
       await this.syncBestEffort(source);
@@ -286,6 +275,29 @@ export class IngestionSourceService {
    * over from the stored one. A credential in its stored form is refused rather than saved back,
    * since re-saving a redacted secret would replace the real one with its own marker.
    */
+  private async updatePinnedToCursor({
+    existing,
+    update,
+  }: {
+    existing: GovernanceIngestionSource;
+    update: UpdateIngestionSourceRecord;
+  }): Promise<GovernanceIngestionSource> {
+    const pinned = await this.repository.updateIfCursorUnchanged({
+      id: existing.id,
+      cursor: existing.pollerCursor,
+      update,
+    });
+    if (pinned.outcome === "cursor_moved") {
+      const message =
+        "This source started pulling while the change was being saved, and the report " +
+        "can no longer be changed. Reload the source to see its current configuration.";
+
+      throw new GovernanceValidationError(message, { formErrors: [message] });
+    }
+
+    return pinned.source;
+  }
+
   private mergedParserConfig({
     existing,
     incoming,

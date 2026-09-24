@@ -9,6 +9,7 @@ import { toDate } from "@langwatch/time";
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
+  type CursorPinnedUpdate,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.repository.ts";
 
@@ -77,7 +78,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return new PrismaIngestionSourceRepository(database);
   }
 
-  async list(organizationId: string): Promise<GovernanceIngestionSource[]> {
+  async findAll(organizationId: string): Promise<GovernanceIngestionSource[]> {
     const rows = await this.database.ingestionSource.findMany({
       where: { organizationId, archivedAt: null },
       orderBy: [{ name: "asc" }],
@@ -140,7 +141,7 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     id: string;
     cursor: unknown;
     update: UpdateIngestionSourceRecord;
-  }): Promise<GovernanceIngestionSource | null> {
+  }): Promise<CursorPinnedUpdate> {
     return this.database.$transaction(async (database) => {
       // As SQL so a pin parked on the row lock re-checks the committed cursor;
       // a JSON null and SQL NULL both mean "never pulled".
@@ -160,14 +161,14 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
                WHERE "id" = ${input.id}
                  AND "pollerCursor" = ${JSON.stringify(input.cursor)}::jsonb
             `;
-      if (matched === 0) return null;
+      if (matched === 0) return { outcome: "cursor_moved" };
 
       const data = updateDataOf(input.update);
       const row = await database.ingestionSource.update({
         where: { id: input.id },
         data,
       });
-      return toIngestionSource(row);
+      return { outcome: "updated", source: toIngestionSource(row) };
     });
   }
 }

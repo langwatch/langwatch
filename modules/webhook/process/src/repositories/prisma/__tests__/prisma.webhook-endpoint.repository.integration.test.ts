@@ -218,7 +218,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
       const read = await repo.getById({ organizationId: orgId, endpointId: endpoint.id });
       expect(JSON.stringify(read)).not.toContain("super-secret-value");
 
-      const all = await repo.getAll({ organizationId: orgId });
+      const all = await repo.findAll({ organizationId: orgId });
       expect(JSON.stringify(all)).not.toContain("super-secret-value");
     });
   });
@@ -374,14 +374,14 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
         now: rolledAt,
       });
 
-      const insideWindow = await repo.getSigningSecrets({
+      const insideWindow = await repo.findSigningSecrets({
         organizationId: orgId,
         endpointId: endpoint.id,
         now: rolledAt.add({ milliseconds: 60 * 60 * 1000 }),
       });
       expect(insideWindow).toEqual([rolled, original]);
 
-      const afterWindow = await repo.getSigningSecrets({
+      const afterWindow = await repo.findSigningSecrets({
         organizationId: orgId,
         endpointId: endpoint.id,
         now: rolledAt.add({ milliseconds: 25 * 60 * 60 * 1000 }),

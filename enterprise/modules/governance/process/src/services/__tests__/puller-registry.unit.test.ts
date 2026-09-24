@@ -38,9 +38,9 @@ describe("PullerRegistryService", () => {
 
     registry.register(puller);
 
-    const resolved = registry.tryGet("test");
-    const config = resolved?.validateConfig({ token: "secret" });
-    await expect(resolved?.runOnce({ cursor: "next" }, config)).resolves.toMatchObject({
+    const resolved = registry.getById("test");
+    const config = resolved.validateConfig({ token: "secret" });
+    await expect(resolved.runOnce({ cursor: "next" }, config)).resolves.toMatchObject({
       cursor: "secret:next",
     });
     expect(registry.ids()).toEqual(["test"]);
@@ -61,7 +61,7 @@ describe("PullerRegistryService", () => {
 
     registry.clear();
 
-    expect(registry.tryGet("test")).toBeUndefined();
+    expect(() => registry.getById("test")).toThrow("Unknown ingestion pull adapter: test");
     expect(registry.ids()).toEqual([]);
   });
 });

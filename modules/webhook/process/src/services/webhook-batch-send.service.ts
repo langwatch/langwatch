@@ -90,7 +90,7 @@ export class WebhookBatchSendService {
     // it — both decrypt, and decryption is the service's to do, not this
     // executor's.
     const [secrets, destination] = await Promise.all([
-      this.deps.endpoints.getSigningSecrets({
+      this.deps.endpoints.findSigningSecrets({
         organizationId: payload.organizationId,
         endpointId: payload.endpointId,
       }),

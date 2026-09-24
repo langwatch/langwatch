@@ -25,7 +25,7 @@ import {
 import {
   attributedColumns,
   attributionFrom,
-  attributionFromOutcome,
+  extractAttributionFromOutcome,
   resolvedModel,
   withStashedOutcome,
 } from "./webhook-spend-payload.rules.ts";
@@ -80,7 +80,7 @@ export function payloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
   };
 }
 
-export function endpointFlushTarget(
+export function deriveEndpointFlushTarget(
   state: WebhookDeliveryState,
   key: string,
 ): { endpointId: string; organizationId: string } | null {
@@ -123,7 +123,7 @@ export function onSpendOutcome<
   data: Data;
   toPayload: (data: Data, instance: DeliverInstance) => DeliverPayload;
 }): { state: WebhookDeliveryState; intents?: Intent[] } {
-  const attribution = attributionFromOutcome(data) ?? state.attribution;
+  const attribution = extractAttributionFromOutcome(data) ?? state.attribution;
   const payload = toPayload(data, { projectId: ctx.projectId, attribution });
   if (attribution === null) {
     return { state: withStashedOutcome(state, payload) };

@@ -1,5 +1,6 @@
 import { isApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import {
+  IngestionKeyNotFoundError,
   PERSONAL_INGEST_KEYS_PER_TOOL_CAP,
   PERSONAL_INGEST_SOURCE_TYPES,
   PersonalSourceTypeNotAllowedError,
@@ -190,13 +191,13 @@ export class IngestionKeyService {
   /**
    * What became of one of the caller's own personal ingest keys, by the lookup
    * id in its token. A cap-retired or rotated key may be re-minted; a
-   * person-revoked one may not. Null for no such key, same as another user's.
+   * person-revoked one may not. Another user's key throws the same not-found.
    */
-  async tryDescribePersonalKey(input: {
+  async getPersonalKeyState(input: {
     userId: string;
     organizationId: string;
     lookupId: string;
-  }): Promise<PersonalIngestionKeyState | null> {
+  }): Promise<PersonalIngestionKeyState> {
     const key = await this.repository.findByLookupId({ lookupId: input.lookupId });
     if (
       !key ||
@@ -204,7 +205,7 @@ export class IngestionKeyService {
       key.userId !== input.userId ||
       !key.ingestSourceType
     ) {
-      return null;
+      throw new IngestionKeyNotFoundError(input.lookupId);
     }
 
     return {

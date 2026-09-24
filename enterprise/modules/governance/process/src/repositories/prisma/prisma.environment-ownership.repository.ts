@@ -50,7 +50,7 @@ export interface EnvironmentReader {
  * builds the config, so this is not fixing a live escape — it holds because
  * anything reaching the service directly is under no such obligation.
  */
-export function readClaimedEnvironment(
+export function extractClaimedEnvironment(
   parserConfig: Record<string, unknown> | null | undefined,
 ): string | null {
   if (!parserConfig || typeof parserConfig !== "object") return null;
@@ -83,7 +83,7 @@ export function assertEnvironmentNotAlreadyClaimed(params: {
 }): void {
   const { parserConfig, claimedBy, sourceId } = params;
 
-  const claimed = readClaimedEnvironment(parserConfig);
+  const claimed = extractClaimedEnvironment(parserConfig);
   if (claimed === null) return;
 
   const owner = claimedBy.find(

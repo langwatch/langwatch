@@ -82,7 +82,7 @@ export type S3PollingConfig = z.infer<typeof s3PollingConfigSchema>;
 
 function mappedValue(rawEvent: unknown, path: string | undefined): unknown {
   if (path === undefined) return undefined;
-  const json = jsonInput(rawEvent);
+  const json = toJsonInput(rawEvent);
   return JSONPath({
     path,
     json,
@@ -90,7 +90,7 @@ function mappedValue(rawEvent: unknown, path: string | undefined): unknown {
   });
 }
 
-function jsonInput(value: unknown): string | number | boolean | object | null {
+function toJsonInput(value: unknown): string | number | boolean | object | null {
   if (value === null) return null;
   if (typeof value === "string") return value;
   if (typeof value === "number") return value;

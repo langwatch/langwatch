@@ -235,7 +235,7 @@ export function deriveConversationIdentity(
  * every caller treats as "this run produced no conversations" rather than an
  * error — a pull with no conversations in it is the normal case.
  */
-export function tryAssembleTraceRequest(
+export function buildTraceRequest(
   spans: OtlpJsonSpan[],
   profile: ConversationRoutingProfile,
 ): ExportTraceServiceRequest | null {
@@ -260,5 +260,5 @@ const ConversationTraceAssemblyService = {
   hashId,
   msToNano,
   deriveConversationIdentity,
-  tryAssembleTraceRequest,
+  buildTraceRequest,
 };

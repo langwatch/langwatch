@@ -131,4 +131,4 @@ export function sourceBadge({
  * screen ask the same question, and the cost service cannot import this
  * module — it brings icons with it.
  */
-export { noDataSinceNotice } from "@langwatch/enterprise-governance-contract";
+export { deriveNoDataSinceNotice } from "@langwatch/enterprise-governance-contract";

@@ -13,13 +13,7 @@ export class IngestionCredentialsService {
     return typeof value === "string" && value.startsWith(ENCRYPTED_PREFIX);
   }
 
-  encryptParserConfig(
-    parserConfig: Record<string, unknown> | null | undefined,
-  ): Record<string, unknown> | null | undefined {
-    if (!parserConfig || typeof parserConfig !== "object") {
-      return parserConfig;
-    }
-
+  encryptParserConfig(parserConfig: Record<string, unknown>): Record<string, unknown> {
     const credentials = parserConfig.credentials;
     if (credentials === undefined || credentials === null || this.isEncrypted(credentials)) {
       return parserConfig;

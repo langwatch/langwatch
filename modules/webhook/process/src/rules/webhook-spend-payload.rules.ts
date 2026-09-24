@@ -167,7 +167,7 @@ export function withStashedOutcome(
  * The organization is the discriminator because delivery cannot resolve a
  * single endpoint without it.
  */
-export function attributionFromOutcome(
+export function extractAttributionFromOutcome(
   data: ConfirmSpendCommandData | FailSpendCommandData | SettleSpendCommandData,
 ): SpendAttribution | null {
   if (!data.organization_id) {

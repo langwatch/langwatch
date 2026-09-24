@@ -35,7 +35,7 @@ export interface WebhookEndpointRuntime {
   create(
     input: CreateWebhookEndpointCommand,
   ): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
-  getAll(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
+  findAll(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
   getById(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   update(input: UpdateWebhookEndpointCommand): Promise<WebhookEndpointView>;
   rollSecret(input: {
@@ -55,7 +55,7 @@ export interface WebhookEndpointRuntime {
     endpointId: string;
   }): Promise<WebhookDestinationConfig>;
   getSigningSecret(input: { organizationId: string; endpointId: string }): Promise<string>;
-  getSigningSecrets(input: {
+  findSigningSecrets(input: {
     organizationId: string;
     endpointId: string;
     now?: Instant;
@@ -70,7 +70,7 @@ export interface WebhookEndpointRuntime {
     since: Instant;
     sampleLimit: number;
   }): Promise<{ attempted: number; delivered: number; latencies: number[] }>;
-  getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
+  findActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
   organizationIdsWithActiveEndpoints(): Promise<string[]>;
   recordDeliveryAttempt(input: {
     organizationId: string;

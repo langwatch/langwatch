@@ -30,7 +30,7 @@ import {
  * channel can arrive spelled that way. Reading only the numbers would attribute
  * such a message to neither side and lose the turn.
  */
-export function tryRoleOf(raw: unknown): number | null {
+export function parseRole(raw: unknown): number | null {
   if (raw === ROLE_USER || raw === ROLE_AGENT) {
     return raw;
   }
@@ -50,7 +50,7 @@ export function tryRoleOf(raw: unknown): number | null {
 }
 
 /** Bot Framework stamps seconds in `timestamp` and ms in `timestampMs`. */
-export function tryActivityMs(activity: Activity): number | null {
+export function extractActivityMs(activity: Activity): number | null {
   const ms = activity.timestampMs;
   if (typeof ms === "number" && Number.isFinite(ms) && ms > 0) {
     return ms;
@@ -85,7 +85,7 @@ export function asObject(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
-export function tryParseRow(event: NormalizedPullEvent): TranscriptRow | null {
+export function parseRow(event: NormalizedPullEvent): TranscriptRow | null {
   const row = CopilotTranscriptGroupingService.asObject(event.raw_payload);
 
   return row ? (row as TranscriptRow) : null;
@@ -100,7 +100,7 @@ export function tryParseRow(event: NormalizedPullEvent): TranscriptRow | null {
  * as 2 then 10 — sorting the values as text puts 10 first and silently
  * reorders a conversation.
  */
-export function tryBatchIdOf(row: TranscriptRow): number | null {
+export function extractBatchId(row: TranscriptRow): number | null {
   const metadata = CopilotTranscriptGroupingService.asObject(row.metadata);
   const raw = metadata?.BatchId;
   if (typeof raw === "number" && Number.isInteger(raw) && raw >= 0) {
@@ -131,7 +131,7 @@ export function tryBatchIdOf(row: TranscriptRow): number | null {
  * and the trace list showed only the newer half — which is exactly what the
  * whole `name` is for, since it already carries the conversation's own id.
  */
-export function tryConversationKeyOf(row: TranscriptRow): string | null {
+export function deriveConversationKey(row: TranscriptRow): string | null {
   const name = typeof row.name === "string" ? row.name.trim() : "";
   if (!name) {
     return null;
@@ -176,18 +176,18 @@ export function bucketRowsByConversation(
 ): Map<string, ConversationBucket> {
   const byKey = new Map<string, ConversationBucket>();
   for (const event of events) {
-    const row = CopilotTranscriptGroupingService.tryParseRow(event);
+    const row = CopilotTranscriptGroupingService.parseRow(event);
     if (!row) {
       continue;
     }
 
-    const key = CopilotTranscriptGroupingService.tryConversationKeyOf(row);
+    const key = CopilotTranscriptGroupingService.deriveConversationKey(row);
     if (!key) {
       continue;
     }
 
     const existing = byKey.get(key) ?? { rows: [], bot: {} };
-    existing.rows.push({ batchId: CopilotTranscriptGroupingService.tryBatchIdOf(row), row });
+    existing.rows.push({ batchId: CopilotTranscriptGroupingService.extractBatchId(row), row });
     CopilotTranscriptGroupingService.rememberBotFacts({
       bot: existing.bot,
       extra: event.extra ?? {},
@@ -271,7 +271,7 @@ export function timeOrderActivities(activities: Activity[]): Activity[] {
   const sortable = activities.map((activity, index) => ({
     activity,
     index,
-    ms: CopilotTranscriptGroupingService.tryActivityMs(activity),
+    ms: CopilotTranscriptGroupingService.extractActivityMs(activity),
   }));
   const dated: { activity: Activity; index: number; ms: number }[] = [];
   for (const item of sortable) {
@@ -352,12 +352,12 @@ export function groupTranscriptRows(events: NormalizedPullEvent[]): Conversation
 }
 
 const CopilotTranscriptGroupingService = {
-  tryRoleOf,
-  tryActivityMs,
+  parseRole,
+  extractActivityMs,
   asObject,
-  tryParseRow,
-  tryBatchIdOf,
-  tryConversationKeyOf,
+  parseRow,
+  extractBatchId,
+  deriveConversationKey,
   hasBatchGap,
   rememberBotFacts,
   bucketRowsByConversation,

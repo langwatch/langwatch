@@ -201,9 +201,9 @@ export class DefaultGovernanceService implements GovernanceApi {
   readonly ingestionKeyListForPersonalProject: GovernanceApi["ingestionKeyListForPersonalProject"] =
     (...args) => this.ingestion.ingestionKeyListForPersonalProject(...args);
 
-  readonly tryDescribePersonalIngestionKey: GovernanceApi["tryDescribePersonalIngestionKey"] = (
+  readonly getPersonalIngestionKeyState: GovernanceApi["getPersonalIngestionKeyState"] = (
     ...args
-  ) => this.ingestion.tryDescribePersonalIngestionKey(...args);
+  ) => this.ingestion.getPersonalIngestionKeyState(...args);
 
   readonly ingestionSourceList: GovernanceApi["ingestionSourceList"] = (...args) =>
     this.ingestion.ingestionSourceList(...args);

@@ -87,7 +87,7 @@ function restatementKeyFor({
  * differ. Until then every adapter on this branch reports dollars, which is
  * what makes the constant below the honest answer rather than a placeholder.
  */
-function reportedMoney({
+function deriveReportedMoney({
   hint,
   event,
 }: {
@@ -161,7 +161,7 @@ export class PulledUsageRecordService {
     // Both halves of the provider's figure, from one decision. Read once into
     // one binding so there is no line at which a later edit could take the
     // amount from here and the currency from somewhere else.
-    const reported = reportedMoney({ hint, event });
+    const reported = deriveReportedMoney({ hint, event });
     if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED && reported === null) {
       return null;
     }
