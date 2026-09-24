@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluationInputStorage } from "../../app/evaluation.members.ts";
+import type {
+  EvaluationInputStorage,
+  StoredEvaluationInput,
+} from "../../app/evaluation.members.ts";
 import {
   EvaluationInputsOffloadService,
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -19,12 +22,15 @@ class MemoryStorage implements EvaluationInputStorage {
     return { id };
   }
 
-  async tryRead(input: { id: string }): Promise<AsyncIterable<Uint8Array> | null> {
+  async read(input: { id: string }): Promise<StoredEvaluationInput> {
     const bytes = this.stored.get(input.id);
-    if (!bytes) return null;
-    return (async function* () {
-      yield bytes;
-    })();
+    if (!bytes) return { kind: "absent" };
+    return {
+      kind: "stored",
+      body: (async function* () {
+        yield bytes;
+      })(),
+    };
   }
 }
 
@@ -199,7 +205,7 @@ describe("EvaluationInputsOffloadService", () => {
 
   it("does not read preview-only markers", async () => {
     const { service, storage } = makeService();
-    const readSpy = vi.spyOn(storage, "tryRead");
+    const readSpy = vi.spyOn(storage, "read");
     const marker = {
       [STORED_OBJECT_MARKER_KEY]: {
         id: "",

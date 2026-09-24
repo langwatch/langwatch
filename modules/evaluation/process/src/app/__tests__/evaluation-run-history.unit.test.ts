@@ -4,18 +4,20 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { evaluationServer } from "../../evaluation.server.ts";
 import { LiveEvaluationRepositories } from "../../repositories/live/live.evaluation.repositories.ts";
-import { EVALUATION_TEST_CONFIG } from "./evaluation.fixture.ts";
+import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 const TENANT = "project-1";
 const TRACE = "trace-1";
@@ -55,13 +57,16 @@ describe("given a process that installs the evaluation module over its repositor
     /** @scenario "An installed evaluation module reads back the runs it wrote" */
     it("reads the run back by id, by trace and among the trace's evaluations", async () => {
       const runtime = await createApp({ role: "worker" })
-        .withModules([withMemoryRepositories(evaluationServer)])
+        .withModules([installableEvaluation])
         .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
+        .withStores(memoryStores())
         .provide({
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),
           "model-provider": createApiFixture<ModelProviderApi>(),
           "feature-flag": createApiFixture<FeatureFlagApi>(),
+          evaluator: createApiFixture<EvaluatorApi>(),
+          monitor: createApiFixture<MonitorApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
             getPlatformDefaultRetentionDays: () => 30,
           }),
@@ -96,13 +101,16 @@ describe("given a process that installs the evaluation module over its repositor
     /** @scenario "A run lookup without a scheduled time stops at the platform default retention" */
     it("refuses it as not found, reading the floor from data retention", async () => {
       const runtime = await createApp({ role: "worker" })
-        .withModules([withMemoryRepositories(evaluationServer)])
+        .withModules([installableEvaluation])
         .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
+        .withStores(memoryStores())
         .provide({
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),
           "model-provider": createApiFixture<ModelProviderApi>(),
           "feature-flag": createApiFixture<FeatureFlagApi>(),
+          evaluator: createApiFixture<EvaluatorApi>(),
+          monitor: createApiFixture<MonitorApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
             getPlatformDefaultRetentionDays: () => 30,
           }),

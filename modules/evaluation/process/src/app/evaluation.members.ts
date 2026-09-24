@@ -14,14 +14,7 @@ import type {
   SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type {
-  TraceApi,
-  Trace,
-  Span,
-  EvaluationTraceReadInput,
-  EvaluationTraceSpan,
-  EvaluationTraceEvent,
-} from "@langwatch/trace-contract";
+import type { TraceApi, Span } from "@langwatch/trace-contract";
 /**
  * Trace view protections for an evaluation read. Declared in Evaluation vocab
  * rather than imported from trace-server (feature packages may not import).
@@ -31,34 +24,6 @@ export type EvaluationTraceProtections = Readonly<{
   canSeeCapturedInput?: boolean | undefined | null;
   canSeeCapturedOutput?: boolean | undefined | null;
 }>;
-
-/**
- * The three legacy trace reads an online evaluation makes, narrowed from
- * `TraceService` (a ClickHouse read stack in another feature's server
- * package). Positional signatures match the packaged implementation's shape exactly.
- */
-export interface EvaluationTraceRead {
-  getTracesWithSpans(
-    projectId: string,
-    traceIds: string[],
-    protections: EvaluationTraceProtections,
-    occurredAt?: { from: number; to: number },
-    opts?: { full?: boolean; withEditOverlay?: boolean },
-  ): Promise<Trace[]>;
-
-  getEvaluationsMultiple(
-    projectId: string,
-    traceIds: string[],
-    protections: EvaluationTraceProtections,
-  ): Promise<Record<string, unknown[]>>;
-
-  getTracesWithSpansByThreadIds(
-    projectId: string,
-    threadIds: string[],
-    protections: EvaluationTraceProtections,
-    opts?: { full?: boolean; withEditOverlay?: boolean },
-  ): Promise<Trace[]>;
-}
 
 /**
  * Renders a trace's spans as the digest an evaluator reads for the
@@ -97,14 +62,14 @@ export interface EvaluationModelEnv {
 
 /** Runs a customer's own evaluation workflow in the Studio runtime. */
 export interface EvaluationWorkflowExecutor {
-  runEvaluationWorkflow(
-    workflowId: string,
-    projectId: string,
-    inputs: Record<string, string>,
-    versionId?: string,
-    causalityDepth?: number,
-    parentTrace?: { traceId: string; parentSpanId: string },
-  ): Promise<{ result: SingleEvaluationResult; status: string }>;
+  run(input: {
+    workflowId: string;
+    projectId: string;
+    inputs: Record<string, string>;
+    versionId?: string;
+    causalityDepth?: number;
+    parentTrace?: { traceId: string; parentSpanId: string };
+  }): Promise<{ result: SingleEvaluationResult; status: string }>;
 }
 
 /**
@@ -225,8 +190,13 @@ export interface EvaluationInputStorage {
     bytes: Uint8Array;
   }): Promise<{ id: string }>;
 
-  tryRead(input: { tenantId: string; id: string }): Promise<AsyncIterable<Uint8Array> | null>;
+  read(input: { tenantId: string; id: string }): Promise<StoredEvaluationInput>;
 }
+
+/** A stored input's bytes, or that no object answers the id. */
+export type StoredEvaluationInput =
+  | Readonly<{ kind: "stored"; body: AsyncIterable<Uint8Array> }>
+  | Readonly<{ kind: "absent" }>;
 
 /** Applies the operator-controlled payload-offload availability switch. */
 export interface EvaluationInputOffloadAvailability {

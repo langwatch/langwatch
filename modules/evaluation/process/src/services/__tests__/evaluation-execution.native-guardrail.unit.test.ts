@@ -45,17 +45,17 @@ function unused(member: string) {
 function buildService(langevalsEvaluate: Mock<EvaluationLangevals["evaluate"]>) {
   const { api: evaluators, executeNative } = createFakeEvaluatorApi();
   const deps: EvaluationExecutionDeps = {
-    traceService: {
-      getTracesWithSpans: unused("traceService.getTracesWithSpans"),
-      getEvaluationsMultiple: unused("traceService.getEvaluationsMultiple"),
-      getTracesWithSpansByThreadIds: unused("traceService.getTracesWithSpansByThreadIds"),
+    traces: {
+      readTracesWithSpans: unused("traces.readTracesWithSpans"),
+      readEvaluations: unused("traces.readEvaluations"),
+      readThreadsTraces: unused("traces.readThreadsTraces"),
     },
     spanDigest: { format: unused("spanDigest.format") },
     modelEnvResolver: { resolveForEvaluator: unused("modelEnvResolver.resolveForEvaluator") },
     langevalsClient: { evaluate: langevalsEvaluate },
     workflows: createApiFixture<WorkflowApi>({}),
     evaluators,
-    workflowExecutor: { runEvaluationWorkflow: unused("workflowExecutor.runEvaluationWorkflow") },
+    workflowExecutor: { run: unused("workflowExecutor.run") },
     installEnvironment: {},
   };
 

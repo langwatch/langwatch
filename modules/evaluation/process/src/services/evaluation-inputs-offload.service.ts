@@ -25,6 +25,8 @@ const storedObjectMarkerSchema = z
   })
   .passthrough();
 
+const resolvedInputsSchema = z.record(z.string(), z.unknown());
+
 const logger = createLogger("langwatch:evaluation:inputs-offload");
 
 export const EVAL_INPUTS_INLINE_MAX_BYTES = 1024 * 1024;
@@ -50,7 +52,7 @@ export class EvaluationInputsOffloadService {
 
   /** Whether a stored inputs payload is the marker standing in for an offload. */
   static isStoredObjectMarker(value: unknown): value is StoredObjectInputsMarker {
-    return storedObjectMarkerSchema.safeParse(value).success;
+    return storedObjectMarkerSchema.validate(value);
   }
 
   private constructor(
@@ -141,11 +143,11 @@ export class EvaluationInputsOffloadService {
     }
 
     try {
-      const stream = await this.storage.tryRead({
+      const stored = await this.storage.read({
         tenantId: input.tenantId,
         id: marker.id,
       });
-      if (!stream) {
+      if (stored.kind === "absent") {
         logger.warn(
           { tenantId: input.tenantId, storedObjectId: marker.id },
           "Offloaded evaluation inputs object missing on read; returning marker with preview",
@@ -154,9 +156,9 @@ export class EvaluationInputsOffloadService {
         return input.inputs;
       }
 
-      const bytes = await this.readBounded(stream, this.config.hardCeilingBytes);
+      const bytes = await this.readBounded(stored.body, this.config.hardCeilingBytes);
       const parsed: unknown = JSON.parse(Buffer.from(bytes).toString("utf8"));
-      const parsedObject = z.record(z.string(), z.unknown()).safeParse(parsed);
+      const parsedObject = resolvedInputsSchema.safeParse(parsed);
       if (parsedObject.success) {
         return parsedObject.data;
       }

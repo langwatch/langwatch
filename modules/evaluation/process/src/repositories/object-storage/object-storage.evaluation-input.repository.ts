@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 
 import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stores/members";
 
-import type { EvaluationInputStorage } from "../../app/evaluation.members.ts";
+import type {
+  EvaluationInputStorage,
+  StoredEvaluationInput,
+} from "../../app/evaluation.members.ts";
 
 const JSON_MEDIA_TYPE = "application/json";
 const STORED_INPUT_ID = /^[a-f0-9]{64}$/u;
@@ -29,16 +32,15 @@ export class ObjectStorageEvaluationInputRepository implements EvaluationInputSt
     return { id };
   }
 
-  async tryRead(input: {
-    tenantId: string;
-    id: string;
-  }): Promise<AsyncIterable<Uint8Array> | null> {
-    if (!STORED_INPUT_ID.test(input.id)) return null;
+  async read(input: { tenantId: string; id: string }): Promise<StoredEvaluationInput> {
+    if (!STORED_INPUT_ID.test(input.id)) return { kind: "absent" };
 
     try {
-      return await this.objects.read(addressOf(input.tenantId, input.id));
+      return { kind: "stored", body: await this.objects.read(addressOf(input.tenantId, input.id)) };
     } catch (error) {
-      if (error instanceof Error && error.name === "StoredObjectNotFoundError") return null;
+      if (error instanceof Error && error.name === "StoredObjectNotFoundError") {
+        return { kind: "absent" };
+      }
       throw error;
     }
   }

@@ -22,7 +22,6 @@ export type {
   EvaluationLangevals,
   EvaluationModelEnv,
   EvaluationSpanDigest,
-  EvaluationTraceRead,
   EvaluationWorkflowExecutor,
   EvaluationTraceProtections,
   LangevalsEvaluateParams,

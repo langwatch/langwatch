@@ -67,7 +67,6 @@
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
-    "@langwatch/workflow-process": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

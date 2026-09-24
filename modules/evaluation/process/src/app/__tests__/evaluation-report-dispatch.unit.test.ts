@@ -1,18 +1,20 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EvaluationApi, type ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands, EventingCommandSender } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import { memoryStores } from "@langwatch/process-stores";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { evaluationServer } from "../../evaluation.server.ts";
 import { EvaluationCommandDispatcherService } from "../../services/evaluation-command-dispatcher.service.ts";
 import type { EvaluationProcessingPipeline } from "../../services/evaluation-processing.service.ts";
-import { EVALUATION_TEST_CONFIG } from "./evaluation.fixture.ts";
+import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
 
 const REPORT: ReportEvaluationCommandData = {
   tenantId: "project-1",
@@ -27,13 +29,16 @@ const REPORT: ReportEvaluationCommandData = {
 
 async function installed() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(evaluationServer)])
+    .withModules([installableEvaluation])
     .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
+    .withStores(memoryStores())
     .provide({
       workflow: createApiFixture<WorkflowApi>(),
       trace: createApiFixture<TraceApi>(),
       "model-provider": createApiFixture<ModelProviderApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
+      evaluator: createApiFixture<EvaluatorApi>(),
+      monitor: createApiFixture<MonitorApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),
     })
     .boot();

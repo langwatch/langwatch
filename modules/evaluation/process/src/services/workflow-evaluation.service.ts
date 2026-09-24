@@ -2,22 +2,23 @@ import {
   singleEvaluationResultSchema,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import type { ExecutionStatus } from "@langwatch/workflow-contract";
-import type { WorkflowService } from "@langwatch/workflow-process";
+import type { ExecutionStatus, WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
+
+import type { EvaluationWorkflowExecutor } from "../app/evaluation.members.ts";
 
 const workflowExecutionResponseSchema = z.object({
   result: z.record(z.string(), z.unknown()).nullable().optional(),
   status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
 });
 
-/** Compatibility adapter from Workflow execution to Evaluation's result contract. */
-export class WorkflowEvaluationAdapter {
-  static create(workflows: WorkflowService): WorkflowEvaluationAdapter {
-    return new WorkflowEvaluationAdapter(workflows);
+/** Runs an evaluator workflow through WorkflowApi and answers Evaluation's result contract. */
+export class WorkflowEvaluationService implements EvaluationWorkflowExecutor {
+  static create(workflows: Pick<WorkflowApi, "run">): WorkflowEvaluationService {
+    return new WorkflowEvaluationService(workflows);
   }
 
-  private constructor(private readonly workflows: WorkflowService) {}
+  private constructor(private readonly workflows: Pick<WorkflowApi, "run">) {}
 
   async run(input: {
     workflowId: string;

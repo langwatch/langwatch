@@ -24,14 +24,20 @@ import {
   type RunTraceEvaluationInput,
   type WarmupEvaluatorsInput,
 } from "@langwatch/evaluation-contract";
-import { AVAILABLE_EVALUATORS, type SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  EvaluatorApi,
+  type SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -44,18 +50,23 @@ import type {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../app/evaluation.members.ts";
-import { AbsentLangevalsPayloadStaging } from "../channels/absent.langevals-payload-staging.channel.ts";
 import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
+import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
+import { DirectEvaluationExecutionReceiptAdapter } from "../services/direct.evaluation-execution-receipt.service.ts";
 import {
   EvaluationBatchLogService,
   type EvaluationExperimentDirectory,
   type EvaluationExperimentRunWriter,
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
+import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
+import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
+import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
+import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
@@ -65,11 +76,18 @@ import {
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import type { EvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
+import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
+import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
 import { EvaluatorEnvironmentService } from "../services/evaluator-environment.service.ts";
+import { EvaluatorModelEnvService } from "../services/evaluator-model-env.service.ts";
+import { HttpLangevalsEvaluatorAdapter } from "../services/http.langevals-evaluator.service.ts";
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
+import { OtelEvaluationExecutionMetricsAdapter } from "../services/otel.evaluation-execution-metrics.service.ts";
+import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
 import type {
   EvaluationExecution,
+  EvaluationExecutionIntent,
   EvaluationInputsResolution,
   EvaluationRetentionFloor,
 } from "./evaluation.members.ts";
@@ -186,6 +204,9 @@ const EVALUATION_PROCESS_NAME = "the evaluation module";
 
 const logger = createLogger("langwatch:evaluation:app");
 
+const LANGEVALS_MAX_RETRIES = 1;
+const LANGEVALS_TIMEOUT_MS = 5 * 60 * 1000;
+
 /**
  * The KSUID resource prefix a re-evaluation's id carries — the app's
  * `KSUID_RESOURCES.EVALUATION`.
@@ -217,8 +238,15 @@ export class EvaluationApp implements EvaluationApiContract {
     /** Owns the platform default retention the run reads are floored at, read per lookup. */
     retention: DataRetentionApi,
     featureFlags: FeatureFlagApi,
+    evaluators: EvaluatorApi,
+    /** Read when a queued evaluation runs, never in construction: MonitorApp depends on us. */
+    monitors: MonitorApi,
   };
-  static readonly reads = reads();
+  static readonly reads = reads("objectStorage");
+  static readonly secrets = {
+    openAi: openAiApiKey,
+    azureContentSafety: Secret.load("AZURE_CONTENT_SAFETY_KEY", { optional: true }),
+  } as const;
 
   readonly #service: EvaluationService;
   readonly #azureSafety: AzureSafetyCredentialsService;
@@ -239,6 +267,7 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #runner: EvaluationRunner;
   readonly #commands: EvaluationCommandDispatcherService | undefined;
   readonly #clustering: LangevalsClusteringService;
+  readonly #executionIntent: EvaluationExecutionIntent;
 
   private constructor({
     service,
@@ -246,15 +275,18 @@ export class EvaluationApp implements EvaluationApiContract {
     members,
     commands,
     clustering,
+    executionIntent,
   }: {
     service: EvaluationService;
     dependencies: EvaluationSetup["dependencies"];
     members: EvaluationInfrastructure;
     commands: EvaluationCommandDispatcherService | undefined;
     clustering: LangevalsClusteringService;
+    executionIntent: EvaluationExecutionIntent;
   }) {
     this.#service = service;
     this.#clustering = clustering;
+    this.#executionIntent = executionIntent;
     this.#azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     this.#environment = members.environment;
     this.#customEvaluators = members.customEvaluators;
@@ -278,31 +310,73 @@ export class EvaluationApp implements EvaluationApiContract {
     });
   }
 
-  /**
-   * Run history, the monitor trend, the retention floor and the report
-   * command are real; the rest is still the closed stub until its port lands
-   * (`.claude/handoffs/port-evaluation-runtime.md`).
-   */
-  static create({ dependencies, repositories, config }: EvaluationSetup): EvaluationApp {
+  /** The closed stub answers what has no port yet (see the port-evaluation-runtime handoff). */
+  static async create(setup: EvaluationSetup): Promise<EvaluationApp> {
+    const { secrets } = setup;
+    const environment = await secrets.into(EvaluationApp.secrets.openAi, (openAi) =>
+      secrets.into(EvaluationApp.secrets.azureContentSafety, (azureContentSafety) =>
+        EvaluatorEnvironmentService.create({
+          config: setup.config,
+          openAiApiKey: openAi,
+          azureContentSafetyKey: azureContentSafety,
+        }),
+      ),
+    );
+
+    return EvaluationApp.withEnvironment(setup, environment);
+  }
+
+  private static withEnvironment(
+    { dependencies, repositories, members, config }: EvaluationSetup,
+    environment: EvaluatorEnvironmentService,
+  ): EvaluationApp {
     const commands = EvaluationCommandDispatcherService.create();
     const langevals = langevalsChannels.live.create({
       config,
-      staging: AbsentLangevalsPayloadStaging.create(),
+      staging: ObjectStorageLangevalsPayloadStaging.create({
+        objectStorage: members.objectStorage,
+      }),
+    });
+    const telemetry = OtelEvaluationExecutionMetricsAdapter.create();
+    const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
+    const inputs = EvaluationInputsOffloadService.create({
+      storage: repositories.inputs,
+      config: {
+        inlineMaxBytes: EVAL_INPUTS_INLINE_MAX_BYTES,
+        hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
+        previewBytes: EVAL_INPUTS_PREVIEW_BYTES,
+      },
+    });
+    const execution = EvaluationExecutionService.create({
+      traces: dependencies.traces,
+      spanDigest: EvaluationSpanDigestService.create(dependencies.traces),
+      modelEnvResolver: EvaluatorModelEnvService.create({
+        modelProviders: dependencies.modelProviders,
+        azureSafety,
+        environment,
+      }),
+      langevalsClient: HttpLangevalsEvaluatorAdapter.create({
+        config: {
+          endpoint: config.langevalsEndpoint,
+          maxRetries: LANGEVALS_MAX_RETRIES,
+          timeoutMs: LANGEVALS_TIMEOUT_MS,
+        },
+        telemetry,
+      }),
+      workflows: dependencies.workflows,
+      evaluators: dependencies.evaluators,
+      workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
+      installEnvironment: environment.read(),
+      telemetry,
     });
 
     return EvaluationApp.fromInfrastructure({
       infrastructure: {
         ...createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
         retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
-        inputResolution: EvaluationInputsOffloadService.create({
-          storage: repositories.inputs,
-          config: {
-            inlineMaxBytes: EVAL_INPUTS_INLINE_MAX_BYTES,
-            hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
-            previewBytes: EVAL_INPUTS_PREVIEW_BYTES,
-          },
-        }),
-        environment: EvaluatorEnvironmentService.create(config),
+        execution,
+        inputResolution: inputs,
+        environment,
         report: commands,
       },
       dependencies,
@@ -311,6 +385,20 @@ export class EvaluationApp implements EvaluationApiContract {
       clustering: LangevalsClusteringService.create({
         endpoint: config.langevalsEndpoint,
         langevals,
+      }),
+      executionIntent: EvaluationExecutionIntentService.create({
+        monitors: dependencies.monitors,
+        traces: dependencies.traces,
+        azureSafetyCredentials: azureSafety,
+        settingsRecovery: EvaluationSettingsRecoverySwitchService.create(dependencies.featureFlags),
+        inputsOffload: FlaggedEvaluationInputsOffloadService.create({
+          inputs,
+          flags: dependencies.featureFlags,
+        }),
+        executionReceipt: DirectEvaluationExecutionReceiptAdapter.create({
+          execution,
+          costs: EvaluationCostService.create({ repository: repositories.costs }),
+        }),
       }),
     });
   }
@@ -321,8 +409,16 @@ export class EvaluationApp implements EvaluationApiContract {
     repositories: Pick<EvaluationRepositories, "runs" | "monitorPerformance">;
     commands?: EvaluationCommandDispatcherService;
     clustering: LangevalsClusteringService;
+    executionIntent: EvaluationExecutionIntent;
   }): EvaluationApp {
-    const { infrastructure: members, dependencies, repositories, commands, clustering } = setup;
+    const {
+      infrastructure: members,
+      dependencies,
+      repositories,
+      commands,
+      clustering,
+      executionIntent,
+    } = setup;
 
     return new EvaluationApp({
       service: EvaluationService.create({
@@ -337,7 +433,13 @@ export class EvaluationApp implements EvaluationApiContract {
       members,
       commands,
       clustering,
+      executionIntent,
     });
+  }
+
+  /** What evaluation_processing's execute command runs through, once (c) registers the pipeline. */
+  executionIntent(): EvaluationExecutionIntent {
+    return this.#executionIntent;
   }
 
   /** Binds evaluation_processing's own senders; `reportEvaluation` goes through them. */

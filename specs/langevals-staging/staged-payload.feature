@@ -37,6 +37,25 @@ Feature: Auto S3 staging for large langevals payloads
     And the delete failure is non-fatal because a bucket lifecycle rule reaps orphans
 
   @unit
+  Scenario: A staged payload is parked in the project's object storage behind a signed download
+    Given the project's object storage can sign a download URL
+    When the control plane stages a payload under the staging prefix
+    Then the exact body is stored under that prefix
+    And the URL handed to langevals is a signed download that lapses after the configured TTL
+
+  @unit
+  Scenario: Discarding a staged payload removes it from object storage
+    Given a payload was staged to the project's object storage
+    When the staged payload is discarded
+    Then the object is no longer readable
+
+  @unit
+  Scenario: A staging call aborted by its caller writes nothing
+    Given the caller's deadline has already fired
+    When the control plane stages a payload
+    Then staging rejects with the abort before any object is written
+
+  @unit
   Scenario: Eval payload above the eval hard cap is rejected before any network call
     Given the serialized request body is larger than the evaluator hard cap
     When the control plane calls the evaluator endpoint

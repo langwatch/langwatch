@@ -2,17 +2,16 @@
  * @vitest-environment node
  */
 
-import type { WorkflowService } from "@langwatch/workflow-process";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { WorkflowEvaluationAdapter } from "../workflow-evaluation.service.ts";
+import { WorkflowEvaluationService } from "../workflow-evaluation.service.ts";
 
-/** The full class has many members; every test here only calls `run`. */
-function stubWorkflows(run: WorkflowService["run"]): WorkflowService {
-  return { run } as unknown as WorkflowService;
+function stubWorkflows(run: WorkflowApi["run"]): Pick<WorkflowApi, "run"> {
+  return { run };
 }
 
-describe("WorkflowEvaluationAdapter.run", () => {
+describe("WorkflowEvaluationService.run", () => {
   describe("given the target trace has no usable parent link", () => {
     describe("when the evaluator workflow is dispatched to nlpgo", () => {
       /** @scenario "An evaluator workflow emits no spans when the target trace has no parent link" */
@@ -22,7 +21,7 @@ describe("WorkflowEvaluationAdapter.run", () => {
           .mockResolvedValue({ result: { status: "processed" }, status: "success" });
         const workflows = stubWorkflows(run);
 
-        await WorkflowEvaluationAdapter.create(workflows).run({
+        await WorkflowEvaluationService.create(workflows).run({
           workflowId: "workflow-1",
           projectId: "project-1",
           inputs: {},
@@ -39,7 +38,7 @@ describe("WorkflowEvaluationAdapter.run", () => {
           .mockResolvedValue({ result: { status: "processed" }, status: "success" });
         const workflows = stubWorkflows(run);
 
-        await WorkflowEvaluationAdapter.create(workflows).run({
+        await WorkflowEvaluationService.create(workflows).run({
           workflowId: "workflow-1",
           projectId: "project-1",
           inputs: {},
@@ -64,7 +63,7 @@ describe("WorkflowEvaluationAdapter.run", () => {
           ),
         );
 
-        const outcome = await WorkflowEvaluationAdapter.create(workflows).run({
+        const outcome = await WorkflowEvaluationService.create(workflows).run({
           workflowId: "workflow-1",
           projectId: "project-1",
           inputs: {},

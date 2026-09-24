@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 
-import type { EvaluationInputStorage } from "../../app/evaluation.members.ts";
+import type {
+  EvaluationInputStorage,
+  StoredEvaluationInput,
+} from "../../app/evaluation.members.ts";
 
 /** The memory twin of the object-storage input repository: same ids, same unknown-id answer. */
 export class MemoryEvaluationInputRepository implements EvaluationInputStorage {
@@ -23,12 +26,9 @@ export class MemoryEvaluationInputRepository implements EvaluationInputStorage {
     return { id };
   }
 
-  async tryRead(input: {
-    tenantId: string;
-    id: string;
-  }): Promise<AsyncIterable<Uint8Array> | null> {
+  async read(input: { tenantId: string; id: string }): Promise<StoredEvaluationInput> {
     const bytes = this.#objects.get(`${input.tenantId}/${input.id}`);
-    return bytes ? once(bytes) : null;
+    return bytes ? { kind: "stored", body: once(bytes) } : { kind: "absent" };
   }
 }
 

@@ -7,8 +7,12 @@ import type {
   ReportEvaluationCommandData,
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -21,6 +25,7 @@ import type {
   EvaluationWarmupProbe,
 } from "../../app/evaluation.members.ts";
 import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
+import { evaluationServer } from "../../evaluation.server.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
@@ -185,6 +190,8 @@ export function createEvaluationTestApp(
       modelProviders: ModelProviderApi;
       retention: DataRetentionApi;
       featureFlags: FeatureFlagApi;
+      evaluators: EvaluatorApi;
+      monitors: MonitorApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -200,6 +207,8 @@ export function createEvaluationTestApp(
         createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
       retention: input.dependencies?.retention ?? createApiFixture<DataRetentionApi>(),
       featureFlags: input.dependencies?.featureFlags ?? createApiFixture<FeatureFlagApi>(),
+      evaluators: input.dependencies?.evaluators ?? createApiFixture<EvaluatorApi>(),
+      monitors: input.dependencies?.monitors ?? createApiFixture<MonitorApi>(),
     },
     clustering:
       input.clustering ??
@@ -207,8 +216,23 @@ export function createEvaluationTestApp(
         endpoint: undefined,
         langevals: MemoryLangevalsChannel.create(),
       }),
+    executionIntent: {
+      execute: () => Promise.reject(new Error("this test composed no evaluation execution intent")),
+    },
   });
 }
+
+const memoryEvaluation = withMemoryRepositories(evaluationServer);
+
+/** `createApp` composes no secrets chain: the install gets a scope answering every handle unset. */
+export const installableEvaluation: typeof memoryEvaluation = {
+  ...memoryEvaluation,
+  install: (args) =>
+    memoryEvaluation.install({
+      ...args,
+      secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    }),
+};
 
 /** The parsed config an installation test hands the module: main's defaults, no endpoint. */
 export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {

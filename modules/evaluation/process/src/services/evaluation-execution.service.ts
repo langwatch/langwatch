@@ -1,7 +1,8 @@
-import { mappingsReadEvaluationsSource } from "@langwatch/dataset-contract";
+import { mappingsReadEvaluationsSource, mappingStateSchema } from "@langwatch/dataset-contract";
 import type { MappingState } from "@langwatch/dataset-contract";
 import {
   type EvaluationExecutionResult,
+  type ExecuteEvaluationCommand,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
@@ -14,16 +15,16 @@ import {
   codeEvaluatorIdFromCheckType,
 } from "@langwatch/evaluator-contract";
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
-import type { Trace } from "@langwatch/trace-contract";
+import type { Trace, TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import {
+  type EvaluationExecution,
   type EvaluationExecutionTelemetry,
   type EvaluationLangevals,
   type EvaluationModelEnv,
   type EvaluationSpanDigest,
   type EvaluationTraceProtections,
-  type EvaluationTraceRead,
   type EvaluationWorkflowExecutor,
 } from "../app/evaluation.members.ts";
 import {
@@ -47,7 +48,7 @@ const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
 // ---------------------------------------------------------------------------
 
 export interface EvaluationExecutionDeps {
-  traceService: EvaluationTraceRead;
+  traces: Pick<TraceApi, "readTracesWithSpans" | "readEvaluations" | "readThreadsTraces">;
   spanDigest: EvaluationSpanDigest;
   modelEnvResolver: EvaluationModelEnv;
   langevalsClient: EvaluationLangevals;
@@ -79,7 +80,7 @@ export type DataForEvaluation =
 // Service
 // ---------------------------------------------------------------------------
 
-export class EvaluationExecutionService {
+export class EvaluationExecutionService implements EvaluationExecution {
   static create(deps: EvaluationExecutionDeps): EvaluationExecutionService {
     return new EvaluationExecutionService(deps);
   }
@@ -88,6 +89,14 @@ export class EvaluationExecutionService {
 
   private constructor(private readonly deps: EvaluationExecutionDeps) {
     this.evaluationData = EvaluationDataService.create(deps);
+  }
+
+  /** The command carries its mappings as JSON; the engine reads them parsed. */
+  execute(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult> {
+    return this.executeForTrace({
+      ...input,
+      mappings: input.mappings === null ? null : mappingStateSchema.parse(input.mappings),
+    });
   }
 
   async executeForTrace(params: {
@@ -186,24 +195,22 @@ export class EvaluationExecutionService {
     traceId: string;
     mappings: MappingState | null;
   }): Promise<Trace> {
-    const traces = await this.deps.traceService.getTracesWithSpans(
+    const traces = await this.deps.traces.readTracesWithSpans({
       projectId,
-      [traceId],
-      INTERNAL_PROTECTIONS,
-      undefined,
-      { full: true },
-    );
+      traceIds: [traceId],
+      protections: INTERNAL_PROTECTIONS,
+    });
     const trace = traces[0];
     if (!trace) {
       throw new TraceNotEvaluatableError(traceId);
     }
 
     if (mappingsReadEvaluationsSource(mappings)) {
-      const evaluationsByTrace = await this.deps.traceService.getEvaluationsMultiple(
+      const evaluationsByTrace = await this.deps.traces.readEvaluations({
         projectId,
-        [traceId],
-        INTERNAL_PROTECTIONS,
-      );
+        traceIds: [traceId],
+        protections: INTERNAL_PROTECTIONS,
+      });
       trace.evaluations = (evaluationsByTrace[traceId] ?? []) as Trace["evaluations"];
     }
 
@@ -410,14 +417,13 @@ export class EvaluationExecutionService {
     // bug rchaves caught in prod).
     const parentTrace = extractParentTraceForNlpgo(trace);
 
-    const response = await this.deps.workflowExecutor.runEvaluationWorkflow(
-      resolvedWorkflowId,
+    const response = await this.deps.workflowExecutor.run({
+      workflowId: resolvedWorkflowId,
       projectId,
-      requestBody as Record<string, string>,
-      undefined,
-      parentCausalityDepth,
-      parentTrace,
-    );
+      inputs: requestBody as Record<string, string>,
+      causalityDepth: parentCausalityDepth,
+      ...(parentTrace === undefined ? {} : { parentTrace }),
+    });
 
     if (response.status !== "success") {
       return { ...response.result, status: "error" } as SingleEvaluationResult;

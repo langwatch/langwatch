@@ -1,16 +1,19 @@
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
-import type { EvaluationInputStorage } from "../../app/evaluation.members.ts";
+import type {
+  EvaluationInputStorage,
+  StoredEvaluationInput,
+} from "../../app/evaluation.members.ts";
 import { MemoryEvaluationInputRepository } from "../memory/memory.evaluation-input.repository.ts";
 import { ObjectStorageEvaluationInputRepository } from "../object-storage/object-storage.evaluation-input.repository.ts";
 
 const bytes = new TextEncoder().encode('{"input":"large"}');
 
-async function textOf(body: AsyncIterable<Uint8Array> | null): Promise<string | undefined> {
-  if (!body) return undefined;
+async function textOf(read: StoredEvaluationInput): Promise<string | undefined> {
+  if (read.kind === "absent") return undefined;
   const chunks: Uint8Array[] = [];
-  for await (const chunk of body) chunks.push(chunk);
+  for await (const chunk of read.body) chunks.push(chunk);
   return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
@@ -31,7 +34,7 @@ describe.each([
       });
 
       expect(id).toMatch(/^[a-f0-9]{64}$/u);
-      expect(await textOf(await repository.tryRead({ tenantId: "project-1", id }))).toBe(
+      expect(await textOf(await repository.read({ tenantId: "project-1", id }))).toBe(
         '{"input":"large"}',
       );
     });
@@ -44,13 +47,15 @@ describe.each([
         bytes,
       });
 
-      expect(await repository.tryRead({ tenantId: "project-2", id })).toBeNull();
+      expect(await repository.read({ tenantId: "project-2", id })).toEqual({ kind: "absent" });
     });
   });
 
   describe("given an id that is not a stored-input hash", () => {
     it("answers nothing", async () => {
-      expect(await create().tryRead({ tenantId: "project-1", id: "../secrets" })).toBeNull();
+      expect(await create().read({ tenantId: "project-1", id: "../secrets" })).toEqual({
+        kind: "absent",
+      });
     });
   });
 });

@@ -108,12 +108,11 @@ export class EvaluationDataService {
           mappings,
           spanDigest: this.deps.spanDigest,
           getThreadTraces: (threadId) =>
-            this.deps.traceService.getTracesWithSpansByThreadIds(
+            this.deps.traces.readThreadsTraces({
               projectId,
-              [threadId],
-              INTERNAL_PROTECTIONS,
-              { full: true },
-            ),
+              threadIds: [threadId],
+              protections: INTERNAL_PROTECTIONS,
+            }),
         });
       }
     }
@@ -165,12 +164,11 @@ export class EvaluationDataService {
       throw new EvaluatorConfigError("Trace does not have a thread_id for thread-based evaluation");
     }
 
-    const threadTraces = await this.deps.traceService.getTracesWithSpansByThreadIds(
+    const threadTraces = await this.deps.traces.readThreadsTraces({
       projectId,
-      [threadId],
-      INTERNAL_PROTECTIONS,
-      { full: true },
-    );
+      threadIds: [threadId],
+      protections: INTERNAL_PROTECTIONS,
+    });
 
     const result: Record<string, unknown> = {};
 

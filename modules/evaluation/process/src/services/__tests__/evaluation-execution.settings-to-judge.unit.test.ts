@@ -41,24 +41,24 @@ function buildService(
       .fn<EvaluationLangevals["evaluate"]>()
       .mockResolvedValue({ status: "processed", score: 0.95, passed: true });
 
-  const traceService = {
-    getTracesWithSpans: vi.fn().mockResolvedValue([buildTrace()]),
-    getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
-    getEvaluationsMultiple: vi.fn().mockResolvedValue({}),
+  const traces = {
+    readTracesWithSpans: vi.fn().mockResolvedValue([buildTrace()]),
+    readThreadsTraces: vi.fn().mockResolvedValue([]),
+    readEvaluations: vi.fn().mockResolvedValue({}),
   };
   const spanDigest = { format: vi.fn().mockResolvedValue("") };
   const modelEnvResolver = { resolveForEvaluator };
   const langevalsClient = { evaluate };
 
   const deps: EvaluationExecutionDeps = {
-    traceService,
+    traces,
     spanDigest,
     modelEnvResolver,
     langevalsClient,
     workflows: createApiFixture<WorkflowApi>({}),
     evaluators: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
     workflowExecutor: {
-      runEvaluationWorkflow: () => {
+      run: () => {
         throw new Error("the judge path never runs an evaluation workflow");
       },
     },
