@@ -38,12 +38,41 @@ import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import {
+  AZURE_AI_METER_CATEGORIES,
+  AZURE_COST_API_VERSION,
+  AZURE_MANAGEMENT_HOST,
+  azureCostEvents,
+  azureCostReadIsDue,
+  azureCostReadWindow,
+  azureCostRequestBody,
+  isAzureResourceManagerUrl,
+  nextAzureCostCursor,
+  readAzureCostRows,
+} from "../../rules/azure-cost-management.rules.ts";
 import { COPILOT_CONVERSATION_ACTION } from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   isEnvironmentOrigin,
   isSameEnvironment,
 } from "../../rules/dataverse-environment-service.rules.ts";
+import {
+  DIRECTORY_USERS_FIRST_PAGE,
+  type DirectoryUser,
+  directoryReadIsDue,
+  isMicrosoftGraphUrl,
+  microsoftDirectoryEvents,
+  nextDirectoryCursor,
+  readDirectoryUserRows,
+} from "../../rules/microsoft-graph-directory.rules.ts";
+import {
+  MICROSOFT_GRAPH_SCOPE,
+  microsoftSeatEvents,
+  nextSeatsCursor,
+  readSubscribedSkuRows,
+  seatsReadIsDue,
+  seatsReportDay,
+} from "../../rules/microsoft-graph-seats.rules.ts";
 export { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
 import type { CopilotStudioDataversePullerChannel } from "../copilot-studio-dataverse.channel.ts";
 
@@ -190,6 +219,57 @@ const cursorSchema = z.object({
 });
 type Cursor = z.infer<typeof cursorSchema>;
 
+const dayField = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .nullish();
+const heldField = z.number().int().nonnegative().nullish();
+
+/** Transcript fields stay top-level and every later field is optional, so positions written by older builds still parse. */
+const storedCursorSchema = z.object({
+  createdon: z.string().datetime({ offset: true }).optional(),
+  conversationtranscriptid: z.string().uuid().optional(),
+  costPricedThroughDay: dayField,
+  costHeldSinceMs: heldField,
+  costReadAtMs: heldField,
+  costDeepReadDay: z.string().nullish(),
+  seatsReportedThroughDay: dayField,
+  seatsHeldSinceMs: heldField,
+  directoryReportedThroughDay: dayField,
+  directoryHeldSinceMs: heldField,
+});
+
+interface CostPosition {
+  pricedThroughDay: string | null;
+  heldSinceMs: number | null;
+  readAtMs: number | null;
+  deepReadDay: string | null;
+}
+
+interface DayPosition {
+  reportedThroughDay: string | null;
+  heldSinceMs: number | null;
+}
+
+interface StoredCursor {
+  transcript: Cursor | null;
+  cost: CostPosition;
+  seats: DayPosition;
+  directory: DayPosition;
+}
+
+const NO_CURSOR: StoredCursor = {
+  transcript: null,
+  cost: { pricedThroughDay: null, heldSinceMs: null, readAtMs: null, deepReadDay: null },
+  seats: { reportedThroughDay: null, heldSinceMs: null },
+  directory: { reportedThroughDay: null, heldSinceMs: null },
+};
+
+/** Dataverse and Azure Resource Manager are separate audiences; a cost-reading run signs in once for each. */
+const AZURE_MANAGEMENT_SCOPE = `https://${AZURE_MANAGEMENT_HOST}/.default`;
+
+const MAX_DIRECTORY_PAGES = 50;
+
 /**
  * What a walk of this run's pages has read so far.
  *
@@ -207,6 +287,8 @@ interface TranscriptWalk {
   events: NormalizedPullEvent[];
   errorCount: number;
   last: Cursor | null;
+  /** The walk stopped at a limit with pages still waiting; the rows read are kept. */
+  isTruncated: boolean;
 }
 
 export class HttpCopilotStudioDataverseChannel
@@ -235,7 +317,21 @@ export class HttpCopilotStudioDataverseChannel
     options: PullRunOptions,
     config: CopilotStudioDataverseConfig,
   ): Promise<PullResult> {
-    const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
+    const walk: TranscriptWalk = { events: [], errorCount: 0, last: null, isTruncated: false };
+    const previous = HttpCopilotStudioDataverseChannel.parseCursor(options.cursor);
+
+    // Cost, seats and directory never throw and never count an error: an
+    // error with an unmoved cursor makes the worker discard the conversations.
+    const costRead = await this.readAzureCost({ config, options, previous: previous.cost });
+    walk.events.push(...costRead.events);
+    const seatsRead = await this.readMicrosoftSeats({ config, options, previous: previous.seats });
+    walk.events.push(...seatsRead.events);
+    const directoryRead = await this.readMicrosoftDirectory({
+      config,
+      options,
+      previous: previous.directory,
+    });
+    walk.events.push(...directoryRead.events);
 
     try {
       const token = await HttpCopilotStudioDataverseChannel.resolveEnvironmentToken({
@@ -249,39 +345,404 @@ export class HttpCopilotStudioDataverseChannel
         token,
         signal: options.signal,
       });
-      await this.walkTranscriptPages({ walk, options, config, token, bots });
+      await this.walkTranscriptPages({
+        walk,
+        options,
+        config,
+        token,
+        bots,
+        cursor: previous.transcript,
+      });
     } catch (error) {
       walk.errorCount += 1;
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
         "copilot studio dataverse pull failed",
       );
-      // The cursor is deliberately not advanced: the next run retries the
-      // same window, and re-reading is safe because identifiers are derived
-      // from the conversation rather than minted per pull.
-      //
-      // The events already read are handed back, but the worker will not
-      // write them — an error count with an unchanged cursor is the "made no
-      // progress" half of the `PullResult` contract, and it fails the run.
-      // That is the intended answer: a walk that threw part-way through a page
-      // cannot say which rows it got, so keeping some of them would persist a
-      // window nobody can describe. They are returned anyway because the caller
-      // is what decides, and a run that reports zero events reads as a source
-      // with nothing in it rather than one that fell over.
-      return {
-        events: walk.events,
-        cursor: options.cursor,
-        errorCount: walk.errorCount,
-      };
     }
+
+    const next: StoredCursor = {
+      transcript: walk.last?.createdon ? walk.last : previous.transcript,
+      cost: costRead.cost,
+      seats: seatsRead.seats,
+      directory: directoryRead.directory,
+    };
 
     return {
       events: walk.events,
-      // Only advance past rows this run actually read. A run that read
-      // nothing leaves the cursor alone so the same window is retried.
-      cursor: walk.last?.createdon ? JSON.stringify(walk.last) : options.cursor,
+      // An unmoved position hands back the incoming string verbatim, which the
+      // worker reads as no progress.
+      cursor: HttpCopilotStudioDataverseChannel.positionMoved({ previous, next })
+        ? HttpCopilotStudioDataverseChannel.encodeCursor(next)
+        : options.cursor,
       errorCount: walk.errorCount,
+      ...(walk.isTruncated ? { completeness: "truncated" as const } : {}),
     };
+  }
+
+  /** The daily Azure bill, or a held window; see specs/ai-governance/puller-framework/copilot-studio-dataverse.feature. */
+  private async readAzureCost(params: {
+    config: CopilotStudioDataverseConfig;
+    options: PullRunOptions;
+    previous: CostPosition;
+  }): Promise<{ events: NormalizedPullEvent[]; cost: CostPosition }> {
+    const { config, options, previous } = params;
+    const subscriptionId = config.azureSubscriptionId;
+    if (!subscriptionId) return { events: [], cost: previous };
+
+    // The bill is read only under the billing identity, never the bot's.
+    const billingClientId = options.credentials?.billingClientId;
+    const billingClientSecret = options.credentials?.billingClientSecret;
+    if (!billingClientId || !billingClientSecret) return { events: [], cost: previous };
+
+    const nowMs = nowInstant().epochMilliseconds;
+    if (!azureCostReadIsDue({ nowMs, readAtMs: previous.readAtMs })) {
+      return { events: [], cost: previous };
+    }
+    const held = (): { events: NormalizedPullEvent[]; cost: CostPosition } => ({
+      events: [],
+      cost: {
+        ...nextAzureCostCursor({ nowMs, previous, outcome: "held" }),
+        deepReadDay: previous.deepReadDay,
+      },
+    });
+
+    try {
+      const token = await HttpCopilotStudioDataverseChannel.resolveEnvironmentToken({
+        credentials: {
+          tenantId: options.credentials?.tenantId ?? "",
+          clientId: billingClientId,
+          clientSecret: billingClientSecret,
+        },
+        environmentUrl: config.environmentUrl,
+        scope: AZURE_MANAGEMENT_SCOPE,
+        signal: options.signal,
+        http: this.http,
+      });
+      const window = azureCostReadWindow({
+        nowMs,
+        pricedThroughDay: previous.pricedThroughDay,
+        deepReadDay: previous.deepReadDay,
+      });
+      const days = await this.fetchAzureCostPages({ subscriptionId, token, window, options });
+      if (days === null) return held();
+
+      const aiDays = days.filter((day) =>
+        AZURE_AI_METER_CATEGORIES.some((category) => category === day.meterCategory),
+      );
+      const priced = nextAzureCostCursor({
+        nowMs,
+        previous,
+        outcome: "priced",
+        wasDeepRead: window.isDeepRead,
+      });
+      return {
+        events: azureCostEvents({ days: aiDays, subscriptionId }),
+        cost: { ...priced, deepReadDay: priced.deepReadDay ?? previous.deepReadDay },
+      };
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the Azure bill; holding the window and delivering the conversations",
+      );
+      return held();
+    }
+  }
+
+  /** Every page of one cost read, or null: a half-read window must never be reported as priced. */
+  private async fetchAzureCostPages(params: {
+    subscriptionId: string;
+    token: string;
+    window: { fromDay: string; toDay: string };
+    options: PullRunOptions;
+  }): Promise<ReturnType<typeof readAzureCostRows>["days"] | null> {
+    const { subscriptionId, token, window, options } = params;
+    const days: ReturnType<typeof readAzureCostRows>["days"] = [];
+
+    let url: string =
+      `https://${AZURE_MANAGEMENT_HOST}/subscriptions/${encodeURIComponent(subscriptionId)}` +
+      `/providers/Microsoft.CostManagement/query?api-version=${AZURE_COST_API_VERSION}`;
+    let pageCount = 0;
+
+    while (pageCount < MAX_PAGES_PER_RUN && !HttpCopilotStudioDataverseChannel.runIsOver(options)) {
+      pageCount += 1;
+      const page = await this.readAzureCostPage({ url, token, window, options, subscriptionId });
+      if (page === null) return null;
+      days.push(...page.days);
+      if (page.nextLink === null) return days;
+
+      // The next link is followed carrying the ARM bearer, so its host is parsed, not compared as text.
+      if (!isAzureResourceManagerUrl(page.nextLink)) {
+        logger.error(
+          { refusedHost: HttpCopilotStudioDataverseChannel.hostOf(page.nextLink), subscriptionId },
+          "copilot studio dataverse: refusing an Azure cost next-page link that is not Azure Resource Manager; holding the window",
+        );
+        return null;
+      }
+      url = page.nextLink;
+    }
+
+    logger.warn(
+      { pageCount, subscriptionId },
+      "copilot studio dataverse: the Azure cost read ran out of run before it ran out of pages; holding the window",
+    );
+    return null;
+  }
+
+  private async readAzureCostPage(params: {
+    url: string;
+    token: string;
+    window: { fromDay: string; toDay: string };
+    options: PullRunOptions;
+    subscriptionId: string;
+  }): Promise<ReturnType<typeof readAzureCostRows> | null> {
+    const { url, token, window, options, subscriptionId } = params;
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const response = await this.http.fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(azureCostRequestBody(window)),
+      signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
+      followRedirects: false,
+    });
+
+    if (!response.ok) {
+      logger.warn(
+        { status: response.status, subscriptionId },
+        response.status === 429
+          ? "copilot studio dataverse: Azure asked the cost read to retry later (HTTP 429); holding the window for the next run"
+          : "copilot studio dataverse: Azure refused the cost read; holding the window for the next run",
+      );
+      return null;
+    }
+
+    const read = readAzureCostRows({ response: await response.json() });
+    if (read.malformed) {
+      logger.warn(
+        { subscriptionId },
+        "copilot studio dataverse: Azure answered the cost read with an unrecognised body; holding the window for the next run",
+      );
+      return null;
+    }
+    if (read.unreadableRows > 0) {
+      logger.warn(
+        { unreadableRows: read.unreadableRows, subscriptionId },
+        "copilot studio dataverse: some Azure cost rows could not be read; the rest of the window is recorded",
+      );
+    }
+    return read;
+  }
+
+  /** The tenant's seat licences, or a held day; a refusal is never recorded as zero seats. */
+  private async readMicrosoftSeats(params: {
+    config: CopilotStudioDataverseConfig;
+    options: PullRunOptions;
+    previous: DayPosition;
+  }): Promise<{ events: NormalizedPullEvent[]; seats: DayPosition }> {
+    const { config, options, previous } = params;
+    if (!config.readSeats) return { events: [], seats: previous };
+
+    const nowMs = nowInstant().epochMilliseconds;
+    if (!seatsReadIsDue({ nowMs, reportedThroughDay: previous.reportedThroughDay })) {
+      return { events: [], seats: previous };
+    }
+    const held = (): { events: NormalizedPullEvent[]; seats: DayPosition } => ({
+      events: [],
+      seats: nextSeatsCursor({ nowMs, previous, outcome: "held" }),
+    });
+
+    try {
+      const token = await HttpCopilotStudioDataverseChannel.resolveEnvironmentToken({
+        credentials: options.credentials,
+        environmentUrl: config.environmentUrl,
+        scope: MICROSOFT_GRAPH_SCOPE,
+        signal: options.signal,
+        http: this.http,
+      });
+      const read = await this.fetchSubscribedSkus({ token, options });
+      if (read === null) return held();
+      return {
+        events: microsoftSeatEvents({ skus: read.skus, day: seatsReportDay({ nowMs }) }),
+        seats: nextSeatsCursor({ nowMs, previous, outcome: "reported" }),
+      };
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the tenant's seat licences; holding the day and delivering the conversations",
+      );
+      return held();
+    }
+  }
+
+  private async fetchSubscribedSkus(params: {
+    token: string;
+    options: PullRunOptions;
+  }): Promise<ReturnType<typeof readSubscribedSkuRows> | null> {
+    const { token, options } = params;
+    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const response = await this.http.fetch("https://graph.microsoft.com/v1.0/subscribedSkus", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
+      followRedirects: false,
+    });
+
+    if (!response.ok) {
+      logger.warn(
+        { status: response.status },
+        response.status === 403
+          ? "copilot studio dataverse: the tenant has not consented to the licence read (HTTP 403); holding the day"
+          : "copilot studio dataverse: Microsoft Graph refused the licence read; holding the day",
+      );
+      return null;
+    }
+
+    const read = readSubscribedSkuRows({ response: await response.json() });
+    if (read.malformed) {
+      logger.warn(
+        "copilot studio dataverse: Microsoft Graph answered the licence read with an unrecognised body; holding the day",
+      );
+      return null;
+    }
+    if (read.unreadableRows > 0) {
+      logger.warn(
+        { unreadableRows: read.unreadableRows },
+        "copilot studio dataverse: some licence pools could not be read; the rest of the list is recorded",
+      );
+    }
+    if (read.skus.length === 0 && read.unreadableRows > 0) {
+      logger.warn(
+        { unreadableRows: read.unreadableRows },
+        "copilot studio dataverse: no licence pool in Microsoft Graph's reply could be read; holding the day",
+      );
+      return null;
+    }
+    return read;
+  }
+
+  /** The tenant's user directory, or a held day; the licence read's contract exactly. */
+  private async readMicrosoftDirectory(params: {
+    config: CopilotStudioDataverseConfig;
+    options: PullRunOptions;
+    previous: DayPosition;
+  }): Promise<{ events: NormalizedPullEvent[]; directory: DayPosition }> {
+    const { config, options, previous } = params;
+    if (!config.readDirectory) return { events: [], directory: previous };
+
+    const nowMs = nowInstant().epochMilliseconds;
+    if (!directoryReadIsDue({ nowMs, reportedThroughDay: previous.reportedThroughDay })) {
+      return { events: [], directory: previous };
+    }
+    const held = (): { events: NormalizedPullEvent[]; directory: DayPosition } => ({
+      events: [],
+      directory: nextDirectoryCursor({ nowMs, previous, outcome: "held" }),
+    });
+
+    try {
+      const token = await HttpCopilotStudioDataverseChannel.resolveEnvironmentToken({
+        credentials: options.credentials,
+        environmentUrl: config.environmentUrl,
+        scope: MICROSOFT_GRAPH_SCOPE,
+        signal: options.signal,
+        http: this.http,
+      });
+      const users = await this.fetchDirectoryUsers({ token, options });
+      if (users === null) return held();
+      return {
+        events: microsoftDirectoryEvents({ users, day: seatsReportDay({ nowMs }) }),
+        directory: nextDirectoryCursor({ nowMs, previous, outcome: "reported" }),
+      };
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        "copilot studio dataverse: could not read the tenant's directory; holding the day and delivering the conversations",
+      );
+      return held();
+    }
+  }
+
+  /** The whole user list across Graph's pages, or null: half a directory would list half the tenant. */
+  private async fetchDirectoryUsers(params: {
+    token: string;
+    options: PullRunOptions;
+  }): Promise<DirectoryUser[] | null> {
+    const { token, options } = params;
+    const users: DirectoryUser[] = [];
+    let unreadableRows = 0;
+    let url: string = DIRECTORY_USERS_FIRST_PAGE;
+
+    for (let page = 0; page < MAX_DIRECTORY_PAGES; page += 1) {
+      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const response = await this.http.fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
+        followRedirects: false,
+      });
+      if (!response.ok) {
+        logger.warn(
+          { status: response.status },
+          response.status === 403
+            ? "copilot studio dataverse: the tenant has not consented to the directory read (HTTP 403); holding the day"
+            : "copilot studio dataverse: Microsoft Graph refused the directory read; holding the day",
+        );
+        return null;
+      }
+      const read = readDirectoryUserRows({ response: await response.json() });
+      if (read.malformed) {
+        logger.warn(
+          "copilot studio dataverse: Microsoft Graph answered the directory read with an unrecognised body; holding the day",
+        );
+        return null;
+      }
+      users.push(...read.users);
+      unreadableRows += read.unreadableRows;
+
+      if (read.nextLink === null) {
+        return HttpCopilotStudioDataverseChannel.completeDirectoryList({ users, unreadableRows });
+      }
+      if (!isMicrosoftGraphUrl(read.nextLink)) {
+        logger.error(
+          { refusedHost: HttpCopilotStudioDataverseChannel.hostOf(read.nextLink) },
+          "copilot studio dataverse: refusing a directory next-page link that is not Microsoft Graph; holding the day",
+        );
+        return null;
+      }
+      url = read.nextLink;
+    }
+
+    logger.error(
+      { pagesRead: MAX_DIRECTORY_PAGES, usersRead: users.length },
+      "copilot studio dataverse: the directory did not fit the page budget; holding the day",
+    );
+    return null;
+  }
+
+  private static completeDirectoryList({
+    users,
+    unreadableRows,
+  }: {
+    users: DirectoryUser[];
+    unreadableRows: number;
+  }): DirectoryUser[] | null {
+    if (users.length === 0 && unreadableRows > 0) {
+      logger.warn(
+        { unreadableRows },
+        "copilot studio dataverse: no directory row in Microsoft Graph's reply could be read; holding the day",
+      );
+      return null;
+    }
+    if (unreadableRows > 0) {
+      logger.warn(
+        { unreadableRows },
+        "copilot studio dataverse: some directory rows could not be read; the rest of the list is recorded",
+      );
+    }
+    return users;
   }
 
   /**
@@ -296,20 +757,24 @@ export class HttpCopilotStudioDataverseChannel
     config: CopilotStudioDataverseConfig;
     token: string;
     bots: Map<string, BotRecord>;
+    cursor: Cursor | null;
   }): Promise<void> {
-    const { walk, options, config, token, bots } = params;
+    const { walk, options, config, token, bots, cursor } = params;
 
     let url: string | null = HttpCopilotStudioDataverseChannel.buildFirstPageUrl({
       environmentUrl: config.environmentUrl,
       config,
-      cursor: HttpCopilotStudioDataverseChannel.parseCursor(options.cursor),
+      cursor,
       now: nowInstant().epochMilliseconds,
     });
     let pageCount = 0;
 
     while (url && pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (HttpCopilotStudioDataverseChannel.runIsOver(options)) break;
+      if (HttpCopilotStudioDataverseChannel.runIsOver(options)) {
+        walk.isTruncated = true;
+        break;
+      }
 
       const page = await this.fetchPage({ url, token, signal: options.signal });
       HttpCopilotStudioDataverseChannel.readPageRows({ page, walk, bots });
@@ -328,6 +793,7 @@ export class HttpCopilotStudioDataverseChannel
     }
 
     if (url && pageCount >= MAX_PAGES_PER_RUN) {
+      walk.isTruncated = true;
       logger.warn(
         { pageCount },
         "copilot studio dataverse hit the page cap; the next run resumes from the cursor",
@@ -419,7 +885,10 @@ export class HttpCopilotStudioDataverseChannel
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await this.http.fetch(url, {
       method: "GET",
-      headers: HttpCopilotStudioDataverseChannel.dataverseHeaders(token),
+      headers: {
+        ...HttpCopilotStudioDataverseChannel.dataverseHeaders(token),
+        Prefer: `odata.maxpagesize=${PAGE_SIZE}`,
+      },
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // The header above carries the token minted from the customer's secret.
       // The helper follows up to ten redirects by default and re-sends
@@ -435,16 +904,76 @@ export class HttpCopilotStudioDataverseChannel
     return odataPageSchema.parse(await response.json());
   }
 
-  private static parseCursor(raw: string | null): Cursor | null {
-    if (!raw) return null;
+  private static parseCursor(raw: string | null): StoredCursor {
+    if (!raw) return NO_CURSOR;
     try {
-      const parsed = cursorSchema.safeParse(JSON.parse(raw));
-      if (parsed.success) return parsed.data;
+      const parsed = storedCursorSchema.safeParse(JSON.parse(raw));
+      if (!parsed.success) return NO_CURSOR;
+      const data = parsed.data;
+      return {
+        transcript:
+          data.createdon && data.conversationtranscriptid
+            ? { createdon: data.createdon, conversationtranscriptid: data.conversationtranscriptid }
+            : null,
+        cost: {
+          pricedThroughDay: data.costPricedThroughDay ?? null,
+          heldSinceMs: data.costHeldSinceMs ?? null,
+          readAtMs: data.costReadAtMs ?? null,
+          deepReadDay: data.costDeepReadDay ?? null,
+        },
+        seats: {
+          reportedThroughDay: data.seatsReportedThroughDay ?? null,
+          heldSinceMs: data.seatsHeldSinceMs ?? null,
+        },
+        directory: {
+          reportedThroughDay: data.directoryReportedThroughDay ?? null,
+          heldSinceMs: data.directoryHeldSinceMs ?? null,
+        },
+      };
     } catch {
-      // A cursor we cannot read is treated as no cursor: re-reading a window is
-      // survivable because identifiers are derived, but skipping one is not.
+      // Unreadable reads as no cursor: re-reading a window is survivable, skipping one is not.
     }
-    return null;
+    return NO_CURSOR;
+  }
+
+  private static positionMoved({
+    previous,
+    next,
+  }: {
+    previous: StoredCursor;
+    next: StoredCursor;
+  }): boolean {
+    const transcriptMoved =
+      next.transcript !== null &&
+      (next.transcript.createdon !== previous.transcript?.createdon ||
+        next.transcript.conversationtranscriptid !== previous.transcript?.conversationtranscriptid);
+    const costMoved =
+      next.cost.pricedThroughDay !== previous.cost.pricedThroughDay ||
+      next.cost.heldSinceMs !== previous.cost.heldSinceMs ||
+      next.cost.readAtMs !== previous.cost.readAtMs ||
+      next.cost.deepReadDay !== previous.cost.deepReadDay;
+    const dayMoved = (a: DayPosition, b: DayPosition) =>
+      a.reportedThroughDay !== b.reportedThroughDay || a.heldSinceMs !== b.heldSinceMs;
+    return (
+      transcriptMoved ||
+      costMoved ||
+      dayMoved(next.seats, previous.seats) ||
+      dayMoved(next.directory, previous.directory)
+    );
+  }
+
+  private static encodeCursor(cursor: StoredCursor): string {
+    return JSON.stringify({
+      ...cursor.transcript,
+      costPricedThroughDay: cursor.cost.pricedThroughDay,
+      costHeldSinceMs: cursor.cost.heldSinceMs,
+      costReadAtMs: cursor.cost.readAtMs,
+      costDeepReadDay: cursor.cost.deepReadDay,
+      seatsReportedThroughDay: cursor.seats.reportedThroughDay,
+      seatsHeldSinceMs: cursor.seats.heldSinceMs,
+      directoryReportedThroughDay: cursor.directory.reportedThroughDay,
+      directoryHeldSinceMs: cursor.directory.heldSinceMs,
+    });
   }
 
   /**
@@ -458,10 +987,12 @@ export class HttpCopilotStudioDataverseChannel
   private static async resolveEnvironmentToken(params: {
     credentials: Record<string, string> | undefined;
     environmentUrl: string;
+    scope?: string;
     signal?: AbortSignal;
     http: GovernanceHttpClient;
   }): Promise<string> {
     const { credentials, environmentUrl, signal, http } = params;
+    const scope = params.scope ?? `${environmentUrl.replace(/\/+$/, "")}/.default`;
     const tenantId = credentials?.tenantId;
     const clientId = credentials?.clientId;
     const clientSecret = credentials?.clientSecret;
@@ -477,7 +1008,7 @@ export class HttpCopilotStudioDataverseChannel
       grant_type: "client_credentials",
       client_id: clientId,
       client_secret: clientSecret,
-      scope: `${environmentUrl.replace(/\/+$/, "")}/.default`,
+      scope,
     });
     const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
 

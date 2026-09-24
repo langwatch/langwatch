@@ -199,6 +199,8 @@ afterEach(() => {
 });
 
 async function runPull({
+  readSeats = true,
+  azureSubscriptionId,
   cursor = null,
 }: {
   readSeats?: boolean;
@@ -227,8 +229,9 @@ async function runPull({
       adapter: "copilot_studio_dataverse" as const,
       environmentUrl: ENVIRONMENT_URL,
       botIds: [],
-      readSeats: true,
+      readSeats,
       readDirectory: false,
+      ...(azureSubscriptionId === undefined ? {} : { azureSubscriptionId }),
     },
   );
 }

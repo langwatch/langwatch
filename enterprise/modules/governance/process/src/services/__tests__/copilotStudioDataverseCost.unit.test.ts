@@ -163,8 +163,18 @@ async function runPull({
 }) {
   const { HttpCopilotStudioDataverseChannel } =
     await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
+  const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
   const adapter = HttpCopilotStudioDataverseChannel.create({
-    fetch: async (url, init) => globalThis.fetch(url, init),
+    async fetch(url, init) {
+      const response = await ssrfSafeFetch(url, init);
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: "",
+        json: () => response.json(),
+        text: () => response.text(),
+      };
+    },
   });
   return adapter.runOnce(
     { cursor, credentials },
