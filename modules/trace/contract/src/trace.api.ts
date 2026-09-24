@@ -569,6 +569,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     evaluations: TraceQueryEvaluationRun[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean;
+  /** A trigger's legacy trace filters against one folded trace; evaluation fields fail closed. */
+  matchesTraceFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    foldState: TraceSummaryData;
+    events: DerivedTraceEvent[] | null;
+  }): boolean;
   readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
 }

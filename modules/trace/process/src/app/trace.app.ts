@@ -156,6 +156,8 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { traceToConversationTurn } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
+import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
+import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import type { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
@@ -657,6 +659,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   #readBounds: TraceReadBoundsService;
   #exportDownload: TraceExportDownloadService | null;
   #scenarioEventMedia: TraceScenarioEventMediaService;
+  #legacyFilterMatching: LegacyFilterMatchingService;
   #dependencies: TraceAppDependencies;
   #explorerEvals: TraceInstantEvalRunService | null;
   #sharedRead: TraceSharedReadService | null;
@@ -678,6 +681,9 @@ export class TraceApp implements TraceApi, CollectorApp {
       : null;
     this.#contentReader = ConcreteTraceContentReadService.create(dependencies.traces.read);
     this.#scenarioEventMedia = TraceScenarioEventMediaService.create(dependencies.storedObjects);
+    this.#legacyFilterMatching = LegacyFilterMatchingService.create({
+      preconditionTraceData: PreconditionTraceDataService.create(),
+    });
     this.#readBounds = TraceReadBoundsService.create({
       entitlement: dependencies.requestBounds,
       projects: dependencies.projects,
@@ -997,6 +1003,14 @@ export class TraceApp implements TraceApi, CollectorApp {
       events: input.events,
       spans: null,
     });
+  }
+
+  matchesTraceFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    foldState: TraceSummaryData;
+    events: DerivedTraceEvent[] | null;
+  }): boolean {
+    return this.#legacyFilterMatching.matchesTraceFilters(input);
   }
 
   async readTopicClusteringCounts(input: {

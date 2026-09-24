@@ -32,11 +32,17 @@ function recordingRuntime() {
     },
   });
   const runtime = {
-    register: (definition: { metadata: { name: string }; commands: { name: string }[] }) => {
+    register: (definition: {
+      metadata: { name: string };
+      commands: { definition: { name: string } }[];
+    }) => {
       registered.push(definition.metadata.name);
       return {
         commands: Object.fromEntries(
-          definition.commands.map((command) => [command.name, senderFor(command.name)]),
+          definition.commands.map(({ definition: command }) => [
+            command.name,
+            senderFor(command.name),
+          ]),
         ),
       };
     },

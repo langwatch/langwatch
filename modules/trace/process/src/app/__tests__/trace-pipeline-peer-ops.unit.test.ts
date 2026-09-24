@@ -164,6 +164,40 @@ describe("TraceApi operations the worker pipelines call", () => {
     });
   });
 
+  describe("matchesTraceFilters()", () => {
+    const match = (filters: Record<string, unknown>) =>
+      createTraceApp().matchesTraceFilters({ filters, foldState: summary, events: null });
+
+    it("matches a folded trace the trigger's trace filters select", () => {
+      expect(match({ "topics.topics": ["t1"] })).toBe(true);
+    });
+
+    it("does not match a folded trace the trigger's trace filters exclude", () => {
+      expect(match({ "topics.topics": ["t2"] })).toBe(false);
+    });
+
+    it("fails closed on an evaluation filter it cannot answer from the trace", () => {
+      expect(match({ "evaluations.passed": { "evaluator-1": ["true"] } })).toBe(false);
+    });
+
+    it("matches an event metric range from the derived events", () => {
+      expect(
+        createTraceApp().matchesTraceFilters({
+          filters: { "events.metrics.value": { thumbs: { vote: ["1", "1"] } } },
+          foldState: summary,
+          events: [
+            {
+              spanId: "span-1",
+              timestamp: 0,
+              name: "thumbs",
+              attributes: { "event.metrics.vote": "1" },
+            },
+          ],
+        }),
+      ).toBe(true);
+    });
+  });
+
   describe("readTopicClusteringCounts()", () => {
     it("reads the counts from trace's own summaries", async () => {
       const app = createTraceApp({

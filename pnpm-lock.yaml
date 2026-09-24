@@ -2396,6 +2396,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../modules/project/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -2475,6 +2478,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../modules/project/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -12902,6 +12908,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
         version: 3.1108.0
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
