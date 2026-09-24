@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   redactSpanContent,
   redactTraceContent,
@@ -12,11 +13,13 @@ import {
 } from "~/server/data-privacy/dropKeyCatalog";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
+  chatMessageSchema,
+  chatRichContentSchema,
   type Event,
-  SPAN_IO_SHAPE_LITERALS,
   type Span,
   type SpanInputOutput,
   type SpanMetrics,
+  spanInputOutputSchema,
   type Trace,
   type TraceInput,
   type TraceOutput,
@@ -67,6 +70,35 @@ export function collectDroppedCategories(spans: Span[] | undefined): string[] {
     ...[...found].filter((category) => !DROP_CATEGORY_ORDER.includes(category)),
   ];
 }
+
+/** The string literal each union member pins its `type` key to, if any. */
+function typeLiteralsOf(options: readonly z.ZodTypeAny[]): string[] {
+  return options.flatMap((option) => {
+    if (!(option instanceof z.ZodObject)) return [];
+    const type: unknown = option.shape.type;
+    return type instanceof z.ZodLiteral && typeof type.value === "string"
+      ? [type.value]
+      : [];
+  });
+}
+
+/**
+ * Every literal a `role` or `type` key takes in the span input/output shapes:
+ * the chat roles, the content-part types and the typed-value types, read off
+ * the schemas so a new shape is covered the day it is added. They describe a
+ * message's shape, not what anyone wrote.
+ */
+const SPAN_IO_SHAPE_LITERALS: ReadonlySet<string> = new Set([
+  ...chatMessageSchema.shape.role.unwrap().options.map((role) => role.value),
+  ...typeLiteralsOf(chatRichContentSchema.options),
+  ...typeLiteralsOf(
+    (
+      spanInputOutputSchema as unknown as z.ZodLazy<
+        z.ZodUnion<[z.ZodTypeAny, ...z.ZodTypeAny[]]>
+      >
+    ).schema.options,
+  ),
+]);
 
 /**
  * Keys whose shape-describing values (`SPAN_IO_SHAPE_LITERALS`: "user",

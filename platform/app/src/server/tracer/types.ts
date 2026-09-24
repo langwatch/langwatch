@@ -300,35 +300,6 @@ export const spanInputOutputSchema: z.ZodType<SpanInputOutput> = z.lazy(() =>
   ]),
 );
 
-/** The string literal each union member pins its `type` key to, if any. */
-function typeLiteralsOf(options: readonly z.ZodTypeAny[]): string[] {
-  return options.flatMap((option) => {
-    if (!(option instanceof z.ZodObject)) return [];
-    const type: unknown = option.shape.type;
-    return type instanceof z.ZodLiteral && typeof type.value === "string"
-      ? [type.value]
-      : [];
-  });
-}
-
-/**
- * Every literal a `role` or `type` key takes in the span input/output shapes:
- * the chat roles, the content-part types and the typed-value types. They
- * describe a message's shape, not what anyone wrote, so read-time redaction
- * leaves them out of the strings it scrubs from other attributes.
- */
-export const SPAN_IO_SHAPE_LITERALS: ReadonlySet<string> = new Set([
-  ...chatRoleSchema.options.map((role) => role.value),
-  ...typeLiteralsOf(chatRichContentSchema.options),
-  ...typeLiteralsOf(
-    (
-      spanInputOutputSchema as unknown as z.ZodLazy<
-        z.ZodUnion<[z.ZodTypeAny, ...z.ZodTypeAny[]]>
-      >
-    ).schema.options,
-  ),
-]);
-
 export const errorCaptureSchema = z.object({
   has_error: z.literal(true),
   message: z.string(),
