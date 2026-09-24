@@ -71,12 +71,7 @@ describe("given the workbench action manifest", () => {
 
   it("gates writes on experiments:update, reads on experiments:view and runs on evaluations:create", () => {
     for (const [, definition] of entries) {
-      const expected =
-        definition.backend === "read"
-          ? "experiments:view"
-          : definition.backend === "run"
-            ? "evaluations:create"
-            : "experiments:update";
+      const expected = expectedPermission(definition.backend);
       expect(definition.requiredPermission).toBe(expected);
     }
   });
@@ -124,3 +119,9 @@ describe("given the workbench action manifest", () => {
     });
   });
 });
+
+function expectedPermission(backend: string): string {
+  if (backend === "read") return "experiments:view";
+  if (backend === "run") return "evaluations:create";
+  return "experiments:update";
+}

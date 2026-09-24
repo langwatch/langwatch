@@ -125,6 +125,18 @@ function Headline({ session }: { session: CodingAgentSessionDisplay }) {
   );
 }
 
+function signalToneColors(tone: SessionSignal["tone"]): {
+  border: string;
+  bg: string;
+  bar: string;
+} {
+  if (tone === "danger") return { border: "red.solid/30", bg: "red.solid/8", bar: "red.solid" };
+  if (tone === "warning") {
+    return { border: "yellow.solid/30", bg: "yellow.solid/8", bar: "yellow.solid" };
+  }
+  return { border: "border", bg: "bg.subtle", bar: "border.emphasized" };
+}
+
 function Signals({ signals }: { signals: SessionSignal[] }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -136,32 +148,14 @@ function Signals({ signals }: { signals: SessionSignal[] }) {
           padding={3}
           borderWidth="1px"
           borderRadius="md"
-          borderColor={
-            signal.tone === "danger"
-              ? "red.solid/30"
-              : signal.tone === "warning"
-                ? "yellow.solid/30"
-                : "border"
-          }
-          bg={
-            signal.tone === "danger"
-              ? "red.solid/8"
-              : signal.tone === "warning"
-                ? "yellow.solid/8"
-                : "bg.subtle"
-          }
+          borderColor={signalToneColors(signal.tone).border}
+          bg={signalToneColors(signal.tone).bg}
         >
           <Box
             width="3px"
             alignSelf="stretch"
             borderRadius="full"
-            bg={
-              signal.tone === "danger"
-                ? "red.solid"
-                : signal.tone === "warning"
-                  ? "yellow.solid"
-                  : "border.emphasized"
-            }
+            bg={signalToneColors(signal.tone).bar}
             flexShrink={0}
           />
           <VStack align="start" gap={0.5}>
@@ -333,16 +327,17 @@ function ToolTable({
  * reliability curve in contextHealth.ts, and cache misses plus the worst
  * rebuild turn a raw "context rebuilt" number into a concrete story.
  */
+function cacheRebuildTone(cacheRebuildCount: number): ContextHealthTone {
+  if (cacheRebuildCount === 0) return "success";
+  if (cacheRebuildCount <= 2) return "warning";
+  return "danger";
+}
+
 function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
   const ceiling = contextWindowCeiling(session.models);
   const ratio = session.peakContextTokens / ceiling;
   const band = contextHealthBand(ratio);
-  const rebuildTone: ContextHealthTone =
-    session.cacheRebuildCount === 0
-      ? "success"
-      : session.cacheRebuildCount <= 2
-        ? "warning"
-        : "danger";
+  const rebuildTone = cacheRebuildTone(session.cacheRebuildCount);
 
   return (
     <Section title="Cache health">

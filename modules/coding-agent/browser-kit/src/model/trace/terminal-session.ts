@@ -87,12 +87,9 @@ export function extractDiffFromToolInput(input: unknown): {
 } | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
   const obj = input as Record<string, unknown>;
-  const filePath =
-    typeof obj.file_path === "string"
-      ? obj.file_path
-      : typeof obj.path === "string"
-        ? obj.path
-        : undefined;
+  const filePath = [obj.file_path, obj.path].find(
+    (candidate): candidate is string => typeof candidate === "string",
+  );
 
   const oldString = typeof obj.old_string === "string" ? obj.old_string : null;
   const newString = typeof obj.new_string === "string" ? obj.new_string : null;
@@ -102,11 +99,9 @@ export function extractDiffFromToolInput(input: unknown): {
 
   // Write / create: whole file content is one big addition.
   const content =
-    typeof obj.content === "string"
-      ? obj.content
-      : typeof obj.file_text === "string"
-        ? obj.file_text
-        : null;
+    [obj.content, obj.file_text].find(
+      (candidate): candidate is string => typeof candidate === "string",
+    ) ?? null;
   if (content != null) {
     return { oldText: "", newText: content, filePath };
   }

@@ -193,6 +193,49 @@ const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
   return result;
 };
 
+function projectOptionsForSource({
+  source,
+  spans,
+  metadata,
+  evaluations,
+  events,
+}: {
+  source: string;
+  spans: KeyOption[];
+  metadata: KeyOption[];
+  evaluations: KeyOption[];
+  events: KeyOption[];
+}): KeyOption[] {
+  if (source === "spans") return spans;
+  if (source === "metadata") return metadata;
+  if (source === "evaluations") return evaluations;
+  if (source === "events") return events;
+  return [];
+}
+
+function subkeyOptions({
+  source,
+  key,
+  defaultSpanSubkeys,
+  computeSubkeys,
+}: {
+  source: string;
+  key: string | undefined;
+  defaultSpanSubkeys: KeyOption[];
+  computeSubkeys: (k: string) => KeyOption[];
+}): KeyOption[] {
+  // Spans always expose the same subfields, for any span name — including
+  // project-wide names not on the loaded trace, where discovery is empty.
+  if (source === "spans") {
+    return dedupeKeyOptions([...defaultSpanSubkeys, ...(key ? computeSubkeys(key) : [])]);
+  }
+  // Evaluations always expose the same result subfields, likewise.
+  if (source === "evaluations" && key) {
+    return dedupeKeyOptions([...DEFAULT_EVALUATION_SUBKEYS, ...computeSubkeys(key)]);
+  }
+  return computeSubkeys(key!);
+}
+
 export const TracesMapping = ({
   titles,
   traces,
@@ -342,16 +385,13 @@ export const TracesMapping = ({
   // selected for mapping.
   const mergeProjectKeyOptions = useCallback(
     (source: string, baseOptions: KeyOption[]): KeyOption[] => {
-      const projectOptions =
-        source === "spans"
-          ? projectSpanNames
-          : source === "metadata"
-            ? projectMetadataKeys
-            : source === "evaluations"
-              ? projectEvaluationNames
-              : source === "events"
-                ? projectEventTypes
-                : [];
+      const projectOptions = projectOptionsForSource({
+        source,
+        spans: projectSpanNames,
+        metadata: projectMetadataKeys,
+        evaluations: projectEvaluationNames,
+        events: projectEventTypes,
+      });
       if (projectOptions.length === 0) {
         return baseOptions;
       }
@@ -617,18 +657,7 @@ export const TracesMapping = ({
           "subkeys" in traceMappingDefinition &&
           source !== "threads" &&
           source !== "threads_until_current"
-            ? source === "spans"
-              ? // Spans always expose the same subfields. Offer them for any
-                // span name — including project-wide names that aren't on the
-                // loaded trace, where subkey discovery would otherwise be empty.
-                dedupeKeyOptions([...defaultSpanSubkeys, ...(key ? computeSubkeys(key) : [])])
-              : source === "evaluations" && key
-                ? // Evaluations always expose the same result subfields. Offer
-                  // them for any selected evaluator — including project-wide
-                  // ones not on the loaded trace, where subkey discovery would
-                  // otherwise be empty.
-                  dedupeKeyOptions([...DEFAULT_EVALUATION_SUBKEYS, ...computeSubkeys(key)])
-                : computeSubkeys(key!)
+            ? subkeyOptions({ source, key, defaultSpanSubkeys, computeSubkeys })
             : undefined;
 
         // The key dropdown waits on whichever project-wide list feeds it:
@@ -683,7 +712,7 @@ export const TracesMapping = ({
                         ]);
                       }}
                     >
-                      <option value=""></option>
+                      <option value="" aria-label="None"></option>
                       {Object.entries(dsl.sourceOptions).map(([key, { label, fields }]) => {
                         const options = fields.map((field) => (
                           <option key={field} value={`${key}.outputs.${field}`}>
@@ -749,7 +778,7 @@ export const TracesMapping = ({
                         }}
                         value={source}
                       >
-                        <option value=""></option>
+                        <option value="" aria-label="None"></option>
                         <optgroup label="Current Trace">
                           {[
                             ...SERVER_ONLY_TRACE_SOURCES,

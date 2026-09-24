@@ -95,7 +95,7 @@ const mapThreadToDatasetEntry = (
       // If source is traces and selectedFields are specified, filter the trace objects
       if (source === "traces" && selectedFields && selectedFields.length > 0) {
         const filteredTraces = (thread.traces ?? []).map((trace) => {
-          const filteredTrace: Record<string, any> = {};
+          const filteredTrace: Record<string, unknown> = {};
           for (const field of selectedFields) {
             const traceMapping = TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
             if (traceMapping) {
@@ -319,7 +319,7 @@ export const ThreadMapping = ({
                           ]);
                         }}
                       >
-                        <option value=""></option>
+                        <option value="" aria-label="None"></option>
                         {Object.entries(dsl.sourceOptions).map(([key, { label, fields }]) => {
                           const options = fields.map((field) => (
                             <option key={field} value={`${key}.outputs.${field}`}>
@@ -371,7 +371,7 @@ export const ThreadMapping = ({
                       }}
                       value={source}
                     >
-                      <option value=""></option>
+                      <option value="" aria-label="None"></option>
                       {[...SERVER_ONLY_THREAD_SOURCES, ...Object.keys(THREAD_MAPPINGS)].map(
                         (key) => (
                           <option key={key} value={key}>

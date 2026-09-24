@@ -64,30 +64,30 @@ export function normalizeFilterValue(value: FilterParam | undefined): FilterPara
   }
 
   // Record<string, string[] | Record<string, string[]>>
-  const entries = Object.entries(value)
-    .map(([k, v]) => {
-      if (Array.isArray(v)) {
-        if (v.length === 0) return null;
-        return [k, [...v].toSorted((a, b) => (a < b ? -1 : Number(a > b)))] as const;
-      }
-      // Nested record
-      const innerEntries = Object.entries(v as Record<string, string[]>)
-        .map(([ik, iv]) => {
-          if (Array.isArray(iv) && iv.length === 0) return null;
-          return [ik, Array.isArray(iv) ? [...iv].toSorted() : iv] as const;
-        })
-        .filter(Boolean) as [string, string[]][];
-
-      if (innerEntries.length === 0) return null;
-      return [
-        k,
-        Object.fromEntries(innerEntries.toSorted(([a], [b]) => a.localeCompare(b))),
-      ] as const;
-    })
-    .filter(Boolean) as [string, FilterParam][];
+  const entries = Object.entries(value).flatMap(([k, v]) => normalizeFilterEntry(k, v));
 
   if (entries.length === 0) return undefined;
   return Object.fromEntries(entries.toSorted(([a], [b]) => a.localeCompare(b))) as FilterParam;
+}
+
+function normalizeFilterEntry(
+  key: string,
+  entryValue: string[] | Record<string, string[]>,
+): [string, FilterParam][] {
+  if (Array.isArray(entryValue)) {
+    if (entryValue.length === 0) return [];
+    return [[key, [...entryValue].toSorted((a, b) => (a < b ? -1 : Number(a > b)))]];
+  }
+  const innerEntries = normalizeNestedFilterEntries(entryValue);
+  if (innerEntries.length === 0) return [];
+  return [[key, Object.fromEntries(innerEntries.toSorted(([a], [b]) => a.localeCompare(b)))]];
+}
+
+function normalizeNestedFilterEntries(record: Record<string, string[]>): [string, string[]][] {
+  return Object.entries(record).flatMap(([innerKey, innerValue]): [string, string[]][] => {
+    if (Array.isArray(innerValue) && innerValue.length === 0) return [];
+    return [[innerKey, Array.isArray(innerValue) ? [...innerValue].toSorted() : innerValue]];
+  });
 }
 
 /**
