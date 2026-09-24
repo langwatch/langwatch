@@ -5687,6 +5687,9 @@ importers:
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

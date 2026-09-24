@@ -25,6 +25,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../evaluation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/eventing/tsconfig.build.json"
     },
     {
