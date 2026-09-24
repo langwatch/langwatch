@@ -392,7 +392,8 @@ Feature: Instant Evals inside the Trace Explorer
       Given the flag read has not answered yet
       When the user submits an eval chip
       Then the estimate is requested
-      And no popover opens
+      And no popover opens before the estimate responds
+      And a server refusal of not_enabled then opens the model popover, never the contact-us one
 
     @integration
     Scenario: Any other refusal falls back to the phrase search
