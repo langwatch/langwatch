@@ -10,7 +10,6 @@ function build(rows: Record<string, unknown>[]) {
   const query = vi.fn(async (_input: { query: string }) => ({ json: async () => rows }));
   const repository = EvaluationRunClickHouseReadRepository.create({
     resolveClient: async () => ({ query }) as never,
-    retentionFloor: { getFloorMs: async () => 0 },
   });
   return { repository, query };
 }

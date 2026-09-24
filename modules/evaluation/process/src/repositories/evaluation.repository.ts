@@ -9,6 +9,12 @@ import type {
   TraceEvaluationsQuery,
 } from "@langwatch/evaluation-contract";
 
+import type { EvaluationRetentionFloor } from "../app/evaluation.members.ts";
+
+/** A run lookup with the floor its unbounded fallback will not read below. */
+export type EvaluationRunFloorLookup = EvaluationRunLookup &
+  Readonly<{ retentionFloor: EvaluationRetentionFloor }>;
+
 /** Private persistence port for the Evaluation server package. */
 export abstract class EvaluationRunRepository {
   abstract upsert(input: {
@@ -20,7 +26,7 @@ export abstract class EvaluationRunRepository {
     input: { data: EvaluationRunData; tenantId: string; retentionDays?: number }[],
   ): Promise<void>;
   /** Throws `EvaluationNotFoundError` when the tenant holds no such run. */
-  abstract getByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
+  abstract getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData>;
   abstract findByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
   abstract findSummariesByTraceIds(
     input: EvaluationSummariesByTraceIdsQuery,

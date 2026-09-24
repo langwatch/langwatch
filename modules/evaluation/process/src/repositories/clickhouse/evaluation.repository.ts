@@ -1,7 +1,6 @@
 import type {
   EvaluationInputsQuery,
   EvaluationRunData,
-  EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
   EvaluationSummariesByTraceIdsQuery,
   EvaluationSummary,
@@ -9,8 +8,10 @@ import type {
   TraceEvaluationsQuery,
 } from "@langwatch/evaluation-contract";
 
-import type { EvaluationRetentionFloor } from "../../app/evaluation.members.ts";
-import { EvaluationRunRepository } from "../evaluation.repository.ts";
+import {
+  EvaluationRunRepository,
+  type EvaluationRunFloorLookup,
+} from "../evaluation.repository.ts";
 import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
 import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository.ts";
 import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository.ts";
@@ -19,7 +20,6 @@ import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.r
 export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   static create(options: {
     resolveClient: EvaluationClickHouseResolver;
-    retentionFloor: EvaluationRetentionFloor;
   }): ClickHouseEvaluationRepository {
     return new ClickHouseEvaluationRepository(options);
   }
@@ -27,10 +27,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
   private readonly reader: EvaluationRunClickHouseReadRepository;
   private readonly writer: EvaluationRunClickHouseWriteRepository;
 
-  private constructor(options: {
-    resolveClient: EvaluationClickHouseResolver;
-    retentionFloor: EvaluationRetentionFloor;
-  }) {
+  private constructor(options: { resolveClient: EvaluationClickHouseResolver }) {
     super();
     this.reader = EvaluationRunClickHouseReadRepository.create(options);
     this.writer = EvaluationRunClickHouseWriteRepository.create(options);
@@ -54,7 +51,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     return this.writer.upsertBatch(input);
   }
 
-  getByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
+  getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
     return this.reader.getByEvaluationId(input);
   }
 

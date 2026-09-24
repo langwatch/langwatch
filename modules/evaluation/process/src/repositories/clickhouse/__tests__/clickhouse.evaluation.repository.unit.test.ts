@@ -107,7 +107,6 @@ function harness(rows: Record<string, unknown>[][] = []): {
     floor,
     repository: ClickHouseEvaluationRepository.create({
       resolveClient: async () => client,
-      retentionFloor: floor,
     }),
   };
 }
@@ -155,6 +154,7 @@ describe("ClickHouseEvaluationRepository", () => {
       repository.getByEvaluationId({
         tenantId: "org_1",
         evaluationId: "evaluation_1",
+        retentionFloor: floor,
       }),
     ).resolves.toMatchObject({ LastEventOccurredAt: 1_700_000_001_000 });
     expect(floor.getFloorMs).toHaveBeenCalledWith({
@@ -172,10 +172,14 @@ describe("ClickHouseEvaluationRepository", () => {
     vi.setSystemTime(new Date("2026-08-03T12:00:00Z"));
     try {
       const scheduledAtMs = Date.now() - 60_000;
-      const { client, repository } = harness([[{ scheduledAtMs }], []]);
+      const { client, floor, repository } = harness([[{ scheduledAtMs }], []]);
 
       await expect(
-        repository.getByEvaluationId({ tenantId: "org_1", evaluationId: "evaluation_1" }),
+        repository.getByEvaluationId({
+          tenantId: "org_1",
+          evaluationId: "evaluation_1",
+          retentionFloor: floor,
+        }),
       ).rejects.toMatchObject({ code: "evaluation_not_found" });
 
       const resolverQueries = client.queries.filter((query) =>
@@ -204,7 +208,11 @@ describe("ClickHouseEvaluationRepository", () => {
       floor.getFloorMs.mockResolvedValueOnce(1_500_000_000_000);
 
       await expect(
-        repository.getByEvaluationId({ tenantId: "org_1", evaluationId: "missing" }),
+        repository.getByEvaluationId({
+          tenantId: "org_1",
+          evaluationId: "missing",
+          retentionFloor: floor,
+        }),
       ).rejects.toMatchObject({ code: "evaluation_not_found" });
 
       const resolverRequests = client.queries
@@ -287,9 +295,6 @@ describe("ClickHouseEvaluationRepository", () => {
     const unavailable = ClickHouseEvaluationRepository.create({
       resolveClient: async () => {
         throw new Error("ClickHouse unavailable");
-      },
-      retentionFloor: {
-        getFloorMs: async () => 1_600_000_000_000,
       },
     });
     await expect(

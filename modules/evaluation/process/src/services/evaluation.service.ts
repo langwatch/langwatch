@@ -21,7 +21,11 @@ import {
 } from "@langwatch/evaluation-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type { EvaluationExecution, EvaluationInputsResolution } from "../app/evaluation.members.ts";
+import type {
+  EvaluationExecution,
+  EvaluationInputsResolution,
+  EvaluationRetentionFloor,
+} from "../app/evaluation.members.ts";
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 import type { MonitorPerformanceRepository } from "../repositories/monitor-performance.repository.ts";
 import { MonitorPerformanceService } from "./monitor-performance.service.ts";
@@ -29,6 +33,7 @@ import { MonitorPerformanceService } from "./monitor-performance.service.ts";
 export type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;
   monitorPerformance: MonitorPerformanceRepository;
+  retentionFloor: EvaluationRetentionFloor;
   execution: EvaluationExecution;
   inputResolution: EvaluationInputsResolution;
   workflows: WorkflowApi;
@@ -85,7 +90,10 @@ export class EvaluationService {
   }
 
   async getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
-    return this.options.repository.getByEvaluationId(evaluationRunLookupSchema.parse(input));
+    return this.options.repository.getByEvaluationId({
+      ...evaluationRunLookupSchema.parse(input),
+      retentionFloor: this.options.retentionFloor,
+    });
   }
 
   async findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {

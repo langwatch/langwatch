@@ -81,7 +81,6 @@ export type EvaluationClickHouseAccess = Readonly<{
 export function createEvaluationRunReads(access: EvaluationClickHouseAccess): EvaluationRunReads {
   return ClickHouseEvaluationRepository.create({
     resolveClient: access.resolveClient,
-    retentionFloor: access.retentionFloor,
   });
 }
 
@@ -111,6 +110,7 @@ export function createEvaluationEventingStores(
   return EvaluationEventingAdapter.create({
     evaluation: EvaluationRunProjectionService.create({
       repository: createEvaluationRunReads(input),
+      retentionFloor: input.retentionFloor,
     }),
     analytics: input.analytics,
     attributePolicy: input.attributePolicy,

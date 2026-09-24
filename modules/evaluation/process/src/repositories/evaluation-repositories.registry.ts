@@ -1,9 +1,9 @@
 import { defineRepositories } from "@langwatch/kernel";
 
+import { LiveEvaluationRepositories } from "./live/live.evaluation.repositories.ts";
 import { MemoryEvaluationRepositories } from "./memory/memory.evaluation.repositories.ts";
-import { PostgresEvaluationRepositories } from "./prisma/prisma.evaluation.repositories.ts";
 
 export const evaluationRepositories = defineRepositories({
-  live: PostgresEvaluationRepositories,
+  live: LiveEvaluationRepositories,
   memory: MemoryEvaluationRepositories,
 });

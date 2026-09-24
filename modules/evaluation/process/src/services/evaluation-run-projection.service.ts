@@ -8,6 +8,7 @@ import {
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
 
+import type { EvaluationRetentionFloor } from "../app/evaluation.members.ts";
 import { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
 import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
@@ -16,11 +17,17 @@ import type { EvaluationRunRepository } from "../repositories/evaluation.reposit
  * for ClickHouse consistency.
  */
 export class EvaluationRunProjectionService extends EvaluationRunProjectionRepository {
-  static create(options: { repository: EvaluationRunRepository }): EvaluationRunProjectionService {
-    return new EvaluationRunProjectionService(options.repository);
+  static create(options: {
+    repository: EvaluationRunRepository;
+    retentionFloor: EvaluationRetentionFloor;
+  }): EvaluationRunProjectionService {
+    return new EvaluationRunProjectionService(options.repository, options.retentionFloor);
   }
 
-  private constructor(private readonly repository: EvaluationRunRepository) {
+  private constructor(
+    private readonly repository: EvaluationRunRepository,
+    private readonly retentionFloor: EvaluationRetentionFloor,
+  ) {
     super();
   }
 
@@ -46,7 +53,10 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionRepos
 
   async findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null> {
     try {
-      return await this.repository.getByEvaluationId(evaluationRunLookupSchema.parse(input));
+      return await this.repository.getByEvaluationId({
+        ...evaluationRunLookupSchema.parse(input),
+        retentionFloor: this.retentionFloor,
+      });
     } catch (error) {
       if (error instanceof EvaluationNotFoundError) return null;
       throw error;

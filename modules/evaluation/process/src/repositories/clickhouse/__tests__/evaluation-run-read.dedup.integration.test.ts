@@ -91,7 +91,6 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
     it("returns the latest version of the evaluation", async () => {
       const repository = EvaluationRunClickHouseReadRepository.create({
         resolveClient: async () => client as never,
-        retentionFloor: { getFloorMs: async () => 0 },
       });
 
       const result = await repository.findTraceEvaluations({
@@ -112,7 +111,6 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
     it("returns it through the by-trace read as well", async () => {
       const repository = EvaluationRunClickHouseReadRepository.create({
         resolveClient: async () => client as never,
-        retentionFloor: { getFloorMs: async () => 0 },
       });
 
       const result = await repository.findByTraceId({ tenantId: TENANT, traceId: TRACE_ID });

@@ -4,7 +4,6 @@ import {
   evaluationSummarySchema,
   traceEvaluationDataSchema,
   type EvaluationRunData,
-  type EvaluationRunLookup,
   type EvaluationSummary,
   type TraceEvaluationData,
 } from "@langwatch/evaluation-contract";
@@ -12,7 +11,8 @@ import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { EvaluationRetentionFloor } from "../../app/evaluation.members.ts";
+import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
+import type { EvaluationRunFloorLookup } from "../evaluation.repository.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseResolver,
@@ -21,7 +21,6 @@ import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repos
 
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
-const DEFAULT_SCHEDULED_AT_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
 /**
  * Load-bearing.
  */
@@ -81,7 +80,6 @@ function parseObject(value: string | null): Record<string, unknown> | null {
 export class EvaluationRunClickHouseReadRepository {
   static create(options: {
     resolveClient: EvaluationClickHouseResolver;
-    retentionFloor: EvaluationRetentionFloor;
   }): EvaluationRunClickHouseReadRepository {
     return new EvaluationRunClickHouseReadRepository(options);
   }
@@ -89,11 +87,10 @@ export class EvaluationRunClickHouseReadRepository {
   private constructor(
     private readonly options: {
       resolveClient: EvaluationClickHouseResolver;
-      retentionFloor: EvaluationRetentionFloor;
     },
   ) {}
 
-  async getByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData> {
+  async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
     validateTenant(input.tenantId, "EvaluationRunClickHouseReadRepository.getByEvaluationId");
     let row: ClickHouseEvaluationRunRecord | undefined;
     try {
@@ -400,7 +397,7 @@ export class EvaluationRunClickHouseReadRepository {
     return output;
   }
 
-  private async resolveScheduledAtRange(input: EvaluationRunLookup): Promise<{
+  private async resolveScheduledAtRange(input: EvaluationRunFloorLookup): Promise<{
     scheduledAtFrom: number;
     scheduledAtTo?: number;
   }> {
@@ -412,7 +409,7 @@ export class EvaluationRunClickHouseReadRepository {
       };
     }
 
-    const floorMs = await this.options.retentionFloor.getFloorMs({
+    const floorMs = await input.retentionFloor.getFloorMs({
       table: TABLE_NAME,
       tenantId: input.tenantId,
     });

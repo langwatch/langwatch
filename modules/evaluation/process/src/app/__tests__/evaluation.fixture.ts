@@ -17,7 +17,8 @@ import type {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../../app/evaluation.members.ts";
-import type { EvaluationClickHouseClient } from "../../repositories/clickhouse/evaluation-clickhouse-client.ts";
+import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
+import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
 import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 import type {
   EvaluationExecution,
@@ -111,10 +112,6 @@ class PassThroughInputsResolution implements EvaluationInputsResolution {
   }
 }
 
-function unreachableClickHouse(): Promise<EvaluationClickHouseClient> {
-  return Promise.reject(new Error("This test composed no ClickHouse connection."));
-}
-
 /**
  * The collaborators the public evaluation doors reach. A test that exercises a
  * door names the one it needs; every other one refuses by name rather than
@@ -159,7 +156,6 @@ export function createEvaluationTestInfrastructure(
   overrides: Partial<EvaluationInfrastructure> = {},
 ): EvaluationInfrastructure {
   return {
-    resolveClickHouse: unreachableClickHouse,
     retentionFloor: new UnreachableRetentionFloor(),
     execution: new UnreachableExecution(),
     inputResolution: new PassThroughInputsResolution(),
@@ -177,6 +173,7 @@ export function createEvaluationTestInfrastructure(
 export function createEvaluationTestApp(
   input: Readonly<{
     members?: Partial<EvaluationInfrastructure>;
+    repositories?: EvaluationRepositories;
     dependencies?: Partial<{
       workflows: WorkflowApi;
       traces: TraceApi;
@@ -186,6 +183,7 @@ export function createEvaluationTestApp(
 ): EvaluationApp {
   return EvaluationApp.fromInfrastructure({
     infrastructure: createEvaluationTestInfrastructure(input.members ?? {}),
+    repositories: input.repositories ?? MemoryEvaluationRepositories.create(),
     dependencies: {
       workflows: input.dependencies?.workflows ?? createApiFixture<WorkflowApi>(),
       traces: input.dependencies?.traces ?? createApiFixture<TraceApi>(),

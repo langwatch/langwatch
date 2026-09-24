@@ -40,9 +40,6 @@ import type {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../app/evaluation.members.ts";
-import type { EvaluationClickHouseResolver } from "../repositories/clickhouse/evaluation-clickhouse-client.ts";
-import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository.ts";
-import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import {
@@ -59,7 +56,6 @@ import type {
 } from "./evaluation.members.ts";
 
 export type EvaluationInfrastructure = Readonly<{
-  resolveClickHouse: EvaluationClickHouseResolver;
   retentionFloor: EvaluationRetentionFloor;
   execution: EvaluationExecution;
   inputResolution: EvaluationInputsResolution;
@@ -90,7 +86,6 @@ export function createUnavailableEvaluationInfrastructure(
   };
 
   return {
-    resolveClickHouse: async () => unavailable("evaluation ClickHouse resolver"),
     retentionFloor: { getFloorMs: async () => 0 },
     execution: { execute: async () => unavailable("evaluation executor") },
     inputResolution: { tryResolve: async (input) => input.inputs },
@@ -246,34 +241,30 @@ export class EvaluationApp implements EvaluationApiContract {
   }
 
   /**
-   * This process composes no evaluator runtime of its own, so `create` always
-   * builds the closed unavailable stub. {@link EvaluationApp.fromInfrastructure}
-   * is what a test composes a working double over instead.
+   * Run history and the monitor trend read the installed repositories; every
+   * other capability is still the closed stub until its port lands
+   * (`.claude/handoffs/port-evaluation-runtime.md`).
    */
-  static create({ dependencies }: EvaluationSetup): EvaluationApp {
+  static create({ dependencies, repositories }: EvaluationSetup): EvaluationApp {
     return EvaluationApp.fromInfrastructure({
       infrastructure: createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
       dependencies,
+      repositories,
     });
   }
 
   static fromInfrastructure(setup: {
     infrastructure: EvaluationInfrastructure;
     dependencies: EvaluationSetup["dependencies"];
+    repositories: Pick<EvaluationRepositories, "runs" | "monitorPerformance">;
   }): EvaluationApp {
-    const { infrastructure: members, dependencies } = setup;
-    const repository = ClickHouseEvaluationRepository.create({
-      resolveClient: members.resolveClickHouse,
-      retentionFloor: members.retentionFloor,
-    });
-    const monitorPerformance = ClickHouseMonitorPerformanceRepository.create({
-      resolveClient: members.resolveClickHouse,
-    });
+    const { infrastructure: members, dependencies, repositories } = setup;
 
     return new EvaluationApp(
       EvaluationService.create({
-        repository,
-        monitorPerformance,
+        repository: repositories.runs,
+        monitorPerformance: repositories.monitorPerformance,
+        retentionFloor: members.retentionFloor,
         execution: members.execution,
         inputResolution: members.inputResolution,
         workflows: dependencies.workflows,

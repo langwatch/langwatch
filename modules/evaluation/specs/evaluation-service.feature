@@ -84,3 +84,16 @@ Feature: Evaluation service boundary
     When the same run is recorded again
     Then the second write is refused rather than billing the project twice
     And a row belonging to another project is never read back for this one
+
+  @unit
+  Scenario: An installed evaluation module reads back the runs it wrote
+    Given a process that installs the evaluation module over its repositories
+    When a run is upserted for a trace
+    Then the run reads back by its id, by its trace and among the trace's evaluations
+    And a run the tenant never wrote is refused as not found
+
+  @unit
+  Scenario: The live tier reads run history through the process's routing ClickHouse
+    Given the live evaluation repositories over the process's ClickHouse member
+    When a run is looked up for a tenant
+    Then every statement names that tenant and carries only settings the member accepts

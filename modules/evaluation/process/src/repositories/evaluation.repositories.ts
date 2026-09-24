@@ -1,10 +1,13 @@
 import type { EvaluationCostRepository } from "./evaluation-cost.repository.ts";
+import type { EvaluationRunRepository } from "./evaluation.repository.ts";
+import type { MonitorPerformanceRepository } from "./monitor-performance.repository.ts";
 
 /**
- * The rows Evaluation owns in the relational store. The run history, the
- * analytics rollups and the monitor trend are ClickHouse reads and arrive
- * through members instead.
+ * The rows Evaluation owns: the cost ledger in Prisma, run history and the
+ * monitor trend in ClickHouse.
  */
 export interface EvaluationRepositories {
   readonly costs: EvaluationCostRepository;
+  readonly runs: EvaluationRunRepository;
+  readonly monitorPerformance: MonitorPerformanceRepository;
 }
