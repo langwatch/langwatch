@@ -205,7 +205,7 @@ One coordinator owns index and HEAD changes; pause overlapping writers before
 collecting or checkpointing. Recheck state if another actor changed it.
 
 Before integration, run that package's own check once yourself - the package
-suite and `pnpm typecheck:one <package>`. If the active merge blocks a check before it reaches this slice, record that
+suite and `pnpm --filter <package> typecheck`. If the active merge blocks a check before it reaches this slice, record that
 limitation and retain `partial` or `blocked` status. The lane reported its results; this is
 you confirming them on the tree as it now stands, which is not the same tree the
 lane saw if you have applied shared-file lines since. It is one command and it

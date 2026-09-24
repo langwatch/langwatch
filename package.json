@@ -62,7 +62,6 @@
     "test:affected": "nx affected -t test",
     "typecheck:all": "nx run-many -t typecheck",
     "typecheck:affected": "nx affected -t typecheck",
-    "typecheck:one": "node dev/nx/typecheck-one.mjs",
     "typecheck:sources": "node dev/nx/typecheck-one.mjs --no-tests",
     "build:affected": "nx affected -t build",
     "lint:affected": "nx affected -t lint"

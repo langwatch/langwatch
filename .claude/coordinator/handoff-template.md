@@ -58,7 +58,7 @@ If nothing is done, write `none`. That is a legitimate handoff.>
 <Command -> result, one per line. Only checks that actually ran.
 
   pnpm --filter @langwatch/trace-process test src/transport -> 24 passed
-  pnpm typecheck:one modules/trace/process -> clean
+  pnpm --filter @langwatch/trace-process typecheck -> clean
 
 A check you did not run is not listed. Do not write "should pass".>
 

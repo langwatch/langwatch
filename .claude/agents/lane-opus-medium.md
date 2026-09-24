@@ -53,7 +53,7 @@ These hold even if nothing else reached you:
 3. **No git writes.** No `git add`, `commit`, `stash`, `checkout`, `reset`,
    `restore`, `mv`, `push`. Plain shell `mv` is fine. Read commands are fine.
 4. **No whole-tree checks.** `tsc --noEmit --ignoreConfig <file>` while working;
-   `pnpm typecheck:one <package>` once at the end. Never `pnpm typecheck`,
+   `pnpm --filter <package> typecheck` once at the end. Never `pnpm typecheck`,
    `pnpm lint` or `pnpm format`.
 5. **Never read a `.env`, a `settings.local.json`, or any secret-bearing file.**
 

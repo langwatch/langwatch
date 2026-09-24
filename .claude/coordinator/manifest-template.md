@@ -81,7 +81,7 @@ skill reference and this section should link to it.>
 reports against.
 
   pnpm --filter @langwatch/trace-process test src/transport
-  pnpm typecheck:one modules/trace/process        (once, at the end)
+  pnpm --filter @langwatch/trace-process typecheck   (once, at the end)
 
 Follows `.claude/skills/core/testing-rules.md`. Never a whole-tree check.>
 
@@ -104,7 +104,7 @@ Add any task-specific ones here.>
   - the transport mount test passes
   - baseline rows trace|nested-transport and trace|legacy-transport-runtime can
     be dropped
-  - typecheck:one is clean for modules/trace/process
+  - `pnpm --filter @langwatch/trace-process typecheck` is clean
 
 If a criterion is not checkable, rewrite it until it is.>
 ```

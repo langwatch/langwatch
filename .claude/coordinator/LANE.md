@@ -63,7 +63,7 @@ The four that lanes break most often:
   is fine - it is `git mv` that is banned, because it stages. Read commands
   (`status`, `diff`, `grep`, `ls-files`, `show`) are always fine.
 - **No whole-tree checks.** `tsc --noEmit --ignoreConfig <file>` while working;
-  `pnpm typecheck:one <package>` once, at the end. Never `pnpm typecheck`,
+  `pnpm --filter <package> typecheck` once, at the end. Never `pnpm typecheck`,
   `pnpm lint` or `pnpm format`.
 - **Never run `oxfmt --write` on a computed list you have not looked at.** An
   empty expansion formats the WHOLE repository (2,681 files, 2026-09-22), and
