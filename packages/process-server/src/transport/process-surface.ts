@@ -1,3 +1,4 @@
+import type { WebSocketHost } from "@langwatch/api";
 import type { TransportSelection } from "@langwatch/api/hosting";
 import type { TransportPeers, ExposedSurface } from "@langwatch/kernel";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
@@ -15,6 +16,7 @@ export async function processSurface({
   secrets,
   selection,
   publicConfig,
+  sockets,
 }: {
   config: ApiHostConfig;
   production: boolean;
@@ -23,6 +25,7 @@ export async function processSurface({
   secrets: ScopedSecrets;
   selection: TransportSelection;
   publicConfig: Readonly<Record<string, unknown>>;
+  sockets: WebSocketHost;
 }): Promise<(peers: TransportPeers) => ExposedSurface<unknown, unknown>> {
   const bundle = resolveUiBundle({
     directory: config.bundleDirectory,
@@ -47,5 +50,6 @@ export async function processSurface({
     executionProxyBaseUrl,
     production,
     selection,
+    sockets,
   });
 }

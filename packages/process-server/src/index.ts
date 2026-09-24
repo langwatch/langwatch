@@ -16,6 +16,7 @@ export {
   type ServerContribution,
   type ServerLogger,
   type ServerOptions,
+  type UpgradeDoor,
 } from "./server.ts";
 export { processOwner } from "./owner.ts";
 export { observabilityOwner } from "./observability-owner.ts";

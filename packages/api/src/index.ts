@@ -29,7 +29,7 @@ export {
 
 export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
 export { ConnectUpgradeRouter } from "./ports.ts";
-export { WebSocketProtocol, type ProtocolConnection } from "./websocket.ts";
+export { WebSocketHost, WebSocketProtocol, type ProtocolConnection } from "./websocket.ts";
 
 export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
 

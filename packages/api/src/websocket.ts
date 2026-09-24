@@ -1,7 +1,10 @@
+import type { IncomingMessage } from "node:http";
+import type { Duplex } from "node:stream";
+
 import { WebSocket, WebSocketServer } from "ws";
 import type { z } from "zod";
 
-import type { ConnectUpgradeRouter } from "./ports.ts";
+import { ConnectUpgradeRouter, type UpgradeHandler } from "./ports.ts";
 
 export interface ProtocolConnection {
   readonly open: boolean;
@@ -89,6 +92,7 @@ class WebSocketConnection implements ProtocolConnection {
 
 /** Owns the upgrade and socket lifecycle; feature code receives only declared facts. */
 export class WebSocketProtocol<App, Facts extends z.ZodObject> {
+  readonly protocol = "websocket" as const;
   readonly #options;
   #server: WebSocketServer | null = null;
 
@@ -110,6 +114,11 @@ export class WebSocketProtocol<App, Facts extends z.ZodObject> {
     handle: (app: App, connection: ProtocolConnection, facts: z.output<Facts>) => Promise<void>;
   }) {
     this.#options = options;
+  }
+
+  /** The declaration as the installer reads a transport back. */
+  router(): this {
+    return this;
   }
 
   mount(router: ConnectUpgradeRouter, app: App): void {
@@ -161,5 +170,55 @@ export class WebSocketProtocol<App, Facts extends z.ZodObject> {
     for (const connection of server.clients) connection.terminate();
 
     await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
+/**
+ * The process's one upgrade listener, routed by path: every installed module's
+ * protocol mounts here, and an upgrade for any other path is answered 404.
+ */
+export class WebSocketHost extends ConnectUpgradeRouter {
+  readonly #handlers = new Map<string, UpgradeHandler>();
+  readonly #closers: (() => Promise<void>)[] = [];
+
+  static create(): WebSocketHost {
+    return new WebSocketHost();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  register(pathname: string, handler: UpgradeHandler): void {
+    if (this.#handlers.has(pathname))
+      throw new Error(`An upgrade handler is already registered for ${pathname}`);
+
+    this.#handlers.set(pathname, handler);
+  }
+
+  mount(declaration: object, app: () => unknown): void {
+    if (!(declaration instanceof WebSocketProtocol))
+      throw new TypeError("A websocket transport must be declared with WebSocketProtocol.create.");
+
+    declaration.mount(this, app());
+    this.#closers.push(() => declaration.close());
+  }
+
+  upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+    const handler = this.#handlers.get(pathname);
+
+    if (!handler) {
+      socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+
+      return;
+    }
+
+    handler(request, socket, head);
+  }
+
+  async close(): Promise<void> {
+    await Promise.all(this.#closers.map((close) => close()));
   }
 }

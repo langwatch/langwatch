@@ -5,6 +5,7 @@
 
 import { createServer } from "node:http";
 
+import { WebSocketHost } from "@langwatch/api";
 import {
   ApiKeyApi,
   type ApiKeyTokenResolutionInput,
@@ -116,6 +117,7 @@ const surface = apiSurface({
   executionProxyBaseUrl: void 0,
   production: false,
   selection: TransportSelection.create().rest().browserBundle(false),
+  sockets: WebSocketHost.create(),
 })(transportPeersOf((token) => peers.get(token)));
 const rest = surface.hosts.rest;
 if (!rest) throw new Error("the surface selected REST");

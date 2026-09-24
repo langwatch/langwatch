@@ -85,7 +85,7 @@ export class ApiProcessComposition extends Composition {
     const selected = this.#transports.selected;
     for (const module of this.modules) {
       for (const transport of module.transports ?? []) {
-        if (!selected[transport.protocol])
+        if (!surfaceOpened(selected, transport.protocol))
           throw new Error(`${module.name} needs surface.${transport.protocol}.`);
       }
     }
@@ -113,4 +113,14 @@ export class WorkerProcessComposition extends Composition {
   boot(): Promise<ServedApplication> {
     return this.runtime.boot("worker", this.modules, this.participation(), this.members);
   }
+}
+
+/** A socket rides the process's one upgrade router, which every api process opens. */
+function surfaceOpened(
+  selected: TransportSelection["selected"],
+  protocol: NonNullable<ProcessModule["transports"]>[number]["protocol"],
+): boolean {
+  if (protocol === "rest") return selected.rest !== undefined;
+  if (protocol === "trpc") return selected.trpc !== undefined;
+  return true;
 }

@@ -1,3 +1,4 @@
+import { WebSocketHost } from "@langwatch/api";
 import type { TransportSelection } from "@langwatch/api/hosting";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import {
@@ -124,6 +125,7 @@ export class ProcessServer implements ProcessBoot {
       members = opened;
       let surface: ((peers: TransportPeers) => ExposedSurface<unknown, unknown>) | undefined;
       if (role === "api" && transports) {
+        const sockets = WebSocketHost.create();
         surface = await processSurface({
           config: this.config.http as ApiHostConfig,
           production: this.production,
@@ -132,7 +134,9 @@ export class ProcessServer implements ProcessBoot {
           secrets: this.resolver.scopeTo(apiOwner.name, Object.values(apiOwner.secrets)),
           selection: transports,
           publicConfig: this.publicConfig(modules),
+          sockets,
         });
+        this.server.with(sockets);
       }
       const runtime = await bootInstalledProcess({
         role,

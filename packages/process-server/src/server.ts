@@ -1,6 +1,7 @@
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import process from "node:process";
+import type { Duplex } from "node:stream";
 
 import { ResourceScope } from "@langwatch/kernel";
 
@@ -42,11 +43,21 @@ export type HealthRoute = Readonly<{
   handle: (request: IncomingMessage, response: ServerResponse) => void | Promise<void>;
 }>;
 
-/** Whatever `.with()` accepts: a lifecycle component, or a route on the door. */
-export type ServerContribution = ServerComponent | HealthRoute;
+/** The one router every upgrade on the door is handed to; closed before the door itself. */
+export type UpgradeDoor = Readonly<{
+  upgrade: (request: IncomingMessage, socket: Duplex, head: Buffer) => void;
+  close: () => Promise<void>;
+}>;
+
+/** Whatever `.with()` accepts: a lifecycle component, a door route, or its upgrade router. */
+export type ServerContribution = ServerComponent | HealthRoute | UpgradeDoor;
 
 function isHealthRoute(contribution: ServerContribution): contribution is HealthRoute {
   return "path" in contribution && "handle" in contribution;
+}
+
+function isUpgradeDoor(contribution: ServerContribution): contribution is UpgradeDoor {
+  return "upgrade" in contribution;
 }
 
 /**
@@ -100,6 +111,7 @@ export class Server {
   /** The ONE handler the application composed. Absent until `serve`. */
   private served: ApplicationHandler | undefined;
   private healthListener: http.Server | undefined;
+  private upgrades: UpgradeDoor | undefined;
   private draining = false;
   private disposeFatal: (() => void) | undefined;
   private disposeSignals: (() => void) | undefined;
@@ -141,6 +153,11 @@ export class Server {
       this.healthRoutes.set(contribution.path, contribution);
       return this;
     }
+    if (isUpgradeDoor(contribution)) {
+      if (this.upgrades) throw new Error(`${this.name} already has an upgrade router.`);
+      this.upgrades = contribution;
+      return this;
+    }
     if (this.sealed) {
       throw new Error(`${this.name} cannot host "${contribution.name}" after it has started.`);
     }
@@ -160,6 +177,9 @@ export class Server {
         const listener = http.createServer((request, response) =>
           this.handleHealthRequest(request, response),
         );
+        listener.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) =>
+          this.handleUpgrade(request, socket, head),
+        );
         await bindHttpServer(listener, port ?? 0);
         this.healthListener = listener;
       },
@@ -167,6 +187,7 @@ export class Server {
         const active = this.healthListener;
         this.healthListener = undefined;
         if (active === undefined) return;
+        await this.upgrades?.close();
         await closeHttpServer(active);
       },
     };
@@ -200,6 +221,23 @@ export class Server {
     }
 
     void this.answer("application", () => application(request, response), response);
+  }
+
+  private handleUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+    const upgrades = this.upgrades;
+    if (this.draining || upgrades === undefined) {
+      const status = this.draining ? "503 Service Unavailable" : "404 Not Found";
+      socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);
+      socket.destroy();
+      return;
+    }
+
+    try {
+      upgrades.upgrade(request, socket, head);
+    } catch (error) {
+      this.logger.error({ error, handler: "upgrade" }, `${this.name}: upgrade handler failed`);
+      socket.destroy();
+    }
   }
 
   /**

@@ -4,6 +4,7 @@ import {
   SurfaceUnconfiguredError,
   SurfaceUnverifiedError,
   type RateLimiter,
+  type WebSocketHost,
 } from "@langwatch/api";
 import { ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import {
@@ -76,6 +77,8 @@ export type ApiSurfaceComposition = Readonly<{
   executionProxyBaseUrl: string | undefined;
   production: boolean;
   selection: TransportSelection;
+  /** The process's one upgrade router, where every declared socket protocol mounts. */
+  sockets: WebSocketHost;
 }>;
 
 export function apiSurface(
@@ -203,8 +206,12 @@ class ApiSurface {
     });
   }
 
-  get hosts(): { rest: RestHost | undefined; trpc: TrpcHost | undefined } {
-    return { rest: this.#rest, trpc: this.#trpc };
+  get hosts(): {
+    rest: RestHost | undefined;
+    trpc: TrpcHost | undefined;
+    websocket: WebSocketHost;
+  } {
+    return { rest: this.#rest, trpc: this.#trpc, websocket: this.composition.sockets };
   }
 
   serve(): NodeHandler {
