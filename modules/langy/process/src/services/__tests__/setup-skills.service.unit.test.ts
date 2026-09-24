@@ -21,6 +21,18 @@ describe("SetupSkillsService", () => {
     expect(body).not.toContain("npx skills add");
   });
 
+  it("answers the prompt for a known skill", async () => {
+    await expect(skills.getPrompt({ skill: "tracing" })).resolves.toEqual({
+      body: SETUP_SKILL_BODIES.tracing,
+    });
+  });
+
+  it("refuses an unknown skill with the handled not_found", async () => {
+    await expect(skills.getPrompt({ skill: "no-such-skill" })).rejects.toMatchObject({
+      code: "not_found",
+    });
+  });
+
   it("carries no credentials of its own", () => {
     for (const id of Object.keys(SETUP_SKILL_BODIES) as (keyof typeof SETUP_SKILL_BODIES)[]) {
       expect(skills.body(id)).not.toContain("LANGWATCH_API_KEY=");

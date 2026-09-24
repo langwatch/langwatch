@@ -12,7 +12,7 @@ import type {
   LangyTokenBuffer,
 } from "./langy-token-buffer.repository.ts";
 import { MemoryLangyRepositories } from "./memory/memory.langy.repositories.ts";
-import { PostgresLangyRepositories } from "./prisma/prisma.langy.repositories.ts";
+import { PostgresLangyRepositories } from "./redis/redis.langy.repositories.ts";
 
 /**
  * The rows the langy module keeps outside its event log, chosen once at

@@ -165,6 +165,8 @@ export interface LangyApi {
     organizationId: string;
     actorUserId: string;
   }): Promise<void>;
+  /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */
+  getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

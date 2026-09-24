@@ -52,6 +52,7 @@ import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-
 import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
 import type { LangyService } from "../services/langy.service.ts";
 import { langyRestPrometheusMetrics } from "../services/prometheus.langy-rest-metrics.service.ts";
+import { SetupSkillsService } from "../services/setup-skills.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
 import { buildLangyConversationCommands } from "./langy-eventing.build.ts";
 
@@ -211,6 +212,7 @@ export class LangyApp implements LangyApiContract {
   }
 
   readonly #internal: LangyInternalService;
+  readonly #setupSkills = SetupSkillsService.create();
 
   private constructor(private readonly dependencies: LangyAppDependencies) {
     this.#internal = LangyInternalService.create(
@@ -290,6 +292,10 @@ export class LangyApp implements LangyApiContract {
     actorUserId: string;
   }): Promise<void> {
     return this.dependencies.virtualKeyProvisioning.provision(input);
+  }
+
+  getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }> {
+    return this.#setupSkills.getPrompt(input);
   }
 
   getAllByConversation(

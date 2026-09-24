@@ -2,12 +2,12 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 
 import type { LangyRepositories } from "../langy-repositories.registry.ts";
-import { LangyFrameDedupRedisRepository } from "../redis/redis.langy-frame-dedup.repository.ts";
-import { LangyLocalPresenceRedisRepository } from "../redis/redis.langy-local-presence.repository.ts";
-import { LangyResourceLinksRedisRepository } from "../redis/redis.langy-resource-links.repository.ts";
-import { LangyTokenBufferRedisRepository } from "../redis/redis.langy-token-buffer.repository.ts";
-import { LangyTurnAccessRedisRepository } from "../redis/redis.langy-turn-access.repository.ts";
-import { LangyTurnHandoffRedisRepository } from "../redis/redis.langy-turn-handoff.repository.ts";
+import { LangyFrameDedupRedisRepository } from "./redis.langy-frame-dedup.repository.ts";
+import { LangyLocalPresenceRedisRepository } from "./redis.langy-local-presence.repository.ts";
+import { LangyResourceLinksRedisRepository } from "./redis.langy-resource-links.repository.ts";
+import { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
+import { LangyTurnAccessRedisRepository } from "./redis.langy-turn-access.repository.ts";
+import { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
 
 /**
  * The live tier. Langy keeps no row of its own in Postgres outside the
