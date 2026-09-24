@@ -400,9 +400,7 @@ describe("given the text is an eval chip typed by hand", () => {
     /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
     it("hands the question to the Instant Eval handler and leaves the typed query unsearched", () => {
       const { result } = renderSubmit({ isInstantEvalAvailable: false });
-      act(() =>
-        result.current.submitSearch('eval:"the user is annoyed"'),
-      );
+      act(() => result.current.submitSearch('eval:"the user is annoyed"'));
       expect(mutation.mutate).not.toHaveBeenCalled();
       expect(handlers.onInstantEval).toHaveBeenCalledWith(
         expect.objectContaining({

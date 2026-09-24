@@ -9,7 +9,15 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const crispPolicy = vi.hoisted(() => ({
+  isSupportChatAvailable: vi.fn(() => false),
+  toggleSupportChat: vi.fn(),
+}));
+
+vi.mock("~/utils/crispBubblePolicy", () => crispPolicy);
+
 import {
   CONTACT_US_HREF,
   InstantEvalRefusalPopover,
@@ -21,6 +29,11 @@ import {
 const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+beforeEach(() => {
+  crispPolicy.isSupportChatAvailable.mockReturnValue(false);
+  crispPolicy.toggleSupportChat.mockClear();
+});
 
 describe("given the organization has spent its free Instant Evals budget", () => {
   describe("when the popover opens", () => {
@@ -93,9 +106,10 @@ describe("given the Instant Evals flag is off for the project", () => {
           "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Contact us and we'll switch them on for you.",
         ),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole("link", { name: "Contact us" }),
-      ).toHaveAttribute("href", CONTACT_US_HREF);
+      expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
+        "href",
+        CONTACT_US_HREF,
+      );
       fireEvent.click(screen.getByRole("button", { name: "Not now" }));
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -114,6 +128,28 @@ describe("given the Instant Evals flag is off for the project", () => {
         href: CONTACT_US_HREF,
       });
       expect(copy.dismiss).toBe("Not now");
+    });
+  });
+
+  describe("when the support chat is available", () => {
+    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
+    it("opens the chat and renders no mailto link when Contact us is clicked", () => {
+      crispPolicy.isSupportChatAvailable.mockReturnValue(true);
+      const onClose = vi.fn();
+      render(
+        <InstantEvalRefusalPopover
+          refusal={{ kind: "unreleased" }}
+          onClose={onClose}
+        >
+          <span>anchor</span>
+        </InstantEvalRefusalPopover>,
+        { wrapper },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Contact us" }));
+      expect(crispPolicy.toggleSupportChat).toHaveBeenCalledTimes(1);
+      expect(
+        screen.queryByRole("link", { name: "Contact us" }),
+      ).not.toBeInTheDocument();
     });
   });
 });

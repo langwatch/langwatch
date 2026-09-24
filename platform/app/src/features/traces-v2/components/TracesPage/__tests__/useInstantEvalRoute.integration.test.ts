@@ -119,7 +119,9 @@ describe("given the router handed over a question", () => {
     /** @scenario "An estimate under half a dollar starts the run" */
     /** @scenario "An Instant Eval route starts a run" */
     it("starts the run, applies the chip beside the other terms and registers the run", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
 
       const estimate = lastCall(mutations.estimate);
@@ -148,7 +150,9 @@ describe("given the router handed over a question", () => {
 
     /** @scenario "The start binds the exact window" */
     it("sends the exact window, the other chips and one boolean question", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
@@ -164,7 +168,9 @@ describe("given the router handed over a question", () => {
   describe("when no model could write the question", () => {
     /** @scenario "A judge question no model could write is judged as typed" */
     it("runs the sentence as the question and says so under the bar", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() =>
         result.current.onInstantEvalRoute({
           ...payload,
@@ -204,7 +210,9 @@ describe("given the router handed over a question", () => {
     });
 
     it("says nothing under the bar when a model wrote the question", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
@@ -222,7 +230,9 @@ describe("given the router handed over a question", () => {
   describe("when the bar already carries an eval chip", () => {
     /** @scenario "A second question judges the same rows as the first" */
     it("judges the scope without the first chip and keeps both chips in the bar", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() =>
         result.current.onInstantEvalRoute({
           ...payload,
@@ -269,7 +279,9 @@ describe("given the router handed over a question", () => {
   describe("when the estimate is half a dollar or more", () => {
     /** @scenario "An estimate of half a dollar or more asks first" */
     it("opens the dialog, and Run starts while the other button searches the words", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(2.4)),
@@ -300,7 +312,9 @@ describe("given the router handed over a question", () => {
     /** @scenario "A target that differs from the lens default is written on the chip" */
     it("writes the forcing spelling on the chip", () => {
       useExplorerStore.setState({ activeLensId: "conversations" });
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onSuccess?.(estimateOf(0.1)),
@@ -323,7 +337,9 @@ describe("given the router handed over a question", () => {
       useExplorerStore
         .getState()
         .registerEvalRun({ key: expectedKey(), runId: "run-9" });
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       expect(mutations.estimate.mutate).not.toHaveBeenCalled();
       expect(useExplorerStore.getState().queryText).toBe(
@@ -337,7 +353,9 @@ describe("given the organization has spent its free budget", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "A spent free budget opens the budget popover and the phrase search runs" */
     it("opens the budget popover, and dismissing it applies the phrase search", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onError?.(
@@ -383,10 +401,11 @@ describe("given the deployment has no classifier", () => {
 describe("given the server refuses a run as not enabled while the flag read is stale", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
-    it("opens the unreleased popover, and dismissing it applies the fallback query", () => {
+    it("opens the unreleased popover, and dismissing it leaves the typed query alone", () => {
       const { result } = renderHook(() =>
         useInstantEvalRoute({ isInstantEvalAvailable: true }),
       );
+      const queryBefore = useExplorerStore.getState().queryText;
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onError?.(
@@ -395,9 +414,8 @@ describe("given the server refuses a run as not enabled while the flag read is s
       );
       expect(result.current.refusal).toEqual({ kind: "unreleased" });
       act(() => result.current.dismissRefusal());
-      expect(useExplorerStore.getState().queryText).toBe(
-        'service:api AND "annoyed users"',
-      );
+      expect(result.current.refusal).toBeNull();
+      expect(useExplorerStore.getState().queryText).toBe(queryBefore);
     });
   });
 });
@@ -406,7 +424,9 @@ describe("given the estimate fails for a reason the registry names", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "Any other refusal falls back to the phrase search" */
     it("shows the registry's copy and applies the phrase search", () => {
-      const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+      const { result } = renderHook(() =>
+        useInstantEvalRoute({ isInstantEvalAvailable: true }),
+      );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
         lastCall(mutations.estimate).options.onError?.(

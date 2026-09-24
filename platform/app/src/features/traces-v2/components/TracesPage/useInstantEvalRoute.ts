@@ -63,7 +63,8 @@ export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
  * `instant_eval_not_enabled` is still mapped here even though the flag read
  * in the search bar is meant to catch this first: that read can be stale or
  * still loading, and the server's refusal is the authority, so a request
- * that reaches it anyway still gets the right popover.
+ * that reaches it anyway still gets the right popover. Dismissing it leaves
+ * the typed query alone, the same as the client-side flag-off path.
  */
 function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   const handled = readHandledError(error);
@@ -192,6 +193,11 @@ function useInstantEvalOutcome(): {
       setConfirmation(null);
       const popover = refusalOf({ error });
       if (popover) {
+        // Unreleased has no sentence to fall back to: dismissing it must
+        // just close the popover, not apply the stale pending fallback.
+        if (popover.kind === "unreleased") {
+          pendingRef.current = null;
+        }
         setRefusal(popover);
         return;
       }

@@ -302,7 +302,8 @@ export const SearchBar: React.FC = () => {
       organizationId: organization?.id,
       enabled: !!project?.id && !!organization?.id,
     });
-  const isInstantEvalAvailable = instantEvalsReleased || instantEvalsFlagLoading;
+  const isInstantEvalAvailable =
+    instantEvalsReleased || instantEvalsFlagLoading;
   const instantEval = useInstantEvalRoute({ isInstantEvalAvailable });
   const { onInstantEvalRoute } = instantEval;
   // The route's dialog and popover are anchored here, so a caller outside the

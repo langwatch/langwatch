@@ -9,6 +9,10 @@ import {
   PopoverRoot,
 } from "~/components/ui/popover";
 import NextLink from "~/utils/compat/next-link";
+import {
+  isSupportChatAvailable,
+  toggleSupportChat,
+} from "~/utils/crispBubblePolicy";
 
 /** Why an Instant Eval did not start, and what the popover says about it. */
 export type InstantEvalRefusal =
@@ -22,7 +26,10 @@ export const UPGRADE_HREF = "/settings/subscription";
 /** Where a model provider is connected, which is what a judge runs on. */
 export const MODEL_PROVIDERS_HREF = "/settings/model-providers";
 
-/** Where a project without Instant Evals asks for it to be switched on. */
+/**
+ * Where a project without Instant Evals asks for it to be switched on, when
+ * there is no support chat to open instead.
+ */
 export const CONTACT_US_HREF =
   "mailto:support@langwatch.ai?subject=Please%20enable%20Instant%20Evals";
 
@@ -81,6 +88,10 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
  * also that project's advertisement for the feature, and closing it just
  * leaves the typed chip where the reader put it.
  *
+ * "Contact us" on the unreleased popover opens the support chat when one is
+ * available, and falls back to a mailto link otherwise — the copy names
+ * neither route, so it reads the same either way.
+ *
  * Spec: specs/traces-v2/instant-eval-search.feature ("A refusal is a
  * popover, never an error state").
  */
@@ -88,6 +99,8 @@ export const InstantEvalRefusalPopover: React.FC<
   InstantEvalRefusalPopoverProps
 > = ({ refusal, onClose, children }) => {
   const copy = refusal ? instantEvalRefusalCopy(refusal) : null;
+  const useSupportChat =
+    refusal?.kind === "unreleased" && isSupportChatAvailable();
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -127,22 +140,35 @@ export const InstantEvalRefusalPopover: React.FC<
                 {copy.body}
               </Text>
               <HStack gap={2}>
-                <NextLink
-                  href={copy.action.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: "block", flex: 1 }}
-                >
+                {useSupportChat ? (
                   <Button
                     size="xs"
-                    width="full"
+                    flex={1}
                     bg="orange.solid"
                     color="white"
                     _hover={{ bg: "orange.fg" }}
+                    onClick={toggleSupportChat}
                   >
                     {copy.action.label}
                   </Button>
-                </NextLink>
+                ) : (
+                  <NextLink
+                    href={copy.action.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: "block", flex: 1 }}
+                  >
+                    <Button
+                      size="xs"
+                      width="full"
+                      bg="orange.solid"
+                      color="white"
+                      _hover={{ bg: "orange.fg" }}
+                    >
+                      {copy.action.label}
+                    </Button>
+                  </NextLink>
+                )}
                 <Button size="xs" variant="ghost" onClick={onClose}>
                   {copy.dismiss}
                 </Button>
