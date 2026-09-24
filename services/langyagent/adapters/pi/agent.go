@@ -432,9 +432,30 @@ func (s *streamState) apply(ev wireEvent) bool {
 		return s.applyToolEnd(ev)
 	case eventPlan:
 		return s.applyPlan(ev)
+	case eventRetrying:
+		return s.emitStatus(retryingStatus(ev.Attempt, ev.MaxAttempts))
+	case eventRetrySettled:
+		return s.emitStatus("")
 	}
 	// turn_started, tool_update, and anything a newer wrapper adds: no frame.
 	return true
+}
+
+// retryingStatus is the panel's status line while a model call is retried.
+func retryingStatus(attempt, maxAttempts int) string {
+	if attempt <= 0 || maxAttempts <= 0 {
+		return "Retrying"
+	}
+	return fmt.Sprintf("Retrying (%d of %d)", attempt, maxAttempts)
+}
+
+// emitStatus draws the panel's status line; an empty status clears it.
+func (s *streamState) emitStatus(status string) bool {
+	f, mErr := frames.Status(status)
+	if mErr != nil {
+		return true
+	}
+	return s.emit(f)
 }
 
 func (s *streamState) applyToolStart(ev wireEvent) bool {
