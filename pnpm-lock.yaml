@@ -439,8 +439,8 @@ catalogs:
       specifier: ^8.21.0
       version: 8.21.3
     zod:
-      specifier: ^4.4.3
-      version: 4.4.3
+      specifier: ^4.6.5
+      version: 4.6.5
     zod-validation-error:
       specifier: ^5.0.0
       version: 5.0.0
@@ -978,7 +978,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
@@ -993,10 +993,10 @@ importers:
         version: 15.1.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zod-validation-error:
         specifier: 'catalog:'
-        version: 5.0.0(zod@4.4.3)
+        version: 5.0.0(zod@4.6.5)
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -1069,7 +1069,7 @@ importers:
         version: 7.5.21
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -1151,7 +1151,7 @@ importers:
         version: 7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -1170,7 +1170,7 @@ importers:
     dependencies:
       '@better-auth/passkey':
         specifier: 'catalog:'
-        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.4.3))(nanostores@1.4.0)
+        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.6.5))(nanostores@1.4.0)
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -1410,14 +1410,14 @@ importers:
         version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@ai-sdk/openai':
         specifier: 'catalog:'
-        version: 3.0.79(zod@4.4.3)
+        version: 3.0.79(zod@4.6.5)
       '@ai-sdk/openai-compatible':
         specifier: 'catalog:'
-        version: 2.0.55(zod@4.4.3)
+        version: 2.0.55(zod@4.6.5)
       '@elevenlabs/client':
         specifier: 'catalog:'
         version: 1.23.0(@types/dom-mediacapture-record@1.0.22)
@@ -1432,7 +1432,7 @@ importers:
         version: link:../../packages/prisma-client
       '@langwatch/scenario':
         specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/scenario-process':
         specifier: workspace:*
         version: link:../../modules/scenario/process
@@ -1477,7 +1477,7 @@ importers:
         version: 6.0.3(babel-plugin-react-compiler@1.0.0)(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       bcrypt:
         specifier: 'catalog:'
         version: 6.0.0
@@ -1921,17 +1921,17 @@ importers:
         version: 1.0.22
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@ai-sdk/openai':
         specifier: 'catalog:'
-        version: 3.0.79(zod@4.4.3)
+        version: 3.0.79(zod@4.6.5)
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../packages/api-fixture
       '@langwatch/scenario':
         specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
@@ -1980,7 +1980,7 @@ importers:
         version: 7.0.2
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
 
   dev/tests/e2e-stack:
     devDependencies:
@@ -2031,7 +2031,7 @@ importers:
         version: 2.0.6
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -2104,7 +2104,7 @@ importers:
         version: link:../../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -2225,7 +2225,7 @@ importers:
         version: 15.12.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -2401,7 +2401,7 @@ importers:
         version: link:../../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -2489,13 +2489,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       jsonpath-plus:
         specifier: 'catalog:'
         version: 10.4.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@clickhouse/client':
         specifier: 'catalog:'
@@ -2626,7 +2626,7 @@ importers:
         version: link:../../../../packages/secrets
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -2684,7 +2684,7 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -2749,7 +2749,7 @@ importers:
         version: link:../../../../packages/secrets
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -2845,7 +2845,7 @@ importers:
         version: link:../../../../modules/ops/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -2989,7 +2989,7 @@ importers:
         version: link:../../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -3071,10 +3071,10 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/enterprise-governance-process':
         specifier: workspace:*
@@ -3187,7 +3187,7 @@ importers:
         version: link:../../../../packages/secrets
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -3236,7 +3236,7 @@ importers:
         version: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -3264,14 +3264,14 @@ importers:
         version: link:../../modules/evaluator/contract
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@ai-sdk/anthropic':
         specifier: 'catalog:'
-        version: 3.0.69(zod@4.4.3)
+        version: 3.0.69(zod@4.6.5)
       '@anthropic-ai/claude-code':
         specifier: 2.1.228
         version: 2.1.228
@@ -3289,7 +3289,7 @@ importers:
         version: link:../../packages/redaction
       '@langwatch/scenario':
         specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
       '@opentelemetry/context-async-hooks':
         specifier: ^2.1.0
         version: 2.10.0(@opentelemetry/api@1.9.1)
@@ -3307,7 +3307,7 @@ importers:
         version: 17.0.35
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       chalk:
         specifier: 'catalog:'
         version: 6.0.0
@@ -3346,7 +3346,7 @@ importers:
         version: 18.0.0
       zod-validation-error:
         specifier: 'catalog:'
-        version: 5.0.0(zod@4.4.3)
+        version: 5.0.0(zod@4.6.5)
 
   modules/agent/browser:
     dependencies:
@@ -3449,7 +3449,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -3516,7 +3516,7 @@ importers:
         version: link:../../workflow/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/actor':
         specifier: workspace:*
@@ -3676,7 +3676,7 @@ importers:
         version: 6.4.3(vega@6.3.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -3761,7 +3761,7 @@ importers:
         version: 5.7.0(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -3828,7 +3828,7 @@ importers:
         version: 8.20.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -3934,7 +3934,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -3943,7 +3943,7 @@ importers:
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -4028,7 +4028,7 @@ importers:
         version: 7.80.0(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -4086,7 +4086,7 @@ importers:
         version: link:../../user/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -4156,13 +4156,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -4281,7 +4281,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/redaction':
         specifier: workspace:*
@@ -4339,13 +4339,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       openapi-types:
         specifier: 'catalog:'
         version: 12.1.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -4370,7 +4370,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -4428,7 +4428,7 @@ importers:
         version: link:../../workflow/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -4456,7 +4456,7 @@ importers:
     dependencies:
       '@better-auth/passkey':
         specifier: 'catalog:'
-        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.4.3))(nanostores@1.4.0)
+        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.6.5))(nanostores@1.4.0)
       '@hookform/resolvers':
         specifier: 'catalog:'
         version: 5.4.0(react-hook-form@7.80.0(react@19.2.8))
@@ -4519,7 +4519,7 @@ importers:
         version: 7.80.0(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -4589,7 +4589,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -4602,10 +4602,10 @@ importers:
     dependencies:
       '@better-auth/passkey':
         specifier: 'catalog:'
-        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.4.3))(nanostores@1.4.0)
+        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.6.5))(nanostores@1.4.0)
       '@better-auth/sso':
         specifier: 'catalog:'
-        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.4.3))
+        version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.6.5))
       '@langwatch/actor':
         specifier: workspace:*
         version: link:../../../packages/actor
@@ -4692,7 +4692,7 @@ importers:
         version: 4.13.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -4851,7 +4851,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -4915,7 +4915,7 @@ importers:
         version: 15.1.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/test-harness':
         specifier: workspace:*
@@ -5067,7 +5067,7 @@ importers:
         version: 2.17.7
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -5170,13 +5170,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -5344,7 +5344,7 @@ importers:
         version: link:../../trace/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -5414,13 +5414,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/group-queue':
         specifier: workspace:*
@@ -5469,7 +5469,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -5518,7 +5518,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -5631,7 +5631,7 @@ importers:
         version: link:../../../packages/redaction
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -5692,7 +5692,7 @@ importers:
         version: 5.1.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -5790,7 +5790,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -5845,7 +5845,7 @@ importers:
         version: link:../../user/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -6097,7 +6097,7 @@ importers:
         version: 5.5.4
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/papaparse':
         specifier: 'catalog:'
@@ -6173,13 +6173,13 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       hono:
         specifier: 'catalog:'
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
@@ -6188,7 +6188,7 @@ importers:
         version: 5.5.4
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -6234,7 +6234,7 @@ importers:
         version: link:../../../packages/plans
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -6286,7 +6286,7 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -6323,7 +6323,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/experiment-contract':
         specifier: workspace:*
@@ -6411,7 +6411,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       safe-regex2:
         specifier: 'catalog:'
         version: 5.1.1
@@ -6420,13 +6420,13 @@ importers:
         version: 1.6.9
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zod-to-json-schema:
         specifier: ^3.25.2
-        version: 3.25.2(zod@4.4.3)
+        version: 3.25.2(zod@4.6.5)
       zod-validation-error:
         specifier: 'catalog:'
-        version: 5.0.0(zod@4.4.3)
+        version: 5.0.0(zod@4.6.5)
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -6562,7 +6562,7 @@ importers:
         version: 3.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -6675,7 +6675,7 @@ importers:
         version: link:../../../packages/ksuid
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/trace-contract':
         specifier: workspace:*
@@ -6748,10 +6748,10 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -6911,7 +6911,7 @@ importers:
         version: 3.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zundo:
         specifier: 'catalog:'
         version: 2.3.0(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
@@ -7020,7 +7020,7 @@ importers:
         version: 3.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -7093,7 +7093,7 @@ importers:
         version: 6.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/dataset-contract':
         specifier: workspace:*
@@ -7208,7 +7208,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1
@@ -7220,7 +7220,7 @@ importers:
         version: 1.6.9
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -7321,7 +7321,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -7376,7 +7376,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -7467,7 +7467,7 @@ importers:
         version: 3.23.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -7534,7 +7534,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -7634,7 +7634,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1
@@ -7646,7 +7646,7 @@ importers:
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@clickhouse/client':
         specifier: 'catalog:'
@@ -7698,7 +7698,7 @@ importers:
         version: 2.0.10(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -7753,7 +7753,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -7835,7 +7835,7 @@ importers:
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -7863,7 +7863,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -7909,7 +7909,7 @@ importers:
         version: link:../../../packages/time
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
-        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+        version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5)
       hono:
         specifier: 'catalog:'
         version: 4.13.1
@@ -7918,7 +7918,7 @@ importers:
         version: 5.10.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -7952,7 +7952,7 @@ importers:
         version: link:../../../packages/system-migrations
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/error-presentation':
         specifier: workspace:*
@@ -8043,7 +8043,7 @@ importers:
         version: 2.13.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -8092,7 +8092,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -8177,13 +8177,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       undici:
         specifier: 'catalog:'
         version: 8.10.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -8205,7 +8205,7 @@ importers:
     dependencies:
       '@ai-sdk/react':
         specifier: ^3.0.219
-        version: 3.0.219(react@19.2.8)(zod@4.4.3)
+        version: 3.0.219(react@19.2.8)(zod@4.6.5)
       '@chakra-ui/charts':
         specifier: ^3.36.0
         version: 3.36.0(@chakra-ui/react@3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(recharts@3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1))
@@ -8271,7 +8271,7 @@ importers:
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -8298,7 +8298,7 @@ importers:
         version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -8365,7 +8365,7 @@ importers:
         version: 2.0.10(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -8426,7 +8426,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -8514,7 +8514,7 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       hono:
         specifier: 'catalog:'
         version: 4.13.1
@@ -8532,7 +8532,7 @@ importers:
         version: 8.21.3(bufferutil@4.1.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -8584,7 +8584,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -8636,7 +8636,7 @@ importers:
         version: link:../../../sdks/typescript
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/trace-process':
         specifier: workspace:*
@@ -8661,7 +8661,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -8716,7 +8716,7 @@ importers:
         version: link:../../../sdks/typescript
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -8807,10 +8807,10 @@ importers:
         version: 10.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zod-validation-error:
         specifier: 'catalog:'
-        version: 5.0.0(zod@4.4.3)
+        version: 5.0.0(zod@4.6.5)
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -8938,7 +8938,7 @@ importers:
         version: 5.1.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/error-presentation':
         specifier: workspace:*
@@ -8957,10 +8957,10 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: 'catalog:'
-        version: 3.0.79(zod@4.4.3)
+        version: 3.0.79(zod@4.6.5)
       '@ai-sdk/openai-compatible':
         specifier: 'catalog:'
-        version: 2.0.55(zod@4.4.3)
+        version: 2.0.55(zod@4.6.5)
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -9017,13 +9017,13 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       hono:
         specifier: 'catalog:'
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
@@ -9032,7 +9032,7 @@ importers:
         version: 5.1.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -9145,7 +9145,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -9203,7 +9203,7 @@ importers:
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@clickhouse/client':
         specifier: 'catalog:'
@@ -9282,7 +9282,7 @@ importers:
         version: 3.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: ^5.0.2
         version: 5.0.15(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
@@ -9398,7 +9398,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -9529,7 +9529,7 @@ importers:
         version: 4.3.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -9608,7 +9608,7 @@ importers:
         version: 4.3.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -9660,7 +9660,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -9864,7 +9864,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -10033,7 +10033,7 @@ importers:
         version: 3.1.3(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -10194,7 +10194,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -10285,7 +10285,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
@@ -10294,7 +10294,7 @@ importers:
         version: 1.6.9
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -10328,7 +10328,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -10383,7 +10383,7 @@ importers:
         version: 4.13.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -10466,7 +10466,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -10521,7 +10521,7 @@ importers:
         version: 5.10.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -10697,7 +10697,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -10761,13 +10761,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -10927,10 +10927,10 @@ importers:
         version: 3.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zod-validation-error:
         specifier: 'catalog:'
-        version: 5.0.0(zod@4.4.3)
+        version: 5.0.0(zod@4.6.5)
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -11064,7 +11064,7 @@ importers:
         version: link:../../../packages/plans
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -11131,13 +11131,13 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/actor':
         specifier: workspace:*
@@ -11174,7 +11174,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -11223,7 +11223,7 @@ importers:
         version: link:../../user/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -11392,7 +11392,7 @@ importers:
         version: 3.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -11480,7 +11480,7 @@ importers:
         version: link:../../../packages/observability
       '@langwatch/scenario':
         specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -11498,7 +11498,7 @@ importers:
         version: 10.27.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -11511,7 +11511,7 @@ importers:
     dependencies:
       '@ai-sdk/openai-compatible':
         specifier: 'catalog:'
-        version: 2.0.55(zod@4.4.3)
+        version: 2.0.55(zod@4.6.5)
       '@ai-sdk/provider':
         specifier: ^3.0.13
         version: 3.0.15
@@ -11583,7 +11583,7 @@ importers:
         version: link:../../prompt/contract
       '@langwatch/scenario':
         specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../contract
@@ -11622,13 +11622,13 @@ importers:
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       hono:
         specifier: 'catalog:'
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       jsonpath-plus:
         specifier: 'catalog:'
         version: 10.4.0
@@ -11649,7 +11649,7 @@ importers:
         version: 8.10.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/actor':
         specifier: workspace:*
@@ -11768,7 +11768,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -11820,7 +11820,7 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -11906,7 +11906,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -11967,7 +11967,7 @@ importers:
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -12007,7 +12007,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -12098,7 +12098,7 @@ importers:
         version: 15.1.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -12166,7 +12166,7 @@ importers:
         version: 7.80.0(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -12233,7 +12233,7 @@ importers:
         version: link:../../scenario/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -12303,13 +12303,13 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -12398,7 +12398,7 @@ importers:
         version: link:../../../packages/kernel
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -12459,7 +12459,7 @@ importers:
         version: 6.0.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/test-harness':
         specifier: workspace:*
@@ -12703,7 +12703,7 @@ importers:
         version: 1.6.9
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -12785,7 +12785,7 @@ importers:
         version: 5.7.0(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zustand:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
@@ -12864,7 +12864,7 @@ importers:
         version: 5.9.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -12979,7 +12979,7 @@ importers:
         version: link:../../../packages/redaction
       '@langwatch/scenario':
         specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
@@ -13021,13 +13021,13 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       hono:
         specifier: 'catalog:'
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -13039,10 +13039,10 @@ importers:
         version: 5.9.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zod-validation-error:
         specifier: 'catalog:'
-        version: 5.0.0(zod@4.4.3)
+        version: 5.0.0(zod@4.6.5)
     devDependencies:
       '@clickhouse/client':
         specifier: 'catalog:'
@@ -13206,7 +13206,7 @@ importers:
         version: link:../../organization/contract
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/error-presentation':
         specifier: workspace:*
@@ -13285,10 +13285,10 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -13331,7 +13331,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -13401,10 +13401,10 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@clickhouse/client':
         specifier: 'catalog:'
@@ -13609,7 +13609,7 @@ importers:
         version: 3.1.1(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
       zundo:
         specifier: 'catalog:'
         version: 2.3.0(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
@@ -13706,7 +13706,7 @@ importers:
         version: 5.7.0(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -13770,7 +13770,7 @@ importers:
         version: link:../../../packages/time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -13846,7 +13846,7 @@ importers:
         version: 11.18.0(typescript@7.0.2)
       ai:
         specifier: ^6.0.161
-        version: 6.0.217(zod@4.4.3)
+        version: 6.0.217(zod@4.6.5)
       diff:
         specifier: 'catalog:'
         version: 9.0.0
@@ -13855,7 +13855,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       monacopilot:
         specifier: 'catalog:'
         version: 1.2.12(monaco-editor@0.55.1)
@@ -13864,7 +13864,7 @@ importers:
         version: 5.1.16
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -13883,7 +13883,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -13944,7 +13944,7 @@ importers:
         version: 4.13.1
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
+        version: 1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -13953,7 +13953,7 @@ importers:
         version: 8.21.3(bufferutil@4.1.0)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*
@@ -14011,7 +14011,7 @@ importers:
         version: 6.0.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/dev-scripts':
         specifier: workspace:*
@@ -14315,7 +14315,7 @@ importers:
         version: link:../handled-error
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -14386,7 +14386,7 @@ importers:
         version: 1.6.9
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -14481,7 +14481,7 @@ importers:
         version: link:../handled-error
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -14561,7 +14561,7 @@ importers:
         version: 15.1.3
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/test-harness':
         specifier: workspace:*
@@ -14641,7 +14641,7 @@ importers:
         version: 1.9.1
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -14962,7 +14962,7 @@ importers:
         version: link:../secrets
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -15023,7 +15023,7 @@ importers:
         version: 8.10.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -15142,7 +15142,7 @@ importers:
         version: 0.55.0(@opentelemetry/api@1.9.1)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/node':
         specifier: ^26.0.1
@@ -15183,7 +15183,7 @@ importers:
     dependencies:
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -15223,7 +15223,7 @@ importers:
         version: 8.22.0
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@types/lodash-es':
         specifier: 'catalog:'
@@ -15296,7 +15296,7 @@ importers:
         version: link:../secrets
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/prisma-client':
         specifier: workspace:*
@@ -15363,7 +15363,7 @@ importers:
         version: link:../time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/test-harness':
         specifier: workspace:*
@@ -15653,7 +15653,7 @@ importers:
         version: link:../time
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -15764,7 +15764,7 @@ importers:
         version: 6.1.2(react@19.2.8)
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@emotion/react':
         specifier: 'catalog:'
@@ -15852,7 +15852,7 @@ importers:
     dependencies:
       '@ai-sdk/openai':
         specifier: '>=2.0.0 <5.0.0'
-        version: 3.0.79(zod@4.4.3)
+        version: 3.0.79(zod@4.6.5)
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
@@ -15939,20 +15939,20 @@ importers:
         version: 0.0.4
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@eslint/js':
         specifier: ^9.32.0
         version: 9.39.5
       '@langchain/core':
         specifier: '>=0.3.80'
-        version: 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+        version: 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       '@langchain/langgraph':
         specifier: '>=0.4.0 <1.0.0'
-        version: 0.4.6(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod-to-json-schema@3.25.2(zod@4.4.3))
+        version: 0.4.6(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod-to-json-schema@3.25.2(zod@4.6.5))
       '@langchain/openai':
         specifier: '>=0.6.0 <1.0.0'
-        version: 0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(ws@8.21.3(bufferutil@4.1.0))
+        version: 0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(ws@8.21.3(bufferutil@4.1.0))
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../modules/langy/contract
@@ -15997,7 +15997,7 @@ importers:
         version: 2.4.0
       langchain:
         specifier: '>=0.3.37'
-        version: 0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+        version: 0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       msw:
         specifier: ^2.10.4
         version: 2.15.0(@types/node@26.2.0)(typescript@6.0.3)
@@ -16033,16 +16033,16 @@ importers:
     dependencies:
       '@earendil-works/pi-ai':
         specifier: 0.84.2
-        version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
+        version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)
       '@earendil-works/pi-coding-agent':
         specifier: 0.84.2
-        version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
+        version: 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)
       typebox:
         specifier: 1.3.7
         version: 1.3.7
       zod:
         specifier: 'catalog:'
-        version: 4.4.3
+        version: 4.6.5
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -16077,16 +16077,16 @@ importers:
     devDependencies:
       '@ai-sdk/anthropic':
         specifier: 'catalog:'
-        version: 3.0.69(zod@4.4.3)
+        version: 3.0.69(zod@4.6.5)
       '@ai-sdk/google':
         specifier: ^3.0.120
-        version: 3.0.120(zod@4.4.3)
+        version: 3.0.120(zod@4.6.5)
       '@ai-sdk/openai':
         specifier: 'catalog:'
-        version: 3.0.79(zod@4.4.3)
+        version: 3.0.79(zod@4.6.5)
       '@langwatch/scenario':
         specifier: file:../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)
+        version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../packages/vitest-config
@@ -27236,6 +27236,9 @@ packages:
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
   zone.js@0.15.1:
     resolution: {integrity: sha512-XE96n56IQpJM7NAoXswY3XRLcWFW83xe0BiAOeMD7K5k5xecOeul3Qcpx6GqEeeHNkW5DWL5zOyTbEfB4eti8w==}
 
@@ -27296,30 +27299,30 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  '@ai-sdk/anthropic@3.0.69(zod@4.4.3)':
+  '@ai-sdk/anthropic@3.0.69(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.23(zod@4.4.3)
-      zod: 4.4.3
+      '@ai-sdk/provider-utils': 4.0.23(zod@4.6.5)
+      zod: 4.6.5
 
-  '@ai-sdk/gateway@3.0.141(zod@4.4.3)':
+  '@ai-sdk/gateway@3.0.141(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.13
-      '@ai-sdk/provider-utils': 4.0.34(zod@4.4.3)
+      '@ai-sdk/provider-utils': 4.0.34(zod@4.6.5)
       '@vercel/oidc': 3.2.0
-      zod: 4.4.3
+      zod: 4.6.5
 
-  '@ai-sdk/google@3.0.120(zod@4.4.3)':
+  '@ai-sdk/google@3.0.120(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.15
-      '@ai-sdk/provider-utils': 4.0.50(zod@4.4.3)
-      zod: 4.4.3
+      '@ai-sdk/provider-utils': 4.0.50(zod@4.6.5)
+      zod: 4.6.5
 
-  '@ai-sdk/openai-compatible@2.0.55(zod@4.4.3)':
+  '@ai-sdk/openai-compatible@2.0.55(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.13
-      '@ai-sdk/provider-utils': 4.0.34(zod@4.4.3)
-      zod: 4.4.3
+      '@ai-sdk/provider-utils': 4.0.34(zod@4.6.5)
+      zod: 4.6.5
 
   '@ai-sdk/openai@3.0.79(zod@3.25.76)':
     dependencies:
@@ -27327,18 +27330,18 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.34(zod@3.25.76)
       zod: 3.25.76
 
-  '@ai-sdk/openai@3.0.79(zod@4.4.3)':
+  '@ai-sdk/openai@3.0.79(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.13
-      '@ai-sdk/provider-utils': 4.0.34(zod@4.4.3)
-      zod: 4.4.3
+      '@ai-sdk/provider-utils': 4.0.34(zod@4.6.5)
+      zod: 4.6.5
 
-  '@ai-sdk/provider-utils@4.0.23(zod@4.4.3)':
+  '@ai-sdk/provider-utils@4.0.23(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.0
-      zod: 4.4.3
+      zod: 4.6.5
 
   '@ai-sdk/provider-utils@4.0.34(zod@3.25.76)':
     dependencies:
@@ -27347,20 +27350,20 @@ snapshots:
       eventsource-parser: 3.1.0
       zod: 3.25.76
 
-  '@ai-sdk/provider-utils@4.0.34(zod@4.4.3)':
+  '@ai-sdk/provider-utils@4.0.34(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.13
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.0
-      zod: 4.4.3
+      zod: 4.6.5
 
-  '@ai-sdk/provider-utils@4.0.50(zod@4.4.3)':
+  '@ai-sdk/provider-utils@4.0.50(zod@4.6.5)':
     dependencies:
       '@ai-sdk/provider': 3.0.15
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.1.0
       undici: 6.28.0
-      zod: 4.4.3
+      zod: 4.6.5
 
   '@ai-sdk/provider@3.0.13':
     dependencies:
@@ -27374,10 +27377,10 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@3.0.219(react@19.2.8)(zod@4.4.3)':
+  '@ai-sdk/react@3.0.219(react@19.2.8)(zod@4.6.5)':
     dependencies:
-      '@ai-sdk/provider-utils': 4.0.34(zod@4.4.3)
-      ai: 6.0.217(zod@4.4.3)
+      '@ai-sdk/provider-utils': 4.0.34(zod@4.6.5)
+      ai: 6.0.217(zod@4.6.5)
       react: 19.2.8
       swr: 2.4.2(react@19.2.8)
       throttleit: 2.1.0
@@ -27424,11 +27427,11 @@ snapshots:
       '@anthropic-ai/claude-code-win32-arm64': 2.1.228
       '@anthropic-ai/claude-code-win32-x64': 2.1.228
 
-  '@anthropic-ai/sdk@0.91.1(zod@4.4.3)':
+  '@anthropic-ai/sdk@0.91.1(zod@4.6.5)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
-      zod: 4.4.3
+      zod: 4.6.5
 
   '@ark-ui/react@5.37.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
@@ -28840,79 +28843,79 @@ snapshots:
 
   '@bcoe/v8-coverage@1.0.2': {}
 
-  '@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)':
+  '@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)':
     dependencies:
       '@better-auth/utils': 0.5.0
       '@better-fetch/fetch': 1.3.1
       '@opentelemetry/semantic-conventions': 1.43.0
       '@standard-schema/spec': 1.1.0
-      better-call: 1.4.0(zod@4.4.3)
+      better-call: 1.4.0(zod@4.6.5)
       jose: 6.2.3
       kysely: 0.28.17
       nanostores: 1.4.0
-      zod: 4.4.3
+      zod: 4.6.5
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
 
-  '@better-auth/drizzle-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)':
+  '@better-auth/drizzle-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
 
-  '@better-auth/kysely-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(kysely@0.28.17)':
+  '@better-auth/kysely-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(kysely@0.28.17)':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
     optionalDependencies:
       kysely: 0.28.17
 
-  '@better-auth/memory-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)':
+  '@better-auth/memory-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
 
-  '@better-auth/mongo-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)':
+  '@better-auth/mongo-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
 
-  '@better-auth/passkey@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.4.3))(nanostores@1.4.0)':
+  '@better-auth/passkey@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.6.5))(nanostores@1.4.0)':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
       '@better-fetch/fetch': 1.3.1
       '@simplewebauthn/browser': 13.3.0
       '@simplewebauthn/server': 13.3.2
       better-auth: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0)
-      better-call: 1.4.0(zod@4.4.3)
+      better-call: 1.4.0(zod@4.6.5)
       nanostores: 1.4.0
-      zod: 4.4.3
+      zod: 4.6.5
 
-  '@better-auth/prisma-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))':
+  '@better-auth/prisma-adapter@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
     optionalDependencies:
       '@prisma/client': 7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
       prisma: 7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
 
-  '@better-auth/sso@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.4.3))':
+  '@better-auth/sso@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0))(better-call@1.4.0(zod@4.6.5))':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
       '@better-fetch/fetch': 1.3.1
       '@xmldom/xmldom': 0.9.12
       better-auth: 1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0)
-      better-call: 1.4.0(zod@4.4.3)
+      better-call: 1.4.0(zod@4.6.5)
       fast-xml-parser: 5.11.1
       jose: 6.2.3
       samlify: 2.13.1
       tldts: 7.4.10
-      zod: 4.4.3
+      zod: 4.6.5
 
-  '@better-auth/telemetry@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)':
+  '@better-auth/telemetry@1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)':
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
       '@better-auth/utils': 0.5.0
       '@better-fetch/fetch': 1.3.1
 
@@ -28975,7 +28978,7 @@ snapshots:
 
   '@clickhouse/parser@0.3.0':
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.5
 
   '@csstools/color-helpers@6.1.0': {}
 
@@ -29039,9 +29042,9 @@ snapshots:
       react: 19.2.8
       tslib: 2.8.1
 
-  '@earendil-works/pi-agent-core@0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)':
+  '@earendil-works/pi-agent-core@0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)':
     dependencies:
-      '@earendil-works/pi-ai': 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)
       '@earendil-works/pi-telemetry': 0.84.2
       diff: 8.0.4
       ignore: 7.0.5
@@ -29055,17 +29058,17 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)':
     dependencies:
-      '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
+      '@anthropic-ai/sdk': 0.91.1(zod@4.6.5)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
       '@earendil-works/pi-telemetry': 0.84.2
-      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)
+      '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)
       '@opentelemetry/api': 1.9.0
       '@smithy/node-http-handler': 4.7.3
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
-      openai: 6.40.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
+      openai: 6.40.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)
       partial-json: 0.1.7
       typebox: 1.3.7
     transitivePeerDependencies:
@@ -29080,10 +29083,10 @@ snapshots:
     dependencies:
       '@earendil-works/pi-protocol': 0.84.2
 
-  '@earendil-works/pi-coding-agent@0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)':
+  '@earendil-works/pi-coding-agent@0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)':
     dependencies:
-      '@earendil-works/pi-agent-core': 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
-      '@earendil-works/pi-ai': 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
+      '@earendil-works/pi-agent-core': 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)
+      '@earendil-works/pi-ai': 0.84.2(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)
       '@earendil-works/pi-client': 0.84.2
       '@earendil-works/pi-protocol': 0.84.2
       '@earendil-works/pi-tui': 0.84.2
@@ -29470,14 +29473,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(bufferutil@4.1.0)':
+  '@google/genai@1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5))(bufferutil@4.1.0)':
     dependencies:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
       protobufjs: 7.6.5
       ws: 8.21.3(bufferutil@4.1.0)
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -29637,14 +29640,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))':
+  '@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       ansi-styles: 5.2.0
       camelcase: 6.3.0
       decamelize: 1.2.0
       js-tiktoken: 1.0.21
-      langsmith: 0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+      langsmith: 0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       mustache: 4.2.0
       p-queue: 6.6.2
       p-retry: 4.6.2
@@ -29658,50 +29661,50 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/langgraph-checkpoint@0.1.1(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))':
+  '@langchain/langgraph-checkpoint@0.1.1(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))':
     dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       uuid: 11.1.1
 
-  '@langchain/langgraph-sdk@0.0.112(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@langchain/langgraph-sdk@0.0.112(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@types/json-schema': 7.0.15
       p-queue: 6.6.2
       p-retry: 4.6.2
       uuid: 11.1.1
     optionalDependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@langchain/langgraph@0.4.6(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod-to-json-schema@3.25.2(zod@4.4.3))':
+  '@langchain/langgraph@0.4.6(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod-to-json-schema@3.25.2(zod@4.6.5))':
     dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
-      '@langchain/langgraph-checkpoint': 0.1.1(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))
-      '@langchain/langgraph-sdk': 0.0.112(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
+      '@langchain/langgraph-checkpoint': 0.1.1(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))
+      '@langchain/langgraph-sdk': 0.0.112(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       uuid: 11.1.1
       zod: 3.25.76
     optionalDependencies:
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
+      zod-to-json-schema: 3.25.2(zod@4.6.5)
     transitivePeerDependencies:
       - react
       - react-dom
 
-  '@langchain/openai@0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(ws@8.21.3(bufferutil@4.1.0))':
+  '@langchain/openai@0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(ws@8.21.3(bufferutil@4.1.0))':
     dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       js-tiktoken: 1.0.21
       openai: 5.12.2(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76)
       zod: 3.25.76
     transitivePeerDependencies:
       - ws
 
-  '@langchain/textsplitters@0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))':
+  '@langchain/textsplitters@0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))':
     dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       js-tiktoken: 1.0.21
 
-  '@langwatch/scenario@file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.4.3))(bufferutil@4.1.0)(vitest@5.0.0)':
+  '@langwatch/scenario@file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)':
     dependencies:
       '@ag-ui/core': 0.0.58
       '@ai-sdk/openai': 3.0.79(zod@3.25.76)
@@ -29711,7 +29714,7 @@ snapshots:
       '@opentelemetry/sdk-node': 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.10.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-node': 2.10.0(@opentelemetry/api@1.9.1)
-      ai: 6.0.217(zod@4.4.3)
+      ai: 6.0.217(zod@4.6.5)
       chalk: 5.6.2
       ffmpeg-static: 5.3.0
       fft.js: 4.0.4
@@ -29815,15 +29818,15 @@ snapshots:
       eventsource-parser: 3.1.0
       jose: 6.2.3
       pkce-challenge: 5.0.1
-      zod: 4.4.3
+      zod: 4.6.5
     optional: true
 
   '@modelcontextprotocol/core@2.0.0':
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.5
     optional: true
 
-  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.6.5)':
     dependencies:
       '@hono/node-server': 2.0.10(hono@4.13.1)
       ajv: 8.20.0
@@ -29840,8 +29843,8 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
+      zod: 4.6.5
+      zod-to-json-schema: 3.25.2(zod@4.6.5)
     optionalDependencies:
       '@cfworker/json-schema': 4.1.1
     transitivePeerDependencies:
@@ -30142,7 +30145,7 @@ snapshots:
 
   '@openrouter/sdk@0.3.16':
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.5
 
   '@opentelemetry/api-logs@0.219.0':
     dependencies:
@@ -31872,7 +31875,7 @@ snapshots:
       '@smithy/util-buffer-from': 2.2.0
       tslib: 2.8.1
 
-  '@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
+  '@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5)':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@types/json-schema': 7.0.15
@@ -31881,20 +31884,20 @@ snapshots:
       effect: 3.20.0
       typebox: 1.3.7
       valibot: 1.4.2(typescript@7.0.2)
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
+      zod: 4.6.5
+      zod-to-json-schema: 3.25.2(zod@4.6.5)
 
-  '@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3)':
+  '@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5)':
     dependencies:
-      '@standard-community/standard-json': 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+      '@standard-community/standard-json': 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5)
       '@standard-schema/spec': 1.1.0
       openapi-types: 12.1.3
     optionalDependencies:
       effect: 3.20.0
       typebox: 1.3.7
       valibot: 1.4.2(typescript@7.0.2)
-      zod: 4.4.3
-      zod-openapi: 4.2.4(zod@4.4.3)
+      zod: 4.6.5
+      zod-openapi: 4.2.4(zod@4.6.5)
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -33916,13 +33919,13 @@ snapshots:
 
   agent-base@9.0.0: {}
 
-  ai@6.0.217(zod@4.4.3):
+  ai@6.0.217(zod@4.6.5):
     dependencies:
-      '@ai-sdk/gateway': 3.0.141(zod@4.4.3)
+      '@ai-sdk/gateway': 3.0.141(zod@4.6.5)
       '@ai-sdk/provider': 3.0.13
-      '@ai-sdk/provider-utils': 4.0.34(zod@4.4.3)
+      '@ai-sdk/provider-utils': 4.0.34(zod@4.6.5)
       '@opentelemetry/api': 1.9.1
-      zod: 4.4.3
+      zod: 4.6.5
 
   ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:
@@ -34171,23 +34174,23 @@ snapshots:
 
   better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.0):
     dependencies:
-      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
-      '@better-auth/drizzle-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)
-      '@better-auth/kysely-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(kysely@0.28.17)
-      '@better-auth/memory-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)
-      '@better-auth/mongo-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)
-      '@better-auth/prisma-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))
-      '@better-auth/telemetry': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)
+      '@better-auth/core': 1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0)
+      '@better-auth/drizzle-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)
+      '@better-auth/kysely-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(kysely@0.28.17)
+      '@better-auth/memory-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)
+      '@better-auth/mongo-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)
+      '@better-auth/prisma-adapter': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@prisma/client@7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))
+      '@better-auth/telemetry': 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)
       '@better-auth/utils': 0.5.0
       '@better-fetch/fetch': 1.3.1
       '@noble/ciphers': 2.2.0
       '@noble/hashes': 2.2.0
-      better-call: 1.4.0(zod@4.4.3)
+      better-call: 1.4.0(zod@4.6.5)
       defu: 6.1.7
       jose: 6.2.3
       kysely: 0.28.17
       nanostores: 1.4.0
-      zod: 4.4.3
+      zod: 4.6.5
     optionalDependencies:
       '@prisma/client': 7.9.1(prisma@7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
       mysql2: 3.24.2(@types/node@26.2.0)
@@ -34200,14 +34203,14 @@ snapshots:
       - '@cloudflare/workers-types'
       - '@opentelemetry/api'
 
-  better-call@1.4.0(zod@4.4.3):
+  better-call@1.4.0(zod@4.6.5):
     dependencies:
       '@better-auth/utils': 0.5.0
       '@better-fetch/fetch': 1.3.1
       rou3: 0.9.2
       set-cookie-parser: 3.1.2
     optionalDependencies:
-      zod: 4.4.3
+      zod: 4.6.5
 
   better-result@2.10.0: {}
 
@@ -35826,10 +35829,10 @@ snapshots:
     dependencies:
       react-is: 19.2.7
 
-  hono-openapi@1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3):
+  hono-openapi@1.3.1(@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.1))(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5))(@types/json-schema@7.0.15)(hono@4.13.1)(openapi-types@12.1.3):
     dependencies:
-      '@standard-community/standard-json': 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
-      '@standard-community/standard-openapi': 0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.4.3))(zod@4.4.3)
+      '@standard-community/standard-json': 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5)
+      '@standard-community/standard-openapi': 0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.20.0)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-to-json-schema@3.25.2(zod@4.6.5))(zod@4.6.5))(@standard-schema/spec@1.1.0)(effect@3.20.0)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2))(zod-openapi@4.2.4(zod@4.6.5))(zod@4.6.5)
       '@types/json-schema': 7.0.15
       openapi-types: 12.1.3
     optionalDependencies:
@@ -36290,15 +36293,15 @@ snapshots:
 
   kysely@0.28.17: {}
 
-  langchain@0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)):
+  langchain@0.3.37(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(axios@1.19.0)(handlebars@4.7.9)(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)):
     dependencies:
-      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
-      '@langchain/openai': 0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))(ws@8.21.3(bufferutil@4.1.0))
-      '@langchain/textsplitters': 0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)))
+      '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
+      '@langchain/openai': 0.6.9(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))(ws@8.21.3(bufferutil@4.1.0))
+      '@langchain/textsplitters': 0.1.0(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)))
       js-tiktoken: 1.0.21
       js-yaml: 4.3.1
       jsonpointer: 5.0.1
-      langsmith: 0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0))
+      langsmith: 0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0))
       openapi-types: 12.1.3
       p-retry: 4.6.2
       uuid: 11.1.1
@@ -36314,14 +36317,14 @@ snapshots:
       - openai
       - ws
 
-  langsmith@0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3))(ws@8.21.3(bufferutil@4.1.0)):
+  langsmith@0.6.0(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5))(ws@8.21.3(bufferutil@4.1.0)):
     dependencies:
       p-queue: 6.6.2
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/exporter-trace-otlp-proto': 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/sdk-trace-base': 2.10.0(@opentelemetry/api@1.9.1)
-      openai: 7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3)
+      openai: 7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5)
       ws: 8.21.3(bufferutil@4.1.0)
 
   launder@1.7.1:
@@ -37524,10 +37527,10 @@ snapshots:
       ws: 8.21.3(bufferutil@4.1.0)
       zod: 3.25.76
 
-  openai@6.40.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3):
+  openai@6.40.0(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5):
     optionalDependencies:
       ws: 8.21.3(bufferutil@4.1.0)
-      zod: 4.4.3
+      zod: 4.6.5
 
   openai@6.49.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@3.25.76):
     optionalDependencies:
@@ -37543,12 +37546,12 @@ snapshots:
       ws: 8.21.3(bufferutil@4.1.0)
       zod: 3.25.76
 
-  openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.4.3):
+  openai@7.4.0(@aws-sdk/credential-provider-node@3.972.81)(@smithy/signature-v4@5.7.0)(ws@8.21.3(bufferutil@4.1.0))(zod@4.6.5):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.81
       '@smithy/signature-v4': 5.7.0
       ws: 8.21.3(bufferutil@4.1.0)
-      zod: 4.4.3
+      zod: 4.6.5
     optional: true
 
   openapi-fetch@0.17.0:
@@ -40323,26 +40326,28 @@ snapshots:
       compress-commons: 6.0.2
       readable-stream: 4.7.0
 
-  zod-openapi@4.2.4(zod@4.4.3):
+  zod-openapi@4.2.4(zod@4.6.5):
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.5
     optional: true
 
   zod-to-json-schema@3.25.2(zod@3.25.76):
     dependencies:
       zod: 3.25.76
 
-  zod-to-json-schema@3.25.2(zod@4.4.3):
+  zod-to-json-schema@3.25.2(zod@4.6.5):
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.5
 
-  zod-validation-error@5.0.0(zod@4.4.3):
+  zod-validation-error@5.0.0(zod@4.6.5):
     dependencies:
-      zod: 4.4.3
+      zod: 4.6.5
 
   zod@3.25.76: {}
 
   zod@4.4.3: {}
+
+  zod@4.6.5: {}
 
   zone.js@0.15.1: {}
 

@@ -168,7 +168,7 @@ catalog:
   vitest: ^5.0.0
   vitest-browser-react: ^2.3.0
   ws: ^8.21.0
-  zod: ^4.4.3
+  zod: ^4.6.5
   zod-validation-error: ^5.0.0
   zundo: ^2.3.0
   zustand: ^4.5.7
