@@ -7,8 +7,8 @@ import { createLogger } from "@langwatch/observability";
 import type { AutomationClock, AutomationProjectDirectory } from "../app/automation.members.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
+import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
-import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-policy.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-persistence");

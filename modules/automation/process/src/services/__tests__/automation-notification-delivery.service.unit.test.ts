@@ -1,5 +1,5 @@
 import { ReactEmailMailRenderer } from "@langwatch/mail";
-import { EmailDelivery, type EmailContent } from "@langwatch/notification-process";
+import { recordingMail } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import type { WebhookDeliveryTransport } from "../../channels/http/http.webhook-delivery.channel.ts";
@@ -25,19 +25,6 @@ const APPLICATION_HTML = `<html><body><p>hi</p>
       <a href="${BASE_HOST}/unsubscribe?token=${APPLICATION_PROJECT_TOKEN}" style="color:#8B96A5;text-decoration:underline;">Stop all notifications from this project</a>
     </div></body></html>`;
 
-class RecordingMailer extends EmailDelivery {
-  readonly sent: EmailContent[] = [];
-
-  defaultFrom(): string {
-    return "LangWatch <contact@langwatch.ai>";
-  }
-
-  async send(content: EmailContent): Promise<unknown> {
-    this.sent.push(content);
-    return {};
-  }
-}
-
 class RecordingLogger {
   readonly warnings: unknown[][] = [];
 
@@ -52,7 +39,7 @@ class RecordingLogger {
 function composeDelivery(
   over: { logger?: RecordingLogger; webhookTransport?: WebhookDeliveryTransport } = {},
 ) {
-  const mailer = new RecordingMailer();
+  const mailer = recordingMail();
   const logger = over.logger ?? new RecordingLogger();
   const adapter = AutomationNotificationDeliveryAdapter.create({
     mailer,

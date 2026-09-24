@@ -269,6 +269,7 @@ export class AutomationApp implements AutomationApi {
     "logger",
     "encryption",
     "secrets",
+    "mail",
     "publicBaseUrl",
   ] as const;
 
@@ -278,13 +279,17 @@ export class AutomationApp implements AutomationApi {
    * {@link AutomationApp.fromInfrastructure} does.
    */
   static create(setup: AutomationSetup): AutomationApp {
-    const verifier = HmacUnsubscribeTokenAdapter.create({
-      secret: setup.members.secrets.find("CREDENTIALS_SECRET"),
-    });
+    const unsubscribeSigningSecret = setup.members.secrets.find("CREDENTIALS_SECRET");
     const infrastructure = buildAutomationInfrastructure({
       members: setup.members,
       auditLog: setup.dependencies.auditLog,
-      verifier,
+      verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
+      unsubscribeSigningSecret,
+      repositories: setup.repositories,
+      caps: {
+        emailHourlyCap: setup.config.emailHourlyCap,
+        tenantDailyCap: setup.config.tenantDailyCap,
+      },
     });
 
     return AutomationApp.fromInfrastructure({

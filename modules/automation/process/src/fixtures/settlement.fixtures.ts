@@ -15,7 +15,7 @@ import { AutomationNotificationDelivery } from "../channels/automation-notificat
 import { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
 import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
 import { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
-import { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-policy.service.ts";
+import type { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-match-confirmation.service.ts";
 import { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import { AutomationEmailCapService } from "../services/email-cap.service.ts";
@@ -292,7 +292,7 @@ class SettlementTraceService extends AutomationSettlementTraceReader {
   }
 }
 
-class SettlementConfirmation extends AutomationSettlementMatchConfirmation {
+class SettlementConfirmation implements AutomationSettlementMatchConfirmation {
   readonly rejected = new Set<string>();
 
   async confirms(input: { traceId: string }): Promise<boolean> {

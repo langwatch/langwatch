@@ -6,7 +6,6 @@ import type {
   AutomationSettlementEvaluationReader,
   AutomationSettlementTraceReader,
 } from "../repositories/automation-settlement-read.repository.ts";
-import { AutomationSettlementMatchConfirmation } from "./automation-settlement-policy.service.ts";
 
 const EVENT_FILTER_FIELDS = new Set([
   "events.event_type",
@@ -46,31 +45,44 @@ export type AutomationSettlementTraceFilters = Pick<
 /** The evaluation owner's half of a trigger's legacy filters. */
 export type AutomationSettlementEvaluationFilters = Pick<EvaluationApi, "matchesEvaluationFilters">;
 
+/** Dispatch-time recheck against the settled trace; it cannot choose delivery,
+ * claims, caps or retries. */
+export interface AutomationSettlementMatchConfirmation {
+  confirms(input: {
+    trigger: TriggerSummary;
+    projectId: string;
+    traceId: string;
+    foldState: TraceSummaryData;
+  }): Promise<boolean>;
+}
+
+type AutomationSettlementMatchConfirmationInput = Readonly<{
+  evaluations: AutomationSettlementEvaluationReader;
+  traces: AutomationSettlementTraceReader;
+  traceFilters: AutomationSettlementTraceFilters;
+  evaluationFilters: AutomationSettlementEvaluationFilters;
+}>;
+
 /** Confirms a recorded match against its settled trace state before delivery.
  * The service owns conditional reads and fail-closed sequencing; each data
  * owner's Api owns the matching over its own data. */
-export class AutomationSettlementMatchConfirmationService extends AutomationSettlementMatchConfirmation {
-  private constructor(
-    private readonly evaluations: AutomationSettlementEvaluationReader,
-    private readonly traces: AutomationSettlementTraceReader,
-    private readonly traceFilters: AutomationSettlementTraceFilters,
-    private readonly evaluationFilters: AutomationSettlementEvaluationFilters,
-  ) {
-    super();
+export class AutomationSettlementMatchConfirmationService implements AutomationSettlementMatchConfirmation {
+  private readonly evaluations: AutomationSettlementEvaluationReader;
+  private readonly traces: AutomationSettlementTraceReader;
+  private readonly traceFilters: AutomationSettlementTraceFilters;
+  private readonly evaluationFilters: AutomationSettlementEvaluationFilters;
+
+  private constructor(input: AutomationSettlementMatchConfirmationInput) {
+    this.evaluations = input.evaluations;
+    this.traces = input.traces;
+    this.traceFilters = input.traceFilters;
+    this.evaluationFilters = input.evaluationFilters;
   }
 
-  static create(input: {
-    evaluations: AutomationSettlementEvaluationReader;
-    traces: AutomationSettlementTraceReader;
-    traceFilters: AutomationSettlementTraceFilters;
-    evaluationFilters: AutomationSettlementEvaluationFilters;
-  }): AutomationSettlementMatchConfirmationService {
-    return new AutomationSettlementMatchConfirmationService(
-      input.evaluations,
-      input.traces,
-      input.traceFilters,
-      input.evaluationFilters,
-    );
+  static create(
+    input: AutomationSettlementMatchConfirmationInput,
+  ): AutomationSettlementMatchConfirmationService {
+    return new AutomationSettlementMatchConfirmationService(input);
   }
 
   async confirms(input: {

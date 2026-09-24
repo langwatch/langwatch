@@ -13,10 +13,10 @@ import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../eventing/trigger-settlement.
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
-import type { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-policy.service.ts";
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import { AutomationSettlementExecutor } from "./automation-settlement-executor.service.ts";
+import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";

@@ -22,9 +22,9 @@ import {
   type AutomationSettlementTraceReader,
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
-import type { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-policy.service.ts";
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import {
   TriggerSettlementEmailService,

@@ -3,8 +3,8 @@ import { createHash } from "node:crypto";
 import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automation-contract";
 import { toDispatchError } from "@langwatch/eventing";
 import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
-import type { EmailDelivery } from "@langwatch/notification-process";
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { Mail } from "@langwatch/process-stores/members";
 import { Temporal } from "@langwatch/time";
 import type { TraceRecord } from "@langwatch/trace-contract";
 
@@ -67,7 +67,7 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
  */
 export class AutomationNotificationDeliveryAdapter extends AutomationNotificationDelivery {
   static create(options: {
-    mailer: EmailDelivery;
+    mailer: Mail;
     /**
      * Renders the default digest. `@langwatch/mail` holds the words; this
      * adapter holds the envelope they leave in.
@@ -110,7 +110,7 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
     });
   }
 
-  private readonly mailer: EmailDelivery;
+  private readonly mailer: Mail;
 
   private readonly renderer: MailRender;
 
@@ -139,7 +139,7 @@ export class AutomationNotificationDeliveryAdapter extends AutomationNotificatio
     webhooks,
     logger,
   }: {
-    mailer: EmailDelivery;
+    mailer: Mail;
     renderer: MailRender;
     baseHost: string;
     unsubscribeTokens: UnsubscribeTokenService;

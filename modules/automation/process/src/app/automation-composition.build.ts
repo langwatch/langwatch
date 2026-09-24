@@ -1,6 +1,6 @@
 /**
- * Builds AutomationInfrastructure for the API process; implements reads/writes to trigger
- * rows, not evaluation/delivery/scheduling (those are the worker's responsibilities).
+ * Builds AutomationInfrastructure for both processes: trigger reads and writes, and the
+ * graph-alert delivery a re-evaluation dispatches through (mail, Slack, webhook).
  */
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
@@ -10,8 +10,9 @@ import {
   type SlackChannelListing,
 } from "@langwatch/automation-contract";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import type { Logger } from "@langwatch/observability";
-import type { Encryption, ProcessMembers } from "@langwatch/process-stores/members";
+import type { Encryption, Mail, ProcessMembers } from "@langwatch/process-stores/members";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -24,15 +25,21 @@ import type {
   AutomationScheduledJobRepository,
   ScheduledJobRecord,
 } from "../repositories/automation-scheduled-job.repository.ts";
+import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
+import { RedisAutomationEmailCapRepository } from "../repositories/redis/redis.automation-email-cap.repository.ts";
 import { RedisAutomationPersistCapRepository } from "../repositories/redis/redis.automation-persist-cap.repository.ts";
+import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 import type {
   AutomationDispatchError,
   AutomationHeartbeat,
   AutomationLogger,
 } from "../services/automation-graph-runtime.service.ts";
+import { AutomationNotificationDeliveryAdapter } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
 import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
+import { AutomationEmailCapService } from "../services/email-cap.service.ts";
+import { GraphAlertDispatchService } from "../services/graph-alert-dispatch.service.ts";
 import type {
   AutomationAuditSink,
   AutomationCallCounter,
@@ -44,28 +51,34 @@ import type {
 } from "./automation.app.ts";
 import type { AutomationClock } from "./automation.members.ts";
 
-/**
- * What `buildAutomationInfrastructure` reads off process members. The
- * unsubscribe key is not among them: `stores` owns `CREDENTIALS_SECRET`, and
- * the verifier built from it is what travels, never the key.
- */
+/** What `buildAutomationInfrastructure` reads off process members. */
 export type AutomationProcessMembers = Readonly<{
   prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   logger: Logger;
   encryption: Encryption;
+  mail: Mail;
   publicBaseUrl: string | undefined;
   secrets: Readonly<{ find(key: string): string | undefined }>;
 }>;
 
-/** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
-export function buildAutomationInfrastructure(input: {
+type AutomationInfrastructureInput = Readonly<{
   members: AutomationProcessMembers;
   auditLog: AuditLogApi;
   verifier: AutomationInfrastructure["verifier"];
-}): AutomationInfrastructure {
+  /** The key the verifier checks with, so every link this process mails verifies. */
+  unsubscribeSigningSecret: string | undefined;
+  repositories: Pick<AutomationRepositories, "triggers" | "suppressions" | "webhookDeliveries">;
+  caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
+}>;
+
+/** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
+export function buildAutomationInfrastructure(
+  input: AutomationInfrastructureInput,
+): AutomationInfrastructure {
   const { members } = input;
   const providers = AutomationProviderRegistryService.create(members.encryption);
+  const clock = new ApiAutomationClock();
 
   return {
     verifier: input.verifier,
@@ -73,9 +86,9 @@ export function buildAutomationInfrastructure(input: {
     // claims a due row through — Eventing's own, not a second narrowing of it,
     // so the row this process writes on save is the row that process reads.
     jobs: new InstantScheduledJobRepository(new PrismaScheduledJobStore(members.prisma)),
-    clock: new ApiAutomationClock(),
+    clock,
     wake: new ApiSchedulerWake(members.redis),
-    notifier: new UndeliveredApiGraphAlerts(),
+    notifier: buildGraphAlertNotifier({ ...input, providers, clock }),
     logger: new ApiAutomationLogger(members.logger),
     slackTokens: new ApiAutomationSlackTokens(providers),
     dispatchErrors: new ApiAutomationDispatchErrors(),
@@ -155,8 +168,40 @@ class ApiSchedulerWake extends SchedulerWake {
   }
 }
 
-/** Graph alerts are dispatched by the worker, so this one refuses by name. */
-class UndeliveredApiGraphAlerts implements AutomationGraphNotifier {
+/**
+ * Main's graph-alert delivery (worker-automation-graph.composition.ts): no public
+ * origin means no alert, since every alert links back to it.
+ */
+function buildGraphAlertNotifier(
+  input: AutomationInfrastructureInput &
+    Readonly<{ providers: AutomationProviderRegistryService; clock: AutomationClock }>,
+): AutomationGraphNotifier {
+  const baseHost = input.members.publicBaseUrl;
+  if (!baseHost) return new UndeliveredGraphAlerts();
+
+  return GraphAlertDispatchService.create({
+    persistence: AutomationGraphDeliveryService.create(input.repositories),
+    emailCaps: AutomationEmailCapService.create({
+      store: RedisAutomationEmailCapRepository.create({ connection: input.members.redis }),
+    }),
+    delivery: AutomationNotificationDeliveryAdapter.create({
+      mailer: input.members.mail,
+      renderer: ReactEmailMailRenderer.create(),
+      baseHost,
+      ...(input.unsubscribeSigningSecret === undefined
+        ? {}
+        : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
+      logger: input.members.logger,
+    }),
+    webhooks: input.providers.webhooks,
+    clock: input.clock,
+    emailHourlyCap: input.caps.emailHourlyCap,
+    tenantDailyCap: input.caps.tenantDailyCap,
+  });
+}
+
+/** A process with no public origin cannot link an alert back, so it refuses by name. */
+class UndeliveredGraphAlerts implements AutomationGraphNotifier {
   dispatch(): never {
     throw new ApiAutomationUnavailableError("deliver graph alerts");
   }
