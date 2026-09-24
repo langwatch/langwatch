@@ -109,6 +109,18 @@ import {
   type EvaluationTraceEvent,
   type EvaluationTraceSpan,
   type TracesForProjectResult,
+  type AssignTopicCommandData,
+  type ClassifyClaudeCallInput,
+  type ClassifyClaudeCallResult,
+  type DeriveClaudeResponseContentInput,
+  type DeriveClaudeResponseContentResult,
+  type ScenarioRoleMetrics,
+  type ScenarioRoleMetricsInput,
+  type TraceQueryEvaluationRun,
+  type TraceTopicAssignment,
+  type TraceTopicClusteringCounts,
+  type TraceTopicClusteringPage,
+  type TraceTopicClusteringPageInput,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -116,6 +128,7 @@ import {
 } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
 
+import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
@@ -143,6 +156,7 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { traceToConversationTurn } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
+import type { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
 import type { TraceEditRemoval } from "../services/trace-edit-overlay.service.ts";
@@ -158,6 +172,7 @@ import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.s
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
+import type { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
 import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import type {
@@ -525,6 +540,12 @@ export interface TraceAppDependencies {
   publicBaseUrl?: string;
   /** Counts the anonymous share read per token and per IP; absent, the share read refuses. */
   shareReadLimiter?: RateLimiter | undefined;
+  /** Per-role scenario cost and latency over stored spans; absent, the derivation refuses. */
+  scenarioRoleMetrics?: ScenarioRoleMetricsDerivationService | undefined;
+  /** Topic clustering's reads of trace summaries; absent, both reads refuse. */
+  topicClustering?: TraceTopicClusteringReadService | undefined;
+  /** trace_processing's assignTopic sender; absent, a topic assignment refuses. */
+  topicAssignment?: TraceTopicAssignment | undefined;
 }
 
 /**
@@ -942,6 +963,64 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount> {
     return this.#dependencies.traces.existence.countUsage(input);
+  }
+
+  classifyClaudeCall(input: ClassifyClaudeCallInput): ClassifyClaudeCallResult {
+    return this.#dependencies.traces.canonicalisation.classifyClaudeCall(input);
+  }
+
+  deriveClaudeResponseContent(
+    input: DeriveClaudeResponseContentInput,
+  ): DeriveClaudeResponseContentResult {
+    return this.#dependencies.traces.canonicalisation.deriveClaudeResponseContent(input);
+  }
+
+  async assignTopic(input: AssignTopicCommandData): Promise<void> {
+    return this.#composed("topicAssignment", "A topic assignment").assignTopic(input);
+  }
+
+  async deriveScenarioRoleMetrics(input: ScenarioRoleMetricsInput): Promise<ScenarioRoleMetrics> {
+    return this.#composed("scenarioRoleMetrics", "A scenario role metrics derivation").derive(
+      input,
+    );
+  }
+
+  matchesFilterQuery(input: {
+    query: string;
+    foldState: TraceSummaryData;
+    evaluations: TraceQueryEvaluationRun[] | null;
+    events: DerivedTraceEvent[] | null;
+  }): boolean {
+    return ClickhouseTraceQueryEvaluationRepository.matches(input.query, {
+      summary: input.foldState,
+      evaluations: input.evaluations,
+      events: input.events,
+      spans: null,
+    });
+  }
+
+  async readTopicClusteringCounts(input: {
+    projectId: string;
+  }): Promise<TraceTopicClusteringCounts> {
+    return this.#composed("topicClustering", "A topic clustering read").readCounts(input);
+  }
+
+  async readTopicClusteringPage(
+    input: TraceTopicClusteringPageInput,
+  ): Promise<TraceTopicClusteringPage> {
+    return this.#composed("topicClustering", "A topic clustering read").readPage(input);
+  }
+
+  #composed<K extends "scenarioRoleMetrics" | "topicClustering" | "topicAssignment">(
+    key: K,
+    capability: string,
+  ): NonNullable<TraceAppDependencies[K]> {
+    const composed = this.#dependencies[key];
+    if (!composed) {
+      throw new Error(`${capability} reached Trace, but this process composed Trace without it`);
+    }
+
+    return composed;
   }
 
   findExistingTraceIds(input: {

@@ -6,6 +6,7 @@ import type { TraceAnalyticsRollupRepository } from "./projection/trace-analytic
 import type { TraceSummaryProjectionRepository } from "./projection/trace-summary-projection.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
+import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
@@ -31,4 +32,5 @@ export interface TraceRepositories {
   readonly sessionGroups: SessionGroupsRepository;
   /** Claim-check reads for fields the fold offloaded out of the summary. */
   readonly eventPayloads: TracePayloadReaderRepository;
+  readonly clusteringSample: TraceClusteringSampleRepository;
 }

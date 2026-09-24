@@ -156,6 +156,7 @@ function deployment(access: OtlpAccess = {}) {
     changeTraceName: async () => undefined,
     addAnnotation: async () => undefined,
     removeAnnotation: async () => undefined,
+    assignTopic: async () => undefined,
   };
 
   const canonicalisation = TraceCanonicalisationService.create();

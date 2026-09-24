@@ -28,6 +28,10 @@ import {
 } from "../repositories/query-field-values.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import { EventingTraceTopicAssignment } from "../services/eventing.trace-topic-assignment.service.ts";
+import { ModelCatalogTraceModelCostAdapter } from "../services/model-catalog.trace-model-cost.service.ts";
+import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { SpanCostService } from "../services/span-cost.service.ts";
 import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
@@ -46,6 +50,7 @@ import { TraceQueryClassificationService } from "../services/trace-query-classif
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
 import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
+import { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
 import {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
@@ -272,6 +277,18 @@ export function composeTraceAppDependencies(
         }
       : {}),
     publicBaseUrl: options.publicBaseUrl,
+    scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
+      spans: options.repositories.derivationSpans,
+      spanCosts: SpanCostService.create({ modelCosts: ModelCatalogTraceModelCostAdapter.create() }),
+    }),
+    topicClustering: TraceTopicClusteringReadService.create({
+      repository: options.repositories.clusteringSample,
+    }),
+    topicAssignment: EventingTraceTopicAssignment.create({
+      sendAssignTopic: async (input) => {
+        await options.commands.assignTopic(input);
+      },
+    }),
   };
 }
 

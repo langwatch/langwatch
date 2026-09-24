@@ -1,8 +1,8 @@
 import { nowInstant } from "@langwatch/time";
+import type { ScenarioRoleMetrics, ScenarioRoleMetricsInput } from "@langwatch/trace-contract";
 
 import type { TraceDerivationSpanReaderRepository } from "../repositories/trace-derivation-span-reader.repository.ts";
 import { deriveScenarioRoleMetricsFromSpans } from "../rules/scenario-role-metrics.rules.ts";
-import type { ScenarioRoleMetrics } from "../rules/scenario-role-metrics.rules.ts";
 import type { SpanCostService } from "./span-cost.service.ts";
 
 /**
@@ -18,23 +18,6 @@ const DERIVATION_MEMO_MAX_ENTRIES = 2_000;
 interface MemoEntry {
   value: Promise<ScenarioRoleMetrics>;
   expiresAt: number;
-}
-
-export interface ScenarioRoleMetricsDerivationInput {
-  tenantId: string;
-  traceId: string;
-  /**
-   * ClickHouse partition hint (the trace's EARLIEST span time). It narrows the
-   * partitions scanned; it is NOT a freshness cutoff and does not bound which
-   * spans come back, so it must not key the memo.
-   */
-  occurredAtMs?: number;
-  /**
-   * Monotonic fold watermark, the fold's spanCount. The memo is keyed on it so a cached derivation
-   * is reused only within one fold version and drops the moment newer spans land. Omit it to
-   * bypass the memo: a live read with no watermark always hits storage.
-   */
-  foldVersion?: number;
 }
 
 /**
@@ -68,7 +51,7 @@ export class ScenarioRoleMetricsDerivationService {
     private readonly now: () => number,
   ) {}
 
-  async derive(input: ScenarioRoleMetricsDerivationInput): Promise<ScenarioRoleMetrics> {
+  async derive(input: ScenarioRoleMetricsInput): Promise<ScenarioRoleMetrics> {
     const read = async (): Promise<ScenarioRoleMetrics> =>
       deriveScenarioRoleMetricsFromSpans({
         spans: await this.spans.findNormalizedSpansByTraceId({

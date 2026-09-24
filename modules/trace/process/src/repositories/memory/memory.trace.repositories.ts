@@ -1,6 +1,7 @@
 import { NullLogRecordStorageRepository } from "../log-record-storage.repository.ts";
 import { NullSessionGroupsRepository } from "../session-groups.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
+import { MemoryNullTraceClusteringSampleRepository } from "./memory.null-trace-clustering-sample.repository.ts";
 import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
@@ -42,6 +43,7 @@ export class MemoryTraceRepositories {
       list: MemoryNullTraceListRepository.create(),
       sessionGroups: new NullSessionGroupsRepository(),
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
+      clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
     };
   }
 }

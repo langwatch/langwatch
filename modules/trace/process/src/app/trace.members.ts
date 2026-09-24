@@ -268,6 +268,7 @@ export interface TraceProcessingCommands {
   changeTraceName(data: TraceNameChangedEventData): Promise<unknown>;
   addAnnotation(data: AnnotationAddedEventData): Promise<unknown>;
   removeAnnotation(data: AnnotationRemovedEventData): Promise<unknown>;
+  assignTopic(data: AssignTopicCommandData): Promise<unknown>;
 }
 
 /** Worker-facing installation capability for Trace's complete processing graph. */

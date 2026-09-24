@@ -1,4 +1,4 @@
-import type { NormalizedSpan } from "@langwatch/trace-contract";
+import type { NormalizedSpan, ScenarioRoleMetrics } from "@langwatch/trace-contract";
 
 import type { SpanCostService } from "../services/span-cost.service.ts";
 
@@ -12,11 +12,6 @@ export interface ScenarioRoleSpanInput {
   /** Per-span cost contribution (already model-cost-matched by the caller). */
   cost: number;
   durationMs: number;
-}
-
-export interface ScenarioRoleMetrics {
-  scenarioRoleCosts: Record<string, number>;
-  scenarioRoleLatencies: Record<string, number>;
 }
 
 // Read-time aggregation of per-role cost/latency; role lives on descendants,

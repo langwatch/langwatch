@@ -6,6 +6,12 @@ import type {
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
+import type {
+  ClassifyClaudeCallInput,
+  ClassifyClaudeCallResult,
+  DeriveClaudeResponseContentInput,
+  DeriveClaudeResponseContentResult,
+} from "./trace-canonicalisation.ts";
 import type { RecordCapturedSpanInput } from "./trace-captured-span.commands.ts";
 import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
@@ -26,7 +32,9 @@ import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.t
 import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
+import type { AssignTopicCommandData } from "./trace-processing.commands.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
+import type { TraceQueryEvaluationRun } from "./trace-query-evaluation.types.ts";
 import type {
   TraceQueryClassification,
   TraceQueryClassificationInput,
@@ -34,6 +42,10 @@ import type {
 } from "./trace-query.contract.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import type { TraceRecord } from "./trace-record.ts";
+import type {
+  ScenarioRoleMetrics,
+  ScenarioRoleMetricsInput,
+} from "./trace-scenario-role-metrics.ts";
 import type { SharedTraceDto } from "./trace-share.schemas.ts";
 import type {
   SpanSummaryRow,
@@ -43,6 +55,11 @@ import type {
   ModelUsageStatsRow,
   ModelSpanSampleRow,
 } from "./trace-span-read-model.ts";
+import type {
+  TraceTopicClusteringCounts,
+  TraceTopicClusteringPage,
+  TraceTopicClusteringPageInput,
+} from "./trace-topic-clustering-read.ts";
 import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type {
@@ -538,6 +555,22 @@ export interface TraceApi extends TraceOtlpIngestApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<TraceUsageCount>;
+  classifyClaudeCall(input: ClassifyClaudeCallInput): ClassifyClaudeCallResult;
+  deriveClaudeResponseContent(
+    input: DeriveClaudeResponseContentInput,
+  ): DeriveClaudeResponseContentResult;
+  /** Sends trace_processing's assignTopic command; refuses where this process registered none. */
+  assignTopic(input: AssignTopicCommandData): Promise<void>;
+  deriveScenarioRoleMetrics(input: ScenarioRoleMetricsInput): Promise<ScenarioRoleMetrics>;
+  /** A saved query against one folded trace, in memory; fails closed on anything it cannot read. */
+  matchesFilterQuery(input: {
+    query: string;
+    foldState: TraceSummaryData;
+    evaluations: TraceQueryEvaluationRun[] | null;
+    events: DerivedTraceEvent[] | null;
+  }): boolean;
+  readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
+  readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
 }
 
 export const TraceApi = moduleApi<TraceApi>()("trace");

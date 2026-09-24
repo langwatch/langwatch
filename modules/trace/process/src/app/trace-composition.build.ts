@@ -99,8 +99,8 @@ export function buildTraceCollaborators(input: {
 }
 
 /** Registers the trace_processing pipeline and publishes three senders.
- * changeTraceName is not included: it's the processing role's command, and a
- * producer would write an event no consumer on this process folds. */
+ * changeTraceName and assignTopic are not included: they are the processing role's
+ * commands, and a producer would write events no consumer on this process folds. */
 export function buildTraceProducerCommands(input: {
   eventing: EventSourcing;
   processName: string;
@@ -127,6 +127,7 @@ export function buildTraceProducerCommands(input: {
     addAnnotation: (data) => add.send(data),
     removeAnnotation: (data) => remove.send(data),
     changeTraceName: () => Promise.reject(refuse("the trace rename command")),
+    assignTopic: () => Promise.reject(refuse("the trace topic assignment command")),
   };
 }
 
@@ -159,6 +160,7 @@ export function buildTraceProcessRegistrationCommands(input: {
     addAnnotation: async (data) => sender("addAnnotation").send(data),
     removeAnnotation: async (data) => sender("removeAnnotation").send(data),
     changeTraceName: async (data) => sender("changeTraceName").send(data),
+    assignTopic: async (data) => sender("assignTopic").send(data),
   };
 }
 
