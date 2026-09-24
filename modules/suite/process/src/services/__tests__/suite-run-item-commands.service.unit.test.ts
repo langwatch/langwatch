@@ -1,6 +1,7 @@
 import type {
   CompleteSuiteRunItemCommandData,
   RecordSuiteRunItemStartedCommandData,
+  RegradeSuiteRunItemCommandData,
 } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
@@ -9,9 +10,11 @@ import { SuiteRunItemCommandsService } from "../suite-run-item-commands.service.
 function recordingSenders() {
   const started: RecordSuiteRunItemStartedCommandData[] = [];
   const completed: CompleteSuiteRunItemCommandData[] = [];
+  const regraded: RegradeSuiteRunItemCommandData[] = [];
   return {
     started,
     completed,
+    regraded,
     senders: {
       recordSuiteRunItemStarted: {
         send: async (payload: RecordSuiteRunItemStartedCommandData) => {
@@ -21,6 +24,11 @@ function recordingSenders() {
       completeSuiteRunItem: {
         send: async (payload: CompleteSuiteRunItemCommandData) => {
           completed.push(payload);
+        },
+      },
+      regradeSuiteRunItem: {
+        send: async (payload: RegradeSuiteRunItemCommandData) => {
+          regraded.push(payload);
         },
       },
     },
@@ -67,6 +75,28 @@ describe("SuiteRunItemCommandsService", () => {
 
         expect(recording.completed).toEqual([itemCompleted]);
         expect(recording.started).toEqual([]);
+      });
+    });
+
+    describe("when a finished run's verdict changes after the fact", () => {
+      /** @scenario "A regraded scenario run moves its suite run item once" */
+      it("sends regradeSuiteRunItem naming the change", async () => {
+        const recording = recordingSenders();
+        const service = SuiteRunItemCommandsService.create();
+        service.connect(recording.senders);
+        const itemRegraded: RegradeSuiteRunItemCommandData = {
+          ...itemStarted,
+          previousStatus: "SUCCESS",
+          previousVerdict: "success",
+          status: "FAILED",
+          verdict: "failure",
+          idempotencyKey: "event-evaluated-1",
+        };
+
+        await service.regradeSuiteRunItem(itemRegraded);
+
+        expect(recording.regraded).toEqual([itemRegraded]);
+        expect(recording.completed).toEqual([]);
       });
     });
   });

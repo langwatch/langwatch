@@ -21,6 +21,7 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -45,6 +46,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       traces: createApiFixture<TraceApi>(),
       billing: createApiFixture<BillingApi>(),
       retention: createApiFixture<DataRetentionApi>(),
+      suites: createApiFixture<SuiteApi>(),
     },
     config: undefined,
     resources: createApiFixture<ResourceOwnership>(),

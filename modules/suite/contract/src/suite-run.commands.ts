@@ -37,3 +37,17 @@ export const completeSuiteRunItemCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 export type CompleteSuiteRunItemCommandData = z.infer<typeof completeSuiteRunItemCommandDataSchema>;
+
+export const regradeSuiteRunItemCommandDataSchema = z.object({
+  tenantId: z.string(),
+  batchRunId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  previousStatus: z.string(),
+  previousVerdict: z.string().optional(),
+  status: z.string(),
+  verdict: z.string().optional(),
+  idempotencyKey: z.string(),
+  occurredAt: z.number(),
+});
+export type RegradeSuiteRunItemCommandData = z.infer<typeof regradeSuiteRunItemCommandDataSchema>;

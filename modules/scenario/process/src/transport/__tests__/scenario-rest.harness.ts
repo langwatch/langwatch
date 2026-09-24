@@ -23,6 +23,7 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { HTTPException } from "hono/http-exception";
@@ -76,6 +77,7 @@ export function createScenarioRestTestApp(
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
       billing: createApiFixture<BillingApi>(options.billing ?? {}, "Billing API"),
       retention: createApiFixture<DataRetentionApi>(),
+      suites: createApiFixture<SuiteApi>(),
     },
     members: {
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),

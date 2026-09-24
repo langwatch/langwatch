@@ -92,6 +92,7 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
         "startSuiteRun",
         "recordSuiteRunItemStarted",
         "completeSuiteRunItem",
+        "regradeSuiteRunItem",
       ]);
       expect([...pipeline.foldProjections.keys()]).toEqual(["suiteRunState"]);
     });
@@ -102,7 +103,7 @@ describe("ClickHouseSuiteRunProcessingAdapter", () => {
 
       expect(
         pipeline.commands.map((command) => Boolean(command.definition.options?.deduplication)),
-      ).toEqual([true, true, true]);
+      ).toEqual([true, true, true, true]);
     });
   });
 

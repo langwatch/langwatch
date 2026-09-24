@@ -6,7 +6,6 @@ import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { SnapshotUpdateBroadcastSubscriberDeps } from "../eventing/snapshot-update-broadcast.subscriber.ts";
-import type { SuiteRunSyncSubscriberDeps } from "../eventing/suite-run-sync.subscriber.ts";
 import { SimulationClickHouseRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
 import type { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
 import { SimulationService } from "../services/simulation.service.ts";
@@ -134,19 +133,6 @@ export function buildScenarioComposition(input: {
           input.execution,
         )
       : void 0,
-  };
-}
-
-/** Suite run items wait on SuiteApi's run-item operations; until then each refuses by name. */
-export function pendingSuiteRunSync(): SuiteRunSyncSubscriberDeps {
-  const refuse = (operation: string) => () =>
-    Promise.reject(
-      new Error(`SuiteApi.${operation} is not available yet; the suite run item is not updated.`),
-    );
-  return {
-    recordSuiteRunItemStarted: refuse("recordSuiteRunItemStarted"),
-    completeSuiteRunItem: refuse("completeSuiteRunItem"),
-    regradeSuiteRunItem: refuse("regradeSuiteRunItem"),
   };
 }
 

@@ -58,7 +58,7 @@ const buildSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) =
           store: deps.suiteRunStateFoldStore,
         }),
       )
-      // These three fold by addition (Started/Completed/FailedCount + 1),
+      // These fold by addition (Started/Completed/FailedCount + 1),
       // deduped by `event.id` — `withCommand` only reads dedup from
       // `makeJobId` in these options; omit it and a redelivery double-counts,
       // flipping status to SUCCESS/FAILURE before the run has finished.
@@ -77,6 +77,12 @@ const buildSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) =
       .withCommand("completeSuiteRunItem", commands.completeSuiteRunItem, {
         deduplication: {
           makeId: jobId("completeSuiteRunItem", commands.completeSuiteRunItem.makeJobId),
+          ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
+        },
+      })
+      .withCommand("regradeSuiteRunItem", commands.regradeSuiteRunItem, {
+        deduplication: {
+          makeId: jobId("regradeSuiteRunItem", commands.regradeSuiteRunItem.makeJobId),
           ttlMs: SUITE_COMMAND_DEDUP_TTL_MS,
         },
       })

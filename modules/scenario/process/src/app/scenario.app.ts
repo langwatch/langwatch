@@ -104,6 +104,7 @@ import {
   type LiteLLMParams,
   type TakenPendingNavigate,
 } from "@langwatch/scenario-contract";
+import { SuiteApi } from "@langwatch/suite-contract";
 /**
  * The scenario feature's application: what all of its doors call.
  */
@@ -137,7 +138,6 @@ import {
 } from "../services/simulation-processing.service.ts";
 import {
   buildScenarioComposition,
-  pendingSuiteRunSync,
   undeliveredSnapshotUpdates,
 } from "./scenario-composition.build.ts";
 
@@ -208,6 +208,8 @@ export const scenarioAppDependencyTokens = {
   billing: BillingApi,
   /** The platform default a simulation run row is stamped with, read per write. */
   retention: DataRetentionApi,
+  /** Where a suite set's scenario runs are recorded against their suite run. */
+  suites: SuiteApi,
 };
 
 /**
@@ -329,7 +331,12 @@ export class ScenarioApp implements ScenarioApi {
         retention: setup.dependencies.retention,
         commands: simulationCommands,
         simulations,
-        suiteRuns: pendingSuiteRunSync(),
+        suiteRuns: {
+          recordSuiteRunItemStarted: (data) =>
+            setup.dependencies.suites.recordSuiteRunItemStarted(data),
+          completeSuiteRunItem: (data) => setup.dependencies.suites.completeSuiteRunItem(data),
+          regradeSuiteRunItem: (data) => setup.dependencies.suites.regradeSuiteRunItem(data),
+        },
         snapshotUpdates: undeliveredSnapshotUpdates(),
       }),
     });

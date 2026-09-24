@@ -3,7 +3,7 @@
 Feature: Composing durable suite-run processing
 
   Durable suite-run processing is a queue consumer. It folds a suite run's
-  progress from the three commands the API and the simulation pipeline send,
+  progress from the four commands the API and the simulation pipeline send,
   and writes the result to one ClickHouse table.
 
   Nothing about that needed the App, and yet only the App could build it: the
@@ -24,7 +24,7 @@ Feature: Composing durable suite-run processing
   Scenario: Durable processing composes from one tenant-keyed client and one Redis
     Given a process that can route a tenant to its ClickHouse instance, and its own Redis
     When it composes durable suite-run processing
-    Then the pipeline registers the same three deduplicated commands the App registers
+    Then the pipeline registers the same four deduplicated commands the App registers
     And it registers the run-state fold the App registers
 
   @unit
@@ -59,3 +59,9 @@ Feature: Composing durable suite-run processing
     When the suite capability is composed
     Then it reads no environment for the default
     And it leaves data retention unasked until a run row is written, once peers are running
+
+  @unit
+  Scenario: A regraded scenario run moves its suite run item once
+    Given the suite run pipeline connected its senders
+    When a finished scenario run's verdict changes after the fact
+    Then suite sends regradeSuiteRunItem naming the change that moved it

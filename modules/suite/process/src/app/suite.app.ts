@@ -4,7 +4,11 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { RepositoryFoldStore, type FoldProjectionStore } from "@langwatch/eventing";
+import {
+  RepositoryFoldStore,
+  type EventingCommands,
+  type FoldProjectionStore,
+} from "@langwatch/eventing";
 import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
@@ -32,6 +36,9 @@ import {
   SuiteScopeNotAllowedError,
   type SuiteTarget,
   type CreateSuiteCommand,
+  type CompleteSuiteRunItemCommandData,
+  type RecordSuiteRunItemStartedCommandData,
+  type RegradeSuiteRunItemCommandData,
   type StartSuiteRunCommandData,
   type Suite,
   type SuiteArchivedNamesInput,
@@ -51,6 +58,7 @@ import { ClickhouseSuiteEventingRepository } from "../repositories/clickhouse/cl
 import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
+import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
 import {
   SuiteRunProcessingPipelineAdapter,
   type SuiteRunProcessingPipeline,
@@ -134,6 +142,7 @@ export class SuiteApp implements SuiteApi {
     return new SuiteApp({
       ...dependencies,
       suites,
+      runItems: SuiteRunItemCommandsService.create(),
       publicBaseUrl: infrastructure.publicBaseUrl,
       pipeline: SuiteApp.buildEventingPipeline({
         clickhouse: members.clickhouse,
@@ -199,6 +208,7 @@ export class SuiteApp implements SuiteApi {
     return new SuiteApp({
       ...setup.dependencies,
       suites,
+      runItems: SuiteRunItemCommandsService.create(),
       publicBaseUrl: infrastructure.publicBaseUrl,
     });
   }
@@ -206,17 +216,20 @@ export class SuiteApp implements SuiteApi {
   #dependencies: SuiteAppDependencies & { suites: SuiteService };
   readonly #publicBaseUrl: string | undefined;
   readonly #pipeline: SuiteRunProcessingPipeline | undefined;
+  readonly #runItems: SuiteRunItemCommandsService;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
       suites: SuiteService;
+      runItems: SuiteRunItemCommandsService;
       publicBaseUrl: string | undefined;
       pipeline?: SuiteRunProcessingPipeline;
     },
   ) {
-    const { publicBaseUrl, pipeline, ...rest } = dependencies;
+    const { publicBaseUrl, pipeline, runItems, ...rest } = dependencies;
     this.#publicBaseUrl = publicBaseUrl;
     this.#pipeline = pipeline;
+    this.#runItems = runItems;
     this.#dependencies = rest;
   }
 
@@ -230,6 +243,25 @@ export class SuiteApp implements SuiteApi {
     }
 
     return this.#pipeline;
+  }
+
+  /** Binds `suite_run_processing`'s own senders; the run-item operations send through them. */
+  connectCommands(commands: EventingCommands<SuiteRunProcessingPipeline>): void {
+    this.#runItems.connect(commands);
+  }
+
+  // -- suite run items (main's suiteRunSync senders) --------------------------
+
+  recordSuiteRunItemStarted(input: RecordSuiteRunItemStartedCommandData): Promise<void> {
+    return this.#runItems.recordSuiteRunItemStarted(input);
+  }
+
+  completeSuiteRunItem(input: CompleteSuiteRunItemCommandData): Promise<void> {
+    return this.#runItems.completeSuiteRunItem(input);
+  }
+
+  regradeSuiteRunItem(input: RegradeSuiteRunItemCommandData): Promise<void> {
+    return this.#runItems.regradeSuiteRunItem(input);
   }
 
   // -- reads -----------------------------------------------------------------

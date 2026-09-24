@@ -22,6 +22,7 @@ import type {
   SimulationService,
 } from "@langwatch/scenario-contract";
 import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -55,6 +56,7 @@ function harness() {
       traces: createApiFixture<TraceApi>(),
       billing: createApiFixture<BillingApi>(),
       retention: createApiFixture<DataRetentionApi>(),
+      suites: createApiFixture<SuiteApi>(),
     },
     config: undefined,
     resources: {} as ResourceOwnership,
@@ -355,6 +357,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           traces: createApiFixture<TraceApi>(),
           billing: createApiFixture<BillingApi>(),
           retention: createApiFixture<DataRetentionApi>(),
+          suites: createApiFixture<SuiteApi>(),
         },
         config: undefined,
         resources: {} as ResourceOwnership,
@@ -407,6 +410,7 @@ describe("given a process that supplies no simulations member but does read Clic
         traces: createApiFixture<TraceApi>(),
         billing: createApiFixture<BillingApi>(),
         retention: createApiFixture<DataRetentionApi>(),
+        suites: createApiFixture<SuiteApi>(),
       },
       config: undefined,
       resources: {} as ResourceOwnership,

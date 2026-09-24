@@ -9,7 +9,10 @@ import type {
 } from "@langwatch/scenario-contract";
 
 import type {
+  CompleteSuiteRunItemCommandData,
   CreateSuiteCommand,
+  RecordSuiteRunItemStartedCommandData,
+  RegradeSuiteRunItemCommandData,
   Suite,
   SuiteArchivedNamesInput,
   SuiteIdInput,
@@ -66,6 +69,12 @@ export interface SuiteApi {
   runAll(input: Omit<SuiteRunAllInput, "organizationId">): Promise<SuiteRunAllResult>;
   runPlan(input: Omit<SuiteRunPlanInput, "organizationId">): Promise<SuiteRunPlanResult>;
   getOrganizationId(projectId: string): Promise<string>;
+  /** A scenario run of a suite set started: sent on `suite_run_processing`. */
+  recordSuiteRunItemStarted(input: RecordSuiteRunItemStartedCommandData): Promise<void>;
+  /** A scenario run of a suite set finished: sent on `suite_run_processing`. */
+  completeSuiteRunItem(input: CompleteSuiteRunItemCommandData): Promise<void>;
+  /** A finished run's verdict changed after the fact; `idempotencyKey` names the change. */
+  regradeSuiteRunItem(input: RegradeSuiteRunItemCommandData): Promise<void>;
   /**
    * The platform's own address for one suite resource, from the project's
    * slug and the path already resolved — the three suite REST declarations
