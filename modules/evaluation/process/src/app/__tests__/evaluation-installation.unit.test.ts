@@ -17,6 +17,7 @@ import { evaluationServer } from "../../evaluation.server.ts";
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(evaluationServer)])
+    .withConfig({ evaluation: { langevalsEndpoint: undefined } })
     .provide({
       workflow: createApiFixture<WorkflowApi>(),
       trace: createApiFixture<TraceApi>(),

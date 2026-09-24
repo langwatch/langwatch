@@ -13,7 +13,7 @@ import {
 } from "@langwatch/evaluation-contract";
 import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import type { MonitorApi, MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { MonitorNotFoundError, monitorWithEvaluatorSchema } from "@langwatch/monitor-contract";
 import type {
   EvaluationTraceEvent,
@@ -26,7 +26,6 @@ import type {
   EvaluationAzureSafetyCredentialsResolution,
   EvaluationCostRecorder,
   EvaluationExecutionReceipt,
-  EvaluationMonitorLookup,
   ExecuteEvaluationCommandDeps,
 } from "../../app/evaluation.members.ts";
 
@@ -96,11 +95,11 @@ export function buildMonitor(overrides: Record<string, unknown> = {}): MonitorWi
 
 /**
  * The one monitor read an execution makes. Narrowed to
- * {@link EvaluationMonitorLookup}: everything else a monitor can answer
+ * `MonitorApi.getById`: everything else a monitor can answer
  * belongs to the monitor feature's own tests.
  */
-export class TestMonitorLookup implements EvaluationMonitorLookup {
-  readonly getMonitorById = vi.fn(async (input: MonitorIdInput): Promise<MonitorWithEvaluator> => {
+export class TestMonitorLookup implements Pick<MonitorApi, "getById"> {
+  readonly getById = vi.fn(async (input: MonitorIdInput): Promise<MonitorWithEvaluator> => {
     if (!this.monitor) throw new MonitorNotFoundError(input.id);
     return this.monitor;
   });

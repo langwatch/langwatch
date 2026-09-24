@@ -19,8 +19,6 @@ export type {
   EvaluationInputsOffload,
   EvaluationInputsResolution,
   EvaluationRetentionFloor,
-  EvaluationMonitorLookup,
-  EvaluationTraceEvidence,
   EvaluationLangevals,
   EvaluationModelEnv,
   EvaluationSpanDigest,

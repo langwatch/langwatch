@@ -13,8 +13,9 @@ import type {
   EvaluatorTypes,
   SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type {
+  TraceApi,
   Trace,
   Span,
   EvaluationTraceReadInput,
@@ -118,26 +119,6 @@ export interface EvaluationExecutionTelemetry {
   }): void;
 }
 
-/**
- * The one monitor read an execution makes: which evaluator this command
- * names. Narrowed from `MonitorService`, which a worker would otherwise
- * compose whole — create, replicate, toggle and the evaluator graph — for a lookup by id.
- */
-export interface EvaluationMonitorLookup {
-  /** Throws `MonitorNotFoundError` when the monitor was deleted after the command was queued. */
-  getMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator>;
-}
-
-/**
- * The two trace reads a precondition check makes, narrowed from the contract's
- * `TraceService` for the same reason. `TraceService` satisfies this.
- */
-export interface EvaluationTraceEvidence {
-  getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
-
-  getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
-}
-
 /** The environment variables this install was started with. */
 export interface EvaluationInstallEnvironment {
   read(): Readonly<Record<string, string | undefined>>;
@@ -205,8 +186,9 @@ export interface EvaluationExecutionReceipt {
 }
 
 export interface ExecuteEvaluationCommandDeps {
-  monitors: EvaluationMonitorLookup;
-  traces: EvaluationTraceEvidence;
+  /** Throws `MonitorNotFoundError` when the monitor was deleted after the command was queued. */
+  monitors: Pick<MonitorApi, "getById">;
+  traces: Pick<TraceApi, "getEvaluationSpans" | "getEvaluationEvents">;
   executionReceipt: EvaluationExecutionReceipt;
   azureSafetyCredentials: EvaluationAzureSafetyCredentials;
   settingsRecovery: EvaluationSettingsRecovery;

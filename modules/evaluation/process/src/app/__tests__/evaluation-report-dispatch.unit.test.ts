@@ -26,6 +26,7 @@ const REPORT: ReportEvaluationCommandData = {
 async function installed() {
   return createApp({ role: "api" })
     .withModules([withMemoryRepositories(evaluationServer)])
+    .withConfig({ evaluation: { langevalsEndpoint: undefined } })
     .provide({
       workflow: createApiFixture<WorkflowApi>(),
       trace: createApiFixture<TraceApi>(),

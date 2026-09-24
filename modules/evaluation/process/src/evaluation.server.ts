@@ -8,10 +8,9 @@ import type {
   EvaluationExecutionIntent,
   EvaluationInputStorage,
   EvaluationInputsOffload,
-  EvaluationMonitorLookup,
   EvaluationRetentionFloor,
   EvaluationSettingsRecovery,
-  EvaluationTraceEvidence,
+  ExecuteEvaluationCommandDeps,
 } from "./app/evaluation.members.ts";
 import { ClickhouseMonitorPerformanceRepository } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";
 import type { EvaluationClickHouseResolver } from "./repositories/clickhouse/evaluation-clickhouse-client.ts";
@@ -98,8 +97,8 @@ export function createEvaluationEngine(deps: EvaluationExecutionDeps): Evaluatio
  * composed. The receipt ledger is built here: a second one would bill a run twice.
  */
 export function createEvaluationExecutionIntent(input: {
-  monitors: EvaluationMonitorLookup;
-  traces: EvaluationTraceEvidence;
+  monitors: ExecuteEvaluationCommandDeps["monitors"];
+  traces: ExecuteEvaluationCommandDeps["traces"];
   azureSafetyCredentials: EvaluationAzureSafetyCredentials;
   settingsRecovery: EvaluationSettingsRecovery;
   inputsOffload: EvaluationInputsOffload;

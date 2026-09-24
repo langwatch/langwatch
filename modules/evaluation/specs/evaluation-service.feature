@@ -121,3 +121,21 @@ Feature: Evaluation service boundary
     Given evaluation's fold stores built over the platform default retention
     When a run and its analytics fold are written for a tenant with no override
     Then each row carries the default read at that write, and building the stores reads nothing
+
+  @unit
+  Scenario: A trigger's evaluation filter matches a processed verdict of the named evaluator
+    Given a trace whose evaluator run passed
+    When a trigger filtering on that evaluator passing is matched against the trace's runs
+    Then the filter matches
+
+  @unit
+  Scenario: A verdict on an errored run never satisfies a trigger's evaluation filter
+    Given a trace whose evaluator run errored with a failing verdict
+    When a trigger filtering on that evaluator failing is matched against the trace's runs
+    Then the filter does not match
+
+  @unit
+  Scenario: A keyed evaluation filter fails when its evaluator has no run on the trace
+    Given a trace with a run for one of two evaluators a trigger names
+    When the trigger's evaluation filters are matched against the trace's runs
+    Then the filter does not match

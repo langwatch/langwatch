@@ -11,8 +11,7 @@ import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 import {
   type EvaluationAzureSafetyCredentials,
   type EvaluationSettingsRecovery,
-  type EvaluationMonitorLookup,
-  type EvaluationTraceEvidence,
+  type ExecuteEvaluationCommandDeps,
 } from "../app/evaluation.members.ts";
 import { EvaluationPreconditionService } from "./evaluation-precondition.service.ts";
 import {
@@ -37,8 +36,8 @@ export type EvaluationPreparationResult =
 
 export class EvaluationExecutionPreparationService {
   static create(input: {
-    monitors: EvaluationMonitorLookup;
-    traces: EvaluationTraceEvidence;
+    monitors: ExecuteEvaluationCommandDeps["monitors"];
+    traces: ExecuteEvaluationCommandDeps["traces"];
     azureSafetyCredentials: EvaluationAzureSafetyCredentials;
     settingsRecovery: EvaluationSettingsRecovery;
   }): EvaluationExecutionPreparationService {
@@ -51,8 +50,8 @@ export class EvaluationExecutionPreparationService {
 
   private constructor(
     private readonly deps: {
-      monitors: EvaluationMonitorLookup;
-      traces: EvaluationTraceEvidence;
+      monitors: ExecuteEvaluationCommandDeps["monitors"];
+      traces: ExecuteEvaluationCommandDeps["traces"];
       azureSafetyCredentials: EvaluationAzureSafetyCredentials;
       settingsRecovery: EvaluationSettingsRecovery;
     },
@@ -63,7 +62,7 @@ export class EvaluationExecutionPreparationService {
   async prepare(data: ExecuteEvaluationCommandData): Promise<EvaluationPreparationResult> {
     let monitor: Monitor;
     try {
-      monitor = await this.deps.monitors.getMonitorById({
+      monitor = await this.deps.monitors.getById({
         projectId: data.tenantId,
         id: data.evaluatorId,
       });

@@ -100,6 +100,11 @@ export interface EvaluationApi {
   reportEvaluation(data: ReportEvaluationCommandData): Promise<void>;
   /** The evaluator-id slug rule for an evaluation that names no evaluator. */
   deriveEvaluatorId(name: string): string;
+  /** The evaluation half of a trigger's legacy filters against a trace's runs. */
+  matchesEvaluationFilters(input: {
+    filters: Readonly<Record<string, unknown>>;
+    evaluations: EvaluationRunData[];
+  }): boolean;
 }
 
 export const EvaluationApi = moduleApi<EvaluationApi>()("evaluation");

@@ -54,6 +54,7 @@ describe("given a process that installs the evaluation module over its repositor
     it("reads the run back by id, by trace and among the trace's evaluations", async () => {
       const runtime = await createApp({ role: "worker" })
         .withModules([withMemoryRepositories(evaluationServer)])
+        .withConfig({ evaluation: { langevalsEndpoint: undefined } })
         .provide({
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),
@@ -93,6 +94,7 @@ describe("given a process that installs the evaluation module over its repositor
     it("refuses it as not found, reading the floor from data retention", async () => {
       const runtime = await createApp({ role: "worker" })
         .withModules([withMemoryRepositories(evaluationServer)])
+        .withConfig({ evaluation: { langevalsEndpoint: undefined } })
         .provide({
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),

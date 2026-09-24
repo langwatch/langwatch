@@ -3,8 +3,10 @@ import {
   AZURE_SAFETY_ENV_VARS,
   AZURE_SAFETY_PROVIDER_KEY,
   EvaluationApi,
+  evaluationConfig,
   isAzureEvaluatorType,
   type CustomEvaluator,
+  type EvaluationServerConfig,
   type DatasetEvaluationRow,
   type EvaluationApi as EvaluationApiContract,
   type EvaluationCostRecord,
@@ -50,6 +52,7 @@ import {
   type EvaluationExperimentRunWriter,
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
+import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import type { EvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
@@ -160,7 +163,7 @@ export interface EvaluationRunner {
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationApp.dependencies,
   MembersRead<typeof EvaluationApp.reads>,
-  undefined,
+  EvaluationServerConfig,
   EvaluationRepositories
 >;
 
@@ -194,6 +197,8 @@ function verdictOf(
 /** The one process-owned Evaluation capability. */
 export class EvaluationApp implements EvaluationApiContract {
   static readonly contract = EvaluationApi;
+  /** `langevalsEndpoint`: where this deployment's evaluator and clustering service answers. */
+  static readonly config = evaluationConfig;
   static readonly dependencies = {
     workflows: WorkflowApi,
     traces: TraceApi,
@@ -213,6 +218,7 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #report: EvaluationReport;
   readonly #batchLog: EvaluationBatchLogService;
   readonly #autoslug: EvaluationNameAutoslugService;
+  readonly #filterMatching: EvaluationFilterMatchingService;
   readonly #experiments: EvaluationExperimentDirectory;
   readonly #slugs: EvaluationSlugDirectory;
   readonly #savedEvaluators: EvaluationSavedEvaluatorDirectory;
@@ -248,6 +254,7 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#runner = members.runner;
     this.#commands = commands;
     this.#autoslug = EvaluationNameAutoslugService.create();
+    this.#filterMatching = EvaluationFilterMatchingService.create();
     this.#batchLog = EvaluationBatchLogService.create({
       experiments: members.experiments,
       runs: members.experimentRuns,
@@ -342,6 +349,8 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#ledger.recordDatasetRow(input);
   deriveEvaluatorId: EvaluationApiContract["deriveEvaluatorId"] = (name) =>
     this.#autoslug.derive(name);
+  matchesEvaluationFilters: EvaluationApiContract["matchesEvaluationFilters"] = (input) =>
+    this.#filterMatching.matchesEvaluationFilters(input);
 
   async reportEvaluation(data: ReportEvaluationCommandData): Promise<void> {
     await this.#report.reportEvaluation(data);
