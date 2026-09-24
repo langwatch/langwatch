@@ -494,6 +494,12 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            # HEAD is the pull request's merge commit, fetched at depth 1, so it
+            # has no parent links and `origin/main...HEAD` has no merge base:
+            # vitest's --changed then selects nothing. One extra level gives the
+            # merge commit its two parents (branch head and main tip), which is
+            # all the three-dot diff needs.
+            git fetch --no-tags --deepen=1 origin "$GITHUB_REF"
             pnpm test:unit --run --changed origin/main --passWithNoTests \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
@@ -629,6 +635,12 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            # HEAD is the pull request's merge commit, fetched at depth 1, so it
+            # has no parent links and `origin/main...HEAD` has no merge base:
+            # vitest's --changed then selects nothing. One extra level gives the
+            # merge commit its two parents (branch head and main tip), which is
+            # all the three-dot diff needs.
+            git fetch --no-tags --deepen=1 origin "$GITHUB_REF"
             pnpm test:component --run --changed origin/main --passWithNoTests \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
@@ -888,6 +900,12 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            # HEAD is the pull request's merge commit, fetched at depth 1, so it
+            # has no parent links and `origin/main...HEAD` has no merge base:
+            # vitest's --changed then selects nothing. One extra level gives the
+            # merge commit its two parents (branch head and main tip), which is
+            # all the three-dot diff needs.
+            git fetch --no-tags --deepen=1 origin "$GITHUB_REF"
             pnpm test:integration --changed origin/main --passWithNoTests \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
