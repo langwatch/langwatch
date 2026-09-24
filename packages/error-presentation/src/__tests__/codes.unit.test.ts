@@ -66,6 +66,9 @@ const CLIENT_MINTED_CODES = new Set([
   // model came from a menu, so the remediation is a different one and needs
   // its own words.
   "langy_model_unavailable",
+  // Narrowed from the gateway's `codex_session_expired` by the panel's
+  // `langy-error-explainer.ts`, so the card can offer a Codex sign-in.
+  "langy_codex_session_expired",
 ]);
 
 /**

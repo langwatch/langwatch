@@ -3755,6 +3755,24 @@ const presentations = {
     title: "Langy has no record of this request",
     describe: () => "It has lapsed. Ask Langy for the code change again to start a new one.",
   },
+  api_key_invalid: {
+    title: "That session key isn't valid",
+    describe: () => "Run the command again and approve a fresh request to get a new key.",
+  },
+  key_type_not_allowed: {
+    title: "This key can't share a folder",
+    describe: () =>
+      "Only the key you get by approving a control request can. Approve the request in the terminal, then try again.",
+  },
+  conversation_mismatch: {
+    title: "That key belongs to another conversation",
+    describe: () =>
+      "Approve the request the conversation shows, or ask Langy for the code change again.",
+  },
+  cancelled: {
+    title: "The request was called off",
+    describe: () => "Nothing was changed. Ask Langy again when you're ready.",
+  },
   langy_local_record_unreadable: {
     title: "Langy can't read this request any more",
     describe: () => "Ask Langy for the code change again to start a new one.",
