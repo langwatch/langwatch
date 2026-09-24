@@ -9,7 +9,7 @@ import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import {
   ScenarioRunStatus,
   resolveScenarioError,
-  scenarioErrorDetail,
+  extractScenarioErrorDetail,
   scenarioErrorTitle,
 } from "@langwatch/scenario-contract";
 import {
@@ -493,7 +493,7 @@ function restatesFailure(reasoning: string): boolean {
 function RunFailurePanel({ raw }: { raw: string }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const handled = resolveScenarioError(raw);
-  const detail = scenarioErrorDetail(raw);
+  const detail = extractScenarioErrorDetail(raw);
   const hasDetail = !!detail && detail.trim() !== handled.message.trim();
 
   return (

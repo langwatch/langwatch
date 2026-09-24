@@ -1,6 +1,11 @@
-import type { BatchEvaluationRecord, BatchEvaluationSummary } from "@langwatch/dataset-contract";
+import {
+  type BatchEvaluationRecord,
+  type BatchEvaluationSummary,
+  DatasetNotFoundError,
+} from "@langwatch/dataset-contract";
 
 import type { BatchEvaluationRepository } from "../batch-evaluation.repository.ts";
+import type { DatasetRow } from "../dataset.repository.ts";
 import {
   type MemoryDatasetDatabase,
   type MemoryBatchEvaluation,
@@ -54,8 +59,14 @@ export class MemoryBatchEvaluationRepository implements BatchEvaluationRepositor
 
   /** The dataset the run was against, as the relational read includes it. */
   #dataset(row: MemoryBatchEvaluation): { id: string; name: string; slug: string } {
-    const dataset = this.#database.dataset(row.projectId, row.datasetId);
-    if (!dataset) throw new Error(`No Dataset found for id ${row.datasetId}`);
+    let dataset: DatasetRow;
+    try {
+      dataset = this.#database.getDataset(row.projectId, row.datasetId);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError)
+        throw new Error(`No Dataset found for id ${row.datasetId}`);
+      throw error;
+    }
 
     return { id: dataset.id, name: dataset.name, slug: dataset.slug };
   }

@@ -46,13 +46,13 @@ const messagesOf = (value: unknown): ProtocolMessage[] => {
 };
 
 /** A mapped cell that holds a number, or nothing when it holds no number. */
-const numberValueOf = (value: unknown): number | undefined => {
+const coerceNumberValue = (value: unknown): number | undefined => {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 /** A mapped cell that holds a truth value, written either way round. */
-const booleanValueOf = (value: unknown): boolean | undefined => {
+const coerceBooleanValue = (value: unknown): boolean | undefined => {
   if (typeof value === "boolean") return value;
   const text = String(value).trim().toLowerCase();
   if (text === "true") return true;
@@ -65,7 +65,7 @@ const booleanValueOf = (value: unknown): boolean | undefined => {
  * empty cell and one the declared type can't read. Left out of the call so
  * the function's own default applies, not the agent seeing `NaN` or "undefined".
  */
-const parameterValueOf = ({
+const coerceParameterValue = ({
   value,
   definition,
 }: {
@@ -73,8 +73,8 @@ const parameterValueOf = ({
   definition: ScenarioParameterDefinition;
 }): string | number | boolean | undefined => {
   if (value === undefined || value === null || value === "") return undefined;
-  if (definition.type === "number") return numberValueOf(value);
-  if (definition.type === "boolean") return booleanValueOf(value);
+  if (definition.type === "number") return coerceNumberValue(value);
+  if (definition.type === "boolean") return coerceBooleanValue(value);
   return typeof value === "string" ? value : (JSON.stringify(value) ?? "");
 };
 
@@ -92,7 +92,7 @@ export const buildConnectedCall = ({
 }): ConnectedTargetCall => {
   const params: Record<string, string | number | boolean> = {};
   for (const definition of definitions) {
-    const value = parameterValueOf({
+    const value = coerceParameterValue({
       value: inputs[definition.name],
       definition,
     });

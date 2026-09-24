@@ -10,7 +10,7 @@ import {
   SIMULATION_PROJECTION_VERSIONS,
   type GatedVerdict,
   gatedStatus,
-  gatedVerdict,
+  computeGatedVerdict,
   runAwaitsEvaluations,
   ScenarioRunStatus,
   simulationMessageSchema,
@@ -257,7 +257,7 @@ function settledOnFinish({
   attachmentCount: number;
 }): { status: string; verdict: string | null } {
   if (!hasOwnEvaluations && state.Evaluations.length > 0) {
-    const gated = gatedVerdict({
+    const gated = computeGatedVerdict({
       evaluations: state.Evaluations,
       judgeVerdict: verdict ?? undefined,
     });

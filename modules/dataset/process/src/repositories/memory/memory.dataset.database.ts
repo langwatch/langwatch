@@ -1,4 +1,4 @@
-import type { DatasetRecord } from "@langwatch/dataset-contract";
+import { type DatasetRecord, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 
 import type { DatasetRow } from "../dataset.repository.ts";
@@ -40,8 +40,11 @@ export class MemoryDatasetDatabase {
     return this.#datasets;
   }
 
-  dataset(projectId: string, id: string): DatasetRow | undefined {
-    return this.#datasets.find((row) => row.projectId === projectId && row.id === id);
+  getDataset(projectId: string, id: string): DatasetRow {
+    const row = this.#datasets.find((stored) => stored.projectId === projectId && stored.id === id);
+    if (!row) throw new DatasetNotFoundError();
+
+    return row;
   }
 
   putDataset(row: DatasetRow): void {

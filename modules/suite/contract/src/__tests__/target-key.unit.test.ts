@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
-  canonicalOverrides,
+  deriveCanonicalOverrides,
   canonicalParameters,
   declaredDefaults,
   differingParameterNames,
@@ -400,7 +400,7 @@ describe("declaredDefaults", () => {
   });
 });
 
-describe("canonicalOverrides", () => {
+describe("deriveCanonicalOverrides", () => {
   const defaults = new Map<string, string | number | boolean>([
     ["locale", "en"],
     ["seats", 12],
@@ -410,7 +410,7 @@ describe("canonicalOverrides", () => {
     /** @scenario "A typed default is not an override" */
     it("keeps only those values", () => {
       expect(
-        canonicalOverrides({
+        deriveCanonicalOverrides({
           runParameters: { locale: "en", model: "gpt-5", seats: 12 },
           defaults,
         }),
@@ -418,7 +418,7 @@ describe("canonicalOverrides", () => {
     });
 
     it("tells the string of a number from the number", () => {
-      expect(canonicalOverrides({ runParameters: { seats: "12" }, defaults })).toEqual({
+      expect(deriveCanonicalOverrides({ runParameters: { seats: "12" }, defaults })).toEqual({
         seats: "12",
       });
     });
@@ -427,9 +427,11 @@ describe("canonicalOverrides", () => {
   describe("when every value is its default", () => {
     /** @scenario "A typed default is not an override" */
     it("reads nothing", () => {
-      expect(canonicalOverrides({ runParameters: { locale: "en" }, defaults })).toBeUndefined();
-      expect(canonicalOverrides({ runParameters: {}, defaults })).toBeUndefined();
-      expect(canonicalOverrides({ defaults })).toBeUndefined();
+      expect(
+        deriveCanonicalOverrides({ runParameters: { locale: "en" }, defaults }),
+      ).toBeUndefined();
+      expect(deriveCanonicalOverrides({ runParameters: {}, defaults })).toBeUndefined();
+      expect(deriveCanonicalOverrides({ defaults })).toBeUndefined();
     });
   });
 });

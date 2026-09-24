@@ -6,7 +6,7 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
-  narrateWorkbenchAction,
+  pickWorkbenchActionNarration,
   readLiveWorkbench,
   scopeFromRunPayload,
 } from "@langwatch/experiment-contract";
@@ -389,7 +389,7 @@ export default function ExperimentsWorkbenchPage() {
           // Named while it works, so the panel's status line says what this
           // page is doing rather than falling back to a verb that claims
           // nothing. The edit itself is instant; the save after it is not.
-          setActionActivity(narrateWorkbenchAction(kind));
+          setActionActivity(pickWorkbenchActionNarration(kind));
           try {
             assertPageIsCurrent();
             const result = useEvaluationsV3Store.getState().applyWorkbenchAction({ kind, payload });
@@ -429,7 +429,7 @@ export default function ExperimentsWorkbenchPage() {
         // Only covers getting the run started: the save before it is the slow
         // part. Once cells are arriving the run reports its own progress, and
         // this is cleared so it cannot outlive the run it announced.
-        setActionActivity(narrateWorkbenchAction("workbench.run"));
+        setActionActivity(pickWorkbenchActionNarration("workbench.run"));
         try {
           // Persist first: a run writes its results back as a new version, so
           // any edit still sitting in this tab would be a version behind before

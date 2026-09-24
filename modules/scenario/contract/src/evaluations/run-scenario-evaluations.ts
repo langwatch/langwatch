@@ -175,7 +175,7 @@ async function loadDefinitions({
  * its workflow, a code evaluator as its own id, a built-in as the type its
  * config names.
  */
-export function checkTypeOf(
+export function deriveCheckType(
   evaluator: Pick<RunEvaluatorDefinition, "id" | "type" | "workflowId" | "evaluatorType">,
 ): string | null {
   if (evaluator.type === "workflow" && evaluator.workflowId) {
@@ -209,7 +209,7 @@ export function dataForEvaluation({
  * evaluation's own spans nest under it and content dropped at ingestion is
  * read off the spans. Absent when the run produced no trace.
  */
-export function traceForEvaluation({
+export function buildTraceForEvaluation({
   projectId,
   traceId,
   spans,
@@ -441,7 +441,7 @@ function prepareAttachment({
   if (!evaluator) {
     return settle(errorResult("The evaluator was not found in this project"));
   }
-  const checkType = checkTypeOf(evaluator);
+  const checkType = deriveCheckType(evaluator);
   if (!checkType) {
     return settle(errorResult("The evaluator names no evaluator type"));
   }
@@ -604,7 +604,7 @@ async function buildRunContext({
       fields: fieldValues,
     },
     lastTraceId,
-    trace: traceForEvaluation({ projectId, traceId: lastTraceId, spans }),
+    trace: buildTraceForEvaluation({ projectId, traceId: lastTraceId, spans }),
     isFinalAttempt,
   };
 }

@@ -15,7 +15,7 @@ export function evaluationFailsRun(evaluation: ScenarioEvaluationResult): boolea
 /** Returns verdict after evaluations; required failures or errors return
  * "failure", otherwise judge's verdict.
  */
-export function gatedVerdict({
+export function computeGatedVerdict({
   evaluations,
   judgeVerdict,
 }: {

@@ -18,7 +18,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   ScenarioTestSuiteNotFoundError,
   type ScenarioTestSuite,
-  runActorFromRequest,
+  deriveRunActor,
 } from "@langwatch/scenario-contract";
 import {
   type suiteResponseSchema,
@@ -290,7 +290,7 @@ async function runSuite(params: {
   // A project key belongs to no person, so it records no actor. A user-bound
   // key records the person it belongs to, through the surface the request
   // declared.
-  const actor = runActorFromRequest({
+  const actor = deriveRunActor({
     userId: params.viewerUserId,
     surfaceHeader: params.surface,
   });
@@ -301,7 +301,7 @@ async function runSuite(params: {
   );
 }
 
-type RunActorArgument = ReturnType<typeof runActorFromRequest>;
+type RunActorArgument = ReturnType<typeof deriveRunActor>;
 
 async function scheduleRun(params: {
   app: SuiteApi;

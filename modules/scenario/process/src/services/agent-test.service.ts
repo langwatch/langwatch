@@ -20,7 +20,7 @@ import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import {
   AGENT_TEST_SCENARIO_ID,
   agentTestScenarioConfig,
-  agentTestTarget,
+  mapAgentTestTarget,
   generateBatchRunId,
   generateScenarioRunId,
   getAgentTestSetId,
@@ -144,7 +144,7 @@ export class AgentTestService {
     projectId: string;
     actor: RunActor | undefined;
   }): Promise<TargetConfig> {
-    const target = agentTestTarget(input.agent);
+    const target = mapAgentTestTarget(input.agent);
     if (!target) {
       throw new AgentTestRefusedError({ reason: NOT_TESTABLE_REASON });
     }
@@ -279,7 +279,7 @@ export class AgentTestService {
       throw new AgentTestRefusedError({ reason: CONNECTED_RUN_NOT_QUEUEABLE_REASON });
     }
 
-    // `agentTestTarget` never answers "prompt"; only "connected" was excluded
+    // `mapAgentTestTarget` never answers "prompt"; only "connected" was excluded
     // above, so what remains is exactly what a run can queue.
     const queueableTarget = target as QueueableTarget;
 

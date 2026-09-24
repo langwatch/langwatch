@@ -15,7 +15,7 @@ export type ParsedEvaluationResult = {
   domainError?: SerializedHandledError;
 };
 
-function readSerializedDomainError(candidate: unknown): SerializedHandledError | undefined {
+function parseSerializedDomainError(candidate: unknown): SerializedHandledError | undefined {
   const result = serializedHandledErrorSchema.safeParse(candidate);
   return result.success ? result.data : undefined;
 }
@@ -49,7 +49,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
     if ("error" in obj && obj.error) {
       parsed.status = "error";
       parsed.details = typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
-      parsed.domainError = readSerializedDomainError(obj.domainError);
+      parsed.domainError = parseSerializedDomainError(obj.domainError);
       return parsed;
     }
 
@@ -59,7 +59,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
       if ("details" in obj && typeof obj.details === "string") {
         parsed.details = obj.details;
       }
-      parsed.domainError = readSerializedDomainError(obj.domainError);
+      parsed.domainError = parseSerializedDomainError(obj.domainError);
       return parsed;
     }
 

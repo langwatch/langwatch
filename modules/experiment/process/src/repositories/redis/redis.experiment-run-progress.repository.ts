@@ -5,6 +5,7 @@ import type { EvaluationV3Event } from "@langwatch/experiment-contract";
  * ensure both see the same Redis instance.
  */
 import { createLogger } from "@langwatch/observability";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
 
 import {
@@ -22,22 +23,12 @@ const RUN_STATE_KEY_PREFIX = "eval_v3_run:";
 /** TTL for run state in seconds (24 hours - keeps completed runs queryable). */
 const RUN_STATE_TTL_SECONDS = 86400;
 
-/**
- * The three commands this repository issues, named rather than the whole
- * client: a clustered deployment's connection serves them identically.
- */
-export type RunProgressStore = Readonly<{
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string, mode: "EX", seconds: number): Promise<unknown>;
-  del(key: string): Promise<number>;
-}>;
-
 export class RedisExperimentRunProgressRepository extends ExperimentRunProgressRepository {
-  static create(options: { redis: RunProgressStore }): RedisExperimentRunProgressRepository {
+  static create(options: { redis: ProcessMembers["redis"] }): RedisExperimentRunProgressRepository {
     return new RedisExperimentRunProgressRepository(options.redis);
   }
 
-  private constructor(private readonly redis: RunProgressStore) {
+  private constructor(private readonly redis: ProcessMembers["redis"]) {
     super();
   }
 

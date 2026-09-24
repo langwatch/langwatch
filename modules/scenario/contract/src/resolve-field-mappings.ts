@@ -59,7 +59,7 @@ export function sessionAsText(session: unknown): string {
 }
 
 /** Returns the supported scenario source behind a mapping, when it has one. */
-export function sourceFieldOf(mapping: FieldMapping): ScenarioSourceField | null {
+export function extractSourceField(mapping: FieldMapping): ScenarioSourceField | null {
   if (mapping.type === "value" || mapping.sourceId !== "scenario") {
     return null;
   }

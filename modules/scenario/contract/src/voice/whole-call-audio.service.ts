@@ -29,19 +29,19 @@ export interface WholeCallAudioInfrastructure {
 
 /** A non-empty string attribute, or null. Guards against the empty string a
  *  half-written span can carry, which is not a usable handle. */
-function stringAttr(attributes: Readonly<Record<string, unknown>>, key: string): string | null {
+function pickStringAttr(attributes: Readonly<Record<string, unknown>>, key: string): string | null {
   const value = attributes[key];
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 /** The handle one span's attributes name, or null. Twilio is checked first: a
  *  phone run carries only the Twilio key, an ElevenLabs run only its own. */
-function handleFromAttributes(
+function extractAttributesHandle(
   attributes: Readonly<Record<string, unknown>>,
 ): WholeCallAudioHandle | null {
-  const callSid = stringAttr(attributes, TWILIO_CALL_SID_ATTR);
+  const callSid = pickStringAttr(attributes, TWILIO_CALL_SID_ATTR);
   if (callSid) return { kind: "twilio", callSid };
-  const conversationId = stringAttr(attributes, ELEVENLABS_CONVERSATION_ID_ATTR);
+  const conversationId = pickStringAttr(attributes, ELEVENLABS_CONVERSATION_ID_ATTR);
   if (conversationId) return { kind: "elevenlabs", conversationId };
   return null;
 }
@@ -69,7 +69,7 @@ export async function resolveWholeCallAudio({
       traceId,
     });
     for (const attributes of spans) {
-      const handle = handleFromAttributes(attributes);
+      const handle = extractAttributesHandle(attributes);
       if (handle) return handle;
     }
   }

@@ -2,7 +2,7 @@
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 
-import { type SuiteScope, suiteScopeSchema } from "./suite.scope.ts";
+import type { SuiteScope } from "./suite.scope.ts";
 import type { SuiteTarget } from "./suite.ts";
 import { targetIdentityKey, targetSortKey } from "./target-key.ts";
 
@@ -84,12 +84,6 @@ export function parametersKey(parameters: RunParameterValues | undefined): strin
 
 function sortedList(values: string[]): string {
   return [...new Set(values)].toSorted().join(",");
-}
-
-/** Reads a stored scope back, refusing nothing: see parseSuiteScope. */
-export function planScopeOrNull(raw: unknown): SuiteScope | null {
-  const parsed = suiteScopeSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
 }
 
 // Normalize scope: all test suites becomes "all" mode.

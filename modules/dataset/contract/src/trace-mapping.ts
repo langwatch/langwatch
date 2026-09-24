@@ -222,7 +222,7 @@ const readableScoreParts = ({
  * What a comment is about, named for a reader who is not looking at the trace:
  * `web_search span (0af31b2c) · Output`, `Trace (95bf974e) · Output`. Null when
  * it is about the trace as a whole. */
-const readableAnnotationPart = ({
+const describeAnnotationPart = ({
   annotation,
   traceId,
   spanNamesById,
@@ -262,7 +262,7 @@ const readableAnnotationHead = ({
   traceId: string;
   spanNamesById?: Map<string, string | null | undefined>;
 }): string => {
-  const part = readableAnnotationPart({ annotation, traceId, spanNamesById });
+  const part = describeAnnotationPart({ annotation, traceId, spanNamesById });
   const author = readableAnnotationAuthor(annotation);
   return part ? `${author} (on ${part})` : author;
 };
@@ -358,7 +358,7 @@ export function buildAnnotationRecord({
   spanNamesById?: Map<string, string | null | undefined>;
   scoreOptions?: AnnotationScore[];
 }): Record<string, unknown> {
-  const part = readableAnnotationPart({ annotation, traceId, spanNamesById });
+  const part = describeAnnotationPart({ annotation, traceId, spanNamesById });
   const comment = oneLine(annotation.comment ?? "");
   const scores = namedScoreOptions({
     scoreOptions: annotation.scoreOptions,

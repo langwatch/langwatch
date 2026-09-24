@@ -1,4 +1,5 @@
 import {
+  DatasetNotFoundError,
   datasetColumnsSchema,
   datasetSchema,
   type Dataset,
@@ -41,8 +42,13 @@ export class MemoryDatasetRepository implements DatasetRepository {
     projectId: string;
     includeArchived?: boolean;
   }): Promise<Dataset | null> {
-    const row = this.#database.dataset(input.projectId, input.id);
-    if (!row) return null;
+    let row: DatasetRow;
+    try {
+      row = this.#database.getDataset(input.projectId, input.id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError) return null;
+      throw error;
+    }
     if (!input.includeArchived && row.archivedAt) return null;
 
     return toDataset(row);
@@ -191,9 +197,12 @@ export class MemoryDatasetRepository implements DatasetRepository {
 
   /** The same refusal the Prisma twin raises when its guarded write matches nothing. */
   #require(projectId: string, id: string, action: string): DatasetRow {
-    const row = this.#database.dataset(projectId, id);
-    if (!row) throw new Error(`Dataset was not found while ${action}`);
-
-    return row;
+    try {
+      return this.#database.getDataset(projectId, id);
+    } catch (error) {
+      if (error instanceof DatasetNotFoundError)
+        throw new Error(`Dataset was not found while ${action}`);
+      throw error;
+    }
   }
 }

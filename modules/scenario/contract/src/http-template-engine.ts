@@ -3,7 +3,11 @@
 import { createSandboxedLiquid } from "@langwatch/automation-contract";
 
 import type { FieldMapping } from "./field-mapping.ts";
-import { resolveFieldMappings, sessionAsText, sourceFieldOf } from "./resolve-field-mappings.ts";
+import {
+  resolveFieldMappings,
+  sessionAsText,
+  extractSourceField,
+} from "./resolve-field-mappings.ts";
 import type { ScenarioInput } from "./resolve-field-mappings.ts";
 import type { RunParameterValues } from "./scenario.parameters.ts";
 
@@ -168,7 +172,7 @@ function resolveTemplateMappings({
       continue;
     }
 
-    const field = sourceFieldOf(mapping);
+    const field = extractSourceField(mapping);
     const isRawJson =
       field === "messages" ||
       (field === "input" && inputIsStructured) ||
@@ -181,7 +185,7 @@ function resolveTemplateMappings({
 }
 
 /** The origin of a rendered URL, or null when it names none. */
-function originOf(url: string): string | null {
+function parseOrigin(url: string): string | null {
   try {
     return new URL(url).origin;
   } catch {
@@ -207,7 +211,7 @@ function assertSessionDidNotChooseTheHost({
   const blanked: Record<string, unknown> = { ...context, session: "" };
   for (const alias of aliases) blanked[alias] = "";
   const withoutSession = urlLiquid.parseAndRenderSync(template, blanked);
-  if (originOf(rendered) !== originOf(withoutSession)) {
+  if (parseOrigin(rendered) !== parseOrigin(withoutSession)) {
     throw new Error("the session of the agent cannot decide the host the turn is sent to");
   }
 }

@@ -48,7 +48,7 @@ export function declaredDefaults(
  * declared default removed — such a value changes nothing the agent
  * receives, so a blank row and one spelling out the default are one target.
  */
-export function canonicalOverrides({
+export function deriveCanonicalOverrides({
   runParameters,
   defaults,
 }: {
@@ -72,7 +72,7 @@ export function withCanonicalOverrides<T extends { runParameters?: RunParameterV
 }): T[] {
   return targets.map((target) => {
     const { runParameters: _given, ...rest } = target;
-    const runParameters = canonicalOverrides({
+    const runParameters = deriveCanonicalOverrides({
       runParameters: target.runParameters,
       defaults,
     });

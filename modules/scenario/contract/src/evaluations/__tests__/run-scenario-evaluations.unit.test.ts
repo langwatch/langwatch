@@ -6,7 +6,7 @@ import type { EvaluatorAttachment } from "../../evaluator-attachments.ts";
 import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators.ts";
 import { MAX_STORED_INPUT_LENGTH } from "../constants.ts";
 import {
-  checkTypeOf,
+  deriveCheckType,
   loadRunAttachments,
   type RunScenarioEvaluationsDeps,
   runScenarioEvaluations,
@@ -549,15 +549,17 @@ describe("toScenarioEvaluationResult", () => {
   });
 });
 
-describe("checkTypeOf", () => {
+describe("deriveCheckType", () => {
   const definition = (overrides: Partial<EvaluatorWithFields> = {}) =>
     runEvaluatorDefinitionOf(evaluator(overrides));
 
   it("dispatches a workflow evaluator on its workflow, a code one on its id, a built-in on its type", () => {
-    expect(checkTypeOf(definition({ type: "workflow", workflowId: "wf-1" }))).toBe("custom/wf-1");
-    expect(checkTypeOf(definition({ type: "code", id: "eval-code" }))).toBe("code/eval-code");
-    expect(checkTypeOf(definition())).toBe("langevals/exact_match");
-    expect(checkTypeOf(definition({ config: {} }))).toBeNull();
+    expect(deriveCheckType(definition({ type: "workflow", workflowId: "wf-1" }))).toBe(
+      "custom/wf-1",
+    );
+    expect(deriveCheckType(definition({ type: "code", id: "eval-code" }))).toBe("code/eval-code");
+    expect(deriveCheckType(definition())).toBe("langevals/exact_match");
+    expect(deriveCheckType(definition({ config: {} }))).toBeNull();
   });
 });
 

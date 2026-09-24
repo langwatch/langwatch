@@ -142,16 +142,16 @@ export function latestRowsQuery({
   `;
 }
 
-const ms = (value: number | string | null): number | null =>
+const toMillis = (value: number | string | null): number | null =>
   value === null ? null : Number(value);
 
-const instantOf = (value: number | string | null): Instant | null => {
-  const at = ms(value);
+const toInstant = (value: number | string | null): Instant | null => {
+  const at = toMillis(value);
   return at === null ? null : Temporal.Instant.fromEpochMilliseconds(at);
 };
 
 /** The driver takes dates, so a checkpoint's epoch millis become one here. */
-const epochDate = (at: number | null): Date | null =>
+const toEpochDate = (at: number | null): Date | null =>
   at === null ? null : toDate(Temporal.Instant.fromEpochMilliseconds(at));
 
 function parseJson<T>(text: string, fallback: T): T {
@@ -178,9 +178,9 @@ export function toRow(record: InstantEvalRunRecord): InstantEvalRunRow {
     plan: parseJson<unknown[]>(record.Plan, []),
     rowLimit: Number(record.RowLimit),
     status: statusOf(record.Status),
-    total: ms(record.Total),
+    total: toMillis(record.Total),
     progress: Number(record.Progress),
-    matched: ms(record.Matched),
+    matched: toMillis(record.Matched),
     matchedByQuestion: parseJson<Record<string, number>>(record.MatchedByQuestion, {}),
     failed: Number(record.Failed),
     skipped: Number(record.Skipped),
@@ -190,10 +190,10 @@ export function toRow(record: InstantEvalRunRecord): InstantEvalRunRow {
     error: record.Error,
     createdAt: Temporal.Instant.fromEpochMilliseconds(Number(record.CreatedAt)),
     updatedAt: Temporal.Instant.fromEpochMilliseconds(Number(record.UpdatedAt)),
-    startedAt: instantOf(record.StartedAt),
-    finishedAt: instantOf(record.FinishedAt),
-    occurredAt: ms(record.OccurredAt),
-    acceptedAt: ms(record.AcceptedAt),
+    startedAt: toInstant(record.StartedAt),
+    finishedAt: toInstant(record.FinishedAt),
+    occurredAt: toMillis(record.OccurredAt),
+    acceptedAt: toMillis(record.AcceptedAt),
     lastEventId: record.LastEventId || null,
     projectionVersion: record.ProjectionVersion || null,
   };
@@ -231,8 +231,8 @@ export function toWriteRecord({
     UpdatedAt: toDate(row.updatedAt),
     StartedAt: row.startedAt === null ? null : toDate(row.startedAt),
     FinishedAt: row.finishedAt === null ? null : toDate(row.finishedAt),
-    OccurredAt: epochDate(row.occurredAt),
-    AcceptedAt: epochDate(row.acceptedAt),
+    OccurredAt: toEpochDate(row.occurredAt),
+    AcceptedAt: toEpochDate(row.acceptedAt),
     LastEventId: row.lastEventId ?? "",
     ProjectionVersion: row.projectionVersion ?? "",
     WrittenAt: toDate(writtenAt),

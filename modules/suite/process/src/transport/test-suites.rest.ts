@@ -12,7 +12,7 @@ import {
   projectRestFacts,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { runActorFromRequest, type ScenarioTestSuite } from "@langwatch/scenario-contract";
+import { deriveRunActor, type ScenarioTestSuite } from "@langwatch/scenario-contract";
 import {
   SuiteApi,
   SuiteNotFoundError,
@@ -166,7 +166,7 @@ async function runTestSuite(params: {
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   await readTestSuite({ app, id: input.testSuiteId, projectId });
-  const actor = runActorFromRequest({
+  const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
   });

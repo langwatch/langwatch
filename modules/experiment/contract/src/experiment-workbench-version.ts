@@ -274,7 +274,7 @@ const normalizeEvaluator = (
 };
 
 /** Repair only legacy evaluator comparison data; results and targets stay intact. */
-export const repairWorkbenchState = (stored: unknown): PersistedEvaluationsV3State | null => {
+export const normalizeWorkbenchState = (stored: unknown): PersistedEvaluationsV3State | null => {
   const state = (stored as PersistedEvaluationsV3State | null) ?? null;
   if (!state || !Array.isArray(state.evaluators)) return state;
 

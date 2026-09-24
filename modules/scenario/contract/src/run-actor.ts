@@ -36,7 +36,7 @@ export function withActor(
  * — a project key records no actor. Only `X-LangWatch-Surface: cli` is
  * honored, so a caller cannot claim an in-app surface over the wire.
  */
-export function runActorFromRequest(params: {
+export function deriveRunActor(params: {
   userId: string | null | undefined;
   surfaceHeader: string | null | undefined;
 }): RunActor | undefined {

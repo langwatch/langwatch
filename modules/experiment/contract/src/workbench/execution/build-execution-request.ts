@@ -239,7 +239,7 @@ export const planBoardCarryOver = ({
 };
 
 /** The dataset a run evaluates: the active one, or the first one there is. */
-export const activeDatasetOf = (
+export const pickActiveDataset = (
   state: Pick<ExecutionRequestState, "datasets" | "activeDatasetId">,
 ): DatasetReference | undefined =>
   state.datasets.find((dataset) => dataset.id === state.activeDatasetId) ?? state.datasets[0];
@@ -299,7 +299,7 @@ export const buildExecutionRequest = ({
   scope: ExecutionScope;
   concurrency?: number;
 }): { request: ExecutionRequest; executionCells: CellId[] } | null => {
-  const dataset = activeDatasetOf(state);
+  const dataset = pickActiveDataset(state);
   if (!dataset) return null;
 
   const datasetRows = datasetRowsOf(dataset);

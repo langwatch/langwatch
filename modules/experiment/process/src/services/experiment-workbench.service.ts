@@ -12,7 +12,7 @@ import {
   listWorkbenchVersionsInputSchema,
   parseWorkbenchState,
   recordWorkbenchRunResultsInputSchema,
-  repairWorkbenchState,
+  normalizeWorkbenchState,
   restoreWorkbenchVersionInputSchema,
   saveWorkbenchStateInputSchema,
   StaleWorkbenchStateError,
@@ -105,7 +105,7 @@ export class ExperimentWorkbenchService {
     const query = getWorkbenchStateInputSchema.parse(input);
     const state = await this.repository.findWorkbenchState(query);
 
-    return { ...state, state: repairWorkbenchState(state.state) };
+    return { ...state, state: normalizeWorkbenchState(state.state) };
   }
 
   async saveWorkbenchState(input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult> {

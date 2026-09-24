@@ -12,7 +12,7 @@ import {
   resolveTraceMapping,
   type ScenarioInputs,
   storedInputsOf,
-  toolNameOf,
+  extractToolName,
 } from "../resolve-scenario-mappings.ts";
 
 const messages: ConversationMessage[] = [
@@ -196,8 +196,8 @@ describe("resolveTraceMapping", () => {
     });
 
     it("names a tool by its gen_ai.tool.name attribute, else by the span name", () => {
-      expect(toolNameOf(spans[0]!)).toBe("run_sql");
-      expect(toolNameOf(span({ type: "tool", name: "lookup" }))).toBe("lookup");
+      expect(extractToolName(spans[0]!)).toBe("run_sql");
+      expect(extractToolName(span({ type: "tool", name: "lookup" }))).toBe("lookup");
     });
   });
 
