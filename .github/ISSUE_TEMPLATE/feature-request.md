@@ -11,6 +11,11 @@ assignees: ""
 
 What problem does this feature solve? Why is it needed?
 
+**Impact**
+
+- Who benefits: [role / customer / number of projects if known]
+- Priority: [P0 - critical / P1 - high / P2 / P3] and why now
+
 **User story**
 
 As a [role], I want [capability], so that [benefit].

@@ -7,6 +7,13 @@ projects: ["5"]
 assignees: ""
 ---
 
+**Impact**
+
+- Severity: [P0 - critical / P1 - high / P2 / P3] and why
+- Who is affected: [which users, projects, or components; how many if known]
+- Since when: [first seen / version / date]
+- Workaround: [what the user can do today, or "none"]
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 
@@ -15,6 +22,9 @@ Steps to reproduce the behavior:
 1. Go to '...'
 2. Click on '....'
 3. See error
+
+**Evidence**
+Logs, screenshots, queries, or event ids that show the failure. Link, don't paste secrets.
 
 **Expected behaviour as acceptance criteria**
 
