@@ -78,3 +78,9 @@ Feature: Enterprise billing compatibility
     When entitlement asks billing for the organization's subscription plan
     Then the subscription's plan answers
     And an operator impersonating a customer gets the adding limitations lifted
+
+  @unit
+  Scenario: Billable events are counted per named project
+    Given an organization metered in events whose second project sent nothing this month
+    When its billable events are counted for both projects
+    Then the first project reports its events and the second reports zero

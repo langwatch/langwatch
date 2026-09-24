@@ -3,7 +3,7 @@
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
-import type { SubscriptionPlanInput } from "./billing-types.ts";
+import type { BillingPricingModel, SubscriptionPlanInput, USAGE_UNKNOWN } from "./billing-types.ts";
 import type {
   ConnectedAddCommitRequest,
   ConnectedBillingAccountView,
@@ -82,6 +82,18 @@ export interface BillingApi {
    * subscription's own limit overrides; the free plan where none is active or off Cloud.
    */
   getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
+  /**
+   * This UTC billing month's approximate billable events per named project, 0 where a project
+   * has none; unknown when no analytics store is composed. Main's `EventUsageService`.
+   */
+  countBillableEventsByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN>;
+  /** The organization's pricing model column, which is empty for organizations never migrated. */
+  getPricingModel(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: BillingPricingModel | null }>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");

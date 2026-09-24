@@ -17,6 +17,7 @@ import {
   TraceSummaryClickHouseRepository,
   TraceSummaryProjectionClickHouseRepository,
 } from "../clickhouse/trace-summary.repository.ts";
+import { TraceUsageCountClickHouseRepository } from "../clickhouse/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../trace.repositories.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
 
@@ -61,6 +62,7 @@ export class PostgresTraceRepositories {
       clusteringSample: ClickHouseTraceClusteringSampleRepository.create({
         resolveClient: traceClickHouse,
       }),
+      usageCount: TraceUsageCountClickHouseRepository.create(members.clickhouse),
     };
   }
 }

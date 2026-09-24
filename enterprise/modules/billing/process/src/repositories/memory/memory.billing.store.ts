@@ -42,13 +42,6 @@ export type MemoryBillableEvent = BillableEventRecord & {
   organizationId: string;
 };
 
-/** The trace-summary fields billing's distinct trace query owns. */
-export type MemoryTraceSummary = {
-  tenantId: string;
-  traceId: string;
-  createdAt: number;
-};
-
 /**
  * One store behind the billing memory tier, the way one Postgres schema serves
  * the Prisma tier: a subscription written through `subscriptions` is what the
@@ -69,7 +62,6 @@ export class MemoryBillingStore {
   readonly organizationOfTenant = new Map<string, string>();
   readonly users = new Map<string, MemoryBillingUser>();
   readonly billableEvents: MemoryBillableEvent[] = [];
-  readonly traceSummaries: MemoryTraceSummary[] = [];
 
   static create(): MemoryBillingStore {
     return new MemoryBillingStore();

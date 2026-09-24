@@ -13,6 +13,7 @@ import { MemoryTracePayloadReaderRepository } from "./memory.trace-payload-reade
 import { MemoryTraceSpanStore } from "./memory.trace-span.store.ts";
 import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
 import { MemoryTraceSummaryRepository } from "./memory.trace-summary.repository.ts";
+import { MemoryTraceUsageCountRepository } from "./memory.trace-usage-count.repository.ts";
 
 /** The "memory" tier: every trace repository the app is tested without a database. */
 export class MemoryTraceRepositories {
@@ -44,6 +45,7 @@ export class MemoryTraceRepositories {
       sessionGroups: new NullSessionGroupsRepository(),
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
+      usageCount: MemoryTraceUsageCountRepository.create(),
     };
   }
 }

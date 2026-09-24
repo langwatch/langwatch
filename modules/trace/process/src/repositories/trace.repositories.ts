@@ -12,6 +12,7 @@ import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
+import type { TraceUsageCountRepository } from "./trace-usage-count.repository.ts";
 
 /**
  * The rows the trace module owns, chosen once at boot. One tier spans two
@@ -33,4 +34,5 @@ export interface TraceRepositories {
   /** Claim-check reads for fields the fold offloaded out of the summary. */
   readonly eventPayloads: TracePayloadReaderRepository;
   readonly clusteringSample: TraceClusteringSampleRepository;
+  readonly usageCount: TraceUsageCountRepository;
 }

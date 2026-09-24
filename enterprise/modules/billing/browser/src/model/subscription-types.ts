@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import type { Currency } from "./billing-plans.ts";
 
-export const isValidEmail = (value: string) => z.string().email().safeParse(value).success;
+export const isValidEmail = (value: string) => z.string().email().validate(value);
 export const countFullMembers = (list: { memberType: MemberType }[]) =>
   list.filter((u) => u.memberType === "FullMember").length;
 export const isSupportedCurrency = (value: unknown): value is Currency =>

@@ -80,13 +80,6 @@ describe("billingClickhouseRepositories", () => {
           endDate: "2026-03-01 00:00:00.000",
         }),
       ).resolves.toBe(0);
-      await expect(
-        repositories.billableEvents.findTraceSummariesTotalUniq({
-          tenantIds: ["project-1"],
-          startDate: "2026-02-01 00:00:00.000",
-          endDate: "2026-03-01 00:00:00.000",
-        }),
-      ).resolves.toBe(0);
       await repositories.billableEventsMeter.insert({
         record: billableEvent(),
         organizationId: "org-1",
@@ -99,8 +92,6 @@ describe("billingClickhouseRepositories", () => {
           unscoped: expect.objectContaining({ reason: expect.any(String) }),
         }),
       );
-      expect(driver.queries[1]).toMatchObject(expect.objectContaining({ tenantId: "project-1" }));
-      expect(driver.queries[1]).not.toHaveProperty("organizationId");
       expect(driver.inserts[0]).toMatchObject(
         expect.objectContaining({
           tenantId: "project-1",

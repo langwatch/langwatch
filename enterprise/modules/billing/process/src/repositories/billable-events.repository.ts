@@ -8,9 +8,6 @@ export type BillableEventsWindow = {
 export abstract class BillableEventsRepository {
   abstract findTotal(input: { organizationId: string } & BillableEventsWindow): Promise<number>;
   abstract findTotalUniq(input: { organizationId: string } & BillableEventsWindow): Promise<number>;
-  abstract findTraceSummariesTotalUniq(
-    input: { tenantIds: string[] } & BillableEventsWindow,
-  ): Promise<number>;
   abstract findByProjectApprox(
     input: { organizationId: string } & BillableEventsWindow,
   ): Promise<{ projectId: string; count: number }[]>;

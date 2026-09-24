@@ -8,7 +8,7 @@ import {
 } from "../billable-events.repository.ts";
 import type { MemoryBillableEvent, MemoryBillingStore } from "./memory.billing.store.ts";
 
-/** In-memory read twin of billing's ClickHouse event and trace-summary queries. */
+/** In-memory read twin of billing's ClickHouse event queries. */
 export class MemoryBillableEventsRepository extends BillableEventsRepository {
   readonly #store: MemoryBillingStore;
 
@@ -28,21 +28,6 @@ export class MemoryBillableEventsRepository extends BillableEventsRepository {
   /** Memory stays exact so small test data is deterministic; ClickHouse `uniq` remains approximate. */
   async findTotalUniq(input: { organizationId: string } & BillableEventsWindow): Promise<number> {
     return distinctCount(this.#eventsInWindow(input).map((event) => event.deduplicationKey));
-  }
-
-  async findTraceSummariesTotalUniq(
-    input: { tenantIds: string[] } & BillableEventsWindow,
-  ): Promise<number> {
-    const tenantIds = new Set(input.tenantIds);
-    const { start, end } = window(input);
-    const traceIds = this.#store.traceSummaries
-      .filter(
-        (summary) =>
-          tenantIds.has(summary.tenantId) && summary.createdAt >= start && summary.createdAt < end,
-      )
-      .map((summary) => summary.traceId);
-
-    return distinctCount(traceIds);
   }
 
   async findByProjectApprox(

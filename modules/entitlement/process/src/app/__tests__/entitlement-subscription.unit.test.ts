@@ -3,7 +3,10 @@ import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { entitlementServer } from "../../entitlement.server.ts";
@@ -43,6 +46,9 @@ async function boot({ isSaas, billing }: { isSaas: boolean; billing: BillingApi 
       user: createEntitlementTestUsers(),
       licensing: createApiFixture<LicensingApi>({ resolve: async () => free }),
       billing,
+      trace: createApiFixture<TraceApi>({}),
+      organization: createApiFixture<OrganizationApi>({}),
+      project: createApiFixture<ProjectApi>({}),
     })
     .boot();
 }

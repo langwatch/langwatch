@@ -21,6 +21,8 @@ import {
   type ScenarioCreatedSignal,
   type SeatChangeBillingOutcome,
   type SubscriptionPlanInput,
+  type BillingPricingModel,
+  type USAGE_UNKNOWN,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
@@ -51,6 +53,7 @@ import { ConnectedMonthlyStatementService } from "../services/connected-monthly-
 import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
 import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import {
   ScenarioCreatedSignalService,
@@ -145,6 +148,7 @@ export class BillingApp implements BillingApi {
       | "billableEvents"
       | "organizationCache"
       | "subscriptions"
+      | "organizationPricing"
     >;
     config: Pick<BillingServerConfig, "bankDetails">;
     peers: ConnectedBillingPeers;
@@ -177,6 +181,8 @@ export class BillingApp implements BillingApi {
         isSaas,
       }),
       isSaas,
+      billableEvents: BillableEventsQueryService.create(repositories.billableEvents),
+      pricing: OrganizationPricingService.create(repositories.organizationPricing),
       reporting: BillingApp.#composeReporting({
         repositories,
         peers,
@@ -244,6 +250,8 @@ export class BillingApp implements BillingApi {
   readonly #scenarioSignals: ScenarioCreatedSignalService;
   readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
+  readonly #billableEvents: BillableEventsQueryService;
+  readonly #pricing: OrganizationPricingService;
   readonly #reporting: BillingReportingPipeline;
 
   private constructor({
@@ -254,6 +262,8 @@ export class BillingApp implements BillingApi {
     scenarioSignals,
     subscriptionPlans,
     isSaas,
+    billableEvents,
+    pricing,
     reporting,
   }: {
     connected: ConnectedBilling | undefined;
@@ -263,6 +273,8 @@ export class BillingApp implements BillingApi {
     scenarioSignals: ScenarioCreatedSignalService;
     subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
+    billableEvents: BillableEventsQueryService;
+    pricing: OrganizationPricingService;
     reporting: BillingReportingPipeline;
   }) {
     this.#connected = connected;
@@ -272,7 +284,22 @@ export class BillingApp implements BillingApi {
     this.#scenarioSignals = scenarioSignals;
     this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
+    this.#billableEvents = billableEvents;
+    this.#pricing = pricing;
     this.#reporting = reporting;
+  }
+
+  countBillableEventsByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN> {
+    return this.#billableEvents.countBillableEventsByProjects(input);
+  }
+
+  getPricingModel(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: BillingPricingModel | null }> {
+    return this.#pricing.getPricingModel(input);
   }
 
   /** The command-only pipeline `billing_reporting` registers, composed once by {@link assemble}. */

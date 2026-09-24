@@ -23,13 +23,16 @@ import {
   type PricingModel,
 } from "@langwatch/entitlement-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   resolveRequestBound,
   type RequestBoundKey,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
+import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
@@ -115,7 +118,14 @@ type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementApp implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
-  static readonly dependencies = { users: UserApi, license: LicensingApi, billing: BillingApi };
+  static readonly dependencies = {
+    users: UserApi,
+    license: LicensingApi,
+    billing: BillingApi,
+    traces: TraceApi,
+    organizations: OrganizationApi,
+    projects: ProjectApi,
+  };
   static readonly config = entitlementConfig;
   /** `logger` is the closed member; `isSaas`/`processName` are named raw so
    * `withMember`/`withMembers` can answer them (see {@link EntitlementMembers}). */
@@ -162,6 +172,7 @@ export class EntitlementApp implements EntitlementApiContract {
       processName: members.processName,
       license: dependencies.license,
       billing: dependencies.billing,
+      usage: dependencies,
     });
 
     return new EntitlementApp({ repositories, members: infrastructure, dependencies, config });

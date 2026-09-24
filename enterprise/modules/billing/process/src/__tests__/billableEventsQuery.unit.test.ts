@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { type BillableEventsRepository as BillableEvents } from "../repositories/billable-events.repository.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 
-const { findTraceSummariesTotalUniq } = vi.hoisted(() => ({
-  findTraceSummariesTotalUniq: vi.fn(),
+const { findByProjectApprox } = vi.hoisted(() => ({
+  findByProjectApprox: vi.fn(),
 }));
 
 let billableEvents: BillableEvents | undefined;
@@ -139,30 +139,36 @@ describe("getPreviousBillingMonth", () => {
   });
 });
 
-describe("queryTraceSummariesTotalUniq", () => {
+describe("countBillableEventsByProjects", () => {
+  const now = Temporal.Instant.from("2026-02-10T00:00:00Z");
+
   beforeEach(() => {
     vi.clearAllMocks();
     billableEvents = {
       findTotal: vi.fn<BillableEvents["findTotal"]>(),
       findTotalUniq: vi.fn<BillableEvents["findTotalUniq"]>(),
-      findTraceSummariesTotalUniq,
-      findByProjectApprox: vi.fn<BillableEvents["findByProjectApprox"]>(),
+      findByProjectApprox,
       findByProject: vi.fn<BillableEvents["findByProject"]>(),
     };
   });
 
-  describe("when a ClickHouse repository is available", () => {
-    it("queries with tenant-scoped and month-bounded params and returns the total", async () => {
-      findTraceSummariesTotalUniq.mockResolvedValue(42);
+  describe("when a project has no events this month", () => {
+    /** @scenario "Billable events are counted per named project" */
+    it("counts it as zero beside the counted projects", async () => {
+      findByProjectApprox.mockResolvedValue([{ projectId: "proj-1", count: 7 }]);
 
-      const result = await service().queryTraceSummariesTotalUniq({
+      const result = await service().countBillableEventsByProjects({
+        organizationId: "org-1",
         projectIds: ["proj-1", "proj-2"],
-        billingMonth: "2026-02",
+        now,
       });
 
-      expect(result).toEqual({ outcome: "counted", total: 42 });
-      expect(findTraceSummariesTotalUniq).toHaveBeenCalledWith({
-        tenantIds: ["proj-1", "proj-2"],
+      expect(result).toEqual([
+        { projectId: "proj-1", count: 7 },
+        { projectId: "proj-2", count: 0 },
+      ]);
+      expect(findByProjectApprox).toHaveBeenCalledWith({
+        organizationId: "org-1",
         startDate: "2026-02-01 00:00:00.000",
         endDate: "2026-03-01 00:00:00.000",
       });
@@ -170,27 +176,13 @@ describe("queryTraceSummariesTotalUniq", () => {
   });
 
   describe("when no ClickHouse repository is available", () => {
-    it("reports unavailable so callers can distinguish outage from zero usage", async () => {
-      billableEvents = undefined;
-
-      const result = await BillableEventsQueryService.create(null).queryTraceSummariesTotalUniq({
+    it("reports the count unknown rather than zero", async () => {
+      const result = await BillableEventsQueryService.create(null).countBillableEventsByProjects({
+        organizationId: "org-1",
         projectIds: ["proj-1"],
-        billingMonth: "2026-02",
       });
 
-      expect(result).toEqual({ outcome: "unavailable" });
-    });
-  });
-
-  describe("when projectIds is empty", () => {
-    it("returns a counted zero without resolving a repository", async () => {
-      const result = await service().queryTraceSummariesTotalUniq({
-        projectIds: [],
-        billingMonth: "2026-02",
-      });
-
-      expect(result).toEqual({ outcome: "counted", total: 0 });
-      expect(findTraceSummariesTotalUniq).not.toHaveBeenCalled();
+      expect(result).toBe("unknown");
     });
   });
 });

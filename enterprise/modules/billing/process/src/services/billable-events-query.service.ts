@@ -1,3 +1,4 @@
+import { USAGE_UNKNOWN } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
@@ -102,36 +103,37 @@ export class BillableEventsQueryService {
     return { outcome: "counted", total };
   }
 
-  /**
-   * Approximate count of distinct trace events for an org in a current month.
-   * Uses HyperLogLog (~1% error, constant memory).
-   */
-  async queryTraceSummariesTotalUniq({
+  /** Main's `EventUsageService.getCountByProjects`: missing projects count 0. */
+  async countBillableEventsByProjects({
+    organizationId,
     projectIds,
-    billingMonth,
+    now = nowInstant(),
   }: {
+    organizationId: string;
     projectIds: string[];
-    billingMonth: string;
-  }): Promise<BillableEventsTotalResult> {
-    if (projectIds.length === 0) {
-      return { outcome: "counted", total: 0 };
+    now?: Instant;
+  }): Promise<{ projectId: string; count: number }[] | typeof USAGE_UNKNOWN> {
+    if (projectIds.length === 0) return [];
+
+    if (!this.repository) {
+      logger.warn(
+        { organizationId },
+        "getCountByProjects: ClickHouse unavailable, usage is unknown",
+      );
+
+      return USAGE_UNKNOWN;
     }
 
-    const repository = this.repository;
-    if (!repository) {
-      logger.warn({ projectIds }, "ClickHouse not available, skipping trace summaries query");
-
-      return { outcome: "unavailable" };
-    }
-
-    const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
-    const total = await repository.findTraceSummariesTotalUniq({
-      tenantIds: projectIds,
-      startDate,
-      endDate,
+    const counts = await this.queryBillableEventsByProjectApprox({
+      organizationId,
+      billingMonth: BillableEventsQueryService.getBillingMonth(now),
     });
+    const countsByProject = new Map(counts.map((c) => [c.projectId, c.count]));
 
-    return { outcome: "counted", total };
+    return projectIds.map((projectId) => ({
+      projectId,
+      count: countsByProject.get(projectId) ?? 0,
+    }));
   }
 
   /**

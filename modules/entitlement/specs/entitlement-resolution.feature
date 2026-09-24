@@ -78,3 +78,9 @@ Feature: Provider-neutral entitlement resolution
     Then EntitlementApp.create constructs its private service from typed sources
     And peers receive the callable EntitlementApi
     And importing the feature starts no work or reads the environment
+
+  @unit
+  Scenario: An organization's month volume is counted from its projects in its metering unit
+    Given a Cloud free organization, metered in events, whose project sent events this month
+    When its usage is read
+    Then the month's volume is billing's event count for its projects, not unknown

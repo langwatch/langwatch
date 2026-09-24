@@ -15,19 +15,24 @@ import {
   EntitlementNotifierUnavailableError,
 } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   BASELINES,
   findRequestBound,
   quotedLimitsOfPlan,
   type Plan as CataloguePlan,
 } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
+import { EntitlementService } from "../services/entitlement.service.ts";
+import { UsageService } from "../services/usage-enforcement.service.ts";
 import type { EntitlementInfrastructure } from "./entitlement.app.ts";
-import { USAGE_UNKNOWN, type UsageCounter, type UsageWarning } from "./entitlement.members.ts";
+import { InProcessUsageCache, type UsageWarning } from "./entitlement.members.ts";
 
 /** Which plan source this deployment could not compose, said once at composition. */
 export abstract class EntitlementAbsenceReport {
-  abstract absent(source: "usage-counter" | "usage-mail"): void;
+  abstract absent(source: "usage-mail"): void;
 }
 
 /** Writes each absent source to the process log, with what it costs. */
@@ -40,41 +45,16 @@ export class LoggedEntitlementAbsence extends EntitlementAbsenceReport {
     super();
   }
 
-  absent(source: "usage-counter" | "usage-mail"): void {
+  absent(source: "usage-mail"): void {
     this.logger.warn({ source }, ENTITLEMENT_CONSEQUENCE[source]);
   }
 }
 
 /** The `usage-mail` string is ported verbatim from the deleted `api-usage.composition.ts`. */
 const ENTITLEMENT_CONSEQUENCE = {
-  "usage-counter":
-    "This module composes no Enterprise billing rollup at core tier, so every organization's month volume reads as unknown rather than a real count, and its metering unit falls back to traces.",
   "usage-mail":
     "API process composed no mail gateway because this deployment named no BASE_HOST: there is no sender address to derive and no host to build the usage link from, so the approaching-limit mail refuses by name rather than reporting that it sent something.",
 } as const;
-
-/**
- * The month's billable volume was asked for on a deployment with no
- * Enterprise billing rollup composed. {@link USAGE_UNKNOWN} is what every
- * {@link UsageCounter} reader treats as "the counting store could not answer".
- */
-class AbsentUsageCounter implements UsageCounter {
-  static create(report: EntitlementAbsenceReport): AbsentUsageCounter {
-    report.absent("usage-counter");
-
-    return new AbsentUsageCounter();
-  }
-
-  private constructor() {}
-
-  async getCurrentMonthCountForDisplay(): Promise<typeof USAGE_UNKNOWN> {
-    return USAGE_UNKNOWN;
-  }
-
-  async getResolvedUsageUnit(): Promise<"traces"> {
-    return "traces";
-  }
-}
 
 /**
  * The approaching-limit mail, on a deployment that composed no Enterprise
@@ -148,6 +128,42 @@ export function createAbsentRequestBound(): Pick<EntitlementApiContract, "reques
   };
 }
 
+/** Main's 30-second count and meter-decision windows. */
+const USAGE_CACHE_TTL_MS = 30_000;
+
+/** Main's `UsageService` over the owners' counts: trace's traces, billing's events and pricing. */
+function liveUsageCounter(input: {
+  isSaas: boolean;
+  plans: EntitlementService;
+  peers: EntitlementUsagePeers;
+}): UsageService {
+  const { traces, billing, organizations, projects } = input.peers;
+
+  return UsageService.create({
+    organizations: {
+      getOrganizationIdByTeamId: (lookup) => organizations.getOrganizationIdByTeamId(lookup),
+      getProjectIds: (organizationId) => projects.listIdsByOrganization({ organizationId }),
+      getPricingModel: (organizationId) => billing.getPricingModel({ organizationId }),
+    },
+    traceCounter: { getCountByProjects: (counted) => traces.countTracesByProjects(counted) },
+    eventCounter: {
+      getCountByProjects: (counted) => billing.countBillableEventsByProjects(counted),
+    },
+    planResolver: (organizationId) => input.plans.getActivePlan({ organizationId }),
+    deployment: { isSaas: input.isSaas },
+    countCache: new InProcessUsageCache(USAGE_CACHE_TTL_MS),
+    decisionCache: new InProcessUsageCache(USAGE_CACHE_TTL_MS),
+  });
+}
+
+/** The peers the live usage count reads through. */
+export type EntitlementUsagePeers = Readonly<{
+  traces: Pick<TraceApi, "countTracesByProjects">;
+  billing: Pick<BillingApi, "countBillableEventsByProjects" | "getPricingModel">;
+  organizations: Pick<OrganizationApi, "getOrganizationIdByTeamId">;
+  projects: Pick<ProjectApi, "listIdsByOrganization">;
+}>;
+
 /** What this module hands `EntitlementApp` at boot. */
 export function buildEntitlementInfrastructure(input: {
   logger: Logger;
@@ -158,6 +174,8 @@ export function buildEntitlementInfrastructure(input: {
   license: EntitlementSource;
   /** Where LangWatch Cloud's subscription plans are read; unused off Cloud. */
   billing: Pick<BillingApi, "getActiveSubscriptionPlan">;
+  /** Where the month's usage is counted. */
+  usage: EntitlementUsagePeers;
   /** Overridable for tests; defaults to the process logger. */
   report?: EntitlementAbsenceReport;
 }): EntitlementInfrastructure {
@@ -166,11 +184,19 @@ export function buildEntitlementInfrastructure(input: {
   // Main composed the subscription provider on Cloud only; self-hosted resolves licences alone.
   const subscription = input.isSaas ? BillingSubscriptionPlans.create(input.billing) : undefined;
 
-  return {
+  const sources = {
     baseline: subscription ?? coreBaseline(input.isSaas),
     license: input.license,
     subscription,
-    counter: AbsentUsageCounter.create(report),
+  };
+
+  return {
+    ...sources,
+    counter: liveUsageCounter({
+      isSaas: input.isSaas,
+      plans: EntitlementService.create(sources),
+      peers: input.usage,
+    }),
     warnings: AbsentUsageWarning.create(report, input.processName),
   };
 }

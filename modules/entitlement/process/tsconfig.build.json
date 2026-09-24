@@ -48,6 +48,9 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
@@ -57,7 +60,13 @@
       "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../user/contract/tsconfig.build.json"

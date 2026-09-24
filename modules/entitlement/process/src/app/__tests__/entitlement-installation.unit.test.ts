@@ -9,7 +9,10 @@ import {
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -75,6 +78,7 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
 describe("entitlement app installation", () => {
   /**
    * @scenario "The core baseline works without enterprise sources"
+   * @scenario "An organization's month volume is counted from its projects in its metering unit"
    * `EntitlementApp` declares `reads("logger")` and no subscription
    * dependency at all, and its declared `license` dependency is answered
    * here with a source that never grants — so a plain boot, with no
@@ -94,7 +98,20 @@ describe("entitlement app installation", () => {
         .withObservability((observability) => observability.withLogging(logger))
         .provide({
           user: createEntitlementTestUsers(),
-          billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
+          billing: createApiFixture<BillingApi>({
+            getActiveSubscriptionPlan: async () => free,
+            getPricingModel: async () => ({ pricingModel: null }),
+            countBillableEventsByProjects: async ({ projectIds }) =>
+              projectIds.map((projectId) => ({ projectId, count: 11 })),
+          }),
+          trace: createApiFixture<TraceApi>({
+            countTracesByProjects: async ({ projectIds }) =>
+              projectIds.map((projectId) => ({ projectId, count: 7 })),
+          }),
+          organization: createApiFixture<OrganizationApi>({}),
+          project: createApiFixture<ProjectApi>({
+            listIdsByOrganization: async () => ["project-1"],
+          }),
           licensing: createApiFixture<LicensingApi>({
             resolve: async () => free,
           }),
@@ -113,13 +130,10 @@ describe("entitlement app installation", () => {
           planSource: "free",
         });
 
-        // The month's volume needs an Enterprise billing rollup this role
-        // never composes, so it answers the honest "could not count" (`null`
-        // on the wire) rather than a confident zero.
         await expect(app.getUsage({ organizationId: "organization-1" })).resolves.toMatchObject({
-          currentMonthMessagesCount: null,
+          currentMonthMessagesCount: 11,
           membersCount: 0,
-          usageUnit: "traces",
+          usageUnit: "events",
         });
 
         // The approaching-limit mail needs the same Enterprise gateway, so it
@@ -152,6 +166,9 @@ describe("entitlement app installation", () => {
         .provide({
           user: createEntitlementTestUsers(),
           billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
+          trace: createApiFixture<TraceApi>({}),
+          organization: createApiFixture<OrganizationApi>({}),
+          project: createApiFixture<ProjectApi>({}),
           licensing: createApiFixture<LicensingApi>({
             resolve: async (input) => (await source.resolve(input)) ?? free,
           }),

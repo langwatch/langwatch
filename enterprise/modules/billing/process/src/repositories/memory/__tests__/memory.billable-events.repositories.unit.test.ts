@@ -82,36 +82,4 @@ describe("MemoryBillableEventsRepository", () => {
       ]);
     });
   });
-
-  describe("when trace summaries span several tenants", () => {
-    it("counts distinct trace ids only from the requested tenants and month", async () => {
-      const { reader, store } = repositories();
-      store.traceSummaries.push(
-        {
-          tenantId: "project-1",
-          traceId: "trace-shared",
-          createdAt: Date.parse("2026-02-02T00:00:00.000Z"),
-        },
-        {
-          tenantId: "project-2",
-          traceId: "trace-shared",
-          createdAt: Date.parse("2026-02-03T00:00:00.000Z"),
-        },
-        {
-          tenantId: "project-3",
-          traceId: "trace-other",
-          createdAt: Date.parse("2026-02-04T00:00:00.000Z"),
-        },
-        {
-          tenantId: "project-1",
-          traceId: "trace-next-month",
-          createdAt: Date.parse("2026-03-01T00:00:00.000Z"),
-        },
-      );
-
-      await expect(
-        reader.findTraceSummariesTotalUniq({ tenantIds: ["project-1", "project-2"], ...WINDOW }),
-      ).resolves.toBe(1);
-    });
-  });
 });

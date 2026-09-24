@@ -58,34 +58,6 @@ export class BillableEventsClickHouseRepository extends BillableEventsRepository
     return totalOf(result.rows);
   }
 
-  async findTraceSummariesTotalUniq(
-    input: { tenantIds: string[] } & BillableEventsWindow,
-  ): Promise<number> {
-    const tenantId = input.tenantIds[0];
-    if (tenantId === undefined) return 0;
-
-    const result = await this.#clickhouse.query<TotalRow>({
-      tenantId,
-      sql: `
-        SELECT uniq(TraceId) as total
-        FROM trace_summaries
-        WHERE TenantId IN {tenantIds:Array(String)}
-          AND CreatedAt >= {startDate:DateTime64(3)}
-          AND CreatedAt < {endDate:DateTime64(3)}
-      `,
-      params: {
-        tenantIds: input.tenantIds,
-        startDate: input.startDate,
-        endDate: input.endDate,
-      },
-      unscoped: {
-        reason: "Billing trace roll-up spans the named projects of one organization.",
-      },
-    });
-
-    return totalOf(result.rows);
-  }
-
   async findByProjectApprox(
     input: { organizationId: string } & BillableEventsWindow,
   ): Promise<{ projectId: string; count: number }[]> {

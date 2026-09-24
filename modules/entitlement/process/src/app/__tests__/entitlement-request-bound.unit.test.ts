@@ -3,8 +3,11 @@ import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { createAbsentRequestBound, entitlementServer } from "../../entitlement.server.ts";
@@ -150,6 +153,9 @@ describe("EntitlementApp.requestBound", () => {
       .provide({
         user: createEntitlementTestUsers(),
         billing: createApiFixture<BillingApi>({ getActiveSubscriptionPlan: async () => free }),
+        trace: createApiFixture<TraceApi>({}),
+        organization: createApiFixture<OrganizationApi>({}),
+        project: createApiFixture<ProjectApi>({}),
         licensing: createApiFixture<LicensingApi>({
           resolve: async () => free,
         }),
