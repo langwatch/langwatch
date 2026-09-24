@@ -1,7 +1,6 @@
 import {
   defineAggregate,
   defineEventingModule,
-  defineEvents,
   definePipeline,
   type EventingSetup,
   type Projection,
@@ -9,9 +8,9 @@ import {
 } from "@langwatch/eventing";
 import {
   SCENARIO_AGGREGATE_TYPE,
-  SCENARIO_LIFECYCLE_EVENT_TYPES,
   SCENARIO_LIFECYCLE_PIPELINE_NAME,
   type ScenarioLifecycleEvent,
+  scenarioCreatedEventSchema,
 } from "@langwatch/scenario-contract";
 
 import type { ScenarioApp } from "../app/scenario.app.ts";
@@ -38,9 +37,9 @@ export function buildScenarioLifecyclePipeline(
     name: SCENARIO_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: SCENARIO_AGGREGATE_TYPE,
-      events: defineEvents(SCENARIO_LIFECYCLE_EVENT_TYPES),
     }),
   })
+    .withEvents([scenarioCreatedEventSchema])
     .withEventSubscriber(
       "scenarioCreatedNurturing",
       createScenarioCreatedNurturingSubscriber(nurturing),

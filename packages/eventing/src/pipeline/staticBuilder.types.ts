@@ -1,5 +1,6 @@
 import type { SealedCommand } from "../commands/sealedCommand.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
+import type { PipelineEventSchema } from "../domain/eventSchemas.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 import type {
@@ -84,6 +85,9 @@ export interface StaticPipelineDefinition<
 > {
   /** The aggregate and complete event vocabulary owned by this pipeline. */
   aggregate: AggregateDefinition;
+
+  /** The contract's event schemas by type, declared with `.withEvents` (ARCHITECTURE §9). */
+  eventSchemas?: ReadonlyMap<string, PipelineEventSchema<EventType>>;
 
   /** Pipeline metadata for introspection and tooling */
   metadata: PipelineMetadata;

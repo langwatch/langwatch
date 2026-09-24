@@ -1,6 +1,5 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type IntentSpec,
   type ProcessManagerHandledStage,
@@ -14,7 +13,6 @@ import {
   JOIN_APPROVED_EVENT_TYPE,
   JOIN_EXPIRED_EVENT_TYPE,
   JOIN_REJECTED_EVENT_TYPE,
-  JOIN_REQUEST_EVENT_TYPES,
   JOIN_REQUESTED_EVENT_TYPE,
   JOIN_WITHDRAWN_EVENT_TYPE,
   JOIN_REQUEST_AGGREGATE_TYPE,
@@ -46,6 +44,11 @@ import {
   type JoinRequestEvent,
   type JoinRequestFoldState,
   JoinRequestStateFoldProjection,
+  joinRequestedEventSchema,
+  joinApprovedEventSchema,
+  joinRejectedEventSchema,
+  joinExpiredEventSchema,
+  joinWithdrawnEventSchema,
 } from "../eventing/join-request-state.projection.ts";
 import {
   ApproveJoinCommand,
@@ -81,9 +84,15 @@ export class JoinRequestPipelineDefinitionAdapter {
       name: JOIN_REQUEST_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: JOIN_REQUEST_AGGREGATE_TYPE,
-        events: defineEvents(JOIN_REQUEST_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        joinRequestedEventSchema,
+        joinApprovedEventSchema,
+        joinRejectedEventSchema,
+        joinExpiredEventSchema,
+        joinWithdrawnEventSchema,
+      ])
       .withPostgresProjection(
         new JoinRequestStateFoldProjection({
           store: deps.joinRequestProjectionStore,

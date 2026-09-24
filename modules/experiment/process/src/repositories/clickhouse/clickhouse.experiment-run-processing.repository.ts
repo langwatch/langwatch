@@ -2,7 +2,6 @@ import {
   type AppendStore,
   defineAggregate,
   defineCommand,
-  defineEvents,
   definePipeline,
   type FoldProjectionStore,
   type Projection,
@@ -21,6 +20,11 @@ import {
   targetResultEventDataSchema,
   type TraceMetricsComputedEventData,
   traceMetricsComputedEventDataSchema,
+  experimentRunStartedEventSchema,
+  targetResultEventSchema,
+  evaluatorResultEventSchema,
+  traceMetricsComputedEventSchema,
+  experimentRunCompletedEventSchema,
 } from "../../eventing/experiment-run-events.process.ts";
 import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
 import {
@@ -31,7 +35,6 @@ import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
 } from "../../eventing/experiment-run-state.projection.ts";
-import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../../rules/experiment-run-event-types.rules.ts";
 import { makeExperimentRunKey } from "../../rules/experiment-run-key.rules.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import type { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
@@ -225,9 +228,15 @@ export class ExperimentEventingAdapter {
       name: "experiment_run_processing",
       aggregate: defineAggregate({
         type: "experiment_run",
-        events: defineEvents(EXPERIMENT_RUN_PROCESSING_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        experimentRunStartedEventSchema,
+        targetResultEventSchema,
+        evaluatorResultEventSchema,
+        traceMetricsComputedEventSchema,
+        experimentRunCompletedEventSchema,
+      ])
       .withClickHouseFoldProjection(
         ExperimentRunStateFoldProjection.create({
           store: deps.experimentRunStateFoldStore,

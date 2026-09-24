@@ -5,7 +5,6 @@
  */
 import {
   defineAggregate,
-  defineEvents,
   defineEventingModule,
   definePipeline,
   type Event,
@@ -36,7 +35,7 @@ export function buildLicenseSync({
 }): StaticPipelineDefinition<Event> {
   return definePipeline<Event>({
     name: LICENSE_SYNC_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "global", events: defineEvents([]) }),
+    aggregate: defineAggregate({ type: "global" }),
   })
     .withProcessManager(LICENSE_SYNC_PROCESS_NAME, (pm) =>
       pm

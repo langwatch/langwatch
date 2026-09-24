@@ -7,7 +7,6 @@
 import {
   defineAggregate,
   defineEventingModule,
-  defineEvents,
   definePipeline,
   type EventingSetup,
   type Projection,
@@ -17,8 +16,12 @@ import {
 import {
   INSTANT_EVAL_AGGREGATE_TYPE,
   INSTANT_EVAL_PIPELINE_NAME,
-  INSTANT_EVAL_PROCESSING_EVENT_TYPES,
   type InstantEvalProcessingEvent,
+  instantEvalRequestedEventSchema,
+  instantEvalPlannedEventSchema,
+  instantEvalPageJudgedEventSchema,
+  instantEvalCancelRequestedEventSchema,
+  instantEvalFinishedEventSchema,
 } from "@langwatch/instant-eval-contract";
 
 import type { InstantEvalApp } from "../app/instant-eval.app.ts";
@@ -57,9 +60,15 @@ function buildInstantEvalProcessingPipeline(
     name: INSTANT_EVAL_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: INSTANT_EVAL_AGGREGATE_TYPE,
-      events: defineEvents(INSTANT_EVAL_PROCESSING_EVENT_TYPES),
     }),
   })
+    .withEvents([
+      instantEvalRequestedEventSchema,
+      instantEvalPlannedEventSchema,
+      instantEvalPageJudgedEventSchema,
+      instantEvalCancelRequestedEventSchema,
+      instantEvalFinishedEventSchema,
+    ])
     .withPostgresProjection(createInstantEvalRunProjection({ store: deps.instantEvalRunStore }))
     .withCommand("requestRun", commands.requestRun)
     .withCommand("recordPlanned", commands.recordPlanned)

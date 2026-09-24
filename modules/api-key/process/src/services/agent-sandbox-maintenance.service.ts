@@ -1,6 +1,5 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type Event,
   type StaticPipelineDefinition,
@@ -58,7 +57,6 @@ export class EventingAgentSandboxMaintenanceAdapter {
         // `global`, like the other maintenance pipelines: this one appends no
         // events, and the sweep spans every tenant by design.
         type: "global",
-        events: defineEvents([]),
       }),
     })
       .withProcessManager(AGENT_SANDBOX_KEY_REAP_PROCESS_NAME, (pm) =>

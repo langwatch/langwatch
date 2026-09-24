@@ -5,7 +5,6 @@
  */
 import {
   defineAggregate,
-  defineEvents,
   defineEventingModule,
   definePipeline,
   type Event,
@@ -40,7 +39,7 @@ export const identityEventing = defineEventingModule({
   build: ({ app, processStore }: EventingSetup<IdentityRepositories, IdentityApp>) =>
     definePipeline<Event>({
       name: IDENTITY_MAINTENANCE_PIPELINE_NAME,
-      aggregate: defineAggregate({ type: "global", events: defineEvents([]) }),
+      aggregate: defineAggregate({ type: "global" }),
     })
       .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
         pm

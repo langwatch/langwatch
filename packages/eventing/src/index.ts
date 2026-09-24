@@ -22,6 +22,7 @@ export {
   EventCatalogue,
 } from "./domain/definitions.ts";
 export type { AggregateDefinition, EventDefinition } from "./domain/definitions.ts";
+export type { PipelineEventSchema } from "./domain/eventSchemas.ts";
 export type { EventType } from "./domain/eventType.ts";
 export type { TenantId } from "./domain/tenantId.ts";
 export { createTenantId, TenantIdSchema } from "./domain/tenantId.ts";

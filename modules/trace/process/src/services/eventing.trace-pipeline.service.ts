@@ -1,19 +1,28 @@
 import {
   type AppendStore,
   defineAggregate,
-  defineEvents,
   definePipeline,
   type FoldProjectionStore,
 } from "@langwatch/eventing";
 import {
   type NormalizedSpan,
   type TraceProcessingEvent,
-  TRACE_PROCESSING_EVENT_TYPES,
   type TraceSummaryData,
   RECORD_SPAN_COALESCE_MAX_BATCH,
   TRACE_CORRELATION_COALESCE_MAX_BATCH,
   type RecordSpanCommandData,
   type TraceCanonicalisationService,
+  spanReceivedEventSchema,
+  spanRecordedEventSchema,
+  topicAssignedEventSchema,
+  logRecordReceivedEventSchema,
+  logContributedEventSchema,
+  metricDataPointCorrelatedEventSchema,
+  originResolvedEventSchema,
+  annotationAddedEventSchema,
+  annotationRemovedEventSchema,
+  annotationsBulkSyncedEventSchema,
+  traceNameChangedEventSchema,
 } from "@langwatch/trace-contract";
 
 import {
@@ -96,9 +105,21 @@ function buildTracePipeline(options: EventingTracePipelineAdapterOptions) {
     name: TRACE_PROCESSING_PIPELINE_NAME,
     aggregate: defineAggregate({
       type: "trace",
-      events: defineEvents(TRACE_PROCESSING_EVENT_TYPES),
     }),
   })
+    .withEvents([
+      spanReceivedEventSchema,
+      spanRecordedEventSchema,
+      topicAssignedEventSchema,
+      logRecordReceivedEventSchema,
+      logContributedEventSchema,
+      metricDataPointCorrelatedEventSchema,
+      originResolvedEventSchema,
+      annotationAddedEventSchema,
+      annotationRemovedEventSchema,
+      annotationsBulkSyncedEventSchema,
+      traceNameChangedEventSchema,
+    ])
     .withProjectionPayloadPreparation(options.prepareEventForProjection)
     .withClickHouseFoldProjection(
       TraceSummaryFoldProjection.create({

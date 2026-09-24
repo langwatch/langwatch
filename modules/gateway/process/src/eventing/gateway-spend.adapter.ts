@@ -1,6 +1,5 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type FoldProjectionStore,
   type ProcessManagerApplier,
@@ -15,7 +14,6 @@ import type { SettleSpendCommandData } from "./gateway-spend-commands.process.ts
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
-  GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
 } from "./gateway-spend-commands.process.ts";
 import type { SpendSettlementProcessDeps } from "./gateway-spend-settlement.intent.ts";
 import {
@@ -27,6 +25,10 @@ import {
   ConfirmSpendCommand,
   FailSpendCommand,
   SettleSpendCommand,
+  gatewaySpendAdmittedEventSchema,
+  gatewaySpendConfirmedEventSchema,
+  gatewaySpendFailedEventSchema,
+  gatewaySpendSettledEventSchema,
 } from "./gateway-spend.intent.ts";
 import type { GatewaySpendProcessingEvent } from "./gateway-spend.intent.ts";
 import type { GatewaySpendState } from "./gateway-spend.projection.ts";
@@ -94,9 +96,14 @@ export class EventingGatewaySpendAdapter {
       name: GATEWAY_SPEND_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: GATEWAY_SPEND_AGGREGATE_TYPE,
-        events: defineEvents(GATEWAY_SPEND_PROCESSING_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        gatewaySpendAdmittedEventSchema,
+        gatewaySpendConfirmedEventSchema,
+        gatewaySpendFailedEventSchema,
+        gatewaySpendSettledEventSchema,
+      ])
       .withClickHouseFoldProjection(GatewaySpendFoldProjection.create({ store: this.foldStore() }))
       .withCommand("admitSpend", AdmitSpendCommand)
       .withCommand("confirmSpend", ConfirmSpendCommand)

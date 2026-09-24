@@ -1,6 +1,5 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type Event,
   type ProcessStore,
@@ -51,7 +50,6 @@ export class EventingGithubMaintenanceAdapter {
         // `global`, like the other maintenance pipelines: this appends no events,
         // and the sweep spans every tenant by design.
         type: "global",
-        events: defineEvents([]),
       }),
     })
       .withProcessManager(GITHUB_BRANCH_RECHECK_PROCESS_NAME, (pm) =>

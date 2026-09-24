@@ -1,12 +1,13 @@
 import {
   type CodingAgentProjectionPersistence,
   CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
-  CODING_AGENT_PROCESSING_EVENT_TYPES,
   type CodingAgentProcessingEvent,
+  spanFactsContributedEventSchema,
+  logFactsContributedEventSchema,
+  metricFactsContributedEventSchema,
 } from "@langwatch/coding-agent-contract";
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   RedisCachedFoldStore,
   type Projection,
@@ -112,9 +113,13 @@ export class EventingCodingAgentProcessingAdapter {
       name: "coding_agent_processing",
       aggregate: defineAggregate({
         type: "coding_agent_session",
-        events: defineEvents(CODING_AGENT_PROCESSING_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        spanFactsContributedEventSchema,
+        logFactsContributedEventSchema,
+        metricFactsContributedEventSchema,
+      ])
       .withClickHouseFoldProjection(
         CodingAgentSessionFoldProjection.create({
           store: sessionStore,

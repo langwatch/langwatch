@@ -1,7 +1,6 @@
 import {
   defineAggregate,
   defineEventingModule,
-  defineEvents,
   definePipeline,
   type Event,
   type EventingSetup,
@@ -31,7 +30,7 @@ export function buildAnomalyDetection({
 }: EventingSetup<unknown, Pick<OpsApp, "detectAnomalies">>): StaticPipelineDefinition<Event> {
   return definePipeline<Event>({
     name: ANOMALY_DETECTION_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "global", events: defineEvents([]) }),
+    aggregate: defineAggregate({ type: "global" }),
   })
     .withProcessManager(ANOMALY_DETECTION_PROCESS_NAME, (pm) =>
       pm

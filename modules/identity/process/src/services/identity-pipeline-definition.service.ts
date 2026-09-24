@@ -1,18 +1,12 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type Projection,
   type RegisteredCommand,
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import {
-  IDENTITY_EVENT_TYPES,
-  MFA_EVENT_TYPES,
-  IDENTITY_PIPELINE_NAME,
-  USER_IDENTITY_AGGREGATE_TYPE,
-} from "@langwatch/identity-contract";
+import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 import { AttachIdentifierCommand } from "../eventing/attach-identifier.intent.ts";
 import { DetachIdentifierCommand } from "../eventing/detach-identifier.intent.ts";
@@ -21,12 +15,26 @@ import {
   type IdentityEvent,
   type IdentityFoldState,
   IdentityStateFoldProjection,
+  identifierAttachedEventSchema,
+  identifierVerifiedEventSchema,
+  identifierDeadEndedEventSchema,
+  primaryChangedEventSchema,
+  identifierDetachedEventSchema,
+  userErasedEventSchema,
+  linkProposedEventSchema,
 } from "../eventing/identity-state.projection.ts";
 import { MarkPrimaryCommand } from "../eventing/mark-primary.intent.ts";
 import {
   MfaEnrollmentStateFoldProjection,
   type MfaEvent,
   type MfaFoldState,
+  mfaEnrolledEventSchema,
+  mfaConfirmedEventSchema,
+  mfaEnrollmentExpiredEventSchema,
+  mfaDisabledEventSchema,
+  backupCodeConsumedEventSchema,
+  backupCodesRegeneratedEventSchema,
+  mfaVerificationFailedEventSchema,
 } from "../eventing/mfa-enrollment-state.projection.ts";
 import {
   ConfirmMfaCommand,
@@ -73,9 +81,24 @@ export class IdentityPipelineDefinitionAdapter {
       name: IDENTITY_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: USER_IDENTITY_AGGREGATE_TYPE,
-        events: defineEvents([...IDENTITY_EVENT_TYPES, ...MFA_EVENT_TYPES]),
       }),
     })
+      .withEvents([
+        identifierAttachedEventSchema,
+        identifierVerifiedEventSchema,
+        identifierDeadEndedEventSchema,
+        primaryChangedEventSchema,
+        identifierDetachedEventSchema,
+        userErasedEventSchema,
+        linkProposedEventSchema,
+        mfaEnrolledEventSchema,
+        mfaConfirmedEventSchema,
+        mfaEnrollmentExpiredEventSchema,
+        mfaDisabledEventSchema,
+        backupCodeConsumedEventSchema,
+        backupCodesRegeneratedEventSchema,
+        mfaVerificationFailedEventSchema,
+      ])
       .withPostgresProjection(
         new IdentityStateFoldProjection({
           store: deps.identityProjectionStore,

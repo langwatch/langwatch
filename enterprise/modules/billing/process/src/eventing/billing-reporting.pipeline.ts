@@ -4,7 +4,6 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type Event,
   type StaticPipelineDefinition,
@@ -55,7 +54,6 @@ export class BillingReportingPipeline {
       name: BILLING_REPORTING_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: "billing_report",
-        events: defineEvents([]),
       }),
     })
       .withCommandInstance(

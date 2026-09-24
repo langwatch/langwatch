@@ -5,7 +5,6 @@ import {
   createTenantId,
   defineAggregate,
   defineCommandSchema,
-  defineEvents,
   definePipeline,
   type EventSubscriberDefinition,
   EventUtils,
@@ -22,9 +21,9 @@ import {
   METRIC_COMMAND_COALESCE_MAX_BATCH,
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   METRIC_DATA_POINT_RECEIVED_EVENT_VERSION_LATEST,
-  METRIC_PROCESSING_EVENT_TYPES,
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
   recordMetricDataPointCommandDataSchema,
+  metricDataPointReceivedEventSchema,
 } from "@langwatch/metric-contract";
 
 import { MetricDataPointStorageMapProjection } from "../eventing/metric-data-point-storage.projection.ts";
@@ -67,9 +66,9 @@ function createMetricProcessingPipeline(
     name: "metric_processing",
     aggregate: defineAggregate({
       type: "metric",
-      events: defineEvents(METRIC_PROCESSING_EVENT_TYPES),
     }),
   })
+    .withEvents([metricDataPointReceivedEventSchema])
     .withClickHouseMapProjection(
       MetricDataPointStorageMapProjection.create({
         store: deps.metricDataPointAppendStore,

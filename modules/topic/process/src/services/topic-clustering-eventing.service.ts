@@ -1,10 +1,4 @@
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
-import { TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES } from "@langwatch/topic-contract";
+import { defineAggregate, definePipeline, type StateProjectionStore } from "@langwatch/eventing";
 
 import {
   type TopicClusteringRunHistoryData,
@@ -31,6 +25,13 @@ import {
   type TopicModelData,
   TopicModelFoldProjection,
 } from "../eventing/topic-model.projection.ts";
+import {
+  TopicClusteringRequestedEventSchema,
+  TopicClusteringRunStartedEventSchema,
+  TopicClusteringRunCompletedEventSchema,
+  TopicClusteringRunFailedEventSchema,
+  TopicClusteringTopicsRecordedEventSchema,
+} from "./topic-events.service.ts";
 import type { TopicClusteringProcessingEvent } from "./topic-events.service.ts";
 
 // Composition needs the projection state types to declare its stores; the
@@ -62,9 +63,15 @@ const buildTopicClusteringProcessingPipeline = (deps: TopicClusteringProcessingP
     name: "topic_clustering_processing",
     aggregate: defineAggregate({
       type: "topic_clustering",
-      events: defineEvents(TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES),
     }),
   })
+    .withEvents([
+      TopicClusteringRequestedEventSchema,
+      TopicClusteringRunStartedEventSchema,
+      TopicClusteringRunCompletedEventSchema,
+      TopicClusteringRunFailedEventSchema,
+      TopicClusteringTopicsRecordedEventSchema,
+    ])
     .withPostgresProjection(
       TopicClusteringRunStatusFoldProjection.create({
         store: deps.topicClusteringRunStatusStore,

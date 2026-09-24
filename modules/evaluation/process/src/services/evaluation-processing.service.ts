@@ -2,14 +2,16 @@ import type { AutomationEvaluationSubscriberService } from "@langwatch/automatio
 import {
   type EvaluationRunData,
   EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_PROCESSING_EVENT_TYPES,
   EVALUATION_REPORTED_EVENT_TYPE,
   type EvaluationProcessingEvent,
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
 } from "@langwatch/evaluation-contract";
 import {
   type AppendStore,
   defineAggregate,
-  defineEvents,
   definePipeline,
   type FoldProjectionStore,
   type Projection,
@@ -64,9 +66,14 @@ export class EvaluationProcessingAdapter {
       name: "evaluation_processing",
       aggregate: defineAggregate({
         type: "evaluation",
-        events: defineEvents(EVALUATION_PROCESSING_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        evaluationScheduledEventSchema,
+        evaluationStartedEventSchema,
+        evaluationCompletedEventSchema,
+        evaluationReportedEventSchema,
+      ])
       .withClickHouseFoldProjection(
         EvaluationRunFoldProjection.create({
           store: this.deps.evalRunStore,

@@ -28,13 +28,17 @@ export function defineEvents<const Types extends readonly EventType[]>(
 export function defineAggregate<
   const Type extends AggregateType,
   const Events extends readonly EventDefinition[],
->(definition: AggregateDefinition<Type, Events>): AggregateDefinition<Type, Events> {
+>(definition: {
+  readonly type: Type;
+  readonly events?: Events;
+}): AggregateDefinition<Type, Events> {
+  const events = definition.events ?? [];
   if (definition.type.trim().length === 0) {
     throw new Error("Aggregate type must be a non-empty string");
   }
 
   const seen = new Set<string>();
-  for (const event of definition.events) {
+  for (const event of events) {
     if (event.type.trim().length === 0) {
       throw new Error(`Aggregate "${definition.type}" has an empty event type`);
     }
@@ -48,7 +52,7 @@ export function defineAggregate<
 
   return Object.freeze({
     type: definition.type,
-    events: Object.freeze([...definition.events]) as unknown as Events,
+    events: Object.freeze([...events]) as unknown as Events,
   });
 }
 

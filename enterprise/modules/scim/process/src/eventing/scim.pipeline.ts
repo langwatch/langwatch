@@ -5,7 +5,6 @@
  */
 import {
   defineAggregate,
-  defineEvents,
   defineEventingModule,
   definePipeline,
   type Event,
@@ -37,7 +36,7 @@ export function buildScimMaintenance({
 }: EventingSetup<unknown, Pick<ScimApp, "sweepExpiredRequests">>): StaticPipelineDefinition<Event> {
   return definePipeline<Event>({
     name: SCIM_MAINTENANCE_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "global", events: defineEvents([]) }),
+    aggregate: defineAggregate({ type: "global" }),
   })
     .withProcessManager(SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME, (pm) =>
       pm

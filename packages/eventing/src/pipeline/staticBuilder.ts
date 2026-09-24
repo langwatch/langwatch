@@ -9,7 +9,12 @@ import {
   type TenantScopedPayload,
 } from "../commands/sealedCommand.ts";
 import type { CommandType } from "../domain/commandType.ts";
-import type { AggregateDefinition } from "../domain/definitions.ts";
+import { type AggregateDefinition, defineAggregate, defineEvents } from "../domain/definitions.ts";
+import {
+  type EventSchemaCoverage,
+  indexEventSchemas,
+  type PipelineEventSchema,
+} from "../domain/eventSchemas.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type {
   CommandHandlerOptions,
@@ -98,10 +103,28 @@ export class PipelineBuilder<
   private processManagers = new Map<string, ProcessManagerDefinition>();
   private eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private prepareEventForProjection?: (event: EventType) => EventType;
+  private eventSchemas?: ReadonlyMap<string, PipelineEventSchema<EventType>>;
   constructor(
     private readonly name: string,
     private readonly aggregate: AggregateDefinition,
   ) {}
+
+  /** Declares the pipeline's events: the contract's zod schemas, one per type (ARCHITECTURE §9). */
+  withEvents<const Schemas extends readonly PipelineEventSchema<EventType>[]>(
+    schemas: Schemas & EventSchemaCoverage<EventType, Schemas>,
+  ): this {
+    if (this.eventSchemas !== undefined) {
+      throw new ConfigurationError(
+        "PipelineBuilder",
+        `Pipeline "${this.name}" declares its events twice`,
+        {
+          pipelineName: this.name,
+        },
+      );
+    }
+    this.eventSchemas = indexEventSchemas({ pipelineName: this.name, schemas });
+    return this;
+  }
 
   /**
    * Installs the process-owned preparation seam used after durable storage and
@@ -476,13 +499,28 @@ export class PipelineBuilder<
     }
   }
 
+  private declaredAggregate(): AggregateDefinition {
+    if (this.eventSchemas === undefined) return this.aggregate;
+    const declared = [...this.eventSchemas.keys()];
+    const listed = this.aggregate.events.map((event) => event.type);
+    if (listed.length > 0 && !sameEventTypes(listed, declared)) {
+      throw new ConfigurationError(
+        "PipelineBuilder",
+        `Pipeline "${this.name}" lists events its .withEvents schemas do not declare`,
+        { pipelineName: this.name, listed, declared },
+      );
+    }
+    return defineAggregate({ type: this.aggregate.type, events: defineEvents(declared) });
+  }
+
   /** Build the static pipeline definition. */
   build(): StaticPipelineDefinition<EventType, RegisteredProjections, RegisteredCommands> {
+    const aggregate = this.declaredAggregate();
     // Build metadata for tooling and introspection
     const metadata: PipelineMetadata = {
       name: this.name,
-      aggregateType: this.aggregate.type,
-      allowedEventTypes: this.aggregate.events.map((event) => event.type),
+      aggregateType: aggregate.type,
+      allowedEventTypes: aggregate.events.map((event) => event.type),
       projections: Array.from(this.foldProjections.entries()).map(([name, def]) => ({
         name,
         handlerClassName: `FoldProjection(${def.definition.name})`,
@@ -510,7 +548,8 @@ export class PipelineBuilder<
     };
 
     return {
-      aggregate: this.aggregate,
+      aggregate,
+      eventSchemas: this.eventSchemas,
       metadata,
       prepareEventForProjection: this.prepareEventForProjection,
       foldProjections: this.foldProjections,
@@ -558,6 +597,11 @@ export function definePipeline<EventType extends Event>(config: {
 > {
   const { name, aggregate } = config;
   return new PipelineBuilder(name, aggregate);
+}
+
+function sameEventTypes(left: readonly string[], right: readonly string[]): boolean {
+  const rightTypes = new Set(right);
+  return left.length === rightTypes.size && left.every((type) => rightTypes.has(type));
 }
 
 type SubscriberJobPayload = { event: Event; foldState: unknown };

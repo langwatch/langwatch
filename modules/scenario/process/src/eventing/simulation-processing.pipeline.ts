@@ -1,6 +1,5 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type AppendStore,
   type FoldProjectionStore,
@@ -9,7 +8,21 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
-import { SIMULATION_PROCESSING_EVENT_TYPES } from "@langwatch/scenario-contract";
+import {
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunEvaluatedEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunDeletedEventSchema,
+  SimulationSetArchivedEventSchema,
+} from "@langwatch/scenario-contract";
 
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
@@ -63,9 +76,23 @@ function buildSimulationProcessingPipelineDefinition(
     name: "simulation_processing",
     aggregate: defineAggregate({
       type: "simulation_run",
-      events: defineEvents(SIMULATION_PROCESSING_EVENT_TYPES),
     }),
   })
+    .withEvents([
+      SimulationRunQueuedEventSchema,
+      SimulationRunStartedEventSchema,
+      SimulationMessageSnapshotEventSchema,
+      SimulationRunFinishedEventSchema,
+      SimulationRunEvaluatedEventSchema,
+      SimulationTextMessageStartEventSchema,
+      SimulationTextMessageEndEventSchema,
+      SimulationRunMetricsComputedEventSchema,
+      SimulationRunCancelRequestedEventSchema,
+      SimulationRunAgentInstanceRecordedEventSchema,
+      SimulationRunCutAtLimitRecordedEventSchema,
+      SimulationRunDeletedEventSchema,
+      SimulationSetArchivedEventSchema,
+    ])
     .withClickHouseFoldProjection(
       SimulationRunStateFoldProjection.create({ store: deps.simulationRunStore }),
     )

@@ -1,11 +1,11 @@
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-  type FoldProjectionStore,
-} from "@langwatch/eventing";
+import { defineAggregate, definePipeline, type FoldProjectionStore } from "@langwatch/eventing";
 import type { SuiteRunStateData, SuiteRunProcessingEvent } from "@langwatch/suite-contract";
-import { SUITE_RUN_PROCESSING_EVENT_TYPES } from "@langwatch/suite-contract";
+import {
+  SuiteRunStartedEventSchema,
+  SuiteRunItemStartedEventSchema,
+  SuiteRunItemCompletedEventSchema,
+  SuiteRunItemRegradedEventSchema,
+} from "@langwatch/suite-contract";
 
 import { SuiteRunStateFoldProjection } from "../eventing/suite-run-state.projection.ts";
 import { SuiteRunCommandsAdapter } from "./suite-run-commands.service.ts";
@@ -45,9 +45,14 @@ const buildSuiteRunProcessingPipeline = (deps: SuiteRunProcessingPipelineDeps) =
       name: "suite_run_processing",
       aggregate: defineAggregate({
         type: "suite_run",
-        events: defineEvents(SUITE_RUN_PROCESSING_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        SuiteRunStartedEventSchema,
+        SuiteRunItemStartedEventSchema,
+        SuiteRunItemCompletedEventSchema,
+        SuiteRunItemRegradedEventSchema,
+      ])
       .withClickHouseFoldProjection(
         SuiteRunStateFoldProjection.create({
           store: deps.suiteRunStateFoldStore,

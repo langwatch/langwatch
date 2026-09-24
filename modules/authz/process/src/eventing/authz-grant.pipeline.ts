@@ -1,5 +1,4 @@
-import { AUTHZ_GRANTS_EVENT_TYPES } from "@langwatch/authz-contract";
-import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
+import { defineAggregate, definePipeline } from "@langwatch/eventing";
 
 import type { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
@@ -12,7 +11,11 @@ import {
   GRANT_COALESCE_MAX_BATCH,
   RevokeGrantCommand,
 } from "./authz-grant.commands.ts";
-import { AUTHZ_GRANT_AGGREGATE_TYPE, type AuthzGrantsEvent } from "./authz-grant.events.ts";
+import {
+  AUTHZ_GRANT_AGGREGATE_TYPE,
+  type AuthzGrantsEvent,
+  authzGrantEventSchemas,
+} from "./authz-grant.events.ts";
 import { AuthzGrantProjection } from "./authz-grant.projection.ts";
 import { EventingAuthzAuditAdapter } from "./authz-grant.subscriber.ts";
 
@@ -29,9 +32,9 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
       name: AUTHZ_GRANT_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: AUTHZ_GRANT_AGGREGATE_TYPE,
-        events: defineEvents(AUTHZ_GRANTS_EVENT_TYPES),
       }),
     })
+      .withEvents(authzGrantEventSchemas)
       .withClickHouseMapProjection(AuthzGrantProjection.create(options.authzGrantsWriteStore))
       .withEventSubscriber(
         "auditTrail",

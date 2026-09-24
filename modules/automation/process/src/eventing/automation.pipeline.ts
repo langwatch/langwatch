@@ -4,13 +4,7 @@ import {
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
   triggerMatchRecordedEventDataSchema,
 } from "@langwatch/automation-contract";
-import {
-  defineAggregate,
-  defineEvents,
-  definePipeline,
-  defineCommand,
-  EventSchema,
-} from "@langwatch/eventing";
+import { defineAggregate, definePipeline, defineCommand, EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
 
 import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
@@ -41,8 +35,6 @@ import {
   type WebhookDeliveryPruneState,
   webhookDeliveryPruneWake,
 } from "./webhook-delivery-prune.process.ts";
-
-const AUTOMATIONS_EVENT_TYPES = [TRIGGER_MATCH_RECORDED_EVENT_TYPE] as const;
 
 export const RecordTriggerMatchCommand = defineCommand({
   commandType: RECORD_TRIGGER_MATCH_COMMAND_TYPE,
@@ -85,9 +77,9 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     name: "automations",
     aggregate: defineAggregate({
       type: "trigger",
-      events: defineEvents(AUTOMATIONS_EVENT_TYPES),
     }),
   })
+    .withEvents([triggerMatchRecordedEventSchema])
     .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
       serializeByAggregate: true,
       // ADR-066 pillar 2: a hot trigger appends one match per trace. Coalesce a

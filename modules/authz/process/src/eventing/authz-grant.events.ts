@@ -1,10 +1,16 @@
 import {
-  type GRANT_ATTACHED_EVENT_TYPE,
-  type GRANT_REVOKED_EVENT_TYPE,
-  type GRANT_ROLE_CHANGED_EVENT_TYPE,
-  type ROLE_DEFINED_EVENT_TYPE,
-  type ROLE_DELETED_EVENT_TYPE,
-  type ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
+  GRANT_ATTACHED_EVENT_TYPE,
+  GRANT_REVOKED_EVENT_TYPE,
+  GRANT_ROLE_CHANGED_EVENT_TYPE,
+  grantAttachedPayloadSchema,
+  grantRevokedPayloadSchema,
+  grantRoleChangedPayloadSchema,
+  ROLE_DEFINED_EVENT_TYPE,
+  ROLE_DELETED_EVENT_TYPE,
+  ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
+  roleDefinedPayloadSchema,
+  roleDeletedPayloadSchema,
+  rolePermissionsChangedPayloadSchema,
   type GrantAttachedPayload,
   type GrantRevokedPayload,
   type GrantRoleChangedPayload,
@@ -12,7 +18,8 @@ import {
   type RoleDeletedPayload,
   type RolePermissionsChangedPayload,
 } from "@langwatch/authz-contract";
-import type { Event } from "@langwatch/eventing";
+import { type Event, EventSchema } from "@langwatch/eventing";
+import { z } from "zod";
 
 /**
  * Both grants and roles use this one Eventing partition. Their aggregate IDs
@@ -44,3 +51,36 @@ export type AuthzGrantsEvent =
   | RoleDefinedEvent
   | RolePermissionsChangedEvent
   | RoleDeletedEvent;
+
+export const authzGrantEventSchemas = [
+  z.object({
+    ...EventSchema.shape,
+    type: z.literal(GRANT_ATTACHED_EVENT_TYPE),
+    data: grantAttachedPayloadSchema,
+  }),
+  z.object({
+    ...EventSchema.shape,
+    type: z.literal(GRANT_ROLE_CHANGED_EVENT_TYPE),
+    data: grantRoleChangedPayloadSchema,
+  }),
+  z.object({
+    ...EventSchema.shape,
+    type: z.literal(GRANT_REVOKED_EVENT_TYPE),
+    data: grantRevokedPayloadSchema,
+  }),
+  z.object({
+    ...EventSchema.shape,
+    type: z.literal(ROLE_DEFINED_EVENT_TYPE),
+    data: roleDefinedPayloadSchema,
+  }),
+  z.object({
+    ...EventSchema.shape,
+    type: z.literal(ROLE_PERMISSIONS_CHANGED_EVENT_TYPE),
+    data: rolePermissionsChangedPayloadSchema,
+  }),
+  z.object({
+    ...EventSchema.shape,
+    type: z.literal(ROLE_DELETED_EVENT_TYPE),
+    data: roleDeletedPayloadSchema,
+  }),
+] as const;

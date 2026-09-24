@@ -5,7 +5,6 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
  */
 import {
   defineAggregate,
-  defineEvents,
   defineEventingModule,
   definePipeline,
   type Event,
@@ -44,7 +43,7 @@ export function buildLwqlReconvergence({
 }): StaticPipelineDefinition<Event> {
   return definePipeline<Event>({
     name: LWQL_RECONVERGENCE_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "global", events: defineEvents([]) }),
+    aggregate: defineAggregate({ type: "global" }),
   })
     .withProcessManager(LWQL_RECONVERGENCE_PROCESS_NAME, (pm) =>
       pm

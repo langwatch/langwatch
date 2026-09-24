@@ -1,22 +1,25 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type Projection,
   type RegisteredCommand,
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import {
-  SCIM_SYNC_EVENT_TYPES,
-  SCIM_SYNC_AGGREGATE_TYPE,
-  SCIM_SYNC_PIPELINE_NAME,
-} from "@langwatch/identity-contract";
+import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
 import {
   type ScimSyncEvent,
   type ScimSyncFoldState,
   ScimSyncStateFoldProjection,
+  scimTokenIssuedEventSchema,
+  scimUserPushedEventSchema,
+  scimGroupMappedEventSchema,
+  scimApplyFailedEventSchema,
+  scimApplyRecoveredEventSchema,
+  scimApplyRetiredEventSchema,
+  scimApplyRedrivenEventSchema,
+  scimTokenRevokedEventSchema,
 } from "../eventing/scim-sync-state.projection.ts";
 import {
   IssueScimTokenCommand,
@@ -51,9 +54,18 @@ export class ScimSyncPipelineDefinitionAdapter {
       name: SCIM_SYNC_PIPELINE_NAME,
       aggregate: defineAggregate({
         type: SCIM_SYNC_AGGREGATE_TYPE,
-        events: defineEvents(SCIM_SYNC_EVENT_TYPES),
       }),
     })
+      .withEvents([
+        scimTokenIssuedEventSchema,
+        scimUserPushedEventSchema,
+        scimGroupMappedEventSchema,
+        scimApplyFailedEventSchema,
+        scimApplyRecoveredEventSchema,
+        scimApplyRetiredEventSchema,
+        scimApplyRedrivenEventSchema,
+        scimTokenRevokedEventSchema,
+      ])
       .withPostgresProjection(
         new ScimSyncStateFoldProjection({
           store: deps.scimSyncProjectionStore,

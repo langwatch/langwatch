@@ -1,7 +1,6 @@
 import {
   defineAggregate,
   defineEventingModule,
-  defineEvents,
   definePipeline,
   type Event,
   type EventingSetup,
@@ -26,7 +25,7 @@ export function buildOpsUsageReportPipeline(
 ): StaticPipelineDefinition<Event> {
   return definePipeline<Event>({
     name: USAGE_REPORT_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "global", events: defineEvents([]) }),
+    aggregate: defineAggregate({ type: "global" }),
   })
     .withProcessManager(USAGE_REPORT_PROCESS_NAME, usageReportPM(deps))
     .build();

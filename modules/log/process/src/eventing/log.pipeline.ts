@@ -2,7 +2,6 @@ import {
   type AppendStore,
   defineAggregate,
   defineEventingModule,
-  defineEvents,
   definePipeline,
   type EventingSetup,
   type EventSubscriberDefinition,
@@ -11,9 +10,9 @@ import {
 } from "@langwatch/eventing";
 import {
   type CanonicalLogRecord,
+  canonicalLogRecordReceivedEventSchema,
   type LogProcessingEvent,
   LOG_COMMAND_COALESCE_MAX_BATCH,
-  LOG_PROCESSING_EVENT_TYPES,
   LOG_PROCESSING_PIPELINE_NAME,
   type RecordCanonicalLogCommandData,
 } from "@langwatch/log-contract";
@@ -50,16 +49,15 @@ export function createLogProcessingPipeline(
 ): LogProcessingPipeline {
   let builder = definePipeline<LogProcessingEvent>({
     name: LOG_PROCESSING_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: "log",
-      events: defineEvents(LOG_PROCESSING_EVENT_TYPES),
-    }),
-  }).withClickHouseMapProjection(
-    CanonicalLogStorageMapProjection.create({
-      store: deps.canonicalLogAppendStore,
-      shardCount: deps.logCommandShardCount,
-    }),
-  );
+    aggregate: defineAggregate({ type: "log" }),
+  })
+    .withEvents([canonicalLogRecordReceivedEventSchema])
+    .withClickHouseMapProjection(
+      CanonicalLogStorageMapProjection.create({
+        store: deps.canonicalLogAppendStore,
+        shardCount: deps.logCommandShardCount,
+      }),
+    );
 
   for (const subscriber of deps.subscribers ?? []) {
     builder = builder.withEventSubscriber(subscriber.name, subscriber);

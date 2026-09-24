@@ -1,7 +1,6 @@
 import {
   type AppendStore,
   defineAggregate,
-  defineEvents,
   definePipeline,
   type EventSubscriberDefinition,
   type Projection,
@@ -14,7 +13,6 @@ import type {
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
 } from "@langwatch/langy-contract";
-import { LANGY_CONVERSATION_PROCESSING_EVENT_TYPES } from "@langwatch/langy-contract";
 
 import type { LangyEffectMembers } from "../app/langy.members.ts";
 import {
@@ -22,7 +20,31 @@ import {
   type LangyAnalyticsEventProjectionRecord,
 } from "../eventing/langy-analytics-event.projection.ts";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "../eventing/langy-conversation-process.schemas.ts";
-import { LangyConversationStateFoldProjection } from "../eventing/langy-conversation-state.projection.ts";
+import {
+  LangyConversationStateFoldProjection,
+  LangyConversationStartedEventSchema,
+  LangyConversationForkedEventSchema,
+  LangyMessageRecordedEventSchema,
+  LangyMessageImportedEventSchema,
+  LangyAgentTurnAcceptedEventSchema,
+  LangyToolCallInitiatedEventSchema,
+  LangyToolCallSucceededEventSchema,
+  LangyToolCallFailedEventSchema,
+  LangyPlanUpdatedEventSchema,
+  LangyAgentResponseFailedEventSchema,
+  LangyAgentRespondedEventSchema,
+  LangyConversationArchivedEventSchema,
+  LangyConversationMetadataUpdatedEventSchema,
+  LangyConversationHandoffPendingEventSchema,
+  LangyConversationHandoffConsumedEventSchema,
+  LangyConversationTitleGeneratedEventSchema,
+  LangyLocalControlRequestedEventSchema,
+  LangyLocalWorkspaceConnectedEventSchema,
+  LangyLocalWorkspaceDisconnectedEventSchema,
+  LangyLocalPolicyChangedEventSchema,
+  LangyUserWaitStartedEventSchema,
+  LangyUserWaitEndedEventSchema,
+} from "../eventing/langy-conversation-state.projection.ts";
 import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 import { LangyConversationTurnFoldProjection } from "../eventing/langy-conversation-turn.projection.ts";
 import {
@@ -88,9 +110,32 @@ function buildLangyConversationPipeline(
     name: "langy_conversation_processing",
     aggregate: defineAggregate({
       type: "langy_conversation",
-      events: defineEvents(LANGY_CONVERSATION_PROCESSING_EVENT_TYPES),
     }),
   })
+    .withEvents([
+      LangyConversationStartedEventSchema,
+      LangyConversationForkedEventSchema,
+      LangyMessageRecordedEventSchema,
+      LangyMessageImportedEventSchema,
+      LangyAgentTurnAcceptedEventSchema,
+      LangyToolCallInitiatedEventSchema,
+      LangyToolCallSucceededEventSchema,
+      LangyToolCallFailedEventSchema,
+      LangyPlanUpdatedEventSchema,
+      LangyAgentResponseFailedEventSchema,
+      LangyAgentRespondedEventSchema,
+      LangyConversationArchivedEventSchema,
+      LangyConversationMetadataUpdatedEventSchema,
+      LangyConversationHandoffPendingEventSchema,
+      LangyConversationHandoffConsumedEventSchema,
+      LangyConversationTitleGeneratedEventSchema,
+      LangyLocalControlRequestedEventSchema,
+      LangyLocalWorkspaceConnectedEventSchema,
+      LangyLocalWorkspaceDisconnectedEventSchema,
+      LangyLocalPolicyChangedEventSchema,
+      LangyUserWaitStartedEventSchema,
+      LangyUserWaitEndedEventSchema,
+    ])
     .withPostgresProjection(
       LangyConversationStateFoldProjection.create({
         store: deps.langyConversationProjectionStore,

@@ -1,6 +1,5 @@
 import {
   defineAggregate,
-  defineEvents,
   definePipeline,
   type Event,
   type StaticPipelineDefinition,
@@ -41,7 +40,6 @@ export class EventingLangyMaintenanceAdapter {
         // minting an aggregate type that can never appear in the event store would
         // be taxonomy debt for nothing. The sweep spans every tenant by design.
         type: "global",
-        events: defineEvents([]),
       }),
     })
       .withProcessManager(LANGY_SESSION_KEY_REAP_PROCESS_NAME, (pm) =>

@@ -7,7 +7,6 @@ import type { BillingApi } from "@langwatch/enterprise-billing-contract";
  */
 import {
   defineAggregate,
-  defineEvents,
   defineEventingModule,
   definePipeline,
   type Event,
@@ -41,7 +40,7 @@ export function buildConnectedBilling({
 }): StaticPipelineDefinition<Event> {
   return definePipeline<Event>({
     name: CONNECTED_BILLING_PIPELINE_NAME,
-    aggregate: defineAggregate({ type: "global", events: defineEvents([]) }),
+    aggregate: defineAggregate({ type: "global" }),
   })
     .withProcessManager(CONNECTED_BILLING_PROCESS_NAME, (pm) =>
       pm
