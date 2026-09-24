@@ -1068,6 +1068,9 @@ projection state keeps its type from declaration to handler (Alex, 2026-09-24).
 A registry holding definitions of different types wraps each typed definition in a closure when it is
 registered; callbacks stay properties, never methods whose bivariant parameters would let a handler
 narrow its pipeline's event type (Alex, 2026-09-24).
+The pipeline builder's type carries each registered fold's name mapped to its state, so a projection
+subscriber named by its fold is typed with that fold's state through the name; a sealed projection
+exposes a read-only `definition` view beside its `open` closure (Alex, 2026-09-24).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
