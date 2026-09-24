@@ -2390,6 +2390,9 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../../../modules/api-key/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/entitlement/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
