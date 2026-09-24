@@ -13,6 +13,8 @@ const TRY_PREFIX = /^try[A-Z]/;
 const REPOSITORY_METHOD_FILE = /\/repositories\/(?:prisma\/|memory\/)?[^/]*\.repository\.ts$/;
 const REPOSITORY_SERVICE_VOCABULARY = /^(get|list)([A-Z]|$)/;
 const GET_VOCABULARY = /^get([A-Z]|$)/;
+const LIST_VOCABULARY = /^list([A-Z]|$)/;
+const FIND_VOCABULARY = /^find([A-Z]|$)/;
 
 // ADR-146's derivations: absence from one means "the input carried none".
 // `resolve*` and `read*` stay governed and are decided per call site.
@@ -22,6 +24,9 @@ const DERIVATION_VOCABULARY =
 // ADR-146: a vendor's callback interface dictates its implementer's name and shape.
 const INTERNAL_SPECIFIER = /^(?:\.|\/|#|@langwatch\/|langwatch(?:\/|$))/;
 const TYPE_WRAPPERS = new Set(["NonNullable", "Readonly", "Required"]);
+// A page (ADR-146's `list*`) is an object carrying an array and a position in the whole.
+const PAGE_POSITION_MEMBER =
+  /^(cursor|nextCursor|previousCursor|prevCursor|next|nextPage|nextPageToken|pageToken|nextOffset|hasMore|hasNextPage|total|totalCount|totalHits|totalItems)$/;
 const OPAQUE_ANSWER = new Set([
   "TSAnyKeyword",
   "TSNeverKeyword",
@@ -42,7 +47,7 @@ function promiseTypeArgument(node) {
 }
 
 function referencedName(node) {
-  return node.type === "TSTypeReference" && node.typeName?.type === "Identifier"
+  return node?.type === "TSTypeReference" && node.typeName?.type === "Identifier"
     ? node.typeName.name
     : undefined;
 }
@@ -141,13 +146,65 @@ export function isVendorTypedDeclarator(declarator, vendorNames) {
   return vendorNames.has(typeHeadName(declarator.id?.typeAnnotation?.typeAnnotation));
 }
 
-/** This file's type aliases that answer null or undefined, and those that answer an array. */
+function interfacesOf(program) {
+  const interfaces = [];
+  for (const statement of program.body) {
+    const declaration =
+      statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
+    if (declaration?.type === "TSInterfaceDeclaration") interfaces.push(declaration);
+  }
+  return interfaces;
+}
+
+function objectMembers(node) {
+  if (node?.type === "TSParenthesizedType") return objectMembers(node.typeAnnotation);
+  if (node?.type === "TSTypeLiteral") return node.members;
+  if (node?.type === "TSInterfaceBody") return node.body;
+  return undefined;
+}
+
+function propertyName(member) {
+  if (member.type !== "TSPropertySignature" || member.computed) return undefined;
+  return member.key?.type === "Identifier" ? member.key.name : undefined;
+}
+
+function isPluralType(node, plural) {
+  return containsArrayType(node) || plural.has(referencedName(node));
+}
+
+/** An object type with a required array member plus a cursor, next or total member. */
+function isPageObject(node, { pages, plural }) {
+  if (pages.has(referencedName(node))) return true;
+  const members = objectMembers(node);
+  if (!members) return false;
+  const carriesItems = members.some(
+    (member) => !member.optional && isPluralType(member.typeAnnotation?.typeAnnotation, plural),
+  );
+  const carriesPosition = members.some((member) =>
+    PAGE_POSITION_MEMBER.test(propertyName(member) ?? ""),
+  );
+  return carriesItems && carriesPosition;
+}
+
+function pageAliasesOf(program, plural) {
+  const pages = new Set();
+  const shapes = { pages, plural };
+  for (const declaration of interfacesOf(program)) {
+    if (isPageObject(declaration.body, shapes)) pages.add(declaration.id.name);
+  }
+  for (const alias of typeAliasesOf(program)) {
+    if (isPageObject(alias.typeAnnotation, shapes)) pages.add(alias.id.name);
+  }
+  return pages;
+}
+
+/** This file's type aliases that answer null or undefined, an array, or a page. */
 export function aliasShapesOf(program) {
   const plural = new Set();
   for (const alias of typeAliasesOf(program)) {
     if (containsArrayType(alias.typeAnnotation)) plural.add(alias.id.name);
   }
-  return { nullable: nullableAliasesOf(program), plural };
+  return { nullable: nullableAliasesOf(program), plural, pages: pageAliasesOf(program, plural) };
 }
 
 function answerMembers(node) {
@@ -164,12 +221,23 @@ function isOneValue(node, { nullable, plural }) {
   return !nullable.has(name) && !plural.has(name);
 }
 
+function presentAnswerMembers(returnType) {
+  return answerMembers(returnType).filter(
+    (member) => member.type !== "TSNullKeyword" && member.type !== "TSUndefinedKeyword",
+  );
+}
+
+/** Whether the declared answer, null and undefined set aside, is a page (`{ items, cursor }`). */
+export function answersPage(returnType, aliasShapes) {
+  if (!returnType) return false;
+  const present = presentAnswerMembers(returnType);
+  return present.length > 0 && present.every((member) => isPageObject(member, aliasShapes));
+}
+
 /** Whether the declared answer, null and undefined set aside, is one value and never an array. */
 export function answersOneValue(returnType, aliasShapes) {
   if (!returnType) return false;
-  const present = answerMembers(returnType).filter(
-    (member) => member.type !== "TSNullKeyword" && member.type !== "TSUndefinedKeyword",
-  );
+  const present = presentAnswerMembers(returnType);
   return present.length > 0 && present.every((member) => isOneValue(member, aliasShapes));
 }
 
@@ -233,8 +301,8 @@ export function governedDeclaratorFunction(node, vendorNames) {
   return init;
 }
 
-// ADR-146 maps a repository's `list*` (a collection or a page) to `find*`; only a
-// one-value `get*` keeps its verb.
+// ADR-146: a repository's unpaged `list*` becomes `find*`, its page stays `list*`,
+// and a one-value `get*` keeps its verb.
 function reportRepositoryVocabulary(context, { key, oneValue }) {
   const name = key.name;
   if (oneValue && GET_VOCABULARY.test(name)) {
@@ -246,14 +314,24 @@ function reportRepositoryVocabulary(context, { key, oneValue }) {
   context.report({ node: key, messageId: "repositoryServiceVocabulary", data });
 }
 
+function isPagedList(name, returnType, aliasShapes) {
+  return LIST_VOCABULARY.test(name) && answersPage(returnType, aliasShapes);
+}
+
 function reportResult(context, { aliasShapes, key, repositoryVocabulary, returnType }) {
   const name = key.name;
   const nullableAliases = aliasShapes.nullable;
+  if (FIND_VOCABULARY.test(name) && answersPage(returnType, aliasShapes)) {
+    const data = { name, rest: name.slice("find".length) };
+    context.report({ node: key, messageId: "findAnswersPage", data });
+    return;
+  }
   const oneValue = answersOneValue(returnType, aliasShapes);
   const isRepositoryVocabularyName =
     repositoryVocabulary &&
     REPOSITORY_SERVICE_VOCABULARY.test(name) &&
-    !isOneOrThrowGet(name, returnType, nullableAliases);
+    !isOneOrThrowGet(name, returnType, nullableAliases) &&
+    !isPagedList(name, returnType, aliasShapes);
   if (isRepositoryVocabularyName) reportRepositoryVocabulary(context, { key, oneValue });
   const scope = { isRepositoryVocabularyName, nullableAliases };
   if (returnType && shouldReportNullableWithoutFind(name, returnType, scope)) {
@@ -295,6 +373,14 @@ export const fallibleResultNamingRule = defineRule({
       what: "Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.",
       fix: "Rename it `find{{rest}}` here and in the repository interface this class implements.",
     },
+    findAnswersPage: {
+      what: "`{{name}}` answers a page, and `find` answers an array.",
+      why: "A page carries a position in a larger whole; `find` promises the whole answer, empty when there is none.",
+      fix:
+        "Rename it `list{{rest}}` here, in the interface it implements and at every caller:" +
+        " a page is `list*` in a service or a repository. If it really answers every match," +
+        " drop the cursor or total and return the array under `find{{rest}}`.",
+    },
     repositoryOneValue: {
       what: "Repository method `{{name}}` answers one value, which a repository names `get*` and answers or throws.",
       why: "`find` answers an array, so renaming a one-value read to `find*` misstates its cardinality.",
@@ -308,7 +394,7 @@ export const fallibleResultNamingRule = defineRule({
   },
   create(context, file) {
     const isRepositoryVocabularyFile = REPOSITORY_METHOD_FILE.test(file.workspacePath ?? "");
-    let aliasShapes = { nullable: new Set(), plural: new Set() };
+    let aliasShapes = { nullable: new Set(), plural: new Set(), pages: new Set() };
     let vendorNames = new Set();
 
     const check = (key, returnType, { accessibility, allowRepositoryVocabulary = false } = {}) => {

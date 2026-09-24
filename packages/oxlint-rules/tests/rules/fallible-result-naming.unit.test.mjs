@@ -197,11 +197,11 @@ describe("given a repository class or interface file", () => {
     });
 
     /** @scenario "A repository read answering one value is pointed at a throwing get, never find" */
-    it("keeps a bare get as get, and leaves a list page to the find rename ADR-146 maps it to", () => {
+    it("keeps a bare get as get, and leaves a list read answering a page alone", () => {
       const found = report(
         [
           "export interface AgentRepository {",
-          "  listPage(): Promise<AgentPage>;",
+          "  listPage(): Promise<{ items: string[]; cursor?: string }>;",
           "  get(key: string): Promise<string | null>;",
           "}",
         ].join("\n"),
@@ -209,7 +209,6 @@ describe("given a repository class or interface file", () => {
       );
 
       expect(found.map((entry) => [entry.messageId, entry.data.rest])).toEqual([
-        ["repositoryServiceVocabulary", "Page"],
         ["repositoryOneValue", ""],
       ]);
     });
@@ -475,6 +474,104 @@ describe("given a declaration whose name and shape a vendor's callback interface
         ["nullableOneValue", "beforeSessionCreate", 9],
         ["nullableOneValue", "beforeAccountCreate", 10],
       ]);
+    });
+  });
+});
+
+describe("given a read whose declared answer is a page", () => {
+  const PAGE_DECLARATIONS = [
+    "interface AgentPage { data: Agent[]; total: number }",
+    "type Page<T> = { items: T[]; nextCursor?: string };",
+  ].join("\n");
+
+  describe("when a repository names it with list vocabulary", () => {
+    /** @scenario "A repository list read answering a page keeps list" */
+    it("leaves an inline page, a local interface page and a local generic page alias alone", () => {
+      const found = report(
+        [
+          PAGE_DECLARATIONS,
+          "export interface AgentRepository {",
+          "  listPage(): Promise<{ runs: Agent[]; totalHits: number }>;",
+          "  listActive(): Promise<AgentPage>;",
+          "  listArchived(): Promise<Page<Agent>>;",
+          "}",
+        ].join("\n"),
+        REPOSITORY_INTERFACE,
+      );
+
+      expect(found).toEqual([]);
+    });
+
+    /** @scenario "A repository list read answering a page keeps list" */
+    it("still reports a list read answering a plain array or a plain object", () => {
+      const found = report(
+        [
+          "export class MemoryAgentRepository {",
+          "  listActive(): Promise<Agent[]> { return this.all(); }",
+          "  listSummary(): Promise<{ id: string; names: string[] }> { return this.summary(); }",
+          "  listCounts(): Promise<{ id: string; total: number }> { return this.counts(); }",
+          "}",
+        ].join("\n"),
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found.map((entry) => [entry.messageId, entry.data.name])).toEqual([
+        ["repositoryServiceVocabulary", "listActive"],
+        ["repositoryServiceVocabulary", "listSummary"],
+        ["repositoryServiceVocabulary", "listCounts"],
+      ]);
+    });
+  });
+
+  describe("when it is named with find vocabulary", () => {
+    /** @scenario "A find read answering a page is pointed at list" */
+    it("reports findAnswersPage naming the list rename, in a repository and in a service", () => {
+      const repository = report(
+        [
+          PAGE_DECLARATIONS,
+          "export abstract class AgentRepository {",
+          "  abstract findPage(): Promise<{ data: Agent[]; total: number }>;",
+          "  abstract findArchived(): Promise<AgentPage | null>;",
+          "}",
+        ].join("\n"),
+        REPOSITORY_INTERFACE,
+      );
+      const service = report(
+        [
+          PAGE_DECLARATIONS,
+          "export class AgentService {",
+          "  findRecent(): Promise<Page<Agent>> { return this.recent(); }",
+          "}",
+        ].join("\n"),
+        SERVICE,
+      );
+
+      expect(
+        [...repository, ...service].map((entry) => [entry.messageId, entry.data.rest]),
+      ).toEqual([
+        ["findAnswersPage", "Page"],
+        ["findAnswersPage", "Archived"],
+        ["findAnswersPage", "Recent"],
+      ]);
+      expect(service[0].message).toContain("Rename it `listRecent`");
+    });
+
+    /** @scenario "A find read answering a page is pointed at list" */
+    it("leaves a find answering an array, and never points a one-object find at list", () => {
+      const found = report(
+        [
+          "export class AgentService {",
+          "  findActive(): Promise<Agent[]> { return this.active(); }",
+          "  findItems(): Promise<{ items: Agent[] }> { return this.items(); }",
+          "  findTotal(): Promise<{ id: string; total: number }> { return this.total(); }",
+          "  findRunState(): Promise<{ total: number; recentEvents?: string[] }> { return this.state(); }",
+          "  findById(): Promise<Agent | null> { return this.lookup(); }",
+          "}",
+        ].join("\n"),
+        SERVICE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).not.toContain("findAnswersPage");
     });
   });
 });

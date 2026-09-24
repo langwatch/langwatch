@@ -18,12 +18,19 @@ Feature: The fallible-result-naming lint rule
   vocabulary, and told to rename to `find*` instead — in the interface and in
   every implementation. A `get*`/`list*` repository method that is also
   nullable draws only this one message. A `get*` whose declared result can be
-  neither null nor an array is the one-or-throw shape and is left alone.
+  neither null nor an array is the one-or-throw shape and is left alone, and
+  a `list*` answering a page keeps its verb.
 
   A result whose declared answer, null and undefined set aside, is one value
   rather than an array is never told to become `find*`: `find` answers an
   array. It is pointed at a throwing `get*`, or at an explicit result union
   when absence means something other than not-found.
+
+  A page is an object type carrying a required array member and a cursor, next or
+  total member, declared inline or as an interface or type alias in the same
+  file. ADR-146 names a page `list*`, in a service or a repository, so a
+  repository `list*` answering a page is left alone and a `find*` answering
+  one is told to become `list*`. A plain array or a plain object is not a page.
 
   A method or module-scope const whose name and shape a vendor's callback
   interface dictates is exempt (ADR-146): a method of a class whose every
@@ -85,7 +92,7 @@ Feature: The fallible-result-naming lint rule
     When the fallible-result-naming rule runs over it
     Then it reports nothing for that method
     But a get method on the same file whose result is nullable is still reported
-    And a list method on the same file is still reported whatever its result type
+    And a list method on the same file answering anything but a page is still reported
 
   @unit
   Scenario: A repository list signature is reported
@@ -141,7 +148,7 @@ Feature: The fallible-result-naming lint rule
     When the fallible-result-naming rule runs over it
     Then it reports repositoryOneValue naming the get-prefixed name, throwing and an explicit result union
     And its message never names the find-prefixed rename
-    But a list method answering a page keeps the find-prefixed rename ADR-146 maps a repository list to
+    But a list method answering a page is left alone, since ADR-146 names a page list
 
   @unit
   Scenario: A vendor callback is exempt, and our own interface of the same shape is not
@@ -150,3 +157,18 @@ Feature: The fallible-result-naming lint rule
     Then it reports nothing
     But the same declaration typed by a @langwatch, langwatch SDK, relative or mixed heritage is reported
     And the same method on a class with no heritage is reported
+
+  @unit
+  Scenario: A repository list read answering a page keeps list
+    Given a repository list method whose declared answer is an inline page, a local page interface or a local generic page alias
+    When the fallible-result-naming rule runs over it
+    Then it reports nothing for that method
+    But a list method answering a plain array or an object with no array or no cursor, next or total member is still told to become find
+
+  @unit
+  Scenario: A find read answering a page is pointed at list
+    Given a find method in a repository or a service whose declared answer, null set aside, is a page
+    When the fallible-result-naming rule runs over it
+    Then it reports findAnswersPage naming the list-prefixed rename
+    But a find answering an array is left alone
+    And a find answering an object that is not a page is never pointed at list
