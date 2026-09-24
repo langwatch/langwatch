@@ -94,6 +94,13 @@ const packageDirs = () =>
     .filter((file) => file && !/(^|\/)node_modules\//.test(file))
     .map((file) => (dirname(file) === "." ? "" : dirname(file)));
 
+const exportTargets = (exportsField) =>
+  Object.entries(exportsField ?? {}).flatMap(([subpath, value]) =>
+    typeof value === "string"
+      ? [[subpath, value]]
+      : Object.values(value ?? {}).map((nested) => [subpath, nested]),
+  );
+
 /**
  * name -> { dir, entries: Map<subpath, file> } for every workspace
  * package, plus its declared roots.
@@ -111,10 +118,7 @@ const manifestEntries = ({ dir, manifest }) => {
 
   add(".", manifest.main);
   add(".", manifest.module);
-  for (const [subpath, value] of Object.entries(manifest.exports ?? {})) {
-    if (typeof value === "string") add(subpath, value);
-    else for (const nested of Object.values(value ?? {})) add(subpath, nested);
-  }
+  for (const [subpath, target] of exportTargets(manifest.exports)) add(subpath, target);
   if (typeof manifest.bin === "string") add(null, manifest.bin);
   else for (const value of Object.values(manifest.bin ?? {})) add(null, value);
 

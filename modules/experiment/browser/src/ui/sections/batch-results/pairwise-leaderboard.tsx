@@ -233,16 +233,14 @@ function SortableHeader({
   onSort: (k: SortKey) => void;
 }) {
   const active = sortKey === col;
-  const ArrowIcon = !active ? LuArrowUpDown : sortDir === "asc" ? LuArrowUp : LuArrowDown;
+  const ArrowIcon = sortArrowIcon({ active, sortDir });
   return (
     // `aria-sort` on the header itself, not just a keyboard handler on the
     // control inside it: the arrow icon communicates the sort state visually,
     // and this is the only thing that communicates it to a screen reader.
     // Keyboard reachability without it would let someone sort the table and
     // have no way to learn that they had.
-    <Table.ColumnHeader
-      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-    >
+    <Table.ColumnHeader aria-sort={ariaSortFor({ active, sortDir })}>
       <HStack
         gap={1}
         cursor="pointer"
@@ -266,6 +264,22 @@ function SortableHeader({
       </HStack>
     </Table.ColumnHeader>
   );
+}
+
+function sortArrowIcon({ active, sortDir }: { active: boolean; sortDir: SortDir }) {
+  if (!active) return LuArrowUpDown;
+  return sortDir === "asc" ? LuArrowUp : LuArrowDown;
+}
+
+function ariaSortFor({
+  active,
+  sortDir,
+}: {
+  active: boolean;
+  sortDir: SortDir;
+}): "ascending" | "descending" | "none" {
+  if (!active) return "none";
+  return sortDir === "asc" ? "ascending" : "descending";
 }
 
 function formatScoreWithCI(score: number, ci: [number, number] | null): string {

@@ -474,6 +474,9 @@ export function BatchEvaluationResults({
   }, [transformedData, experiment]);
 
   const isDownloadCSVEnabled = !!transformedData && transformedData.rows.length > 0;
+  const showRunsLoading = runsQuery.isLoading;
+  const showWaitingForRuns = !showRunsLoading && sidebarRuns.length === 0;
+  const showResultsTable = !showRunsLoading && sidebarRuns.length > 0;
 
   // Error state
   if (runsQuery.error) {
@@ -610,13 +613,13 @@ export function BatchEvaluationResults({
         )}
 
         {/* Table container - fills remaining space */}
-        {runsQuery.isLoading ? (
+        {showRunsLoading && (
           <Box flex={1} minHeight="300px" overflow="auto" paddingX={2} paddingBottom={2}>
             <TableSkeleton withCard />
           </Box>
-        ) : sidebarRuns.length === 0 ? (
-          <Text padding={4}>Waiting for results...</Text>
-        ) : (
+        )}
+        {showWaitingForRuns && <Text padding={4}>Waiting for results...</Text>}
+        {showResultsTable && (
           <Box flex={1} minHeight="300px" paddingX={2} paddingBottom={2}>
             <Card.Root width="100%" height="100%" overflow="hidden">
               <Card.Body padding={0} height="100%">

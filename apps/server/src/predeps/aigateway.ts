@@ -46,9 +46,9 @@ function findRepoRoot(): string | null {
   }
   let dir = dirname(here);
   for (let i = 0; i < 6; i++) {
-    if (existsSync(join(dir, "go.mod")) && existsSync(join(dir, "cmd", "service"))) {
-      return dir;
-    }
+    const hasGoMod = existsSync(join(dir, "go.mod"));
+    const hasServiceCmd = existsSync(join(dir, "cmd", "service"));
+    if (hasGoMod && hasServiceCmd) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -126,23 +126,54 @@ export function makeAigatewayPredep({
         const v = (await resolveVersion(out)) ?? version;
         return { version: v, resolvedPath: out };
       } catch (err) {
-        const is404 = err instanceof Error && /HTTP 404/.test(err.message);
-        if (!is404) throw err;
-
-        if (development.aiGatewayDevBuild) {
-          const repoRoot = findRepoRoot();
-          if (repoRoot) {
-            await buildFromCheckout(repoRoot, paths.bin, task);
-            const v = (await resolveVersion(out)) ?? `${version}+local-build`;
-            return { version: v, resolvedPath: out };
-          }
-        }
-
-        throw new Error(
-          `ai-gateway prebuilt monobinary for v${version} not found at ${url} (HTTP 404). The v${version} release must publish aigateway-${platform.replace("x64", "amd64")} for npx installs to work. ` +
-            `Devs working from a checkout can opt into a local Go build via LANGWATCH_AIGATEWAY_DEV_BUILD=1.`,
-        );
+        return recoverFromMissingRelease({
+          err,
+          version,
+          url,
+          platform,
+          development,
+          bin: paths.bin,
+          out,
+          task,
+        });
       }
     },
   };
+}
+
+async function recoverFromMissingRelease({
+  err,
+  version,
+  url,
+  platform,
+  development,
+  bin,
+  out,
+  task,
+}: {
+  err: unknown;
+  version: string;
+  url: string;
+  platform: string;
+  development: LocalOrchestratorDevelopmentConfig;
+  bin: string;
+  out: string;
+  task: { output?: string };
+}): Promise<{ version: string; resolvedPath: string }> {
+  const is404 = err instanceof Error && /HTTP 404/.test(err.message);
+  if (!is404) throw err;
+
+  if (development.aiGatewayDevBuild) {
+    const repoRoot = findRepoRoot();
+    if (repoRoot) {
+      await buildFromCheckout(repoRoot, bin, task);
+      const v = (await resolveVersion(out)) ?? `${version}+local-build`;
+      return { version: v, resolvedPath: out };
+    }
+  }
+
+  throw new Error(
+    `ai-gateway prebuilt monobinary for v${version} not found at ${url} (HTTP 404). The v${version} release must publish aigateway-${platform.replace("x64", "amd64")} for npx installs to work. ` +
+      `Devs working from a checkout can opt into a local Go build via LANGWATCH_AIGATEWAY_DEV_BUILD=1.`,
+  );
 }

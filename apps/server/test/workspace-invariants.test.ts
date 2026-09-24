@@ -45,7 +45,8 @@ function workspaceMembers(): string[] {
       members.push(entry[1]);
       continue;
     }
-    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
     break; // the next top-level key ends the list
   }
   return members;
@@ -59,7 +60,8 @@ function rootOverrideKeys(): string[] {
 
   const keys: string[] = [];
   for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
     if (!/^\s/.test(line)) break; // next top-level key
     const m = /^\s+"?([^"]+?)"?:/.exec(line);
     if (m?.[1]) keys.push(m[1]);
@@ -77,7 +79,8 @@ function patchedDependencyPaths(): string[] {
 
   const paths: string[] = [];
   for (const line of lines.slice(start + 1)) {
-    if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
     if (!/^\s/.test(line)) break; // next top-level key
     const target = /:\s*"?([^"\s]+)"?\s*$/.exec(line);
     if (target?.[1]) paths.push(target[1]);

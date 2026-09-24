@@ -168,6 +168,39 @@ type TargetMetricsResult = {
   evaluatorNames: Record<string, string>;
 };
 
+const accumulateEvaluatorResults = ({
+  evaluatorMetrics,
+  targetOutput,
+}: {
+  evaluatorMetrics: Record<string, EvaluatorMetrics>;
+  targetOutput: BatchEvaluationData["rows"][number]["targets"][string];
+}): void => {
+  for (const evalResult of targetOutput.evaluatorResults) {
+    if (!evaluatorMetrics[evalResult.evaluatorId]) {
+      evaluatorMetrics[evalResult.evaluatorId] = {
+        scores: [],
+        passed: 0,
+        failed: 0,
+        total: 0,
+        name: evalResult.evaluatorName,
+      };
+    }
+
+    const metrics = evaluatorMetrics[evalResult.evaluatorId]!;
+    metrics.total++;
+
+    if (evalResult.score !== null && evalResult.score !== undefined) {
+      metrics.scores.push(evalResult.score);
+    }
+
+    if (evalResult.passed === true) {
+      metrics.passed++;
+    } else if (evalResult.passed === false) {
+      metrics.failed++;
+    }
+  }
+};
+
 /**
  * Compute metrics for a single target within a run.
  * This is used when grouping by target to get per-target values
@@ -192,30 +225,7 @@ export const computeTargetMetrics = (
       durationCount++;
     }
 
-    for (const evalResult of targetOutput.evaluatorResults) {
-      if (!evaluatorMetrics[evalResult.evaluatorId]) {
-        evaluatorMetrics[evalResult.evaluatorId] = {
-          scores: [],
-          passed: 0,
-          failed: 0,
-          total: 0,
-          name: evalResult.evaluatorName,
-        };
-      }
-
-      const metrics = evaluatorMetrics[evalResult.evaluatorId]!;
-      metrics.total++;
-
-      if (evalResult.score !== null && evalResult.score !== undefined) {
-        metrics.scores.push(evalResult.score);
-      }
-
-      if (evalResult.passed === true) {
-        metrics.passed++;
-      } else if (evalResult.passed === false) {
-        metrics.failed++;
-      }
-    }
+    accumulateEvaluatorResults({ evaluatorMetrics, targetOutput });
   }
 
   const avgLatency = durationCount > 0 ? totalDuration / durationCount : 0;
@@ -261,30 +271,7 @@ export const computeRunMetrics = (data: BatchEvaluationData): RunMetricsResult =
         targetCount++;
       }
 
-      for (const evalResult of targetOutput.evaluatorResults) {
-        if (!evaluatorMetrics[evalResult.evaluatorId]) {
-          evaluatorMetrics[evalResult.evaluatorId] = {
-            scores: [],
-            passed: 0,
-            failed: 0,
-            total: 0,
-            name: evalResult.evaluatorName,
-          };
-        }
-
-        const metrics = evaluatorMetrics[evalResult.evaluatorId]!;
-        metrics.total++;
-
-        if (evalResult.score !== null && evalResult.score !== undefined) {
-          metrics.scores.push(evalResult.score);
-        }
-
-        if (evalResult.passed === true) {
-          metrics.passed++;
-        } else if (evalResult.passed === false) {
-          metrics.failed++;
-        }
-      }
+      accumulateEvaluatorResults({ evaluatorMetrics, targetOutput });
     }
   }
 

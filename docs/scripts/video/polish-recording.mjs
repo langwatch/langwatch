@@ -13,7 +13,11 @@ import path from "node:path";
 
 // --------------------------------------------------------------------- easing
 
-const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const clamp = (v, lo, hi) => {
+  if (v < lo) return lo;
+  if (v > hi) return hi;
+  return v;
+};
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (x) => x * x * (3 - 2 * x);
 
@@ -914,12 +918,11 @@ async function main() {
   const base = path.dirname(path.resolve(timelinePath));
   // A bare `cursors/...`, `backgrounds/...` path means the assets shipped next
   // to this script; anything else resolves against the timeline.
-  const asset = (p) =>
-    /^(cursors|backgrounds)\//.test(p)
-      ? path.join(here, p)
-      : path.isAbsolute(p)
-        ? p
-        : path.resolve(base, p);
+  const asset = (p) => {
+    if (/^(cursors|backgrounds)\//.test(p)) return path.join(here, p);
+    if (path.isAbsolute(p)) return p;
+    return path.resolve(base, p);
+  };
   const rel = (p) => (path.isAbsolute(p) ? p : path.resolve(base, p));
   const cfg = merge(DEFAULTS, JSON.parse(fs.readFileSync(timelinePath, "utf8")));
 

@@ -254,18 +254,19 @@ export function collapseStackRecord(line) {
   if (stack === "") return null;
 
   const frame = firstAppFrame(stack);
-  const baseMsg =
-    typeof record.msg === "string"
-      ? record.msg
-      : typeof record.message === "string"
-        ? record.message
-        : "";
+  const baseMsg = recordMessage(record);
   const msg = frame ? `${baseMsg} — at ${frame.file}:${frame.line}` : baseMsg;
 
   const collapsed = { ...record, msg };
   delete collapsed.stack;
   delete collapsed.message;
   return { collapsed: JSON.stringify(collapsed), rawText: `${baseMsg}\n${stack}` };
+}
+
+function recordMessage(record) {
+  if (typeof record.msg === "string") return record.msg;
+  if (typeof record.message === "string") return record.message;
+  return "";
 }
 
 /** Node's ESM loader refusing a named import the target module never
@@ -392,6 +393,17 @@ function wireStdout(stream, { raw, crashLog }) {
  * dump arrives as one burst and the telling line isn't always last), then
  * classifies the whole burst: a recognised crash renders as one line.
  */
+function writeBurst({ pending, crashLog }) {
+  const text = pending.join("\n");
+  const classified = classifyRawCrash(text);
+  if (classified) {
+    process.stderr.write(`${crashRecordLine(classified)}\n`);
+    appendCrashLog(crashLog, text);
+    return;
+  }
+  for (const line of pending) process.stderr.write(`${line}\n`);
+}
+
 function wireStderr(stream, { raw, crashLog, quietMs = 150 }) {
   if (raw) {
     stream.pipe(process.stderr);
@@ -408,14 +420,7 @@ function wireStderr(stream, { raw, crashLog, quietMs = 150 }) {
       buffer = "";
     }
     if (pending.length === 0) return;
-    const text = pending.join("\n");
-    const classified = classifyRawCrash(text);
-    if (classified) {
-      process.stderr.write(`${crashRecordLine(classified)}\n`);
-      appendCrashLog(crashLog, text);
-    } else {
-      for (const line of pending) process.stderr.write(`${line}\n`);
-    }
+    writeBurst({ pending, crashLog });
     pending.length = 0;
   };
   stream.setEncoding("utf8");
@@ -827,6 +832,16 @@ async function startSentinel({ leader, argv, env }) {
  * not a wait on the sentinel itself (it outlives the stack). A closed
  * stream with nothing left answers both as null.
  */
+function deliverHandshakeLine({ seen, line, onPid, onExit }) {
+  const value = Number.parseInt(line, 10);
+  const parsed = Number.isInteger(value) ? value : null;
+  if (seen === 1) {
+    onPid(parsed !== null && parsed > 1 ? parsed : null);
+    return;
+  }
+  onExit(parsed);
+}
+
 function readHandshake(stream, { onPid, onExit }) {
   if (!stream) {
     onPid(null);
@@ -837,11 +852,8 @@ function readHandshake(stream, { onPid, onExit }) {
   let seen = 0;
   const take = (line) => {
     if (seen >= 2) return;
-    const value = Number.parseInt(line, 10);
-    const parsed = Number.isInteger(value) ? value : null;
     seen += 1;
-    if (seen === 1) onPid(parsed !== null && parsed > 1 ? parsed : null);
-    else onExit(parsed);
+    deliverHandshakeLine({ seen, line, onPid, onExit });
   };
 
   stream.setEncoding("utf8");
