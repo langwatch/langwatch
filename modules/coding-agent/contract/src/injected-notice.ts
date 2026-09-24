@@ -20,7 +20,7 @@ export interface ClassifiedPrompt {
 export function classifyPromptText(text: string): ClassifiedPrompt {
   if (text.trimStart().startsWith(SYSTEM_NOTIFICATION_MARKER)) {
     return {
-      notices: [{ label: summaryOf(text) ?? "system notification", body: text }],
+      notices: [{ label: extractSummary(text) ?? "system notification", body: text }],
       remainder: null,
     };
   }
@@ -42,11 +42,11 @@ export function classifyPromptText(text: string): ClassifiedPrompt {
 function labelOf(block: string): string {
   const tagName = BLOCK_OPEN_TAG.exec(block)?.[1] ?? "note";
   const humanized = tagName.replace(/[-_]+/g, " ").trim();
-  const summary = summaryOf(block);
+  const summary = extractSummary(block);
   return summary === null ? humanized : `${humanized}: ${summary}`;
 }
 
-function summaryOf(text: string): string | null {
+function extractSummary(text: string): string | null {
   const inner = SUMMARY_TAG.exec(text)?.[1];
   if (inner === void 0) {
     return null;

@@ -627,7 +627,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   /**
    * Reads pull-request usage across one organization's project tenants.
    */
-  async listByRepositoryBranch({
+  async findByRepositoryBranch({
     tenantIds,
     repositoryHost,
     repositoryOwner,
@@ -646,7 +646,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     for (const tenantId of tenantIds) {
       EventUtils.validateTenantId(
         { tenantId },
-        "CodingAgentSessionClickHouseRepository.listByRepositoryBranch",
+        "CodingAgentSessionClickHouseRepository.findByRepositoryBranch",
       );
     }
 
@@ -735,11 +735,11 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * The same row shape as `listByRepositoryBranch`, anchored on session ids: the second leg
+   * The same row shape as `findByRepositoryBranch`, anchored on session ids: the second leg
    * of fact-stamp discovery, fetching the session rows for sessions whose stamped events
    * named a repository their own row has since moved away from.
    */
-  async listBySessionIds({
+  async findBySessionIds({
     tenantIds,
     sessionIds,
     startedAtFromMs,
@@ -752,7 +752,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     for (const tenantId of tenantIds) {
       EventUtils.validateTenantId(
         { tenantId },
-        "CodingAgentSessionClickHouseRepository.listBySessionIds",
+        "CodingAgentSessionClickHouseRepository.findBySessionIds",
       );
     }
 

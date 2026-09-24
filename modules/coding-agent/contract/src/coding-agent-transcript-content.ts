@@ -1,10 +1,13 @@
 import { isReplyTextPart } from "@langwatch/trace-contract";
 
-import { isInjectedContextOnly, systemReminderText } from "./coding-agent-transcript-context.ts";
+import {
+  isInjectedContextOnly,
+  extractSystemReminderText,
+} from "./coding-agent-transcript-context.ts";
 
 const RECOVERED_REPLY_MATCH_CHARS = 200;
 
-export function extractedOutputText(output: string | null | undefined): string | null {
+export function extractOutputText(output: string | null | undefined): string | null {
   if (typeof output !== "string" || output.trim().length === 0) return null;
 
   const raw = output.trim();
@@ -13,7 +16,7 @@ export function extractedOutputText(output: string | null | undefined): string |
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed === "string") return parsed.length > 0 ? parsed : null;
-    if (Array.isArray(parsed)) return messagesReplyText(parsed);
+    if (Array.isArray(parsed)) return extractMessagesReplyText(parsed);
     if (!parsed || typeof parsed !== "object") return null;
 
     const inputOutput = parsed as { type?: unknown; value?: unknown };
@@ -21,7 +24,7 @@ export function extractedOutputText(output: string | null | undefined): string |
       return inputOutput.value.length > 0 ? inputOutput.value : null;
     }
     if (inputOutput.type === "chat_messages" && Array.isArray(inputOutput.value)) {
-      return messagesReplyText(inputOutput.value);
+      return extractMessagesReplyText(inputOutput.value);
     }
 
     return null;
@@ -30,8 +33,8 @@ export function extractedOutputText(output: string | null | undefined): string |
   }
 }
 
-export function extractedSystemText(input: string | null | undefined): string | null {
-  const messages = parsedChatMessages(input);
+export function extractSystemText(input: string | null | undefined): string | null {
+  const messages = parseChatMessages(input);
   if (messages === null) return null;
 
   const parts: string[] = [];
@@ -50,7 +53,7 @@ export function extractedSystemText(input: string | null | undefined): string | 
       continue;
     }
     if (candidate.role === "user" && firstUserReminders === null) {
-      firstUserReminders = systemReminderText(candidate.content);
+      firstUserReminders = extractSystemReminderText(candidate.content);
     }
   }
 
@@ -58,7 +61,7 @@ export function extractedSystemText(input: string | null | undefined): string | 
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
 
-export function parsedChatMessages(input: string | null | undefined): unknown[] | null {
+export function parseChatMessages(input: string | null | undefined): unknown[] | null {
   if (typeof input !== "string") return null;
 
   const raw = input.trim();
@@ -88,18 +91,18 @@ export function isSameRecoveredReply(candidate: string, previous: string | null)
   return candidate.slice(0, width) === previous.slice(0, width);
 }
 
-export function outputMessagesText(raw: string | null): string | null {
+export function extractOutputMessagesText(raw: string | null): string | null {
   if (raw === null) return null;
 
   try {
     const parsed: unknown = JSON.parse(raw);
-    return messagesReplyText(Array.isArray(parsed) ? parsed : [parsed]);
+    return extractMessagesReplyText(Array.isArray(parsed) ? parsed : [parsed]);
   } catch {
     return null;
   }
 }
 
-function messagesReplyText(messages: unknown[]): string | null {
+function extractMessagesReplyText(messages: unknown[]): string | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index] as {
       role?: unknown;
@@ -109,10 +112,10 @@ function messagesReplyText(messages: unknown[]): string | null {
     if (!message) continue;
     if (!isAssistantRole(message.role)) continue;
 
-    const contentText = contentTextOf(message.content);
+    const contentText = extractContentText(message.content);
     if (contentText !== null) return contentText;
 
-    const partsText = partsTextOf(message.parts);
+    const partsText = extractPartsText(message.parts);
     if (partsText !== null) return partsText;
   }
 
@@ -123,7 +126,7 @@ function isAssistantRole(role: unknown): boolean {
   return role === void 0 || role === "assistant" || role === "model";
 }
 
-function contentTextOf(content: unknown): string | null {
+function extractContentText(content: unknown): string | null {
   if (typeof content === "string") return content.length > 0 ? content : null;
   if (!Array.isArray(content)) return null;
 
@@ -137,7 +140,7 @@ function contentTextOf(content: unknown): string | null {
   return texts.length > 0 ? texts.join("\n") : null;
 }
 
-function partsTextOf(parts: unknown): string | null {
+function extractPartsText(parts: unknown): string | null {
   if (!Array.isArray(parts)) return null;
 
   const texts = parts.flatMap((part) => {
@@ -148,7 +151,7 @@ function partsTextOf(parts: unknown): string | null {
   return texts.length > 0 ? texts.join("\n") : null;
 }
 
-export function geminiResponseText(raw: string | null): string | null {
+export function extractGeminiResponseText(raw: string | null): string | null {
   if (raw === null) return null;
 
   try {

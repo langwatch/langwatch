@@ -348,7 +348,7 @@ export class TestSessions extends CodingAgentSessionRepository {
     return this.recentRowsByTenant.get(input.tenantId) ?? this.rows;
   }
 
-  async listByRepositoryBranch(input: {
+  async findByRepositoryBranch(input: {
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;
@@ -360,7 +360,7 @@ export class TestSessions extends CodingAgentSessionRepository {
     return this.branchRows;
   }
 
-  async listBySessionIds(input: {
+  async findBySessionIds(input: {
     tenantIds: string[];
     sessionIds: string[];
     startedAtFromMs: number;
@@ -492,7 +492,7 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     return this.modelTotals;
   }
 
-  async listSessionsByStampedBranch(input: {
+  async findSessionsByStampedBranch(input: {
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;

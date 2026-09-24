@@ -6,20 +6,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  declaredCodingAgent,
+  pickDeclaredCodingAgent,
   detectCodingAgent,
   isCodingAgentMetricName,
-  liftCodingAgentLogFacts,
+  extractCodingAgentLogFacts,
   mergeAliasTables,
   normalizeEventName,
   normalizeMetricName,
   normalizeTokenType,
   parseMcpToolName,
-  resolveConversationKey,
+  deriveConversationKey,
   resolveSpanConversationKey,
-  resolveToolName,
+  deriveToolName,
   SESSION_CONTEXT_EVENT_NAME,
-  sessionTitleFromPrompt,
+  deriveSessionTitleFromPrompt,
 } from "../coding-agent-normalization.ts";
 
 describe("detectCodingAgent", () => {
@@ -100,22 +100,22 @@ describe("detectCodingAgent", () => {
   });
 });
 
-describe("resolveConversationKey", () => {
+describe("deriveConversationKey", () => {
   /**
    * The one key every agent agrees on, under four names. Claude Code puts
    * `session.id` on LOGS but `gen_ai.conversation.id` on SPANS, carrying the
    * identical UUID (verified against live data) — else spans and logs never join.
    */
   it("finds the session however the agent spelled it", () => {
-    expect(resolveConversationKey({ "session.id": "s-1" })).toBe("s-1");
-    expect(resolveConversationKey({ "gen_ai.conversation.id": "s-1" })).toBe("s-1");
-    expect(resolveConversationKey({ "conversation.id": "s-1" })).toBe("s-1");
-    expect(resolveConversationKey({ "thread.id": "s-1" })).toBe("s-1");
+    expect(deriveConversationKey({ "session.id": "s-1" })).toBe("s-1");
+    expect(deriveConversationKey({ "gen_ai.conversation.id": "s-1" })).toBe("s-1");
+    expect(deriveConversationKey({ "conversation.id": "s-1" })).toBe("s-1");
+    expect(deriveConversationKey({ "thread.id": "s-1" })).toBe("s-1");
   });
 
   it("returns null rather than an empty string when there is no session", () => {
-    expect(resolveConversationKey({})).toBeNull();
-    expect(resolveConversationKey({ "session.id": "" })).toBeNull();
+    expect(deriveConversationKey({})).toBeNull();
+    expect(deriveConversationKey({ "session.id": "" })).toBeNull();
   });
 });
 
@@ -241,7 +241,7 @@ describe("normalizeEventName", () => {
   });
 });
 
-describe("liftCodingAgentLogFacts", () => {
+describe("extractCodingAgentLogFacts", () => {
   describe("given a log record named langwatch.session_context under the langwatch hook scope", () => {
     const attributes = {
       "event.name": SESSION_CONTEXT_EVENT_NAME,
@@ -256,7 +256,7 @@ describe("liftCodingAgentLogFacts", () => {
 
     /** @scenario A langwatch session context event passes the log lift without a vendor scope */
     it("admits the record and lifts its vcs attributes", () => {
-      const facts = liftCodingAgentLogFacts({
+      const facts = extractCodingAgentLogFacts({
         scopeName: "langwatch.coding_agent.hook",
         attributes,
       });
@@ -272,7 +272,7 @@ describe("liftCodingAgentLogFacts", () => {
         "langwatch.session.name": "pr-reviewer",
       };
 
-      const facts = liftCodingAgentLogFacts({
+      const facts = extractCodingAgentLogFacts({
         scopeName: "langwatch.coding_agent.hook",
         attributes: titled,
       });
@@ -299,7 +299,7 @@ describe("liftCodingAgentLogFacts", () => {
   describe("given an ordinary application log", () => {
     it("declines it, so the firehose costs one name check", () => {
       expect(
-        liftCodingAgentLogFacts({
+        extractCodingAgentLogFacts({
           scopeName: "express",
           attributes: { "event.name": "http.request", "session.id": "s" },
         }),
@@ -308,20 +308,20 @@ describe("liftCodingAgentLogFacts", () => {
   });
 });
 
-describe("declaredCodingAgent", () => {
+describe("pickDeclaredCodingAgent", () => {
   describe("given a declaration naming an agent in the registry", () => {
     it("answers that agent", () => {
-      expect(declaredCodingAgent({ "coding_agent.name": "claude_code" })).toBe("claude_code");
-      expect(declaredCodingAgent({ "coding_agent.name": "codex" })).toBe("codex");
+      expect(pickDeclaredCodingAgent({ "coding_agent.name": "claude_code" })).toBe("claude_code");
+      expect(pickDeclaredCodingAgent({ "coding_agent.name": "codex" })).toBe("codex");
     });
   });
 
   describe("given a declaration LangWatch cannot resolve", () => {
     it("answers null rather than trusting the wire", () => {
-      expect(declaredCodingAgent({ "coding_agent.name": "totally_new_agent" })).toBeNull();
-      expect(declaredCodingAgent({ "coding_agent.name": "" })).toBeNull();
-      expect(declaredCodingAgent({ "coding_agent.name": 42 })).toBeNull();
-      expect(declaredCodingAgent({})).toBeNull();
+      expect(pickDeclaredCodingAgent({ "coding_agent.name": "totally_new_agent" })).toBeNull();
+      expect(pickDeclaredCodingAgent({ "coding_agent.name": "" })).toBeNull();
+      expect(pickDeclaredCodingAgent({ "coding_agent.name": 42 })).toBeNull();
+      expect(pickDeclaredCodingAgent({})).toBeNull();
     });
   });
 });
@@ -367,17 +367,17 @@ describe("normalizeTokenType", () => {
   });
 });
 
-describe("resolveToolName", () => {
+describe("deriveToolName", () => {
   describe("given Claude Code / Codex, which carry the tool in an attribute", () => {
     it("reads the attribute", () => {
       expect(
-        resolveToolName({
+        deriveToolName({
           spanName: "claude_code.tool",
           attrs: { tool_name: "Bash" },
         }),
       ).toBe("Bash");
       expect(
-        resolveToolName({
+        deriveToolName({
           spanName: "mcp.tools.call",
           attrs: { "tool.name": "search" },
         }),
@@ -388,13 +388,13 @@ describe("resolveToolName", () => {
   describe("given opencode, which puts the tool IN the span name", () => {
     // Reading only the attribute loses every opencode tool.
     it("reads it out of the span name", () => {
-      expect(resolveToolName({ spanName: "opencode.tool.bash", attrs: {} })).toBe("bash");
+      expect(deriveToolName({ spanName: "opencode.tool.bash", attrs: {} })).toBe("bash");
     });
   });
 
   it("returns null when there is no tool to name", () => {
-    expect(resolveToolName({ spanName: "opencode.llm", attrs: {} })).toBeNull();
-    expect(resolveToolName({ spanName: "opencode.tool.", attrs: {} })).toBeNull();
+    expect(deriveToolName({ spanName: "opencode.llm", attrs: {} })).toBeNull();
+    expect(deriveToolName({ spanName: "opencode.tool.", attrs: {} })).toBeNull();
   });
 });
 
@@ -460,7 +460,7 @@ describe("GitHub Copilot CLI", () => {
   it("finds the session on its spans, where the only copy of it lives", () => {
     // Copilot metrics are fleet-level and it emits NO log records at all — its
     // spans are the sole place a session id (or a cost) can be read.
-    expect(resolveConversationKey({ "gen_ai.conversation.id": "conv-9" })).toBe("conv-9");
+    expect(deriveConversationKey({ "gen_ai.conversation.id": "conv-9" })).toBe("conv-9");
   });
 });
 
@@ -480,28 +480,28 @@ describe("isCodingAgentMetricName", () => {
   });
 });
 
-describe("sessionTitleFromPrompt", () => {
+describe("deriveSessionTitleFromPrompt", () => {
   describe("given the first thing a user typed", () => {
     /** @scenario A session with no generated title is named by the first thing the user asked */
     it("names the session by the prompt's first line, whitespace collapsed", () => {
       expect(
-        sessionTitleFromPrompt(
+        deriveSessionTitleFromPrompt(
           "Fix the retry loop   in the outbox worker\nIt spins on lease loss.",
         ),
       ).toBe("Fix the retry loop in the outbox worker");
     });
 
     it("caps a run-on prompt", () => {
-      expect(sessionTitleFromPrompt("a".repeat(500))).toHaveLength(120);
+      expect(deriveSessionTitleFromPrompt("a".repeat(500))).toHaveLength(120);
     });
   });
 
   describe("given text that is not the user's own words", () => {
     /** @scenario A machine-injected first prompt does not name the session */
     it("answers null for machine-injected turns, withheld text, and nothing", () => {
-      expect(sessionTitleFromPrompt("<task-notification>\n<task-id>a</task-id>")).toBeNull();
-      expect(sessionTitleFromPrompt("[REDACTED]")).toBeNull();
-      expect(sessionTitleFromPrompt("   \n  ")).toBeNull();
+      expect(deriveSessionTitleFromPrompt("<task-notification>\n<task-id>a</task-id>")).toBeNull();
+      expect(deriveSessionTitleFromPrompt("[REDACTED]")).toBeNull();
+      expect(deriveSessionTitleFromPrompt("   \n  ")).toBeNull();
     });
   });
 });

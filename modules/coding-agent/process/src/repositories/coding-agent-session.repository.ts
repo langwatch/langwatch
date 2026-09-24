@@ -44,7 +44,7 @@ export abstract class CodingAgentSessionRepository {
   }): Promise<CodingAgentSession[]>;
 
   /** The minimal cross-project session row used by pull-request rollups. */
-  abstract listByRepositoryBranch(input: {
+  abstract findByRepositoryBranch(input: {
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;
@@ -54,11 +54,11 @@ export abstract class CodingAgentSessionRepository {
   }): Promise<CodingAgentSessionBranchRecord[]>;
 
   /**
-   * The same rows as `listByRepositoryBranch`, fetched by session id: the
+   * The same rows as `findByRepositoryBranch`, fetched by session id: the
    * read behind fact-stamp discovery, where a session's stamped rows name a
    * repository its own row has since moved away from.
    */
-  abstract listBySessionIds(input: {
+  abstract findBySessionIds(input: {
     tenantIds: string[];
     sessionIds: string[];
     startedAtFromMs: number;

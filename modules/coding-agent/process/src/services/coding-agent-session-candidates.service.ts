@@ -53,7 +53,7 @@ export class CodingAgentSessionCandidatesService {
     // Independent reads, so they go together: the stamped one needs the
     // row-matched keys only to subtract them, which happens after both land.
     const [rowMatched, stamped] = await Promise.all([
-      this.dependencies.sessions.listByRepositoryBranch({
+      this.dependencies.sessions.findByRepositoryBranch({
         tenantIds,
         repositoryHost,
         repositoryOwner,
@@ -61,7 +61,7 @@ export class CodingAgentSessionCandidatesService {
         branches,
         startedAtFromMs: fromMs,
       }),
-      this.dependencies.sessionEvents.listSessionsByStampedBranch({
+      this.dependencies.sessionEvents.findSessionsByStampedBranch({
         tenantIds,
         repositoryHost,
         repositoryOwner,
@@ -81,7 +81,7 @@ export class CodingAgentSessionCandidatesService {
       return { sessions: rowMatched, rowMatchedSessionKeys };
     }
 
-    const fetched = await this.dependencies.sessions.listBySessionIds({
+    const fetched = await this.dependencies.sessions.findBySessionIds({
       tenantIds,
       sessionIds: [...new Set(missing.map((pair) => pair.sessionId))],
       startedAtFromMs: fromMs,

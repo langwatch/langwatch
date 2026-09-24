@@ -18,7 +18,7 @@ export const codexAgent: CodingAgentDefinition = {
   // `gen_ai.conversation.id` is the TURN's — reading the latter via the
   // shared order would split turns into their own sessions. Guarded to
   // UUID shape since codex's OTHER spans stamp tokio worker id "10" here too.
-  sessionKeyFromSpan: ({ name, attrs }) => {
+  deriveSessionKeyFromSpan: ({ name, attrs }) => {
     if (name !== "session_task.turn") return null;
     const threadId = attrs["thread.id"];
     return typeof threadId === "string" && threadId.includes("-") ? threadId : null;

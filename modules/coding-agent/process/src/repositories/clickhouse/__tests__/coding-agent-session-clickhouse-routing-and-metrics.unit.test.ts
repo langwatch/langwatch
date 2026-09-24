@@ -82,7 +82,7 @@ function makeRepository(
 }
 
 const listBranch = (repository: ReturnType<typeof makeRepository>) =>
-  repository.listByRepositoryBranch({
+  repository.findByRepositoryBranch({
     tenantIds: ["tenant-a", "tenant-b"],
     repositoryHost: "github.com",
     repositoryOwner: "acme",

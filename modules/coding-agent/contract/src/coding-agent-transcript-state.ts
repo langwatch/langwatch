@@ -1,6 +1,6 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
 
-import { extractedSystemText } from "./coding-agent-transcript-content.ts";
+import { extractSystemText } from "./coding-agent-transcript-content.ts";
 import { parseMaybeJson, readString } from "./coding-agent-transcript-value.ts";
 import type { CodingAgentTranscript, TranscriptEntry } from "./coding-agent-transcript.ts";
 
@@ -83,7 +83,7 @@ export function indexCodexToolLogsByCallId(
 export function emitSystemPrompt(span: SpanDetail, accumulator: SpanEntryAccumulator): void {
   if (accumulator.hasEmittedSystemPrompt) return;
 
-  const systemText = extractedSystemText(span.input);
+  const systemText = extractSystemText(span.input);
   if (systemText === null) return;
 
   accumulator.hasEmittedSystemPrompt = true;

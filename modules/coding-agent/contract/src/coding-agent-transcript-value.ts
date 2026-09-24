@@ -46,7 +46,7 @@ export function parseMaybeJson(raw: string | null): unknown {
   }
 }
 
-export function modelOf(span: SpanDetail): string | null {
+export function pickModel(span: SpanDetail): string | null {
   return (
     readString(span.params, "gen_ai.request.model") ??
     readString(span.params, "ai.model.id") ??

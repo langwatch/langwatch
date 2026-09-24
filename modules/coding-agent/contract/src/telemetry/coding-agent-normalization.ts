@@ -35,7 +35,7 @@ export function detectCodingAgent({
 }
 
 /** The sole session key every agent agrees on; varies by vendor under four different names. */
-export function resolveConversationKey(attrs: Record<string, unknown>): string | null {
+export function deriveConversationKey(attrs: Record<string, unknown>): string | null {
   const candidates = ["session.id", "conversation.id", "gen_ai.conversation.id", "thread.id"];
   for (const key of candidates) {
     const value = attrs[key];
@@ -52,8 +52,8 @@ export function resolveConversationKey(attrs: Record<string, unknown>): string |
 
 /**
  * The conversation key off one SPAN's attributes: the detected agent's own
- * `sessionKeyFromSpan` hook first, the shared candidate order otherwise. Log and metric
- * callers instead keep {@link resolveConversationKey} — no agent's events need the override.
+ * `deriveSessionKeyFromSpan` hook first, the shared candidate order otherwise. Log and metric
+ * callers instead keep {@link deriveConversationKey} — no agent's events need the override.
  */
 export function resolveSpanConversationKey({
   agent,
@@ -65,7 +65,7 @@ export function resolveSpanConversationKey({
   attrs: Record<string, unknown>;
 }): string | null {
   const definition = CODING_AGENT_REGISTRY.find((candidate) => candidate.id === agent);
-  return definition?.sessionKeyFromSpan?.({ name, attrs }) ?? resolveConversationKey(attrs);
+  return definition?.deriveSessionKeyFromSpan?.({ name, attrs }) ?? deriveConversationKey(attrs);
 }
 
 /**
@@ -357,7 +357,7 @@ const MAX_PROMPT_TITLE_CHARS = 120;
  * empty string, or a machine-injected turn (agents wrap notifications as user turns, and a
  * session named `<task-notification>` names nothing). Otherwise the first line, capped.
  */
-export function sessionTitleFromPrompt(text: string): string | null {
+export function deriveSessionTitleFromPrompt(text: string): string | null {
   const trimmed = text.trim();
   if (trimmed === "" || trimmed === WITHHELD_PROMPT_TEXT) return null;
   if (trimmed.startsWith("<")) return null;
@@ -368,7 +368,7 @@ export function sessionTitleFromPrompt(text: string): string | null {
 }
 
 /** Declared agent name from companion event (only source), null if unknown. */
-export function declaredCodingAgent(facts: Record<string, unknown>): CodingAgent | null {
+export function pickDeclaredCodingAgent(facts: Record<string, unknown>): CodingAgent | null {
   const declared = facts["coding_agent.name"];
   if (typeof declared !== "string" || declared.length === 0) return null;
   const match = CODING_AGENT_REGISTRY.find((agent) => agent.id === declared);
@@ -376,7 +376,7 @@ export function declaredCodingAgent(facts: Record<string, unknown>): CodingAgent
 }
 
 /** Extract coding-agent facts from log record; consumer-side gate for session fold. */
-export function liftCodingAgentLogFacts({
+export function extractCodingAgentLogFacts({
   scopeName,
   attributes,
 }: {
@@ -469,20 +469,20 @@ export function normalizeTokenType(rawType: string | null | undefined): TokenTyp
  * definition reads off the span name (opencode encodes it there). Reading only the attribute
  * loses every opencode tool; reading only the span name loses everyone else's.
  */
-export function resolveToolName({
+export function deriveToolName({
   spanName,
   attrs,
 }: {
   spanName?: string | null;
   attrs: Record<string, unknown>;
 }): string | null {
-  const fromAttr = firstString(attrs, ["tool_name", "tool.name"]);
+  const fromAttr = pickFirstString(attrs, ["tool_name", "tool.name"]);
   if (fromAttr !== null) return fromAttr;
 
   const name = spanName ?? "";
   if (name.length === 0) return null;
   for (const agent of CODING_AGENT_REGISTRY) {
-    const tool = agent.toolNameFromSpanName?.(name) ?? null;
+    const tool = agent.extractToolNameFromSpanName?.(name) ?? null;
     if (tool !== null) return tool;
   }
   return null;
@@ -510,7 +510,7 @@ export function parseMcpToolName(
   return { server, tool };
 }
 
-function firstString(attrs: Record<string, unknown>, keys: string[]): string | null {
+function pickFirstString(attrs: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = attrs[key];
     if (typeof value === "string" && value.length > 0) return value;

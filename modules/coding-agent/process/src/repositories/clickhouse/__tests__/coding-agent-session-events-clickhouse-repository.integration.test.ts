@@ -385,7 +385,7 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
 
     describe("when a stamped branch is looked up", () => {
       it("finds the session, case-folding the repository", async () => {
-        const pairs = await repository.listSessionsByStampedBranch({
+        const pairs = await repository.findSessionsByStampedBranch({
           tenantIds: [tenantId],
           repositoryHost: "github.com",
           repositoryOwner: "acme",
@@ -400,7 +400,7 @@ describe.skipIf(clickHouseUrl === null)("CodingAgentSessionEventsClickHouseRepos
 
     describe("when a branch nothing was stamped on is looked up", () => {
       it("answers nothing", async () => {
-        const pairs = await repository.listSessionsByStampedBranch({
+        const pairs = await repository.findSessionsByStampedBranch({
           tenantIds: [tenantId],
           repositoryHost: "github.com",
           repositoryOwner: "acme",

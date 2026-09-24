@@ -4,7 +4,7 @@ import {
   CODEX_RECOVERED_CONTENT_SPAN_NAME,
   collectRecoveredCodexTurn,
 } from "./coding-agent-transcript-codex.ts";
-import { extractedOutputText, outputMessagesText } from "./coding-agent-transcript-content.ts";
+import { extractOutputText, extractOutputMessagesText } from "./coding-agent-transcript-content.ts";
 import {
   type CodexToolLogContent,
   createSpanEntryAccumulator,
@@ -12,8 +12,8 @@ import {
   fillToolCallGaps,
   type SpanEntryAccumulator,
 } from "./coding-agent-transcript-state.ts";
-import { modelOf, readNumber, readString } from "./coding-agent-transcript-value.ts";
-import { parseMcpToolName, resolveToolName } from "./telemetry/coding-agent-normalization.ts";
+import { pickModel, readNumber, readString } from "./coding-agent-transcript-value.ts";
+import { parseMcpToolName, deriveToolName } from "./telemetry/coding-agent-normalization.ts";
 import { isModelCallSpan } from "./telemetry/index.ts";
 
 export function collectSpanEntries(
@@ -60,8 +60,8 @@ function collectModelCallSpan(span: SpanDetail, accumulator: SpanEntryAccumulato
   emitSystemPrompt(span, accumulator);
 
   const replyText =
-    extractedOutputText(span.output) ??
-    outputMessagesText(readString(span.params, "gen_ai.output.messages"));
+    extractOutputText(span.output) ??
+    extractOutputMessagesText(readString(span.params, "gen_ai.output.messages"));
   if (replyText === null) return;
 
   accumulator.spanReplies.push({
@@ -69,7 +69,7 @@ function collectModelCallSpan(span: SpanDetail, accumulator: SpanEntryAccumulato
       kind: "assistant_message",
       atMs: span.endTimeMs ?? span.startTimeMs,
       text: replyText,
-      model: modelOf(span),
+      model: pickModel(span),
     },
     windowStartMs: span.startTimeMs,
     windowEndMs: span.endTimeMs ?? span.startTimeMs,
@@ -81,7 +81,7 @@ function collectToolSpan(
   accumulator: SpanEntryAccumulator,
   codexToolLogs: Map<string, CodexToolLogContent>,
 ): void {
-  const toolName = resolveToolName({
+  const toolName = deriveToolName({
     spanName: span.name,
     attrs: (span.params ?? {}) as Record<string, unknown>,
   });
@@ -93,7 +93,7 @@ function collectToolSpan(
   const claimed = callId !== null ? accumulator.claimedToolCalls.get(callId) : void 0;
 
   if (claimed !== void 0) {
-    fillToolCallGaps(claimed, { durationMs: spanDurationMs(span), failed });
+    fillToolCallGaps(claimed, { durationMs: computeSpanDurationMs(span), failed });
     return;
   }
 
@@ -108,7 +108,7 @@ function collectToolSpan(
     mcpServer: parseMcpToolName(toolName)?.server ?? null,
     input: span.input ?? logContent?.input ?? null,
     output: span.output ?? logContent?.output ?? null,
-    durationMs: spanDurationMs(span),
+    durationMs: computeSpanDurationMs(span),
     failed,
     agentId,
     spanId: span.spanId,
@@ -125,7 +125,7 @@ function countSubAgentTool(agentId: string | null, accumulator: SpanEntryAccumul
   accumulator.subAgentToolCounts.set(agentId, count + 1);
 }
 
-function spanDurationMs(span: SpanDetail): number | null {
+function computeSpanDurationMs(span: SpanDetail): number | null {
   return span.endTimeMs && span.startTimeMs ? span.endTimeMs - span.startTimeMs : null;
 }
 
@@ -151,10 +151,10 @@ function modelCallEntry(span: SpanDetail): {
   return {
     kind: "model_call" as const,
     atMs: span.startTimeMs,
-    model: modelOf(span),
+    model: pickModel(span),
     tokens,
     costUsd: span.metrics?.cost ?? 0,
-    durationMs: spanDurationMs(span),
+    durationMs: computeSpanDurationMs(span),
     spanId: span.spanId,
     inputTokens,
     outputTokens,

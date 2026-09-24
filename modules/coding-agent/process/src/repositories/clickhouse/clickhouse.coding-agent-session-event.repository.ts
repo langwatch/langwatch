@@ -506,7 +506,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     };
   }
 
-  async listSessionsByStampedBranch({
+  async findSessionsByStampedBranch({
     tenantIds,
     repositoryHost,
     repositoryOwner,
@@ -525,7 +525,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     for (const tenantId of tenantIds) {
       EventUtils.validateTenantId(
         { tenantId },
-        "CodingAgentSessionEventsClickHouseRepository.listSessionsByStampedBranch",
+        "CodingAgentSessionEventsClickHouseRepository.findSessionsByStampedBranch",
       );
     }
 

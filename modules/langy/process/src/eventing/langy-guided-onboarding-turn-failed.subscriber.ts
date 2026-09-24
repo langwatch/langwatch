@@ -22,7 +22,8 @@ export interface GuidedOnboardingForProject {
 }
 
 export interface GuidedOnboardingReader {
-  read(params: { projectId: string }): Promise<GuidedOnboardingForProject | null>;
+  /** Throws `project_not_found` when the project is gone; unguided has a null `conversationId`. */
+  getByProject(params: { projectId: string }): Promise<GuidedOnboardingForProject>;
 }
 
 /** The owner of a conversation, for the distinct id the failure is tracked against. */
@@ -99,38 +100,7 @@ export function createGuidedOnboardingTurnFailedSubscriber(
       const conversationId = String(event.aggregateId);
 
       try {
-        const guided = await deps.guidedOnboarding.read({ projectId });
-        if (!guided || guided.conversationId !== conversationId) return;
-
-        const conversation = await deps.conversations
-          .getById({ projectId, conversationId })
-          .catch((error: unknown) => {
-            if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found")
-              return null;
-            throw error;
-          });
-        const userId = conversation?.ownerUserId;
-        if (!userId) {
-          logger.warn(
-            { projectId, conversationId, turnId: failure.turnId },
-            "Guided conversation has no owner, guided_onboarding_turn_failed not tracked",
-          );
-          return;
-        }
-
-        deps.analytics.track({
-          userId,
-          event: "guided_onboarding_turn_failed",
-          projectId,
-          properties: {
-            code: failure.code,
-            path: guided.currentPath ?? null,
-            conversation_id: conversationId,
-            turn_id: failure.turnId,
-            organization_id: guided.organizationId,
-            ...guided.experimentProperties,
-          },
-        });
+        await trackGuidedTurnFailure({ deps, failure, projectId, conversationId });
       } catch (error) {
         logger.error(
           { projectId, conversationId, turnId: failure.turnId, error },
@@ -139,4 +109,52 @@ export function createGuidedOnboardingTurnFailedSubscriber(
       }
     },
   };
+}
+
+async function trackGuidedTurnFailure({
+  deps,
+  failure,
+  projectId,
+  conversationId,
+}: {
+  deps: GuidedOnboardingTurnFailedSubscriberDeps;
+  failure: { turnId: string; code: string };
+  projectId: string;
+  conversationId: string;
+}): Promise<void> {
+  const guided = await deps.guidedOnboarding.getByProject({ projectId }).catch((error: unknown) => {
+    if (HandledError.isHandled(error) && error.code === "project_not_found") return null;
+    throw error;
+  });
+  if (!guided || guided.conversationId !== conversationId) return;
+
+  const conversation = await deps.conversations
+    .getById({ projectId, conversationId })
+    .catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found")
+        return null;
+      throw error;
+    });
+  const userId = conversation?.ownerUserId;
+  if (!userId) {
+    logger.warn(
+      { projectId, conversationId, turnId: failure.turnId },
+      "Guided conversation has no owner, guided_onboarding_turn_failed not tracked",
+    );
+    return;
+  }
+
+  deps.analytics.track({
+    userId,
+    event: "guided_onboarding_turn_failed",
+    projectId,
+    properties: {
+      code: failure.code,
+      path: guided.currentPath ?? null,
+      conversation_id: conversationId,
+      turn_id: failure.turnId,
+      organization_id: guided.organizationId,
+      ...guided.experimentProperties,
+    },
+  });
 }

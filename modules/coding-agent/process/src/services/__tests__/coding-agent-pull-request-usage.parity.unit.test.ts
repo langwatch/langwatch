@@ -181,13 +181,13 @@ function serviceWith({
   const sessionRepository = new TestSessions();
   sessionRepository.branchRows = sessions;
   sessionRepository.bySessionIdRows = sessionsById;
-  const listByRepositoryBranch = vi.spyOn(sessionRepository, "listByRepositoryBranch");
-  const listBySessionIds = vi.spyOn(sessionRepository, "listBySessionIds");
+  const findByRepositoryBranch = vi.spyOn(sessionRepository, "findByRepositoryBranch");
+  const findBySessionIds = vi.spyOn(sessionRepository, "findBySessionIds");
   const events = new TestEvents();
   events.modelTotals = modelTotals;
   events.stampedSessions = stampedSessions;
   const sumTokensByModelPerSession = vi.spyOn(events, "sumTokensByModelPerSession");
-  const listSessionsByStampedBranch = vi.spyOn(events, "listSessionsByStampedBranch");
+  const findSessionsByStampedBranch = vi.spyOn(events, "findSessionsByStampedBranch");
   const github = new TestGithubService();
   github.pullRequests = pullRequests;
   const billing = new FunctionBillingPolicy(async ({ sourceType }) =>
@@ -205,10 +205,10 @@ function serviceWith({
   });
   return {
     service,
-    listByRepositoryBranch,
-    listBySessionIds,
+    findByRepositoryBranch,
+    findBySessionIds,
     sumTokensByModelPerSession,
-    listSessionsByStampedBranch,
+    findSessionsByStampedBranch,
   };
 }
 
@@ -279,7 +279,7 @@ function personalServiceWith({
   const sessionRepository = new TestSessions();
   sessionRepository.recentRowsByTenant.set("project-1", personalSessions);
   sessionRepository.branchRows = organizationSessions;
-  const listByRepositoryBranch = vi.spyOn(sessionRepository, "listByRepositoryBranch");
+  const findByRepositoryBranch = vi.spyOn(sessionRepository, "findByRepositoryBranch");
   const events = new TestEvents();
   events.modelTotals = modelTotals;
   const github = new TestGithubService();
@@ -298,7 +298,7 @@ function personalServiceWith({
     ),
     clock: new TestClock(NOW),
   });
-  return { service, listByRepositoryBranch, findAllByBranches };
+  return { service, findByRepositoryBranch, findAllByBranches };
 }
 
 describe("PullRequestUsageService", () => {
@@ -482,7 +482,7 @@ describe("PullRequestUsageService", () => {
 
   describe("given a caller who may view no project at all", () => {
     it("reads no sessions and answers with empty totals", async () => {
-      const { service, listByRepositoryBranch } = serviceWith({
+      const { service, findByRepositoryBranch } = serviceWith({
         pullRequests: [pullRequestRow()],
         sessions: [sessionRow()],
       });
@@ -495,7 +495,7 @@ describe("PullRequestUsageService", () => {
 
       expect(usage.rows).toEqual([]);
       expect(usage.totals.sessionsCount).toBe(0);
-      expect(listByRepositoryBranch).not.toHaveBeenCalled();
+      expect(findByRepositoryBranch).not.toHaveBeenCalled();
     });
   });
 
@@ -558,14 +558,14 @@ describe("PullRequestUsageService", () => {
 
   describe("when reading sessions", () => {
     it("bounds the partition scan on the session start time", async () => {
-      const { service, listByRepositoryBranch } = serviceWith({
+      const { service, findByRepositoryBranch } = serviceWith({
         pullRequests: [pullRequestRow()],
         sessions: [sessionRow()],
       });
 
       await service.getPullRequestUsage(QUERY);
 
-      expect(listByRepositoryBranch).toHaveBeenCalledWith(
+      expect(findByRepositoryBranch).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantIds: ["project-1"],
           repositoryOwner: "acme",
@@ -574,7 +574,7 @@ describe("PullRequestUsageService", () => {
           startedAtFromMs: expect.any(Number),
         }),
       );
-      const call = listByRepositoryBranch.mock.calls[0]![0] as {
+      const call = findByRepositoryBranch.mock.calls[0]![0] as {
         startedAtFromMs: number;
       };
       expect(call.startedAtFromMs).toBeLessThan(NOW);
@@ -751,7 +751,7 @@ describe("PullRequestUsageService", () => {
   describe("given a pull request whose sessions ran in two projects", () => {
     /** @scenario "A listed pull request counts every project the viewer may read" */
     it("counts every project the viewer may read on the personal row", async () => {
-      const { service, listByRepositoryBranch } = personalServiceWith({
+      const { service, findByRepositoryBranch } = personalServiceWith({
         pullRequests: [pullRequestRow()],
         personalSessions: [personalSessionRow({ sessionId: "mine" })],
         organizationSessions: [
@@ -765,7 +765,7 @@ describe("PullRequestUsageService", () => {
         ...BOTH_PROJECTS,
       });
 
-      expect(listByRepositoryBranch).toHaveBeenCalledWith(
+      expect(findByRepositoryBranch).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantIds: ["project-1", "project-2"],
         }),
@@ -777,7 +777,7 @@ describe("PullRequestUsageService", () => {
 
     /** @scenario "A project the viewer may not read is absent from the row and its totals" */
     it("leaves a project the viewer may not read out of the row and its totals", async () => {
-      const { service, listByRepositoryBranch } = personalServiceWith({
+      const { service, findByRepositoryBranch } = personalServiceWith({
         pullRequests: [pullRequestRow()],
         personalSessions: [personalSessionRow({ sessionId: "mine" })],
         // The read is scoped to the permitted projects, so a hidden project's
@@ -787,7 +787,7 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getForPersonalProject(PERSONAL_QUERY);
 
-      expect(listByRepositoryBranch).toHaveBeenCalledWith(
+      expect(findByRepositoryBranch).toHaveBeenCalledWith(
         expect.objectContaining({ tenantIds: ["project-1"] }),
       );
       expect(usage.rows[0]?.sessionsCount).toBe(1);
@@ -960,7 +960,7 @@ describe("PullRequestUsageService", () => {
   describe("when the read resolves which projects to count", () => {
     /** @scenario "The viewer never chooses which projects are counted" */
     it("counts the projects it was handed and never a repository name from the request", async () => {
-      const { service, listByRepositoryBranch } = serviceWith({
+      const { service, findByRepositoryBranch } = serviceWith({
         pullRequests: [pullRequestRow()],
         sessions: [sessionRow()],
       });
@@ -973,7 +973,7 @@ describe("PullRequestUsageService", () => {
 
       // The query object carries no project list of its own: `tenantIds` is
       // exactly the resolved permission cut, so a caller cannot widen it.
-      const call = listByRepositoryBranch.mock.calls[0]![0] as {
+      const call = findByRepositoryBranch.mock.calls[0]![0] as {
         tenantIds: string[];
       };
       expect(call.tenantIds).toEqual(["project-1"]);
@@ -1491,7 +1491,7 @@ describe("PullRequestUsageService", () => {
         gitBranch: "feat/elsewhere",
         gitBranches: ["feat/linkage", "feat/elsewhere"],
       });
-      const { service, listBySessionIds } = serviceWith({
+      const { service, findBySessionIds } = serviceWith({
         pullRequests: [pullRequestRow()],
         sessions: [],
         stampedSessions: [{ tenantId: "project-1", sessionId: "moved-on" }],
@@ -1501,7 +1501,7 @@ describe("PullRequestUsageService", () => {
 
       const usage = await service.getPullRequestUsage(QUERY);
 
-      expect(listBySessionIds).toHaveBeenCalledWith(
+      expect(findBySessionIds).toHaveBeenCalledWith(
         expect.objectContaining({ sessionIds: ["moved-on"] }),
       );
       expect(usage.totals.totalTokens).toBe(180);

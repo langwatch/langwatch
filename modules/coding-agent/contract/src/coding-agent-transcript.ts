@@ -170,7 +170,7 @@ function withoutStubsOfRecoveredPrompts({
   const recovered = spanEntries.filter(isUserPromptEntry).toSorted((a, b) => a.atMs - b.atMs);
 
   for (const prompt of recovered) {
-    const twin = nearestUnclaimedStub({ stubs, claimed, prompt });
+    const twin = pickNearestUnclaimedStub({ stubs, claimed, prompt });
     if (twin !== null) claimed.add(twin);
   }
 
@@ -185,7 +185,7 @@ function isWithheldPrompt(entry: TranscriptEntry): entry is UserPromptEntry {
   return isUserPromptEntry(entry) && (entry.text === null || entry.text === WITHHELD_PROMPT_TEXT);
 }
 
-function nearestUnclaimedStub({
+function pickNearestUnclaimedStub({
   stubs,
   claimed,
   prompt,
@@ -219,7 +219,7 @@ function detectAgentFrom({
 }): CodingAgent {
   for (const log of logs) {
     const agent = detectCodingAgent({
-      recordName: attributeString(log.attributes, "event.name"),
+      recordName: pickAttributeString(log.attributes, "event.name"),
       serviceName: log.serviceName,
     });
     if (agent !== "unknown") return agent;
@@ -234,7 +234,7 @@ function detectAgentFrom({
   return "unknown";
 }
 
-function attributeString(attrs: Record<string, unknown>, key: string): string | null {
+function pickAttributeString(attrs: Record<string, unknown>, key: string): string | null {
   const value = readUnknown(attrs, key);
   return typeof value === "string" && value.length > 0 ? value : null;
 }

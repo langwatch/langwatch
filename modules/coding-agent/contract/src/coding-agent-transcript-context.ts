@@ -21,7 +21,7 @@ export function isInjectedContextOnly(content: string): boolean {
   return strippedOfTagBlocks(trimmed).trim().length === 0;
 }
 
-export function systemReminderText(content: string): string | null {
+export function extractSystemReminderText(content: string): string | null {
   const blocks = content.match(/<system-reminder>[\s\S]*?(?:<\/system-reminder>|$)/g);
   if (blocks === null || blocks.length === 0) return null;
 
@@ -39,11 +39,11 @@ function strippedOfTagBlocks(text: string): string {
   let at = text.indexOf("<");
 
   while (at !== -1) {
-    const open = readOpenTag(text, at, tagEnds);
+    const open = parseOpenTag(text, at, tagEnds);
     const closeAt =
       open === null
         ? null
-        : closeTagAtOrAfter({
+        : pickCloseTagAtOrAfter({
             closesByName,
             closeCursors,
             name: open.name,
@@ -92,7 +92,7 @@ function indexCloseTagPositions(text: string): Map<string, number[]> {
   return byName;
 }
 
-function readOpenTag(text: string, at: number, tagEnds: TagEndScan): OpenTag | null {
+function parseOpenTag(text: string, at: number, tagEnds: TagEndScan): OpenTag | null {
   const nameStart = at + 1;
   const nameEnd = tagNameEnd(text, nameStart);
   if (nameEnd === nameStart) return null;
@@ -115,7 +115,7 @@ function tagEndAtOrAfter(text: string, scan: TagEndScan, from: number): number {
   return scan.at;
 }
 
-function closeTagAtOrAfter({
+function pickCloseTagAtOrAfter({
   closesByName,
   closeCursors,
   name,

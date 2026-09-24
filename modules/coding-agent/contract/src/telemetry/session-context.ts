@@ -32,7 +32,7 @@ export interface SessionWorkingContext {
  * names no repository. A partial answer (repository without branch, as on a
  * detached HEAD) still returns, empty field and all — the stamper decides.
  */
-export function workingContextOfFacts(facts: ContributionFacts): SessionWorkingContext | null {
+export function extractWorkingContext(facts: ContributionFacts): SessionWorkingContext | null {
   const context = {
     repositoryHost: str(facts[SESSION_CONTEXT_ATTR.REPOSITORY_HOST]),
     repositoryOwner: str(facts[SESSION_CONTEXT_ATTR.REPOSITORY_OWNER]),
@@ -59,7 +59,7 @@ export function isStampableContext(context: SessionWorkingContext): boolean {
  * all-or-nothing, so any missing field means the whole stamp is absent; checking each keeps a
  * partial stamp from ever reading as a context.
  */
-export function stampedContextOf(stamp: {
+export function extractStampedContext(stamp: {
   repositoryHost?: string;
   repositoryOwner?: string;
   repositoryName?: string;

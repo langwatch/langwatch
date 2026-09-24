@@ -129,7 +129,7 @@ export interface CodingAgentDefinition {
    * If the agent encodes the tool name in its SPAN NAME rather than an
    * attribute, this resolves it; return null when the span is not a tool span.
    */
-  toolNameFromSpanName?(spanName: string): string | null;
+  extractToolNameFromSpanName?(spanName: string): string | null;
 
   /**
    * Span names this agent's session facts fold from. Names need not carry the
@@ -143,7 +143,10 @@ export interface CodingAgentDefinition {
    * order reads the wrong attribute. Codex needs it: its turn span carries
    * the per-turn id under `gen_ai.conversation.id`, the session's under `thread.id`.
    */
-  sessionKeyFromSpan?(params: { name: string; attrs: Record<string, unknown> }): string | null;
+  deriveSessionKeyFromSpan?(params: {
+    name: string;
+    attrs: Record<string, unknown>;
+  }): string | null;
 
   /**
    * True when tool runs are reported only on LOG events (no tool span to fold

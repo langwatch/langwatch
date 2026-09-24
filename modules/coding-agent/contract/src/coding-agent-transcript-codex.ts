@@ -1,14 +1,14 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 import {
-  extractedOutputText,
+  extractOutputText,
   isSameRecoveredReply,
-  parsedChatMessages,
+  parseChatMessages,
 } from "./coding-agent-transcript-content.ts";
 import { isInjectedContextOnly } from "./coding-agent-transcript-context.ts";
 import { emitSystemPrompt } from "./coding-agent-transcript-state.ts";
 import type { RenderedToolCall, SpanEntryAccumulator } from "./coding-agent-transcript-state.ts";
-import { modelOf } from "./coding-agent-transcript-value.ts";
+import { pickModel } from "./coding-agent-transcript-value.ts";
 
 export const CODEX_RECOVERED_CONTENT_SPAN_NAME = "codex.turn.response";
 
@@ -26,7 +26,7 @@ export function collectRecoveredCodexTurn(
   span: SpanDetail,
   accumulator: SpanEntryAccumulator,
 ): void {
-  const messages = parsedChatMessages(span.input);
+  const messages = parseChatMessages(span.input);
   emitSystemPrompt(span, accumulator);
 
   if (messages !== null) {
@@ -35,7 +35,7 @@ export function collectRecoveredCodexTurn(
     replayRecoveredMessages({ messages: fresh, span, accumulator });
   }
 
-  const replyText = extractedOutputText(span.output);
+  const replyText = extractOutputText(span.output);
   if (replyText === null) return;
 
   accumulator.lastRecoveredReply = replyText;
@@ -44,7 +44,7 @@ export function collectRecoveredCodexTurn(
       kind: "assistant_message",
       atMs: span.endTimeMs ?? span.startTimeMs,
       text: replyText,
-      model: modelOf(span),
+      model: pickModel(span),
     },
     windowStartMs: span.startTimeMs,
     windowEndMs: span.endTimeMs ?? span.startTimeMs,
@@ -161,7 +161,7 @@ function replayAssistantMessage({
     kind: "assistant_message",
     atMs: span.startTimeMs,
     text: content,
-    model: modelOf(span),
+    model: pickModel(span),
   });
 }
 

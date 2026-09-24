@@ -1,13 +1,13 @@
 import {
   LOGS_REQUIRE_SESSION_KEY_AGENT_IDS,
-  declaredCodingAgent,
+  pickDeclaredCodingAgent,
   detectCodingAgent,
-  liftCodingAgentLogFacts,
+  extractCodingAgentLogFacts,
   normalizeEventName,
-  resolveConversationKey,
+  deriveConversationKey,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
-  sessionTitleFromPrompt,
+  deriveSessionTitleFromPrompt,
 } from "@langwatch/coding-agent-contract";
 import type { ContributeLogFactsCommandData } from "@langwatch/coding-agent-contract";
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
@@ -56,7 +56,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       // check, never a resource-attributes parse. Cowork reuses Claude Code's
       // runtime (anthropic scope, claude_code names), so it PASSES this gate
       // as claude_code; the resource parse below relabels it claude_cowork.
-      const facts = liftCodingAgentLogFacts({
+      const facts = extractCodingAgentLogFacts({
         scopeName: record.scopeName,
         attributes,
       });
@@ -79,7 +79,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
       stampPromptTitleFallback({ facts, attributes });
 
-      const agent = resolveContributionAgent({
+      const agent = detectContributionAgent({
         scopeName: record.scopeName,
         attributes,
         serviceName,
@@ -87,7 +87,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
       if (agent === null) return;
 
-      const sessionKey = resolveConversationKey(attributes) ?? (record.providerSessionId || null);
+      const sessionKey = deriveConversationKey(attributes) ?? (record.providerSessionId || null);
       const correlationTraceId =
         record.correlationSource !== "none" && record.correlationTraceId
           ? record.correlationTraceId
@@ -169,12 +169,12 @@ function stampPromptTitleFallback({
   if (typeof eventName !== "string") return;
   if (normalizeEventName(eventName) !== "user_prompt") return;
   if (typeof attributes.prompt !== "string") return;
-  const title = sessionTitleFromPrompt(attributes.prompt);
+  const title = deriveSessionTitleFromPrompt(attributes.prompt);
   if (title !== null) facts[SESSION_TITLE_FALLBACK_FACT_KEY] = title;
 }
 
 /** Resolve agent label; rejects unknown (from LangWatch companion event declaration). */
-function resolveContributionAgent({
+function detectContributionAgent({
   scopeName,
   attributes,
   serviceName,
@@ -191,7 +191,7 @@ function resolveContributionAgent({
     recordName: typeof eventName === "string" ? eventName : null,
     serviceName,
   });
-  return detected !== "unknown" ? detected : declaredCodingAgent(facts);
+  return detected !== "unknown" ? detected : pickDeclaredCodingAgent(facts);
 }
 
 /** The canonical row stores attributes flattened as JSON — parse or skip. */

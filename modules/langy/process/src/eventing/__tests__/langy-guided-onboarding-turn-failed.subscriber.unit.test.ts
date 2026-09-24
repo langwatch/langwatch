@@ -4,6 +4,7 @@
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
 import type { EventSubscriberContext } from "@langwatch/eventing";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -33,27 +34,28 @@ function responded(outcome: "completed" | "failed" | "stopped", error?: string) 
 }
 
 function harness(options: {
-  guided?: Partial<GuidedOnboardingForProject> | null;
+  guided?: Partial<GuidedOnboardingForProject>;
   ownerUserId?: string | null;
   readFails?: boolean;
+  projectGone?: boolean;
 }) {
   const tracked: unknown[] = [];
   const reads = { guided: 0, conversations: 0 };
-  const guided: GuidedOnboardingForProject | null =
-    options.guided === null
-      ? null
-      : {
-          organizationId: "org-1",
-          conversationId: CONVERSATION_ID,
-          currentPath: "gateway",
-          experimentProperties: EXPERIMENT,
-          ...options.guided,
-        };
+  const guided: GuidedOnboardingForProject = {
+    organizationId: "org-1",
+    conversationId: CONVERSATION_ID,
+    currentPath: "gateway",
+    experimentProperties: EXPERIMENT,
+    ...options.guided,
+  };
   const subscriber = createGuidedOnboardingTurnFailedSubscriber({
     guidedOnboarding: {
-      read: async () => {
+      getByProject: async ({ projectId }) => {
         reads.guided += 1;
         if (options.readFails) throw new Error("postgres down");
+        if (options.projectGone) {
+          throw new ProjectNotFoundError("Project not found", { meta: { projectId } });
+        }
         return guided;
       },
     },
@@ -158,8 +160,15 @@ describe("given a conversation that is not the organization's guided conversatio
   });
 
   it("tracks nothing when the organization recorded no guided onboarding", async () => {
-    const { subscriber, tracked } = harness({ guided: null });
+    const { subscriber, tracked } = harness({ guided: { conversationId: null } });
     await subscriber.handle(failedEvent(), context);
     expect(tracked).toEqual([]);
+  });
+
+  it("tracks nothing when the project is gone", async () => {
+    const { subscriber, tracked, reads } = harness({ projectGone: true });
+    await expect(subscriber.handle(failedEvent(), context)).resolves.toBeUndefined();
+    expect(tracked).toEqual([]);
+    expect(reads.conversations).toBe(0);
   });
 });

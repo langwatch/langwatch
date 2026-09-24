@@ -90,20 +90,20 @@ export class CodingAgentSessionLogProjection {
     // `codex.tool_result`); opencode sends a bare `tool_result` and dots its
     // session events (`session.created`). Matching the raw string would have meant
     // three switch statements that drift apart.
-    const event = normalizeEventName(this.stateProjection.string(attrs["event.name"]));
+    const event = normalizeEventName(this.stateProjection.coerceString(attrs["event.name"]));
     if (event === null) return state;
 
     const base = this.stateProjection.withIdentity(state, attrs);
 
     switch (event) {
       case CLAUDE.EVENT.USER_PROMPT: {
-        const command = this.stateProjection.string(attrs.command_name);
+        const command = this.stateProjection.coerceString(attrs.command_name);
         return {
           // The first prompt names an unnamed session; the generated title
           // (API_RESPONSE below) and the session's own name replace it.
           ...this.stateProjection.withTitle({
             state: base,
-            value: this.stateProjection.string(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]),
+            value: this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.TITLE_FALLBACK]),
             source: "prompt",
           }),
           prompts: base.prompts + 1,
@@ -158,7 +158,7 @@ export class CodingAgentSessionLogProjection {
         // name.
         return this.stateProjection.withTitle({
           state: base,
-          value: this.stateProjection.string(attrs[LANGWATCH.ATTR.TITLE]),
+          value: this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.TITLE]),
           source: "generated",
         });
 
@@ -168,7 +168,7 @@ export class CodingAgentSessionLogProjection {
         // repositories. Per-branch history lives on the fact rows instead, so
         // every branch the session passed through also joins the set — it
         // still drove the branch it left, and the pull request opened there.
-        const branch = this.stateProjection.string(attrs[LANGWATCH.ATTR.BRANCH]);
+        const branch = this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.BRANCH]);
         // Two titles can ride the record. The context title is codex's
         // prompt-derived name (codex withholds prompt text from its own
         // events), filling an empty row only. The session NAME is what the
@@ -177,25 +177,25 @@ export class CodingAgentSessionLogProjection {
         const named = this.stateProjection.withTitle({
           state: this.stateProjection.withTitle({
             state: base,
-            value: this.stateProjection.string(attrs[LANGWATCH.ATTR.TITLE]),
+            value: this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.TITLE]),
             source: "prompt",
           }),
-          value: this.stateProjection.string(attrs[LANGWATCH.ATTR.NAME]),
+          value: this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.NAME]),
           source: "name",
         });
         return {
           ...named,
           repositoryHost:
-            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]) ??
+            this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.REPOSITORY_HOST]) ??
             base.repositoryHost,
           repositoryOwner:
-            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]) ??
+            this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.REPOSITORY_OWNER]) ??
             base.repositoryOwner,
           repositoryName:
-            this.stateProjection.string(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]) ??
+            this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.REPOSITORY_NAME]) ??
             base.repositoryName,
           gitWorktree:
-            this.stateProjection.string(attrs[LANGWATCH.ATTR.WORKTREE]) ?? base.gitWorktree,
+            this.stateProjection.coerceString(attrs[LANGWATCH.ATTR.WORKTREE]) ?? base.gitWorktree,
           gitBranch: branch ?? base.gitBranch,
           gitBranches:
             branch !== null
@@ -205,7 +205,7 @@ export class CodingAgentSessionLogProjection {
       }
 
       case CLAUDE.EVENT.TOOL_RESULT: {
-        const errorType = this.stateProjection.string(attrs.error_type);
+        const errorType = this.stateProjection.coerceString(attrs.error_type);
         const withBytes = {
           ...base,
           // Bytes of tool OUTPUT fed back into the context — the usual cause of a
@@ -215,7 +215,7 @@ export class CodingAgentSessionLogProjection {
           toolInputBytes:
             base.toolInputBytes + this.stateProjection.number(attrs.tool_input_size_bytes),
           errorTypes:
-            errorType !== null && this.stateProjection.scalarString(attrs.success) === "false"
+            errorType !== null && this.stateProjection.coerceScalarString(attrs.success) === "false"
               ? this.stateProjection.incrementCounter(base.errorTypes, errorType)
               : base.errorTypes,
         };
@@ -227,7 +227,7 @@ export class CodingAgentSessionLogProjection {
         const wrapperNames =
           agent !== undefined ? WRAPPER_TOOL_NAMES_BY_AGENT_ID.get(agent) : undefined;
         const wrapped =
-          wrapperNames?.has(this.stateProjection.string(attrs.tool_name) ?? "") === true;
+          wrapperNames?.has(this.stateProjection.coerceString(attrs.tool_name) ?? "") === true;
         // For an agent whose tool runs live on events — every logs-only agent,
         // and codex, which has no tool span — this event IS the tool run:
         // name, duration, outcome, which span-bearing agents fold from the
@@ -235,7 +235,7 @@ export class CodingAgentSessionLogProjection {
         return !wrapped && agent !== undefined && EVENTS_FOLD_TOOL_RUNS_AGENT_IDS.has(agent)
           ? this.stateProjection.foldToolInvocation(withBytes, {
               attrs,
-              failed: this.stateProjection.scalarString(attrs.success) === "false",
+              failed: this.stateProjection.coerceScalarString(attrs.success) === "false",
               toolMs: this.stateProjection.number(attrs.duration_ms),
               startedAtMs: occurredAtMs ?? 0,
             })
@@ -247,12 +247,12 @@ export class CodingAgentSessionLogProjection {
         // `denied_with_network_policy_deny`). Codex also puts the walk-away on
         // the DECISION itself — `abort`, or `timed_out` for a prompt left to
         // expire — where claude reports it as `reject` + `source: user_abort`.
-        const decision = this.stateProjection.string(attrs.decision) ?? "";
+        const decision = this.stateProjection.coerceString(attrs.decision) ?? "";
         const rejected = decision === "reject" || decision.startsWith("denied");
         const walkedAway =
           decision === "abort" ||
           decision === "timed_out" ||
-          ABORTED_SOURCES.has(this.stateProjection.string(attrs.source) ?? "");
+          ABORTED_SOURCES.has(this.stateProjection.coerceString(attrs.source) ?? "");
         if (!rejected && !walkedAway) return base;
         // An ABORT (the human walked away from the prompt) is a different act from
         // a refusal, and NEITHER is a tool that broke. Counting them as failures
@@ -268,7 +268,9 @@ export class CodingAgentSessionLogProjection {
           apiErrors: base.apiErrors + 1,
           rateLimited:
             base.rateLimited +
-            (this.stateProjection.scalarString(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
+            (this.stateProjection.coerceScalarString(attrs.status_code) === RATE_LIMIT_STATUS
+              ? 1
+              : 0),
         };
 
       case CLAUDE.EVENT.RETRIES_EXHAUSTED:
@@ -289,8 +291,9 @@ export class CodingAgentSessionLogProjection {
         // A server-side fallback hop already retried on another model, so the user
         // never saw that refusal. Counting it would overstate how often the agent
         // actually refused the human.
-        if (this.stateProjection.scalarString(attrs.server_fallback_hop) === "true") return base;
-        const category = this.stateProjection.string(attrs.category);
+        if (this.stateProjection.coerceScalarString(attrs.server_fallback_hop) === "true")
+          return base;
+        const category = this.stateProjection.coerceString(attrs.category);
         return {
           ...base,
           refusals: base.refusals + 1,
@@ -314,12 +317,12 @@ export class CodingAgentSessionLogProjection {
           // that predates the trigger attribute.
           compactionTriggers: this.stateProjection.incrementCounter(
             base.compactionTriggers,
-            this.stateProjection.string(attrs.trigger) ?? "unknown",
+            this.stateProjection.coerceString(attrs.trigger) ?? "unknown",
           ),
         };
 
       case CLAUDE.EVENT.PERMISSION_MODE: {
-        const mode = this.stateProjection.string(attrs.to_mode);
+        const mode = this.stateProjection.coerceString(attrs.to_mode);
         return {
           ...base,
           permissionMode: mode ?? base.permissionMode,
@@ -329,7 +332,7 @@ export class CodingAgentSessionLogProjection {
       }
 
       case CLAUDE.EVENT.SKILL_ACTIVATED: {
-        const skill = this.stateProjection.string(attrs["skill.name"]);
+        const skill = this.stateProjection.coerceString(attrs["skill.name"]);
         return skill !== null
           ? { ...base, skills: this.stateProjection.addToBoundedSet(base.skills, skill) }
           : base;
@@ -337,8 +340,8 @@ export class CodingAgentSessionLogProjection {
 
       case CLAUDE.EVENT.MCP_CONNECTION: {
         const server =
-          this.stateProjection.string(attrs.server_name) ??
-          this.stateProjection.string(attrs["plugin.name"]);
+          this.stateProjection.coerceString(attrs.server_name) ??
+          this.stateProjection.coerceString(attrs["plugin.name"]);
         return server !== null
           ? { ...base, mcpServers: this.stateProjection.addToBoundedSet(base.mcpServers, server) }
           : base;

@@ -2040,7 +2040,7 @@ describe("coding-agent session fold, codex", () => {
 
       expect(state.ttftMsTotal).toBe(2_000);
       expect(state.ttftSamples).toBe(2);
-      expect(stateProjection.meanTtftMs(state)).toBe(1_000);
+      expect(stateProjection.computeMeanTtftMs(state)).toBe(1_000);
     });
   });
 

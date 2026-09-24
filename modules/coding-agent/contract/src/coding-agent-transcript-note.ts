@@ -3,7 +3,7 @@ import type { TranscriptEntry } from "./coding-agent-transcript.ts";
 
 type NoteEntry = Extract<TranscriptEntry, { kind: "note" }>;
 
-export function transcriptNoteEntry({
+export function buildTranscriptNoteEntry({
   event,
   attrs,
   atMs,

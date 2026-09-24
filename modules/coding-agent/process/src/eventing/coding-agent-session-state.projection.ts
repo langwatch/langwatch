@@ -300,11 +300,11 @@ export class CodingAgentSessionStateProjection {
     };
   }
 
-  meanTtftMs(state: CodingAgentSessionData): number | null {
+  computeMeanTtftMs(state: CodingAgentSessionData): number | null {
     return state.ttftSamples > 0 ? Math.round(state.ttftMsTotal / state.ttftSamples) : null;
   }
 
-  cacheHitRate(state: CodingAgentSessionData): number | null {
+  computeCacheHitRate(state: CodingAgentSessionData): number | null {
     const total = state.cacheReadTokens + state.cacheCreationTokens + state.inputTokens;
     return total > 0 ? state.cacheReadTokens / total : null;
   }
@@ -359,11 +359,11 @@ export class CodingAgentSessionStateProjection {
     };
   }
 
-  string(value: unknown): string | null {
+  coerceString(value: unknown): string | null {
     return typeof value === "string" && value.length > 0 ? value : null;
   }
 
-  scalarString(value: unknown): string | null {
+  coerceScalarString(value: unknown): string | null {
     if (typeof value === "string") return value.length > 0 ? value : null;
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
     if (typeof value === "boolean") return String(value);
@@ -459,26 +459,26 @@ export class CodingAgentSessionStateProjection {
       ...state,
       agentVersion:
         state.agentVersion ??
-        this.string(attrs["app.version"]) ??
-        this.string(attrs["service.version"]),
-      terminalType: state.terminalType ?? this.string(attrs["terminal.type"]),
-      entrypoint: state.entrypoint ?? this.string(attrs["app.entrypoint"]),
+        this.coerceString(attrs["app.version"]) ??
+        this.coerceString(attrs["service.version"]),
+      terminalType: state.terminalType ?? this.coerceString(attrs["terminal.type"]),
+      entrypoint: state.entrypoint ?? this.coerceString(attrs["app.entrypoint"]),
       // Claude stamps user identity on log events, not spans; other agents keep
       // this null. Opaque provider ids only — Claude Code's `user.id` hash, or
       // Cowork's account UUID/tagged id. `user.email` also rides those events
       // but is raw human identity and deliberately never read into this durable row.
       userId:
         state.userId ??
-        this.string(attrs["user.id"]) ??
-        this.string(attrs["user.account_uuid"]) ??
-        this.string(attrs["user.account_id"]),
+        this.coerceString(attrs["user.id"]) ??
+        this.coerceString(attrs["user.account_uuid"]) ??
+        this.coerceString(attrs["user.account_id"]),
       // Spawn lineage, for agents that stamp it — a session has ONE parent, and
       // a fork stays a fork. Nothing observed so far stamps it: a sub-agent spawn
       // with every enhanced-telemetry knob on carried neither key, though the
       // sub-agent's own `agent_id` arrives and is counted by `seenSubAgent`. So
       // empty reads as "no lineage reported", never as "this is a root session".
-      parentSessionId: state.parentSessionId ?? this.string(attrs.parent_session_id),
-      isFork: state.isFork || this.scalarString(attrs.is_fork) === "true",
+      parentSessionId: state.parentSessionId ?? this.coerceString(attrs.parent_session_id),
+      isFork: state.isFork || this.coerceScalarString(attrs.is_fork) === "true",
     };
   }
 
@@ -487,12 +487,13 @@ export class CodingAgentSessionStateProjection {
     attrs: Record<string, unknown>,
     fallbackDurationMs: number,
   ): CodingAgentSessionData {
-    const agentId = this.string(attrs.agent_id);
+    const agentId = this.coerceString(attrs.agent_id);
     if (agentId !== null) Object.assign(next, this.recordSubAgent(next, agentId));
-    const stopReason = this.string(attrs.stop_reason);
+    const stopReason = this.coerceString(attrs.stop_reason);
     const ttft = this.number(attrs.ttft_ms);
-    const model = this.string(attrs.model) ?? this.string(attrs["gen_ai.request.model"]);
-    const requestId = this.string(attrs.request_id);
+    const model =
+      this.coerceString(attrs.model) ?? this.coerceString(attrs["gen_ai.request.model"]);
+    const requestId = this.coerceString(attrs.request_id);
 
     const cacheReadTokens = this.number(attrs.cache_read_tokens);
     const cacheCreationTokens = this.number(attrs.cache_creation_tokens);
@@ -552,7 +553,7 @@ export class CodingAgentSessionStateProjection {
       startedAtMs: number;
     },
   ): CodingAgentSessionData {
-    const toolName = this.string(attrs.tool_name);
+    const toolName = this.coerceString(attrs.tool_name);
 
     const withTool: CodingAgentSessionData = {
       ...next,
@@ -572,7 +573,7 @@ export class CodingAgentSessionStateProjection {
     // session's steps would flatten the hierarchy — it's already represented
     // by the step that SPAWNED it. `agent_id` is absent on the main thread and
     // present on every sub-agent span, so it's exactly the discriminator.
-    const toolAgentId = this.string(attrs.agent_id);
+    const toolAgentId = this.coerceString(attrs.agent_id);
     if (toolAgentId !== null) {
       Object.assign(withTool, this.recordSubAgent(withTool, toolAgentId));
     }
@@ -584,7 +585,7 @@ export class CodingAgentSessionStateProjection {
       });
     }
 
-    const filePath = this.string(attrs.file_path);
+    const filePath = this.coerceString(attrs.file_path);
     if (filePath !== null) {
       withTool.filesTouched = this.addToBoundedSet(next.filesTouched, filePath);
     }
@@ -592,7 +593,7 @@ export class CodingAgentSessionStateProjection {
     // A skill reaches the session two ways: the `skill_activated` event and the
     // Skill TOOL span. A skill the agent invoked proactively arrives on one path,
     // a `/slash` skill on the other — reading only one loses half of them.
-    const skillName = this.string(attrs.skill_name);
+    const skillName = this.coerceString(attrs.skill_name);
     if (skillName !== null) {
       withTool.skills = this.addToBoundedSet(next.skills, skillName);
     }
@@ -604,16 +605,16 @@ export class CodingAgentSessionStateProjection {
     // the name first; treat the attributes as a bonus for agents that do send them.
     const fromName = parseMcpToolName(toolName);
     // Codex spells the server as a bare `mcp_server` on its tool_result events
-    // (empty string for a builtin tool, which this.string() already reads as absent).
+    // (empty string for a builtin tool, which this.coerceString() already reads as absent).
     const mcpServer =
-      this.string(attrs["mcp_server.name"]) ??
-      this.string(attrs.mcp_server) ??
+      this.coerceString(attrs["mcp_server.name"]) ??
+      this.coerceString(attrs.mcp_server) ??
       fromName?.server ??
       null;
     if (mcpServer !== null) {
       withTool.mcpServers = this.addToBoundedSet(next.mcpServers, mcpServer);
     }
-    const mcpTool = this.string(attrs["mcp_tool.name"]) ?? fromName?.tool ?? null;
+    const mcpTool = this.coerceString(attrs["mcp_tool.name"]) ?? fromName?.tool ?? null;
     if (mcpTool !== null) {
       withTool.mcpTools = this.addToBoundedSet(next.mcpTools, mcpTool);
     }

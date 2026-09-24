@@ -76,7 +76,7 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
       .slice(0, input.limit);
   }
 
-  async listByRepositoryBranch(input: {
+  async findByRepositoryBranch(input: {
     tenantIds: string[];
     repositoryHost: string;
     repositoryOwner: string;
@@ -99,7 +99,7 @@ export class MemoryCodingAgentSessionRepository extends CodingAgentSessionReposi
       .map(branchRecord);
   }
 
-  async listBySessionIds(input: {
+  async findBySessionIds(input: {
     tenantIds: string[];
     sessionIds: string[];
     startedAtFromMs: number;

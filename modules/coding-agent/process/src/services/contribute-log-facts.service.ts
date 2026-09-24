@@ -8,7 +8,7 @@ import {
   normalizeEventName,
   SESSION_CONTEXT_EVENT,
   type SessionWorkingContext,
-  workingContextOfFacts,
+  extractWorkingContext,
   type LogFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
@@ -91,7 +91,7 @@ export class EventingContributeLogFactsAdapter implements CommandHandler<
    * outage leaves those later rows unstamped rather than failing this one.
    */
   private async remember(data: ContributeLogFactsCommandData): Promise<void> {
-    const context = workingContextOfFacts(data.facts);
+    const context = extractWorkingContext(data.facts);
     if (context === null) return;
     try {
       await this.deps.contextMemo.set({

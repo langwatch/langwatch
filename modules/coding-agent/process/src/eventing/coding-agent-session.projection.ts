@@ -2,7 +2,7 @@ import {
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
   type CodingAgentSessionContextUsage,
-  stampedContextOf,
+  extractStampedContext,
   type MetricFactsContributedEvent,
   metricFactsContributedEventSchema,
   type SpanFactsContributedEvent,
@@ -196,7 +196,7 @@ export class CodingAgentSessionFoldProjection
       agent: data.agent,
       // The stamp the contribute service put on the event, so the call's
       // tokens are charged to the context declared before it.
-      context: stampedContextOf(data),
+      context: extractStampedContext(data),
     });
 
     const withIdentity = this.withContributionIdentity(
@@ -218,7 +218,7 @@ export class CodingAgentSessionFoldProjection
       // state's — the logs-only gate must reflect what THIS record is.
       agent: data.agent,
       occurredAtMs: data.timeUnixMs,
-      context: stampedContextOf(data),
+      context: extractStampedContext(data),
     });
 
     return this.withContributionIdentity(
@@ -535,7 +535,7 @@ export class CodingAgentSessionRowMapper {
 /**
  * The git identity and title columns (migrations 00075/00077). Empty string
  * is the honest unset here — an agent with no companion emitter reports
- * none — mapped back by `nullIfEmpty`; `gitBranches` uses an empty array.
+ * none — mapped back by `normalizeEmptyToNull`; `gitBranches` uses an empty array.
  */
 function gitContextColumns(state: CodingAgentSessionState): {
   repositoryHost: string;
@@ -564,11 +564,11 @@ function gitContextColumns(state: CodingAgentSessionState): {
  * default on a pre-00083 row included — reads as unset, which the fold ranks
  * as a generated title (see `withTitle`).
  */
-const titleSourceFromRow = (value: string): SessionTitleSource | null =>
+const decodeTitleSource = (value: string): SessionTitleSource | null =>
   sessionTitleSourceSchema.safeParse(value).data ?? null;
 
 /** An empty string in a row column reads back as "unset" (null) in state. */
-const nullIfEmpty = (value: string): string | null => (value === "" ? null : value);
+const normalizeEmptyToNull = (value: string): string | null => (value === "" ? null : value);
 
 /** Deserialize fold state from persisted row; total decoder mapping defaults for absent columns. */
 export class CodingAgentSessionStateMapper {
@@ -580,32 +580,32 @@ export class CodingAgentSessionStateMapper {
         unit.seriesId,
         {
           metricName: unit.metricName,
-          type: nullIfEmpty(unit.type),
-          decision: nullIfEmpty(unit.decision),
-          language: nullIfEmpty(unit.language),
+          type: normalizeEmptyToNull(unit.type),
+          decision: normalizeEmptyToNull(unit.decision),
+          language: normalizeEmptyToNull(unit.language),
           value: unit.value,
         },
       ]),
     );
 
     return {
-      agent: nullIfEmpty(row.agent),
-      sessionId: nullIfEmpty(row.sessionId),
-      agentVersion: nullIfEmpty(row.agentVersion),
-      terminalType: nullIfEmpty(row.terminalType),
-      entrypoint: nullIfEmpty(row.entrypoint),
-      finalRequestId: nullIfEmpty(row.finalRequestId),
-      userId: nullIfEmpty(row.userId),
-      parentSessionId: nullIfEmpty(row.parentSessionId),
+      agent: normalizeEmptyToNull(row.agent),
+      sessionId: normalizeEmptyToNull(row.sessionId),
+      agentVersion: normalizeEmptyToNull(row.agentVersion),
+      terminalType: normalizeEmptyToNull(row.terminalType),
+      entrypoint: normalizeEmptyToNull(row.entrypoint),
+      finalRequestId: normalizeEmptyToNull(row.finalRequestId),
+      userId: normalizeEmptyToNull(row.userId),
+      parentSessionId: normalizeEmptyToNull(row.parentSessionId),
       isFork: row.isFork,
-      repositoryHost: nullIfEmpty(row.repositoryHost),
-      repositoryOwner: nullIfEmpty(row.repositoryOwner),
-      repositoryName: nullIfEmpty(row.repositoryName),
-      gitBranch: nullIfEmpty(row.gitBranch),
+      repositoryHost: normalizeEmptyToNull(row.repositoryHost),
+      repositoryOwner: normalizeEmptyToNull(row.repositoryOwner),
+      repositoryName: normalizeEmptyToNull(row.repositoryName),
+      gitBranch: normalizeEmptyToNull(row.gitBranch),
       gitBranches: row.gitBranches,
-      gitWorktree: nullIfEmpty(row.gitWorktree),
-      title: nullIfEmpty(row.title),
-      titleSource: titleSourceFromRow(row.titleSource),
+      gitWorktree: normalizeEmptyToNull(row.gitWorktree),
+      title: normalizeEmptyToNull(row.title),
+      titleSource: decodeTitleSource(row.titleSource),
 
       modelCalls: row.modelCalls,
       toolCalls: row.toolCalls,
@@ -674,7 +674,7 @@ export class CodingAgentSessionStateMapper {
 
       toolsDenied: row.toolsDenied,
       toolsAborted: row.toolsAborted,
-      permissionMode: nullIfEmpty(row.permissionMode),
+      permissionMode: normalizeEmptyToNull(row.permissionMode),
       permissionChanges: row.permissionChanges,
       hooksBlocked: row.hooksBlocked,
       hooksCancelled: row.hooksCancelled,
@@ -690,7 +690,7 @@ export class CodingAgentSessionStateMapper {
       languagesEdited: row.languagesEdited,
       atMentions: row.atMentions,
 
-      stopReason: nullIfEmpty(row.stopReason),
+      stopReason: normalizeEmptyToNull(row.stopReason),
       truncated: row.truncated,
 
       sessionKeySource: row.sessionKeySource,

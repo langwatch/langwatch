@@ -98,7 +98,7 @@ function buildLangyConversationProducerPipeline(input: {
     turns: { start: refuse("start an owed connect turn") },
   };
   const guidedOnboarding = {
-    reader: { read: refuse("read a project's guided onboarding") },
+    reader: { getByProject: refuse("read a project's guided onboarding") },
     analytics: {
       track: () => {
         throw producerOnly(processName, "track a guided onboarding turn failure");

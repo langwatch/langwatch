@@ -115,7 +115,7 @@ const UNKNOWN_EVENT_CONTENT_KEYS: readonly LogContentKey[] = ALL_CONTENT_KEYS.ma
 }));
 
 /** The table entry for an event, or undefined when neither table places it. */
-function knownContentKeys(eventName: string): readonly LogContentKey[] | undefined {
+function pickContentKeys(eventName: string): readonly LogContentKey[] | undefined {
   const canonical = normalizeEventName(eventName);
   if (canonical !== null && CONTENT_KEYS_BY_EVENT[canonical]) {
     return CONTENT_KEYS_BY_EVENT[canonical];
@@ -129,7 +129,7 @@ function knownContentKeys(eventName: string): readonly LogContentKey[] | undefin
  * key the table knows — always a superset of `contentAttrKeys`.
  */
 export function logContentKeys(eventName: string): readonly LogContentKey[] {
-  return knownContentKeys(eventName) ?? UNKNOWN_EVENT_CONTENT_KEYS;
+  return pickContentKeys(eventName) ?? UNKNOWN_EVENT_CONTENT_KEYS;
 }
 
 /**
@@ -138,5 +138,5 @@ export function logContentKeys(eventName: string): readonly LogContentKey[] {
  * than the gate's wide one — hiding too much is safe, showing the wrong thing isn't.
  */
 export function contentAttrKeys(eventName: string): readonly string[] {
-  return knownContentKeys(eventName)?.map((entry) => entry.key) ?? [BODY_ATTR];
+  return pickContentKeys(eventName)?.map((entry) => entry.key) ?? [BODY_ATTR];
 }

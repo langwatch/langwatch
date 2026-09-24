@@ -2,7 +2,7 @@ import type { ContributeMetricFactsCommandData } from "@langwatch/coding-agent-c
 import {
   detectCodingAgent,
   isCodingAgentMetricName,
-  resolveConversationKey,
+  deriveConversationKey,
 } from "@langwatch/coding-agent-contract";
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import {
@@ -63,7 +63,7 @@ function parsePointAttributes(json: string): Record<string, string | number | bo
 }
 
 /** Resource-level service.name off the point's canonical KeyValue JSON. */
-function serviceNameFromResource(json: string): string | null {
+function extractServiceNameFromResource(json: string): string | null {
   const resource = parsePointAttributes(json);
   const serviceName = resource?.["service.name"];
   return typeof serviceName === "string" && serviceName.length > 0 ? serviceName : null;
@@ -84,7 +84,7 @@ async function dispatchMetricPoint({
 
   const attributes = parsePointAttributes(point.pointAttributesJson);
   if (attributes === null) return;
-  const sessionKey = resolveConversationKey(attributes);
+  const sessionKey = deriveConversationKey(attributes);
   if (sessionKey === null) return;
 
   const intValue = point.valueInt !== null ? Number(point.valueInt) : null;
@@ -104,7 +104,7 @@ async function dispatchMetricPoint({
       // from the Claude Code runtime it reuses; without it a session's
       // metric contribution could first-writer-win the fold's agent to
       // claude_code while its log contributions say claude_cowork.
-      serviceName: serviceNameFromResource(point.resourceAttributesJson),
+      serviceName: extractServiceNameFromResource(point.resourceAttributesJson),
     }),
     occurredAt: point.timeUnixMs,
     seriesId: isDelta ? point.pointId : point.seriesId,

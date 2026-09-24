@@ -497,7 +497,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions by repository bra
 
   /** @scenario "A session that moved to another branch is still read for the branch it left" */
   it("lists a session under every branch it drove, not only its last", async () => {
-    const listed = await sessions.listByRepositoryBranch({
+    const listed = await sessions.findByRepositoryBranch({
       tenantIds: [tenantId],
       repositoryHost: "github.com",
       repositoryOwner: "acme",
@@ -522,7 +522,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions by repository bra
   });
 
   it("still matches the branch the session ended on", async () => {
-    const listed = await sessions.listByRepositoryBranch({
+    const listed = await sessions.findByRepositoryBranch({
       tenantIds: [tenantId],
       repositoryHost: "github.com",
       repositoryOwner: "acme",
@@ -550,7 +550,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions by repository bra
       [],
     );
 
-    const listed = await sessions.listByRepositoryBranch({
+    const listed = await sessions.findByRepositoryBranch({
       tenantIds: [tenantId],
       repositoryHost: "github.com",
       repositoryOwner: "acme",
@@ -563,7 +563,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions by repository bra
   });
 
   it("fetches the same row shape by session id, whatever repository the row names", async () => {
-    const listed = await sessions.listBySessionIds({
+    const listed = await sessions.findBySessionIds({
       tenantIds: [tenantId],
       sessionIds: [`${tag}-moved`],
       startedAtFromMs: baseMs - 60_000,
@@ -576,7 +576,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions by repository bra
   });
 
   it("answers nothing for a session id never folded", async () => {
-    const listed = await sessions.listBySessionIds({
+    const listed = await sessions.findBySessionIds({
       tenantIds: [tenantId],
       sessionIds: [`${tag}-never-existed`],
       startedAtFromMs: baseMs - 60_000,

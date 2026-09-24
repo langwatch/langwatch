@@ -1,5 +1,5 @@
-import { geminiResponseText } from "./coding-agent-transcript-content.ts";
-import { transcriptNoteEntry } from "./coding-agent-transcript-note.ts";
+import { extractGeminiResponseText } from "./coding-agent-transcript-content.ts";
+import { buildTranscriptNoteEntry } from "./coding-agent-transcript-note.ts";
 import {
   type ClaimedToolCalls,
   type TranscriptLogRecord,
@@ -11,7 +11,7 @@ import {
   WITHHELD_PROMPT_TEXT,
   normalizeEventName,
   parseMcpToolName,
-  resolveConversationKey,
+  deriveConversationKey,
 } from "./telemetry/coding-agent-normalization.ts";
 
 export function collectLogEntries(
@@ -28,15 +28,15 @@ export function collectLogEntries(
     const event = normalizeEventName(readString(log.attributes, "event.name"));
     if (event === null) continue;
 
-    sessionId ??= resolveConversationKey(log.attributes);
-    const entry = logToEntry({ event, log, claimedToolCalls });
+    sessionId ??= deriveConversationKey(log.attributes);
+    const entry = buildLogEntry({ event, log, claimedToolCalls });
     if (entry !== null) entries.push(entry);
   }
 
   return { entries, sessionId };
 }
 
-function logToEntry({
+function buildLogEntry({
   event,
   log,
   claimedToolCalls,
@@ -54,13 +54,13 @@ function logToEntry({
     case "assistant_response":
       return assistantResponseEntry(attrs, atMs);
     case "api_response":
-      return apiResponseEntry(attrs, atMs);
+      return buildApiResponseEntry(attrs, atMs);
     case "tool_result":
-      return toolResultEntry({ attrs, atMs, claimedToolCalls });
+      return buildToolResultEntry({ attrs, atMs, claimedToolCalls });
     case "tool_decision":
-      return toolDecisionEntry(attrs, atMs);
+      return buildToolDecisionEntry(attrs, atMs);
     default:
-      return transcriptNoteEntry({ event, attrs, atMs });
+      return buildTranscriptNoteEntry({ event, attrs, atMs });
   }
 }
 
@@ -83,11 +83,14 @@ function assistantResponseEntry(attrs: Record<string, unknown>, atMs: number): T
   };
 }
 
-function apiResponseEntry(attrs: Record<string, unknown>, atMs: number): TranscriptEntry | null {
+function buildApiResponseEntry(
+  attrs: Record<string, unknown>,
+  atMs: number,
+): TranscriptEntry | null {
   const role = readString(attrs, "role");
   if (role !== null && role !== "main") return null;
 
-  const text = geminiResponseText(readString(attrs, "response_text"));
+  const text = extractGeminiResponseText(readString(attrs, "response_text"));
   if (text === null) return null;
 
   return {
@@ -98,7 +101,7 @@ function apiResponseEntry(attrs: Record<string, unknown>, atMs: number): Transcr
   };
 }
 
-function toolResultEntry({
+function buildToolResultEntry({
   attrs,
   atMs,
   claimedToolCalls,
@@ -109,7 +112,7 @@ function toolResultEntry({
 }): TranscriptEntry | null {
   const callId = readString(attrs, "call_id");
   const isCodex = callId !== null && readString(attrs, "event.name") === "codex.tool_result";
-  if (isCodex) return codexToolResultEntry({ attrs, atMs, callId, claimedToolCalls });
+  if (isCodex) return buildCodexToolResultEntry({ attrs, atMs, callId, claimedToolCalls });
 
   const name = readString(attrs, "function_name");
   if (name === null) return null;
@@ -133,7 +136,7 @@ function toolResultEntry({
   };
 }
 
-function codexToolResultEntry({
+function buildCodexToolResultEntry({
   attrs,
   atMs,
   callId,
@@ -171,7 +174,10 @@ function codexToolResultEntry({
   };
 }
 
-function toolDecisionEntry(attrs: Record<string, unknown>, atMs: number): TranscriptEntry | null {
+function buildToolDecisionEntry(
+  attrs: Record<string, unknown>,
+  atMs: number,
+): TranscriptEntry | null {
   const decision = readString(attrs, "decision");
   if (decision === null || decision === "accept") return null;
 

@@ -16,7 +16,7 @@ export const opencodeAgent: CodingAgentDefinition = {
   // while Claude Code and Codex keep the span name constant and carry the
   // tool in an attribute. Reading only the attribute loses every opencode
   // tool; reading only the span name loses everyone else's.
-  toolNameFromSpanName: (spanName) => {
+  extractToolNameFromSpanName: (spanName) => {
     if (!spanName.startsWith(OPENCODE_TOOL_SPAN)) return null;
     const tool = spanName.slice(OPENCODE_TOOL_SPAN.length);
     return tool.length > 0 ? tool : null;

@@ -111,9 +111,9 @@ export class CodingAgentSessionSpanProjection {
   ): CodingAgentSessionData {
     const next = this.stateProjection.withIdentity(state, attrs);
     const agentType =
-      this.stateProjection.string(attrs.agent_type) ??
-      this.stateProjection.string(attrs.subagent_type);
-    const agentId = this.stateProjection.string(attrs.agent_id);
+      this.stateProjection.coerceString(attrs.agent_type) ??
+      this.stateProjection.coerceString(attrs.subagent_type);
+    const agentId = this.stateProjection.coerceString(attrs.agent_id);
     return {
       ...next,
       ...(agentId !== null ? this.stateProjection.recordSubAgent(next, agentId) : {}),
@@ -216,7 +216,7 @@ export class CodingAgentSessionSpanProjection {
   ): number {
     return modelProviders.estimateCost({
       attrs: facts,
-      model: this.stateProjection.string(facts.model) ?? undefined,
+      model: this.stateProjection.coerceString(facts.model) ?? undefined,
       promptTokens: this.stateProjection.number(facts.input_tokens),
       completionTokens: this.stateProjection.number(facts.output_tokens),
     });
@@ -230,8 +230,8 @@ export class CodingAgentSessionSpanProjection {
     const writesLongLived =
       cacheWriteTokens > 0 &&
       traceCanonicalisation.classifyClaudeCall({
-        llmRequestContext: this.stateProjection.string(attrs["llm_request.context"]),
-        querySource: this.stateProjection.string(attrs.query_source),
+        llmRequestContext: this.stateProjection.coerceString(attrs["llm_request.context"]),
+        querySource: this.stateProjection.coerceString(attrs.query_source),
       }).cacheWritesLongLived;
     return {
       ...attrs,
@@ -251,8 +251,8 @@ export class CodingAgentSessionSpanProjection {
       cache_read_tokens: this.stateProjection.number(attrs[CODEX.ATTR.CACHE_READ_TOKENS]),
       cache_creation_tokens: this.stateProjection.number(attrs[CODEX.ATTR.CACHE_CREATION_TOKENS]),
       model:
-        this.stateProjection.string(attrs["gen_ai.request.model"]) ??
-        this.stateProjection.string(attrs[CODEX.ATTR.RESPONSE_MODEL]),
+        this.stateProjection.coerceString(attrs["gen_ai.request.model"]) ??
+        this.stateProjection.coerceString(attrs[CODEX.ATTR.RESPONSE_MODEL]),
     };
   }
 }

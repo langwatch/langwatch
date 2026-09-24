@@ -58,9 +58,9 @@ export class CodingAgentSessionMetricProjection {
     const attrs = metric.attributes;
     const fact: MetricSeriesFact = {
       metricName: metric.metricName,
-      type: this.stateProjection.string(attrs.type),
-      decision: this.stateProjection.string(attrs.decision),
-      language: this.stateProjection.string(attrs.language),
+      type: this.stateProjection.coerceString(attrs.type),
+      decision: this.stateProjection.coerceString(attrs.decision),
+      language: this.stateProjection.coerceString(attrs.language),
       value: this.total(metric.value),
     };
 
