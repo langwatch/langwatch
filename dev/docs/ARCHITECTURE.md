@@ -1065,6 +1065,9 @@ lease-held writer) is not background work: it stays a service the module owns. `
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
 projection state keeps its type from declaration to handler (Alex, 2026-09-24).
+A registry holding definitions of different types wraps each typed definition in a closure when it is
+registered; callbacks stay properties, never methods whose bivariant parameters would let a handler
+narrow its pipeline's event type (Alex, 2026-09-24).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
