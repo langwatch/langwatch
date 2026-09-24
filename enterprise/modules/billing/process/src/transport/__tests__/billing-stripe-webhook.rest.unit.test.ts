@@ -85,7 +85,7 @@ describe("given the provider callback declaration", () => {
       // verifies nothing.
       expect(route?.rawBody).toEqual({ form: "bytes", mediaType: "application/octet-stream" });
       expect(route?.rawResponse).toBeUndefined();
-      expect(route?.output.safeParse({ received: true }).success).toBe(true);
+      expect(route?.output.validate({ received: true })).toBe(true);
     });
   });
 });

@@ -22,6 +22,12 @@ export function nanoUsdToInstantEvalMeterUnits(nanoUsd: number): number {
 }
 
 /** Meter units to the dollar value the meter event carries. */
+const METER_UNITS_PER_USD_CENT = INSTANT_EVAL_METER_UNITS_PER_USD / 100;
+
+export function usdCentsToInstantEvalMeterUnits(cents: number): number {
+  return Math.round(cents * METER_UNITS_PER_USD_CENT);
+}
+
 export function instantEvalMeterUnitsToUsd(units: number): number {
   return Number((units / INSTANT_EVAL_METER_UNITS_PER_USD).toFixed(4));
 }

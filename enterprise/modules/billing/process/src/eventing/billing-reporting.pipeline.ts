@@ -4,17 +4,27 @@ import {
 } from "@langwatch/enterprise-billing-contract";
 import {
   defineAggregate,
+  defineEventingModule,
   definePipeline,
   type Event,
-  type StaticPipelineDefinition,
+  type EventingSetup,
   type Projection,
-  type RegisteredCommand,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
+import type { BillingApp } from "../app/billing.app.ts";
+import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import {
   ReportUsageForMonthCommandHandler,
   type ReportUsageForMonthCommandDeps,
 } from "./report-usage-for-month.commands.ts";
+
+/** The roll-up's one command, typed so the registered sender keeps its payload. */
+export type BillingReportingDefinition = StaticPipelineDefinition<
+  Event,
+  Record<string, Projection>,
+  { name: "reportUsageForMonth"; payload: ReportUsageForMonthCommandData }
+>;
 
 /**
  * Command-only billing pipeline. selfDispatch loop closes at registration
@@ -33,11 +43,7 @@ export class BillingReportingPipeline {
     private readonly deps: Omit<ReportUsageForMonthCommandDeps, "selfDispatch">,
   ) {}
 
-  buildProcessing(): StaticPipelineDefinition<
-    Event,
-    Record<string, Projection>,
-    RegisteredCommand
-  > {
+  buildProcessing(): BillingReportingDefinition {
     const reportUsageForMonthCommand = ReportUsageForMonthCommandHandler.create({
       ...this.deps,
       selfDispatch: (data) => {
@@ -79,3 +85,9 @@ export class BillingReportingPipeline {
     this.send = sendReportUsageForMonth;
   }
 }
+
+export const billingReportingEventing = defineEventingModule({
+  pipeline: BILLING_REPORTING_PIPELINE_NAME,
+  build: ({ app }: EventingSetup<BillingRepositories, BillingApp>) => app.reportingPipeline(),
+  connect: ({ app, commands }) => app.connectReporting(commands.reportUsageForMonth),
+});

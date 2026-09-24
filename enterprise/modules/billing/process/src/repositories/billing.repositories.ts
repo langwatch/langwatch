@@ -10,6 +10,7 @@ import type { ConnectedBillingRepository } from "./connected-billing.repository.
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
 import type { NurturingProfileRepository } from "./nurturing-profile.repository.ts";
 import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
+import type { BillingOrganizationCache } from "./organization/billing-organization-cache.repository.ts";
 import type { BillingReportOrganizationRepository } from "./organization/billing-report-organization.repository.ts";
 import type { ProjectActiveDayRepository } from "./project-active-day.repository.ts";
 import type { BillingSubscription } from "./subscription.repository.ts";
@@ -19,11 +20,13 @@ import type { TenantOrganizationRepository } from "./tenant-organization.reposit
  * The rows the billing module owns, chosen once at boot.
  */
 export interface BillingRepositories {
+  readonly billableEvents: BillableEventsRepository;
   readonly checkpoints: BillingCheckpointRepository;
   readonly connectedBilling: ConnectedBillingRepository;
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
   readonly nurturingProfiles: NurturingProfileRepository;
   readonly organizations: BillingAccountFactsRepository;
+  readonly organizationCache: BillingOrganizationCache;
   readonly organizationPricing: OrganizationPricingRepository;
   readonly projectActiveDays: ProjectActiveDayRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;
@@ -34,6 +37,11 @@ export interface BillingRepositories {
 }
 
 /** ClickHouse-backed billing rows, selected through their own registry and store tier. */
+export type BillingPostgresRepositories = Omit<
+  BillingRepositories,
+  "billableEvents" | "organizationCache"
+>;
+
 export interface BillingClickHouseRepositories {
   readonly billableEvents: BillableEventsRepository;
   readonly billableEventsMeter: BillableEventsMeter;

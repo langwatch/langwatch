@@ -8,6 +8,7 @@ import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
  */
 import { BillingApp } from "./app/billing.app.ts";
 import { BillableEventsMeterProjection } from "./eventing/billable-events-meter.projection.ts";
+import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
 import type { BillableEventsMeter } from "./repositories/billable-events-meter.repository.ts";
 import {
@@ -45,7 +46,8 @@ export const billingServer = defineServerModule("billing")
   .withRepositories(billingRepositories)
   .withApp(BillingApp)
   .withTransports(connectedBillingTrpcTransport)
-  .withEventing(connectedBillingEventing);
+  .withEventing(connectedBillingEventing)
+  .withEventing(billingReportingEventing);
 
 /** The billable-events totals a reporting run reads, over the process's own endpoints. */
 export function createBillableEventsQuery(options: {

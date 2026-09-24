@@ -17,10 +17,12 @@ import {
   type ConnectedRenewRequest,
   getStripeEnvironmentFromNodeEnv,
   type RenewalCompletion,
+  type ReportUsageForMonthCommandData,
   type ScenarioCreatedSignal,
   type SeatChangeBillingOutcome,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { EventingCommandSender } from "@langwatch/eventing";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
@@ -29,8 +31,14 @@ import { Temporal } from "@langwatch/time";
 
 import { connectedInvoicingChannels } from "../channels/connected-invoicing-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import {
+  type BillingReportingDefinition,
+  BillingReportingPipeline,
+} from "../eventing/billing-reporting.pipeline.ts";
 import type { BillingRepositories } from "../repositories/billing.repositories.ts";
 import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service.rules.ts";
+import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
+import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
 import { ConnectedBillingService } from "../services/connected-billing.service.ts";
@@ -40,10 +48,16 @@ import {
 } from "../services/connected-customer-facts.service.ts";
 import { ConnectedMonthlyStatementService } from "../services/connected-monthly-statement.service.ts";
 import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
+import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
+import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import {
   ScenarioCreatedSignalService,
   type ScenarioSignalOrganizations,
 } from "../services/scenario-created-signal.service.ts";
+import {
+  StripeUsageReportingBuilder,
+  type UsageReportingService,
+} from "../services/usage-reporting.service.ts";
 
 /** Both are the process's own facts: where it runs, and which price mode it bills in. */
 type BillingMembers = Readonly<{ isSaas: boolean; nodeEnvironment: string | undefined }>;
@@ -121,7 +135,14 @@ export class BillingApp implements BillingApi {
     statementMail,
   }: {
     members: BillingMembers;
-    repositories: Pick<BillingRepositories, "connectedBilling">;
+    repositories: Pick<
+      BillingRepositories,
+      | "connectedBilling"
+      | "checkpoints"
+      | "reportOrganizations"
+      | "billableEvents"
+      | "organizationCache"
+    >;
     config: Pick<BillingServerConfig, "bankDetails">;
     peers: ConnectedBillingPeers;
     stripeSecretKey: string | undefined;
@@ -149,6 +170,18 @@ export class BillingApp implements BillingApi {
       overview,
       scenarioSignals,
       isSaas,
+      reporting: BillingApp.#composeReporting({
+        repositories,
+        peers,
+        facts,
+        usageReporting: isSaas
+          ? () =>
+              StripeUsageReportingBuilder.create({
+                secretKey: stripeSecretKey,
+                nodeEnvironment,
+              }).build()
+          : void 0,
+      }),
     };
     if (!stripeSecretKey) return new BillingApp({ ...gate, connected: void 0 });
 
@@ -203,6 +236,7 @@ export class BillingApp implements BillingApi {
   readonly #overview: ConnectedBillingOverviewService;
   readonly #scenarioSignals: ScenarioCreatedSignalService;
   readonly #isSaas: boolean;
+  readonly #reporting: BillingReportingPipeline;
 
   private constructor({
     connected,
@@ -211,6 +245,7 @@ export class BillingApp implements BillingApi {
     overview,
     scenarioSignals,
     isSaas,
+    reporting,
   }: {
     connected: ConnectedBilling | undefined;
     operators: Pick<OpsApi, "isAdmin">;
@@ -218,6 +253,7 @@ export class BillingApp implements BillingApi {
     overview: ConnectedBillingOverviewService;
     scenarioSignals: ScenarioCreatedSignalService;
     isSaas: boolean;
+    reporting: BillingReportingPipeline;
   }) {
     this.#connected = connected;
     this.#operators = operators;
@@ -225,6 +261,66 @@ export class BillingApp implements BillingApi {
     this.#overview = overview;
     this.#scenarioSignals = scenarioSignals;
     this.#isSaas = isSaas;
+    this.#reporting = reporting;
+  }
+
+  /** The command-only pipeline `billing_reporting` registers, composed once by {@link assemble}. */
+  reportingPipeline(): BillingReportingDefinition {
+    return this.#reporting.buildProcessing();
+  }
+
+  /** Closes the roll-up's self re-dispatch over the registered sender. */
+  connectReporting(
+    reportUsageForMonth: EventingCommandSender<ReportUsageForMonthCommandData>,
+  ): void {
+    this.#reporting.connectSelfDispatch(async (data) => {
+      await reportUsageForMonth.send(data);
+    });
+  }
+
+  static #composeReporting({
+    repositories,
+    peers,
+    facts,
+    usageReporting,
+  }: {
+    repositories: Pick<
+      BillingRepositories,
+      "checkpoints" | "reportOrganizations" | "billableEvents" | "organizationCache"
+    >;
+    peers: Pick<ConnectedBillingPeers, "licensing" | "gateway">;
+    facts: ConnectedCustomerFactsService;
+    usageReporting: (() => UsageReportingService) | undefined;
+  }): BillingReportingPipeline {
+    const billableEvents = BillableEventsQueryService.create(repositories.billableEvents);
+    const projects = {
+      findProjectIds: (organizationId: string) => facts.findProjectIds(organizationId),
+    };
+    const instantEvalSpend = InstantEvalSpendQueryService.create({
+      isSpendSourceAvailable: () => peers.gateway.isSpendSourceAvailable(),
+      listProjectIds: ({ organizationId }) => projects.findProjectIds(organizationId),
+      sumSpendNanoUsdByRequestType: (input) => peers.gateway.sumSpendNanoUsdByRequestType(input),
+    });
+    const ceiling = ConnectedUsageCeilingService.create({
+      licensing: peers.licensing,
+      gateway: peers.gateway,
+      projects,
+    });
+    let reporter: UsageReportingService | undefined;
+
+    return BillingReportingPipeline.create({
+      organizations: repositories.reportOrganizations,
+      billingCheckpoints: repositories.checkpoints,
+      getUsageReportingService: () => (reporter ??= usageReporting?.()),
+      queryBillableEventsTotal: (input) => billableEvents.queryBillableEventsTotal(input),
+      queryInstantEvalSpendTotal: (input) => instantEvalSpend.queryInstantEvalSpendTotal(input),
+      organizationCache: repositories.organizationCache,
+      errorReporter: BillingErrorReporterService.create(),
+      connectedUsageCeiling: async (input) => {
+        const answer = await ceiling.getRemaining(input);
+        return answer.kind === "capped" ? answer.remainingUnits : null;
+      },
+    });
   }
 
   recordScenarioCreated(input: ScenarioCreatedSignal): Promise<void> {

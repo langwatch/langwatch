@@ -69,7 +69,7 @@ export class ConnectedCustomerFactsService implements ConnectedStatementSources 
     until: Instant;
   }): Promise<StatementSpendLine[]> {
     if (!this.peers.gateway.isSpendSourceAvailable()) return [];
-    const tenantIds = await this.projectIdsOf(organizationId);
+    const tenantIds = await this.findProjectIds(organizationId);
     if (tenantIds.length === 0) return [];
 
     const lines: StatementSpendLine[] = [];
@@ -128,7 +128,8 @@ export class ConnectedCustomerFactsService implements ConnectedStatementSources 
     };
   }
 
-  private async projectIdsOf(organizationId: string): Promise<string[]> {
+  /** Every project the organization holds, walked page by page. */
+  async findProjectIds(organizationId: string): Promise<string[]> {
     const ids: string[] = [];
     let total = Number.POSITIVE_INFINITY;
     for (let page = 1; ids.length < total; page++) {

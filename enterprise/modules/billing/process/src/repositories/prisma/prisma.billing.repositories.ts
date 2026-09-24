@@ -2,7 +2,7 @@
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { BillingRepositories } from "../billing.repositories.ts";
+import type { BillingPostgresRepositories } from "../billing.repositories.ts";
 import { PrismaBillingOrganizationRepository } from "./prisma.billing-account-facts.repository.ts";
 import { PrismaBillingCheckpointRepository } from "./prisma.billing-checkpoint.repository.ts";
 import { PrismaBillingReportOrganizationRepository } from "./prisma.billing-report-organization.repository.ts";
@@ -23,7 +23,7 @@ import { PrismaBillingTenantOrganizationRepository } from "./prisma.tenant-organ
 export class PostgresBillingRepositories {
   static readonly requires = ["prisma"] as const;
 
-  static create(members: Readonly<{ prisma: PrismaClient }>): BillingRepositories {
+  static create(members: Readonly<{ prisma: PrismaClient }>): BillingPostgresRepositories {
     const { prisma } = members;
 
     const subscriptions = PrismaBillingSubscription.create(prisma);

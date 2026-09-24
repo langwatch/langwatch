@@ -3,12 +3,12 @@
 import { defineRepositories } from "@langwatch/kernel";
 
 import { ClickHouseBillingRepositories } from "./clickhouse/clickhouse.billing-clickhouse.repositories.ts";
+import { LiveBillingRepositories } from "./live/live.billing.repositories.ts";
 import { MemoryBillingClickHouseRepositories } from "./memory/memory.billing-clickhouse.repositories.ts";
 import { MemoryBillingRepositories } from "./memory/memory.billing.repositories.ts";
-import { PostgresBillingRepositories } from "./prisma/prisma.billing.repositories.ts";
 
 export const billingRepositories = defineRepositories({
-  live: PostgresBillingRepositories,
+  live: LiveBillingRepositories,
   memory: MemoryBillingRepositories,
 });
 
