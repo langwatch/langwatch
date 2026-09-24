@@ -28,6 +28,7 @@ import {
   EventingTopicClusteringCommandsService,
   EventingTopicClusteringOutcomeCommandsService,
 } from "../services/topic-clustering-commands.service.ts";
+import { TopicClusteringManualRunService } from "../services/topic-clustering-manual-run.service.ts";
 import { OtelTopicClusteringMetricsService } from "../services/topic-clustering-metrics.service.ts";
 import { ModelProviderTopicClusteringModelsService } from "../services/topic-clustering-models.service.ts";
 import { EventingTopicClusteringScheduleService } from "../services/topic-clustering-schedule.service.ts";
@@ -52,6 +53,7 @@ export class TopicApp implements TopicApi {
   readonly #commands: EventingTopicClusteringCommandsService;
   readonly #outcomes: EventingTopicClusteringOutcomeCommandsService;
   readonly #bootstrap: TopicClusteringBootstrapService;
+  readonly #manualRun: TopicClusteringManualRunService;
   readonly #pipeline: TopicClusteringProcessingPipelineDefinition;
 
   private constructor(parts: {
@@ -59,12 +61,14 @@ export class TopicApp implements TopicApi {
     commands: EventingTopicClusteringCommandsService;
     outcomes: EventingTopicClusteringOutcomeCommandsService;
     bootstrap: TopicClusteringBootstrapService;
+    manualRun: TopicClusteringManualRunService;
     pipeline: TopicClusteringProcessingPipelineDefinition;
   }) {
     this.#topics = parts.topics;
     this.#commands = parts.commands;
     this.#outcomes = parts.outcomes;
     this.#bootstrap = parts.bootstrap;
+    this.#manualRun = parts.manualRun;
     this.#pipeline = parts.pipeline;
   }
 
@@ -103,6 +107,7 @@ export class TopicApp implements TopicApi {
         claims: repositories.claims,
         commands,
       }),
+      manualRun: TopicClusteringManualRunService.create({ runner }),
       pipeline: createTopicClusteringProcessingPipeline({
         topicClusteringRunStatusStore: repositories.runStatus,
         topicClusteringRunHistoryStore: repositories.runHistory,
@@ -143,6 +148,11 @@ export class TopicApp implements TopicApi {
 
   bootstrapClustering(input: TopicProjectInput): Promise<void> {
     return this.#bootstrap.bootstrap(input);
+  }
+
+  /** The tasks role's manual walk over every clustering page for one project. */
+  runClusteringForProject(input: TopicProjectInput): Promise<void> {
+    return this.#manualRun.run(input);
   }
 
   getAll(input: TopicProjectInput): Promise<Topic[]> {

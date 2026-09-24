@@ -1,4 +1,5 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -59,6 +60,22 @@ function makeRow(overrides: Record<string, unknown> = {}) {
 }
 
 let client: ClickHouseClient | undefined;
+
+function queryClient(raw: ClickHouseClient): ClickHouseQueryClient {
+  const driver: QueryDriver = {
+    async execute(request) {
+      const result = await raw.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+      });
+      return { rows: await result.json() };
+    },
+    insert: () => Promise.reject(new Error("the stalled-run sweep never inserts")),
+    command: () => Promise.reject(new Error("the stalled-run sweep never commands")),
+  };
+  return new ClickHouseQueryClient({ driver });
+}
 let finder: ClickHouseStalledSimulationRunRepository;
 
 async function insertRows(rows: ReturnType<typeof makeRow>[]) {
@@ -77,7 +94,7 @@ beforeAll(() => {
     url: databaseUrl,
     clickhouse_settings: { date_time_input_format: "best_effort" },
   });
-  finder = ClickHouseStalledSimulationRunRepository.create(client);
+  finder = ClickHouseStalledSimulationRunRepository.create(queryClient(client));
 });
 
 afterAll(async () => {

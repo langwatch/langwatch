@@ -107,11 +107,11 @@ export class StalledRunsBackfillTask extends Task {
     return new StalledRunsBackfillTask(finder, execution, dryRun);
   }
 
-  async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
+  async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const result = await backfillStalledRuns({
       finder: this.finder(),
       execution: this.execution(),
-      dryRun: this.dryRun,
+      dryRun: this.dryRun || args.includes("--dry-run"),
     });
     logger.info(result, "stalled-runs-backfill finished");
   }

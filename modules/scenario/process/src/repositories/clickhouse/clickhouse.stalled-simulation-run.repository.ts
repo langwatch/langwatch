@@ -1,3 +1,5 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+
 import {
   type StalledHistoricalRun,
   type StalledSimulationRunRepository,
@@ -20,14 +22,7 @@ const NON_TERMINAL_STATUSES = ["QUEUED", "PENDING", "IN_PROGRESS"] as const;
  * older than `now - thresholdMs`, across all tenants on the given client.
  * Cross-tenant sweep BY DESIGN — a backfill has no single tenant to scope to.
  */
-export interface StalledSimulationRunClickHouseClient {
-  query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-    unscoped?: { reason: string };
-  }): Promise<{ json<Row>(): Promise<Row[]> }>;
-}
+export type StalledSimulationRunClickHouseClient = Pick<ClickHouseQueryClient, "query">;
 
 export class ClickHouseStalledSimulationRunRepository implements StalledSimulationRunRepository {
   static create(
@@ -47,8 +42,9 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
   }): Promise<StalledHistoricalRun[]> {
     const staleBeforeMs = now - thresholdMs;
 
-    const result = await this.client.query({
-      query: `
+    const { rows } = await this.client.query<StalledHistoricalRun>({
+      tenantId: "",
+      sql: `
         SELECT
           TenantId AS tenantId,
           ScenarioRunId AS scenarioRunId,
@@ -73,19 +69,17 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
         ORDER BY UpdatedAt ASC
         LIMIT {maxRows:UInt32}
       `,
-      query_params: {
+      params: {
         staleBeforeMs,
         nonTerminalStatuses: [...NON_TERMINAL_STATUSES],
         maxRows: MAX_ROWS,
       },
-      format: "JSONEachRow",
       unscoped: {
         reason:
           "Install-wide stalled-run sweep: a backfill has no single tenant to scope to, and each terminal write it triggers is scoped to that run's own tenant.",
       },
     });
 
-    const rows = await result.json<StalledHistoricalRun>();
     if (rows.length >= MAX_ROWS) {
       throw new Error(
         `Stalled-run sweep hit the ${MAX_ROWS}-row sanity cap; refusing to mass-error what is probably a live population. Check the query and deploy ordering before re-running.`,

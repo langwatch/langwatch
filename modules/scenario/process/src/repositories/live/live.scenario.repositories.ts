@@ -1,5 +1,6 @@
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
+import { ClickHouseStalledSimulationRunRepository } from "../clickhouse/clickhouse.stalled-simulation-run.repository.ts";
 import { PostgresScenarioRepositories } from "../prisma/prisma.scenario.repositories.ts";
 import {
   DuplicatedCancellationConnection,
@@ -25,6 +26,7 @@ export class LiveScenarioRepositories {
       cancellationSubscriptions: RedisCancellationSubscriberAdapter.create(
         DuplicatedCancellationConnection.over(redis),
       ),
+      stalledRuns: ClickHouseStalledSimulationRunRepository.create(clickhouse),
     };
   }
 }

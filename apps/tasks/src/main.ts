@@ -66,8 +66,16 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
 
 const isTask = (contribution: unknown): contribution is Task => contribution instanceof Task;
 
-/** Boots the installed modules in the tasks role and runs the named tasks they declared. */
-export async function runModuleTasks(names: readonly string[], signal: AbortSignal): Promise<void> {
+/** Boots the modules in the tasks role and runs one declared task: main's `<name> <args…>`. */
+export async function runModuleTask({
+  name,
+  args,
+  signal,
+}: {
+  name: string;
+  args: readonly string[];
+  signal: AbortSignal;
+}): Promise<void> {
   const server = await Server.create("langwatch-tasks")
     .withConfig(processConfig(processModules))
     .withSecrets((config, secrets) =>
@@ -100,12 +108,10 @@ export async function runModuleTasks(names: readonly string[], signal: AbortSign
     await server.run(app);
     const catalogue = TaskCatalogue.create({ tasks: app.tasks(isTask) });
     const logger = createLogger("langwatch:tasks");
-    for (const name of names) {
-      signal.throwIfAborted();
-      logger.info({ task: name }, "task starting");
-      await catalogue.get({ name }).run({ args: [], signal });
-      logger.info({ task: name }, "task finished");
-    }
+    signal.throwIfAborted();
+    logger.info({ task: name }, "task starting");
+    await catalogue.get({ name }).run({ args, signal });
+    logger.info({ task: name }, "task finished");
   } finally {
     await server.close();
   }
@@ -138,19 +144,14 @@ async function openConnections(config: TasksConfig): Promise<TaskConnections> {
 async function main(): Promise<void> {
   configureLogger({ redactPaths: secretLogRedactPaths(Object.values(tasksSecrets)) });
   const argv = process.argv.slice(2);
-  const moduleTasks = argv.filter((name) => !tasks.has(name));
-  if (moduleTasks.length > 0 && moduleTasks.length < argv.length) {
-    throw new Error(
-      `Run ${[...tasks.keys()].join(", ")} apart from module tasks (${moduleTasks.join(", ")}).`,
-    );
-  }
+  const [first, ...rest] = argv;
   const controller = new AbortController();
   const abort = () => controller.abort();
   process.once("SIGINT", abort);
   process.once("SIGTERM", abort);
-  if (moduleTasks.length > 0) {
+  if (first !== undefined && !tasks.has(first)) {
     try {
-      await runModuleTasks(moduleTasks, controller.signal);
+      await runModuleTask({ name: first, args: rest, signal: controller.signal });
     } finally {
       process.off("SIGINT", abort);
       process.off("SIGTERM", abort);

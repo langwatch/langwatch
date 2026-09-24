@@ -1,29 +1,26 @@
-import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { nowInstant } from "@langwatch/time";
 
-import type {
-  TopicClusteringPageOutcome,
-  TopicClusteringRun,
-} from "../eventing/topic-clustering.intent.ts";
-
-const logger = createLogger("langwatch:tasks:topic-clustering-run");
+import type { TopicApp } from "../app/topic.app.ts";
 
 /**
  * Manual, one-shot clustering run for a single project — the operator's escape hatch for a
  * project that needs a run outside its own cadence gate, or a re-run after a langevals/model
- * incident. Walks every page `runPage` returns until `nextSearchAfter` is empty.
+ * incident.
  */
 export class TopicClusteringRunTask extends Task {
   readonly name = "topic-clustering-run";
   readonly description = "Runs a manual topic-clustering walk for one project.";
 
-  private constructor(private readonly runPage: () => TopicClusteringRun) {
+  private constructor(private readonly topics: Pick<TopicApp, "runClusteringForProject">) {
     super();
   }
 
-  static create({ runPage }: { runPage: () => TopicClusteringRun }): TopicClusteringRunTask {
-    return new TopicClusteringRunTask(runPage);
+  static create({
+    topics,
+  }: {
+    topics: Pick<TopicApp, "runClusteringForProject">;
+  }): TopicClusteringRunTask {
+    return new TopicClusteringRunTask(topics);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -31,31 +28,6 @@ export class TopicClusteringRunTask extends Task {
     if (!projectId) {
       throw new Error("topic-clustering-run requires a projectId as its first argument");
     }
-
-    const runner = this.runPage();
-
-    // One stable run identity for the whole walk, so re-recorded pages dedupe
-    // instead of appending a fresh topics_recorded chain on every re-run.
-    const runId = `manual-task-${nowInstant().epochMilliseconds}`;
-    let page = 1;
-    let searchAfter: TopicClusteringPageOutcome["nextSearchAfter"];
-    do {
-      const outcome = await runner.runClusteringPage({
-        projectId,
-        searchAfter: searchAfter ?? null,
-        runId,
-        page,
-      });
-      logger.info(
-        {
-          mode: outcome.mode,
-          tracesProcessed: outcome.tracesProcessed,
-          skippedReason: outcome.skippedReason,
-        },
-        "topic-clustering-run page finished",
-      );
-      searchAfter = outcome.nextSearchAfter;
-      page++;
-    } while (searchAfter);
+    await this.topics.runClusteringForProject({ projectId });
   }
 }

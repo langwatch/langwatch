@@ -5,6 +5,7 @@ import { ScenarioApp } from "./app/scenario.app.ts";
 import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipeline.ts";
 import { simulationProcessingEventing } from "./eventing/simulation-processing.pipeline.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
+import { StalledRunsBackfillTask } from "./tasks/stalled-runs-backfill.task.ts";
 import { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
 import { scenarioRunExportRest } from "./transport/scenario-run-export.rest.ts";
 import { createScenarioRest, scenarioRestSurface } from "./transport/scenario.rest.ts";
@@ -30,4 +31,10 @@ export const scenarioServer = defineServerModule("scenario")
   // `X-LangWatch-Surface` header - nothing a process collaborator answers.
   .withTransportFacts(() => [bindRestHeader(scenarioRestSurface, "x-langwatch-surface")])
   .withEventing(scenarioLifecycleEventing)
-  .withEventing(simulationProcessingEventing);
+  .withEventing(simulationProcessingEventing)
+  .withTasks(({ repositories, members }) => [
+    StalledRunsBackfillTask.create({
+      finder: () => repositories.stalledRuns,
+      execution: () => members.scenarioExecution,
+    }),
+  ]);
