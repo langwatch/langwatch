@@ -139,7 +139,7 @@ describe("the tasks process installation", () => {
 
     try {
       const names = runtime.tasks(isTask).map((task) => task.name);
-      expect(names).toEqual(["backfill-annotations-to-clickhouse"]);
+      expect(names).toEqual(["backfill-annotations-to-clickhouse", "slack-alert"]);
     } finally {
       await runtime.stop();
     }

@@ -79,6 +79,7 @@ import {
   UnsubscribeTokenService,
   type UnsubscribeTokenPayload,
 } from "./services/unsubscribe-token.service.ts";
+import { SlackAlertTask } from "./tasks/slack-alert.task.ts";
 import { createAutomationRest } from "./transport/automation.rest.ts";
 import { automationTrpcTransport } from "./transport/automation.trpc.ts";
 import { emailSuppressionTrpcTransport } from "./transport/email-suppression.trpc.ts";
@@ -97,6 +98,7 @@ export const automationServer = defineServerModule("automation")
     slackAutomationRest,
     unsubscribeRest,
   )
+  .withTasks(({ members }) => [SlackAlertTask.create({ baseHost: members.publicBaseUrl ?? "" })])
   .withEventing(automationsEventing);
 
 /**
