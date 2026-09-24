@@ -90,7 +90,6 @@ export type DataPrivacyInfrastructure = Readonly<{
           transport: PiiAnalysis;
           isLangevalsConfigured: boolean;
           isProduction: boolean;
-          nativePolicyEnforced: boolean;
           piiRedactionMaxAttributeLength: number;
         }>;
       }>
@@ -180,6 +179,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
         "pii" in members
           ? OtlpSpanPiiRedactionService.create({
               ...members.pii,
+              nativePolicyEnforced: config.enforcement !== "off",
               dataPrivacy: privacy,
               featureFlags: dependencies.featureFlags,
             })

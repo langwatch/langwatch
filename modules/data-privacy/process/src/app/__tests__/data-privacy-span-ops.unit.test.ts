@@ -48,7 +48,7 @@ async function boot({
     .withMember(
       "dataPrivacy",
       nativeRedaction
-        ? { ...infrastructure, pii: { ...infrastructure.pii, nativePolicyEnforced: true } }
+        ? infrastructure
         : { directory: MemoryDataPrivacyDirectory.create(), redaction: null },
     )
     .withConfig({ "data-privacy": { googleDlpDisabled: undefined, enforcement } })

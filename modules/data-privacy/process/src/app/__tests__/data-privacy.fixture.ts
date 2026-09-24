@@ -144,7 +144,6 @@ export function dataPrivacyTestInfrastructure(directory = MemoryDataPrivacyDirec
       transport: UnusedPiiAnalysis.create(),
       isLangevalsConfigured: false,
       isProduction: false,
-      nativePolicyEnforced: false,
       piiRedactionMaxAttributeLength: 250_000,
     },
   };
