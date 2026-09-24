@@ -1554,7 +1554,7 @@ member bags · `*App` classes inside modules · `defineServerModule` /
 `defineWebModule` (renamed) · `RestErrorHandler` · error envelopes in
 transports · re-exports for backwards compatibility · `refusing*` twins ·
 `try*`/`require*` method names · `T | null` returns in new code (`find*` =
-array; `get*` = one or throws) · `static readonly configSchema` and its
+array; `get*` = one or throws; `list*` = a page, Alex 2026-09-24) · `static readonly configSchema` and its
 `*AppConfigSchema`/`*ServerConfigSchema` consts · a module declaring an env
 var another owner already declares (`BASE_HOST` outside the process owner) ·
 `surfaces/` and `screens/` browser folders · any `exports` entry on a browser

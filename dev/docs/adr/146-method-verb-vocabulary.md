@@ -42,7 +42,7 @@ fragment of them and none of the fragments agreed.
 | ---- | -------- |
 | `get<Noun>` / `getBy<Key>` | exactly one, or throws. Never nullable. `getBy<Key>` only when the key distinguishes the method and the entity itself comes back (`getById`, `getByEmail`). |
 | `find<Noun>` | an array. The empty array is the absence. |
-| `list<Noun>` | a collection or a page. Service vocabulary; a repository answers `find*`. |
+| `list<Noun>` | a page (`{ items, cursor }`), in a service or a repository (Alex, 2026-09-24). A repository's unpaged collection is `find*`. |
 
 **A keyed read that may miss is a `get*`** (Alex, 2026-09-24). One thing by its key
 that may not exist throws the module's not-found `HandledError`; a caller for
@@ -56,6 +56,8 @@ propagates and degrades to "unknown" (ARCHITECTURE §12).
 
 A method whose name and return shape are **dictated by a vendor's callback interface** (better-auth's
 `beforeUserCreate`, …) is exempt from the naming rules (Alex, 2026-09-24); the exemption lives in the rule.
+Such a method is declared with the vendor's own type, which is what the rule keys on — a hand-written
+signature restating the vendor's is not exempt (Alex, 2026-09-24).
 
 **Writes.** `create`, `update`, `delete`, `upsert`, `archive` — the five the
 tree already uses. A write whose target may normally be absent returns an
