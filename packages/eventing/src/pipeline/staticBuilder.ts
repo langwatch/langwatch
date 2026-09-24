@@ -50,6 +50,7 @@ import type {
   SubscriberSpec,
   TriggerContext,
 } from "./processManagerDefinition.ts";
+import type { GlobalProjection } from "./staticBuilder.types.ts";
 
 // Turns a union like {name:"a"; payload:A} | {name:"b"; payload:B}
 // into a record { a: A; b: B }
@@ -101,6 +102,7 @@ export class PipelineBuilder<
   private processManagers = new Map<string, ProcessManagerDefinition>();
   private eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private prepareEventForProjection?: (event: EventType) => EventType;
+  private readonly globalProjections: GlobalProjection[] = [];
   constructor(
     private readonly name: string,
     private readonly aggregate: AggregateDefinition,
@@ -115,6 +117,29 @@ export class PipelineBuilder<
     prepareEventForProjection: (event: EventType) => EventType,
   ): this {
     this.prepareEventForProjection = prepareEventForProjection;
+    return this;
+  }
+
+  /**
+   * A map projection over every pipeline's events, not only this one's, with the
+   * subscribers that react to its records. The runtime registers it when this pipeline registers.
+   */
+  withGlobalMapProjection<MapRecord>(
+    projection: MapProjectionDefinition<MapRecord, Event>,
+    subscribers: readonly SubscriberDispatchDefinition<Event>[] = [],
+  ): this {
+    if (this.globalProjections.some(({ name }) => name === projection.name)) {
+      this.throwDuplicateProjectionName(projection.name);
+    }
+    this.globalProjections.push({
+      name: projection.name,
+      register: (registry) => {
+        registry.registerMapProjection(projection);
+        for (const subscriber of subscribers) {
+          registry.registerMapSubscriber(projection.name, subscriber);
+        }
+      },
+    });
     return this;
   }
 
@@ -534,6 +559,7 @@ export class PipelineBuilder<
       mapSubscribers: this.mapSubscribers,
       eventSubscribers: this.eventSubscribers,
       processManagers: this.processManagers,
+      globalProjections: [...this.globalProjections],
       // Purely for typing: lets downstream code infer the command names + payloads
       // from `.withCommand(...)` calls without any runtime cost.
       commandRegistry: {} as CommandsUnionToRegistry<RegisteredCommands>,

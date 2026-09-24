@@ -11,6 +11,7 @@ import type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "../projections/mapProjection.types.ts";
+import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type {
   SealedFoldProjection,
   SealedMapProjection,
@@ -78,6 +79,12 @@ export type RegisteredCommand = {
 export type NoCommands = never;
 
 /** Static pipeline definition importable without runtime dependencies. */
+/** A cross-pipeline map projection, registered onto the runtime's global registry. */
+export interface GlobalProjection {
+  readonly name: string;
+  readonly register: (registry: ProjectionRegistry<Event>) => void;
+}
+
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,
   _ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
@@ -137,6 +144,9 @@ export interface StaticPipelineDefinition<
 
   /** Process managers mounted on this pipeline (ADR-049/052). */
   processManagers: Map<string, ProcessManagerDefinition>;
+
+  /** Map projections over every pipeline's events, each sealed with its subscribers (§9). */
+  globalProjections?: readonly GlobalProjection[];
 
   /** Type-level marker for registered commands (not used at runtime) */
   readonly _registeredCommands?: RegisteredCommands;

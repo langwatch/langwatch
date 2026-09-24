@@ -6,6 +6,12 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import {
+  createBlobMaintenancePipeline,
+  createProcessManagerMaintenancePipeline,
+  type BlobCleanupDeps,
+  type ProcessRetentionSweepDeps,
+} from "@langwatch/eventing/server";
 import { serverModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
@@ -63,6 +69,12 @@ async function bootWorker() {
     enabled: false,
     participation: "consume",
     processStore: InMemoryProcessStore.createForTesting(),
+    maintenance: () => [
+      createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
+      createProcessManagerMaintenancePipeline({
+        retentionSweep: unreachable<ProcessRetentionSweepDeps>("process retention sweep"),
+      }),
+    ],
   });
   const stores: Partial<ProcessMembers> = {
     logger: createTestLogger().logger,
@@ -141,6 +153,8 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("governance_events_processing");
       expect(pipelines).toContain("pulled_usage_processing");
       expect(pipelines).toContain("ingestion_pull_processing");
+      expect(pipelines).toContain("blob_maintenance");
+      expect(pipelines).toContain("process_manager_maintenance");
       // Every process that is not producing resolves trace commands from this registration.
       expect(pipelines).toContain("trace_processing");
       const schedules = eventing.definitions.flatMap((definition) =>

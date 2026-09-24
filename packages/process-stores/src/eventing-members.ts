@@ -13,9 +13,12 @@ import {
   type ProcessStore,
 } from "@langwatch/eventing";
 import {
+  createBlobMaintenancePipeline,
   createEventingRetentionConfiguration,
+  createProcessManagerMaintenancePipeline,
   EventingClickHouseEventRepository,
   EventingClickHouseEventStore,
+  OtelProcessRetentionMetricsAdapter,
   PrismaProcessStore,
   type EventingClickHouseClientResolver,
 } from "@langwatch/eventing/server";
@@ -24,6 +27,7 @@ import {
   type GroupQueueContext,
   type GroupQueueContextMetadata,
 } from "@langwatch/group-queue";
+import { BlobSweeper } from "@langwatch/group-queue/operational";
 import type { EventingParticipation } from "@langwatch/kernel";
 import {
   createContextFromJobData,
@@ -84,9 +88,47 @@ export function buildEventing(options: {
     ...(queueFactory === undefined ? {} : { queueFactory }),
     ...(stores.processStore === undefined ? {} : { processStore: stores.processStore }),
     ...(config.killSwitch === undefined ? {} : { killSwitch: config.killSwitch }),
+    ...(options.redis === undefined || stores.processStore === undefined
+      ? {}
+      : {
+          maintenance: eventingMaintenance({
+            redis: options.redis,
+            processStore: stores.processStore,
+          }),
+        }),
   });
 
   return { value: eventing, close: () => eventing.close() };
+}
+
+/**
+ * The queue's blob sweep and the process managers' inbox/outbox retention. The
+ * retention reaps by predicate across every process name, so it covers ones added later.
+ */
+function eventingMaintenance({
+  redis,
+  processStore,
+}: {
+  readonly redis: RedisConnection;
+  readonly processStore: ProcessStore;
+}): NonNullable<EventSourcingOptions["maintenance"]> {
+  const sweeper = new BlobSweeper({ redis });
+  return () => [
+    createBlobMaintenancePipeline({
+      cleanup: {
+        sweep: () => sweeper.sweep(),
+        deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
+      },
+    }),
+    createProcessManagerMaintenancePipeline({
+      retentionSweep: {
+        deleteDispatchedOutboxBatch: (params) => processStore.deleteDispatchedOutboxBatch(params),
+        deleteDeadOutboxBatch: (params) => processStore.deleteDeadOutboxBatch(params),
+        deleteConsumedInboxBatch: (params) => processStore.deleteConsumedInboxBatch(params),
+        metrics: OtelProcessRetentionMetricsAdapter.create(),
+      },
+    }),
+  ];
 }
 
 /** Where this role appends, and the durable state it leases while draining. */

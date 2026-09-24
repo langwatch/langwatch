@@ -1105,6 +1105,14 @@ one's `connect` handed the app. Each still follows the role table below — the
 api constructs none of their reactions. A pipeline the module defines but does
 not declare this way is registered by nobody; no application line stands in.
 
+A projection over every pipeline's events, not only its own (the SaaS billable-events meter), is
+declared on the owning module's pipeline with `.withGlobalMapProjection(projection, subscribers)`;
+the runtime registers it onto its global registry when that pipeline registers, in both roles, and
+refuses by name one that arrives after the registry started routing. The runtime's own maintenance
+pipelines (blob sweep, process-manager retention) are built by the eventing member where a Redis and a
+process store exist, answered by `maintenancePipelines()`, and installed once by the process after the
+modules', where the role drains (2026-09-25).
+
 `withPipelines((pipelines) => pipelines.produce())` selects API production;
 `withPipelines((pipelines) => pipelines.consume())` selects worker consumption.
 Neither declaration exposes a transport. `boot()` translates the same module

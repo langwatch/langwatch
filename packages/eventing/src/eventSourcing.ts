@@ -75,6 +75,8 @@ export interface EventSourcingOptions {
    * is what every normal process wants; state it only for one that differs.
    */
   participation?: EventingParticipation;
+  /** The runtime's own maintenance pipelines, installed once where the role drains. */
+  maintenance?: () => readonly StaticPipelineDefinition[];
 }
 
 /**
@@ -123,6 +125,7 @@ export class EventSourcing {
   private readonly _processStore?: ProcessStore;
   private readonly _processManagerMode: "run" | "producer-only";
   private readonly _participation?: EventingParticipation;
+  private readonly _maintenance?: () => readonly StaticPipelineDefinition[];
   private _processRuntimeInstance?: ProcessRuntime;
   /** The process managers this producer registered and will not run. */
   private readonly _unrunProcessManagers = new Set<string>();
@@ -141,6 +144,7 @@ export class EventSourcing {
     this._processStore = options.processStore;
     this._processManagerMode = options.processManagerMode ?? "run";
     this._participation = options.participation;
+    this._maintenance = options.maintenance;
 
     this.projectionRegistry = new ProjectionRegistry<Event>();
     options.configureGlobalProjections?.(this.projectionRegistry);
@@ -227,6 +231,11 @@ export class EventSourcing {
     return pipeline;
   }
 
+  /** The blob and process-manager sweeps this runtime was built with; none when it drains nothing. */
+  maintenancePipelines(): readonly StaticPipelineDefinition[] {
+    return this._maintenance?.() ?? [];
+  }
+
   /** Returns the static definitions captured during register() calls. */
   get definitions(): readonly StaticPipelineDefinition<any, any, any>[] {
     return this._definitions;
@@ -281,6 +290,22 @@ export class EventSourcing {
       `Refused: ${this.describeDefinition(incoming)}.`,
       "One runtime registers one pipeline per name - compose exactly one of them in this process.",
     ].join(" ");
+  }
+
+  /** A pipeline's cross-pipeline projections, before the global registry starts routing. */
+  private registerGlobalProjections(
+    definition: Pick<StaticPipelineDefinition, "globalProjections" | "metadata">,
+  ): void {
+    for (const projection of definition.globalProjections ?? []) {
+      if (this.projectionRegistry.isInitialized) {
+        throw new ConfigurationError(
+          "EventSourcing",
+          `Pipeline "${definition.metadata.name}" declares the global projection "${projection.name}" after the global registry started routing. Register it before any pipeline that starts the registry.`,
+          { pipeline: definition.metadata.name, projection: projection.name },
+        );
+      }
+      projection.register(this.projectionRegistry);
+    }
   }
 
   /** One registration's capabilities, as a line a boot failure can carry. */
@@ -371,6 +396,8 @@ export class EventSourcing {
         ];
       }
     }
+
+    this.registerGlobalProjections(definition);
 
     // Initialize the projection registry if it has projections and hasn't been initialized yet
     if (
