@@ -174,20 +174,22 @@ function declarationExposesProjectionWrite(
   return heritageTypes.some((type) => typeExposesProjectionWrite(type, types, seen));
 }
 
+function memberNodeExposesProjectionWrite(node: ts.Node): boolean {
+  const isMember =
+    ts.isMethodSignature(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isPropertySignature(node) ||
+    ts.isPropertyDeclaration(node);
+
+  return isMember && memberExposesProjectionWrite(node);
+}
+
 function typeExposesProjectionWrite(
   node: ts.Node,
   types: PackageTypes,
   seen: Set<TypeDeclaration>,
 ): boolean {
-  if (ts.isMethodSignature(node)) {
-    if (memberExposesProjectionWrite(node)) return true;
-  } else if (ts.isMethodDeclaration(node)) {
-    if (memberExposesProjectionWrite(node)) return true;
-  } else if (ts.isPropertySignature(node)) {
-    if (memberExposesProjectionWrite(node)) return true;
-  } else if (ts.isPropertyDeclaration(node)) {
-    if (memberExposesProjectionWrite(node)) return true;
-  }
+  if (memberNodeExposesProjectionWrite(node)) return true;
 
   let reference: string | null = null;
 

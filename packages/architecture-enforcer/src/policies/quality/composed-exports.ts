@@ -363,6 +363,22 @@ function valueReferences({
   return found;
 }
 
+function hasUncomposedMention({
+  words,
+  wanted,
+  composed,
+}: {
+  words: Iterable<string>;
+  wanted: ReadonlySet<string>;
+  composed: ReadonlySet<string>;
+}): boolean {
+  for (const word of words) {
+    if (wanted.has(word) && !composed.has(word)) return true;
+  }
+
+  return false;
+}
+
 export function collectUncomposedExports({ root }: { root: string }): ComposedExportSubject[] {
   const resolver = workspaceModuleResolver({ root });
   const subjects = collectComposedExportSubjects({ root, resolver });
@@ -384,17 +400,8 @@ export function collectUncomposedExports({ root }: { root: string }): ComposedEx
     if (file.endsWith(".d.ts")) continue;
 
     const words = mentionedWords({ file });
-    let candidate = false;
 
-    for (const word of words) {
-      if (!wanted.has(word)) continue;
-
-      if (composed.has(word)) continue;
-
-      candidate = true;
-    }
-
-    if (!candidate) continue;
+    if (!hasUncomposedMention({ words, wanted, composed })) continue;
 
     const declaredHere = declaredIn.get(file) ?? new Set<string>();
     for (const name of valueReferences({ file, wanted, declaredHere })) composed.add(name);

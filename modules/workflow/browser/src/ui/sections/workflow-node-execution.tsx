@@ -93,6 +93,9 @@ export function ComponentExecutionButton({
 
   const executionStatus = node.data.execution_state?.status;
   const shouldOpenExecutionResults = node.data.execution_state && !propertiesExpanded;
+  const isExecuting = executionStatus === "running" || executionStatus === "waiting";
+  const showRunButton = !isExecuting && componentOnly;
+  const showRunMenu = !isExecuting && !componentOnly;
 
   return (
     <>
@@ -129,7 +132,7 @@ export function ComponentExecutionButton({
           {executionStatusIcon({ node, iconSize })}
         </Center>
       </Tooltip>
-      {executionStatus === "running" || executionStatus === "waiting" ? (
+      {isExecuting && (
         <Button
           variant="ghost"
           size="xs"
@@ -146,7 +149,8 @@ export function ComponentExecutionButton({
         >
           <Square size={iconSize} />
         </Button>
-      ) : componentOnly ? (
+      )}
+      {showRunButton && (
         <Button
           variant="ghost"
           size="xs"
@@ -158,7 +162,8 @@ export function ComponentExecutionButton({
         >
           <Play size={iconSize} />
         </Button>
-      ) : (
+      )}
+      {showRunMenu && (
         <Menu.Root positioning={{ placement: "top-start" }}>
           <Menu.Trigger asChild>
             <Button
