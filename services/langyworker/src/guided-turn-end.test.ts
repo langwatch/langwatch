@@ -171,6 +171,8 @@ describe("the guided turn end guard", () => {
         "local_ls",
         "local_read",
         "ls",
+        "notify",
+        "offer_notifications",
         "read",
         "skill",
         "todowrite",
