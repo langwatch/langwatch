@@ -1031,6 +1031,8 @@ never thinks about resolution at all. The per-module resolver adapters
   authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
   project on the request; no handler reads the key's headers (Alex, 2026-09-25).
+- A socket is declared like a route: a module declares its `WebSocketProtocol`, and the process opens one upgrade router
+  and mounts every installed module's protocols, as it mounts REST (coordinator, 2026-09-25; main's connect gateway, pending Alex's review).
 - `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
   OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
