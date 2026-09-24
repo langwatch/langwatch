@@ -1,6 +1,10 @@
 import type { AuthzAccessBreakdownOutput, GrantsLedgerActor } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
-import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
+import type {
+  GuidedOnboardingRecord,
+  OnboardingInitializeOrganizationInput,
+  OrganizationInitialized,
+} from "@langwatch/onboarding-contract";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -31,7 +35,6 @@ import type {
   JoinRequestMine,
   JoinRequestPending,
 } from "./join-request.responses.ts";
-import type { OrganizationInitialized } from "./onboarding.responses.ts";
 import type {
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
@@ -55,7 +58,6 @@ import type {
   OrganizationApiInviteScope,
   OrganizationApiUpdateTeamMemberRoleInput,
 } from "./organization.trpc-schemas.ts";
-import type { OnboardingInitializeOrganizationInput } from "./organization.trpc.ts";
 import type {
   EnrichedAuditLog,
   GetOrganizationBillingProfileInput,

@@ -31,7 +31,8 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "posthog-node": "catalog:"
+    "posthog-node": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",

@@ -56,7 +56,7 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
-  const setIntegrationMethod = api.organization.setIntegrationMethod.useMutation();
+  const setIntegrationMethod = api.onboarding.setIntegrationMethod.useMutation();
 
   return (
     <VStack gap={3} align="stretch" w="full" maxW="520px" mx="auto">

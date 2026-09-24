@@ -234,21 +234,18 @@ export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
   const hasProject = orgs.some((o) => (o.teams ?? []).some((t) => (t.projects ?? []).length > 0));
   if (hasProject) return;
 
-  const response = await page.request.post(
-    "/api/trpc/organization.initializeOrganization?batch=1",
-    {
-      data: {
-        "0": {
-          json: {
-            orgName: "Front Door Test Org",
-            projectName: "Front Door Test Project",
-            language: "other",
-            framework: "other",
-          },
+  const response = await page.request.post("/api/trpc/onboarding.initializeOrganization?batch=1", {
+    data: {
+      "0": {
+        json: {
+          orgName: "Front Door Test Org",
+          projectName: "Front Door Test Project",
+          language: "other",
+          framework: "other",
         },
       },
     },
-  );
+  });
   const result = await response.json().catch(() => null);
   if (!response.ok() || (result as { "0"?: { error?: unknown } })?.["0"]?.error) {
     throw new Error(

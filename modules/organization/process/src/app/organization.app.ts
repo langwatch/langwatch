@@ -9,7 +9,11 @@ import {
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
+import type {
+  GuidedOnboardingRecord,
+  OnboardingInitializeOrganizationInput,
+  OrganizationInitialized,
+} from "@langwatch/onboarding-contract";
 /**
  * The organization feature's application: what its four tRPC doors (`organization.*`, `team.*`,
  * `group.*`, the personal-workspace nav predicate) call. What lives here is cross-door shared
@@ -36,8 +40,6 @@ import {
   type JoinRequestJoiningChanged,
   type JoinRequestAdmitted,
   type JoinRequestAutomaticJoins,
-  type OnboardingInitializeOrganizationInput,
-  type OrganizationInitialized,
   type OrganizationProvisioningSummary,
   type OrganizationRestMemberSummary,
   type OrganizationRestMemberTeamBinding,

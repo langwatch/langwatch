@@ -2,10 +2,9 @@
 
 import type {
   OnboardingInitializeOrganizationInput,
-  OrganizationCaller,
   OrganizationInitialized,
-  OrganizationIntent,
-} from "@langwatch/organization-contract";
+} from "@langwatch/onboarding-contract";
+import type { OrganizationCaller, OrganizationIntent } from "@langwatch/organization-contract";
 import { OnboardingProjectNotCreatedError } from "@langwatch/organization-contract";
 
 import type { OrganizationCeremony, OrganizationSignals } from "../app/organization.members.ts";
@@ -125,7 +124,7 @@ export class OrganizationOnboardingService {
     } catch (error) {
       this.deps.signals.reportError(error, {
         extra: {
-          origin: "organization.initializeOrganization.ensureDefaultCatalog",
+          origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
           organizationId,
         },
       });
@@ -148,7 +147,7 @@ export class OrganizationOnboardingService {
     } catch (error) {
       this.deps.signals.reportError(error, {
         extra: {
-          origin: "organization.initializeOrganization",
+          origin: "onboarding.initializeOrganization",
           organizationId: input.organizationId,
         },
       });

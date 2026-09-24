@@ -22,7 +22,6 @@ export * from "./team.responses.ts";
 export * from "./team.errors.ts";
 export * from "./team.rest.ts";
 export * from "./organization.rows.ts";
-export * from "./onboarding.responses.ts";
 export * from "./organization-membership.errors.ts";
 export * from "./organization.trpc.ts";
 export * from "./team.trpc.ts";

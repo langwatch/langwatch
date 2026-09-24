@@ -1,9 +1,21 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type { OnboardingVariant, GuidedOnboardingState } from "./onboarding-schemas.ts";
+import type { OrganizationInitialized } from "./onboarding.responses.ts";
+import type {
+  OnboardingInitializeOrganizationInput,
+  OnboardingIntegrationMethod,
+} from "./onboarding.trpc.ts";
 
 /** Every guided-onboarding write, scoped to the caller who made it. */
 export type OnboardingCallerInput = Readonly<{ organizationId: string; userId: string }>;
+
+/** The signed-in person a sign-up runs for, as their session carries them. */
+export type OnboardingSignUpCaller = Readonly<{
+  id: string;
+  name: string | null;
+  email: string | null;
+}>;
 
 export type GuidedOnboardingStateWithInstance = GuidedOnboardingState &
   Readonly<{ gatewayUrl?: string }>;
@@ -38,6 +50,14 @@ export interface OnboardingApi {
   attachConversation(
     input: OnboardingCallerInput & Readonly<{ conversationId: string }>,
   ): Promise<GuidedOnboardingState>;
+  /** The sign-up ceremony; the organization module carries it out. */
+  initializeOrganization(
+    input: OnboardingInitializeOrganizationInput,
+    by: OnboardingSignUpCaller,
+  ): Promise<OrganizationInitialized>;
+  recordIntegrationMethod(
+    input: Readonly<{ userId: string; selection: OnboardingIntegrationMethod }>,
+  ): void;
 }
 
 export const OnboardingApi = moduleApi<OnboardingApi>()("onboarding");

@@ -174,7 +174,7 @@ export const WelcomeScreen: React.FC = () => {
 
   const screens = useCreateWelcomeScreens({ flow });
 
-  const initializeOrganization = api.organization.initializeOrganization.useMutation();
+  const initializeOrganization = api.onboarding.initializeOrganization.useMutation();
 
   const guided = flow.variant === "guided";
   const { created, leavingCard, isCreating, createGuidedOrganization } =

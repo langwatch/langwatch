@@ -3,7 +3,6 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import { onboardingWriteAckSchema, organizationInitializedSchema } from "./onboarding.responses.ts";
 import {
   organizationAuditLogPageSchema,
   organizationCreatedSchema,
@@ -49,44 +48,6 @@ export const organizationApiCreateAndAssignInputSchema = z.object({
 });
 export type OrganizationApiCreateAndAssignInput = z.infer<
   typeof organizationApiCreateAndAssignInputSchema
->;
-
-/**
- * The four keys the "pick your flavour" screen offers. The traits they map to
- * are the deployment's marketing vocabulary rather than this feature's, so
- * only the keys are named here.
- */
-export const onboardingIntegrationMethodSchema = z.enum([
-  "via-claude-code",
-  "via-platform",
-  "via-claude-desktop",
-  "manually",
-]);
-export type OnboardingIntegrationMethod = z.infer<typeof onboardingIntegrationMethodSchema>;
-
-/**
- * The whole sign-up ceremony in one request. `primaryIntent` stays optional
- * for rolling-deploy tolerance (ADR-038).
- */
-export const onboardingInitializeOrganizationInputSchema = z.object({
-  orgName: z.string().optional(),
-  phoneNumber: z.string().optional(),
-  signUpData: organizationApiSignUpDataSchema.optional(),
-  primaryIntent: organizationIntentSchema.optional(),
-
-  projectName: z.string().optional(),
-  language: z.string().default("other"),
-  framework: z.string().default("other"),
-});
-export type OnboardingInitializeOrganizationInput = z.infer<
-  typeof onboardingInitializeOrganizationInputSchema
->;
-
-export const onboardingSetIntegrationMethodInputSchema = z.object({
-  integrationMethod: onboardingIntegrationMethodSchema,
-});
-export type OnboardingSetIntegrationMethodInput = z.infer<
-  typeof onboardingSetIntegrationMethodInputSchema
 >;
 
 /**
@@ -174,20 +135,4 @@ export const organizationTrpc = defineTrpcContract("organization")
   .query("getAuditLogs")
   .withInput(organizationApiAuditLogsInputSchema)
   .withOutput(organizationAuditLogPageSchema)
-
-  /**
-   * The sign-up ceremony. It runs before the caller belongs to any
-   * organization, so neither it nor the screen after it has a scope to check.
-   */
-  .mutation("initializeOrganization")
-  .withInput(onboardingInitializeOrganizationInputSchema)
-  .withOutput(organizationInitializedSchema)
-
-  /**
-   * Records the flavour the customer picked, separately from the ceremony:
-   * the organization is created before that screen is shown.
-   */
-  .mutation("setIntegrationMethod")
-  .withInput(onboardingSetIntegrationMethodInputSchema)
-  .withOutput(onboardingWriteAckSchema)
   .build();

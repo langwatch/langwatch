@@ -4,10 +4,8 @@
  * Sign-up ceremony: intent-driven step selection, failure isolation, response.
  * @see specs/features/onboarding/intent-fork.feature
  */
-import type {
-  OnboardingInitializeOrganizationInput,
-  OrganizationCaller,
-} from "@langwatch/organization-contract";
+import type { OnboardingInitializeOrganizationInput } from "@langwatch/onboarding-contract";
+import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationCeremony, OrganizationSignals } from "../../app/organization.members.ts";
@@ -167,7 +165,7 @@ describe("given a customer who declared the coding-agent intent", () => {
       expect(result).toMatchObject({ success: true, organizationId: ORGANIZATION.id });
       expect(signals.reportError).toHaveBeenCalledWith(failure, {
         extra: {
-          origin: "organization.initializeOrganization",
+          origin: "onboarding.initializeOrganization",
           organizationId: ORGANIZATION.id,
         },
       });
@@ -189,7 +187,7 @@ describe("given a customer who declared the coding-agent intent", () => {
       expect(result).toMatchObject({ success: true });
       expect(signals.reportError).toHaveBeenCalledWith(failure, {
         extra: {
-          origin: "organization.initializeOrganization.ensureDefaultCatalog",
+          origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
           organizationId: ORGANIZATION.id,
         },
       });
