@@ -118,14 +118,46 @@ const cliBudgetRefusalSchema = z.object({
   }),
 });
 const cliProjectSchema = z.object({ id: z.string(), slug: z.string(), name: z.string() });
-const cliSuccessSchema = z.union([
-  z.object({ ok: z.literal(true) }),
-  cliBootstrapResultSchema,
-  governanceBudgetOverviewForUserSchema,
-  z.object({ project: z.object({ ...cliProjectSchema.shape, api_key: z.string() }) }),
-  z.object({ id: z.string(), secret: z.string(), prefix: z.string() }),
-  z.object({ api_key: z.string(), project: cliProjectSchema }),
-  z.object({
+
+// Released CLI versions read OAuth-shaped errors and the budget preflight's 402 document.
+export const governanceCliRefusalAnswers = {
+  400: cliRefusalSchema,
+  401: cliRefusalSchema,
+  402: cliRefusalSchema,
+  403: cliRefusalSchema,
+  404: cliRefusalSchema,
+  409: cliRefusalSchema,
+  412: cliRefusalSchema,
+  500: cliRefusalSchema,
+} as const;
+
+export const governanceCliBudgetStatusAnswers = {
+  200: z.object({ ok: z.literal(true) }),
+  ...governanceCliRefusalAnswers,
+  402: cliBudgetRefusalSchema,
+} as const;
+export const governanceCliBootstrapAnswers = {
+  200: cliBootstrapResultSchema,
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliBudgetOverviewAnswers = {
+  200: governanceBudgetOverviewForUserSchema,
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliPersonalProjectAnswers = {
+  200: z.object({ project: z.object({ ...cliProjectSchema.shape, api_key: z.string() }) }),
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliVirtualKeyAnswers = {
+  201: z.object({ id: z.string(), secret: z.string(), prefix: z.string() }),
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliProjectKeyAnswers = {
+  200: z.object({ api_key: z.string(), project: cliProjectSchema }),
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliIngestionSourcesAnswers = {
+  200: z.object({
     sources: z.array(
       z.object({
         id: z.string(),
@@ -139,47 +171,97 @@ const cliSuccessSchema = z.union([
       }),
     ),
   }),
-  z.object({ events: z.array(activityEventDetailRowSchema) }),
-  z.object({
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliIngestionSourceEventsAnswers = {
+  200: z.object({ events: z.array(activityEventDetailRowSchema) }),
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliIngestionSourceHealthAnswers = {
+  200: z.object({
     source: z.object({ id: z.string(), name: z.string(), status: z.string() }),
     health: sourceHealthMetricsSchema,
   }),
-  z.object({ setup: governanceSetupStateSchema }),
-  z.object({ ingestion_templates: z.array(governanceCliIngestionTemplateSchema) }),
-  z.object({
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliGovernanceStatusAnswers = {
+  200: z.object({ setup: governanceSetupStateSchema }),
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliIngestionTemplatesAnswers = {
+  200: z.object({ ingestion_templates: z.array(governanceCliIngestionTemplateSchema) }),
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliIngestionKeyAnswers = {
+  201: z.object({
     token: z.string(),
     prefix: z.string(),
     endpoint: z.string(),
     project: cliProjectSchema.optional(),
   }),
-  z.object({ keys: z.array(governanceCliIngestionKeySchema) }),
-  z.object({
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliIngestionKeysAnswers = {
+  200: z.object({ keys: z.array(governanceCliIngestionKeySchema) }),
+  ...governanceCliRefusalAnswers,
+} as const;
+export const governanceCliIngestionKeyStateAnswers = {
+  200: z.object({
     lookup_id: z.string(),
     status: z.enum(["unknown", "live", "revoked"]),
     source_type: z.string().optional(),
     revocation_cause: z.string().nullable().optional(),
   }),
-]);
-
-// Released CLI versions read OAuth-shaped errors and the budget preflight's 402 document.
-export const governanceCliAnswers = {
-  200: cliSuccessSchema,
-  201: cliSuccessSchema,
-  400: cliRefusalSchema,
-  401: cliRefusalSchema,
-  402: z.union([cliRefusalSchema, cliBudgetRefusalSchema]),
-  403: cliRefusalSchema,
-  404: cliRefusalSchema,
-  409: cliRefusalSchema,
-  412: cliRefusalSchema,
-  500: cliRefusalSchema,
+  ...governanceCliRefusalAnswers,
 } as const;
-export type GovernanceCliAnswer = {
-  [Status in keyof typeof governanceCliAnswers]: {
-    status: Status;
-    body: z.infer<(typeof governanceCliAnswers)[Status]>;
-  };
-}[keyof typeof governanceCliAnswers];
+
+/** Each status a route declares, paired with the body it answers under it. */
+export type GovernanceCliAnswerOf<Answers extends Readonly<Record<number, z.ZodType>>> = {
+  [Status in keyof Answers & number]: { status: Status; body: z.infer<Answers[Status]> };
+}[keyof Answers & number];
+export type GovernanceCliRefusalAnswer = GovernanceCliAnswerOf<typeof governanceCliRefusalAnswers>;
+export type GovernanceCliBudgetStatusAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliBudgetStatusAnswers
+>;
+export type GovernanceCliBootstrapAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliBootstrapAnswers
+>;
+export type GovernanceCliBudgetOverviewAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliBudgetOverviewAnswers
+>;
+export type GovernanceCliPersonalProjectAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliPersonalProjectAnswers
+>;
+export type GovernanceCliVirtualKeyAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliVirtualKeyAnswers
+>;
+export type GovernanceCliProjectKeyAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliProjectKeyAnswers
+>;
+export type GovernanceCliIngestionSourcesAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliIngestionSourcesAnswers
+>;
+export type GovernanceCliIngestionSourceEventsAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliIngestionSourceEventsAnswers
+>;
+export type GovernanceCliIngestionSourceHealthAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliIngestionSourceHealthAnswers
+>;
+export type GovernanceCliGovernanceStatusAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliGovernanceStatusAnswers
+>;
+export type GovernanceCliIngestionTemplatesAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliIngestionTemplatesAnswers
+>;
+export type GovernanceCliIngestionKeyAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliIngestionKeyAnswers
+>;
+export type GovernanceCliIngestionKeysAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliIngestionKeysAnswers
+>;
+export type GovernanceCliIngestionKeyStateAnswer = GovernanceCliAnswerOf<
+  typeof governanceCliIngestionKeyStateAnswers
+>;
 
 export const governanceCliHeadersSchema = z.object({
   authorization: z.string().nullable().default(null),

@@ -51,7 +51,20 @@ import {
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceApi,
-  type GovernanceCliAnswer,
+  type GovernanceCliBudgetStatusAnswer,
+  type GovernanceCliBootstrapAnswer,
+  type GovernanceCliBudgetOverviewAnswer,
+  type GovernanceCliPersonalProjectAnswer,
+  type GovernanceCliVirtualKeyAnswer,
+  type GovernanceCliProjectKeyAnswer,
+  type GovernanceCliIngestionSourcesAnswer,
+  type GovernanceCliIngestionSourceEventsAnswer,
+  type GovernanceCliIngestionSourceHealthAnswer,
+  type GovernanceCliGovernanceStatusAnswer,
+  type GovernanceCliIngestionTemplatesAnswer,
+  type GovernanceCliIngestionKeyAnswer,
+  type GovernanceCliIngestionKeysAnswer,
+  type GovernanceCliIngestionKeyStateAnswer,
   type GovernanceCliKeyLookupRequest,
   type GovernanceCliRawRequest,
   type GovernanceCliRequest,
@@ -483,59 +496,69 @@ export class GovernanceApp implements GovernanceRestApi {
     return this.governanceApi;
   }
 
-  cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).budgetStatus(input);
   }
 
-  cliBootstrapRead(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  cliBootstrapRead(input: GovernanceCliRequest): Promise<GovernanceCliBootstrapAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).bootstrap(input);
   }
 
-  cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliBudgetOverviewAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).budgetOverview(input);
   }
 
-  cliPersonalProject(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  cliPersonalProject(input: GovernanceCliRequest): Promise<GovernanceCliPersonalProjectAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).personalProject(input);
   }
 
-  cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+  cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliVirtualKeyAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).virtualKey(input);
   }
 
-  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliProjectKeyAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).projectKey(input);
   }
 
-  cliIngestionSources(input: GovernanceCliSourcesRequest): Promise<GovernanceCliAnswer> {
+  cliIngestionSources(
+    input: GovernanceCliSourcesRequest,
+  ): Promise<GovernanceCliIngestionSourcesAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).ingestionSources(input);
   }
 
-  cliIngestionSourceEvents(input: GovernanceCliSourceEventsRequest): Promise<GovernanceCliAnswer> {
+  cliIngestionSourceEvents(
+    input: GovernanceCliSourceEventsRequest,
+  ): Promise<GovernanceCliIngestionSourceEventsAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).ingestionSourceEvents(input);
   }
 
-  cliIngestionSourceHealth(input: GovernanceCliSourceRequest): Promise<GovernanceCliAnswer> {
+  cliIngestionSourceHealth(
+    input: GovernanceCliSourceRequest,
+  ): Promise<GovernanceCliIngestionSourceHealthAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).ingestionSourceHealth(input);
   }
 
-  cliGovernanceStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  cliGovernanceStatus(input: GovernanceCliRequest): Promise<GovernanceCliGovernanceStatusAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).governanceStatus(input);
   }
 
-  cliIngestionTemplates(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  cliIngestionTemplates(
+    input: GovernanceCliRequest,
+  ): Promise<GovernanceCliIngestionTemplatesAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).ingestionTemplates(input);
   }
 
-  cliIngestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+  cliIngestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliIngestionKeyAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).ingestionKey(input);
   }
 
-  cliIngestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  cliIngestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliIngestionKeysAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).ingestionKeys(input);
   }
 
-  cliIngestionKeyState(input: GovernanceCliKeyLookupRequest): Promise<GovernanceCliAnswer> {
+  cliIngestionKeyState(
+    input: GovernanceCliKeyLookupRequest,
+  ): Promise<GovernanceCliIngestionKeyStateAnswer> {
     return (this.cliService ?? this.unfinishedCapability()).ingestionKeyState(input);
   }
 

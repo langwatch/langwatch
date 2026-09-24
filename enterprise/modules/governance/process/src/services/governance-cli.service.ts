@@ -1,12 +1,40 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
-  governanceCliAnswers,
+  governanceCliBudgetStatusAnswers,
+  governanceCliBootstrapAnswers,
+  governanceCliBudgetOverviewAnswers,
+  governanceCliPersonalProjectAnswers,
+  governanceCliVirtualKeyAnswers,
+  governanceCliProjectKeyAnswers,
+  governanceCliIngestionSourcesAnswers,
+  governanceCliIngestionSourceEventsAnswers,
+  governanceCliIngestionSourceHealthAnswers,
+  governanceCliGovernanceStatusAnswers,
+  governanceCliIngestionTemplatesAnswers,
+  governanceCliIngestionKeyAnswers,
+  governanceCliIngestionKeysAnswers,
+  governanceCliIngestionKeyStateAnswers,
   governanceCliIngestionKeyRequestSchema,
   governanceCliProjectKeyRequestSchema,
+  governanceCliRefusalAnswers,
   governanceCliVirtualKeyRequestSchema,
   type GovernanceApi,
-  type GovernanceCliAnswer,
+  type GovernanceCliBudgetStatusAnswer,
+  type GovernanceCliBootstrapAnswer,
+  type GovernanceCliBudgetOverviewAnswer,
+  type GovernanceCliPersonalProjectAnswer,
+  type GovernanceCliVirtualKeyAnswer,
+  type GovernanceCliProjectKeyAnswer,
+  type GovernanceCliIngestionSourcesAnswer,
+  type GovernanceCliIngestionSourceEventsAnswer,
+  type GovernanceCliIngestionSourceHealthAnswer,
+  type GovernanceCliGovernanceStatusAnswer,
+  type GovernanceCliIngestionTemplatesAnswer,
+  type GovernanceCliIngestionKeyAnswer,
+  type GovernanceCliIngestionKeysAnswer,
+  type GovernanceCliIngestionKeyStateAnswer,
+  type GovernanceCliRefusalAnswer,
   type GovernanceCliIngestionKey,
   type GovernanceCliIngestionTemplate,
   type GovernanceCliKeyLookupRequest,
@@ -54,13 +82,18 @@ export class GovernanceCliService {
     return new GovernanceCliService(members);
   }
 
-  async budgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  async budgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer> {
     const gate = await this.#admit(input);
-    if ("refusal" in gate) return gate.refusal;
+    if ("refusal" in gate) {
+      if (gate.refusal.status === 402)
+        throw new Error("budget status admits with no plan feature, so it never answers 402");
+      return gate.refusal;
+    }
     const status = await this.#credentials.budgetStatus(gate.caller);
-    if (status.outcome === "clear") return answer({ ok: true });
-    return answer(
-      {
+    if (status.outcome === "clear") return ok(governanceCliBudgetStatusAnswers[200], { ok: true });
+    return {
+      status: 402,
+      body: governanceCliBudgetStatusAnswers[402].parse({
         error: {
           type: "budget_exceeded",
           scope: status.scope,
@@ -70,15 +103,15 @@ export class GovernanceCliService {
           request_increase_url: status.requestIncreaseUrl,
           admin_email: status.adminEmail,
         },
-      },
-      402,
-    );
+      }),
+    };
   }
 
-  async bootstrap(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  async bootstrap(input: GovernanceCliRequest): Promise<GovernanceCliBootstrapAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
-    return answer(
+    return ok(
+      governanceCliBootstrapAnswers[200],
       await this.#governance.cliBootstrapResolve({
         userId: gate.caller.user_id,
         organizationId: gate.caller.organization_id,
@@ -86,10 +119,11 @@ export class GovernanceCliService {
     );
   }
 
-  async budgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  async budgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliBudgetOverviewAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
-    return answer(
+    return ok(
+      governanceCliBudgetOverviewAnswers[200],
       await this.#governance.personalBudgetOverviewForUser({
         userId: gate.caller.user_id,
         organizationId: gate.caller.organization_id,
@@ -97,13 +131,13 @@ export class GovernanceCliService {
     );
   }
 
-  async personalProject(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  async personalProject(input: GovernanceCliRequest): Promise<GovernanceCliPersonalProjectAnswer> {
     const gate = await this.#admit({ ...input, requireActiveMembership: true });
     if ("refusal" in gate) return gate.refusal;
     const resolved = await this.#credentials.resolvePersonalProject(gate.caller);
     if (resolved.outcome === "failed")
       return refuse("server_error", "Could not resolve your personal project", 500);
-    return answer({
+    return ok(governanceCliPersonalProjectAnswers[200], {
       project: {
         id: resolved.project.id,
         slug: resolved.project.slug,
@@ -113,7 +147,7 @@ export class GovernanceCliService {
     });
   }
 
-  async virtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+  async virtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliVirtualKeyAnswer> {
     const gate = await this.#admit({ ...input, requireActiveMembership: true });
     if ("refusal" in gate) return gate.refusal;
     const parsed = governanceCliVirtualKeyRequestSchema.safeParse(posted(input.raw));
@@ -130,10 +164,14 @@ export class GovernanceCliService {
       );
     if (issued.outcome === "failed")
       return refuse("server_error", "Could not issue a personal virtual key", 500);
-    return answer({ id: issued.id, secret: issued.secret, prefix: issued.prefix }, 201);
+    return created(governanceCliVirtualKeyAnswers[201], {
+      id: issued.id,
+      secret: issued.secret,
+      prefix: issued.prefix,
+    });
   }
 
-  async projectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+  async projectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliProjectKeyAnswer> {
     const gate = await this.#admit({ ...input, requireActiveMembership: true });
     if ("refusal" in gate) return gate.refusal;
     const parsed = governanceCliProjectKeyRequestSchema.safeParse(posted(input.raw));
@@ -162,11 +200,16 @@ export class GovernanceCliService {
           403,
         );
       case "granted":
-        return answer({ api_key: handout.apiKey, project: handout.project });
+        return ok(governanceCliProjectKeyAnswers[200], {
+          api_key: handout.apiKey,
+          project: handout.project,
+        });
     }
   }
 
-  async ingestionSources(input: GovernanceCliSourcesRequest): Promise<GovernanceCliAnswer> {
+  async ingestionSources(
+    input: GovernanceCliSourcesRequest,
+  ): Promise<GovernanceCliIngestionSourcesAnswer> {
     const gate = await this.#admit({
       ...input,
       feature: "ingestionSources",
@@ -177,7 +220,7 @@ export class GovernanceCliService {
       organizationId: gate.caller.organization_id,
       includeArchived: input.includeArchived,
     });
-    return answer({
+    return ok(governanceCliIngestionSourcesAnswers[200], {
       sources: sources.map((source) => ({
         id: source.id,
         name: source.name,
@@ -193,14 +236,14 @@ export class GovernanceCliService {
 
   async ingestionSourceEvents(
     input: GovernanceCliSourceEventsRequest,
-  ): Promise<GovernanceCliAnswer> {
+  ): Promise<GovernanceCliIngestionSourceEventsAnswer> {
     const gate = await this.#admit({
       ...input,
       feature: "activityMonitor",
       permission: "activityMonitor:view",
     });
     if ("refusal" in gate) return gate.refusal;
-    return answer({
+    return ok(governanceCliIngestionSourceEventsAnswers[200], {
       events: await this.#activity.eventsForSource({
         organizationId: gate.caller.organization_id,
         sourceId: input.sourceId,
@@ -210,14 +253,17 @@ export class GovernanceCliService {
     });
   }
 
-  async ingestionSourceHealth(input: GovernanceCliSourceRequest): Promise<GovernanceCliAnswer> {
+  async ingestionSourceHealth(
+    input: GovernanceCliSourceRequest,
+  ): Promise<GovernanceCliIngestionSourceHealthAnswer> {
     const gate = await this.#admit({
       ...input,
       feature: "ingestionSources",
       permission: "activityMonitor:view",
     });
     if ("refusal" in gate) return gate.refusal;
-    return answer(
+    return ok(
+      governanceCliIngestionSourceHealthAnswers[200],
       await this.#activity.healthForSource({
         organizationId: gate.caller.organization_id,
         sourceId: input.sourceId,
@@ -225,22 +271,30 @@ export class GovernanceCliService {
     );
   }
 
-  async governanceStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  async governanceStatus(
+    input: GovernanceCliRequest,
+  ): Promise<GovernanceCliGovernanceStatusAnswer> {
     const gate = await this.#admit({ ...input, feature: "ingestionSources" });
     if ("refusal" in gate) return gate.refusal;
-    return answer({ setup: await this.#governance.resolveSetupState(gate.caller.organization_id) });
+    return ok(governanceCliGovernanceStatusAnswers[200], {
+      setup: await this.#governance.resolveSetupState(gate.caller.organization_id),
+    });
   }
 
-  async ingestionTemplates(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  async ingestionTemplates(
+    input: GovernanceCliRequest,
+  ): Promise<GovernanceCliIngestionTemplatesAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
     const rows = await this.#governance.templateListForUser({
       organizationId: gate.caller.organization_id,
     });
-    return answer({ ingestion_templates: rows.map(toTemplate) });
+    return ok(governanceCliIngestionTemplatesAnswers[200], {
+      ingestion_templates: rows.map(toTemplate),
+    });
   }
 
-  async ingestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer> {
+  async ingestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliIngestionKeyAnswer> {
     const gate = await this.#admit({ ...input, requireActiveMembership: true });
     if ("refusal" in gate) return gate.refusal;
     const parsed = governanceCliIngestionKeyRequestSchema.safeParse(posted(input.raw));
@@ -255,17 +309,19 @@ export class GovernanceCliService {
     );
   }
 
-  async ingestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliAnswer> {
+  async ingestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliIngestionKeysAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
     const keys = await this.#governance.ingestionKeyListForPersonalProject({
       userId: gate.caller.user_id,
       organizationId: gate.caller.organization_id,
     });
-    return answer({ keys: keys.map(toIngestionKey) });
+    return ok(governanceCliIngestionKeysAnswers[200], { keys: keys.map(toIngestionKey) });
   }
 
-  async ingestionKeyState(input: GovernanceCliKeyLookupRequest): Promise<GovernanceCliAnswer> {
+  async ingestionKeyState(
+    input: GovernanceCliKeyLookupRequest,
+  ): Promise<GovernanceCliIngestionKeyStateAnswer> {
     const gate = await this.#admit(input);
     if ("refusal" in gate) return gate.refusal;
     const key = await this.#governance
@@ -278,8 +334,12 @@ export class GovernanceCliService {
         if (HandledError.isHandled(error) && error.code === "ingestion_key_not_found") return null;
         throw error;
       });
-    if (!key) return answer({ lookup_id: input.lookupId, status: "unknown" });
-    return answer({
+    if (!key)
+      return ok(governanceCliIngestionKeyStateAnswers[200], {
+        lookup_id: input.lookupId,
+        status: "unknown",
+      });
+    return ok(governanceCliIngestionKeyStateAnswers[200], {
       lookup_id: input.lookupId,
       status: key.live ? "live" : "revoked",
       source_type: key.sourceType,
@@ -294,23 +354,34 @@ export class GovernanceCliService {
         permission?: AuthzPermission;
         requireActiveMembership?: boolean;
       }>,
-  ): Promise<{ caller: GovernanceCliCaller } | { refusal: GovernanceCliAnswer }> {
+  ): Promise<{ caller: GovernanceCliCaller } | { refusal: GovernanceCliGateRefusal }> {
     return admissionResult(await this.#access.admit(input));
   }
 }
 
-function answer(body: unknown, status: GovernanceCliAnswer["status"] = 200): GovernanceCliAnswer {
-  if (status === 200 || status === 201)
-    return { status, body: governanceCliAnswers[200].parse(body) };
-  if (status === 402) return { status, body: governanceCliAnswers[402].parse(body) };
-  return { status, body: governanceCliAnswers[400].parse(body) };
+type GovernanceCliGateRefusal = Extract<GovernanceCliRefusalAnswer, { status: 401 | 402 | 403 }>;
+
+function ok<Body>(
+  schema: { parse(body: unknown): Body },
+  body: unknown,
+): { status: 200; body: Body } {
+  return { status: 200, body: schema.parse(body) };
 }
-function refuse(
+function created<Body>(
+  schema: { parse(body: unknown): Body },
+  body: unknown,
+): { status: 201; body: Body } {
+  return { status: 201, body: schema.parse(body) };
+}
+function refuse<Status extends GovernanceCliRefusalAnswer["status"]>(
   error: string,
   error_description: string,
-  status: GovernanceCliAnswer["status"],
-): GovernanceCliAnswer {
-  return answer({ error, error_description }, status);
+  status: Status,
+): { status: Status; body: GovernanceCliRefusalAnswer["body"] } {
+  return {
+    status,
+    body: governanceCliRefusalAnswers[status].parse({ error, error_description }),
+  };
 }
 function posted(raw: string): unknown {
   try {
@@ -321,7 +392,7 @@ function posted(raw: string): unknown {
 }
 function admissionResult(
   result: GovernanceCliAdmission,
-): { caller: GovernanceCliCaller } | { refusal: GovernanceCliAnswer } {
+): { caller: GovernanceCliCaller } | { refusal: GovernanceCliGateRefusal } {
   switch (result.outcome) {
     case "admitted":
       return { caller: result.caller };
@@ -343,14 +414,14 @@ function admissionResult(
       };
     case "payment-required":
       return {
-        refusal: answer(
-          {
+        refusal: {
+          status: 402,
+          body: governanceCliRefusalAnswers[402].parse({
             error: "payment_required",
             error_description: result.errorMessage,
             upgrade_url: result.upgradeUrl,
-          },
-          402,
-        ),
+          }),
+        },
       };
     case "forbidden":
       return {
@@ -400,18 +471,17 @@ function toIngestionKey(row: {
     ingestion_template_id: row.ingestionTemplateId,
   };
 }
-function renderIngestionKey(outcome: GovernanceCliIngestionKeyOutcome): GovernanceCliAnswer {
+function renderIngestionKey(
+  outcome: GovernanceCliIngestionKeyOutcome,
+): GovernanceCliIngestionKeyAnswer {
   switch (outcome.outcome) {
     case "minted":
-      return answer(
-        {
-          token: outcome.token,
-          prefix: outcome.prefix,
-          endpoint: outcome.endpoint,
-          ...(outcome.project ? { project: outcome.project } : {}),
-        },
-        201,
-      );
+      return created(governanceCliIngestionKeyAnswers[201], {
+        token: outcome.token,
+        prefix: outcome.prefix,
+        endpoint: outcome.endpoint,
+        ...(outcome.project ? { project: outcome.project } : {}),
+      });
     case "direct-otel-not-allowed":
       return refuse(
         "direct_otel_not_allowed",

@@ -389,17 +389,13 @@ describe("the CLI governance plane", () => {
       const absentResponse = await absent.get("/api/auth/cli/governance/ingestion-keys/lookup-2");
 
       expect(revokedResponse.status).toBe(200);
-      await expect(revokedResponse.json()).resolves.toEqual({
-        lookup_id: "lookup-1",
-        status: "revoked",
-        source_type: "internal_codex",
-        revocation_cause: "cap_retired",
-      });
+      await expect(revokedResponse.text()).resolves.toBe(
+        '{"lookup_id":"lookup-1","status":"revoked","source_type":"internal_codex","revocation_cause":"cap_retired"}',
+      );
       expect(absentResponse.status).toBe(200);
-      await expect(absentResponse.json()).resolves.toEqual({
-        lookup_id: "lookup-2",
-        status: "unknown",
-      });
+      await expect(absentResponse.text()).resolves.toBe(
+        '{"lookup_id":"lookup-2","status":"unknown"}',
+      );
     });
   });
 
@@ -457,7 +453,7 @@ describe("the CLI governance plane", () => {
       const response = await api.get("/api/auth/cli/budget/status");
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ ok: true });
+      await expect(response.text()).resolves.toBe('{"ok":true}');
     });
   });
 

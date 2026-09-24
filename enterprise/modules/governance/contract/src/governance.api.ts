@@ -27,7 +27,20 @@ import type { CliSession, CliUserInput, RevokeCliSessionInput } from "./cli-sess
 import type { TraceDepartmentInput, Department, DepartmentAssignments } from "./department.ts";
 import type { GovernanceCallSurface } from "./governance-audit.ts";
 import type {
-  GovernanceCliAnswer,
+  GovernanceCliBudgetStatusAnswer,
+  GovernanceCliBootstrapAnswer,
+  GovernanceCliBudgetOverviewAnswer,
+  GovernanceCliPersonalProjectAnswer,
+  GovernanceCliVirtualKeyAnswer,
+  GovernanceCliProjectKeyAnswer,
+  GovernanceCliIngestionSourcesAnswer,
+  GovernanceCliIngestionSourceEventsAnswer,
+  GovernanceCliIngestionSourceHealthAnswer,
+  GovernanceCliGovernanceStatusAnswer,
+  GovernanceCliIngestionTemplatesAnswer,
+  GovernanceCliIngestionKeyAnswer,
+  GovernanceCliIngestionKeysAnswer,
+  GovernanceCliIngestionKeyStateAnswer,
   GovernanceCliKeyLookupRequest,
   GovernanceCliRawRequest,
   GovernanceCliRequest,
@@ -372,20 +385,30 @@ export interface GovernanceTemplateDraft {
 
 /** The ingestion-template operations the governance REST family calls. */
 export interface GovernanceRestApi {
-  cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
-  cliBootstrapRead(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
-  cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
-  cliPersonalProject(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
-  cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer>;
-  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer>;
-  cliIngestionSources(input: GovernanceCliSourcesRequest): Promise<GovernanceCliAnswer>;
-  cliIngestionSourceEvents(input: GovernanceCliSourceEventsRequest): Promise<GovernanceCliAnswer>;
-  cliIngestionSourceHealth(input: GovernanceCliSourceRequest): Promise<GovernanceCliAnswer>;
-  cliGovernanceStatus(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
-  cliIngestionTemplates(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
-  cliIngestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliAnswer>;
-  cliIngestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliAnswer>;
-  cliIngestionKeyState(input: GovernanceCliKeyLookupRequest): Promise<GovernanceCliAnswer>;
+  cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer>;
+  cliBootstrapRead(input: GovernanceCliRequest): Promise<GovernanceCliBootstrapAnswer>;
+  cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliBudgetOverviewAnswer>;
+  cliPersonalProject(input: GovernanceCliRequest): Promise<GovernanceCliPersonalProjectAnswer>;
+  cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliVirtualKeyAnswer>;
+  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliProjectKeyAnswer>;
+  cliIngestionSources(
+    input: GovernanceCliSourcesRequest,
+  ): Promise<GovernanceCliIngestionSourcesAnswer>;
+  cliIngestionSourceEvents(
+    input: GovernanceCliSourceEventsRequest,
+  ): Promise<GovernanceCliIngestionSourceEventsAnswer>;
+  cliIngestionSourceHealth(
+    input: GovernanceCliSourceRequest,
+  ): Promise<GovernanceCliIngestionSourceHealthAnswer>;
+  cliGovernanceStatus(input: GovernanceCliRequest): Promise<GovernanceCliGovernanceStatusAnswer>;
+  cliIngestionTemplates(
+    input: GovernanceCliRequest,
+  ): Promise<GovernanceCliIngestionTemplatesAnswer>;
+  cliIngestionKey(input: GovernanceCliRawRequest): Promise<GovernanceCliIngestionKeyAnswer>;
+  cliIngestionKeys(input: GovernanceCliRequest): Promise<GovernanceCliIngestionKeysAnswer>;
+  cliIngestionKeyState(
+    input: GovernanceCliKeyLookupRequest,
+  ): Promise<GovernanceCliIngestionKeyStateAnswer>;
 
   ingestOtlpTraces(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse>;
   ingestWebhook(input: GovernanceIngestWebhookInput): Promise<GovernanceIngestResponse>;
