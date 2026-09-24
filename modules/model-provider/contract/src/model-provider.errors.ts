@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./catalog/codex-refusal-message.ts";
 import type { ModelRole } from "./catalog/model-feature-registry.ts";
@@ -660,5 +660,27 @@ export class AiCallFailedError extends HandledError {
       role: this.role,
       featureDisplayName: this.featureDisplayName,
     };
+  }
+}
+
+/** An evaluator's model setting names a provider or model this project cannot run it with. */
+export class EvaluatorConfigError extends HandledError {
+  declare readonly code: "evaluator_config_error";
+
+  constructor(
+    message: string,
+    options: {
+      meta?: Record<string, unknown>;
+      reasons?: readonly Error[];
+    } = {},
+  ) {
+    super("evaluator_config_error", message, {
+      httpStatus: 422,
+      // `fault` decides whether evaluation processing reports a skip or an error.
+      fault: "customer",
+      ...remediation("evaluator_config_error"),
+      ...options,
+    });
+    this.name = "EvaluatorConfigError";
   }
 }

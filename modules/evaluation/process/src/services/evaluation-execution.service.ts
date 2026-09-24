@@ -2,7 +2,6 @@ import { mappingsReadEvaluationsSource } from "@langwatch/dataset-contract";
 import type { MappingState } from "@langwatch/dataset-contract";
 import {
   type EvaluationExecutionResult,
-  EvaluatorConfigError,
   EvaluatorNotFoundError,
   TraceNotEvaluatableError,
 } from "@langwatch/evaluation-contract";
@@ -14,6 +13,7 @@ import {
   isNativeEvaluatorType,
   codeEvaluatorIdFromCheckType,
 } from "@langwatch/evaluator-contract";
+import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 

@@ -176,6 +176,7 @@ function forwarded(app: ModelProviderApp): ModelProviderApi {
     findRowServingModel: (...args) => app.findRowServingModel(...args),
     getExecutionProviders: (...args) => app.getExecutionProviders(...args),
     prepareExecution: (...args) => app.prepareExecution(...args),
+    prepareEvaluatorModelEnv: (...args) => app.prepareEvaluatorModelEnv(...args),
     generateStructured: (...args) => app.generateStructured(...args),
     runPlaygroundCompletion: (...args) => app.runPlaygroundCompletion(...args),
     upsert: (...args) => app.upsert(...args),

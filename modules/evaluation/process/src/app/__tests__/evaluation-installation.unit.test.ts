@@ -6,6 +6,7 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
  * behind the `EvaluationApi` token, in every role a process installs it in.
  */
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -25,6 +26,7 @@ function process(role: "api" | "worker") {
       "model-provider": createApiFixture<ModelProviderApi>({
         getExecutionProviders: async () => ({}),
       }),
+      "feature-flag": createApiFixture<FeatureFlagApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
         getPlatformDefaultRetentionDays: () => 30,
       }),

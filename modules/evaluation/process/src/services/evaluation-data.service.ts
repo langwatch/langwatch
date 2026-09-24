@@ -13,16 +13,13 @@ import {
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
-import {
-  EvaluatorConfigError,
-  EvaluatorNotFoundError,
-  TraceNotEvaluatableError,
-} from "@langwatch/evaluation-contract";
+import { EvaluatorNotFoundError, TraceNotEvaluatableError } from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
   isCodeEvaluatorCheckType,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
+import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import { type Trace } from "@langwatch/trace-contract";
 
 import type { EvaluationTraceProtections } from "../app/evaluation.members.ts";

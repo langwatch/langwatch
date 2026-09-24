@@ -4,6 +4,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
@@ -60,6 +61,7 @@ describe("given a process that installs the evaluation module over its repositor
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),
           "model-provider": createApiFixture<ModelProviderApi>(),
+          "feature-flag": createApiFixture<FeatureFlagApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
             getPlatformDefaultRetentionDays: () => 30,
           }),
@@ -100,6 +102,7 @@ describe("given a process that installs the evaluation module over its repositor
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),
           "model-provider": createApiFixture<ModelProviderApi>(),
+          "feature-flag": createApiFixture<FeatureFlagApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
             getPlatformDefaultRetentionDays: () => 30,
           }),
@@ -139,6 +142,7 @@ describe("given the live evaluation repositories over the process's ClickHouse m
         prisma: createApiFixture<ProcessMembers["prisma"]>(),
         clickhouse,
         redis: createApiFixture<ProcessMembers["redis"]>(),
+        objectStorage: createApiFixture<ProcessMembers["objectStorage"]>(),
       });
 
       await expect(

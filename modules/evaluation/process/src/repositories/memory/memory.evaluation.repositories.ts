@@ -1,6 +1,7 @@
 import type { EvaluationRepositories } from "../evaluation.repositories.ts";
 import { MemoryEvaluationAnalyticsFoldCacheRepository } from "./memory.evaluation-analytics-fold-cache.repository.ts";
 import { MemoryEvaluationCostRepository } from "./memory.evaluation-cost.repository.ts";
+import { MemoryEvaluationInputRepository } from "./memory.evaluation-input.repository.ts";
 import { MemoryEvaluationRunRepository } from "./memory.evaluation-run.repository.ts";
 import { MemoryMonitorPerformanceRepository } from "./memory.monitor-performance.repository.ts";
 
@@ -13,6 +14,7 @@ export class MemoryEvaluationRepositories {
       runs: MemoryEvaluationRunRepository.create(),
       monitorPerformance: MemoryMonitorPerformanceRepository.create(),
       analyticsFoldCache: MemoryEvaluationAnalyticsFoldCacheRepository.create(),
+      inputs: MemoryEvaluationInputRepository.create(),
     };
   }
 }

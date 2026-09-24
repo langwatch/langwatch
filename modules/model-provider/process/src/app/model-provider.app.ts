@@ -65,7 +65,7 @@ import {
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import { Secret } from "@langwatch/secrets";
+import { openAiApiKey, Secret } from "@langwatch/secrets";
 
 import type { ModelProviderConnectionPing } from "../channels/model-provider-connection-ping.channel.ts";
 import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
@@ -77,6 +77,7 @@ import {
 import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
 import { ModelLimitsService } from "../services/model-limits.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderEvaluatorModelEnvService } from "../services/model-provider-evaluator-model-env.service.ts";
 import { ModelProviderExecutionHandleService } from "../services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
@@ -209,7 +210,7 @@ export class ModelProviderApp implements ModelProviderApi {
    * credentials alone, which is what a self-hosted install does.
    */
   static readonly secrets = {
-    openai: Secret.load("OPENAI_API_KEY", { optional: true }),
+    openai: openAiApiKey,
     openai_codex: Secret.load("CODEX_ACCESS_TOKEN", { optional: true }),
     anthropic: Secret.load("ANTHROPIC_API_KEY", { optional: true }),
     gemini: Secret.load("GEMINI_API_KEY", { optional: true }),
@@ -327,6 +328,7 @@ export class ModelProviderApp implements ModelProviderApi {
   readonly #providerAuthorization: ModelProviderWriteAuthorizationService;
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #playground: ModelProviderPlaygroundService;
+  readonly #evaluatorModelEnv: ModelProviderEvaluatorModelEnvService;
   readonly #structuredGeneration: ModelProviderStructuredGenerationService;
 
   private readonly platformChain: PlatformProviderChainService;
@@ -367,6 +369,11 @@ export class ModelProviderApp implements ModelProviderApi {
     this.#credentialProbe = members.credentialProbe;
     this.#codexAccounts = members.codexAccounts;
     this.#spans = members.spans;
+    // The same always-empty fallback map `ModelProviderBuildConfig.environment` carries.
+    this.#evaluatorModelEnv = ModelProviderEvaluatorModelEnvService.create({
+      modelProviders: this,
+      environment: {},
+    });
     this.#playground = ModelProviderPlaygroundService.create({
       modelProviders: this,
       executionProxyBaseUrl,
@@ -415,6 +422,12 @@ export class ModelProviderApp implements ModelProviderApi {
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters> {
     return this.#modelProviders.prepareExecution(input);
+  }
+
+  prepareEvaluatorModelEnv(
+    input: Parameters<ModelProviderApi["prepareEvaluatorModelEnv"]>[0],
+  ): Promise<Record<string, string>> {
+    return this.#evaluatorModelEnv.prepare(input);
   }
 
   generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown> {

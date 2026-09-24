@@ -2,6 +2,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EvaluationApi, type ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EventingCommands, EventingCommandSender } from "@langwatch/eventing";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -32,6 +33,7 @@ async function installed() {
       workflow: createApiFixture<WorkflowApi>(),
       trace: createApiFixture<TraceApi>(),
       "model-provider": createApiFixture<ModelProviderApi>(),
+      "feature-flag": createApiFixture<FeatureFlagApi>(),
       "data-retention": createApiFixture<DataRetentionApi>(),
     })
     .boot();

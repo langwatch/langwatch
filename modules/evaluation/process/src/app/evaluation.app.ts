@@ -26,6 +26,7 @@ import {
 } from "@langwatch/evaluation-contract";
 import { AVAILABLE_EVALUATORS, type SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -55,6 +56,12 @@ import {
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
+import {
+  EVAL_INPUTS_HARD_CEILING_BYTES,
+  EVAL_INPUTS_INLINE_MAX_BYTES,
+  EVAL_INPUTS_PREVIEW_BYTES,
+  EvaluationInputsOffloadService,
+} from "../services/evaluation-inputs-offload.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import type { EvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
@@ -209,6 +216,7 @@ export class EvaluationApp implements EvaluationApiContract {
     modelProviders: ModelProviderApi,
     /** Owns the platform default retention the run reads are floored at, read per lookup. */
     retention: DataRetentionApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly reads = reads();
 
@@ -286,6 +294,14 @@ export class EvaluationApp implements EvaluationApiContract {
       infrastructure: {
         ...createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
         retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
+        inputResolution: EvaluationInputsOffloadService.create({
+          storage: repositories.inputs,
+          config: {
+            inlineMaxBytes: EVAL_INPUTS_INLINE_MAX_BYTES,
+            hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
+            previewBytes: EVAL_INPUTS_PREVIEW_BYTES,
+          },
+        }),
         environment: EvaluatorEnvironmentService.create(config),
         report: commands,
       },

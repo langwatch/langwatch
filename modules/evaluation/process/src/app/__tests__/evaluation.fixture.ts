@@ -7,6 +7,7 @@ import type {
   ReportEvaluationCommandData,
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -183,6 +184,7 @@ export function createEvaluationTestApp(
       traces: TraceApi;
       modelProviders: ModelProviderApi;
       retention: DataRetentionApi;
+      featureFlags: FeatureFlagApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -197,6 +199,7 @@ export function createEvaluationTestApp(
         input.dependencies?.modelProviders ??
         createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
       retention: input.dependencies?.retention ?? createApiFixture<DataRetentionApi>(),
+      featureFlags: input.dependencies?.featureFlags ?? createApiFixture<FeatureFlagApi>(),
     },
     clustering:
       input.clustering ??

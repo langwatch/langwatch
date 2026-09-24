@@ -119,6 +119,9 @@ export class TestModelProviderService implements ModelProviderApi {
   prepareExecution(): Promise<Record<string, string>> {
     return Promise.resolve({});
   }
+  prepareEvaluatorModelEnv(): Promise<Record<string, string>> {
+    return Promise.resolve({});
+  }
 
   runPlaygroundCompletion(): Promise<never> {
     throw new Error("Not used by Coding Agent tests.");

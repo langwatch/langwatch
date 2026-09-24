@@ -1,7 +1,7 @@
 import { getModelById } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { pickMaxTokensCeiling } from "../model-provider.server.ts";
+import { pickMaxTokensCeiling } from "../rules/max-tokens-ceiling.rules.ts";
 
 describe("pickMaxTokensCeiling", () => {
   it("prefers a configured custom-model ceiling", () => {

@@ -203,6 +203,16 @@ export interface ModelProviderApi {
   prepareExecution(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;
+  /**
+   * The `X_LITELLM_*` (or `X_LITELLM_EMBEDDINGS_*`) block an evaluator calls `model` with; throws
+   * `EvaluatorConfigError` when the provider is unconfigured, disabled or does not serve the model.
+   */
+  prepareEvaluatorModelEnv(input: {
+    projectId: string;
+    model: string;
+    embeddings: boolean;
+    settings?: Readonly<Record<string, unknown>>;
+  }): Promise<Record<string, string>>;
   /** Resolves a feature's configured model and returns schema-validated structured data. */
   generateStructured(input: ModelProviderStructuredGenerationInput): Promise<unknown>;
   /** Streams one browser playground completion through the configured execution proxy. */
