@@ -21,6 +21,10 @@ export const testSuiteTrpcTransport = defineTrpcRouter(SuiteApi, testSuiteTrpc)
   .withPermission("scenarios:manage")
   .handle(({ app, input }) => app.renameTestSuite(input))
 
+  .procedure("update")
+  .withPermission("scenarios:manage")
+  .handle(({ app, input }) => app.updateTestSuite(input))
+
   .procedure("archive")
   .withPermission("scenarios:manage")
   .handle(({ app, input }) => app.archiveTestSuite(input))

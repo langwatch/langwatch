@@ -327,3 +327,9 @@ Feature: A test suite groups scenarios
     And a run plan carrying its own copy of that same evaluator with a required input left unmapped
     When a run of that suite is started with that plan
     Then the run is not refused, because the suite's attachment is the one that executes
+
+  @unit
+  Scenario: The suite editor saves a test suite's name, fields and evaluators through suites.testSuites.update
+    Given a test suite the suite editor has open
+    When it saves a new name, fields and evaluators through suites.testSuites.update
+    Then the suite service receives them unchanged for that suite

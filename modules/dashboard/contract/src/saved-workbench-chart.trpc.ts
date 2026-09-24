@@ -1,7 +1,7 @@
 /**
- * Every saved LangWatchQL workbench chart procedure, declared once. Mounted
- * under `analytics.savedWorkbenchCharts` — the reachable namespace — while
- * the subject belongs to Dashboard. Spec: lwql-saved-charts.feature.
+ * Every saved LangWatchQL workbench chart procedure, declared once. A member
+ * namespace of `analytics`, main's wire, while the subject belongs to
+ * Dashboard. Spec: lwql-saved-charts.feature.
  */
 import {
   langWatchQLQueryResultSchema,
@@ -32,7 +32,7 @@ const granularityStepSchema = z.union([
 
 export const savedWorkbenchChartDeletedSchema = z.object({ success: z.literal(true) });
 
-export const savedWorkbenchChartTrpc = defineTrpcContract("savedWorkbenchCharts")
+export const savedWorkbenchChartTrpc = defineTrpcContract("analytics.savedWorkbenchCharts")
   .query("getAll")
   .withInput(projectScopeSchema)
   .withOutput(savedWorkbenchChartSchema.array())

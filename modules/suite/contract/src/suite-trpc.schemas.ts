@@ -5,9 +5,11 @@
  */
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import {
+  evaluatorAttachmentsSchema,
   runNoteSchema,
   runParameterValuesSchema,
   scenarioTestSuiteSchema,
+  suiteFieldDefinitionsSchema,
 } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
@@ -143,6 +145,14 @@ export const createTestSuiteTrpcInputSchema = z.object({
 export const renameTestSuiteTrpcInputSchema = z.object({
   ...testSuiteIdShape,
   name: z.string().trim().min(1),
+});
+
+/** What the suite editor saves: the name, the fields and the evaluators, any of them. */
+export const updateTestSuiteTrpcInputSchema = z.object({
+  ...testSuiteIdShape,
+  name: z.string().trim().min(1).optional(),
+  fields: suiteFieldDefinitionsSchema.optional(),
+  evaluators: evaluatorAttachmentsSchema.optional(),
 });
 
 /**

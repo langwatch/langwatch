@@ -28,6 +28,7 @@ import {
   suiteTrpcIdInputSchema,
   testSuiteTrpcIdInputSchema,
   updateSuiteTrpcInputSchema,
+  updateTestSuiteTrpcInputSchema,
 } from "./suite-trpc.schemas.ts";
 import { suiteSchema } from "./suite.ts";
 
@@ -91,10 +92,10 @@ export const suiteTrpc = defineTrpcContract("suites")
 
 /**
  * A test suite groups scenarios through Scenario.testSuiteId and runs them the
- * ordinary way. The process mounts this namespace under `suites.testSuites.*`.
+ * ordinary way, as a member namespace of `suites`.
  * @see specs/suites/test-suites.feature
  */
-export const testSuiteTrpc = defineTrpcContract("testSuites")
+export const testSuiteTrpc = defineTrpcContract("suites.testSuites")
   .mutation("create")
   .withInput(createTestSuiteTrpcInputSchema)
   .withOutput(scenarioTestSuiteSchema)
@@ -106,6 +107,10 @@ export const testSuiteTrpc = defineTrpcContract("testSuites")
 
   .mutation("rename")
   .withInput(renameTestSuiteTrpcInputSchema)
+  .withOutput(scenarioTestSuiteSchema)
+
+  .mutation("update")
+  .withInput(updateTestSuiteTrpcInputSchema)
   .withOutput(scenarioTestSuiteSchema)
 
   .mutation("archive")
