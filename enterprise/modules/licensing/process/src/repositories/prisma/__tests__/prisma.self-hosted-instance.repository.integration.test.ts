@@ -105,7 +105,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry on Postgr
         }),
       );
 
-      const { rows } = await repository.findPage({ page: 0, pageSize: 25, search: RUN });
+      const { rows } = await repository.listPage({ page: 0, pageSize: 25, search: RUN });
 
       expect(rows[0]?.instanceId).toBe(`${RUN}-c`);
       expect(rows.at(-1)?.instanceId).toBe(`${RUN}-b`);
@@ -119,7 +119,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the self-hosted instance registry on Postgr
         upsertOf({ instanceId: `${RUN}-d`, hostname: null, userEmailDomains: { [domain]: 7 } }),
       );
 
-      const { rows, total } = await repository.findPage({ page: 0, pageSize: 25, search: domain });
+      const { rows, total } = await repository.listPage({ page: 0, pageSize: 25, search: domain });
 
       expect(total).toBe(1);
       expect(rows[0]?.instanceId).toBe(`${RUN}-d`);

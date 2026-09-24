@@ -172,7 +172,7 @@ function contractCases(backend: Backend): void {
         ],
       });
 
-      const page = await backend.records().findAll({
+      const page = await backend.records().listAll({
         datasetId: dataset.id,
         projectId: backend.mine(),
         page: 2,
@@ -203,7 +203,7 @@ function contractCases(backend: Backend): void {
         }),
       ).resolves.toBe(1);
 
-      const remaining = await backend.records().findAll({
+      const remaining = await backend.records().listAll({
         datasetId: dataset.id,
         projectId: backend.mine(),
         page: 1,

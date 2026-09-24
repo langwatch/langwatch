@@ -55,7 +55,7 @@ class Records implements DatasetRecordRepository {
   async findPage() {
     return [];
   }
-  findAll = async () => ({ records: [], total: 0 });
+  listAll = async () => ({ records: [], total: 0 });
   createMany = async () => [];
   update = async () => {
     throw new Error("unused");

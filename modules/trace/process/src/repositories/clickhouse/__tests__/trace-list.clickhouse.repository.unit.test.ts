@@ -1,4 +1,4 @@
-// Unit tests for SQL `findAll` emits. List pages in two stages: inner picks
+// Unit tests for SQL `listAll` emits. List pages in two stages: inner picks
 // page traces (keys only), outer reads payload. Dedup is full-window aggregate.
 // Assertions on emitted SQL; companion integration test proves semantics
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -48,12 +48,12 @@ const isCountQuery = (sql: string) => sql.includes("totalHits");
 
 const USER_FILTER = "AnnotationIds != []";
 
-describe("TraceListClickHouseRepository.findAll (unit)", () => {
+describe("TraceListClickHouseRepository.listAll (unit)", () => {
   describe("when the caller asks for a page of traces", () => {
     it("builds the version dedup aggregate once for the page read, not once per stage", async () => {
       const { repo, queries } = makeRepo();
 
-      await repo.findAll(baseQuery());
+      await repo.listAll(baseQuery());
 
       const pageQuery = queries.find(isPageQuery);
       expect(pageQuery).toBeDefined();
@@ -63,7 +63,7 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
     it("carries the winning row's identity from the inner page stage to the outer read", async () => {
       const { repo, queries } = makeRepo();
 
-      await repo.findAll(baseQuery());
+      await repo.listAll(baseQuery());
 
       const pageQuery = queries.find(isPageQuery)!;
       // The inner stage resolved (TraceId, UpdatedAt) for the page. The outer
@@ -75,7 +75,7 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
     it("still bounds the total count by the version dedup", async () => {
       const { repo, queries } = makeRepo();
 
-      await repo.findAll(baseQuery());
+      await repo.listAll(baseQuery());
 
       const countQuery = queries.find(isCountQuery);
       expect(countQuery).toBeDefined();
@@ -87,7 +87,7 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
     it("keeps it out of the dedup so a trace cannot answer to both sides of it", async () => {
       const { repo, queries } = makeRepo();
 
-      await repo.findAll(
+      await repo.listAll(
         baseQuery({
           filterWhere: { sql: USER_FILTER, params: { unused: 1 } },
         }),
@@ -109,7 +109,7 @@ describe("TraceListClickHouseRepository.findAll (unit)", () => {
     it("applies it to both stages of the page read, so an unmerged same-version row cannot slip through", async () => {
       const { repo, queries } = makeRepo();
 
-      await repo.findAll(
+      await repo.listAll(
         baseQuery({
           filterWhere: { sql: USER_FILTER, params: { unused: 1 } },
         }),

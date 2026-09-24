@@ -56,7 +56,7 @@ export class PrismaDatasetRecordRepository
     return rows.map(toDatasetRecord);
   }
 
-  async findAll(input: {
+  async listAll(input: {
     datasetId: string;
     projectId: string;
     page: number;

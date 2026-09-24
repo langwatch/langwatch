@@ -463,7 +463,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
    * backwards through the same sort expression, breaking ties on scenario run
    * id so same-millisecond runs can't both sit on a page boundary.
    */
-  async findAtoms({
+  async listAtoms({
     filter,
     limit,
     cursor,

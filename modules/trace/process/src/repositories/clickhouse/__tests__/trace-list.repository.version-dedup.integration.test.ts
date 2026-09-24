@@ -102,7 +102,7 @@ describe.skipIf(!clickHouseConfigured)(
     };
 
     const listWith = (queryText: string) =>
-      repo.findAll({
+      repo.listAll({
         tenantId: versionTenant,
         timeRange,
         sort: { column: "OccurredAt", direction: "desc" },

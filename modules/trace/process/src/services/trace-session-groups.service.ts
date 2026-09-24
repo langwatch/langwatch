@@ -212,7 +212,7 @@ export class SessionGroupsService {
   async getSessionGroups(params: SessionGroupsParams): Promise<SessionGroupsResult> {
     const sortColumn = SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
     const sortDirection = params.sort?.direction ?? DEFAULT_SORT.direction;
-    const page = await this.repository.findSessionGroups({
+    const page = await this.repository.listSessionGroups({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: sortDirection },

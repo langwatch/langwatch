@@ -17,7 +17,7 @@ export class MemoryResultAtomsRepository extends ResultAtomsRepository {
   private refuse<T>(): Promise<T> {
     return Promise.reject(new Error("Results tab has no ClickHouse endpoint on this deployment"));
   }
-  findAtoms(): ReturnType<ResultAtomsRepository["findAtoms"]> {
+  listAtoms(): ReturnType<ResultAtomsRepository["listAtoms"]> {
     return this.refuse();
   }
   findRunOrdinals(): ReturnType<ResultAtomsRepository["findRunOrdinals"]> {

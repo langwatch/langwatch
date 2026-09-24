@@ -438,7 +438,7 @@ export class OrganizationMembershipService {
     offset?: number;
     limit?: number;
   }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }> {
-    return this.repo.findAllMembers({
+    return this.repo.listAllMembers({
       organizationId: params.organizationId,
       includeDisabled: params.includeDisabled ?? false,
       offset: params.offset ?? 0,

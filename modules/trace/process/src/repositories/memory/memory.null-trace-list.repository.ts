@@ -13,7 +13,7 @@ export class MemoryNullTraceListRepository implements TraceListRepository {
     return new MemoryNullTraceListRepository();
   }
 
-  async findAll(): Promise<TraceListRepositoryPage> {
+  async listAll(): Promise<TraceListRepositoryPage> {
     return { rows: [], totalHits: 0 };
   }
 

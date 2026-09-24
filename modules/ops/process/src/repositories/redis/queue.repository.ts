@@ -991,7 +991,7 @@ export class QueueRedisRepository extends QueueRepository {
     return ageMs;
   }
 
-  async findParkedGroups(params: {
+  async listParkedGroups(params: {
     queueName: string;
     tenantId: string;
     page: number;

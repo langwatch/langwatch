@@ -156,7 +156,7 @@ export abstract class SpanStorageRepository {
   abstract findSpanResourcesByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]>;
-  abstract findSpansPaginated(
+  abstract listSpansPaginated(
     params: {
       tenantId: string;
       traceId: string;
@@ -291,7 +291,7 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findSpansPaginated(
+  async listSpansPaginated(
     _params: {
       tenantId: string;
       traceId: string;

@@ -58,7 +58,7 @@ function serviceHolding(records: DatasetRecord[]) {
   });
 
   const recordsRepository = Object.assign(MemoryDatasetRecordRepository.create({ database }), {
-    findAll: async ({ page, limit }: { page: number; limit: number }) => ({
+    listAll: async ({ page, limit }: { page: number; limit: number }) => ({
       records: records.slice((page - 1) * limit, page * limit),
       total: records.length,
     }),

@@ -390,7 +390,7 @@ export class LicenseRegistryService {
     pageSize: number;
     search?: string;
   }): Promise<IssuedLicensePage> {
-    const { rows, total } = await this.options.repository.findAll(input);
+    const { rows, total } = await this.options.repository.listAll(input);
     return { licenses: rows.map((row) => this.toView(row)), total };
   }
 

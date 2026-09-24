@@ -41,11 +41,11 @@ const repoAnswering = (results: unknown[]) => {
 
 describe("ProcessOpsPrismaRepository dead-letter reads", () => {
   describe("given the fleet holds a dead message", () => {
-    describe("when findDeadMessages is called", () => {
+    describe("when listDeadMessages is called", () => {
       it("issues the queries and maps the rows it got back", async () => {
         const { repo, queryRaw } = repoAnswering([[deadRow], [{ total: 1 }]]);
 
-        const result = await repo.findDeadMessages({ page: 1, pageSize: 25 });
+        const result = await repo.listDeadMessages({ page: 1, pageSize: 25 });
 
         expect(queryRaw).toHaveBeenCalledTimes(2);
         expect(result.total).toBe(1);
@@ -73,7 +73,7 @@ describe("ProcessOpsPrismaRepository dead-letter reads", () => {
       it("passes the page's SQL the tenancy opt-out marker the guard requires", async () => {
         const { repo, queryRaw } = repoAnswering([[], [{ total: 0 }]]);
 
-        await repo.findDeadMessages({ page: 1, pageSize: 25 });
+        await repo.listDeadMessages({ page: 1, pageSize: 25 });
 
         // `strings` is the Prisma.Sql fragment list; the marker sits in the
         // first chunk. Without it dbMultiTenancyProtection rejects the read,
@@ -87,7 +87,7 @@ describe("ProcessOpsPrismaRepository dead-letter reads", () => {
       it("still returns a mapped page rather than the filter fragment", async () => {
         const { repo } = repoAnswering([[deadRow], [{ total: 1 }]]);
 
-        const result = await repo.findDeadMessages({
+        const result = await repo.listDeadMessages({
           processName: "triggerSettlement",
           page: 2,
           pageSize: 10,
@@ -100,11 +100,11 @@ describe("ProcessOpsPrismaRepository dead-letter reads", () => {
   });
 
   describe("given the fleet holds no dead messages", () => {
-    describe("when findDeadMessages is called", () => {
+    describe("when listDeadMessages is called", () => {
       it("reports an empty page instead of throwing", async () => {
         const { repo } = repoAnswering([[], []]);
 
-        const result = await repo.findDeadMessages({ page: 1, pageSize: 25 });
+        const result = await repo.listDeadMessages({ page: 1, pageSize: 25 });
 
         expect(result).toEqual({ messages: [], total: 0 });
       });

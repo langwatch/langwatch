@@ -39,7 +39,7 @@ export abstract class ProcessOpsRepository {
     overduePendingMs: number;
   }): Promise<ProcessNameCounts[]>;
 
-  abstract findInstances(params: {
+  abstract listInstances(params: {
     /** Omit to list instances across EVERY process manager. */
     processName?: string;
     page: number;
@@ -51,7 +51,7 @@ export abstract class ProcessOpsRepository {
   /** The soonest-due instance wakes across every process, for the dashboard. */
   abstract findUpcomingWakes(params: { limit: number }): Promise<ProcessWakeRow[]>;
 
-  abstract findOutboxMessages(params: {
+  abstract listOutboxMessages(params: {
     ref: ProcessRef;
     page: number;
     pageSize: number;
@@ -61,7 +61,7 @@ export abstract class ProcessOpsRepository {
    * Every retired message across the fleet, newest retirement first.
    * `processName` narrows to one process; omit it for everything.
    */
-  abstract findDeadMessages(params: {
+  abstract listDeadMessages(params: {
     processName?: string;
     page: number;
     pageSize: number;

@@ -13,7 +13,7 @@ export interface DatasetRecordRepository {
     projectId: string;
     ids: readonly string[];
   }): Promise<DatasetRecord[]>;
-  findAll(input: {
+  listAll(input: {
     datasetId: string;
     projectId: string;
     page: number;

@@ -61,7 +61,7 @@ export interface IssuedLicenseRepository {
   findAllByOrganization(organizationId: string): Promise<IssuedLicenseRecord[]>;
   /** Unrevoked licenses bound to one install, the most recently bound first. */
   findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]>;
-  findAll(params: {
+  listAll(params: {
     page: number;
     pageSize: number;
     search?: string;

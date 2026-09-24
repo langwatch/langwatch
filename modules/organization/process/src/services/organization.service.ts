@@ -357,7 +357,7 @@ export class OrganizationService extends OrganizationServiceContract {
   }
 
   listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage> {
-    return this.teams.findPage(listOrganizationTeamsInputSchema.parse(input));
+    return this.teams.listPage(listOrganizationTeamsInputSchema.parse(input));
   }
 
   async createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam> {

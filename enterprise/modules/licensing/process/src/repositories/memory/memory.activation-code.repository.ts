@@ -55,7 +55,7 @@ export class MemoryActivationCodeRepository implements ActivationCodeRepository 
     return row ? view(row) : null;
   }
 
-  async findAll({
+  async listAll({
     page,
     pageSize,
     organizationId,

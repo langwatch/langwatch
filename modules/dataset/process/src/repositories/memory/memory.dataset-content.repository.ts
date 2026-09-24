@@ -262,7 +262,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
       .map((row) => ({ slug: row.slug }));
   }
 
-  async findPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
+  async listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
     datasets: (DatasetRow & { _count: { datasetRecords: number } })[];
     total: number;
   }> {

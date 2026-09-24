@@ -39,7 +39,7 @@ export class PrismaActivationCodeRepository implements ActivationCodeRepository 
     return row === null ? null : rowOf(row);
   }
 
-  async findAll({
+  async listAll({
     page,
     pageSize,
     organizationId,

@@ -145,7 +145,7 @@ export class QueueService {
     page: number;
     pageSize: number;
   }> {
-    const result = await this.repository.findParkedGroups(params);
+    const result = await this.repository.listParkedGroups(params);
 
     return { ...result, page: params.page, pageSize: params.pageSize };
   }

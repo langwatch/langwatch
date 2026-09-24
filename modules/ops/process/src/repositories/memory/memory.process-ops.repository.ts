@@ -72,7 +72,7 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
     });
   }
 
-  async findInstances({
+  async listInstances({
     processName,
     page,
     pageSize,
@@ -113,7 +113,7 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
       }));
   }
 
-  async findOutboxMessages({
+  async listOutboxMessages({
     ref,
     page,
     pageSize,
@@ -132,7 +132,7 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
     };
   }
 
-  async findDeadMessages({
+  async listDeadMessages({
     processName,
     page,
     pageSize,

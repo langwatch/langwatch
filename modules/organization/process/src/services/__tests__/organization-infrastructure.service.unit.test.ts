@@ -165,7 +165,7 @@ class UnusedTeams extends TeamRepository {
   findOrganizationId(): Promise<string | null> {
     throw new Error("not used by this test");
   }
-  findPage(): Promise<OrganizationTeamPage> {
+  listPage(): Promise<OrganizationTeamPage> {
     throw new Error("not used by this test");
   }
   create(): Promise<OrganizationTeam> {
@@ -361,7 +361,7 @@ class MemoryTeams extends TeamRepository {
   findOrganizationId({ teamId }: { teamId: string }): Promise<string | null> {
     return Promise.resolve(teamId === this.team.id ? this.team.organizationId : null);
   }
-  findPage(): Promise<OrganizationTeamPage> {
+  listPage(): Promise<OrganizationTeamPage> {
     return Promise.resolve({
       data: [this.team],
       pagination: { page: 1, limit: 50, total: 1 },

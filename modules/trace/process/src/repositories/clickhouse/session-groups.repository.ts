@@ -93,7 +93,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
 
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async findSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage> {
+  async listSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage> {
     EventUtils.validateTenantId(
       { tenantId: query.tenantId },
       "SessionGroupsClickHouseRepository.findSessionGroups",

@@ -53,7 +53,7 @@ export interface ActivationCodeRepository {
   findByCodeHash(codeHash: string): Promise<ActivationCodeRecord | null>;
   findById(id: string): Promise<ActivationCodeRecord | null>;
 
-  findAll(input: {
+  listAll(input: {
     page: number;
     pageSize: number;
     organizationId?: string;

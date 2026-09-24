@@ -132,7 +132,7 @@ class MemoryRecordRepository implements DatasetRecordRepository {
     return this.records;
   }
   records: DatasetRecord[] = [];
-  async findAll(): Promise<{ records: DatasetRecord[]; total: number }> {
+  async listAll(): Promise<{ records: DatasetRecord[]; total: number }> {
     return { records: this.records, total: this.records.length };
   }
   async createMany(input: {

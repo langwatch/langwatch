@@ -103,7 +103,7 @@ const createDataset = async ({
 const listed = async (): Promise<
   { id: string; _count: { datasetRecords: number }; contentLayout?: string | null }[]
 > => {
-  const page = await datasets().findPaginated({ projectId: PROJECT_ID, skip: 0, take: 50 });
+  const page = await datasets().listPaginated({ projectId: PROJECT_ID, skip: 0, take: 50 });
 
   return page.datasets;
 };

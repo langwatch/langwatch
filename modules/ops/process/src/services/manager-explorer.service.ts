@@ -116,7 +116,7 @@ export class ManagerExplorerService {
     pageSize: number;
     search?: string;
   }): Promise<{ instances: ProcessInstanceRow[]; total: number }> {
-    return this.fleet.findInstances(params);
+    return this.fleet.listInstances(params);
   }
 
   /** The soonest-due instance wakes across every process, for the dashboard. */
@@ -145,7 +145,7 @@ export class ManagerExplorerService {
     page: number;
     pageSize: number;
   }): Promise<{ messages: ProcessOutboxMessageView[]; total: number }> {
-    return this.fleet.findOutboxMessages(params);
+    return this.fleet.listOutboxMessages(params);
   }
 
   /**
@@ -157,7 +157,7 @@ export class ManagerExplorerService {
     byProcess: DeadLetterCount[];
   }> {
     const [page, byProcess] = await Promise.all([
-      this.fleet.findDeadMessages(params),
+      this.fleet.listDeadMessages(params),
       this.fleet.countDeadByProcessName(),
     ]);
 

@@ -49,7 +49,7 @@ export class MemoryTeamRepository extends TeamRepository {
     return toOrganizationTeam(team);
   }
 
-  async findPage(input: {
+  async listPage(input: {
     organizationId: string;
     page: number;
     limit: number;

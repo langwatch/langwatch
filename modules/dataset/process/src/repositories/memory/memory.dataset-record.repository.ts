@@ -56,7 +56,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
       .map((record) => structuredClone(record));
   }
 
-  async findAll(input: {
+  async listAll(input: {
     datasetId: string;
     projectId: string;
     page: number;

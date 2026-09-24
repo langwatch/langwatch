@@ -74,7 +74,7 @@ export class PrismaTeamRepository extends TeamRepository {
     return team;
   }
 
-  async findPage(input: {
+  async listPage(input: {
     organizationId: string;
     page: number;
     limit: number;

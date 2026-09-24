@@ -186,7 +186,7 @@ class FakeRepository implements SessionGroupsRepository {
     private readonly rows: SessionGroupRow[],
     private readonly totalHits = 0,
   ) {}
-  async findSessionGroups(query: SessionGroupsQuery) {
+  async listSessionGroups(query: SessionGroupsQuery) {
     this.lastQuery = query;
     return {
       rows: this.rows.slice(0, query.limit),

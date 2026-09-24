@@ -124,7 +124,7 @@ export interface RawTotalsRow {
  */
 export abstract class ResultAtomsRepository {
   /** One page of atoms, newest first, keyset paginated. */
-  abstract findAtoms(input: {
+  abstract listAtoms(input: {
     filter: ResultsFilter;
     limit: number;
     cursor?: string;

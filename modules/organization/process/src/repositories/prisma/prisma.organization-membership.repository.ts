@@ -776,7 +776,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return rows.map((row) => row.userId);
   }
 
-  async findAllMembers(params: {
+  async listAllMembers(params: {
     organizationId: string;
     includeDisabled: boolean;
     offset: number;

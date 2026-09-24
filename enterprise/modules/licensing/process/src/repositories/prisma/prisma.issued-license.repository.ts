@@ -58,7 +58,7 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     return rows.map(rowOf);
   }
 
-  async findAll({
+  async listAll({
     page,
     pageSize,
     search,

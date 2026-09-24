@@ -51,7 +51,7 @@ describe("OrganizationMembershipService", () => {
     findMemberById: vi.fn(),
     findActiveMemberUsers: vi.fn(),
     getMembership: vi.fn(),
-    findAllMembers: vi.fn(),
+    listAllMembers: vi.fn(),
     findMemberTeamBindings: vi.fn(),
     deleteMember: vi.fn(),
     setMemberDisabled: vi.fn(),
@@ -722,7 +722,7 @@ describe("OrganizationMembershipService", () => {
         { userId: "user-1", role: OrganizationUserRole.MEMBER, disabledAt: null },
         { userId: "user-2", role: OrganizationUserRole.MEMBER, disabledAt: null },
       ];
-      vi.mocked(mockRepo.findAllMembers).mockResolvedValue({
+      vi.mocked(mockRepo.listAllMembers).mockResolvedValue({
         members: members as never,
         totalCount: members.length,
       });

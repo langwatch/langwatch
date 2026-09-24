@@ -207,7 +207,7 @@ export class SpanStorageService {
   async getSpansPaginated(
     params: Paginated & VisibilityGate,
   ): Promise<{ spans: Span[]; total: number }> {
-    const page = await this.repository.findSpansPaginated(params);
+    const page = await this.repository.listSpansPaginated(params);
 
     return {
       ...page,

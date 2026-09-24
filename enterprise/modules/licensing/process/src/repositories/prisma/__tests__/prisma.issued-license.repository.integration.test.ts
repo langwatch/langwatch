@@ -190,7 +190,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
   it("matches the list search on the customer name without regard to case", async () => {
     await issue("Zebra Logistics");
 
-    const { rows, total } = await repository.findAll({
+    const { rows, total } = await repository.listAll({
       page: 0,
       pageSize: 25,
       search: `zebra logistics ${RUN}`.toUpperCase(),

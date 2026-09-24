@@ -120,7 +120,7 @@ function explorerFilter({
 }
 
 function listWith({ tenantId, filterWhere }: { tenantId: string; filterWhere: TraceFilterWhere }) {
-  return repo.findAll({
+  return repo.listAll({
     tenantId,
     timeRange,
     sort: { column: "OccurredAt", direction: "desc" },

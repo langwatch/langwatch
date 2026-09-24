@@ -1464,7 +1464,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
   }
 
-  async findSpansPaginated({
+  async listSpansPaginated({
     tenantId,
     traceId,
     limit,

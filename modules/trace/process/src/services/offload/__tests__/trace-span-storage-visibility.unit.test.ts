@@ -25,7 +25,7 @@ const makeService = (spans: Span[]) =>
     repository: {
       findSpansByTraceId: vi.fn().mockResolvedValue(spans),
       findSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
-      findSpansPaginated: vi.fn().mockResolvedValue({ spans, total: spans.length }),
+      listSpansPaginated: vi.fn().mockResolvedValue({ spans, total: spans.length }),
       findSpansSince: vi.fn().mockResolvedValue(spans),
     } as never,
   });

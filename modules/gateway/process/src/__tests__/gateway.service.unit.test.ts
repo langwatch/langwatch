@@ -45,7 +45,7 @@ class FakeBudgetRepository extends GatewayBudgetRepository {
   findWithHealth(): never {
     throw new Error("not used");
   }
-  findPageWithHealth(): never {
+  listPageWithHealth(): never {
     throw new Error("not used");
   }
   findForProjectWithHealth(): never {

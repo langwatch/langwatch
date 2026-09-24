@@ -53,7 +53,7 @@ function makeRepo(data: FakeData) {
     aggregateGroups: vi.fn().mockResolvedValue(data.groups ?? []),
     aggregateTrend: vi.fn().mockResolvedValue(data.trend ?? []),
     aggregateSeries: vi.fn().mockResolvedValue(data.series ?? []),
-    findAtoms: vi.fn().mockResolvedValue({ atoms: data.atoms ?? [], hasMore: false }),
+    listAtoms: vi.fn().mockResolvedValue({ atoms: data.atoms ?? [], hasMore: false }),
     findRunOrdinals: vi.fn().mockResolvedValue([]),
     findCodeScenarios: vi.fn().mockResolvedValue([]),
     findRunTargets: vi.fn().mockResolvedValue(data.runTargets ?? []),

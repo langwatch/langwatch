@@ -71,7 +71,7 @@ async function insertRows(rows: ReturnType<typeof makeTraceSummaryRow>[]) {
 }
 
 describe.skipIf(!clickHouseConfigured)(
-  "TraceListClickHouseRepository.findAll cache/reasoning/context attributes",
+  "TraceListClickHouseRepository.listAll cache/reasoning/context attributes",
   () => {
     const cacheTenant = `test-cache-attrs-${nanoid()}`;
 
@@ -106,7 +106,7 @@ describe.skipIf(!clickHouseConfigured)(
     describe("given a trace carries fold-summed cache + reasoning token attributes", () => {
       /** @scenario "Context size is shown in the trace list next to tokens" */
       it("surfaces the reserved cache/reasoning/context keys so the list and drawer header can show them", async () => {
-        const page = await repo.findAll({
+        const page = await repo.listAll({
           tenantId: cacheTenant,
           timeRange: { from: base - 60_000, to: base + 60_000 },
           sort: { column: "OccurredAt", direction: "desc" },

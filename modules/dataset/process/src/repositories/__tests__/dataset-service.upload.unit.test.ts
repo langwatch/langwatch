@@ -55,7 +55,7 @@ class Records implements DatasetRecordRepository {
   async findPage() {
     return [];
   }
-  findAll = vi.fn(async () => ({ records: [], total: 0 }));
+  listAll = vi.fn(async () => ({ records: [], total: 0 }));
   createMany = vi.fn(async () => []);
   update = vi.fn(async () => {
     throw new Error("unused");

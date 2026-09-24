@@ -58,7 +58,7 @@ class Records implements DatasetRecordRepository {
   async findPage() {
     return [];
   }
-  findAll = vi.fn(async (): Promise<{ records: DatasetRecord[]; total: number }> => ({
+  listAll = vi.fn(async (): Promise<{ records: DatasetRecord[]; total: number }> => ({
     records: [],
     total: 0,
   }));

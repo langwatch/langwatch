@@ -174,7 +174,7 @@ export interface BatchedFacetResult {
 }
 
 export interface TraceListRead {
-  findAll(query: TraceListQuery): Promise<TraceListRepositoryPage>;
+  listAll(query: TraceListQuery): Promise<TraceListRepositoryPage>;
 
   findCount(params: {
     tenantId: string;

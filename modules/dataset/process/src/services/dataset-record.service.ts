@@ -95,7 +95,7 @@ export class DatasetRecordService {
       return this.options.content.listRecords({ dataset, input: parsed });
     }
 
-    const result = await this.options.records.findAll({
+    const result = await this.options.records.listAll({
       datasetId: dataset.id,
       projectId: parsed.projectId,
       page: parsed.page ?? 1,
@@ -225,7 +225,7 @@ export class DatasetRecordService {
       return this.options.content.getDatasetPage({ dataset, input: parsed });
     }
 
-    const page = await this.options.records.findAll({
+    const page = await this.options.records.listAll({
       datasetId: dataset.id,
       projectId: parsed.projectId,
       page: parsed.page ?? 1,

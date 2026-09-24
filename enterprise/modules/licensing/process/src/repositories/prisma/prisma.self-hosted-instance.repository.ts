@@ -72,7 +72,7 @@ export class PrismaSelfHostedInstanceRepository implements SelfHostedInstanceRep
     });
   }
 
-  async findPage(input: {
+  async listPage(input: {
     page: number;
     pageSize: number;
     search?: string;

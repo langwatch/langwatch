@@ -13,7 +13,7 @@ export abstract class TeamRepository {
    */
   abstract findOrganizationId(input: { teamId: string }): Promise<string | null>;
   abstract getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam>;
-  abstract findPage(input: {
+  abstract listPage(input: {
     organizationId: string;
     page: number;
     limit: number;

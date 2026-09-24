@@ -306,7 +306,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
 
   /** @scenario Session rollups sum every trace in the range, not one page */
   it("sums every trace of a session even when the page holds one session", async () => {
-    const page = await repository.findSessionGroups(query({ limit: 1 }));
+    const page = await repository.listSessionGroups(query({ limit: 1 }));
 
     // Beta is most recent (baseMs - 50s) and must carry BOTH its traces
     // even though the page fits a single session row.
@@ -318,7 +318,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     expect(beta.totalTokens).toBe(1800);
     expect(page.totalHits).toBe(2);
 
-    const full = await repository.findSessionGroups(query());
+    const full = await repository.listSessionGroups(query());
     const alpha = full.rows.find((row) => row.conversationId === SESSION_ALPHA)!;
     expect(alpha.traceCount).toBe(3);
     expect(alpha.totalCost).toBeCloseTo(6);
@@ -335,7 +335,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
 
   /** @scenario The rollup names each session's most recent trace */
   it("names the latest trace of every session row", async () => {
-    const page = await repository.findSessionGroups(query());
+    const page = await repository.listSessionGroups(query());
 
     const alpha = page.rows.find((row) => row.conversationId === SESSION_ALPHA)!;
     const beta = page.rows.find((row) => row.conversationId === SESSION_BETA)!;
@@ -371,7 +371,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
       }),
     ]);
 
-    const page = await repository.findSessionGroups(query());
+    const page = await repository.listSessionGroups(query());
     const session = page.rows.find((row) => row.conversationId === sessionId)!;
 
     expect(session.traceCount).toBe(1);
@@ -382,7 +382,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
   describe("given a content term that only one session's transcript mentions", () => {
     /** @scenario Session content search matches transcript text in log records */
     it("returns only the session whose log body mentions the term", async () => {
-      const page = await repository.findSessionGroups(query({ contentTerms: ["#6418"] }));
+      const page = await repository.listSessionGroups(query({ contentTerms: ["#6418"] }));
 
       expect(page.rows.map((row) => row.conversationId)).toEqual([SESSION_ALPHA]);
       // The rollup still sums the whole session, not the matching log alone.
@@ -391,7 +391,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     });
 
     it("unions transcript matches with trace-level filter matches", async () => {
-      const page = await repository.findSessionGroups(
+      const page = await repository.listSessionGroups(
         query({
           contentTerms: ["#6418"],
           filterWhere: {
@@ -431,7 +431,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
       }),
     ]);
 
-    const stale = await repository.findSessionGroups(
+    const stale = await repository.listSessionGroups(
       query({
         filterWhere: {
           sql: "ComputedInput ILIKE {supersededTerm:String}",
@@ -441,7 +441,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     );
     expect(stale.rows.map((row) => row.conversationId)).not.toContain(sessionId);
 
-    const current = await repository.findSessionGroups(
+    const current = await repository.listSessionGroups(
       query({
         filterWhere: {
           sql: "ComputedInput ILIKE {currentTerm:String}",
@@ -472,7 +472,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     let cursor: SessionGroupsQuery["cursor"];
     let didReachLastPage = false;
     for (let guard = 0; guard < 10; guard++) {
-      const page = await repository.findSessionGroups(query({ limit: 3, cursor }));
+      const page = await repository.listSessionGroups(query({ limit: 3, cursor }));
       const pageRows = page.rows.slice(0, 2);
       seen.push(...pageRows.map((row) => row.conversationId));
       activities.push(...pageRows.map((row) => row.lastActivityMs));

@@ -82,7 +82,7 @@ export class ResultAtomsService {
   }): Promise<{ atoms: ResultAtom[]; nextCursor?: string; hasMore: boolean }> {
     const scopedFilter = await this.resolveScenarioScope(filter);
     const [page, ordinals, plans] = await Promise.all([
-      this.repository.findAtoms({ filter: scopedFilter, limit, cursor }),
+      this.repository.listAtoms({ filter: scopedFilter, limit, cursor }),
       this.repository.findRunOrdinals(scopedFilter),
       this.readPlans(scopedFilter.projectId),
     ]);

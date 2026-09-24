@@ -60,7 +60,7 @@ async function datasetWith(answer: () => StoredObjectMetadata) {
   const saveRow = (entry: Record<string, unknown>) =>
     service.batchCreateRecords({ projectId, slugOrId: dataset.id, entries: [entry] });
   const rows = () =>
-    repositories.records.findAll({ datasetId: dataset.id, projectId, page: 1, limit: 10 });
+    repositories.records.listAll({ datasetId: dataset.id, projectId, page: 1, limit: 10 });
 
   return { service, dataset, getMetadata, saveRow, rows };
 }

@@ -121,7 +121,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     return new TraceListClickHouseRepository(resolveClient);
   }
 
-  async findAll(query: TraceListQuery): Promise<TraceListRepositoryPage> {
+  async listAll(query: TraceListQuery): Promise<TraceListRepositoryPage> {
     EventUtils.validateTenantId(
       { tenantId: query.tenantId },
       "TraceListClickHouseRepository.findAll",
@@ -1407,6 +1407,6 @@ type FacetRow = {
 
 // CH returns empty strings for missing Map keys; the list mapper expects
 // keys absent so its ?? null / ?? "" fallbacks fire, not present-but-empty.
-// Keys below match findAll's explicit Attributes[...] projections — add a
+// Keys below match listAll's explicit Attributes[...] projections — add a
 // new one in both places. If user-pinned attribute columns ship, prefer an
 // extraAttributeKeys: string[] input over reintroducing the full Map projection.

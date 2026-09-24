@@ -443,7 +443,7 @@ export class DatasetService {
       return target;
     }
 
-    const records = await this.options.records.findAll({
+    const records = await this.options.records.listAll({
       datasetId: source.id,
       projectId: parsed.sourceProjectId,
       page: 1,

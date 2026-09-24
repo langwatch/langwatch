@@ -339,7 +339,7 @@ export abstract class OrganizationMembershipRepository {
     userId: string;
   }) => Promise<OrganizationMemberSummary>;
 
-  // findAllMembers and the members through updateTeamMemberRole below are
+  // listAllMembers and the members through updateTeamMemberRole below are
   // function-typed properties, not method shorthand, so test mocks can be
   // asserted on directly without tripping `unbound-method`.
 
@@ -360,7 +360,7 @@ export abstract class OrganizationMembershipRepository {
   }): Promise<string[]>;
 
   /** Paginated membership list for the management surface. */
-  abstract findAllMembers: (params: {
+  abstract listAllMembers: (params: {
     organizationId: string;
     includeDisabled: boolean;
     offset: number;

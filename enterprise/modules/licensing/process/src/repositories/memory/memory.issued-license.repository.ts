@@ -69,7 +69,7 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
       .map((row) => ({ ...row }));
   }
 
-  async findAll({
+  async listAll({
     page,
     pageSize,
     search,

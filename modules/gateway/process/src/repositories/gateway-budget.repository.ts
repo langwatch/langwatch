@@ -127,7 +127,7 @@ export abstract class GatewayBudgetRepository {
   abstract findAll(input: GatewayOrganizationBudgetReadInput): Promise<GatewayBudgetWithSeats[]>;
   abstract findForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]>;
   abstract findWithHealth(input: GatewayOrganizationBudgetReadInput): Promise<BudgetListWithHealth>;
-  abstract findPageWithHealth(
+  abstract listPageWithHealth(
     input: GatewayBudgetPageInput & GatewayOrganizationBudgetReadInput,
   ): Promise<BudgetListWithHealth>;
   abstract findForProjectWithHealth(

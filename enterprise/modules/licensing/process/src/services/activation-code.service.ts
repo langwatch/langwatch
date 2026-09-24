@@ -116,7 +116,7 @@ export class ActivationCodeService {
     pageSize: number;
     organizationId?: string;
   }): Promise<ActivationCodePage> {
-    const { rows, total } = await this.collaborators.repository.findAll(input);
+    const { rows, total } = await this.collaborators.repository.listAll(input);
     return { codes: rows.map((row) => this.#view(row)), total };
   }
 

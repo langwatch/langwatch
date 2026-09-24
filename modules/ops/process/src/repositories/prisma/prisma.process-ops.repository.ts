@@ -136,7 +136,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     return Array.from(byName.values());
   }
 
-  async findInstances(params: {
+  async listInstances(params: {
     /** Omit to list instances across EVERY process manager. */
     processName?: string;
     page: number;
@@ -261,7 +261,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
     }));
   }
 
-  async findOutboxMessages(params: {
+  async listOutboxMessages(params: {
     ref: ProcessRef;
     page: number;
     pageSize: number;
@@ -301,7 +301,7 @@ export class ProcessOpsPrismaRepository implements ProcessOpsRepository {
   /**
    * Every retired message across the fleet, newest retirement first.
    */
-  async findDeadMessages(params: {
+  async listDeadMessages(params: {
     processName?: string;
     page: number;
     pageSize: number;

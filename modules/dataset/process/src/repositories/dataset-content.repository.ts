@@ -106,7 +106,7 @@ export interface DatasetContentRepository {
   }): Promise<DatasetRow | null>;
   findStalePendingUploads(input: { projectId: string; olderThan: Instant }): Promise<DatasetRow[]>;
   findAllSlugs(input: { projectId: string }): Promise<{ slug: string }[]>;
-  findPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
+  listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
     datasets: (DatasetRow & { _count: { datasetRecords: number } })[];
     total: number;
   }>;

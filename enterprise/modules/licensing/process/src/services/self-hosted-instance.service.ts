@@ -119,7 +119,7 @@ export class SelfHostedInstanceService {
     pageSize: number;
     search?: string;
   }): Promise<SelfHostedInstancePage> {
-    const { rows, total } = await this.collaborators.repository.findPage(input);
+    const { rows, total } = await this.collaborators.repository.listPage(input);
     return { instances: await this.viewsOf(rows), total };
   }
 

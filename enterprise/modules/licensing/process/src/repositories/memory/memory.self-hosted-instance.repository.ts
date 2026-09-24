@@ -40,7 +40,7 @@ export class MemorySelfHostedInstanceRepository implements SelfHostedInstanceRep
     });
   }
 
-  async findPage({
+  async listPage({
     page,
     pageSize,
     search,

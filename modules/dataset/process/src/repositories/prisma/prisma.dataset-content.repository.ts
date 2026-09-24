@@ -337,7 +337,7 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${datasetId}`}, 0))`;
   /**
    * Lists non-archived datasets for a project with pagination and record counts.
    */
-  async findPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
+  async listPaginated(input: { projectId: string; skip: number; take: number }): Promise<{
     datasets: (DatasetRow & { _count: { datasetRecords: number } })[];
     total: number;
   }> {

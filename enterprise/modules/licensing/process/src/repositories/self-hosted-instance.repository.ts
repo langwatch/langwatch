@@ -73,7 +73,7 @@ export interface SelfHostedInstanceRepository {
   upsert(row: SelfHostedInstanceUpsert): Promise<void>;
   appendReport(report: SelfHostedReportInsert): Promise<void>;
   /** Most recent activity first, which is the order an operator wants. */
-  findPage(input: {
+  listPage(input: {
     page: number;
     pageSize: number;
     search?: string;

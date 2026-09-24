@@ -48,7 +48,7 @@ export abstract class QueueRepository {
    * One parked tenant's groups, ordered by dispatch eligibility.
    * every pod reads would recreate the size problem ADR-090 removes.
    */
-  abstract findParkedGroups(params: {
+  abstract listParkedGroups(params: {
     queueName: string;
     tenantId: string;
     page: number;
@@ -187,7 +187,7 @@ export class NullQueueRepository extends QueueRepository {
     return { tenants: [], total: 0 };
   }
 
-  async findParkedGroups(): Promise<{
+  async listParkedGroups(): Promise<{
     groups: ParkedGroupInfo[];
     total: number;
   }> {

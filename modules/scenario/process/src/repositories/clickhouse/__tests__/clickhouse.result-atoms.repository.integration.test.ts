@@ -161,7 +161,7 @@ afterAll(async () => {
   ch = undefined;
 });
 
-describe.skipIf(databaseUrl === null)("findAtoms", () => {
+describe.skipIf(databaseUrl === null)("listAtoms", () => {
   describe("given one run of one scenario against one target", () => {
     /** @scenario "An atom names its plan, its run and its scenario" */
     /** @scenario "An atom carries the target the run was pointed at" */
@@ -181,7 +181,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -211,7 +211,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -228,7 +228,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
       const setId = `set-${nanoid(6)}`;
       await insertRows([makeRow({ batchRunId: `batch-${nanoid(6)}`, scenarioSetId: setId })]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -258,7 +258,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         ),
       );
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -297,7 +297,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -319,7 +319,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -341,7 +341,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         makeRow({ batchRunId: `batch-${nanoid(6)}`, scenarioSetId: setId }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -372,7 +372,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -390,7 +390,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
       });
 
       await expect(
-        failing.findAtoms({
+        failing.listAtoms({
           filter: baseFilter({ scenarioIds: [] }),
           limit: 10,
         }),
@@ -414,7 +414,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
         ),
       );
 
-      const first = await repo.findAtoms({
+      const first = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 2,
       });
@@ -422,7 +422,7 @@ describe.skipIf(databaseUrl === null)("findAtoms", () => {
       expect(first.hasMore).toBe(true);
       expect(first.nextCursor).toBeDefined();
 
-      const second = await repo.findAtoms({
+      const second = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
         cursor: first.nextCursor,
@@ -469,7 +469,7 @@ describe.skipIf(databaseUrl === null)("the evaluator results of an atom", () => 
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter(),
         limit: 50,
       });
@@ -507,7 +507,7 @@ describe.skipIf(databaseUrl === null)("the evaluator results of an atom", () => 
       ]);
 
       const filter = baseFilter({ scenarioSetIds: [scenarioSetId] });
-      const { atoms } = await repo.findAtoms({ filter, limit: 50 });
+      const { atoms } = await repo.listAtoms({ filter, limit: 50 });
       const groups = await repo.aggregateGroups({ filter, groupBy: "plan" });
 
       expect(atoms).toHaveLength(1);
@@ -531,7 +531,7 @@ describe.skipIf(databaseUrl === null)("the evaluator results of an atom", () => 
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [scenarioSetId] }),
         limit: 50,
       });
@@ -557,7 +557,7 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -584,7 +584,7 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -614,7 +614,7 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -644,7 +644,7 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -668,7 +668,7 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -693,7 +693,7 @@ describe.skipIf(databaseUrl === null)("the cost of an atom", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -749,7 +749,7 @@ describe.skipIf(databaseUrl === null)("filters", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -783,7 +783,7 @@ describe.skipIf(databaseUrl === null)("filters", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId], scenarioIds: [wanted] }),
         limit: 10,
       });
@@ -815,7 +815,7 @@ describe.skipIf(databaseUrl === null)("filters", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({
           scenarioSetIds: [setId],
           scenarioIds: [`${setId}-list-agents`],
@@ -846,7 +846,7 @@ describe.skipIf(databaseUrl === null)("filters", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({
           scenarioSetIds: [setId],
           targetKeys: ["agent_dev"],
@@ -892,7 +892,7 @@ describe.skipIf(databaseUrl === null)("filters", () => {
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId], outcome: "failed" }),
         limit: 10,
       });
@@ -922,7 +922,7 @@ describe.skipIf(databaseUrl === null)("the target of a run that reports its agen
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -975,7 +975,7 @@ describe.skipIf(databaseUrl === null)("the target of a run that reports its agen
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -998,7 +998,7 @@ describe.skipIf(databaseUrl === null)("the target of a run that reports its agen
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -1037,7 +1037,7 @@ describe.skipIf(databaseUrl === null)("the target of a run whose target carries 
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });
@@ -1103,7 +1103,7 @@ describe.skipIf(databaseUrl === null)("the target of a run whose target carries 
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({
           scenarioSetIds: [setId],
           targetKeys: [variantKey],
@@ -1127,7 +1127,7 @@ describe.skipIf(databaseUrl === null)("the target of a run whose target carries 
         }),
       ]);
 
-      const { atoms } = await repo.findAtoms({
+      const { atoms } = await repo.listAtoms({
         filter: baseFilter({ scenarioSetIds: [setId] }),
         limit: 10,
       });

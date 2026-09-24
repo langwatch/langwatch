@@ -270,7 +270,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     });
 
     it("lists instances with their per-row outbox trouble, searchably", async () => {
-      const all = await fleet.findInstances({
+      const all = await fleet.listInstances({
         processName: ns,
         page: 1,
         pageSize: 10,
@@ -280,7 +280,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       expect(stuck?.deadMessages).toBe(2);
       expect(stuck?.pendingMessages).toBe(2);
 
-      const searched = await fleet.findInstances({
+      const searched = await fleet.listInstances({
         processName: ns,
         page: 1,
         pageSize: 10,
@@ -291,7 +291,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     });
 
     it("serves the outbox page with the trace id parsed from the carrier", async () => {
-      const outbox = await fleet.findOutboxMessages({
+      const outbox = await fleet.listOutboxMessages({
         ref: { processName: ns, projectId: PROJECT, processKey: "stuck" },
         page: 1,
         pageSize: 10,

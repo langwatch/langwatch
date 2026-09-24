@@ -179,7 +179,7 @@ export class TraceListService {
       throw new PageTooDeepError(TRACE_LIST_MAX_OFFSET_ROWS);
     }
 
-    const result = await this.repository.findAll({
+    const result = await this.repository.listAll({
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: params.sort.direction },

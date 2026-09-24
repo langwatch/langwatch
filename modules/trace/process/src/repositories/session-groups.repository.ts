@@ -85,11 +85,11 @@ export interface SessionGroupsPage {
 }
 
 export abstract class SessionGroupsRepository {
-  abstract findSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage>;
+  abstract listSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage>;
 }
 
 export class NullSessionGroupsRepository implements SessionGroupsRepository {
-  async findSessionGroups(): Promise<SessionGroupsPage> {
+  async listSessionGroups(): Promise<SessionGroupsPage> {
     return { rows: [], totalHits: 0 };
   }
 }
