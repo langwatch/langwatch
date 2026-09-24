@@ -1,7 +1,7 @@
 import type { Readable } from "node:stream";
 
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { EventSourcing, QueueSendOptions, TenantId } from "@langwatch/eventing";
+import type { TenantId } from "@langwatch/eventing";
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type {
@@ -34,28 +34,14 @@ import type {
   TraceNameChangedEventData,
   TraceQueryClassification,
   TraceRecordValue,
-  TraceTopicAssignment,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
 
 import type { EventingTracePipelineAdapter } from "../services/eventing.trace-pipeline.service.ts";
 
-/**
- * Dispatch online-evaluator runs for ingested traces. Payload is Trace's
- * (fold state, monitor, delay, TTL); dedup key is Evaluation's (from makeJobId).
- * Ported (not imported) to avoid cross-feature server dependency.
- */
+/** Queues an online-evaluator run for an ingested trace; Evaluation owns its delay and dedup. */
 export interface TraceEvaluationDispatch {
-  /**
-   * The queue deduplication id for this evaluation run. Called by the queue
-   * for every send, so it must stay pure and cheap.
-   */
-  makeDedupId(data: ExecuteEvaluationCommandData): string;
-
-  send(
-    data: ExecuteEvaluationCommandData,
-    options?: QueueSendOptions<ExecuteEvaluationCommandData>,
-  ): Promise<void>;
+  send(data: ExecuteEvaluationCommandData): Promise<void>;
 }
 
 /**
@@ -271,28 +257,11 @@ export interface TraceProcessingCommands {
   assignTopic(data: AssignTopicCommandData): Promise<unknown>;
 }
 
-/** Worker-facing installation capability for Trace's complete processing graph. */
-export interface TraceProcessingInstaller {
-  install(eventSourcing: EventSourcing): {
-    traceAssignments: TraceTopicAssignment;
-    /** The registered recordSpan command. Available only AFTER registration,
-     * so the process that needs it uses a late-bound proxy. */
-    commands: TraceProcessingCommands;
-  };
-}
-
 /** The exact definition Trace's builder produces, commands and projections
  * included. Type-preserves the commands (recordSpan as itself, not as union). */
 export type TraceProcessingPipelineDefinition = ReturnType<
   ReturnType<EventingTracePipelineAdapter["build"]>["build"]
 >;
-
-/** Process-composed Trace pipeline definition, built before registration. */
-export interface TraceProcessingPipeline {
-  build(options: {
-    deferredOrigins: TraceDeferredOriginScheduler;
-  }): TraceProcessingPipelineDefinition;
-}
 
 /** One product-usage event, as the ingest path emits it. Keyed by userId,
  * not traced to observability. */
@@ -342,12 +311,12 @@ export interface TraceSpanNormalization {
 }
 
 export interface TraceSpanPiiRedaction {
-  redact(
-    span: OtlpSpan,
-    resource: OtlpResource | null,
-    level: PIIRedactionLevel,
-    tenantId: TenantId,
-  ): Promise<void>;
+  redact(input: {
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    tenantId: TenantId;
+  }): Promise<void>;
 }
 
 export interface TraceSpanCostEnrichment {

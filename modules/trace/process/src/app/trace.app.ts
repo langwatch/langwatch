@@ -582,17 +582,13 @@ const traceQueryTranslator = ClickHouseTraceQueryRepository.create();
 const langWatchQLTraceFilter = ClickHouseTraceQueryLangWatchQLRepository.create();
 
 /**
- * The store members this process opens, plus the three facts the process
- * itself knows: its public origin, its own name, and whether it produces the
- * pipeline. None of the three is a deployment fact, so none is config.
+ * The store members this process opens, plus the two facts the process itself
+ * knows: its public origin and its own name. Neither is a deployment fact.
  */
-type TraceMembers = MembersRead<
-  readonly ["clickhouse", "eventing", "logger", "redis", "rateLimiter"]
-> &
+type TraceMembers = MembersRead<readonly ["clickhouse", "logger", "redis", "rateLimiter"]> &
   Readonly<{
     publicBaseUrl: string | undefined;
     processName: string;
-    producesPipelines: boolean;
   }>;
 
 type TraceSetup = FeatureSetup<
@@ -612,13 +608,11 @@ export class TraceApp implements TraceApi, CollectorApp {
    */
   static readonly reads = [
     "clickhouse",
-    "eventing",
     "logger",
     "redis",
     "rateLimiter",
     "publicBaseUrl",
     "processName",
-    "producesPipelines",
   ] as const;
 
   static create(input: TraceAppDependencies | TraceSetup): TraceApp {

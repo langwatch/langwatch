@@ -53,7 +53,7 @@ function createCommand(attributes: OtlpSpan["attributes"]): Command<RecordSpanCo
 
 function createOptions(mutatingPiiRedact: (span: OtlpSpan) => void): RecordSpanCommandOptions {
   const piiRedaction: TraceSpanPiiRedaction = {
-    redact: async (span) => {
+    redact: async ({ span }) => {
       mutatingPiiRedact(span);
     },
   };

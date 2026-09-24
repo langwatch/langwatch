@@ -1,3 +1,4 @@
+import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -7,6 +8,7 @@ import type { EventingParticipation } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceCapabilityUnavailableError,
@@ -21,6 +23,7 @@ import type {
 import { CustomEvaluationSync } from "../eventing/custom-evaluation-sync.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "../eventing/evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "../eventing/experiment-metrics-sync.subscriber.ts";
+import { passesTraceOriginGuards } from "../eventing/origin-guarded.subscriber.ts";
 import { ProjectMetadataSync } from "../eventing/project-metadata.subscriber.ts";
 import { createSimulationMetricsSyncHandler } from "../eventing/simulation-metrics-sync.subscriber.ts";
 import { SpanStorageStore } from "../eventing/span-storage.store.ts";
@@ -49,12 +52,20 @@ import { TraceSpanNormalizationAdapter } from "./trace-span-normalization-adapte
 export interface TraceProcessingPeers {
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays">;
-  evaluations: Pick<EvaluationApi, "reportEvaluation">;
+  automations: Pick<
+    AutomationApi,
+    "handleTraceTriggerMatch" | "handleEvaluationGraphTriggerActivity"
+  >;
+  evaluations: Pick<
+    EvaluationApi,
+    "queueTraceEvaluation" | "reportEvaluation" | "deriveEvaluatorId"
+  >;
   experiments: Pick<ExperimentApi, "computeRunMetrics" | "lookupExperimentId">;
   featureFlags: FeatureFlagApi;
   modelProviders: Pick<ModelProviderApi, "listCosts">;
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
+  scenarios: Pick<ScenarioApi, "computeRunMetrics">;
   topics: Pick<TopicApi, "bootstrapClustering">;
 }
 
@@ -121,8 +132,7 @@ export class TraceProcessingPipelineService {
       prepareEventForProjection: (event) => TraceProjectionLeanService.leanForProjection(event),
       recordSpanCommand: EventingRecordSpanAdapter.create({
         piiRedaction: {
-          redact: (span, resource, piiRedactionLevel, tenantId) =>
-            peers.dataPrivacy.redactSpan({ span, resource, piiRedactionLevel, tenantId }),
+          redact: (input) => peers.dataPrivacy.redactSpan(input),
         },
         contentDrop: {
           drop: (span, projectId) => peers.dataPrivacy.dropSpanContent({ span, projectId }),
@@ -160,19 +170,12 @@ export class TraceProcessingPipelineService {
       evaluationTrigger: createEvaluationTriggerSubscriber({
         featureFlags: peers.featureFlags,
         monitors: peers.monitors,
-        evaluation: {
-          makeDedupId: () => {
-            throw this.#refuse("the delayed evaluation execute operation");
-          },
-          send: refusing("the delayed evaluation execute operation"),
-        },
+        evaluation: { send: (data) => peers.evaluations.queueTraceEvaluation(data) },
         metrics: OtelTraceEvaluationLoopMetricsAdapter.create(),
       }),
       customEvaluationSync: CustomEvaluationSync.createCustomEvaluationSyncHandler({
         reportEvaluation: (data) => peers.evaluations.reportEvaluation(data),
-        deriveEvaluatorId: () => {
-          throw this.#refuse("the evaluator id slug derivation");
-        },
+        deriveEvaluatorId: (name) => peers.evaluations.deriveEvaluatorId(name),
       }),
       trackedEventSync: TrackedEventSync.createTrackedEventSyncHandler({
         recordTrackedEvent: this.input.recordTrackedEvent,
@@ -186,7 +189,7 @@ export class TraceProcessingPipelineService {
         },
       }),
       simulationMetricsSync: createSimulationMetricsSyncHandler({
-        computeRunMetrics: refusing("ScenarioApi.computeRunMetrics"),
+        computeRunMetrics: (data) => peers.scenarios.computeRunMetrics(data),
       }),
       experimentMetricsSync: createExperimentMetricsSyncHandler({
         computeExperimentRunMetrics: (data) => peers.experiments.computeRunMetrics(data),
@@ -195,7 +198,18 @@ export class TraceProcessingPipelineService {
           return found.kind === "recorded" ? found.experimentId : null;
         },
       }),
-      triggerMatch: refusing("the automation trace trigger-match handler"),
+      triggerMatch: async (event, context) => {
+        if (!passesTraceOriginGuards(event, context.state)) return;
+        await peers.automations.handleTraceTriggerMatch({
+          event: { occurredAt: event.occurredAt },
+          context: { tenantId: String(context.tenantId), aggregateId: context.aggregateId },
+        });
+      },
+      graphTriggerActivity: (event, context) =>
+        peers.automations.handleEvaluationGraphTriggerActivity({
+          event: { occurredAt: event.occurredAt },
+          context: { tenantId: String(context.tenantId) },
+        }),
       spanStorageBroadcast: refusing("the span storage broadcast"),
       broadcastDisabled: true,
     };

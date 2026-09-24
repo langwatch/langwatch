@@ -1,8 +1,6 @@
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { QueueSendOptions } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
-import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   SYNTHETIC_TRACE_SPAN_NAMES,
@@ -17,7 +15,6 @@ import type {
   TraceEvaluationLoopMetrics,
   TraceEvaluationMonitor,
 } from "../app/trace.members.ts";
-import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../services/eventing.deferred-origin.service.ts";
 import {
   defineOriginGuardedTraceSubscriber,
   type TraceSummarySubscriber,
@@ -309,14 +306,7 @@ async function dispatchEvaluations({
         ...traceFields,
       };
 
-      await deps.evaluation.send(
-        payload,
-        buildSendOptions({
-          dispatch: deps.evaluation,
-          monitor,
-          threadId: traceFields.threadId,
-        }),
-      );
+      await deps.evaluation.send(payload);
     } catch (error) {
       logger.error(
         {
@@ -335,49 +325,6 @@ async function dispatchEvaluations({
     { tenantId, traceId, monitorCount: monitors.length },
     "Sent executeEvaluation commands for trace",
   );
-}
-
-function buildSendOptions({
-  dispatch,
-  monitor,
-  threadId,
-}: {
-  dispatch: TraceEvaluationDispatch;
-  monitor: Pick<MonitorSummary, "threadIdleTimeout">;
-  threadId: string | undefined;
-}): QueueSendOptions<ExecuteEvaluationCommandData> {
-  const makeId = (payload: ExecuteEvaluationCommandData): string => dispatch.makeDedupId(payload);
-  const isThreadLevel = monitor.threadIdleTimeout && monitor.threadIdleTimeout > 0 && threadId;
-
-  if (isThreadLevel) {
-    return {
-      delay: monitor.threadIdleTimeout! * 1000,
-      deduplication: {
-        makeId,
-        ttlMs: monitor.threadIdleTimeout! * 1000,
-        // Defensive on this branch: the thread dedup TTL roughly equals the
-        // dispatch delay (both = threadIdleTimeout), so the post-dispatch
-        // squash window is ~0. The load-bearing fix is the trace-level
-        // deferred branch below (6-min TTL >> dispatch latency) (#3912).
-        shouldSurviveDispatch: true,
-      },
-    };
-  }
-
-  return {
-    deduplication: {
-      makeId,
-      // 6 min — outlasts the 5-min deferred origin resolution window
-      // so that if the subscriber fires twice (once from a late span,
-      // once from the deferred OriginResolvedEvent), the second
-      // dispatch is squashed by the dedup key.
-      ttlMs: DEFERRED_ORIGIN_CHECK_DELAY_MS + 60_000,
-      // Honor the still-alive dedup key even after the first command was
-      // dispatched, so the second trigger is squashed rather than
-      // DEL+restaged into a duplicate evaluation run (#3912).
-      shouldSurviveDispatch: true,
-    },
-  };
 }
 
 function parseLabels(labelsJson: string | undefined): string[] | undefined {

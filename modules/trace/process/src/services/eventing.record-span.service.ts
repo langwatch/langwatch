@@ -153,7 +153,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
 
     const piiRedactionLevel = commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
     const [piiResult, costResult, tokenResult] = await Promise.allSettled([
-      this.options.piiRedaction.redact(span, resource, piiRedactionLevel, tenantId),
+      this.options.piiRedaction.redact({ span, resource, piiRedactionLevel, tenantId }),
       this.options.costEnrichment.enrich(span, command.tenantId),
       this.options.tokenEstimation.estimate(span, command.tenantId),
     ]);

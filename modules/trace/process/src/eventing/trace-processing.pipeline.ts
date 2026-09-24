@@ -48,6 +48,13 @@ import {
   TrackedEventSync,
 } from "./tracked-event-sync.subscriber.ts";
 
+/** Automation's graph-alert debounce, restated as evaluation-processing.service.ts:37 does. */
+const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
+
+function graphTriggerActivityGroupKey(event: { tenantId: string }): string {
+  return `graph-trigger-activity:${event.tenantId}`;
+}
+
 type SummaryHandler = (
   event: TraceProcessingEvent,
   context: TriggerContext<TraceSummaryData>,
@@ -64,6 +71,10 @@ export interface TraceProcessingReactions {
   simulationMetricsSync: SummaryHandler;
   experimentMetricsSync: SummaryHandler;
   triggerMatch: SummaryHandler;
+  graphTriggerActivity: (
+    event: TraceProcessingEvent,
+    context: { tenantId: string },
+  ) => Promise<void>;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
@@ -147,6 +158,19 @@ export function buildTraceProcessingConsumer(
       delay: 30_000,
       ttl: 30_000,
       handler: (event, context) => reactions.triggerMatch(event, context),
+    })
+    .withEventSubscriber("graphTriggerActivity", {
+      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+      dedup: {
+        makeId: graphTriggerActivityGroupKey,
+        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+        extend: false,
+        replace: false,
+      },
+      // One lane per tenant, shared with evaluation_processing's registration.
+      groupKeyFn: graphTriggerActivityGroupKey,
+      handler: (event, context) => reactions.graphTriggerActivity(event, context),
     })
     .withProjectionSubscriber("spanStorageBroadcast", {
       map: "spanStorage",

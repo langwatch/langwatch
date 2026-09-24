@@ -4,7 +4,7 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { createTenantId, type QueueSendOptions, type TriggerContext } from "@langwatch/eventing";
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import {
@@ -130,14 +130,7 @@ const spanAtDepth = ({
 class RecordingDispatch implements TraceEvaluationDispatch {
   readonly sent: ExecuteEvaluationCommandData[] = [];
 
-  makeDedupId(data: ExecuteEvaluationCommandData): string {
-    return `exec:${data.tenantId}:${data.traceId}:${data.evaluatorId}`;
-  }
-
-  async send(
-    data: ExecuteEvaluationCommandData,
-    _options?: QueueSendOptions<ExecuteEvaluationCommandData>,
-  ): Promise<void> {
+  async send(data: ExecuteEvaluationCommandData): Promise<void> {
     this.sent.push(data);
   }
 }

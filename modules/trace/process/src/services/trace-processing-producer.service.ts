@@ -163,7 +163,7 @@ class ProducerOnlySpanNormalization implements TraceSpanNormalization {
 class ProducerOnlyPiiRedaction implements TraceSpanPiiRedaction {
   constructor(private readonly processName: string) {}
 
-  redact(_span: unknown, _resource: unknown, _level: unknown, _tenantId: TenantId): Promise<void> {
+  redact(_input: { tenantId: TenantId }): Promise<void> {
     return Promise.reject(producerOnly(this.processName, "redact a span"));
   }
 }

@@ -29,11 +29,8 @@ export {
   EventingTracePipelineAdapter,
   type EventingTracePipelineAdapterOptions,
 } from "./services/eventing.trace-pipeline.service.ts";
-export { TraceProcessingServerInstallerAdapter } from "./services/eventing.trace-processing-installer.service.ts";
 export type {
-  TraceProcessingInstaller,
   TraceDeferredOriginScheduler,
-  TraceProcessingPipeline,
   TraceSpanTokenEstimation,
   TraceSpoolLegacyObject,
   TraceSpoolStorage,

@@ -45,34 +45,31 @@ Feature: Trace processing pipeline registration ownership
     When a pipeline with a different name is registered
     Then both registrations are held
 
-  @unit
+  # Retired 2026-09-25: trace registers through its own withEventing; the kernel registers once per role.
   Scenario: The producing process registers the pipeline it stages commands on
     Given a process in Trace's producer role
     When it composes Trace
     Then it registers the trace_processing pipeline exactly once
 
-  @unit
+  # Retired 2026-09-25: trace registers through its own withEventing; the kernel registers once per role.
   Scenario: The draining process registers no second pipeline
     Given a process that drains the trace_processing pipeline
     When it composes Trace before its install phase
     Then it registers no pipeline
 
   @unit
-  Scenario: A command sent before the install phase names the missing registration
-    Given a process that drains the trace_processing pipeline
-    And it has composed Trace but not yet installed the processing pipeline
+  Scenario: A command sent before the pipeline is connected names the missing command
+    Given Trace has been composed but trace_processing has not connected its senders
     When a trace command is sent
-    Then the command is refused naming the trace_processing pipeline
+    Then the command is refused by name, naming the trace_processing command
 
   @unit
-  Scenario: Trace's commands reach the registration the process made
-    Given a process that drains the trace_processing pipeline
-    And its install phase has registered the complete definition
-    When Trace sends its recorded span, annotation and rename commands
-    Then every one of them reaches the process's own registration
-    And the process still holds exactly one registration
+  Scenario: Trace's commands reach the senders the process connected
+    Given trace_processing has connected its senders to Trace
+    When Trace sends its annotation and rename commands
+    Then every one of them reaches the connected sender of the same name
 
-  @unit
+  # Retired 2026-09-25: trace registers through its own withEventing; the kernel registers once per role.
   Scenario: A command the process's registration does not declare refuses by name
     Given a process that drains the trace_processing pipeline
     And its registration declares no rename command

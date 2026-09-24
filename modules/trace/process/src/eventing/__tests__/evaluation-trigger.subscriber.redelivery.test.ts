@@ -1,6 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { createTenantId, type QueueSendOptions, type TriggerContext } from "@langwatch/eventing";
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import {
@@ -129,26 +129,12 @@ const monitor: MonitorSummary = {
   evaluator: null,
 };
 
-/** The evaluation command's real identity, as `ExecuteEvaluationCommand` mints it. */
+/** Records what trace queued; evaluation's queue owns the dedup over these fields. */
 class Dispatch implements TraceEvaluationDispatch {
-  readonly sent: {
-    data: ExecuteEvaluationCommandData;
-    options?: QueueSendOptions<ExecuteEvaluationCommandData>;
-  }[] = [];
+  readonly sent: { data: ExecuteEvaluationCommandData }[] = [];
 
-  makeDedupId(data: ExecuteEvaluationCommandData): string {
-    if (data.threadIdleTimeout && data.threadIdleTimeout > 0 && data.threadId) {
-      return `exec:${data.tenantId}:thread:${data.threadId}:${data.evaluatorId}`;
-    }
-
-    return `exec:${data.tenantId}:${data.traceId}:${data.evaluatorId}`;
-  }
-
-  async send(
-    data: ExecuteEvaluationCommandData,
-    options?: QueueSendOptions<ExecuteEvaluationCommandData>,
-  ): Promise<void> {
-    this.sent.push({ data, options });
+  async send(data: ExecuteEvaluationCommandData): Promise<void> {
+    this.sent.push({ data });
   }
 }
 
@@ -190,12 +176,17 @@ describe("the evaluationTrigger subscriber under redelivery", () => {
 
         expect(dispatch.sent).toHaveLength(2);
         const [first, second] = dispatch.sent;
-        expect(first!.options?.deduplication?.makeId(first!.data)).toBe(
-          second!.options?.deduplication?.makeId(second!.data),
-        );
-        expect(first!.options?.deduplication?.makeId(first!.data)).toBe(
-          "exec:tenant-1:trace-1:check-1",
-        );
+        const identity = (sent: { data: ExecuteEvaluationCommandData }) => ({
+          tenantId: sent.data.tenantId,
+          traceId: sent.data.traceId,
+          evaluatorId: sent.data.evaluatorId,
+        });
+        expect(identity(first!)).toEqual(identity(second!));
+        expect(identity(first!)).toEqual({
+          tenantId: "tenant-1",
+          traceId: "trace-1",
+          evaluatorId: "check-1",
+        });
       });
 
       /** @scenario "The command identity ignores the freshly minted evaluation id" */
@@ -206,21 +197,6 @@ describe("the evaluationTrigger subscriber under redelivery", () => {
 
         const [first, second] = dispatch.sent;
         expect(first!.data.evaluationId).not.toBe(second!.data.evaluationId);
-        expect(first!.options?.deduplication?.makeId(first!.data)).not.toContain(
-          first!.data.evaluationId,
-        );
-      });
-
-      /** @scenario "The identity outlives the first dispatch" */
-      it("keeps the identity alive after the first command dispatches", async () => {
-        const dispatch = new Dispatch();
-
-        await deliverTwice(dispatch);
-
-        for (const sent of dispatch.sent) {
-          expect(sent.options?.deduplication?.shouldSurviveDispatch).toBe(true);
-          expect(sent.options?.deduplication?.ttlMs).toBe(360_000);
-        }
       });
     });
   });

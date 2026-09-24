@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -16,6 +17,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { TopicApi } from "@langwatch/topic-contract";
@@ -35,6 +37,7 @@ export const traceDependencies = {
    */
   apiKeys: ApiKeyApi,
   authz: AuthzApi,
+  automations: AutomationApi,
   codingAgents: CodingAgentApi,
   dataPrivacy: DataPrivacyApi,
   dataRetention: DataRetentionApi,
@@ -48,6 +51,7 @@ export const traceDependencies = {
   monitors: MonitorApi,
   presence: PresenceApi,
   projects: ProjectApi,
+  scenarios: ScenarioApi,
   share: ShareApi,
   storedObjects: StoredObjectApi,
   topics: TopicApi,

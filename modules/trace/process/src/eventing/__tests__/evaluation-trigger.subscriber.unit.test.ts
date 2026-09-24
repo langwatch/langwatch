@@ -1,6 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { createTenantId, type QueueSendOptions, type TriggerContext } from "@langwatch/eventing";
+import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import {
@@ -172,23 +172,13 @@ function monitor(overrides: Partial<MonitorSummary> = {}): MonitorSummary {
 }
 
 class Dispatch implements TraceEvaluationDispatch {
-  readonly sent: {
-    data: ExecuteEvaluationCommandData;
-    options?: QueueSendOptions<ExecuteEvaluationCommandData>;
-  }[] = [];
+  readonly sent: { data: ExecuteEvaluationCommandData }[] = [];
 
   constructor(private readonly behaviour: { throwsFor?: string } = {}) {}
 
-  makeDedupId(data: ExecuteEvaluationCommandData): string {
-    return `exec:${data.tenantId}:${data.traceId}:${data.evaluatorId}`;
-  }
-
-  async send(
-    data: ExecuteEvaluationCommandData,
-    options?: QueueSendOptions<ExecuteEvaluationCommandData>,
-  ): Promise<void> {
+  async send(data: ExecuteEvaluationCommandData): Promise<void> {
     if (this.behaviour.throwsFor === data.evaluatorId) throw new Error("queue is down");
-    this.sent.push({ data, options });
+    this.sent.push({ data });
   }
 }
 
@@ -447,84 +437,6 @@ describe("createEvaluationTriggerSubscriber", () => {
         const ids = dispatch.sent.map((sent) => sent.data.evaluationId);
         expect(ids.every((id) => id.startsWith("eval_"))).toBe(true);
         expect(new Set(ids).size).toBe(2);
-      });
-
-      /**
-       * @scenario "A trace-level dispatch is deduplicated for six minutes"
-       *
-       * The window outlasts the five-minute deferred origin resolution, so a
-       * subscriber that fires twice — once for a late span, once for the
-       * deferred origin event — sends one evaluation, not two.
-       */
-      it("uses a six-minute TTL that survives dispatch", async () => {
-        const { built, dispatch } = subscriber({});
-
-        await run(built, spanEvent(), foldState());
-
-        expect(dispatch.sent[0]!.options).toEqual({
-          deduplication: {
-            makeId: expect.any(Function),
-            ttlMs: 360_000,
-            shouldSurviveDispatch: true,
-          },
-        });
-      });
-
-      /** @scenario "The dedup id comes from the evaluation command itself" */
-      it("asks the dispatch port for the key rather than spelling one", async () => {
-        const { built, dispatch } = subscriber({});
-
-        await run(built, spanEvent(), foldState());
-
-        const sent = dispatch.sent[0]!;
-        expect(sent.options?.deduplication?.makeId(sent.data)).toBe(
-          "exec:tenant-1:trace-1:check-1",
-        );
-      });
-
-      /**
-       * @scenario "A thread-level monitor waits for the thread to go idle"
-       *
-       * The delay and the dedup TTL are both the monitor's idle timeout in
-       * milliseconds, so the evaluation runs once, after the conversation
-       * stops.
-       */
-      it("delays by the idle timeout and dedups for the same window", async () => {
-        const { built, dispatch } = subscriber({
-          monitors: [monitor({ threadIdleTimeout: 90 })],
-        });
-
-        await run(
-          built,
-          spanEvent(),
-          foldState({ attributes: { "langwatch.origin": "app", "gen_ai.conversation.id": "t-1" } }),
-        );
-
-        expect(dispatch.sent[0]!.options).toEqual({
-          delay: 90_000,
-          deduplication: {
-            makeId: expect.any(Function),
-            ttlMs: 90_000,
-            shouldSurviveDispatch: true,
-          },
-        });
-      });
-
-      /**
-       * @scenario "A thread-level monitor with no thread falls back to the trace window"
-       *
-       * Without a conversation id there is no thread to wait for, and a
-       * delayed evaluation would simply never be grouped with anything.
-       */
-      it("uses the trace-level window when the trace has no thread id", async () => {
-        const { built, dispatch } = subscriber({
-          monitors: [monitor({ threadIdleTimeout: 90 })],
-        });
-
-        await run(built, spanEvent(), foldState());
-
-        expect(dispatch.sent[0]!.options?.delay).toBeUndefined();
-        expect(dispatch.sent[0]!.options?.deduplication?.ttlMs).toBe(360_000);
       });
 
       /** @scenario "The command carries the trace fields preconditions match on" */

@@ -7,13 +7,12 @@ import {
 import { OtlpSpanContentDropService } from "@langwatch/data-privacy-process";
 // Data-privacy content DROP wired into EventingRecordSpanAdapter; runs at
 // command choke point so SpanReceivedEvent carries already-dropped span
-import { createTenantId, type Command, type TenantId } from "@langwatch/eventing";
+import { createTenantId, type Command } from "@langwatch/eventing";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   spanReceivedEventSchema,
   type OtlpKeyValue,
-  type OtlpResource,
   type OtlpSpan,
   type PIIRedactionLevel,
   type RecordSpanCommandData,
@@ -80,12 +79,7 @@ class ContentDropWithPolicy implements TraceSpanContentDrop {
 }
 
 class NoopPiiRedaction implements TraceSpanPiiRedaction {
-  async redact(
-    _span: OtlpSpan,
-    _resource: OtlpResource | null,
-    _level: PIIRedactionLevel,
-    _tenantId: TenantId,
-  ) {}
+  async redact(_input: Parameters<TraceSpanPiiRedaction["redact"]>[0]) {}
 }
 
 class NoopCostEnrichment implements TraceSpanCostEnrichment {
