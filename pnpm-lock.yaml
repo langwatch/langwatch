@@ -11638,6 +11638,9 @@ importers:
       '@langwatch/scenario':
         specifier: file:../../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
         version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(vitest@5.0.0)
+      '@langwatch/scenario-child':
+        specifier: workspace:*
+        version: link:../../../packages/scenario-child
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../contract
