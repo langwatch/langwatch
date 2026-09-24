@@ -26,8 +26,6 @@
  * stops the numbers lying in the meantime.
  */
 
-import { ValidationError } from "@langwatch/handled-error";
-
 /** The config key naming the Azure subscription a source reads the bill of. */
 export const AZURE_SUBSCRIPTION_FIELD = "azureSubscriptionId";
 
@@ -48,11 +46,10 @@ export interface AzureBillReader {
  * anything reaching the service directly, without going through that form, is
  * under no such obligation.
  */
-export function extractClaimedSubscription(
-  parserConfig: Record<string, unknown> | null | undefined,
-): string | null {
+export function extractClaimedSubscription(parserConfig: unknown): string | null {
   if (!parserConfig || typeof parserConfig !== "object") return null;
-  const claimed = parserConfig[AZURE_SUBSCRIPTION_FIELD];
+  const claimed =
+    AZURE_SUBSCRIPTION_FIELD in parserConfig ? parserConfig[AZURE_SUBSCRIPTION_FIELD] : undefined;
   if (typeof claimed !== "string") return null;
   const trimmed = claimed.trim();
   return trimmed === "" ? null : trimmed;
@@ -126,13 +123,13 @@ export function readPrepaidDeclared(
  * report guard it mirrors) is what closes that half — this guard stays about
  * the pair being present, never about which bill the source has history with.
  */
-export function assertAzureBillHasItsOwnCredential(params: {
+export function findAzureBillCredentialComplaints(params: {
   parserConfig: Record<string, unknown> | null | undefined;
   /** The config as stored before this edit. Omitted on create. */
   storedParserConfig?: Record<string, unknown> | null;
-}): void {
+}): string[] {
   const { parserConfig, storedParserConfig } = params;
-  if (extractClaimedSubscription(parserConfig) === null) return;
+  if (extractClaimedSubscription(parserConfig) === null) return [];
 
   const complaint =
     "Reading this subscription's bill needs its own app registration — a billing client ID and secret holding the Cost Management Reader role. The conversation credential is never used for the bill, so without the billing pair the spend would stay unreadable. Add both billing fields, or leave the subscription empty.";
@@ -147,27 +144,21 @@ export function assertAzureBillHasItsOwnCredential(params: {
       storedParserConfig !== undefined &&
       extractClaimedSubscription(storedParserConfig) !== null
     ) {
-      return;
+      return [];
     }
     const editComplaint =
       "This change claims an Azure subscription, but the credentials on file were never checked for the bill's own app registration. Re-enter the credentials — including the billing client ID and secret — to claim the bill.";
-    const message = storedParserConfig === undefined ? complaint : editComplaint;
-    throw new ValidationError(message, {
-      meta: { formErrors: [message] },
-    });
+    return [storedParserConfig === undefined ? complaint : editComplaint];
   }
 
-  const readBillingKey = (key: string): string => {
-    const value = (credentials as Record<string, unknown>)[key];
-    return typeof value === "string" ? value.trim() : "";
-  };
-  if (readBillingKey("billingClientId") && readBillingKey("billingClientSecret")) {
-    return;
+  const billingClientId = "billingClientId" in credentials ? credentials.billingClientId : "";
+  const billingClientSecret =
+    "billingClientSecret" in credentials ? credentials.billingClientSecret : "";
+  if (isFilled(billingClientId) && isFilled(billingClientSecret)) {
+    return [];
   }
 
-  throw new ValidationError(complaint, {
-    meta: { formErrors: [complaint] },
-  });
+  return [complaint];
 }
 
 /**
@@ -190,21 +181,21 @@ export function assertAzureBillHasItsOwnCredential(params: {
  * would put the matching rules somewhere that silently returns nothing when
  * they are wrong, which is the one failure this guard cannot afford.
  */
-export function assertAzureBillNotAlreadyClaimed(params: {
+export function findAzureBillClaimComplaints(params: {
   parserConfig: Record<string, unknown> | null | undefined;
   claimedBy: AzureBillReader[];
   sourceId?: string;
-}): void {
+}): string[] {
   const { parserConfig, claimedBy, sourceId } = params;
 
   const claimed = extractClaimedSubscription(parserConfig);
-  if (claimed === null) return;
+  if (claimed === null) return [];
 
   const wanted = claimed.toLowerCase();
   const owner = claimedBy.find(
     (reader) => reader.id !== sourceId && reader.subscriptionId.trim().toLowerCase() === wanted,
   );
-  if (!owner) return;
+  if (!owner) return [];
 
   // The complaint travels in `meta.formErrors` because that is the half of the
   // `validation_error` contract the presentation layer reads for a field it has
@@ -212,8 +203,11 @@ export function assertAzureBillNotAlreadyClaimed(params: {
   // input" copy and never learns which source already holds the subscription —
   // which is the entire point of naming the owner here (see
   // `unsupportedValue.ts` for the same trap spelled out).
-  const complaint = `The source "${owner.name}" already reads this Azure subscription's bill. A subscription's bill covers everything running under it, so reading it from two sources would report double the spend. Leave the subscription empty here, or name a different one.`;
-  throw new ValidationError(complaint, {
-    meta: { formErrors: [complaint] },
-  });
+  return [
+    `The source "${owner.name}" already reads this Azure subscription's bill. A subscription's bill covers everything running under it, so reading it from two sources would report double the spend. Leave the subscription empty here, or name a different one.`,
+  ];
+}
+
+function isFilled(value: unknown): boolean {
+  return typeof value === "string" && value.trim() !== "";
 }

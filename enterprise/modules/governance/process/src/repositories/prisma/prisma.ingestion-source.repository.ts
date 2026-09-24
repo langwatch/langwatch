@@ -10,6 +10,7 @@ import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
+  type IngestionSourceClaim,
   type UpdateIngestionSourceRecord,
 } from "../ingestion-source.repository.ts";
 
@@ -116,6 +117,21 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
   countLive(organizationId: string): Promise<number> {
     return this.database.ingestionSource.count({
       where: { organizationId, archivedAt: null },
+    });
+  }
+
+  async findClaims(organizationId: string): Promise<IngestionSourceClaim[]> {
+    const rows = await this.database.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { id: true, name: true, status: true, providerAccountId: true, parserConfig: true },
+    });
+    return rows.map((row) => ({ ...row, parserConfig: asRecord(row.parserConfig) }));
+  }
+
+  findAzureBillHistory(organizationId: string): Promise<{ id: string; parserConfig: unknown }[]> {
+    return this.database.ingestionSource.findMany({
+      where: { organizationId, sourceType: "copilot_studio_dataverse" },
+      select: { id: true, parserConfig: true },
     });
   }
 

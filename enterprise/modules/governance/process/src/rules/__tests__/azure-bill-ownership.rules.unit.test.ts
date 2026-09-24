@@ -1,12 +1,11 @@
-import { ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 import {
   type AzureBillReader,
-  assertAzureBillHasItsOwnCredential,
-  assertAzureBillNotAlreadyClaimed,
+  findAzureBillCredentialComplaints,
+  findAzureBillClaimComplaints,
   extractClaimedSubscription,
-} from "../prisma.azure-bill-ownership.repository";
+} from "../azure-bill-ownership.rules.ts";
 
 const SUBSCRIPTION = "00000000-0000-4000-8000-000000000001";
 
@@ -26,8 +25,8 @@ const configNaming = (azureSubscriptionId: string) => ({
 describe("given a subscription no live source reads yet", () => {
   describe("when an admin saves a source naming it", () => {
     it("saves the source", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [
             existingReader({
@@ -36,7 +35,7 @@ describe("given a subscription no live source reads yet", () => {
             }),
           ],
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
   });
 });
@@ -45,22 +44,22 @@ describe("given a source that already reads a subscription's bill", () => {
   describe("when an admin saves another source naming that same subscription", () => {
     /** @scenario "A subscription another source already reads is refused at save time" */
     it("refuses the source before it is stored", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [existingReader()],
         }),
-      ).toThrow(/already reads this Azure subscription's bill/);
+      ).toEqual([expect.stringMatching(/already reads this Azure subscription's bill/)]);
     });
 
     /** @scenario "A subscription another source already reads is refused at save time" */
     it("names the source that already reads it, so the admin knows which one to look at", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [existingReader({ name: "Copilot Studio, Europe" })],
         }),
-      ).toThrow(/Copilot Studio, Europe/);
+      ).toEqual([expect.stringMatching(/Copilot Studio, Europe/)]);
     });
 
     /** @scenario "A subscription another source already reads is refused at save time" */
@@ -68,74 +67,66 @@ describe("given a source that already reads a subscription's bill", () => {
       // Asserting on the message alone passes whether or not the admin ever
       // sees it: the presentation layer falls back to generic copy unless the
       // sentence is in `meta.formErrors`.
-      let thrown: unknown;
-      try {
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [existingReader({ name: "Copilot Studio, Europe" })],
-        });
-      } catch (error) {
-        thrown = error;
-      }
-
-      expect(thrown).toBeInstanceOf(ValidationError);
-      const formErrors = (thrown as ValidationError).meta?.formErrors;
-      expect(Array.isArray(formErrors)).toBe(true);
-      expect((formErrors as string[])[0]).toMatch(/Copilot Studio, Europe/);
+        }),
+      ).toEqual([expect.stringMatching(/Copilot Studio, Europe/)]);
     });
   });
 
   describe("when an admin saves another source naming that subscription in capitals", () => {
     /** @scenario "The same subscription in different letter case is still refused" */
     it("refuses it, because the two spellings name one bill", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION.toUpperCase()),
           claimedBy: [existingReader()],
         }),
-      ).toThrow(/already reads this Azure subscription's bill/);
+      ).toEqual([expect.stringMatching(/already reads this Azure subscription's bill/)]);
     });
 
     /** @scenario "The same subscription in different letter case is still refused" */
     it("refuses it when the stored one is the capitalised spelling", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [existingReader({ subscriptionId: SUBSCRIPTION.toUpperCase() })],
         }),
-      ).toThrow(/already reads this Azure subscription's bill/);
+      ).toEqual([expect.stringMatching(/already reads this Azure subscription's bill/)]);
     });
 
     it("refuses it when the typed one carries surrounding space", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(`  ${SUBSCRIPTION}  `),
           claimedBy: [existingReader()],
         }),
-      ).toThrow(/already reads this Azure subscription's bill/);
+      ).toEqual([expect.stringMatching(/already reads this Azure subscription's bill/)]);
     });
   });
 
   describe("when an admin edits that same source and keeps the subscription", () => {
     /** @scenario "A source keeping the subscription it already reads is saved" */
     it("saves it, rather than colliding the source with itself", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [existingReader({ id: "src_first" })],
           sourceId: "src_first",
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
 
     it("still refuses when a different source holds the subscription", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [existingReader({ id: "src_first" })],
           sourceId: "src_second",
         }),
-      ).toThrow(/already reads this Azure subscription's bill/);
+      ).toEqual([expect.stringMatching(/already reads this Azure subscription's bill/)]);
     });
   });
 });
@@ -155,14 +146,14 @@ describe("given an admin saving a source that names no Azure subscription", () =
       if (azureSubscriptionId !== undefined) {
         parserConfig.azureSubscriptionId = azureSubscriptionId;
       }
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig,
           // A reader whose own subscription is blank must not swallow a blank
           // claim: two sources that name nothing are not in conflict.
           claimedBy: [existingReader({ subscriptionId: "" })],
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
   });
 });
@@ -183,11 +174,11 @@ describe("given a save that names a subscription and carries credentials", () =>
   describe("when the credentials hold no billing pair", () => {
     /** @scenario "A subscription cannot be saved without its own billing credential" */
     it("refuses the save and says the bill needs its own sign-in", () => {
-      expect(() =>
-        assertAzureBillHasItsOwnCredential({
+      expect(
+        findAzureBillCredentialComplaints({
           parserConfig: configWithCredentials(conversationCredentials),
         }),
-      ).toThrow(/its own app registration/);
+      ).toEqual([expect.stringMatching(/its own app registration/)]);
     });
 
     /** @scenario "A subscription cannot be saved without its own billing credential" */
@@ -199,41 +190,41 @@ describe("given a save that names a subscription and carries credentials", () =>
         { billingClientId: "billing-client-id", billingClientSecret: "  " },
       ],
     ])("refuses half a pair too — %s", (_case, half) => {
-      expect(() =>
-        assertAzureBillHasItsOwnCredential({
+      expect(
+        findAzureBillCredentialComplaints({
           parserConfig: configWithCredentials({
             ...conversationCredentials,
             ...half,
           }),
         }),
-      ).toThrow(/its own app registration/);
+      ).toEqual([expect.stringMatching(/its own app registration/)]);
     });
   });
 
   describe("when the credentials hold the billing pair", () => {
     it("saves the source", () => {
-      expect(() =>
-        assertAzureBillHasItsOwnCredential({
+      expect(
+        findAzureBillCredentialComplaints({
           parserConfig: configWithCredentials({
             ...conversationCredentials,
             billingClientId: "billing-client-id",
             billingClientSecret: "billing-client-secret",
           }),
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
   });
 
   describe("when no subscription is named", () => {
     it("asks for nothing — there is no bill to sign in to", () => {
-      expect(() =>
-        assertAzureBillHasItsOwnCredential({
+      expect(
+        findAzureBillCredentialComplaints({
           parserConfig: {
             adapter: "copilot_studio_dataverse",
             credentials: conversationCredentials,
           },
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
   });
 
@@ -254,9 +245,9 @@ describe("given a save that names a subscription and carries credentials", () =>
       // reach "subscription named, bill unreadable forever".
       const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
       if (credentials !== undefined) parserConfig.credentials = credentials;
-      expect(() => assertAzureBillHasItsOwnCredential({ parserConfig })).toThrow(
-        /needs its own app registration/i,
-      );
+      expect(findAzureBillCredentialComplaints({ parserConfig })).toEqual([
+        expect.stringMatching(/needs its own app registration/i),
+      ]);
     });
 
     /** @scenario "A subscription cannot be saved without its own billing credential" */
@@ -264,15 +255,15 @@ describe("given a save that names a subscription and carries credentials", () =>
       // The envelope was proven to hold the billing pair when the claim was
       // first saved. Refusing here would lock an admin out of renaming their
       // own source.
-      expect(() =>
-        assertAzureBillHasItsOwnCredential({
+      expect(
+        findAzureBillCredentialComplaints({
           parserConfig: {
             ...configNaming(SUBSCRIPTION),
             credentials: "enc:v1:abcdef",
           },
           storedParserConfig: configNaming(SUBSCRIPTION),
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
 
     /** @scenario "A subscription cannot be saved without its own billing credential" */
@@ -286,15 +277,15 @@ describe("given a save that names a subscription and carries credentials", () =>
       // named, billing pair never checked, bill silent forever.
       const parserConfig: Record<string, unknown> = configNaming(SUBSCRIPTION);
       if (credentials !== undefined) parserConfig.credentials = credentials;
-      expect(() =>
-        assertAzureBillHasItsOwnCredential({
+      expect(
+        findAzureBillCredentialComplaints({
           parserConfig,
           storedParserConfig: {
             adapter: "copilot_studio_dataverse",
             environmentUrl: "https://orgacme01.crm4.dynamics.com",
           },
         }),
-      ).toThrow(/re-enter the credentials/i);
+      ).toEqual([expect.stringMatching(/re-enter the credentials/i)]);
     });
   });
 });
@@ -304,9 +295,7 @@ describe("given a config that is not a config at all", () => {
     it.each([[null], [undefined], [{ azureSubscriptionId: 12345 }]])(
       "reads no claim from %s",
       (parserConfig) => {
-        expect(
-          extractClaimedSubscription(parserConfig as Record<string, unknown> | null | undefined),
-        ).toBe(null);
+        expect(extractClaimedSubscription(parserConfig)).toBe(null);
       },
     );
   });
@@ -321,12 +310,12 @@ describe("given a connection already reading a cloud subscription", () => {
   describe("when the admin saves another connection naming that same subscription", () => {
     /** @scenario "A second connection to a subscription another connection reads is refused" */
     it("refuses the save and names the connection that already reads it", () => {
-      expect(() =>
-        assertAzureBillNotAlreadyClaimed({
+      expect(
+        findAzureBillClaimComplaints({
           parserConfig: configNaming(SUBSCRIPTION),
           claimedBy: [existingReader({ name: "Copilot Studio, first" })],
         }),
-      ).toThrow(/Copilot Studio, first/);
+      ).toEqual([expect.stringMatching(/Copilot Studio, first/)]);
     });
   });
 });

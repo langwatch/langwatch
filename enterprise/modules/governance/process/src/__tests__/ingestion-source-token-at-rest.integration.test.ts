@@ -17,6 +17,7 @@ import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
 } from "../app/governance.members.ts";
+import { MemoryProviderAccountChannel } from "../channels/memory/memory.provider-account.channel.ts";
 import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import {
@@ -93,6 +94,7 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
         { random: () => new Uint8Array(32).fill(7) },
       ),
       destinations: PullDestinationService.create(),
+      providerAccounts: MemoryProviderAccountChannel.create(),
       diagnostics: new NoopDiagnostics(),
     });
 

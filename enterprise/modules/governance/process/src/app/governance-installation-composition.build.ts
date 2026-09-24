@@ -97,6 +97,7 @@ export type GovernanceInstallationOptions = {
   ottl: GovernanceOttlGateway;
 };
 
+import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
 import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
 import { PrismaAiToolCatalogRepository } from "../repositories/prisma/prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
@@ -151,18 +152,22 @@ export class GovernanceInstallationComposition {
         clickhouse: this.options.activityClickhouse,
       }),
     );
+    const ingestionCredentials = IngestionCredentialsService.create(
+      this.options.ingestionEncryption,
+    );
     const ingestionSources = IngestionSourceService.create({
       repository: PrismaIngestionSourceRepository.create(this.options.database),
       projects: this.options.projects,
       entitlements: this.options.ingestionSourceEntitlements,
       lifecycle: this.options.ingestionSourceLifecycle,
-      credentials: IngestionCredentialsService.create(this.options.ingestionEncryption),
+      credentials: ingestionCredentials,
       secrets: IngestionSecretService.create(
         IngestionSecretConfiguration.create({
           pepper: this.options.ingestionSecretPepper,
         }),
       ),
       destinations: PullDestinationService.create(),
+      providerAccounts: HttpProviderAccountChannel.create({ credentials: ingestionCredentials }),
       diagnostics: this.options.ingestionDiagnostics,
     });
 

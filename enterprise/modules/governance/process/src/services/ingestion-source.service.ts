@@ -19,10 +19,31 @@ import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
 } from "../app/governance.members.ts";
+import type { ProviderAccountChannel } from "../channels/provider-account.channel.ts";
 import type {
+  IngestionSourceClaim,
   IngestionSourceRepository,
   UpdateIngestionSourceRecord,
 } from "../repositories/ingestion-source.repository.ts";
+import {
+  findAzureBillHistoryComplaints,
+  withAzureBillIdentity,
+} from "../rules/azure-bill-identity.rules.ts";
+import {
+  extractClaimedSubscription,
+  findAzureBillClaimComplaints,
+  findAzureBillCredentialComplaints,
+} from "../rules/azure-bill-ownership.rules.ts";
+import {
+  extractClaimedEnvironment,
+  findEnvironmentClaimComplaints,
+} from "../rules/environment-ownership.rules.ts";
+import {
+  findProviderAccountClaimComplaints,
+  hasAdminCredentials,
+  PROVIDER_ACCOUNT_UNCONFIRMED,
+  readsProviderAccount,
+} from "../rules/provider-account-ownership.rules.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
@@ -38,6 +59,7 @@ export class IngestionSourceService {
   private readonly credentials: IngestionCredentialsService;
   private readonly secrets: IngestionSecretService;
   private readonly destinations: PullDestinationService;
+  private readonly providerAccounts: ProviderAccountChannel;
   private readonly diagnostics: GovernanceDiagnosticsSink;
   private readonly now: () => number;
   private readonly validation: IngestionSourceValidationService;
@@ -50,6 +72,7 @@ export class IngestionSourceService {
     credentials,
     secrets,
     destinations,
+    providerAccounts,
     diagnostics,
     now,
     validation,
@@ -61,6 +84,7 @@ export class IngestionSourceService {
     credentials: IngestionCredentialsService;
     secrets: IngestionSecretService;
     destinations: PullDestinationService;
+    providerAccounts: ProviderAccountChannel;
     diagnostics: GovernanceDiagnosticsSink;
     now: () => number;
     validation: IngestionSourceValidationService;
@@ -72,6 +96,7 @@ export class IngestionSourceService {
     this.credentials = credentials;
     this.secrets = secrets;
     this.destinations = destinations;
+    this.providerAccounts = providerAccounts;
     this.diagnostics = diagnostics;
     this.now = now;
     this.validation = validation;
@@ -85,6 +110,7 @@ export class IngestionSourceService {
     credentials: IngestionCredentialsService;
     secrets: IngestionSecretService;
     destinations: PullDestinationService;
+    providerAccounts: ProviderAccountChannel;
     diagnostics: GovernanceDiagnosticsSink;
     now?: () => number;
   }): IngestionSourceService {
@@ -96,6 +122,7 @@ export class IngestionSourceService {
       credentials: options.credentials,
       secrets: options.secrets,
       destinations: options.destinations,
+      providerAccounts: options.providerAccounts,
       diagnostics: options.diagnostics,
       now: options.now ?? Date.now,
       validation: IngestionSourceValidationService.create({ projects: options.projects }),
@@ -183,11 +210,19 @@ export class IngestionSourceService {
       ...input.parserConfig,
     };
     this.destinations.assertAllowed(requestedParserConfig);
+    const { providerAccountId } = await this.assertClaimsAreFree({
+      organizationId: input.organizationId,
+      sourceType: input.sourceType,
+      parserConfig: requestedParserConfig,
+    });
     await this.validation.assertTraceDestination({
       organizationId: input.organizationId,
       traceProjectId: input.traceProjectId,
     });
-    const parserConfig = this.credentials.encryptParserConfig(requestedParserConfig);
+    const parserConfig = await this.prepareParserConfig({
+      organizationId: input.organizationId,
+      parserConfig: requestedParserConfig,
+    });
     const source = await this.repository.create({
       organizationId: input.organizationId,
       teamId: input.teamId ?? null,
@@ -200,6 +235,7 @@ export class IngestionSourceService {
       pullSchedule: input.pullSchedule ?? null,
       status: "awaiting_first_event",
       createdById: input.actorUserId,
+      providerAccountId: providerAccountId ?? null,
     });
     if (source.pullSchedule) {
       await this.syncBestEffort(source);
@@ -214,21 +250,34 @@ export class IngestionSourceService {
     const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
     this.validation.assertPullSchedule(input.pullSchedule);
     const update: UpdateIngestionSourceRecord = this.plainUpdateFields(input);
-    if (input.traceProjectId !== undefined) {
-      await this.validation.assertTraceDestination({
-        organizationId: input.organizationId,
-        traceProjectId: input.traceProjectId,
-      });
-      update.traceProjectId = input.traceProjectId;
-    }
-
     let cursorMustNotMove = false;
     if (input.parserConfig !== undefined) {
       const incoming = this.mergedParserConfig({ existing, incoming: input.parserConfig });
       this.validation.assertAdapterUnchanged(existing.parserConfig, incoming);
       cursorMustNotMove = this.validation.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
-      update.parserConfig = this.credentials.encryptParserConfig(incoming);
+      const { providerAccountId } = await this.assertClaimsAreFree({
+        organizationId: input.organizationId,
+        sourceType: existing.sourceType,
+        parserConfig: incoming,
+        existing,
+      });
+      if (providerAccountId !== undefined) {
+        update.providerAccountId = providerAccountId;
+      }
+      update.parserConfig = await this.prepareParserConfig({
+        organizationId: input.organizationId,
+        parserConfig: incoming,
+        existing,
+      });
+    }
+
+    if (input.traceProjectId !== undefined) {
+      await this.validation.assertTraceDestination({
+        organizationId: input.organizationId,
+        traceProjectId: input.traceProjectId,
+      });
+      update.traceProjectId = input.traceProjectId;
     }
 
     const source = cursorMustNotMove
@@ -240,6 +289,117 @@ export class IngestionSourceService {
     }
 
     return source;
+  }
+
+  /**
+   * The one-reader-per-claim guards, in main's order: the Azure bill (its own credential, then
+   * another reader), the environment, then the provider account, whose id is returned to be stored.
+   * Each reads the organisation's sources only when the config makes that claim.
+   */
+  private async assertClaimsAreFree({
+    organizationId,
+    sourceType,
+    parserConfig,
+    existing,
+  }: {
+    organizationId: string;
+    sourceType: string;
+    parserConfig: Record<string, unknown>;
+    existing?: GovernanceIngestionSource;
+  }): Promise<{ providerAccountId?: string }> {
+    const sourceId = existing?.id;
+    let claims: Promise<IngestionSourceClaim[]> | undefined;
+    const claimsOf = () => (claims ??= this.repository.findClaims(organizationId));
+
+    if (extractClaimedSubscription(parserConfig) !== null) {
+      refuseOnComplaint(
+        findAzureBillCredentialComplaints({
+          parserConfig,
+          storedParserConfig: existing?.parserConfig,
+        }),
+      );
+      refuseOnComplaint(
+        findAzureBillClaimComplaints({
+          parserConfig,
+          claimedBy: (await claimsOf()).flatMap((claim) => {
+            const subscriptionId = extractClaimedSubscription(claim.parserConfig);
+            return subscriptionId ? [{ id: claim.id, name: claim.name, subscriptionId }] : [];
+          }),
+          sourceId,
+        }),
+      );
+    }
+
+    if (extractClaimedEnvironment(parserConfig) !== null) {
+      refuseOnComplaint(
+        findEnvironmentClaimComplaints({
+          parserConfig,
+          claimedBy: (await claimsOf()).flatMap((claim) => {
+            const environmentUrl = extractClaimedEnvironment(claim.parserConfig);
+            return environmentUrl ? [{ id: claim.id, name: claim.name, environmentUrl }] : [];
+          }),
+          sourceId,
+        }),
+      );
+    }
+
+    if (!readsProviderAccount({ sourceType }) || !hasAdminCredentials(parserConfig)) {
+      return {};
+    }
+    const providerAccountId = await this.providerAccounts
+      .getAccountId({ sourceType, parserConfig })
+      .catch(() => refuse(PROVIDER_ACCOUNT_UNCONFIRMED));
+    refuseOnComplaint(
+      findProviderAccountClaimComplaints({
+        providerAccountId,
+        parserConfig,
+        claimedBy: (await claimsOf()).flatMap((claim) =>
+          claim.providerAccountId
+            ? [
+                {
+                  id: claim.id,
+                  name: claim.name,
+                  providerAccountId: claim.providerAccountId,
+                  report:
+                    typeof claim.parserConfig.report === "string"
+                      ? claim.parserConfig.report
+                      : null,
+                  disabled: claim.status === "disabled",
+                },
+              ]
+            : [],
+        ),
+        sourceId,
+      }),
+    );
+
+    return { providerAccountId };
+  }
+
+  /** Seal the credentials once the server-owned Azure billing identity is settled. */
+  private async prepareParserConfig({
+    organizationId,
+    parserConfig,
+    existing,
+  }: {
+    organizationId: string;
+    parserConfig: Record<string, unknown>;
+    existing?: GovernanceIngestionSource;
+  }): Promise<Record<string, unknown>> {
+    const history =
+      extractClaimedSubscription(parserConfig) === null
+        ? []
+        : await this.repository.findAzureBillHistory(organizationId);
+
+    const identity = {
+      parserConfig,
+      sourceId: existing?.id,
+      storedConfig: existing?.parserConfig,
+      history,
+    };
+    refuseOnComplaint(findAzureBillHistoryComplaints(identity));
+
+    return this.credentials.encryptParserConfig(withAzureBillIdentity(identity));
   }
 
   /** The fields whose only rule is that they were supplied. */
@@ -436,5 +596,17 @@ export class IngestionSourceService {
         },
       );
     }
+  }
+}
+
+/** A guard's complaint, refused the way the rest of this service refuses a save. */
+function refuse(complaint: string): never {
+  throw new GovernanceValidationError(complaint, { formErrors: [complaint] });
+}
+
+function refuseOnComplaint(complaints: readonly string[]): void {
+  const [complaint] = complaints;
+  if (complaint !== undefined) {
+    refuse(complaint);
   }
 }

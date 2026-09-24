@@ -12,6 +12,7 @@ import type {
   IngestionSourceLifecycleChannel,
   GovernanceEncryptor,
 } from "../../app/governance.members.ts";
+import { MemoryProviderAccountChannel } from "../../channels/memory/memory.provider-account.channel.ts";
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
@@ -71,6 +72,8 @@ class FakeSourceRepository extends IngestionSourceRepository {
   findByCurrentSecretHash = vi.fn(async () => null);
   findByPriorSecretHash = vi.fn(async () => []);
   countLive = vi.fn(async () => 0);
+  findClaims = vi.fn(async () => []);
+  findAzureBillHistory = vi.fn(async () => []);
   create = vi.fn(async (input: CreateIngestionSourceRecord) => {
     this.createInput = input;
     this.row = source({ ...input });
@@ -142,6 +145,7 @@ function harness() {
       { random: () => new Uint8Array(32).fill(7) },
     ),
     destinations: PullDestinationService.create(),
+    providerAccounts: MemoryProviderAccountChannel.create(),
     diagnostics: new FakeDiagnostics(),
     now: () => NOW,
   });

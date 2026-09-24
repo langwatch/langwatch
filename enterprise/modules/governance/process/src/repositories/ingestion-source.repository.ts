@@ -16,6 +16,7 @@ export type CreateIngestionSourceRecord = {
   pullSchedule: string | null;
   status: "awaiting_first_event";
   createdById: string;
+  providerAccountId: string | null;
 };
 
 export type UpdateIngestionSourceRecord = {
@@ -27,8 +28,18 @@ export type UpdateIngestionSourceRecord = {
   traceProjectId?: string | null;
   pullSchedule?: string | null;
   ingestSecretHash?: string;
+  providerAccountId?: string;
   archivedAt?: Instant;
   lastEventAt?: Instant;
+};
+
+/** A live source as the ownership guards read it: what it claims, and whether it is off. */
+export type IngestionSourceClaim = {
+  id: string;
+  name: string;
+  status: string;
+  providerAccountId: string | null;
+  parserConfig: Record<string, unknown>;
 };
 
 export type CursorPinnedUpdate =
@@ -41,6 +52,12 @@ export abstract class IngestionSourceRepository {
   abstract findByCurrentSecretHash(hash: string): Promise<GovernanceIngestionSource | null>;
   abstract findByPriorSecretHash(hash: string): Promise<GovernanceIngestionSource[]>;
   abstract countLive(organizationId: string): Promise<number>;
+  /** Every source in the organisation that is not archived, as the ownership guards see them. */
+  abstract findClaims(organizationId: string): Promise<IngestionSourceClaim[]>;
+  /** Every Copilot Studio source in the organisation, archived included: Azure bill history. */
+  abstract findAzureBillHistory(
+    organizationId: string,
+  ): Promise<{ id: string; parserConfig: unknown }[]>;
   abstract create(input: CreateIngestionSourceRecord): Promise<GovernanceIngestionSource>;
   abstract update(
     id: string,

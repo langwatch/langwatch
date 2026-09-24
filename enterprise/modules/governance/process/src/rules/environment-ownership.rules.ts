@@ -3,7 +3,7 @@
 /**
  * Who is allowed to read a conversation environment.
  *
- * The sibling of {@link ./prisma.azure-bill-ownership.repository.ts} for the identity an admin
+ * The sibling of {@link ./azure-bill-ownership.rules.ts} for the identity an admin
  * types rather than one a provider reports. A Power Platform environment holds
  * one set of conversations, and everything below the read files what it fetched
  * against the source that fetched it. So two sources naming one environment
@@ -27,9 +27,7 @@
  * Decision: 00d claim C, settlement 6 (Dataverse identity = environment origin).
  */
 
-import { ValidationError } from "@langwatch/handled-error";
-
-import { isSameEnvironment } from "../../rules/dataverse-environment-service.rules.ts";
+import { isSameEnvironment } from "./dataverse-environment-service.rules.ts";
 
 /** The config key naming the environment a source reads conversations from. */
 export const ENVIRONMENT_URL_FIELD = "environmentUrl";
@@ -76,15 +74,15 @@ export function extractClaimedEnvironment(
  * filter is literal, so it would silently match nothing on exactly the input
  * that needs catching.
  */
-export function assertEnvironmentNotAlreadyClaimed(params: {
+export function findEnvironmentClaimComplaints(params: {
   parserConfig: Record<string, unknown> | null | undefined;
   claimedBy: EnvironmentReader[];
   sourceId?: string;
-}): void {
+}): string[] {
   const { parserConfig, claimedBy, sourceId } = params;
 
   const claimed = extractClaimedEnvironment(parserConfig);
-  if (claimed === null) return;
+  if (claimed === null) return [];
 
   const owner = claimedBy.find(
     (reader) =>
@@ -97,15 +95,14 @@ export function assertEnvironmentNotAlreadyClaimed(params: {
         environmentUrl: reader.environmentUrl,
       }),
   );
-  if (!owner) return;
+  if (!owner) return [];
 
   // The complaint travels in `meta.formErrors` because that is the half of the
   // `validation_error` contract the presentation layer reads for a field it has
   // no on-screen name for. Without it the admin gets the generic "Check your
   // input" copy and never learns which connection already holds the
   // environment, which is the entire point of naming the owner here.
-  const complaint = `The connection "${owner.name}" already reads conversations from this environment. Reading one environment from two connections files the same conversations twice, so every count taken from them reports double. Archive that connection, or name a different environment here.`;
-  throw new ValidationError(complaint, {
-    meta: { formErrors: [complaint] },
-  });
+  return [
+    `The connection "${owner.name}" already reads conversations from this environment. Reading one environment from two connections files the same conversations twice, so every count taken from them reports double. Archive that connection, or name a different environment here.`,
+  ];
 }

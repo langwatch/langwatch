@@ -18,16 +18,15 @@
  * Decision: 00d claim C, settlement 6 (Dataverse identity = environment origin).
  */
 
-import { ValidationError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 // The environment arm of the one-connection-per-account rule. Lives beside
-// `prisma.azure-bill-ownership.repository.ts` rather than inside it, because an environment is not
+// `azure-bill-ownership.rules.ts` rather than inside it, because an environment is not
 // an Azure bill and the module is named after what it owns.
 import {
-  assertEnvironmentNotAlreadyClaimed,
+  findEnvironmentClaimComplaints,
   type EnvironmentReader,
-} from "../prisma.environment-ownership.repository";
+} from "../environment-ownership.rules.ts";
 
 const ENVIRONMENT = "https://orgtest01.crm4.dynamics.com";
 
@@ -52,12 +51,12 @@ describe("given a connection already reading a conversation environment", () => 
       ["a path after it", `${ENVIRONMENT}/api/data/v9.2/`],
       ["surrounding space", `  ${ENVIRONMENT}  `],
     ])("refuses the save when the second names it with %s", (_case, typed) => {
-      expect(() =>
-        assertEnvironmentNotAlreadyClaimed({
+      expect(
+        findEnvironmentClaimComplaints({
           parserConfig: configNaming(typed),
           claimedBy: [existingReader()],
         }),
-      ).toThrow(ValidationError);
+      ).toHaveLength(1);
     });
 
     /** @scenario "A second connection to an environment another connection reads is refused" */
@@ -66,42 +65,35 @@ describe("given a connection already reading a conversation environment", () => 
       // gets the generic "Check your input" copy and never learns which
       // connection already holds the environment, which is the whole point of
       // naming the owner.
-      let thrown: unknown;
-      try {
-        assertEnvironmentNotAlreadyClaimed({
+      expect(
+        findEnvironmentClaimComplaints({
           parserConfig: configNaming(`${ENVIRONMENT}/`),
           claimedBy: [existingReader({ name: "Copilot Studio, first" })],
-        });
-      } catch (error) {
-        thrown = error;
-      }
-
-      expect(thrown).toBeInstanceOf(ValidationError);
-      const formErrors = (thrown as ValidationError).meta?.formErrors;
-      expect((formErrors as string[])[0]).toMatch(/Copilot Studio, first/);
+        }),
+      ).toEqual([expect.stringMatching(/Copilot Studio, first/)]);
     });
   });
 
   describe("when the admin saves that same connection again", () => {
     it("saves it, rather than colliding the connection with itself", () => {
-      expect(() =>
-        assertEnvironmentNotAlreadyClaimed({
+      expect(
+        findEnvironmentClaimComplaints({
           parserConfig: configNaming(ENVIRONMENT),
           claimedBy: [existingReader({ id: "src_first" })],
           sourceId: "src_first",
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
   });
 
   describe("when the admin saves a connection naming a different environment", () => {
     it("saves it — a different environment is different conversations", () => {
-      expect(() =>
-        assertEnvironmentNotAlreadyClaimed({
+      expect(
+        findEnvironmentClaimComplaints({
           parserConfig: configNaming("https://orgtest02.crm4.dynamics.com"),
           claimedBy: [existingReader()],
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
   });
 });
@@ -120,14 +112,14 @@ describe("given a config that names no environment at all", () => {
       if (environmentUrl !== undefined) {
         parserConfig.environmentUrl = environmentUrl;
       }
-      expect(() =>
-        assertEnvironmentNotAlreadyClaimed({
+      expect(
+        findEnvironmentClaimComplaints({
           parserConfig,
           // A reader whose own address is blank must not swallow a blank
           // claim: two connections that name nothing are not in conflict.
           claimedBy: [existingReader({ environmentUrl: "" })],
         }),
-      ).not.toThrow();
+      ).toEqual([]);
     });
   });
 });

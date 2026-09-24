@@ -23,7 +23,10 @@ import { describe, expect, it, vi } from "vitest";
 
 const { fetchStub } = vi.hoisted(() => ({ fetchStub: vi.fn() }));
 
-vi.mock("../../../services/ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: fetchStub }));
+vi.mock("@langwatch/egress", () => ({
+  createSsrfUrlValidator: () => async (url: string) => url,
+  fetchValidatedDestination: (url: string, init: unknown) => fetchStub(url, init),
+}));
 
 // A reversible stand-in for the shared AES helper, so the sealed-envelope case
 // below can be built here without an app key. The real crypto is covered by
@@ -33,10 +36,12 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (blob: string) => blob.slice("cipher(".length, -1),
 }));
 
-import {
-  createProviderAccountLookup,
-  lookUpProviderAccount,
-} from "../prisma.provider-account-lookup.repository.ts";
+import { HttpProviderAccountChannel } from "../http/http.provider-account.channel.ts";
+
+const lookUpProviderAccount = (input: {
+  sourceType: string;
+  parserConfig: Record<string, unknown>;
+}) => HttpProviderAccountChannel.create().getAccountId(input);
 
 /** An obviously fake administrator key. */
 const ADMIN_KEY = "sk-ant-admin-EXAMPLEKEY-00000000";
@@ -104,11 +109,11 @@ describe("given an edit that did not resend the secret, so the stored envelope w
       fetchStub.mockReset();
       fetchStub.mockResolvedValue(providerResponding({ json: { id: "org_example_0001" } }));
       const sealed = { report: "cost", credentials: "sealed-admin-key" };
-      const lookup = createProviderAccountLookup({
-        decrypt: () => ({ token: ADMIN_KEY }),
+      const channel = HttpProviderAccountChannel.create({
+        credentials: { decrypt: () => ({ token: ADMIN_KEY }) },
       });
 
-      await lookup({
+      await channel.getAccountId({
         sourceType: "anthropic_admin",
         parserConfig: sealed,
       });

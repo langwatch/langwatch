@@ -3,7 +3,7 @@
 /**
  * Asking a provider which account an administrator key belongs to.
  *
- * The live side of the port {@link ./prisma.provider-account-ownership.repository.ts} declares. It
+ * The live side of {@link ../provider-account.channel.ts}. It
  * runs once per save, on create and on edit, and its answer is both what the
  * duplicate guard compares and what is stored beside the connection.
  *
@@ -23,11 +23,15 @@
  * connection or let a duplicate through — both worse than asking again.
  */
 
+import {
+  createSsrfUrlValidator,
+  fetchValidatedDestination,
+  type FencedFetchOptions,
+} from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
 
 import type { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
-import { ssrfSafeFetch } from "../../services/ssrf-safe-fetch.ts";
-import type { LookUpProviderAccount } from "./prisma.provider-account-ownership.repository.ts";
+import { ProviderAccountChannel } from "../provider-account.channel.ts";
 
 const logger = createLogger("langwatch:governance:provider-account-lookup");
 
@@ -39,6 +43,14 @@ const OPENAI_PROJECTS_URL = "https://api.openai.com/v1/organization/projects?lim
 const OPENAI_ORGANIZATION_HEADER = "openai-organization";
 
 const REQUEST_TIMEOUT_MS = 15_000;
+
+const validateDestination = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
+
+async function ssrfSafeFetch(url: string, init: FencedFetchOptions) {
+  return fetchValidatedDestination(await validateDestination(url), init, {
+    rejectUnauthorized: true,
+  });
+}
 
 /**
  * The administrator key on a config, whether it arrived fresh or sealed.
@@ -77,11 +89,12 @@ async function readAnthropicAccount(apiKey: string): Promise<string> {
     await response.body?.cancel().catch(() => void 0);
     throw new Error(`anthropic organization read failed (${response.status})`);
   }
-  const body = (await response.json()) as { id?: unknown };
-  if (typeof body.id !== "string" || body.id === "") {
+  const body: unknown = await response.json();
+  const id = typeof body === "object" && body !== null && "id" in body ? body.id : undefined;
+  if (typeof id !== "string" || id === "") {
     throw new Error("anthropic organization read named no account");
   }
-  return body.id;
+  return id;
 }
 
 async function readOpenAiAccount(apiKey: string): Promise<string> {
@@ -108,20 +121,34 @@ async function readOpenAiAccount(apiKey: string): Promise<string> {
 }
 
 /**
- * The live lookup, and the default the service is constructed with.
- *
- * The failure is logged HERE rather than where it is caught: the guard turns
- * every cause into one sentence an admin reads, deliberately, because an
- * upstream error can carry a URL, a header or a response body and that sentence
- * is rendered verbatim. Losing the cause entirely is the other failure, so it
- * is written to the log on the way past.
+ * The live lookup. The failure is logged HERE rather than where it is caught: the service turns
+ * every cause into one sentence an admin reads, since an upstream error can carry a URL, a header
+ * or a response body, and losing the cause entirely is the other failure.
  */
-export function createProviderAccountLookup(
-  credentials?: Pick<IngestionCredentialsService, "decrypt">,
-): LookUpProviderAccount {
-  return async ({ sourceType, parserConfig }) => {
+export class HttpProviderAccountChannel extends ProviderAccountChannel {
+  private constructor(
+    private readonly credentials: Pick<IngestionCredentialsService, "decrypt"> | undefined,
+  ) {
+    super();
+  }
+
+  static create(
+    options: {
+      credentials?: Pick<IngestionCredentialsService, "decrypt">;
+    } = {},
+  ): HttpProviderAccountChannel {
+    return new HttpProviderAccountChannel(options.credentials);
+  }
+
+  async getAccountId({
+    sourceType,
+    parserConfig,
+  }: {
+    sourceType: string;
+    parserConfig: Record<string, unknown>;
+  }): Promise<string> {
     try {
-      const apiKey = readAdminKey(parserConfig, credentials);
+      const apiKey = readAdminKey(parserConfig, this.credentials);
       if (sourceType === "anthropic_admin") {
         return await readAnthropicAccount(apiKey);
       }
@@ -136,7 +163,5 @@ export function createProviderAccountLookup(
       );
       throw error;
     }
-  };
+  }
 }
-
-export const lookUpProviderAccount = createProviderAccountLookup();
