@@ -6,6 +6,7 @@ import type {
   StateProjectionDefinition,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "../stateProjection.types.ts";
 import {
   compareCursors,
@@ -44,7 +45,9 @@ function event({
 function setup(initial: StoredProjection<CounterState> | null = null) {
   let stored = initial;
   const store: StateProjectionStore<CounterState> = {
-    tryLoad: vi.fn(async () => stored),
+    get: vi.fn(async (): Promise<StoredProjectionRead<CounterState>> =>
+      stored === null ? { kind: "empty" } : { kind: "folded", projection: stored },
+    ),
     store: vi.fn(async (projection) => {
       stored = projection;
     }),

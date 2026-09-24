@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
@@ -68,17 +69,17 @@ export class PrismaIngestionPullRunProjectionRepository implements StateProjecti
     return new PrismaIngestionPullRunProjectionRepository(database);
   }
 
-  async tryLoad(
+  async get(
     projectionKey: string,
     context: ProjectionStoreContext,
-  ): Promise<StoredProjection<IngestionPullRunStatusData> | null> {
+  ): Promise<StoredProjectionRead<IngestionPullRunStatusData>> {
     const row = await this.prisma.ingestionPullRunProjection.findUnique({
       where: {
         sourceId: projectionKey,
         projectId: String(context.tenantId),
       },
     });
-    return row ? fromRow(row) : null;
+    return row ? { kind: "folded", projection: fromRow(row) } : { kind: "empty" };
   }
 
   // Separate from load for cost: agents screen needs two columns per source.

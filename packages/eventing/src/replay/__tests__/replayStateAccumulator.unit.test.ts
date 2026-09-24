@@ -7,6 +7,7 @@ import type {
   StateProjectionDefinition,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "../../projections/stateProjection.types.ts";
 import { StateProjectionExecutor } from "../../projections/stateProjectionExecutor.ts";
 import type { RetentionPolicy, RetentionPolicyResolver } from "../../runtime.types.ts";
@@ -40,7 +41,9 @@ function spyStore(seed?: StoredProjection<CounterState>) {
     context: ProjectionStoreContext;
   }[] = [];
   const store: StateProjectionStore<CounterState> = {
-    tryLoad: vi.fn(async () => seed ?? null),
+    get: vi.fn(async (): Promise<StoredProjectionRead<CounterState>> =>
+      seed === undefined ? { kind: "empty" } : { kind: "folded", projection: seed },
+    ),
     store: vi.fn(async (projection, context) => {
       writes.push({ projection, context });
     }),
@@ -92,7 +95,7 @@ function makeEvent(overrides: CounterEventOverrides = {}): CounterEvent {
 
 describe("StateAccumulator", () => {
   describe("given a rebuild from the canonical log", () => {
-    it("never calls store.tryLoad — it rebuilds from init(), it does not merge", async () => {
+    it("never calls store.get — it rebuilds from init(), it does not merge", async () => {
       const { store, writes } = spyStore({
         // A pre-existing row that MUST be ignored by a rebuild.
         state: { count: 999, amounts: [999] },
@@ -108,7 +111,7 @@ describe("StateAccumulator", () => {
       acc.apply(makeEvent({ data: { amount: 3 } }));
       await acc.flush();
 
-      expect(store.tryLoad).not.toHaveBeenCalled();
+      expect(store.get).not.toHaveBeenCalled();
       expect(writes).toHaveLength(1);
       // From init(), not merged onto the seed's 999.
       expect(writes[0]!.projection.state).toEqual({

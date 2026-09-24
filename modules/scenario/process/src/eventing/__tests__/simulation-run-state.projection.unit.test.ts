@@ -26,7 +26,7 @@ import {
 // Create a dummy store -- only init/apply are tested, not persistence
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  tryGet: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 const foldProjection = SimulationRunStateFoldProjection.create({
   store: noopStore,
@@ -701,10 +701,7 @@ describe("simulationRunStateFoldProjection", () => {
         }),
       ]);
 
-      expect(state.UnmetCriteria).toEqual([
-        "names the refund window",
-        "opens a ticket",
-      ]);
+      expect(state.UnmetCriteria).toEqual(["names the refund window", "opens a ticket"]);
       expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
     });
 

@@ -2,7 +2,11 @@
  * Combinatorial test for experiment run fold ordering.
  */
 
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
@@ -38,12 +42,15 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<ExperimentRunState
     async store(state: ExperimentRunStateData): Promise<void> {
       rows.push({ ...state });
     },
-    async tryGet(
+    async get(
       _key: string,
       _ctx: ProjectionStoreContext,
-    ): Promise<ExperimentRunStateData | null> {
-      if (rows.length === 0) return null;
-      return rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best));
+    ): Promise<FoldStateRead<ExperimentRunStateData>> {
+      if (rows.length === 0) return { kind: "empty" };
+      return {
+        kind: "folded",
+        state: rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best)),
+      };
     },
   };
 }
@@ -146,11 +153,14 @@ async function processFold(
 
   store.clear();
   for (const event of events) {
-    const currentState = (await store.tryGet("run-1", ctx)) ?? projection.init();
+    const read = await store.get("run-1", ctx);
+    const currentState = read.kind === "folded" ? read.state : projection.init();
     const newState = projection.apply(currentState, event);
     await store.store(newState, ctx);
   }
-  return (await store.tryGet("run-1", ctx))!;
+  const final = await store.get("run-1", ctx);
+  if (final.kind === "empty") throw new Error("no state was folded for run-1");
+  return final.state;
 }
 
 // --- Permutation helper ---

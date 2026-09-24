@@ -45,7 +45,7 @@ function makeFold({
   withEventLoader?: boolean;
 }) {
   const store = createMockFoldProjectionStore<CounterState>();
-  (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(storedState);
+  (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "folded", state: storedState });
 
   const fold = createMockFoldProjectionDefinition("counter", {
     store,
@@ -129,9 +129,12 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         const late = eventAt(1_000);
         const history = [late, eventAt(2_000), eventAt(3_000), eventAt(CHECKPOINT_MS)];
         const store = createMockFoldProjectionStore<OrderState>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
-          sequence: [5_000],
-          LastEventOccurredAt: CHECKPOINT_MS,
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          kind: "folded",
+          state: {
+            sequence: [5_000],
+            LastEventOccurredAt: CHECKPOINT_MS,
+          },
         });
         const fold = createMockFoldProjectionDefinition("evaluation", {
           store,
@@ -159,9 +162,12 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
 
       function makeOrderFold(history: Event[]) {
         const store = createMockFoldProjectionStore<OrderState>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
-          sequence: [1_000, 2_000, CHECKPOINT_MS],
-          LastEventOccurredAt: CHECKPOINT_MS,
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          kind: "folded",
+          state: {
+            sequence: [1_000, 2_000, CHECKPOINT_MS],
+            LastEventOccurredAt: CHECKPOINT_MS,
+          },
         });
         const fold = createMockFoldProjectionDefinition("run", {
           store,
@@ -349,9 +355,12 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       /** Records the ids in fold order, which is what a tie decides. */
       function makeIdFold(history: Event[]) {
         const store = createMockFoldProjectionStore<IdState>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
-          ids: [],
-          LastEventOccurredAt: CHECKPOINT_MS,
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          kind: "folded",
+          state: {
+            ids: [],
+            LastEventOccurredAt: CHECKPOINT_MS,
+          },
         });
         const fold = createMockFoldProjectionDefinition("run", {
           store,

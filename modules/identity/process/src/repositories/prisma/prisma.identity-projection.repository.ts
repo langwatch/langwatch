@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import type { IdentifierFact } from "@langwatch/identity-contract";
 import { isLiveIdentifierState, LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
@@ -63,15 +64,15 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
     private readonly reservations: IdentityReservationRepository,
   ) {}
 
-  async tryLoad(
+  async get(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<IdentityFoldState> | null> {
+  ): Promise<StoredProjectionRead<IdentityFoldState>> {
     const userId = key;
     const cursor = await this.prisma.identityProjectionCursor.findUnique({
       where: { userId },
     });
-    if (!cursor) return null;
+    if (!cursor) return { kind: "empty" };
 
     const rows = await this.prisma.identifier.findMany({ where: { userId } });
     const state: IdentityFoldState = {
@@ -87,15 +88,18 @@ export class PrismaIdentityProjectionRepository implements StateProjectionStore<
       ),
     };
     return {
-      state,
-      cursor: {
-        acceptedAt: cursor.acceptedAt.getTime(),
-        eventId: cursor.lastEventId,
+      kind: "folded",
+      projection: {
+        state,
+        cursor: {
+          acceptedAt: cursor.acceptedAt.getTime(),
+          eventId: cursor.lastEventId,
+        },
+        occurredAt: cursor.occurredAt.getTime(),
+        createdAt: cursor.createdAt.getTime(),
+        updatedAt: cursor.updatedAt.getTime(),
+        version: cursor.projectionVersion,
       },
-      occurredAt: cursor.occurredAt.getTime(),
-      createdAt: cursor.createdAt.getTime(),
-      updatedAt: cursor.updatedAt.getTime(),
-      version: cursor.projectionVersion,
     };
   }
 

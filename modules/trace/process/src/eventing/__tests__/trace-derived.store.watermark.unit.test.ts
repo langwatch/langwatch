@@ -23,7 +23,7 @@ const TENANT = "tenant-watermark";
 const TRACE_ID = "trace-1";
 
 const projection = TraceAnalyticsFoldProjection.create({
-  store: { store: async () => {}, tryGet: async () => null },
+  store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
   traceCanonicalisation: TraceCanonicalisationService.create(),
   runtime: createTestRuntime(),
 });

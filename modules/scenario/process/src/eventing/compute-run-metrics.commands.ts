@@ -108,12 +108,12 @@ export class ComputeRunMetricsAdapter implements CommandHandler<
 
     // Pull fallback: read from trace summary store
     if (!metrics) {
-      const traceSummary = await this.deps.traceSummaryStore.tryGet(traceId, {
+      const summaryRead = await this.deps.traceSummaryStore.get(traceId, {
         tenantId,
         aggregateId: traceId,
       });
 
-      if (!traceSummary) {
+      if (summaryRead.kind === "empty") {
         logger.debug(
           { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
           "Trace summary not available yet",
@@ -142,6 +142,7 @@ export class ComputeRunMetricsAdapter implements CommandHandler<
 
         return [];
       }
+      const traceSummary = summaryRead.state;
 
       // Role cost/latency are derived from stored_spans (not carried on the
       // summary anymore); totalCost is still a summary scalar.

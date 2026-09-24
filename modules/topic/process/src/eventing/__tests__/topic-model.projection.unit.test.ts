@@ -5,7 +5,7 @@ import type { TopicClusteringTopicsRecordedEvent } from "../../services/topic-ev
 import { type TopicModelData, TopicModelFoldProjection } from "../topic-model.projection.ts";
 
 const stubStore: StateProjectionStore<TopicModelData> = {
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
   store: async () => undefined,
 };
 

@@ -40,7 +40,7 @@ function appendStore<T>(
 
 function stateStore<T>(): StateProjectionStore<T> {
   return {
-    tryLoad: vi.fn().mockResolvedValue(null),
+    get: vi.fn().mockResolvedValue({ kind: "empty" }),
     store: vi.fn().mockResolvedValue(undefined),
   };
 }

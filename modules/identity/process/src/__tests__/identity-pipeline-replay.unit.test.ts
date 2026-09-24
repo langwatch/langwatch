@@ -4,6 +4,7 @@ import {
   type ProjectionStoreContext,
   type StateProjectionStore,
   type StoredProjection,
+  type StoredProjectionRead,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import {
@@ -27,11 +28,12 @@ const T0 = 1_690_000_000_000;
 class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
   readonly stored = new Map<string, StoredProjection<IdentityFoldState>>();
 
-  async tryLoad(
+  async get(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<IdentityFoldState> | null> {
-    return this.stored.get(key) ?? null;
+  ): Promise<StoredProjectionRead<IdentityFoldState>> {
+    const folded = this.stored.get(key) ?? null;
+    return folded === null ? { kind: "empty" } : { kind: "folded", projection: folded };
   }
 
   async store(

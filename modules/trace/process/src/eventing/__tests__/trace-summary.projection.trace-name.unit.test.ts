@@ -44,7 +44,7 @@ function makeTraceNameChangedEvent({
 
 function makeProjection() {
   return TraceSummaryFoldProjection.create({
-    store: { store: async () => {}, tryGet: async () => null },
+    store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
     traceCanonicalisation: TraceCanonicalisationService.create(),
     runtime,
   });

@@ -24,7 +24,7 @@ const tenantId = createTenantId("project-wiring");
 
 function foldStore<State>(): FoldProjectionStore<State> {
   return {
-    tryGet: vi.fn().mockResolvedValue(null),
+    get: vi.fn().mockResolvedValue({ kind: "empty" }),
     store: vi.fn().mockResolvedValue(undefined),
   };
 }

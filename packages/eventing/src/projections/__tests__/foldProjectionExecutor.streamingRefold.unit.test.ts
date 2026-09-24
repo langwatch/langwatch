@@ -76,7 +76,7 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
 
   function makeFold(loader: ReturnType<typeof pagedLoaderFrom>) {
     const store = createMockFoldProjectionStore<CountState>();
-    (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
     const foldDef = createMockFoldProjectionDefinition("slim", {
       store,
       init,

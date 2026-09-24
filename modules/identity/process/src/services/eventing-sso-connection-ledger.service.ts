@@ -193,9 +193,9 @@ export class SsoConnectionLedgerWriterAdapter implements SsoConnectionLedger {
     last: SsoConnectionEvent;
   }): Promise<boolean> {
     try {
-      const stored = await this.projectionStore.tryLoad(connectionId, context);
-      const cursor = stored?.cursor;
-      if (!cursor) return false;
+      const stored = await this.projectionStore.get(connectionId, context);
+      if (stored.kind === "empty") return false;
+      const { cursor } = stored.projection;
       return (
         cursor.acceptedAt > last.createdAt ||
         (cursor.acceptedAt === last.createdAt && cursor.eventId >= last.id)

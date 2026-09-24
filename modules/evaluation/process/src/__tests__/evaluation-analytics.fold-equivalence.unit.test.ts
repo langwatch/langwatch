@@ -29,7 +29,7 @@ const attributePolicy = new PreserveEvaluationAnalyticsAttributes();
 const rowProjection = EvaluationAnalyticsRowProjection.create();
 
 const projection = new EvaluationAnalyticsFoldProjection({
-  store: { store: async () => {}, tryGet: async () => null },
+  store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
 });
 
 function project(state: EvaluationAnalyticsData): EvaluationAnalyticsRow {

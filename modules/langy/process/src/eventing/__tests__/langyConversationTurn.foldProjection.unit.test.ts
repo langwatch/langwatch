@@ -16,7 +16,7 @@ import { LangyConversationTurnFoldProjection } from "../langy-conversation-turn.
 
 const noopStore: StateProjectionStore<LangyConversationTurnData> = {
   store: async () => {},
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 
 const fold = new LangyConversationTurnFoldProjection({ store: noopStore });

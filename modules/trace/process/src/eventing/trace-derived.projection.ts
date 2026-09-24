@@ -157,7 +157,7 @@ export interface TraceAnalyticsRow {
 
   // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   // Not analytics columns — these round-trip the fold's working state so
-  // store.tryGet() can decode without replaying event_log; the hoisted
+  // store.get() can decode without replaying event_log; the hoisted
   // dimension columns above double as read-back sources for the attribute map.
   /** Spans seen — the MAX_PROCESSED_SPANS cap AND the persistable-signal gate. */
   spanCount: number;

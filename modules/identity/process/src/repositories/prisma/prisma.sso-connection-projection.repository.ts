@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import {
   DEFAULT_SSO_ARRIVAL_POLICY,
@@ -69,29 +70,32 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
     private readonly engineProvider?: SsoEngineProviderProjection,
   ) {}
 
-  async tryLoad(
+  async get(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<SsoConnectionFoldState> | null> {
+  ): Promise<StoredProjectionRead<SsoConnectionFoldState>> {
     const row = await this.prisma.ssoConnection.findUnique({
       where: { id: key },
     });
-    if (!row) return null;
+    if (!row) return { kind: "empty" };
     return {
-      state: {
-        ...PrismaSsoConnectionProjectionRepository.rowToConnection(row),
-        CreatedAt: row.createdAt.getTime(),
-        UpdatedAt: row.updatedAt.getTime(),
-        LastEventOccurredAt: row.occurredAt.getTime(),
+      kind: "folded",
+      projection: {
+        state: {
+          ...PrismaSsoConnectionProjectionRepository.rowToConnection(row),
+          CreatedAt: row.createdAt.getTime(),
+          UpdatedAt: row.updatedAt.getTime(),
+          LastEventOccurredAt: row.occurredAt.getTime(),
+        },
+        cursor: {
+          acceptedAt: row.acceptedAt.getTime(),
+          eventId: row.lastEventId,
+        },
+        occurredAt: row.occurredAt.getTime(),
+        createdAt: row.createdAt.getTime(),
+        updatedAt: row.updatedAt.getTime(),
+        version: row.projectionVersion,
       },
-      cursor: {
-        acceptedAt: row.acceptedAt.getTime(),
-        eventId: row.lastEventId,
-      },
-      occurredAt: row.occurredAt.getTime(),
-      createdAt: row.createdAt.getTime(),
-      updatedAt: row.updatedAt.getTime(),
-      version: row.projectionVersion,
     };
   }
 

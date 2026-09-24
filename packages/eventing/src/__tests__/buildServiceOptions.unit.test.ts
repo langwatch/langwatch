@@ -41,7 +41,7 @@ class TestFoldProjection
   readonly name = "testFold";
   readonly version = "2026-03-29";
   readonly store: FoldProjectionStore<TestFoldState> = {
-    tryGet: async () => null,
+    get: async () => ({ kind: "empty" as const }),
     store: async () => {},
   };
   protected readonly events = testEvents;

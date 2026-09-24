@@ -28,13 +28,16 @@ function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = 
   const tryResolveStagedSender = vi.fn((name: string) => senders[name] ?? null);
   // A store whose cursor already sits past anything appended, so convergence
   // returns on the first read rather than sleeping through a real window.
-  const tryLoad = vi.fn<StateProjectionStore<JoinRequestFoldState>["tryLoad"]>(async () => ({
-    state: {} as JoinRequestFoldState,
-    cursor: { acceptedAt: Number.MAX_SAFE_INTEGER, eventId: "evt_last" },
-    occurredAt: 0,
-    createdAt: 0,
-    updatedAt: 0,
-    version: "1",
+  const get = vi.fn<StateProjectionStore<JoinRequestFoldState>["get"]>(async () => ({
+    kind: "folded",
+    projection: {
+      state: {} as JoinRequestFoldState,
+      cursor: { acceptedAt: Number.MAX_SAFE_INTEGER, eventId: "evt_last" },
+      occurredAt: 0,
+      createdAt: 0,
+      updatedAt: 0,
+      version: "1",
+    },
   }));
 
   const unread = async (): Promise<never> => {
@@ -49,7 +52,7 @@ function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = 
     countEventsBefore: unread,
   };
   const projectionStore: StateProjectionStore<JoinRequestFoldState> = {
-    tryLoad,
+    get,
     store: async () => {
       throw new Error("the ledger never stores the fold");
     },
@@ -61,7 +64,7 @@ function compose(input: { senders?: Record<string, JoinRequestStagedSender> } = 
     tryResolveStagedSender,
     convergence: { timeoutMs: 20, pollMs: 1 },
   });
-  return { adapter, storeEvents, send, tryResolveStagedSender, tryLoad };
+  return { adapter, storeEvents, send, tryResolveStagedSender, get };
 }
 
 const expireCommand = (): JoinRequestCommand => ({

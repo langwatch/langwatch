@@ -8,6 +8,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
@@ -54,23 +55,26 @@ export class InstantEvalRunProjectionStore implements StateProjectionStore<Insta
    * starts: the service wrote the definition and nothing has been folded, so
    * the fold starts from `init()` rather than from counters never applied.
    */
-  async tryLoad(
+  async get(
     projectionKey: string,
     context: ProjectionStoreContext,
-  ): Promise<StoredProjection<InstantEvalRunProjectionState> | null> {
+  ): Promise<StoredProjectionRead<InstantEvalRunProjectionState>> {
     const row = await this.runs.findById({
       projectId: String(context.tenantId),
       runId: projectionKey,
     });
-    if (!row || row.lastEventId === null || row.acceptedAt === null) return null;
+    if (!row || row.lastEventId === null || row.acceptedAt === null) return { kind: "empty" };
 
     return {
-      state: instantEvalStateFromRow(row),
-      cursor: { acceptedAt: row.acceptedAt, eventId: row.lastEventId },
-      occurredAt: row.occurredAt ?? row.createdAt.epochMilliseconds,
-      createdAt: row.createdAt.epochMilliseconds,
-      updatedAt: row.updatedAt.epochMilliseconds,
-      version: row.projectionVersion ?? INITIAL_INSTANT_EVAL_PROJECTION_VERSION,
+      kind: "folded",
+      projection: {
+        state: instantEvalStateFromRow(row),
+        cursor: { acceptedAt: row.acceptedAt, eventId: row.lastEventId },
+        occurredAt: row.occurredAt ?? row.createdAt.epochMilliseconds,
+        createdAt: row.createdAt.epochMilliseconds,
+        updatedAt: row.updatedAt.epochMilliseconds,
+        version: row.projectionVersion ?? INITIAL_INSTANT_EVAL_PROJECTION_VERSION,
+      },
     };
   }
 

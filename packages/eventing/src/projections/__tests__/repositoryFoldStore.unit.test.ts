@@ -268,12 +268,15 @@ describe("RepositoryFoldStore", () => {
       };
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      const result = await store.tryGet("agg-1", makeContext());
+      const result = await store.get("agg-1", makeContext());
       expect(result).toEqual({
-        total: 10,
-        status: "done",
-        CreatedAt: 1000,
-        UpdatedAt: 2000,
+        kind: "folded",
+        state: {
+          total: 10,
+          status: "done",
+          CreatedAt: 1000,
+          UpdatedAt: 2000,
+        },
       });
     });
 
@@ -282,8 +285,8 @@ describe("RepositoryFoldStore", () => {
       repo.getResult = null;
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      const result = await store.tryGet("agg-1", makeContext());
-      expect(result).toBeNull();
+      const result = await store.get("agg-1", makeContext());
+      expect(result).toEqual({ kind: "empty" });
     });
 
     it("passes tenantId to repository read context", async () => {
@@ -291,7 +294,7 @@ describe("RepositoryFoldStore", () => {
       repo.getResult = null;
       const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
 
-      await store.tryGet("agg-1", makeContext({ tenantId: "tenant-99" as TenantId }));
+      await store.get("agg-1", makeContext({ tenantId: "tenant-99" as TenantId }));
 
       expect(repo.findProjection).toHaveBeenCalledWith(
         "agg-1",

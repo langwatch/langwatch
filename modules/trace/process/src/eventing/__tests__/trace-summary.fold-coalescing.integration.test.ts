@@ -100,8 +100,8 @@ describe("trace summary fold coalescing", () => {
       // write for the whole batch is the coalescing claim; the count is the
       // correctness claim.
       expect(storage.written).toHaveLength(1);
-      const persisted = await store.tryGet(TRACE_ID, context);
-      expect(persisted?.spanCount).toBe(SPAN_COUNT);
+      const persisted = await store.get(TRACE_ID, context);
+      expect(persisted).toMatchObject({ kind: "folded", state: { spanCount: SPAN_COUNT } });
     });
   });
 });

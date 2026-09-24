@@ -98,13 +98,13 @@ describe("given a process that produces identity commands without consuming them
       const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
       }).joinRequestPipeline() as unknown as {
-        stateProjections: Map<string, { store: { tryLoad(): Promise<unknown> } }>;
+        stateProjections: Map<string, { store: { get(): Promise<unknown> } }>;
       };
       const projection = [...definition.stateProjections.values()][0];
       if (!projection)
         throw new Error("the join-request definition registered no state projection");
 
-      await expect(projection.store.tryLoad()).rejects.toThrow(
+      await expect(projection.store.get()).rejects.toThrow(
         /langwatch-api registered the join-requests pipeline as a producer only/,
       );
     });
@@ -132,12 +132,12 @@ describe("given a process that produces identity commands without consuming them
       const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
       }).scimSyncPipeline() as unknown as {
-        stateProjections: Map<string, { store: { tryLoad(): Promise<unknown> } }>;
+        stateProjections: Map<string, { store: { get(): Promise<unknown> } }>;
       };
       const projection = [...definition.stateProjections.values()][0];
       if (!projection) throw new Error("the scim-sync definition registered no state projection");
 
-      await expect(projection.store.tryLoad()).rejects.toThrow(
+      await expect(projection.store.get()).rejects.toThrow(
         /langwatch-api registered the scim-sync pipeline as a producer only/,
       );
     });

@@ -103,6 +103,9 @@ export interface FoldProjectionOptions {
   refoldOnOutOfOrder?: boolean;
 }
 
+// ADR-146: `empty` until the first event is folded.
+export type FoldStateRead<State> = { kind: "folded"; state: State } | { kind: "empty" };
+
 /**
  * Store interface for fold projections.
  * Handles persistence and retrieval of fold state.
@@ -114,8 +117,8 @@ export interface FoldProjectionStore<State> {
   /** Optional batch store for persisting multiple fold states at once. */
   storeBatch?: (entries: { state: State; context: ProjectionStoreContext }[]) => Promise<void>;
 
-  /** Retrieves the stored state for an aggregate, or null if not found. */
-  tryGet: (aggregateId: string, context: ProjectionStoreContext) => Promise<State | null>;
+  /** The folded state for an aggregate, or `empty` when nothing has been folded yet. */
+  get: (aggregateId: string, context: ProjectionStoreContext) => Promise<FoldStateRead<State>>;
 
   // Retrieves state with ids of already-folded events for redelivery dedup.
   // Executor prefers this over get() so dedup survives cache loss.

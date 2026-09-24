@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 /**
  * The join-request ledger writer, which had no test of its own at all. appender, so this writer
@@ -29,7 +30,7 @@ const ACTOR = { type: "user" as const, id: USER };
 const T0 = 1_690_000_000_000;
 
 /**
- * The projection head as the queue's fold leaves it. `tryLoad` is what the
+ * The projection head as the queue's fold leaves it. `get` is what the
  * read-your-writes wait watches, so a store that answers `null` forever is a
  * fold that never ran.
  */
@@ -37,21 +38,24 @@ class ConvergedProjection implements StateProjectionStore<JoinRequestFoldState> 
   constructor(private readonly converged: boolean) {}
   readonly reads: string[] = [];
 
-  async tryLoad(
+  async get(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<JoinRequestFoldState> | null> {
+  ): Promise<StoredProjectionRead<JoinRequestFoldState>> {
     this.reads.push(key);
-    if (!this.converged) return null;
+    if (!this.converged) return { kind: "empty" };
     return {
-      state: {} as JoinRequestFoldState,
-      // Far past any event this suite states, so the wait returns on its
-      // first read rather than spending the window.
-      cursor: { acceptedAt: Number.MAX_SAFE_INTEGER, eventId: "zzz" },
-      occurredAt: T0,
-      createdAt: T0,
-      updatedAt: T0,
-      version: "1",
+      kind: "folded",
+      projection: {
+        state: {} as JoinRequestFoldState,
+        // Far past any event this suite states, so the wait returns on its
+        // first read rather than spending the window.
+        cursor: { acceptedAt: Number.MAX_SAFE_INTEGER, eventId: "zzz" },
+        occurredAt: T0,
+        createdAt: T0,
+        updatedAt: T0,
+        version: "1",
+      },
     };
   }
 
@@ -231,7 +235,7 @@ describe("given a process that registered no join-request pipeline", () => {
 
     it("does not wait on the projection for a command nothing received", async () => {
       const projection = new ConvergedProjection(false);
-      const tryLoad = vi.spyOn(projection, "tryLoad");
+      const get = vi.spyOn(projection, "get");
       const writer = new JoinRequestLedgerWriterAdapter({
         projectionStore: projection,
         eventing: new RecordingEventing(false),
@@ -242,7 +246,7 @@ describe("given a process that registered no join-request pipeline", () => {
         "join request ledger cannot stage",
       );
 
-      expect(tryLoad).not.toHaveBeenCalled();
+      expect(get).not.toHaveBeenCalled();
     });
   });
 });

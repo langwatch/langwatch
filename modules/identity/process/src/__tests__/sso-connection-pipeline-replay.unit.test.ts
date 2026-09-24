@@ -5,6 +5,7 @@ import {
   type ProjectionStoreContext,
   type StateProjectionStore,
   type StoredProjection,
+  type StoredProjectionRead,
 } from "@langwatch/eventing";
 import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
@@ -111,8 +112,9 @@ function lifecycle(): SsoConnectionEvent[] {
 class InMemoryProjectionStore implements StateProjectionStore<SsoConnectionFoldState> {
   stored: StoredProjection<SsoConnectionFoldState> | null = null;
 
-  async tryLoad(): Promise<StoredProjection<SsoConnectionFoldState> | null> {
-    return this.stored;
+  async get(): Promise<StoredProjectionRead<SsoConnectionFoldState>> {
+    const folded = this.stored;
+    return folded === null ? { kind: "empty" } : { kind: "folded", projection: folded };
   }
 
   async store(

@@ -38,7 +38,7 @@ describe("given the aggregate's event vocabulary and the projection's subscripti
     /** @scenario "Every fact the aggregate can state is one the projection folds" */
     it("finds the projection subscribed to it", () => {
       const unusedStore: StateProjectionStore<SsoConnectionFoldState> = {
-        tryLoad: async () => null,
+        get: async () => ({ kind: "empty" as const }),
         store: async () => {},
       };
       const folded = new SsoConnectionStateFoldProjection({ store: unusedStore }).eventTypes;

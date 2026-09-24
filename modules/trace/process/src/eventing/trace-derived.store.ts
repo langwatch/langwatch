@@ -1,4 +1,8 @@
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 
 import type { TraceAnalyticsProjectionRepository } from "../repositories/projection/trace-analytics-projection.repository.ts";
 import {
@@ -115,10 +119,11 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
   }
 
   /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
-  async tryGet(
+  async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<TraceAnalyticsData | null> {
-    return (await this.getWithApplied(aggregateId, context)).state;
+  ): Promise<FoldStateRead<TraceAnalyticsData>> {
+    const { state } = await this.getWithApplied(aggregateId, context);
+    return state === null ? { kind: "empty" } : { kind: "folded", state };
   }
 }

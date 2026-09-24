@@ -10,7 +10,7 @@ import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.stor
  */
 describe("evaluationAnalytics fold projection", () => {
   const fold = EvaluationAnalyticsFoldProjection.create({
-    store: { store: async () => {}, tryGet: async () => null },
+    store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
   });
 
   it("is one of the folds that trusts an absent read", () => {

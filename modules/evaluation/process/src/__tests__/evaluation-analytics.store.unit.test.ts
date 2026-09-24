@@ -34,7 +34,7 @@ const attributePolicy = new PassthroughAnalyticsAttributePolicy();
 const rowProjection = EvaluationAnalyticsRowProjection.create();
 
 const fold = new EvaluationAnalyticsFoldProjection({
-  store: { store: async () => {}, tryGet: async () => null },
+  store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
 });
 
 function project(state: EvaluationAnalyticsData): EvaluationAnalyticsRow {
@@ -271,7 +271,7 @@ describe("EvaluationAnalyticsStore read-back version gate", () => {
     it("misses through get() too, so both read paths agree", async () => {
       const { store } = storeOver(staleRow());
 
-      expect(await store.tryGet("eval-rb", context)).toBeNull();
+      expect(await store.get("eval-rb", context)).toEqual({ kind: "empty" });
     });
   });
 });

@@ -54,7 +54,7 @@ describe("given an accepted run nothing has been folded onto yet", () => {
     it("answers nothing, so the fold starts from the initial state", async () => {
       const { store } = await storeWithRun({ lastEventId: null, acceptedAt: null });
 
-      expect(await store.tryLoad(RUN_ID, context)).toBeNull();
+      expect(await store.get(RUN_ID, context)).toEqual({ kind: "empty" });
     });
   });
 });
@@ -67,11 +67,14 @@ describe("given a run with a checkpoint", () => {
         acceptedAt: AT.epochMilliseconds,
       });
 
-      const loaded = await store.tryLoad(RUN_ID, context);
+      const loaded = await store.get(RUN_ID, context);
 
       expect(loaded).toMatchObject({
-        state: { status: "RUNNING", progress: 40, matched: 12, tokens: 4_200 },
-        cursor: { acceptedAt: AT.epochMilliseconds, eventId: "evt-9" },
+        kind: "folded",
+        projection: {
+          state: { status: "RUNNING", progress: 40, matched: 12, tokens: 4_200 },
+          cursor: { acceptedAt: AT.epochMilliseconds, eventId: "evt-9" },
+        },
       });
     });
   });

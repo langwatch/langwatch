@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import type { LangyConversationStateData } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
@@ -38,10 +39,10 @@ export class PrismaLangyConversationProjectionRepository implements StateProject
     return new PrismaLangyConversationProjectionRepository(database);
   }
 
-  async tryLoad(
+  async get(
     ConversationId: string,
     context: ProjectionStoreContext,
-  ): Promise<StoredProjection<LangyConversationStateData> | null> {
+  ): Promise<StoredProjectionRead<LangyConversationStateData>> {
     const projectId = String(context.tenantId);
     const row = await this.prisma.langyConversationProjection.findUnique({
       where: {
@@ -51,7 +52,7 @@ export class PrismaLangyConversationProjectionRepository implements StateProject
         projectId_ConversationId: { projectId, ConversationId },
       },
     });
-    return row ? fromRow(row) : null;
+    return row ? { kind: "folded", projection: fromRow(row) } : { kind: "empty" };
   }
 
   async store(

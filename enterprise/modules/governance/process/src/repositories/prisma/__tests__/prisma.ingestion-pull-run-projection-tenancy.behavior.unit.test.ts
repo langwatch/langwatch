@@ -72,11 +72,11 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
     );
 
     await expect(
-      repository.tryLoad(SOURCE_ID, {
+      repository.get(SOURCE_ID, {
         aggregateId: SOURCE_ID,
         tenantId: createTenantId(PROJECT_ID),
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ kind: "empty" });
     expect(findUnique).toHaveBeenCalledWith({
       where: { sourceId: SOURCE_ID, projectId: PROJECT_ID },
     });

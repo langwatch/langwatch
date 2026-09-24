@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@langwatch/prisma-client/generated";
@@ -63,15 +64,15 @@ export class PrismaTopicClusteringRunHistoryProjectionRepository implements Stat
     return new PrismaTopicClusteringRunHistoryProjectionRepository(options.database);
   }
 
-  async tryLoad(
+  async get(
     _projectionKey: string,
     context: ProjectionStoreContext,
-  ): Promise<StoredProjection<TopicClusteringRunHistoryData> | null> {
+  ): Promise<StoredProjectionRead<TopicClusteringRunHistoryData>> {
     const projectId = String(context.tenantId);
     const row = await this.prisma.topicClusteringRunHistoryProjection.findUnique({
       where: { projectId },
     });
-    return row ? fromRow(row) : null;
+    return row ? { kind: "folded", projection: fromRow(row) } : { kind: "empty" };
   }
 
   async store(

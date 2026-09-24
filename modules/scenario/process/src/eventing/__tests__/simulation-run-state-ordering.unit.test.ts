@@ -1,9 +1,13 @@
 /**
  * Combinatorial test for simulation run fold ordering: correct final state regardless
- * of event order. Simulates incremental fold pattern: store.tryGet() → apply(event) → store().
+ * of event order. Simulates incremental fold pattern: store.get() → apply(event) → store().
  */
 
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import {
   SIMULATION_EVENT_VERSIONS,
@@ -40,12 +44,15 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<SimulationRunState
     async store(state: SimulationRunStateData): Promise<void> {
       rows.push({ ...state });
     },
-    async tryGet(
+    async get(
       _key: string,
       _ctx: ProjectionStoreContext,
-    ): Promise<SimulationRunStateData | null> {
-      if (rows.length === 0) return null;
-      return rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best));
+    ): Promise<FoldStateRead<SimulationRunStateData>> {
+      if (rows.length === 0) return { kind: "empty" };
+      return {
+        kind: "folded",
+        state: rows.reduce((best, row) => (row.UpdatedAt > best.UpdatedAt ? row : best)),
+      };
     },
   };
 }
@@ -206,7 +213,8 @@ async function processFold(
   store.clear();
   for (const event of events) {
     allEventsSoFar.push(event);
-    const currentState = (await store.tryGet("run-1", ctx)) ?? projection.init();
+    const read = await store.get("run-1", ctx);
+    const currentState = read.kind === "folded" ? read.state : projection.init();
 
     // Capture LastEventOccurredAt before apply
     const prevLastOccurred = currentState.LastEventOccurredAt ?? 0;
@@ -231,7 +239,9 @@ async function processFold(
     }
   }
   // Return what ReplacingMergeTree would return
-  return (await store.tryGet("run-1", ctx))!;
+  const final = await store.get("run-1", ctx);
+  if (final.kind === "empty") throw new Error("no state was folded for run-1");
+  return final.state;
 }
 
 // --- Permutation helper ---

@@ -29,7 +29,10 @@ function buildProjection(
 }
 
 function stateWithSpanCount(spanCount: number): TraceAnalyticsData {
-  const projection = buildProjection({ store: async () => {}, tryGet: async () => null });
+  const projection = buildProjection({
+    store: async () => {},
+    get: async () => ({ kind: "empty" as const }),
+  });
   return {
     ...projection.init(),
     traceId: TRACE_ID,
@@ -53,7 +56,9 @@ describe("TraceAnalyticsFoldProjection re-fold policy", () => {
   /** @scenario "The slim trace-analytics fold folds an earlier span without reading the event log" */
   it("folds a span that occurred before the checkpoint without reading the event log", async () => {
     const store: FoldProjectionStore<TraceAnalyticsData> = {
-      tryGet: vi.fn().mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
+      get: vi
+        .fn()
+        .mockResolvedValue({ kind: "folded", state: stateWithSpanCount(MAX_PROCESSED_SPANS + 1) }),
       store: vi.fn().mockResolvedValue(undefined),
     };
     const projection = buildProjection(store);

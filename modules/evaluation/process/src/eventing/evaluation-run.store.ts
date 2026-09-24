@@ -1,5 +1,9 @@
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 
 import type { EvaluationRunProjectionRepository } from "../repositories/evaluation-run-projection.repository.ts";
 
@@ -49,10 +53,14 @@ export class EvaluationRunStore implements FoldProjectionStore<EvaluationRunData
     );
   }
 
-  tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<EvaluationRunData | null> {
-    return this.service.findRunByEvaluationId({
+  async get(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<FoldStateRead<EvaluationRunData>> {
+    const folded = await this.service.findRunByEvaluationId({
       tenantId: String(context.tenantId),
       evaluationId: aggregateId,
     });
+    return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
   }
 }

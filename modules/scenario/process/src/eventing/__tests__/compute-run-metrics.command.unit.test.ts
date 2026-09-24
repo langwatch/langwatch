@@ -10,7 +10,7 @@ import { ComputeRunMetricsCommand } from "../compute-run-metrics.commands.ts";
 function makeDeps(overrides: Partial<ComputeRunMetricsDeps> = {}): ComputeRunMetricsDeps {
   return {
     traceSummaryStore: {
-      tryGet: vi.fn().mockResolvedValue(null),
+      get: vi.fn().mockResolvedValue({ kind: "empty" }),
       store: vi.fn().mockResolvedValue(undefined),
     },
     scheduleRetry: vi.fn().mockResolvedValue(undefined),
@@ -92,7 +92,9 @@ describe("ComputeRunMetricsCommand", () => {
     it("schedules a deferred retry instead of silently returning", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
-          tryGet: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: null })),
+          get: vi
+            .fn()
+            .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: null }) }),
           store: vi.fn(),
         },
         // No role cost derivable yet (spans not settled) and totalCost null.
@@ -120,7 +122,9 @@ describe("ComputeRunMetricsCommand", () => {
     it("gives up after MAX_RETRIES", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
-          tryGet: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: null })),
+          get: vi
+            .fn()
+            .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: null }) }),
           store: vi.fn(),
         },
       });
@@ -140,7 +144,9 @@ describe("ComputeRunMetricsCommand", () => {
     it("emits a metrics_computed event with totalCost from the summary and role costs derived from spans", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
-          tryGet: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: 0.003 })),
+          get: vi
+            .fn()
+            .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: 0.003 }) }),
           store: vi.fn(),
         },
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
@@ -174,7 +180,9 @@ describe("ComputeRunMetricsCommand", () => {
         traceSummaryStore: {
           // Cost-free scenario trace: no totalCost, but role-bearing spans
           // with latency. The readiness check must not treat this as "empty".
-          tryGet: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: null })),
+          get: vi
+            .fn()
+            .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: null }) }),
           store: vi.fn(),
         },
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
@@ -201,7 +209,9 @@ describe("ComputeRunMetricsCommand", () => {
     it("still emits totalCost from the trace summary with empty role maps", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
-          tryGet: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: 0.01 })),
+          get: vi
+            .fn()
+            .mockResolvedValue({ kind: "folded", state: makeTraceSummary({ totalCost: 0.01 }) }),
           store: vi.fn(),
         },
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
@@ -238,7 +248,7 @@ describe("ComputeRunMetricsCommand", () => {
       const events = await handler.handle(cmd);
 
       expect(events).toHaveLength(1);
-      expect(deps.traceSummaryStore.tryGet).not.toHaveBeenCalled();
+      expect(deps.traceSummaryStore.get).not.toHaveBeenCalled();
       expect(deps.deriveScenarioRoleMetrics).not.toHaveBeenCalled();
       expect(events[0]!.data).toMatchObject({
         totalCost: 0.005,

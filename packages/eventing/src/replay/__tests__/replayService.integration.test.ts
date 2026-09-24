@@ -357,7 +357,7 @@ describe("ReplayService", () => {
         LastEventOccurredAtKey: "LastEventOccurredAt",
         init: () => ({ count: 0 }),
         apply: (state) => ({ count: state.count + 1 }),
-        store: { store: foldStore, tryGet: vi.fn(async () => null) },
+        store: { store: foldStore, get: vi.fn(async () => ({ kind: "empty" as const })) },
       };
       const foldProjection: RegisteredFoldProjection = {
         projectionName: foldName,
@@ -373,7 +373,7 @@ describe("ReplayService", () => {
 
       const stateWrites: unknown[] = [];
       const stateStore: StateProjectionStore<{ seen: number }> = {
-        tryLoad: vi.fn(async () => null),
+        get: vi.fn(async () => ({ kind: "empty" as const })),
         store: vi.fn(async (stored) => {
           stateWrites.push(stored);
         }),

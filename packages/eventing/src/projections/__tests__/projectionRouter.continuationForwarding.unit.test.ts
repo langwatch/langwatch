@@ -74,7 +74,7 @@ describe("continuation forwarding", () => {
         store: vi.fn(async (_state, context) => {
           stored.push({ appliedEventIds: context.appliedEventIds });
         }),
-        tryGet: vi.fn(async () => ({ count: 1 })),
+        get: vi.fn(async () => ({ kind: "folded" as const, state: { count: 1 } })),
         getWithApplied: vi.fn(async () => ({
           state: { count: 1 },
           appliedEventIds: ["prev-1", "prev-2"],

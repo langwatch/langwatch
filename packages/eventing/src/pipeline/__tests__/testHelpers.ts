@@ -181,7 +181,7 @@ export function createMockFoldProjection<State = unknown, E extends Event = Even
     apply: config?.apply ?? ((state) => state),
     store: config?.store ?? {
       store: vi.fn().mockResolvedValue(void 0),
-      tryGet: vi.fn().mockResolvedValue(null),
+      get: vi.fn().mockResolvedValue({ kind: "empty" }),
     },
   };
 }

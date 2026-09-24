@@ -23,7 +23,7 @@ function stateProjectionOf({
     init: () => ({ count: 0 }),
     apply: (state) => state,
     store: {
-      tryLoad: async () => null,
+      get: async () => ({ kind: "empty" as const }),
       store: async () => undefined,
     },
     ...(coalesceMaxBatch === undefined ? {} : { options: { coalesceMaxBatch } }),

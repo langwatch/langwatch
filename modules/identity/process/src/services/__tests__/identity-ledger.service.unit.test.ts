@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
@@ -29,12 +30,12 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
   readonly stored = new Map<string, StoredProjection<IdentityFoldState>>();
   readonly storeContexts: ProjectionStoreContext[] = [];
 
-  // `tryLoad`, not `load`: the contract's reader answers null for a key it
-  // holds nothing for rather than throwing, which is what this already did —
-  // only the name was stale. `implements` would have caught it, but tests are
-  // outside the typecheck people run.
-  async tryLoad(key: string, _context: ProjectionStoreContext) {
-    return this.stored.get(key) ?? null;
+  async get(
+    key: string,
+    _context: ProjectionStoreContext,
+  ): Promise<StoredProjectionRead<IdentityFoldState>> {
+    const projection = this.stored.get(key);
+    return projection === undefined ? { kind: "empty" } : { kind: "folded", projection };
   }
 
   async store(projection: StoredProjection<IdentityFoldState>, context: ProjectionStoreContext) {

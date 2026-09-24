@@ -15,7 +15,7 @@ import { LangyConversationStateFoldProjection } from "../langy-conversation-stat
 
 const noopStore: StateProjectionStore<LangyConversationStateData> = {
   store: async () => {},
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 
 const fold = new LangyConversationStateFoldProjection({ store: noopStore });

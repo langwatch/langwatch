@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
@@ -30,10 +31,10 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
     return new PrismaTopicModelProjectionRepository(options.database);
   }
 
-  async tryLoad(
+  async get(
     _projectionKey: string,
     context: ProjectionStoreContext,
-  ): Promise<StoredProjection<TopicModelData> | null> {
+  ): Promise<StoredProjectionRead<TopicModelData>> {
     const projectId = String(context.tenantId);
     const cursor = await this.prisma.topicModelProjection.findUnique({
       where: { projectId },
@@ -41,7 +42,7 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
     // No cursor row means the projection never ran for this project. Any
     // pre-existing Topic rows are pre-ownership data the seed event will
     // re-record; starting the fold from them would double-apply the seed.
-    if (!cursor) return null;
+    if (!cursor) return { kind: "empty" };
 
     const rows = await this.prisma.topic.findMany({
       where: { projectId },
@@ -60,18 +61,21 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
     }));
 
     return {
-      state: {
-        ProjectId: projectId,
-        Topics: topics,
-        CreatedAt: cursor.CreatedAt,
-        UpdatedAt: cursor.UpdatedAt,
-        LastEventOccurredAt: cursor.OccurredAt,
+      kind: "folded",
+      projection: {
+        state: {
+          ProjectId: projectId,
+          Topics: topics,
+          CreatedAt: cursor.CreatedAt,
+          UpdatedAt: cursor.UpdatedAt,
+          LastEventOccurredAt: cursor.OccurredAt,
+        },
+        cursor: { acceptedAt: cursor.AcceptedAt, eventId: cursor.LastEventId },
+        occurredAt: cursor.OccurredAt,
+        createdAt: cursor.CreatedAt,
+        updatedAt: cursor.UpdatedAt,
+        version: cursor.ProjectionVersion,
       },
-      cursor: { acceptedAt: cursor.AcceptedAt, eventId: cursor.LastEventId },
-      occurredAt: cursor.OccurredAt,
-      createdAt: cursor.CreatedAt,
-      updatedAt: cursor.UpdatedAt,
-      version: cursor.ProjectionVersion,
     };
   }
 

@@ -1,7 +1,7 @@
 import type { Projection } from "../domain/types.ts";
 import type { RetentionPolicy } from "../runtime.types.ts";
 import type { ProjectionStore } from "../stores/projectionStore.types.ts";
-import type { FoldProjectionStore } from "./foldProjection.types.ts";
+import type { FoldProjectionStore, FoldStateRead } from "./foldProjection.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 /** Treats absent and null retention as equal (both mean indefinite). */
@@ -80,11 +80,12 @@ export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
     );
   }
 
-  async tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<TData | null> {
+  async get(aggregateId: string, context: ProjectionStoreContext): Promise<FoldStateRead<TData>> {
     const projection = await this.repo.findProjection(aggregateId, {
       tenantId: context.tenantId,
     });
+    if (!projection) return { kind: "empty" };
 
-    return (projection?.data as TData) ?? null;
+    return { kind: "folded", state: projection.data as TData };
   }
 }

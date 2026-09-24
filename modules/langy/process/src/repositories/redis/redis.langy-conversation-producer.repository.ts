@@ -34,7 +34,7 @@ class ProducerOnlyStateProjectionStore<TState> implements StateProjectionStore<T
     private readonly name: string,
   ) {}
 
-  tryLoad(): Promise<never> {
+  get(): Promise<never> {
     return Promise.reject(producerOnly(this.processName, `read the ${this.name} projection`));
   }
 

@@ -138,17 +138,18 @@ export class EventingLangyConversationAdapter {
         projectId: string;
         conversationId: string;
       }) => {
-        const projection = await conversationStore.tryLoad(conversationId, {
+        const read = await conversationStore.get(conversationId, {
           tenantId: createTenantId(projectId),
           aggregateId: conversationId,
         });
-        if (!projection) {
+        if (read.kind === "empty") {
           throw new NotFoundError(
             "langy_conversation_not_found",
             "Langy conversation",
             conversationId,
           );
         }
+        const { projection } = read;
         return {
           cursor: projection.cursor,
           status: projection.state.Status,

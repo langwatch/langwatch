@@ -40,11 +40,11 @@ function event(body: EventBody, occurredAt: number): LangyConversationProcessing
 
 const stateStore: StateProjectionStore<LangyConversationStateData> = {
   store: async () => {},
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 const turnStore: StateProjectionStore<LangyConversationTurnData> = {
   store: async () => {},
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 
 const hasRunTokenKey = (o: object) => Object.keys(o).some((k) => /run.?token/i.test(k));

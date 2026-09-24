@@ -23,12 +23,14 @@ export interface StoredProjection<State> {
   version: string;
 }
 
+// ADR-146: `empty` until the first event is folded.
+export type StoredProjectionRead<State> =
+  | { kind: "folded"; projection: StoredProjection<State> }
+  | { kind: "empty" };
+
 /** Direct persistence boundary used by `.withPostgresProjection()`. */
 export interface StateProjectionStore<State> {
-  tryLoad: (
-    key: string,
-    context: ProjectionStoreContext,
-  ) => Promise<StoredProjection<State> | null>;
+  get: (key: string, context: ProjectionStoreContext) => Promise<StoredProjectionRead<State>>;
 
   store: (projection: StoredProjection<State>, context: ProjectionStoreContext) => Promise<void>;
 }

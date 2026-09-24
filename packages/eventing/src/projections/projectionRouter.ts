@@ -2086,15 +2086,15 @@ export class ProjectionRouter<
       tenantId: context.tenantId,
     };
 
-    const state = await fold.store.tryGet(lookupKey, storeContext);
-    if (state === null) return null;
+    const read = await fold.store.get(lookupKey, storeContext);
+    if (read.kind === "empty") return null;
 
     return {
       id: `${projectionName}:${context.tenantId}:${aggregateId}`,
       aggregateId,
       tenantId: context.tenantId,
       version: fold.version,
-      data: state,
+      data: read.state,
     } as ProjectionTypes[ProjectionName];
   }
 

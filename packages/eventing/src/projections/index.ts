@@ -2,6 +2,7 @@ export type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
   FoldProjectionStore,
+  FoldStateRead,
 } from "./foldProjection.types.ts";
 export { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";
 export type {

@@ -112,7 +112,7 @@ describe("EventSourcingService - Security Flows", () => {
 
       await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context1);
 
-      expect(foldStore.tryGet).toHaveBeenCalledWith(
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({
           aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -186,7 +186,7 @@ describe("EventSourcingService - Security Flows", () => {
 
       await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context);
 
-      expect(foldStore.tryGet).toHaveBeenCalledWith(
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({
           aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -327,11 +327,11 @@ describe("EventSourcingService - Security Flows", () => {
       await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context2);
 
       // Verify different tenantIds are passed to fold store
-      expect(foldStore.tryGet).toHaveBeenCalledWith(
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({ tenantId: tenantId1 }),
       );
-      expect(foldStore.tryGet).toHaveBeenCalledWith(
+      expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({ tenantId: tenantId2 }),
       );

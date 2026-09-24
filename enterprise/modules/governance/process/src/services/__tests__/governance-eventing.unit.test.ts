@@ -436,7 +436,7 @@ describe("ingestion pull process and projection", () => {
   /** @scenario "Pull outcomes cannot regress the projected cursor" */
   it("does not let an older projected completion regress the run cursor", () => {
     const projection = IngestionPullRunStatusEventingProjection.create({
-      tryLoad: async () => null,
+      get: async () => ({ kind: "empty" as const }),
       store: async () => undefined,
     } as StateProjectionStore<IngestionPullRunStatusData>);
     const configured = ingestionPullConfiguredEventSchema.parse({

@@ -30,7 +30,7 @@ const context: EventSubscriberContext = {
 
 const noopStore: StateProjectionStore<LangyConversationStateData> = {
   store: async () => {},
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 
 const waitEnded: LangyConversationProcessingEvent = {

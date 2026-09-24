@@ -32,7 +32,7 @@ const BASE_MS = 1_760_000_000_000;
 
 const runtime = createTestRuntime();
 const projection = TraceAnalyticsFoldProjection.create({
-  store: { store: async () => {}, tryGet: async () => null },
+  store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
   traceCanonicalisation: TraceCanonicalisationService.create(),
   runtime,
 });

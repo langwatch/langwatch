@@ -202,15 +202,13 @@ export class FoldProjectionExecutor {
       if (store.getWithApplied) {
         return store.getWithApplied(key, readContext);
       }
-      // A get()-only store has no way to say "found but refused", so its null
-      // is always an absent miss; stamping it keeps the miss kind uniform for
-      // the refold gate and `trustAbsentMiss` downstream.
-      const state = await store.tryGet(key, readContext);
-      return {
-        state,
-        appliedEventIds: [],
-        ...(state === null ? { miss: "absent" as const } : {}),
-      };
+      // A get()-only store has no way to say "found but refused", so its empty
+      // answer is always an absent miss; stamping it keeps the miss kind uniform
+      // for the refold gate and `trustAbsentMiss` downstream.
+      const read = await store.get(key, readContext);
+      return read.kind === "folded"
+        ? { state: read.state, appliedEventIds: [] }
+        : { state: null, appliedEventIds: [], miss: "absent" };
     };
 
     const windowed = await read(context);

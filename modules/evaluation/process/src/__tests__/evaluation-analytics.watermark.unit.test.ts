@@ -59,7 +59,7 @@ class RecordingAnalytics extends AnalyticsService {
 }
 
 const fold = EvaluationAnalyticsFoldProjection.create({
-  store: { store: async () => {}, tryGet: async () => null },
+  store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
 });
 
 const bareState = (): EvaluationAnalyticsData => fold.init();

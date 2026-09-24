@@ -324,9 +324,9 @@ describe("EventingCodingAgentSessionStoreAdapter durable dedup", () => {
         persistence.withApplied = { row: makeRow(state), appliedEventIds: ["e1"] };
         const store = storeWith(persistence);
 
-        const result = await store.tryGet("session-1", context());
+        const result = await store.get("session-1", context());
 
-        expect(result?.modelCalls).toBe(7);
+        expect(result).toMatchObject({ kind: "folded", state: { modelCalls: 7 } });
       });
     });
   });
@@ -409,7 +409,7 @@ describe("EventingCodingAgentSessionStoreAdapter read-back gate", () => {
         persistence.withApplied = { row: staleRow(), appliedEventIds: ["e1"] };
         const store = storeWith(persistence);
 
-        expect(await store.tryGet("session-1", context())).toBeNull();
+        expect(await store.get("session-1", context())).toEqual({ kind: "empty" });
       });
     });
   });
@@ -474,7 +474,7 @@ describe("EventingCodingAgentSessionStoreAdapter read-back gate", () => {
         };
         const store = storeWith(persistence);
 
-        expect(await store.tryGet("session-1", context())).toBeNull();
+        expect(await store.get("session-1", context())).toEqual({ kind: "empty" });
       });
     });
   });

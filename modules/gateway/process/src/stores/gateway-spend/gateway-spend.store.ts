@@ -1,4 +1,8 @@
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import type { GatewaySpendEvents } from "../../repositories/gateway-spend-events.repository.ts";
@@ -15,14 +19,15 @@ export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState>
 
   private constructor(private readonly repo: GatewaySpendEvents) {}
 
-  async tryGet(
+  async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<GatewaySpendState | null> {
-    return this.repo.findForFold({
+  ): Promise<FoldStateRead<GatewaySpendState>> {
+    const folded = await this.repo.findForFold({
       tenantId: String(context.tenantId),
       gatewayRequestId: aggregateId,
     });
+    return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
   }
 
   async store(state: GatewaySpendState, context: ProjectionStoreContext): Promise<void> {

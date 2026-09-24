@@ -77,7 +77,8 @@ export class StateProjectionExecutor {
     if (matching.length === 0) return null;
 
     const key = context.key ?? context.aggregateId;
-    const loaded = await projection.store.tryLoad(key, context);
+    const read = await projection.store.get(key, context);
+    const loaded = read.kind === "folded" ? read.projection : null;
     let latest = loaded;
 
     for (const event of matching) {

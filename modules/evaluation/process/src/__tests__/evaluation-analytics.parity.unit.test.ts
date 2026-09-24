@@ -115,10 +115,10 @@ describe("evaluationAnalytics fold — parity vs evaluationRun fold", () => {
   describe("given the scheduled → started → completed event stream", () => {
     it("agrees on every shared field (evaluatorType / status / score / passed / label / traceId / isGuardrail / costId)", () => {
       const slim = new EvaluationAnalyticsFoldProjection({
-        store: { store: async () => {}, tryGet: async () => null },
+        store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
       });
       const runFold = new EvaluationRunFoldProjection({
-        store: { store: async () => {}, tryGet: async () => null },
+        store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
       });
 
       let slimState = slim.init();
@@ -156,10 +156,10 @@ describe("evaluationAnalytics fold — parity vs evaluationRun fold", () => {
   describe("given an atomic reported event carrying an errored run's stray verdict", () => {
     it("both folds agree the verdict is null (#6833 — the gate is shared)", () => {
       const slim = new EvaluationAnalyticsFoldProjection({
-        store: { store: async () => {}, tryGet: async () => null },
+        store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
       });
       const runFold = new EvaluationRunFoldProjection({
-        store: { store: async () => {}, tryGet: async () => null },
+        store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
       });
 
       const errored = evaluationReportedEventSchema.parse({
@@ -186,10 +186,10 @@ describe("evaluationAnalytics fold — parity vs evaluationRun fold", () => {
   describe("given an atomic reported event", () => {
     it("agrees on every shared field", () => {
       const slim = new EvaluationAnalyticsFoldProjection({
-        store: { store: async () => {}, tryGet: async () => null },
+        store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
       });
       const runFold = new EvaluationRunFoldProjection({
-        store: { store: async () => {}, tryGet: async () => null },
+        store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
       });
 
       const reported = makeReported();

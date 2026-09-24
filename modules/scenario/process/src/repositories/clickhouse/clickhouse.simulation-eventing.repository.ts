@@ -9,6 +9,7 @@ import {
   type ProjectionStoreReadContext,
   type ProjectionStoreWriteContext,
   type ProjectionStoreContext,
+  type FoldStateRead,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
@@ -60,11 +61,11 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
     for (const { state, context } of writable) await this.inner.store(state, context);
   }
 
-  async tryGet(
+  async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<SimulationRunStateData | null> {
-    return this.inner.tryGet(aggregateId, context);
+  ): Promise<FoldStateRead<SimulationRunStateData>> {
+    return this.inner.get(aggregateId, context);
   }
 
   private reportDeclined(context: ProjectionStoreContext): void {

@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_TURN_STATUS,
@@ -85,10 +86,10 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
     return new PrismaLangyConversationTurnProjectionRepository(database);
   }
 
-  async tryLoad(
+  async get(
     key: string,
     context: ProjectionStoreContext,
-  ): Promise<StoredProjection<LangyConversationTurnData> | null> {
+  ): Promise<StoredProjectionRead<LangyConversationTurnData>> {
     const projectId = String(context.tenantId);
     const { conversationId: ConversationId, turnId: TurnId } = parseConversationTurnKey(key);
     const row = await this.prisma.langyConversationTurnProjection.findUnique({
@@ -103,7 +104,7 @@ export class PrismaLangyConversationTurnProjectionRepository implements StatePro
         },
       },
     });
-    return row ? fromRow(row) : null;
+    return row ? { kind: "folded", projection: fromRow(row) } : { kind: "empty" };
   }
 
   async store(

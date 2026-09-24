@@ -47,7 +47,7 @@ function spyStore() {
     context: ProjectionStoreContext;
   }[] = [];
   const store: StateProjectionStore<CounterState> = {
-    tryLoad: vi.fn(async () => null),
+    get: vi.fn(async () => ({ kind: "empty" as const })),
     store: vi.fn(async (projection, context) => {
       writes.push({ projection, context });
     }),
@@ -174,7 +174,7 @@ describe("replayStateProjection", () => {
     });
 
     // Never merged with an existing row.
-    expect(store.tryLoad).not.toHaveBeenCalled();
+    expect(store.get).not.toHaveBeenCalled();
     // Only SELECTs — the state path reads CH, never writes it.
     expect(queries.every((q) => q.trim().toUpperCase().startsWith("SELECT"))).toBe(true);
 
@@ -296,7 +296,7 @@ describe("replayStateProjection", () => {
     });
 
     expect(store.store).not.toHaveBeenCalled();
-    expect(store.tryLoad).not.toHaveBeenCalled();
+    expect(store.get).not.toHaveBeenCalled();
     expect(result.totalEvents).toBe(0);
   });
 });
@@ -329,6 +329,6 @@ describe("the fold/map engine with state projections", () => {
 
     // The guard fired before any store or CH work.
     expect(store.store).not.toHaveBeenCalled();
-    expect(store.tryLoad).not.toHaveBeenCalled();
+    expect(store.get).not.toHaveBeenCalled();
   });
 });

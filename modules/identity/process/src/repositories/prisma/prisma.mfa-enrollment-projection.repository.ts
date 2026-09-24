@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -19,29 +20,32 @@ export class PrismaMfaEnrollmentProjectionRepository implements StateProjectionS
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryLoad(
+  async get(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<MfaFoldState> | null> {
+  ): Promise<StoredProjectionRead<MfaFoldState>> {
     const row = await this.prisma.mfaEnrollment.findUnique({
       where: { userId: key },
     });
-    if (!row) return null;
+    if (!row) return { kind: "empty" };
     return {
-      state: {
-        ...mfaEnrollmentRowToState(row),
-        CreatedAt: row.createdAt.getTime(),
-        UpdatedAt: row.updatedAt.getTime(),
-        LastEventOccurredAt: row.occurredAt.getTime(),
+      kind: "folded",
+      projection: {
+        state: {
+          ...mfaEnrollmentRowToState(row),
+          CreatedAt: row.createdAt.getTime(),
+          UpdatedAt: row.updatedAt.getTime(),
+          LastEventOccurredAt: row.occurredAt.getTime(),
+        },
+        cursor: {
+          acceptedAt: row.acceptedAt.getTime(),
+          eventId: row.lastEventId,
+        },
+        occurredAt: row.occurredAt.getTime(),
+        createdAt: row.createdAt.getTime(),
+        updatedAt: row.updatedAt.getTime(),
+        version: row.projectionVersion,
       },
-      cursor: {
-        acceptedAt: row.acceptedAt.getTime(),
-        eventId: row.lastEventId,
-      },
-      occurredAt: row.occurredAt.getTime(),
-      createdAt: row.createdAt.getTime(),
-      updatedAt: row.updatedAt.getTime(),
-      version: row.projectionVersion,
     };
   }
 

@@ -1,4 +1,8 @@
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 
 import type { ExperimentRunStateRepository } from "../repositories/experiment-run-state.repository.ts";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
@@ -45,14 +49,16 @@ export class ExperimentRunStateStore implements FoldProjectionStore<ExperimentRu
     });
   }
 
-  async tryGet(
+  async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<ExperimentRunStateData | null> {
+  ): Promise<FoldStateRead<ExperimentRunStateData>> {
     const projection = await this.repository.findProjection(aggregateId, {
       tenantId: context.tenantId,
     });
 
-    return (projection?.data as ExperimentRunStateData) ?? null;
+    if (!projection) return { kind: "empty" };
+
+    return { kind: "folded", state: projection.data as ExperimentRunStateData };
   }
 }

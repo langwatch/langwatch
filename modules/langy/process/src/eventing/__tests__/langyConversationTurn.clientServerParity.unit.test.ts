@@ -99,7 +99,7 @@ const RECORDED_STEPS: RecordedStep[] = [
 
 const noopStore: StateProjectionStore<LangyConversationTurnData> = {
   store: async () => {},
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 
 /** How the backend sees a recorded step: the full branded event envelope. */

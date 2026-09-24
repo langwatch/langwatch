@@ -13,7 +13,7 @@ import {
   observeEsFoldCacheStoreDuration,
 } from "../metrics.ts";
 import { decodeFoldCacheEntry, encodeFoldCacheEntry } from "./foldCache/foldCacheEntry.ts";
-import type { FoldProjectionStore } from "./foldProjection.types.ts";
+import type { FoldProjectionStore, FoldStateRead } from "./foldProjection.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
@@ -96,8 +96,9 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
   }
 
-  async tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<State | null> {
-    return (await this.getWithApplied(aggregateId, context)).state;
+  async get(aggregateId: string, context: ProjectionStoreContext): Promise<FoldStateRead<State>> {
+    const { state } = await this.getWithApplied(aggregateId, context);
+    return state === null ? { kind: "empty" } : { kind: "folded", state };
   }
 
   /**
@@ -234,12 +235,17 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     const startedAt = performance.now();
     const result = this.inner.getWithApplied
       ? await this.inner.getWithApplied(aggregateId, context)
-      : {
-          state: await this.inner.tryGet(aggregateId, context),
-          appliedEventIds: [] as string[],
-        };
+      : await this.readInnerState(aggregateId, context);
     observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", performance.now() - startedAt);
     return result;
+  }
+
+  private async readInnerState(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+    const read = await this.inner.get(aggregateId, context);
+    return { state: read.kind === "folded" ? read.state : null, appliedEventIds: [] };
   }
 
   async store(state: State, context: ProjectionStoreContext): Promise<void> {

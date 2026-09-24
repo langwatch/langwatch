@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import type {
   ScimRevokeCause,
@@ -32,29 +33,32 @@ export class PrismaScimSyncProjectionRepository
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryLoad(
+  async get(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<ScimSyncFoldState> | null> {
+  ): Promise<StoredProjectionRead<ScimSyncFoldState>> {
     const row = await this.prisma.scimSyncState.findUnique({
       where: { id: key },
     });
-    if (!row) return null;
+    if (!row) return { kind: "empty" };
     return {
-      state: {
-        ...PrismaScimSyncProjectionRepository.rowToScimSync(row),
-        CreatedAt: row.createdAt.getTime(),
-        UpdatedAt: row.updatedAt.getTime(),
-        LastEventOccurredAt: row.occurredAt.getTime(),
+      kind: "folded",
+      projection: {
+        state: {
+          ...PrismaScimSyncProjectionRepository.rowToScimSync(row),
+          CreatedAt: row.createdAt.getTime(),
+          UpdatedAt: row.updatedAt.getTime(),
+          LastEventOccurredAt: row.occurredAt.getTime(),
+        },
+        cursor: {
+          acceptedAt: row.acceptedAt.getTime(),
+          eventId: row.lastEventId,
+        },
+        occurredAt: row.occurredAt.getTime(),
+        createdAt: row.createdAt.getTime(),
+        updatedAt: row.updatedAt.getTime(),
+        version: row.projectionVersion,
       },
-      cursor: {
-        acceptedAt: row.acceptedAt.getTime(),
-        eventId: row.lastEventId,
-      },
-      occurredAt: row.occurredAt.getTime(),
-      createdAt: row.createdAt.getTime(),
-      updatedAt: row.updatedAt.getTime(),
-      version: row.projectionVersion,
     };
   }
 

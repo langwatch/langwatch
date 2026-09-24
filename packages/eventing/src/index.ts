@@ -77,6 +77,7 @@ export type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
   FoldProjectionStore,
+  FoldStateRead,
 } from "./projections/foldProjection.types.ts";
 export type {
   AppendStore,
@@ -91,6 +92,7 @@ export type {
   StateProjectionOptions,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "./projections/stateProjection.types.ts";
 // Queues
 export { EventSourcingPipeline } from "./runtimePipeline.ts";

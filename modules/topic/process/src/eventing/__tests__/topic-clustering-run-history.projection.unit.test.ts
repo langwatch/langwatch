@@ -17,7 +17,7 @@ import {
 } from "../topic-clustering-run-history.projection.ts";
 
 const stubStore: StateProjectionStore<TopicClusteringRunHistoryData> = {
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
   store: async () => undefined,
 };
 

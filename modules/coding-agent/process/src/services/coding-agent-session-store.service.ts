@@ -1,5 +1,9 @@
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
@@ -137,13 +141,13 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
   }
 
   /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
-  async tryGet(
+  async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<CodingAgentSessionState | null> {
-    const found = await this.getWithApplied(aggregateId, context);
+  ): Promise<FoldStateRead<CodingAgentSessionState>> {
+    const { state } = await this.getWithApplied(aggregateId, context);
 
-    return found.state;
+    return state === null ? { kind: "empty" } : { kind: "folded", state };
   }
 }
 

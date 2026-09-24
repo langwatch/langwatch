@@ -1,4 +1,8 @@
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 import type { TraceSummaryProjectionRepository } from "../repositories/projection/trace-summary-projection.repository.ts";
@@ -59,18 +63,19 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
     await this.storage.upsertBatch(batchEntries);
   }
 
-  async tryGet(
+  async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<TraceSummaryData | null> {
+  ): Promise<FoldStateRead<TraceSummaryData>> {
     // `context.readWindow` bounds this read so trace_summaries (partitioned
     // by toYearWeek) prunes instead of cold-scanning. The EXECUTOR retries a
     // windowed miss without the window — correctness never depends on width.
-    return this.storage.findByTraceId({
+    const folded = await this.storage.findByTraceId({
       tenantId: String(context.tenantId),
       traceId: aggregateId,
       window: context.readWindow,
     });
+    return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
   }
 }
 

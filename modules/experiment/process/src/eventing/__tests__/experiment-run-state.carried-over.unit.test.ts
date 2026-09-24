@@ -104,7 +104,7 @@ const fold = (events: ExperimentRunProcessingEvent[]): ExperimentRunStateData =>
   const projection = ExperimentRunStateFoldProjection.create({
     store: {
       store: async () => undefined,
-      tryGet: async () => null,
+      get: async () => ({ kind: "empty" as const }),
     },
   });
   let state = projection.init();

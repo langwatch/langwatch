@@ -50,7 +50,7 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
         const fold = createMockFoldProjectionDefinition("filtered-fold", {
           store,
@@ -77,7 +77,7 @@ describe("ProjectionRouter", () => {
         await router.dispatch([matchingEvent, nonMatchingEvent], { tenantId });
 
         // store.get called once for the matching event, not for the non-matching one
-        expect(store.tryGet).toHaveBeenCalledTimes(1);
+        expect(store.get).toHaveBeenCalledTimes(1);
         expect(store.store).toHaveBeenCalledTimes(1);
       });
     });
@@ -157,12 +157,12 @@ describe("ProjectionRouter", () => {
         );
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
-        (failingStore.tryGet as ReturnType<typeof vi.fn>).mockRejectedValue(
+        (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
           new Error("store failure"),
         );
 
         const successStore = createMockFoldProjectionStore<{ count: number }>();
-        (successStore.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (successStore.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
         const failingFold = createMockFoldProjectionDefinition("failing", {
           store: failingStore,
@@ -188,7 +188,7 @@ describe("ProjectionRouter", () => {
         await expect(router.dispatch([event], { tenantId })).rejects.toThrow(AggregateError);
 
         // The succeeding projection should still have been attempted
-        expect(successStore.tryGet).toHaveBeenCalled();
+        expect(successStore.get).toHaveBeenCalled();
         expect(successStore.store).toHaveBeenCalled();
       });
     });
@@ -203,7 +203,7 @@ describe("ProjectionRouter", () => {
         );
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
-        (failingStore.tryGet as ReturnType<typeof vi.fn>).mockRejectedValue(
+        (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
           new Error("fold store failure"),
         );
 
@@ -245,7 +245,7 @@ describe("ProjectionRouter", () => {
         );
 
         const foldStore = createMockFoldProjectionStore<{ count: number }>();
-        (foldStore.tryGet as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("fold failure"));
+        (foldStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("fold failure"));
 
         const failingFold = createMockFoldProjectionDefinition("failing-fold", {
           store: foldStore,
@@ -289,7 +289,7 @@ describe("ProjectionRouter", () => {
         );
 
         const failingStore = createMockFoldProjectionStore<{ count: number }>();
-        (failingStore.tryGet as ReturnType<typeof vi.fn>).mockRejectedValue(
+        (failingStore.get as ReturnType<typeof vi.fn>).mockRejectedValue(
           new Error("fold exploded"),
         );
 
@@ -372,7 +372,7 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
         const fold = createMockFoldProjectionDefinition("my-fold", {
           store,
@@ -410,7 +410,7 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
         const fold = createMockFoldProjectionDefinition("my-fold", {
           store,
@@ -569,7 +569,7 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
         const fold = createMockFoldProjectionDefinition("my-fold", {
           store,
@@ -608,7 +608,7 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
         const fold = createMockFoldProjectionDefinition("my-fold", {
           store,
@@ -650,7 +650,7 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
         const fold = createMockFoldProjectionDefinition("my-fold", {
           store,
@@ -791,7 +791,10 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 5 });
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          kind: "folded",
+          state: { count: 5 },
+        });
 
         const fold = createMockFoldProjectionDefinition("myProjection", {
           store,
@@ -809,7 +812,7 @@ describe("ProjectionRouter", () => {
           { key: customKey },
         );
 
-        expect(store.tryGet).toHaveBeenCalledWith(
+        expect(store.get).toHaveBeenCalledWith(
           customKey,
           expect.objectContaining({
             aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -829,7 +832,10 @@ describe("ProjectionRouter", () => {
         );
 
         const store = createMockFoldProjectionStore<{ count: number }>();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 5 });
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          kind: "folded",
+          state: { count: 5 },
+        });
 
         const fold = createMockFoldProjectionDefinition("myProjection", {
           store,
@@ -843,7 +849,7 @@ describe("ProjectionRouter", () => {
           tenantId,
         });
 
-        expect(store.tryGet).toHaveBeenCalledWith(
+        expect(store.get).toHaveBeenCalledWith(
           TEST_CONSTANTS.AGGREGATE_ID,
           expect.objectContaining({
             aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -889,7 +895,7 @@ describe("ProjectionRouter", () => {
           createMockQueueManager(),
         );
         const store = createMockFoldProjectionStore();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
         router.registerFoldProjection(fold);
 
@@ -918,7 +924,7 @@ describe("ProjectionRouter", () => {
         });
 
         // The expensive fold load/store happens once — the O(n) win.
-        expect(store.tryGet).toHaveBeenCalledTimes(1);
+        expect(store.get).toHaveBeenCalledTimes(1);
         expect(store.store).toHaveBeenCalledTimes(1);
         // Per-span subscribers (embedded-eval sync, evaluation triggers) must see
         // EVERY event, not just the last — otherwise N-1 spans are dropped.
@@ -932,7 +938,7 @@ describe("ProjectionRouter", () => {
           createMockQueueManager(),
         );
         const store = createMockFoldProjectionStore();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
         router.registerFoldProjection(fold);
 
@@ -971,7 +977,7 @@ describe("ProjectionRouter", () => {
           createMockQueueManager(),
         );
         const store = createMockFoldProjectionStore();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
         router.registerFoldProjection(fold);
 
@@ -1015,7 +1021,7 @@ describe("ProjectionRouter", () => {
           },
         );
         const store = createMockFoldProjectionStore();
-        (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
         const fold = batchFold(store);
         router.registerFoldProjection(fold);
 

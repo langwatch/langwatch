@@ -52,7 +52,7 @@ describe("FoldProjectionExecutor durable dedup", () => {
   } {
     const storeFn = vi.fn().mockResolvedValue(undefined);
     const store: FoldProjectionStore<FoldState> = {
-      tryGet: vi.fn().mockResolvedValue(state),
+      get: vi.fn().mockResolvedValue({ kind: "folded", state: state }),
       getWithApplied: vi.fn().mockResolvedValue({ state, appliedEventIds }),
       store: storeFn,
     };

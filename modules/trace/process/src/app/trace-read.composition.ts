@@ -168,10 +168,12 @@ export function composeTraceAppDependencies(
           ? {
               summaryReader: {
                 findSummary: ({ tenantId, traceId }: { tenantId: string; traceId: string }) =>
-                  summaryStore.tryGet(traceId, {
-                    aggregateId: traceId,
-                    tenantId: createTenantId(tenantId),
-                  }),
+                  summaryStore
+                    .get(traceId, {
+                      aggregateId: traceId,
+                      tenantId: createTenantId(tenantId),
+                    })
+                    .then((read) => (read.kind === "folded" ? read.state : null)),
               },
             }
           : {}),

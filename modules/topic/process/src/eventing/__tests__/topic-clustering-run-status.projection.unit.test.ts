@@ -9,7 +9,7 @@ import {
 } from "../topic-clustering-run-status.projection.ts";
 
 const stubStore: StateProjectionStore<TopicClusteringRunStatusData> = {
-  tryLoad: async () => null,
+  get: async () => ({ kind: "empty" as const }),
   store: async () => undefined,
 };
 

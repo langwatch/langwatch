@@ -35,9 +35,10 @@ function createInnerStore(durable: TestState | null = { count: 1, UpdatedAt: 100
   };
 
   const store: FoldProjectionStore<TestState> = {
-    async tryGet(aggregateId: string) {
+    async get(aggregateId: string) {
       calls.get.push(aggregateId);
-      return durable;
+      const folded = durable;
+      return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
     },
     async store(state: TestState) {
       calls.store.push(state);
@@ -60,9 +61,10 @@ function createDurableInnerStore({
 }) {
   const calls = { get: [] as string[], getWithApplied: [] as string[] };
   const store: FoldProjectionStore<TestState> = {
-    async tryGet(aggregateId: string) {
+    async get(aggregateId: string) {
       calls.get.push(aggregateId);
-      return state;
+      const folded = state;
+      return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
     },
     async getWithApplied(aggregateId: string) {
       calls.getWithApplied.push(aggregateId);
@@ -153,9 +155,9 @@ describe("RedisCachedFoldStore", () => {
         const { store, inner } = createStore(redis);
 
         await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
-        const result = await store.tryGet("agg-1", CONTEXT);
+        const result = await store.get("agg-1", CONTEXT);
 
-        expect(result).toEqual({ count: 5, UpdatedAt: 200 });
+        expect(result).toEqual({ kind: "folded", state: { count: 5, UpdatedAt: 200 } });
         expect(inner.calls.get).toHaveLength(0);
       });
     });
@@ -168,9 +170,9 @@ describe("RedisCachedFoldStore", () => {
         const redis = createRedis();
         const { store, inner } = createStore(redis);
 
-        const result = await store.tryGet("agg-1", CONTEXT);
+        const result = await store.get("agg-1", CONTEXT);
 
-        expect(result).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(result).toEqual({ kind: "folded", state: { count: 1, UpdatedAt: 100 } });
         expect(inner.calls.get).toEqual(["agg-1"]);
       });
     });
@@ -186,13 +188,13 @@ describe("RedisCachedFoldStore", () => {
         await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
         redis.get.mockClear();
 
-        const result = await store.tryGet("agg-1", {
+        const result = await store.get("agg-1", {
           ...CONTEXT,
           bypassReadCache: true,
         });
 
         expect(redis.get).not.toHaveBeenCalled();
-        expect(result).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(result).toEqual({ kind: "folded", state: { count: 1, UpdatedAt: 100 } });
         expect(inner.calls.get).toEqual(["agg-1"]);
       });
     });
@@ -208,9 +210,9 @@ describe("RedisCachedFoldStore", () => {
         redis.get.mockRejectedValueOnce(new Error("connection lost"));
         const { store, inner } = createStore(redis);
 
-        const result = await store.tryGet("agg-1", CONTEXT);
+        const result = await store.get("agg-1", CONTEXT);
 
-        expect(result).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(result).toEqual({ kind: "folded", state: { count: 1, UpdatedAt: 100 } });
         expect(inner.calls.get).toEqual(["agg-1"]);
         // Counted as its own outcome, never as an ordinary miss. A miss means
         // the last write is at least a TTL old and has therefore settled
@@ -282,7 +284,7 @@ describe("RedisCachedFoldStore", () => {
         const fallbacksBefore = await cacheTotalCount("fallback_error");
 
         await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
-        await store.tryGet("agg-1", CONTEXT);
+        await store.get("agg-1", CONTEXT);
 
         expect(await redisErrorCount("set")).toBe(errorsBefore + 1);
         expect(await cacheTotalCount("miss")).toBe(missesBefore + 1);

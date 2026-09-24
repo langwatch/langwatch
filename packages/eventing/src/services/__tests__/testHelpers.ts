@@ -83,7 +83,7 @@ export function createMockEventStore<T extends Event>(): {
  */
 export function createMockFoldProjectionStore<State>(): FoldProjectionStore<State> {
   return {
-    tryGet: vi.fn().mockResolvedValue(null),
+    get: vi.fn().mockResolvedValue({ kind: "empty" }),
     store: vi.fn().mockResolvedValue(void 0),
   };
 }

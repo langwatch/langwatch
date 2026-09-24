@@ -60,7 +60,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       const e1 = makeEvent("e1", 1000);
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -88,7 +88,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     it("does not double-apply the delivered event when the history already contains it", async () => {
       const e1 = makeEvent("e1", 1000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -107,7 +107,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       const e1 = makeEvent("e1", 1000);
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -126,7 +126,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     it("falls through to plain init+apply when the history read returns nothing", async () => {
       const e1 = makeEvent("e1", 1000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -145,7 +145,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     it("propagates a failed history read so the queue retries the delivery", async () => {
       const e1 = makeEvent("e1", 1000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -166,9 +166,12 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     it("never consults the event log", async () => {
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ids: ["e1"],
-        LastEventOccurredAt: 1000,
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+        kind: "folded",
+        state: {
+          ids: ["e1"],
+          LastEventOccurredAt: 1000,
+        },
       });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
@@ -195,7 +198,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     it("starts from init+apply on a store miss without reading the event log", async () => {
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -219,7 +222,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     it("degrades gracefully to init+apply on a store miss", async () => {
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -247,7 +250,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       e2 = makeEvent("e2", 2000);
       e3 = makeEvent("e3", 3000);
       store = createMockFoldProjectionStore<CountState>();
-      vi.mocked(store.tryGet).mockResolvedValue(null);
+      vi.mocked(store.get).mockResolvedValue({ kind: "empty" });
 
       foldDef = createMockFoldProjectionDefinition("slim", {
         store,
@@ -319,7 +322,7 @@ describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
 
   function missingStoreFold(name: string) {
     const store = createMockFoldProjectionStore<CountState>();
-    (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
     return createMockFoldProjectionDefinition(name, {
       store,
       init,

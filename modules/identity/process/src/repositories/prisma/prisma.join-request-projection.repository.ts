@@ -2,6 +2,7 @@ import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
+  StoredProjectionRead,
 } from "@langwatch/eventing";
 import type {
   JoinMatchKind,
@@ -25,29 +26,32 @@ export class PrismaJoinRequestProjectionRepository implements StateProjectionSto
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryLoad(
+  async get(
     key: string,
     _context: ProjectionStoreContext,
-  ): Promise<StoredProjection<JoinRequestFoldState> | null> {
+  ): Promise<StoredProjectionRead<JoinRequestFoldState>> {
     const row = await this.prisma.joinRequest.findUnique({
       where: { id: key },
     });
-    if (!row) return null;
+    if (!row) return { kind: "empty" };
     return {
-      state: {
-        ...PrismaJoinRequestProjectionRepository.rowToJoinRequest(row),
-        CreatedAt: row.createdAt.getTime(),
-        UpdatedAt: row.updatedAt.getTime(),
-        LastEventOccurredAt: row.occurredAt.getTime(),
+      kind: "folded",
+      projection: {
+        state: {
+          ...PrismaJoinRequestProjectionRepository.rowToJoinRequest(row),
+          CreatedAt: row.createdAt.getTime(),
+          UpdatedAt: row.updatedAt.getTime(),
+          LastEventOccurredAt: row.occurredAt.getTime(),
+        },
+        cursor: {
+          acceptedAt: row.acceptedAt.getTime(),
+          eventId: row.lastEventId,
+        },
+        occurredAt: row.occurredAt.getTime(),
+        createdAt: row.createdAt.getTime(),
+        updatedAt: row.updatedAt.getTime(),
+        version: row.projectionVersion,
       },
-      cursor: {
-        acceptedAt: row.acceptedAt.getTime(),
-        eventId: row.lastEventId,
-      },
-      occurredAt: row.occurredAt.getTime(),
-      createdAt: row.createdAt.getTime(),
-      updatedAt: row.updatedAt.getTime(),
-      version: row.projectionVersion,
     };
   }
 

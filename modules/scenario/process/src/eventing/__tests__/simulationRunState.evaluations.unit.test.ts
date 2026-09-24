@@ -20,7 +20,7 @@ import {
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  tryGet: async () => null,
+  get: async () => ({ kind: "empty" as const }),
 };
 const foldProjection = SimulationRunStateFoldProjection.create({
   store: noopStore,

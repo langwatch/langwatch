@@ -27,7 +27,7 @@ function createTestProjection(opts?: { keyFn?: (event: any) => string }) {
     }),
     store: {
       store: vi.fn().mockResolvedValue(undefined),
-      tryGet: vi.fn().mockResolvedValue(null),
+      get: vi.fn().mockResolvedValue({ kind: "empty" }),
       storeBatch: storeBatchSpy,
     },
     ...(opts?.keyFn ? { key: opts.keyFn } : {}),
@@ -237,7 +237,7 @@ describe("replayEvents", () => {
       // State is init() + both events, NOT loaded from store.get()
       expect(batch[0]!.state).toEqual({ total: 12, count: 2 });
       // store.get was never called (replay rebuilds from scratch)
-      expect(projection.store.tryGet).not.toHaveBeenCalled();
+      expect(projection.store.get).not.toHaveBeenCalled();
     });
   });
 });

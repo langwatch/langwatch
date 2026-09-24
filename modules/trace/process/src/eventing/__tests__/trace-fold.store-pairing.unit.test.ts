@@ -12,7 +12,7 @@ import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
  * only visible here; folds are wrapped in a cache by the time they reach router. */
 
 const deps = {
-  store: { store: async () => {}, tryGet: async () => null },
+  store: { store: async () => {}, get: async () => ({ kind: "empty" as const }) },
   traceCanonicalisation: TraceCanonicalisationService.create(),
   runtime: createTestRuntime(),
 };
@@ -21,7 +21,7 @@ const FOLDS = [
   {
     name: "traceSummary",
     projection: TraceSummaryFoldProjection.create(deps),
-    // TraceSummaryStore is tryGet()-only — consistent, because this fold declares
+    // TraceSummaryStore is get()-only — consistent, because this fold declares
     // no refoldOnStoreMiss for a miss discriminator to feed.
     storeClass: TraceSummaryStore,
   },

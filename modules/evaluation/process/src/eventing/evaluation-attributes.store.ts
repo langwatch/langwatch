@@ -1,5 +1,9 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type {
+  FoldProjectionStore,
+  ProjectionStoreContext,
+  FoldStateRead,
+} from "@langwatch/eventing";
 
 import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.members.ts";
 import {
@@ -121,10 +125,11 @@ export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationA
   }
 
   /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
-  async tryGet(
+  async get(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<EvaluationAnalyticsData | null> {
-    return (await this.getWithApplied(aggregateId, context)).state;
+  ): Promise<FoldStateRead<EvaluationAnalyticsData>> {
+    const { state } = await this.getWithApplied(aggregateId, context);
+    return state === null ? { kind: "empty" } : { kind: "folded", state };
   }
 }

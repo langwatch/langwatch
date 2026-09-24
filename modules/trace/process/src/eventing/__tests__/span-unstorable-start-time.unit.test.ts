@@ -39,7 +39,7 @@ function storableEvent(): SpanReceivedEvent {
 }
 
 const runtime = createTestRuntime();
-const noopFoldStore = { store: async () => {}, tryGet: async () => null };
+const noopFoldStore = { store: async () => {}, get: async () => ({ kind: "empty" as const }) };
 const noopAppendStore = { append: async () => {}, bulkAppend: async () => {} } as never;
 
 const spanStorage = () =>
@@ -147,7 +147,10 @@ describe("given a span whose start time cannot be stored", () => {
     it("still sets the trace's timing in the summary fold", () => {
       const projection = summaryFold();
 
-      const afterUnstorable = projection.handleTraceSpanReceived(unstorableEvent(), projection.init());
+      const afterUnstorable = projection.handleTraceSpanReceived(
+        unstorableEvent(),
+        projection.init(),
+      );
       const afterStorable = projection.handleTraceSpanReceived(storableEvent(), afterUnstorable);
 
       expect(afterStorable.occurredAt).toBe(1_700_000_000_500);
