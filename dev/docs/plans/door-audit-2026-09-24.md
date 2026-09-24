@@ -34,3 +34,10 @@ AnalyticsLwql, ExperimentV3Rest, GatewaySpend, TraceLegacy, TrackedEvent, AuthDo
 
 Nothing checks that the installed class satisfies the doors mounted over it. Fix: the kernel types each router's door
 against the installed module class at `.withTransports(...)`, so a missing operation is a compile error.
+
+## Progress
+
+- github: fixed (d3bbd76a55, then the CodingAgentApi peer 340e7f3a2d). Completed-install and disconnect scenarios stay
+  `@unimplemented`: `RedisGithubAppTokenCache.create` always builds `githubApiChannels.live`
+  (redis-github-app-token-cache.ts:42), so a `memoryStores()` test cannot seed an installation — the channel choice
+  should come from the registry's `{ live, memory }`.
