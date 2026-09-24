@@ -2,6 +2,7 @@ import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import type {
   JoinRequestJoining,
   OrganizationBillingProfile,
+  OrganizationWithAdministrators,
   OrganizationIntent,
   OrganizationSettings,
   PersonalFeatures,
@@ -9,6 +10,7 @@ import type {
   PersonalWorkspaceInput,
   OrganizationUsageCount,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
 
 export type PersonalWorkspaceResourceIds = {
   teamId: string;
@@ -95,6 +97,11 @@ export abstract class OrganizationRepository {
   }): Promise<void>;
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;
+  abstract getWithAdministrators(organizationId: string): Promise<OrganizationWithAdministrators>;
+  abstract updateSentPlanLimitAlert(input: {
+    organizationId: string;
+    sentAt: Instant;
+  }): Promise<void>;
   abstract claimBillingCustomerId(input: {
     organizationId: string;
     billingCustomerId: string;

@@ -10,11 +10,12 @@ import {
   PersonalProjectNotFoundError,
   TeamNotFoundError,
   type OrganizationBillingProfile,
+  type OrganizationWithAdministrators,
   type PersonalFeatures,
   type PersonalWorkspace,
   type OrganizationUsageCount,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import {
   OrganizationRepository,
@@ -175,6 +176,32 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     )[0];
     if (!oldest) throw new OrganizationHasNoTeamError(organizationId);
     return oldest.id;
+  }
+
+  async getWithAdministrators(organizationId: string): Promise<OrganizationWithAdministrators> {
+    const organization = this.memory.organizations.get(organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    const administrators = this.memory.organizationUsers
+      .filter((member) => member.organizationId === organizationId && member.role === "ADMIN")
+      .flatMap((member) => {
+        const user = this.memory.users.get(member.userId);
+        return user ? [{ userId: user.id, name: user.name, email: user.email }] : [];
+      });
+    return {
+      id: organization.id,
+      name: organization.name,
+      sentPlanLimitAlert: organization.sentPlanLimitAlert ?? null,
+      administrators,
+    };
+  }
+
+  async updateSentPlanLimitAlert(input: {
+    organizationId: string;
+    sentAt: Instant;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) throw new OrganizationNotFoundError();
+    organization.sentPlanLimitAlert = input.sentAt;
   }
 
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {

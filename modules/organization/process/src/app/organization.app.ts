@@ -65,6 +65,7 @@ import {
   type ListOrganizationTeamAccessInput,
   type ListOrganizationTeamsWithMembersInput,
   type OrganizationBillingProfile,
+  type OrganizationWithAdministrators,
   type OrganizationGroup,
   type OrganizationGroupBinding,
   type JoinRequestJoining,
@@ -110,6 +111,7 @@ import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { ShareApi } from "@langwatch/share-contract";
+import type { Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
@@ -1030,6 +1032,16 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     billingCustomerId: string;
   }): Promise<boolean> {
     return this.#dependencies.organizations.claimBillingCustomerId(input);
+  }
+
+  getWithAdministrators(input: {
+    organizationId: string;
+  }): Promise<OrganizationWithAdministrators> {
+    return this.#dependencies.organizations.getWithAdministrators(input);
+  }
+
+  updateSentPlanLimitAlert(input: { organizationId: string; sentAt: Instant }): Promise<void> {
+    return this.#dependencies.organizations.updateSentPlanLimitAlert(input);
   }
 
   /** The billing-facing profile, which is also where the display name lives. */

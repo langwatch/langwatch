@@ -104,6 +104,14 @@ class StubRepository extends OrganizationRepository {
     return this.billingProfile;
   }
 
+  async getWithAdministrators(): Promise<never> {
+    throw new OrganizationNotFoundError();
+  }
+
+  async updateSentPlanLimitAlert(): Promise<void> {
+    throw new OrganizationNotFoundError();
+  }
+
   async claimBillingCustomerId(input: {
     organizationId: string;
     billingCustomerId: string;

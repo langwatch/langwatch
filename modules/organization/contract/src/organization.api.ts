@@ -167,6 +167,14 @@ export interface OrganizationAdministrator {
   email: string | null;
 }
 
+/** Main's `findWithAdmins`: the organization and every ADMIN membership, disabled or not. */
+export interface OrganizationWithAdministrators {
+  id: string;
+  name: string;
+  sentPlanLimitAlert: Instant | null;
+  administrators: OrganizationAdministrator[];
+}
+
 /**
  * What the install-wide usage report counts here (ADR-156, section 10): the
  * members, the single sign-on providers named (by name only), and when the
@@ -429,6 +437,14 @@ export interface OrganizationApi {
     }>,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }>;
   getBillingProfile(input: GetOrganizationBillingProfileInput): Promise<OrganizationBillingProfile>;
+  /** Main's `findWithAdmins`, for the usage-limit mails; throws `OrganizationNotFoundError`. */
+  getWithAdministrators(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationWithAdministrators>;
+  /** Main's `updateSentPlanLimitAlert`. */
+  updateSentPlanLimitAlert(
+    input: Readonly<{ organizationId: string; sentAt: Instant }>,
+  ): Promise<void>;
   claimBillingCustomerId(
     input: Readonly<{ organizationId: string; billingCustomerId: string }>,
   ): Promise<boolean>;

@@ -41,6 +41,7 @@ import {
   type ListOrganizationTeamsWithMembersInput,
   type ListOrganizationTeamAccessInput,
   type OrganizationBillingProfile,
+  type OrganizationWithAdministrators,
   type OrganizationTeam,
   type OrganizationTeamAccess,
   type OrganizationTeamPage,
@@ -58,6 +59,7 @@ import {
   type OrganizationUsageCount,
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
 
 import type {
   GroupIdentity,
@@ -310,6 +312,16 @@ export class OrganizationService extends OrganizationServiceContract {
     const parsed = getOldestTeamInputSchema.parse(input);
 
     return this.repository.getOldestTeamId(parsed.organizationId);
+  }
+
+  getWithAdministrators(input: {
+    organizationId: string;
+  }): Promise<OrganizationWithAdministrators> {
+    return this.repository.getWithAdministrators(input.organizationId);
+  }
+
+  updateSentPlanLimitAlert(input: { organizationId: string; sentAt: Instant }): Promise<void> {
+    return this.repository.updateSentPlanLimitAlert(input);
   }
 
   getBillingProfile(

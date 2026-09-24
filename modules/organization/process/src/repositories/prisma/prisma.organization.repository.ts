@@ -11,12 +11,14 @@ import {
   PersonalProjectNotFoundError,
   TeamNotFoundError,
   type OrganizationBillingProfile,
+  type OrganizationWithAdministrators,
   type UpdateOrganizationSettingsInput,
   type PersonalFeatures,
   type PersonalWorkspace,
   type OrganizationUsageCount,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
   OrganizationRepository,
@@ -213,6 +215,43 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
     if (!team) throw new OrganizationHasNoTeamError(organizationId);
     return team.id;
+  }
+
+  async getWithAdministrators(organizationId: string): Promise<OrganizationWithAdministrators> {
+    const organization = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        id: true,
+        name: true,
+        sentPlanLimitAlert: true,
+        members: {
+          where: { role: "ADMIN" },
+          select: { user: { select: { id: true, name: true, email: true } } },
+        },
+      },
+    });
+    if (!organization) throw new OrganizationNotFoundError();
+    return {
+      id: organization.id,
+      name: organization.name,
+      sentPlanLimitAlert:
+        organization.sentPlanLimitAlert && fromDate(organization.sentPlanLimitAlert),
+      administrators: organization.members.map(({ user }) => ({
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+      })),
+    };
+  }
+
+  async updateSentPlanLimitAlert(input: {
+    organizationId: string;
+    sentAt: Instant;
+  }): Promise<void> {
+    await this.database.organization.update({
+      where: { id: input.organizationId },
+      data: { sentPlanLimitAlert: toDate(input.sentAt) },
+    });
   }
 
   async getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile> {
