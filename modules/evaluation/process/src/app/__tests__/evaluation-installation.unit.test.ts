@@ -13,11 +13,12 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { evaluationServer } from "../../evaluation.server.ts";
+import { EVALUATION_TEST_CONFIG } from "./evaluation.fixture.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(evaluationServer)])
-    .withConfig({ evaluation: { langevalsEndpoint: undefined } })
+    .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
     .provide({
       workflow: createApiFixture<WorkflowApi>(),
       trace: createApiFixture<TraceApi>(),

@@ -3,6 +3,7 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type {
   CustomEvaluator,
   EvaluationRunOutcome,
+  EvaluationServerConfig,
   ReportEvaluationCommandData,
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
@@ -18,8 +19,10 @@ import type {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../../app/evaluation.members.ts";
+import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
+import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
 import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 import type {
   EvaluationExecution,
@@ -181,6 +184,7 @@ export function createEvaluationTestApp(
       modelProviders: ModelProviderApi;
       retention: DataRetentionApi;
     }>;
+    clustering?: LangevalsClusteringService;
   }> = {},
 ): EvaluationApp {
   return EvaluationApp.fromInfrastructure({
@@ -194,5 +198,23 @@ export function createEvaluationTestApp(
         createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
       retention: input.dependencies?.retention ?? createApiFixture<DataRetentionApi>(),
     },
+    clustering:
+      input.clustering ??
+      LangevalsClusteringService.create({
+        endpoint: undefined,
+        langevals: MemoryLangevalsChannel.create(),
+      }),
   });
 }
+
+/** The parsed config an installation test hands the module: main's defaults, no endpoint. */
+export const EVALUATION_TEST_CONFIG: EvaluationServerConfig = {
+  langevalsEndpoint: undefined,
+  stagingThresholdBytes: undefined,
+  stagingTtlSeconds: 600,
+  evaluationMaxPayloadBytes: 16_000_000,
+  topicClusteringMaxPayloadBytes: 180_000_000,
+  azureContentSafetyEndpoint: undefined,
+  enablePresidio: undefined,
+  enableLingua: undefined,
+};

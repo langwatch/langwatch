@@ -46,6 +46,7 @@ import type {
   EvaluationSummary,
   TraceEvaluationData,
 } from "./evaluation.ts";
+import type { TopicClusteringOutcome, TopicClusteringRequest } from "./langevals-clustering.ts";
 
 /** The complete callable Evaluation capability shared by process peers. */
 export interface EvaluationApi {
@@ -105,6 +106,8 @@ export interface EvaluationApi {
     filters: Readonly<Record<string, unknown>>;
     evaluations: EvaluationRunData[];
   }): boolean;
+  /** One topic-clustering call to langevals, staging an oversized body; aborts with the signal. */
+  requestTopicClustering(input: TopicClusteringRequest): Promise<TopicClusteringOutcome>;
 }
 
 export const EvaluationApi = moduleApi<EvaluationApi>()("evaluation");

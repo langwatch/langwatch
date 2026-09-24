@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { evaluationServer } from "../../evaluation.server.ts";
 import { LiveEvaluationRepositories } from "../../repositories/live/live.evaluation.repositories.ts";
+import { EVALUATION_TEST_CONFIG } from "./evaluation.fixture.ts";
 
 const TENANT = "project-1";
 const TRACE = "trace-1";
@@ -54,7 +55,7 @@ describe("given a process that installs the evaluation module over its repositor
     it("reads the run back by id, by trace and among the trace's evaluations", async () => {
       const runtime = await createApp({ role: "worker" })
         .withModules([withMemoryRepositories(evaluationServer)])
-        .withConfig({ evaluation: { langevalsEndpoint: undefined } })
+        .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
         .provide({
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),
@@ -94,7 +95,7 @@ describe("given a process that installs the evaluation module over its repositor
     it("refuses it as not found, reading the floor from data retention", async () => {
       const runtime = await createApp({ role: "worker" })
         .withModules([withMemoryRepositories(evaluationServer)])
-        .withConfig({ evaluation: { langevalsEndpoint: undefined } })
+        .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
         .provide({
           workflow: createApiFixture<WorkflowApi>(),
           trace: createApiFixture<TraceApi>(),

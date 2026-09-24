@@ -1,7 +1,6 @@
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
-  AZURE_SAFETY_PROVIDER_KEY,
   EvaluationApi,
   evaluationConfig,
   isAzureEvaluatorType,
@@ -44,8 +43,11 @@ import type {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../app/evaluation.members.ts";
+import { AbsentLangevalsPayloadStaging } from "../channels/absent.langevals-payload-staging.channel.ts";
+import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
+import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
 import {
   EvaluationBatchLogService,
   type EvaluationExperimentDirectory,
@@ -57,6 +59,8 @@ import { EvaluationNameAutoslugService } from "../services/evaluation-name-autos
 import type { EvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
+import { EvaluatorEnvironmentService } from "../services/evaluator-environment.service.ts";
+import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
 import type {
   EvaluationExecution,
   EvaluationInputsResolution,
@@ -209,7 +213,7 @@ export class EvaluationApp implements EvaluationApiContract {
   static readonly reads = reads();
 
   readonly #service: EvaluationService;
-  readonly #modelProviders: ModelProviderApi;
+  readonly #azureSafety: AzureSafetyCredentialsService;
   readonly #environment: EvaluationInstallEnvironment;
   readonly #customEvaluators: EvaluationCustomEvaluators;
   readonly #rescore: EvaluationRescore;
@@ -226,20 +230,24 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #ledger: EvaluationLedger;
   readonly #runner: EvaluationRunner;
   readonly #commands: EvaluationCommandDispatcherService | undefined;
+  readonly #clustering: LangevalsClusteringService;
 
   private constructor({
     service,
     dependencies,
     members,
     commands,
+    clustering,
   }: {
     service: EvaluationService;
     dependencies: EvaluationSetup["dependencies"];
     members: EvaluationInfrastructure;
     commands: EvaluationCommandDispatcherService | undefined;
+    clustering: LangevalsClusteringService;
   }) {
     this.#service = service;
-    this.#modelProviders = dependencies.modelProviders;
+    this.#clustering = clustering;
+    this.#azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     this.#environment = members.environment;
     this.#customEvaluators = members.customEvaluators;
     this.#rescore = members.rescore;
@@ -267,18 +275,27 @@ export class EvaluationApp implements EvaluationApiContract {
    * command are real; the rest is still the closed stub until its port lands
    * (`.claude/handoffs/port-evaluation-runtime.md`).
    */
-  static create({ dependencies, repositories }: EvaluationSetup): EvaluationApp {
+  static create({ dependencies, repositories, config }: EvaluationSetup): EvaluationApp {
     const commands = EvaluationCommandDispatcherService.create();
+    const langevals = langevalsChannels.live.create({
+      config,
+      staging: AbsentLangevalsPayloadStaging.create(),
+    });
 
     return EvaluationApp.fromInfrastructure({
       infrastructure: {
         ...createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
         retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
+        environment: EvaluatorEnvironmentService.create(config),
         report: commands,
       },
       dependencies,
       repositories,
       commands,
+      clustering: LangevalsClusteringService.create({
+        endpoint: config.langevalsEndpoint,
+        langevals,
+      }),
     });
   }
 
@@ -287,8 +304,9 @@ export class EvaluationApp implements EvaluationApiContract {
     dependencies: EvaluationSetup["dependencies"];
     repositories: Pick<EvaluationRepositories, "runs" | "monitorPerformance">;
     commands?: EvaluationCommandDispatcherService;
+    clustering: LangevalsClusteringService;
   }): EvaluationApp {
-    const { infrastructure: members, dependencies, repositories, commands } = setup;
+    const { infrastructure: members, dependencies, repositories, commands, clustering } = setup;
 
     return new EvaluationApp({
       service: EvaluationService.create({
@@ -302,6 +320,7 @@ export class EvaluationApp implements EvaluationApiContract {
       dependencies,
       members,
       commands,
+      clustering,
     });
   }
 
@@ -351,6 +370,8 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#autoslug.derive(name);
   matchesEvaluationFilters: EvaluationApiContract["matchesEvaluationFilters"] = (input) =>
     this.#filterMatching.matchesEvaluationFilters(input);
+  requestTopicClustering: EvaluationApiContract["requestTopicClustering"] = (input) =>
+    this.#clustering.request(input);
 
   async reportEvaluation(data: ReportEvaluationCommandData): Promise<void> {
     await this.#report.reportEvaluation(data);
@@ -361,9 +382,8 @@ export class EvaluationApp implements EvaluationApiContract {
     // project's azure_safety model provider. There is no environment fallback,
     // so an unconfigured provider reports them as missing. Resolved once and
     // reused for all three Azure evaluator types.
-    const azureMissing = (await this.#azureSafetyCredentials(input.projectId))
-      ? []
-      : [...AZURE_SAFETY_ENV_VARS];
+    const azure = await this.#azureSafety.resolveForTenant({ tenantId: input.projectId });
+    const azureMissing = azure.kind === "configured" ? [] : [...AZURE_SAFETY_ENV_VARS];
     const environment = this.#environment.read();
     const catalogue: EvaluatorCatalogue = {};
 
@@ -412,24 +432,6 @@ export class EvaluationApp implements EvaluationApiContract {
     );
 
     return { success: true, count: input.count };
-  }
-
-  /**
-   * Azure Content Safety credentials for a project, resolved solely from its
-   * `azure_safety` model provider, or null when it is not configured.
-   * @see specs/evaluators/azure-safety-byok-gating.feature
-   */
-  async #azureSafetyCredentials(projectId: string): Promise<Record<string, string> | null> {
-    const providers = await this.#modelProviders.getExecutionProviders({ projectId });
-    const provider = providers[AZURE_SAFETY_PROVIDER_KEY];
-    if (!provider?.enabled) return null;
-
-    const endpoint = provider.customKeys?.AZURE_CONTENT_SAFETY_ENDPOINT;
-    const key = provider.customKeys?.AZURE_CONTENT_SAFETY_KEY;
-    if (typeof endpoint !== "string" || endpoint.trim() === "") return null;
-    if (typeof key !== "string" || key.trim() === "") return null;
-
-    return { AZURE_CONTENT_SAFETY_ENDPOINT: endpoint, AZURE_CONTENT_SAFETY_KEY: key };
   }
 
   /** One warmup probe, its failure swallowed: a cold runtime is a nudge, not a request. */

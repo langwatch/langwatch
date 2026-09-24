@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { evaluationServer } from "../../evaluation.server.ts";
 import { EvaluationCommandDispatcherService } from "../../services/evaluation-command-dispatcher.service.ts";
 import type { EvaluationProcessingPipeline } from "../../services/evaluation-processing.service.ts";
+import { EVALUATION_TEST_CONFIG } from "./evaluation.fixture.ts";
 
 const REPORT: ReportEvaluationCommandData = {
   tenantId: "project-1",
@@ -26,7 +27,7 @@ const REPORT: ReportEvaluationCommandData = {
 async function installed() {
   return createApp({ role: "api" })
     .withModules([withMemoryRepositories(evaluationServer)])
-    .withConfig({ evaluation: { langevalsEndpoint: undefined } })
+    .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
     .provide({
       workflow: createApiFixture<WorkflowApi>(),
       trace: createApiFixture<TraceApi>(),

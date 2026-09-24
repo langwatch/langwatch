@@ -3,6 +3,7 @@
  * the request params the runner posts and the response it reads back.
  * Portable shapes only; the runner lives in `@langwatch/topic-process`.
  */
+import { z } from "zod";
 
 export type ModelOption = {
   value: string;
@@ -10,29 +11,38 @@ export type ModelOption = {
   mode?: "chat" | "embedding" | undefined;
 };
 
-export type TopicClusteringTrace = {
-  trace_id: string;
-  input: string;
-  topic_id: string | null;
-  subtopic_id: string | null;
-};
+export const topicClusteringTraceSchema = z.object({
+  trace_id: z.string(),
+  input: z.string(),
+  topic_id: z.string().nullable(),
+  subtopic_id: z.string().nullable(),
+});
 
-export type TopicClusteringTopic = {
-  id: string;
-  name: string;
-  centroid: number[];
-  p95_distance: number;
-};
+export type TopicClusteringTrace = z.infer<typeof topicClusteringTraceSchema>;
 
-export type TopicClusteringSubtopic = TopicClusteringTopic & {
-  parent_id: string;
-};
+export const topicClusteringTopicSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  centroid: z.array(z.number()),
+  p95_distance: z.number(),
+});
 
-export type TopicClusteringTraceTopicMap = {
-  trace_id: string;
-  topic_id: string | null;
-  subtopic_id: string | null;
-};
+export type TopicClusteringTopic = z.infer<typeof topicClusteringTopicSchema>;
+
+export const topicClusteringSubtopicSchema = z.object({
+  ...topicClusteringTopicSchema.shape,
+  parent_id: z.string(),
+});
+
+export type TopicClusteringSubtopic = z.infer<typeof topicClusteringSubtopicSchema>;
+
+export const topicClusteringTraceTopicMapSchema = z.object({
+  trace_id: z.string(),
+  topic_id: z.string().nullable(),
+  subtopic_id: z.string().nullable(),
+});
+
+export type TopicClusteringTraceTopicMap = z.infer<typeof topicClusteringTraceTopicMapSchema>;
 
 export type BatchClusteringParams = {
   project_id: string;
@@ -51,11 +61,18 @@ export type IncrementalClusteringParams = {
 };
 
 /** The clustering call's billed cost. */
-export type TopicClusteringCost = { amount: number; currency: "USD" | "EUR" };
+export const topicClusteringCostSchema = z.object({
+  amount: z.number(),
+  currency: z.enum(["USD", "EUR"]),
+});
 
-export type TopicClusteringResponse = {
-  topics: TopicClusteringTopic[];
-  subtopics: TopicClusteringSubtopic[];
-  traces: TopicClusteringTraceTopicMap[];
-  cost: TopicClusteringCost;
-};
+export type TopicClusteringCost = z.infer<typeof topicClusteringCostSchema>;
+
+export const topicClusteringResponseSchema = z.object({
+  topics: z.array(topicClusteringTopicSchema),
+  subtopics: z.array(topicClusteringSubtopicSchema),
+  traces: z.array(topicClusteringTraceTopicMapSchema),
+  cost: topicClusteringCostSchema,
+});
+
+export type TopicClusteringResponse = z.infer<typeof topicClusteringResponseSchema>;

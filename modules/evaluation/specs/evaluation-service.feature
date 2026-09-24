@@ -139,3 +139,29 @@ Feature: Evaluation service boundary
     Given a trace with a run for one of two evaluators a trigger names
     When the trigger's evaluation filters are matched against the trace's runs
     Then the filter does not match
+
+  @unit
+  Scenario: Topic clustering sends nothing when the deployment names no langevals endpoint
+    Given a deployment with no langevals endpoint configured
+    When topic clustering asks evaluation for a batch clustering
+    Then the answer is not configured
+    And nothing is posted to langevals
+
+  @unit
+  Scenario: Topic clustering posts a batch to langevals and returns its checked answer
+    Given a deployment with a langevals endpoint
+    When topic clustering asks evaluation for a batch clustering
+    Then the params are posted to the batch clustering route as a topic clustering batch call
+    And the answer carries the topics langevals returned
+
+  @unit
+  Scenario: A langevals clustering failure is refused with its status and body
+    Given langevals answers a clustering call with a server error
+    When topic clustering asks evaluation for an incremental clustering
+    Then it is refused naming the incremental clustering, the status text and the body
+
+  @unit
+  Scenario: A clustering call aborted by its caller does not reach langevals
+    Given topic clustering's deadline has already fired
+    When it asks evaluation for a batch clustering
+    Then the call rejects with the abort and nothing is posted
