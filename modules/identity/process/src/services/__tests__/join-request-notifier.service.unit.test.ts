@@ -2,9 +2,9 @@ import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
-import type { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
+import type { JoinRequestAudienceRepository } from "../../repositories/join-request-audience.repository.ts";
 import type { PrismaJoinRequestNotificationContextRepository } from "../../repositories/prisma/prisma.join-request-notification-context.repository.ts";
-import { EmailJoinRequestNotifierAdapter } from "../join-request-notifier.service.ts";
+import { JoinRequestNotifierService } from "../join-request-notifier.service.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature
@@ -42,7 +42,7 @@ function recordingMail() {
   };
 }
 
-function fakeAudience(): JoinRequestAudience {
+function fakeAudience(): JoinRequestAudienceRepository {
   return {
     getRequesterId: vi.fn(async () => {
       throw new JoinRequestNotFoundError("no such request");
@@ -64,14 +64,14 @@ function fakeContext(
   } as unknown as PrismaJoinRequestNotificationContextRepository;
 }
 
-describe("EmailJoinRequestNotifierAdapter", () => {
+describe("JoinRequestNotifierService", () => {
   describe("when a request arrives from a domain with prior approvals", () => {
     /** @scenario "The arrival notifier counts prior approvals from the domain" */
     it("passes the approved-from-domain count to the mail", async () => {
       const recording = recordingMail();
       const audience = fakeAudience();
       const context = fakeContext({ countApprovedFromDomain: vi.fn(async () => 3) });
-      const adapter = EmailJoinRequestNotifierAdapter.create({
+      const adapter = JoinRequestNotifierService.create({
         audience,
         context,
         mail: recording.mail,
@@ -99,7 +99,7 @@ describe("EmailJoinRequestNotifierAdapter", () => {
       const context = fakeContext({
         findPersonalTeamSlugs: vi.fn(async () => ["personal-morgan-ellis"]),
       });
-      const adapter = EmailJoinRequestNotifierAdapter.create({
+      const adapter = JoinRequestNotifierService.create({
         audience,
         context,
         mail: recording.mail,
@@ -126,7 +126,7 @@ describe("EmailJoinRequestNotifierAdapter", () => {
       const recording = recordingMail();
       const audience = fakeAudience();
       const context = fakeContext();
-      const adapter = EmailJoinRequestNotifierAdapter.create({
+      const adapter = JoinRequestNotifierService.create({
         audience,
         context,
         mail: recording.mail,
@@ -154,7 +154,7 @@ describe("EmailJoinRequestNotifierAdapter", () => {
         getActivePlan: vi.fn(async () => ({ maxMembers: 5, planSource: "subscription" })),
       };
       const memberships = { getMemberCount: vi.fn(async () => 4) };
-      const adapter = EmailJoinRequestNotifierAdapter.create({
+      const adapter = JoinRequestNotifierService.create({
         audience,
         context,
         mail: recording.mail,
@@ -186,7 +186,7 @@ describe("EmailJoinRequestNotifierAdapter", () => {
         getActivePlan: vi.fn(async () => ({ maxMembers: 1000, planSource: "license" })),
       };
       const memberships = { getMemberCount: vi.fn(async () => 4) };
-      const adapter = EmailJoinRequestNotifierAdapter.create({
+      const adapter = JoinRequestNotifierService.create({
         audience,
         context,
         mail: recording.mail,

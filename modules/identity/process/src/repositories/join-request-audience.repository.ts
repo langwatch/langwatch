@@ -5,15 +5,15 @@
  */
 export type JoinRequestAudienceProfile = Readonly<{ name: string | null; email: string | null }>;
 
-export abstract class JoinRequestAudience {
+export interface JoinRequestAudienceRepository {
   /** Throws `JoinRequestNotFoundError` when no request carries this id. */
-  abstract getRequesterId(input: { joinRequestId: string }): Promise<string>;
+  getRequesterId(input: { joinRequestId: string }): Promise<string>;
 
   /** Throws `OrganizationNotFoundError` when no organization carries this id. */
-  abstract getOrganizationName(input: { organizationId: string }): Promise<string>;
+  getOrganizationName(input: { organizationId: string }): Promise<string>;
 
-  abstract findAdminEmails(input: { organizationId: string }): Promise<string[]>;
+  findAdminEmails(input: { organizationId: string }): Promise<string[]>;
 
   /** Throws `UserNotFoundError` when no user carries this id; both fields may be unset. */
-  abstract getUserProfile(input: { userId: string }): Promise<JoinRequestAudienceProfile>;
+  getUserProfile(input: { userId: string }): Promise<JoinRequestAudienceProfile>;
 }

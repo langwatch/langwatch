@@ -44,15 +44,15 @@ export interface ScimSyncLedgerWriterDeps {
   logger?: Logger;
 }
 
-export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
+export class ScimSyncLedgerWriterService implements ScimSyncLedger {
   private readonly eventing: IdentityEventing;
   private readonly logger: Logger;
 
-  static create(deps: ScimSyncLedgerWriterDeps): ScimSyncLedgerWriterAdapter {
-    return new ScimSyncLedgerWriterAdapter(deps);
+  static create(deps: ScimSyncLedgerWriterDeps): ScimSyncLedgerWriterService {
+    return new ScimSyncLedgerWriterService(deps);
   }
 
-  constructor(deps: ScimSyncLedgerWriterDeps) {
+  private constructor(deps: ScimSyncLedgerWriterDeps) {
     this.eventing = deps.eventing;
     this.logger = deps.logger ?? createLogger("langwatch:identity:scim-sync-ledger");
   }

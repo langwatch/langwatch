@@ -11,7 +11,7 @@ export const IDENTITY_SECRET_HEAL_MIGRATION_NAME = "identity-d01-secret-heal" as
  * FINALIZED, and `finalized` is terminal: the runner skips a tenant whose record is terminal,
  * The reverse leg of the bridge mirror, as a pass (ADR-116 §4).
  */
-export class IdentitySecretHealMigrationAdapter implements SystemMigration {
+export class IdentitySecretHealMigrationService implements SystemMigration {
   readonly name = IDENTITY_SECRET_HEAL_MIGRATION_NAME;
   readonly title = "Sign-in credential repair";
   readonly description =
@@ -28,11 +28,11 @@ export class IdentitySecretHealMigrationAdapter implements SystemMigration {
 
   static create(
     secrets: Pick<IdentitySecretCarryService, "carryForUser">,
-  ): IdentitySecretHealMigrationAdapter {
-    return new IdentitySecretHealMigrationAdapter(secrets);
+  ): IdentitySecretHealMigrationService {
+    return new IdentitySecretHealMigrationService(secrets);
   }
 
-  constructor(private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">) {}
+  private constructor(private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">) {}
 
   async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
     const outcome = await this.secrets.carryForUser({ userId: tenantId });

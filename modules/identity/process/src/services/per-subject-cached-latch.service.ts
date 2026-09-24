@@ -18,14 +18,14 @@ type CachedAnswer = { value: boolean; expiresAt: number };
  * coalesced per subject. Moved verbatim out of `postgres.identity-email.adapter.ts`
  * so the app can build it from a repository row instead of a Prisma client.
  */
-export class CachedIdentityLatch {
+export class CachedIdentityLatchService {
   static create(options: {
     repository: IdentityLatchRepository;
     ttlMs: number;
     maxUsers: number;
     now: () => number;
-  }): CachedIdentityLatch {
-    return new CachedIdentityLatch(options);
+  }): CachedIdentityLatchService {
+    return new CachedIdentityLatchService(options);
   }
 
   private anyone: CachedAnswer | undefined;

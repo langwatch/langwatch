@@ -10,8 +10,6 @@ import {
   IDENTIFIER_DETACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   type IdentifierArrivalState,
-  IdentityDetachStrandsUserError,
-  type IdentityHeads,
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
   IdentityPrimaryMustDemoteFirstError,
@@ -32,38 +30,7 @@ import type { IdentityHeadsRepository } from "../repositories/identity-heads.rep
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import { computeIdentifierHash } from "../rules/identifier-hash.rules.ts";
-
-/**
- * Refuses removing an identifier that would strand the person. Pure and
- * exported so the detach guard and the Remove control share ONE answer,
- * never a screen's own drifting rule. Reads only what would be LEFT.
- */
-export function assertDetachKeepsWayBack({
-  heads,
-  identifierId,
-}: {
-  heads: IdentityHeads;
-  identifierId: string;
-}): void {
-  const remaining = Object.values(heads.identifiers).filter(
-    (candidate) =>
-      candidate.identifierId !== identifierId &&
-      (candidate.state === "VERIFIED" || candidate.state === "PRIMARY"),
-  );
-  if (remaining.length === 0) {
-    throw new IdentityDetachStrandsUserError(
-      `detach_identifier: ${identifierId} is the last verified identifier for this user`,
-    );
-  }
-  // A passkey is a way in and not a way back: it has no address, so a person
-  // holding only passkeys has nowhere a recovery message could reach them.
-  // The remedy the screen offers is a verified email.
-  if (remaining.every((candidate) => candidate.provider === "passkey")) {
-    throw new IdentityDetachStrandsUserError(
-      `detach_identifier: removing ${identifierId} would leave this user with passkeys only and no recovery address`,
-    );
-  }
-}
+import { assertDetachKeepsWayBack } from "../rules/identity-detach.rules.ts";
 
 /**
  * The identity guards (ADR-101 §2): what runs BEFORE any fact exists — the

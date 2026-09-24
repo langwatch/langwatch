@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
-import { IdentityIdentifierBackfillMigrationAdapter } from "../system-migration-identity-identifier-backfill.service.ts";
+import { IdentityIdentifierBackfillMigrationService } from "../system-migration-identity-identifier-backfill.service.ts";
 
 describe("the identifier backfill migration", () => {
   describe("when the runner drives a tenant", () => {
@@ -11,7 +11,7 @@ describe("the identifier backfill migration", () => {
         status: "migrated" as const,
         report: { kind: "parity" as const, diffs: [] },
       }));
-      const migration = new IdentityIdentifierBackfillMigrationAdapter({
+      const migration = IdentityIdentifierBackfillMigrationService.create({
         migrateUser,
       });
 
@@ -28,7 +28,7 @@ describe("the identifier backfill migration", () => {
   describe("when the runner reads its declaration", () => {
     /** @scenario "Finalizing a user's backfill opens their write gate" */
     it("registers under the name the write gate reads, dark and operator-free", () => {
-      const migration = new IdentityIdentifierBackfillMigrationAdapter({
+      const migration = IdentityIdentifierBackfillMigrationService.create({
         migrateUser: vi.fn(),
       });
       expect(migration.name).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);

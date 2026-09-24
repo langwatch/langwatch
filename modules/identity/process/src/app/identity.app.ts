@@ -62,7 +62,7 @@ import { JoinRequestsService } from "../services/join-requests.service.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../services/local-door-break-glass-binding.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
-import { CachedIdentityLatch } from "../services/per-subject-cached-latch.service.ts";
+import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
 import { SsoArrivalAdoptionService } from "../services/sso-arrival-adoption.service.ts";
@@ -100,8 +100,8 @@ import {
   type SsoTestArrivalAccounts,
   type SsoTestArrivalMemberships,
 } from "../services/sso-test-arrival.service.ts";
-import { IdentityIdentifierBackfillMigrationAdapter } from "../services/system-migration-identity-identifier-backfill.service.ts";
-import { IdentitySecretHealMigrationAdapter } from "../services/system-migration-identity-secret-heal.service.ts";
+import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
+import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
 import { buildIdentityInfrastructure } from "./identity-composition.build.ts";
 /**
@@ -372,7 +372,7 @@ export class IdentityApp implements IdentityApi {
       identifiers: CryptoIdentifierIdentityAdapter.create(),
     });
     const mfaGuards = MfaGuardsService.create(setup.repositories.mfaEnrollment);
-    const latch = CachedIdentityLatch.create({
+    const latch = CachedIdentityLatchService.create({
       repository: setup.repositories.latch,
       ttlMs: infrastructure.latch.ttlMs,
       maxUsers: infrastructure.latch.maxUsers,
@@ -683,8 +683,8 @@ export class IdentityApp implements IdentityApi {
 
   userMigrations(): readonly SystemMigration[] {
     return [
-      IdentityIdentifierBackfillMigrationAdapter.create(this.#parts.backfill),
-      IdentitySecretHealMigrationAdapter.create(this.#parts.secrets),
+      IdentityIdentifierBackfillMigrationService.create(this.#parts.backfill),
+      IdentitySecretHealMigrationService.create(this.#parts.secrets),
     ] as const;
   }
 

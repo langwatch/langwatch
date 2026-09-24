@@ -145,7 +145,7 @@ export {
   type PostgresJoinRequestNotificationOptions,
 } from "./repositories/prisma/prisma.join-request-notification.repository.ts";
 export type { JoinRequestGuardsDeps } from "./services/join-request-guards.service.ts";
-export type { JoinRequestAudience } from "./repositories/join-request-audience.repository.ts";
+export type { JoinRequestAudienceRepository } from "./repositories/join-request-audience.repository.ts";
 export { type JoinRequestMail, type SsoDomainProofMail } from "./app/identity.members.ts";
 export type { JoinRequestLedger } from "./rules/join-request-ledger.rules.ts";
 export type { ScimSyncLedger } from "./rules/scim-sync-ledger.rules.ts";
@@ -183,7 +183,7 @@ export {
   type JoinRequestStagedSender,
 } from "./services/join-request-ledger.service.ts";
 export { type JoinRequestNotificationMail } from "./app/identity.members.ts";
-export { InProcessBreakGlassLimiterAdapter } from "./services/in-process-break-glass-limiter.service.ts";
+export { InProcessBreakGlassLimiterService } from "./services/in-process-break-glass-limiter.service.ts";
 export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-glass-binding.service.ts";
 export type { SsoConnectionBackofficePage } from "./repositories/sso-connection-backoffice.repository.ts";
 export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
@@ -222,12 +222,10 @@ export { type IdentityWriteGateState } from "./app/identity.members.ts";
 // §5). Exported because the process that mounts better-auth composes them; a
 // deployment that reaches neither runs the stock storage engine and no
 // ceremonies, which is what it did before they were written.
+export { BetterAuthCeremonyBridgeService } from "./services/better-auth-ceremony-bridge.service.ts";
+export { IdentityCeremoniesService } from "./services/better-auth-identity-ceremonies.service.ts";
 export {
-  BetterAuthCeremonyBridgeAdapter,
-  IdentityCeremoniesAdapter,
-} from "./services/better-auth-identity-ceremonies.service.ts";
-export {
-  BetterAuthIdentityStorageAdapter,
+  BetterAuthIdentityStorageService,
   type IdentityStorageAdapterDeps,
 } from "./services/better-auth-identity-storage.service.ts";
 export type { PrismaIdentityUsersDatabase } from "./repositories/prisma/prisma.identity-users.repository.ts";
@@ -241,11 +239,11 @@ export {
   IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
 } from "./rules/identity-migration-names.rules.ts";
-export { IdentitySsoConnectionGrandfatherMigrationAdapter } from "./services/system-migration-identity-connection-grandfather.service.ts";
-export { IdentityIdentifierBackfillMigrationAdapter } from "./services/system-migration-identity-identifier-backfill.service.ts";
+export { IdentitySsoConnectionGrandfatherMigrationService } from "./services/system-migration-identity-connection-grandfather.service.ts";
+export { IdentityIdentifierBackfillMigrationService } from "./services/system-migration-identity-identifier-backfill.service.ts";
 export {
   IDENTITY_SECRET_HEAL_MIGRATION_NAME,
-  IdentitySecretHealMigrationAdapter,
+  IdentitySecretHealMigrationService,
 } from "./services/system-migration-identity-secret-heal.service.ts";
 export {
   PostgresIdentityOrganizationMigrationsAdapter,
@@ -256,12 +254,12 @@ export {
   type PostgresIdentityUserMigrationsOptions,
 } from "./repositories/prisma/prisma.identity-user-migrations.repository.ts";
 export {
-  ScimSyncLedgerWriterAdapter,
+  ScimSyncLedgerWriterService,
   type ScimSyncLedgerWriterDeps,
   type ScimSyncStagedSender,
 } from "./services/eventing-scim-sync-ledger.service.ts";
 export {
-  SsoConnectionTeardownDispatcherAdapter,
+  SsoConnectionTeardownDispatcherService,
   type ConnectionDirectoryRevocation,
 } from "./services/sso-connection-teardown.service.ts";
 export type { IdentityRepositories } from "./repositories/identity.repositories.ts";

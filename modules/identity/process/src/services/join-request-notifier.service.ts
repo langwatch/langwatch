@@ -2,7 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
-import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
+import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
 import type { PrismaJoinRequestNotificationContextRepository } from "../repositories/prisma/prisma.join-request-notification-context.repository.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 
@@ -25,9 +25,9 @@ export type JoinRequestNotifierMemberships = {
  * gives: one bouncing admin address must not silence the rest. A mail that cannot be sent is logged
  * and the request stands — the durable fact is the request, not the notification.
  */
-export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
+export class JoinRequestNotifierService implements JoinRequestNotifier {
   static create(options: {
-    audience: JoinRequestAudience;
+    audience: JoinRequestAudienceRepository;
     context: PrismaJoinRequestNotificationContextRepository;
     mail: JoinRequestNotificationMail;
     /** This deployment's public origin, for a lapsed requester's personal project link. */
@@ -35,8 +35,8 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     /** Read for the seat census a domain-auto-join notice carries. Absent omits it. */
     plans?: JoinRequestNotifierPlans;
     memberships?: JoinRequestNotifierMemberships;
-  }): EmailJoinRequestNotifierAdapter {
-    return new EmailJoinRequestNotifierAdapter({
+  }): JoinRequestNotifierService {
+    return new JoinRequestNotifierService({
       audience: options.audience,
       context: options.context,
       mail: options.mail,
@@ -46,7 +46,7 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     });
   }
 
-  private readonly audience: JoinRequestAudience;
+  private readonly audience: JoinRequestAudienceRepository;
   private readonly context: PrismaJoinRequestNotificationContextRepository;
   private readonly mail: JoinRequestNotificationMail;
   private readonly baseHost: string;
@@ -61,7 +61,7 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     plans,
     memberships,
   }: {
-    audience: JoinRequestAudience;
+    audience: JoinRequestAudienceRepository;
     context: PrismaJoinRequestNotificationContextRepository;
     mail: JoinRequestNotificationMail;
     baseHost: string;

@@ -17,46 +17,6 @@ import { BetterAuthAccountQueriesAdapter } from "./better-auth-account-queries.s
 
 const logger = createLogger("langwatch:better-auth:identity-ceremonies");
 
-/**
- * The account ceremonies as better-auth's `databaseHooks` bind them once the
- * identity storage adapter is live (ADR-116 §5).
- */
-export class BetterAuthCeremonyBridgeAdapter implements Pick<
-  IdentityAccountCeremonies,
-  "createAccountIdentifier" | "beforeAccountDelete"
-> {
-  static create(deps: {
-    ceremonies: IdentityAccountCeremonies;
-    routesToIdentity: IdentityUserGate;
-  }): BetterAuthCeremonyBridgeAdapter {
-    return new BetterAuthCeremonyBridgeAdapter(deps);
-  }
-
-  private constructor(
-    private readonly deps: {
-      ceremonies: IdentityAccountCeremonies;
-      routesToIdentity: IdentityUserGate;
-    },
-  ) {}
-
-  async createAccountIdentifier(account: CeremonyAccountRow): Promise<CeremonyAccountPin> {
-    if (await this.deferred(account.userId)) return { pinned: false };
-
-    return this.deps.ceremonies.createAccountIdentifier(account);
-  }
-
-  async beforeAccountDelete(
-    account: Parameters<IdentityAccountCeremonies["beforeAccountDelete"]>[0],
-  ): Promise<void> {
-    if (await this.deferred(account.userId)) return;
-    await this.deps.ceremonies.beforeAccountDelete(account);
-  }
-
-  private async deferred(userId: unknown): Promise<boolean> {
-    return typeof userId === "string" && (await this.deps.routesToIdentity({ userId }));
-  }
-}
-
 /** The `User` fields a ceremony reads. */
 interface UserRow {
   id?: unknown;
@@ -67,7 +27,7 @@ interface UserRow {
  * GATED no-ops until latch, and the create hook pins the row's id via
  * `forceAllowId: true` so live attach and the backfill derive the same id.
  */
-export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
+export class IdentityCeremoniesService implements IdentityAccountCeremonies {
   static create({
     heads,
     users,
@@ -80,8 +40,8 @@ export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
     identity: IdentityCeremonyWrites;
     isLatched: IdentityUserGate;
     clock: IdentityCeremonyClock;
-  }): IdentityCeremoniesAdapter {
-    return new IdentityCeremoniesAdapter({ heads, users, identity, isLatched, clock });
+  }): IdentityCeremoniesService {
+    return new IdentityCeremoniesService({ heads, users, identity, isLatched, clock });
   }
 
   private readonly heads: IdentityHeadsRepository;

@@ -4,9 +4,9 @@ import { UserNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestMail } from "../../app/identity.members.ts";
-import {
-  JoinRequestAudience,
-  type JoinRequestAudienceProfile,
+import type {
+  JoinRequestAudienceRepository,
+  JoinRequestAudienceProfile,
 } from "../../repositories/join-request-audience.repository.ts";
 import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
@@ -17,7 +17,7 @@ const ORGANIZATION = "organization_acme";
 const REQUEST = "joinreq_1";
 const REQUESTER = "user_ada";
 
-class Audience extends JoinRequestAudience {
+class Audience implements JoinRequestAudienceRepository {
   constructor(
     private readonly answers: {
       requesterId?: string | null;
@@ -26,9 +26,7 @@ class Audience extends JoinRequestAudience {
       displayName?: string | null;
       email?: string | null;
     } = {},
-  ) {
-    super();
-  }
+  ) {}
 
   async getRequesterId(): Promise<string> {
     if (!("requesterId" in this.answers)) return REQUESTER;

@@ -1,4 +1,4 @@
-import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
+import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 import type { SsoConnectionHistoryRepository } from "../repositories/sso-connection-history.repository.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
@@ -42,7 +42,7 @@ export type IdentityInfrastructure = Readonly<{
   /** The three backfill reads the D01 secret-carry pass writes through. */
   secrets: IdentitySecretCarryRepository;
   /** Who a join-request notification reaches. Read only when `mail` is present. */
-  joinRequestAudience: JoinRequestAudience;
+  joinRequestAudience: JoinRequestAudienceRepository;
   /** Who counts as a LangWatch platform operator, for the SSO connection guards (D05 tier 1). */
   ssoPlatformOperators: SsoPlatformOperatorRepository;
   /**

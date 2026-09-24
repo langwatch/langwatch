@@ -9,8 +9,8 @@ import { IdentityBackfillService } from "../../services/identity-backfill.servic
 import { IdentityLedgerWriterAdapter } from "../../services/identity-ledger.service.ts";
 import { IdentitySecretCarryService } from "../../services/identity-secret-carry.service.ts";
 import { IdentityService } from "../../services/identity.service.ts";
-import { IdentityIdentifierBackfillMigrationAdapter } from "../../services/system-migration-identity-identifier-backfill.service.ts";
-import { IdentitySecretHealMigrationAdapter } from "../../services/system-migration-identity-secret-heal.service.ts";
+import { IdentityIdentifierBackfillMigrationService } from "../../services/system-migration-identity-identifier-backfill.service.ts";
+import { IdentitySecretHealMigrationService } from "../../services/system-migration-identity-secret-heal.service.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaIdentitySecretCarryRepository } from "./prisma.identity-secret-carry.repository.ts";
@@ -63,8 +63,8 @@ export class PostgresIdentityUserMigrationsAdapter {
     });
 
     return [
-      IdentityIdentifierBackfillMigrationAdapter.create(backfill),
-      IdentitySecretHealMigrationAdapter.create(secrets),
+      IdentityIdentifierBackfillMigrationService.create(backfill),
+      IdentitySecretHealMigrationService.create(secrets),
     ];
   }
 }

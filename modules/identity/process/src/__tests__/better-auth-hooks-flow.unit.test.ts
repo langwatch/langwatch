@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
-import { IdentityCeremoniesAdapter } from "../services/better-auth-identity-ceremonies.service.ts";
+import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { IdentityService } from "../services/identity.service.ts";
@@ -69,7 +69,7 @@ function harness() {
     }),
     ledger,
   );
-  const ceremonies = IdentityCeremoniesAdapter.create({
+  const ceremonies = IdentityCeremoniesService.create({
     heads,
     users,
     identity,

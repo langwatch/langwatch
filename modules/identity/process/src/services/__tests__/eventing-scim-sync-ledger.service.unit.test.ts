@@ -14,7 +14,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import type { IdentityEventing } from "../../app/identity.members.ts";
-import { ScimSyncLedgerWriterAdapter } from "../eventing-scim-sync-ledger.service.ts";
+import { ScimSyncLedgerWriterService } from "../eventing-scim-sync-ledger.service.ts";
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_1";
@@ -71,7 +71,7 @@ describe("given a process that registered the directory-sync pipeline", () => {
   describe("when a push states a fact", () => {
     it("stages the command on the pipeline's own sender and appends nothing itself", async () => {
       const eventing = new RecordingEventing(true);
-      const writer = new ScimSyncLedgerWriterAdapter({ eventing });
+      const writer = ScimSyncLedgerWriterService.create({ eventing });
       const { command, facts } = issueToken();
 
       await writer.commit({ command, facts });
@@ -84,7 +84,7 @@ describe("given a process that registered the directory-sync pipeline", () => {
   describe("when the guard stated nothing", () => {
     it("stages nothing, because there is no fact to carry", async () => {
       const eventing = new RecordingEventing(true);
-      const writer = new ScimSyncLedgerWriterAdapter({ eventing });
+      const writer = ScimSyncLedgerWriterService.create({ eventing });
       const { command } = issueToken();
 
       await writer.commit({ command, facts: [] });
@@ -97,7 +97,7 @@ describe("given a process that registered the directory-sync pipeline", () => {
 describe("given a process that composed the writer with no queue behind it", () => {
   describe("when a push states a fact", () => {
     it("lets the push through rather than failing the identity provider", async () => {
-      const writer = new ScimSyncLedgerWriterAdapter({ eventing: new RecordingEventing(false) });
+      const writer = ScimSyncLedgerWriterService.create({ eventing: new RecordingEventing(false) });
       const { command, facts } = issueToken();
 
       await expect(writer.commit({ command, facts })).resolves.toBeUndefined();
@@ -108,7 +108,7 @@ describe("given a process that composed the writer with no queue behind it", () 
       // a warn would read as an event-stack blip that clears, and this one
       // never does.
       const { logger, lines } = createTestLogger();
-      const writer = new ScimSyncLedgerWriterAdapter({
+      const writer = ScimSyncLedgerWriterService.create({
         eventing: new RecordingEventing(false),
         logger,
       });
@@ -128,7 +128,7 @@ describe("given a process that composed the writer with no queue behind it", () 
 
     it("names the verb the command carries, not one fixed sender", async () => {
       const eventing = new RecordingEventing(false);
-      const writer = new ScimSyncLedgerWriterAdapter({ eventing });
+      const writer = ScimSyncLedgerWriterService.create({ eventing });
       const { command, facts } = issueToken();
 
       await writer.commit({

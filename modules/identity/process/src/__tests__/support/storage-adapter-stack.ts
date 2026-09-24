@@ -15,13 +15,11 @@ import {
   newIdentityCommandId,
 } from "../../rules/identity-command-id.rules.ts";
 import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
+import { BetterAuthCeremonyBridgeService } from "../../services/better-auth-ceremony-bridge.service.ts";
 import { BetterAuthIdentityBirthAdapter } from "../../services/better-auth-identity-birth.service.ts";
+import { IdentityCeremoniesService } from "../../services/better-auth-identity-ceremonies.service.ts";
 import {
-  BetterAuthCeremonyBridgeAdapter,
-  IdentityCeremoniesAdapter,
-} from "../../services/better-auth-identity-ceremonies.service.ts";
-import {
-  BetterAuthIdentityStorageAdapter,
+  BetterAuthIdentityStorageService,
   type PasskeyRemoval,
 } from "../../services/better-auth-identity-storage.service.ts";
 import { CryptoIdentifierIdentityAdapter } from "../../services/crypto-identifier-identity.service.ts";
@@ -228,7 +226,7 @@ export function identityStack({
     ledger,
   );
 
-  const ceremonies = IdentityCeremoniesAdapter.create({
+  const ceremonies = IdentityCeremoniesService.create({
     heads,
     users,
     identity,
@@ -279,12 +277,12 @@ export function identityStack({
   const accounts: IdentityAccounts = inert ? inertIdentityPorts.accounts : storage;
   const resolution: IdentityResolver = inert ? inertIdentityPorts.resolution : storage;
 
-  const bridge = BetterAuthCeremonyBridgeAdapter.create({
+  const bridge = BetterAuthCeremonyBridgeService.create({
     ceremonies,
     routesToIdentity: BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites),
   });
   const auth = authOver(
-    BetterAuthIdentityStorageAdapter.create({
+    BetterAuthIdentityStorageService.create({
       legacyEngine: schemaBoundLegacy ? schemaBoundLegacyEngine(db) : memoryAdapter(db),
       accounts,
       resolution,

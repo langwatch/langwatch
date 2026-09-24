@@ -2,7 +2,7 @@ import { IdentityPrimaryMustDemoteFirstError } from "@langwatch/identity-contrac
 import { describe, expect, it, vi } from "vitest";
 
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
-import { IdentityCeremoniesAdapter } from "../services/better-auth-identity-ceremonies.service.ts";
+import { IdentityCeremoniesService } from "../services/better-auth-identity-ceremonies.service.ts";
 import { fact, InMemoryHeads, T0, USER } from "./support/in-memory-heads.ts";
 
 function harness(options?: {
@@ -45,7 +45,7 @@ function harness(options?: {
     eraseUser: vi.fn(async () => []),
   };
   let minted = 0;
-  const ceremonies = IdentityCeremoniesAdapter.create({
+  const ceremonies = IdentityCeremoniesService.create({
     heads,
     users,
     identity: identity as never,

@@ -8,7 +8,7 @@ import type { IdentityBackfillService } from "./identity-backfill.service.ts";
  * `SystemMigration` contract over `IdentityBackfillService`.
  * Spec: specs/identity/identifier-model.feature.
  */
-export class IdentityIdentifierBackfillMigrationAdapter implements SystemMigration {
+export class IdentityIdentifierBackfillMigrationService implements SystemMigration {
   // Never rename: the stable state-table key. The write gate reads exactly
   // this record, so the latch and the migration share the one constant.
   readonly name = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
@@ -31,11 +31,11 @@ export class IdentityIdentifierBackfillMigrationAdapter implements SystemMigrati
 
   static create(
     backfill: Pick<IdentityBackfillService, "migrateUser">,
-  ): IdentityIdentifierBackfillMigrationAdapter {
-    return new IdentityIdentifierBackfillMigrationAdapter(backfill);
+  ): IdentityIdentifierBackfillMigrationService {
+    return new IdentityIdentifierBackfillMigrationService(backfill);
   }
 
-  constructor(private readonly backfill: Pick<IdentityBackfillService, "migrateUser">) {}
+  private constructor(private readonly backfill: Pick<IdentityBackfillService, "migrateUser">) {}
 
   async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
     // Nothing here consults `previous`: the pass re-reads the legacy rows

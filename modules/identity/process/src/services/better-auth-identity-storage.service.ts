@@ -134,9 +134,9 @@ export interface PasskeyRemoval {
 /**
  * better-auth's one `database:` entry (ADR-116 §1): an identity-owned
  */
-export class BetterAuthIdentityStorageAdapter {
-  static create(deps: IdentityStorageAdapterDeps): BetterAuthIdentityStorageAdapter {
-    return new BetterAuthIdentityStorageAdapter(deps);
+export class BetterAuthIdentityStorageService {
+  static create(deps: IdentityStorageAdapterDeps): BetterAuthIdentityStorageService {
+    return new BetterAuthIdentityStorageService(deps);
   }
 
   private constructor(private readonly deps: IdentityStorageAdapterDeps) {}

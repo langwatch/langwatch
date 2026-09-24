@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { SsoDomainProofMail } from "../app/identity.members.ts";
 import type { SsoDomainProofNotifications } from "../eventing/sso-domain-proof-notification.process.ts";
-import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
+import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
 
 const logger = createLogger("langwatch:identity:sso-domain-proof-notification");
 
@@ -21,7 +21,7 @@ const UNNAMED_ORGANIZATION = "your organization";
  * members, never a second repository over the same tables.
  */
 export type SsoDomainProofAudience = Pick<
-  JoinRequestAudience,
+  JoinRequestAudienceRepository,
   "findAdminEmails" | "getOrganizationName"
 >;
 

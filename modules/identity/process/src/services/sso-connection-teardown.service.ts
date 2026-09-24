@@ -22,18 +22,18 @@ const logger = createLogger("langwatch:identity:sso-connection-teardown");
  * projection write, and that is the point — the process manager decides WHEN,
  * `completeTeardown` command (ADR-117 §5).
  */
-export class SsoConnectionTeardownDispatcherAdapter implements ConnectionTeardown {
+export class SsoConnectionTeardownDispatcherService implements ConnectionTeardown {
   static create({
     connections,
     scim,
   }: {
     connections: () => SsoConnectionService;
     scim: () => ConnectionDirectoryRevocation;
-  }): SsoConnectionTeardownDispatcherAdapter {
-    return new SsoConnectionTeardownDispatcherAdapter(connections, scim);
+  }): SsoConnectionTeardownDispatcherService {
+    return new SsoConnectionTeardownDispatcherService(connections, scim);
   }
 
-  constructor(
+  private constructor(
     private readonly connections: () => SsoConnectionService,
     private readonly scim: () => ConnectionDirectoryRevocation,
   ) {}
