@@ -469,7 +469,7 @@ export class ApplicationBuilder<
       return cleanupAfterFailure(error, () => scope.close());
     }
 
-    const contributions = roleContributions(declarations, role);
+    const contributions = roleContributions(declarations, role, installed);
 
     return new BootedRuntime<Members, Rest, Trpc>(
       this.name,
@@ -677,11 +677,15 @@ function installModuleEventing({
 function roleContributions(
   declarations: readonly DeclaredFeature[],
   role: ServerRole,
+  installed: ReadonlyMap<string, InstalledFeatureState>,
 ): { contributions: readonly unknown[]; declaredBy: ReadonlyMap<unknown, string> } {
   const declaredBy = new Map<unknown, string>();
   const contributions: unknown[] = [];
   for (const declaration of declarations) {
-    const declared = contributionsFor({ declaration, role });
+    const declared = [
+      ...contributionsFor({ declaration, role }),
+      ...(role === "tasks" ? (installed.get(declaration.name)?.tasks ?? []) : []),
+    ];
     for (const contribution of declared) {
       contributions.push(contribution);
       if (typeof contribution === "object" && contribution !== null) {

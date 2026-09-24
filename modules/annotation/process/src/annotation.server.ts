@@ -2,6 +2,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { AnnotationApp } from "#app/annotation.app";
 import { annotationRepositories } from "#repositories/annotation-repositories.registry";
+import { AnnotationTraceBackfillTask } from "#tasks/annotation-trace-backfill.task";
 import { annotationScoreTrpcTransport } from "#transport/annotation-score.trpc";
 import { annotationRest } from "#transport/annotation.rest";
 import { annotationTrpcTransport } from "#transport/annotation.trpc";
@@ -14,4 +15,12 @@ import { annotationTrpcTransport } from "#transport/annotation.trpc";
 export const annotationServer = defineServerModule("annotation")
   .withRepositories(annotationRepositories)
   .withApp(AnnotationApp)
-  .withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport);
+  .withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport)
+  .withTasks(({ app, dependencies }) => [
+    AnnotationTraceBackfillTask.create({
+      annotations: app,
+      traces: dependencies.traces,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+    }),
+  ]);

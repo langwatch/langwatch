@@ -93,3 +93,33 @@ describe("given modules that declare one-shot work", () => {
     });
   });
 });
+
+describe("given a module that builds its tasks over its own app", () => {
+  const bound = defineServerModule("annotation")
+    .withApp(AnnotationApp)
+    .withTransports()
+    .withTasks(({ app }) => [new NamedTask(`${app.label()}-backfill`)]);
+
+  describe("when a tasks process boots", () => {
+    /** @scenario "A module builds its tasks over its own booted app" */
+    it("answers with the task built over the booted app", async () => {
+      const runtime = await createApp({ role: "tasks" }).withModules([bound, dataset]).boot();
+
+      expect(runtime.tasks(isNamedTask).map((task) => task.name)).toEqual([
+        "annotation-backfill",
+        "weekly-report",
+      ]);
+      await runtime.stop();
+    });
+  });
+
+  describe("when a worker process boots", () => {
+    /** @scenario "A task binder is never run outside the tasks role" */
+    it("never builds the task", async () => {
+      const runtime = await createApp({ role: "worker" }).withModules([bound]).boot();
+
+      expect(() => runtime.tasks(isNamedTask)).toThrowError(/"worker"/);
+      await runtime.stop();
+    });
+  });
+});

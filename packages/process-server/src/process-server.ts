@@ -21,10 +21,12 @@ import { z } from "zod";
 
 import {
   ApiProcessComposition,
+  TasksProcessComposition,
   WorkerProcessComposition,
   type ProcessBoot,
   type ProcessMemberFactory,
   type ProcessModule,
+  type BootedApplication,
 } from "./process-composition.ts";
 import {
   Server,
@@ -97,18 +99,22 @@ export class ProcessServer implements ProcessBoot {
 
   composeProcess(role: "api"): ApiProcessComposition;
   composeProcess(role: "worker"): WorkerProcessComposition;
-  composeProcess(role: "api" | "worker"): ApiProcessComposition | WorkerProcessComposition {
+  composeProcess(role: "tasks"): TasksProcessComposition;
+  composeProcess(
+    role: "api" | "worker" | "tasks",
+  ): ApiProcessComposition | WorkerProcessComposition | TasksProcessComposition {
     if (role === "api") return new ApiProcessComposition(this);
+    if (role === "tasks") return new TasksProcessComposition(this);
     return new WorkerProcessComposition(this);
   }
 
   async boot(
-    role: "api" | "worker",
+    role: "api" | "worker" | "tasks",
     modules: readonly ProcessModule[],
     pipelines: PipelineParticipation,
     suppliedMembers: Readonly<Record<string, ProcessMemberFactory>> = {},
     transports?: TransportSelection,
-  ): Promise<ServedApplication> {
+  ): Promise<BootedApplication> {
     if (!this.config.stores)
       throw new Error("The stores config owner must be installed before boot.");
     const config = this.config.stores as StoresConfig;

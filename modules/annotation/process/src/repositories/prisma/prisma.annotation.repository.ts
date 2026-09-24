@@ -1,12 +1,7 @@
 import {
   AnnotationNotFoundError,
   annotationSchema,
-  createAnnotationInputSchema,
-  deleteAnnotationInputSchema,
-  listAnnotationsInputSchema,
-  listProjectionAnnotationsInputSchema,
   projectionAnnotationSchema,
-  updateAnnotationInputSchema,
   type Annotation,
   type AnnotationByIdInput,
   type CreateAnnotationInput,
@@ -82,22 +77,20 @@ export class PrismaAnnotationRepository
   static readonly create = this.factory((prisma) => new PrismaAnnotationRepository(prisma));
 
   async create(input: CreateAnnotationInput): Promise<Annotation> {
-    const parsed = createAnnotationInputSchema.parse(input);
-
     const row = await this.prisma.annotation.create({
       data: {
-        id: parsed.id,
-        projectId: parsed.projectId,
-        traceId: parsed.traceId,
-        userId: parsed.userId,
-        email: parsed.email,
-        comment: parsed.comment,
-        isThumbsUp: parsed.isThumbsUp,
-        scoreOptions: parsed.scoreOptions,
-        expectedOutput: parsed.expectedOutput,
-        anchorKind: parsed.anchorKind ?? null,
-        anchorId: parsed.anchorId ?? null,
-        anchorPath: parsed.anchorPath ?? null,
+        id: input.id,
+        projectId: input.projectId,
+        traceId: input.traceId,
+        userId: input.userId,
+        email: input.email,
+        comment: input.comment,
+        isThumbsUp: input.isThumbsUp,
+        scoreOptions: input.scoreOptions,
+        expectedOutput: input.expectedOutput,
+        anchorKind: input.anchorKind ?? null,
+        anchorId: input.anchorId ?? null,
+        anchorPath: input.anchorPath ?? null,
       },
       select: annotationSelect,
     });
@@ -106,45 +99,41 @@ export class PrismaAnnotationRepository
   }
 
   async update(input: UpdateAnnotationInput): Promise<Annotation> {
-    const parsed = updateAnnotationInputSchema.parse(input);
-
     try {
       const row = await this.prisma.annotation.update({
         where: {
-          id: parsed.id,
-          projectId: parsed.projectId,
-          ...(parsed.traceId === void 0 ? {} : { traceId: parsed.traceId }),
+          id: input.id,
+          projectId: input.projectId,
+          ...(input.traceId === void 0 ? {} : { traceId: input.traceId }),
         },
         data: {
-          comment: parsed.comment,
-          isThumbsUp: parsed.isThumbsUp,
-          ...(parsed.email === void 0 ? {} : { email: parsed.email }),
-          ...(parsed.scoreOptions === void 0 ? {} : { scoreOptions: parsed.scoreOptions }),
-          ...(parsed.expectedOutput === void 0 ? {} : { expectedOutput: parsed.expectedOutput }),
+          comment: input.comment,
+          isThumbsUp: input.isThumbsUp,
+          ...(input.email === void 0 ? {} : { email: input.email }),
+          ...(input.scoreOptions === void 0 ? {} : { scoreOptions: input.scoreOptions }),
+          ...(input.expectedOutput === void 0 ? {} : { expectedOutput: input.expectedOutput }),
         },
         select: annotationSelect,
       });
 
       return parseRow(row);
     } catch (error) {
-      if (isRecordNotFoundError(error)) throw new AnnotationNotFoundError(parsed.id);
+      if (isRecordNotFoundError(error)) throw new AnnotationNotFoundError(input.id);
 
       throw error;
     }
   }
 
   async delete(input: DeleteAnnotationInput): Promise<Annotation> {
-    const parsed = deleteAnnotationInputSchema.parse(input);
-
     try {
       const row = await this.prisma.annotation.delete({
-        where: { id: parsed.id, projectId: parsed.projectId },
+        where: { id: input.id, projectId: input.projectId },
         select: annotationSelect,
       });
 
       return parseRow(row);
     } catch (error) {
-      if (isRecordNotFoundError(error)) throw new AnnotationNotFoundError(parsed.id);
+      if (isRecordNotFoundError(error)) throw new AnnotationNotFoundError(input.id);
 
       throw error;
     }
@@ -162,18 +151,16 @@ export class PrismaAnnotationRepository
   }
 
   async findAll(input: ListAnnotationsInput): Promise<Annotation[]> {
-    const parsed = listAnnotationsInputSchema.parse(input);
-
     const rows = await this.prisma.annotation.findMany({
       where: {
-        projectId: parsed.projectId,
-        ...(parsed.traceIds ? { traceId: { in: parsed.traceIds } } : {}),
-        ...(parsed.anchor === "trace" ? { anchorKind: null } : {}),
-        ...(parsed.startDate || parsed.endDate
-          ? { createdAt: { gte: parsed.startDate, lte: parsed.endDate } }
+        projectId: input.projectId,
+        ...(input.traceIds ? { traceId: { in: input.traceIds } } : {}),
+        ...(input.anchor === "trace" ? { anchorKind: null } : {}),
+        ...(input.startDate || input.endDate
+          ? { createdAt: { gte: input.startDate, lte: input.endDate } }
           : {}),
       },
-      ...(parsed.order === void 0 ? {} : { orderBy: { createdAt: parsed.order } }),
+      ...(input.order === void 0 ? {} : { orderBy: { createdAt: input.order } }),
       select: annotationSelect,
     });
 
@@ -181,13 +168,11 @@ export class PrismaAnnotationRepository
   }
 
   async findForProjection(input: ListProjectionAnnotationsInput): Promise<ProjectionAnnotation[]> {
-    const parsed = listProjectionAnnotationsInputSchema.parse(input);
-
     const rows = await this.prisma.annotation.findMany({
       where: {
-        projectId: parsed.projectId,
-        traceId: { in: parsed.traceIds },
-        ...(parsed.anchor === "trace" ? { anchorKind: null } : {}),
+        projectId: input.projectId,
+        traceId: { in: input.traceIds },
+        ...(input.anchor === "trace" ? { anchorKind: null } : {}),
       },
       orderBy: { createdAt: "asc" },
       select: projectionAnnotationSelect,

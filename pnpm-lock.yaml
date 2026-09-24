@@ -1113,6 +1113,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@langwatch/data-privacy-process':
+        specifier: workspace:*
+        version: link:../../modules/data-privacy/process
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
@@ -1125,6 +1128,9 @@ importers:
       '@langwatch/identity-process':
         specifier: workspace:*
         version: link:../../modules/identity/process
+      '@langwatch/installed-server-modules':
+        specifier: workspace:*
+        version: link:../../packages/installed-server-modules
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -1134,6 +1140,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
+      '@langwatch/process-server':
+        specifier: workspace:*
+        version: link:../../packages/process-server
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../packages/redis-client
@@ -1143,6 +1152,9 @@ importers:
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../packages/system-migrations
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../packages/time
@@ -1153,6 +1165,18 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../packages/api-fixture
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../packages/process-stores
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
@@ -2508,6 +2532,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../../../modules/trace/contract
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/user/contract
       '@opentelemetry/otlp-transformer':
         specifier: 'catalog:'
         version: 0.55.0(@opentelemetry/api@1.9.1)
@@ -4175,6 +4202,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

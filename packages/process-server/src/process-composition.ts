@@ -16,15 +16,20 @@ export type ProcessModule = InstallableServerFeature<never> & {
 export type ModuleBundle =
   | readonly ProcessModule[]
   | Readonly<{ chunks: readonly (readonly ProcessModule[])[] }>;
+/** A booted application: the server hosts it, and only the tasks role answers `tasks` (§9). */
+export type BootedApplication = ServedApplication &
+  Readonly<{
+    tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[];
+  }>;
 export interface ProcessBoot {
   readonly surfaceDefaults: SurfaceDefaultsOptions;
   boot(
-    role: "api" | "worker",
+    role: "api" | "worker" | "tasks",
     modules: readonly ProcessModule[],
     pipelines: PipelineParticipation,
     members: Readonly<Record<string, ProcessMemberFactory>>,
     transports?: TransportSelection,
-  ): Promise<ServedApplication>;
+  ): Promise<BootedApplication>;
 }
 
 /**
@@ -112,6 +117,23 @@ export class WorkerProcessComposition extends Composition {
 
   boot(): Promise<ServedApplication> {
     return this.runtime.boot("worker", this.modules, this.participation(), this.members);
+  }
+}
+
+/** One-shot work over the installed modules: sends commands, hosts no consumer (§9). */
+export class TasksProcessComposition extends Composition {
+  constructor(runtime: ProcessBoot) {
+    super(runtime);
+  }
+
+  withPipelines(build: (pipelines: ProducerPipelines) => PipelineParticipation<"produce">): this {
+    this.pipelines = build(new ProducerPipelines());
+    if (this.pipelines.mode !== "produce") throw new Error("Tasks pipelines can only produce.");
+    return this;
+  }
+
+  boot(): Promise<BootedApplication> {
+    return this.runtime.boot("tasks", this.modules, this.participation(), this.members);
   }
 }
 

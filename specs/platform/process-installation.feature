@@ -28,3 +28,9 @@ Feature: Every installed module boots in the process that installs it
     Given two api processes booted over memory stores
     When one of them records a prompt tag
     Then the other lists no tags for that organization
+
+  @integration
+  Scenario: Every installed module boots in the tasks role over memory stores
+    Given the tasks process's installed modules, config owners and composed members
+    When the tasks process boots over memory stores and a synthetic environment
+    Then it lists every task the installed modules declared

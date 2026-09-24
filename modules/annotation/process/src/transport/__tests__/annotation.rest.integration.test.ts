@@ -46,8 +46,8 @@ describe("annotation REST transport declaration", () => {
     const get = routes.find((route) => route.operation === "getAnnotation");
     const remove = routes.find((route) => route.operation === "deleteAnnotation");
 
-    expect(list?.output.safeParse({ data: [] }).success).toBe(true);
-    expect(get?.output.safeParse({ data: { id: "annotation-1" } }).success).toBe(false);
-    expect(remove?.output.safeParse(void 0).success).toBe(true);
+    expect(list?.output.validate({ data: [] })).toBe(true);
+    expect(get?.output.validate({ data: { id: "annotation-1" } })).toBe(false);
+    expect(remove?.output.validate(void 0)).toBe(true);
   });
 });

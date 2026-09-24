@@ -125,9 +125,9 @@ describe("the annotation tRPC declaration", () => {
 
       expect(answering).toHaveLength(Object.keys(annotationTrpc.members).length);
 
-      expect(
-        annotationTrpc.members.getPendingItemsCount?.output?.safeParse({ count: 3 }).success,
-      ).toBe(true);
+      expect(annotationTrpc.members.getPendingItemsCount?.output?.validate({ count: 3 })).toBe(
+        true,
+      );
     });
   });
 

@@ -161,3 +161,15 @@ Feature: Composing a process declaratively
     When the worker boots and its runtime starts
     Then the service starts after boot
     And shutdown drains the service before releasing its module
+
+  @unit
+  Scenario: A module builds its tasks over its own booted app
+    Given a module whose withTasks call received a binder
+    When a process with the "tasks" role boots and is asked for its tasks
+    Then the binder's tasks are built over the module's app, in installation order
+
+  @unit
+  Scenario: A task binder is never run outside the tasks role
+    Given a module whose withTasks call received a binder
+    When a process with the "worker" role boots
+    Then the binder never runs and asking for tasks refuses, naming the role

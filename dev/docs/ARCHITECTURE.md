@@ -551,7 +551,11 @@ component. Its pipeline declaration selects consumption, and shutdown drains tha
 before closing the services and stores it uses.
 
 **Tasks** takes the Server for telemetry and config, skips the listener;
-graceful degenerates to run-to-completion. Migrations are tasks (§7).
+graceful degenerates to run-to-completion. Migrations are tasks (§7), run before any module boots,
+so `apps/tasks` keeps them by hand. Every other task is a module's: `.withTasks(({ app,
+repositories, dependencies }) => [task])` builds it over the booted App in the tasks role only, and
+`server.composeProcess("tasks")` boots the installed list producer-only and runs the named tasks
+(coordinator ruling, 2026-09-25).
 
 **A test passes no server** — `createApp({ role: "api" })` registers nothing
 anywhere; `boot()` returns the runtime and the test drives `start`/`stop`.
@@ -1119,12 +1123,12 @@ Neither declaration exposes a transport. `boot()` translates the same module
 pipeline declaration per role — **api is commands-only,
 structurally**:
 
-|                                              | role `"api"`                            | role `"worker"`                    |
-| -------------------------------------------- | --------------------------------------- | ---------------------------------- |
-| commands                                     | send (append + return)                  | send                               |
-| projections / subscribers / process managers | **never constructed** — nothing to call | hosted, per-aggregate ordered      |
-| scheduled jobs                               | never constructed                       | hosted                             |
-| eventing supply the role's chain demands     | `EventingProducer` (the type)           | `EventingHost` (consume + produce) |
+|                                              | role `"api"`                            | role `"worker"`                    | role `"tasks"`     |
+| -------------------------------------------- | --------------------------------------- | ---------------------------------- | ------------------ |
+| commands                                     | send (append + return)                  | send                               | send               |
+| projections / subscribers / process managers | **never constructed** — nothing to call | hosted, per-aggregate ordered      | never constructed  |
+| scheduled jobs                               | never constructed                       | hosted                             | never constructed  |
+| eventing supply the role's chain demands     | `EventingProducer` (the type)           | `EventingHost` (consume + produce) | `EventingProducer` |
 
 Two enforcement layers: the reaction half is simply not built in an api
 process, and the role types the eventing requirement — an api-role chain
@@ -1627,7 +1631,7 @@ chain. New code uses the left column only.
 | `traceProcessModule` / `processModules`       | `traceServer` / `serverModules`                                    |
 | `TraceModule` + `.withApi(...)`               | `TraceApp` + `.withApp(...)`                                       |
 | `<f>.module.ts` / `<f>.web.ts` file stems     | `<f>.server.ts` / `<f>.web.ts`                                     |
-| `definePipeline(...).withEvents(schemas)`     | `defineAggregate({ events: defineEvents([...type strings]) })`      |
+| `definePipeline(...).withEvents(schemas)`     | `defineAggregate({ events: defineEvents([...type strings]) })`     |
 
 `createProcessApp` stays the target shape. Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,

@@ -77,6 +77,8 @@ export {
   type InstallableServerFeature,
   type InstalledFeatureState,
   type ModuleContributions,
+  type ModuleTaskBinder,
+  type ModuleTaskSetup,
   type ModuleTransportFacts,
   type ModuleTransportFactSetup,
   serverFeature,

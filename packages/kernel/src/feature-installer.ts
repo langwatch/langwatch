@@ -126,6 +126,21 @@ export type ModuleTransportFacts<Dependencies extends TokenMap, Members, App> = 
   setup: ModuleTransportFactSetup<Dependencies, Members, App>,
 ) => readonly TransportFactBinding[];
 
+/** What a task binder is handed: the transport-fact setup plus the module's own repositories. */
+export interface ModuleTaskSetup<
+  Dependencies extends TokenMap,
+  Members,
+  Repositories,
+  App,
+> extends ModuleTransportFactSetup<Dependencies, Members, App> {
+  readonly repositories: Repositories;
+}
+
+/** Builds a module's one-shot tasks over its booted App, once at install in the tasks role. */
+export type ModuleTaskBinder<Dependencies extends TokenMap, Members, Repositories, App> = (
+  setup: ModuleTaskSetup<Dependencies, Members, Repositories, App>,
+) => readonly unknown[];
+
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
   readonly protocol: "rest" | "trpc" | "websocket";
@@ -215,6 +230,8 @@ export interface InstalledFeatureState {
    * fact left unbound is refused by the door at mount, naming fact and route.
    */
   readonly facts?: readonly TransportFactBinding[];
+  /** The tasks this module's binders built over its App, in the tasks role only. */
+  readonly tasks?: readonly unknown[];
   /** Bound contribution readers; absent where the feature declared none. */
   readonly rest: (() => unknown) | undefined;
   readonly trpc: (() => unknown) | undefined;
@@ -1557,6 +1574,9 @@ export type ModuleContributions<
       ...workers: readonly unknown[]
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
     withTasks(
+      bind: ModuleTaskBinder<Dependencies, Members, Repositories, App>,
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+    withTasks(
       ...tasks: readonly unknown[]
     ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
     /** What this module binds for the facts its own declarations name. */
@@ -1602,6 +1622,33 @@ function bindingTransportFacts<Declaration extends object>(
   };
 }
 
+/** Build tasks at install (tasks role only), over the App and repositories just installed. */
+function bindingTasks<Declaration extends object>(
+  declaration: Declaration,
+  bind: ModuleTaskBinder<TokenMap, never, unknown, never>,
+): Declaration {
+  const installable = declaration as Declaration & InstallableDeclaration;
+
+  return {
+    ...declaration,
+    install: async (args: FeatureInstallArguments<never>): Promise<InstalledFeatureState> => {
+      const state = await installable.install(args);
+      if (args.role !== "tasks") return state;
+
+      const built = bind({
+        app: state.provided as never,
+        repositories: state.repositories,
+        dependencies: resolveTokens(
+          installable.dependencies,
+          args.resolve,
+        ) as ResolvedTokens<TokenMap>,
+        members: args.members,
+      });
+      return { ...state, tasks: [...(state.tasks ?? []), ...built] };
+    },
+  };
+}
+
 /** Adds the worker, task, facts and eventing halves to a built declaration. */
 function withContributions<
   Declaration extends object,
@@ -1627,8 +1674,18 @@ function withContributions<
     eventing,
     withWorkers: (...next: readonly unknown[]) =>
       withContributions({ declaration, workers: [...workers, ...next], tasks, eventing }),
-    withTasks: (...next: readonly unknown[]) =>
-      withContributions({ declaration, workers, tasks: [...tasks, ...next], eventing }),
+    withTasks: (...next: readonly unknown[]) => {
+      const [bind] = next;
+      if (next.length === 1 && isTaskBinder(bind)) {
+        return withContributions({
+          declaration: bindingTasks(declaration, bind),
+          workers,
+          tasks,
+          eventing,
+        });
+      }
+      return withContributions({ declaration, workers, tasks: [...tasks, ...next], eventing });
+    },
     withTransportFacts: (bind: ModuleTransportFacts<TokenMap, never, never>) =>
       withContributions({
         declaration: bindingTransportFacts(declaration, bind),
@@ -1646,6 +1703,10 @@ function withContributions<
   } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
 
   return contributions;
+}
+
+function isTaskBinder(value: unknown): value is ModuleTaskBinder<TokenMap, never, unknown, never> {
+  return typeof value === "function";
 }
 
 /**

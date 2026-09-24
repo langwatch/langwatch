@@ -24,6 +24,8 @@ export { ServerPreamble, type Metrics, type PreambleOwner, type Telemetry } from
 export { ProcessServer } from "./process-server.ts";
 export {
   ApiProcessComposition,
+  type BootedApplication,
+  TasksProcessComposition,
   WorkerProcessComposition,
   type ModuleBundle,
   type ProcessBoot,
