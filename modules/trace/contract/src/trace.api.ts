@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/instant-eval-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
+import type { ExportProgressEvent } from "./export-progress.trpc.ts";
 import type { TraceOtlpIngestApi } from "./otlp-ingest.rest.ts";
 import type {
   ClassifyClaudeCallInput,
@@ -496,6 +497,19 @@ export interface TraceApi extends TraceOtlpIngestApi {
   deleteTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<void>;
   readEvaluationRuns(input: { tenantId: string; traceId: string }): Promise<unknown>;
   readCodingAgentSession(input: { projectId: string; traceId: string }): Promise<unknown>;
+  /** Main's `codingAgentTranscript`: the transcript through the viewer's own protections. */
+  readCodingAgentTranscript(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+    viewerUserId: string;
+  }): Promise<unknown>;
+  /** One export's progress frames from the tenant broadcast, ending at `done` or `error`. */
+  streamExportProgress(input: {
+    projectId: string;
+    exportId: string;
+    signal?: AbortSignal | undefined;
+  }): AsyncGenerator<ExportProgressEvent>;
   resolveShareForViewer(input: {
     token: string;
     viewer: unknown;

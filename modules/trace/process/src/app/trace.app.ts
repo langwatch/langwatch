@@ -5,7 +5,7 @@ import { on } from "node:events";
  * Rules: attribution (caller stamped), full resolution on consuming reads,
  * partition-pruning hints, visibility verdicts, sample draw. See ADR for details.
  */
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   type EvaluationApi,
@@ -32,6 +32,7 @@ import { nowInstant } from "@langwatch/time";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TraceCapabilityUnavailableError,
+  type ExportProgressEvent,
   type Protections,
   type TraceEditOverlayPatch,
   TraceIngestionUnavailableError,
@@ -211,8 +212,13 @@ import type {
   CollectorEvaluationReport,
   CollectorSpanIngest,
 } from "../services/trace-collector-dispatch.service.ts";
+import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
 import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
-import { traceReadMapperPorts } from "../transport/api-trpc/trace-read-mapper-ports.ts";
+import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
+import {
+  traceDerivedAttrPrefixes,
+  traceReadMapperPorts,
+} from "../transport/api-trpc/trace-read-mapper-ports.ts";
 import type {
   TraceLegacyCredential,
   TraceLegacyReads,
@@ -707,8 +713,14 @@ export class TraceApp implements TraceApi, CollectorApp {
   #dependencies: TraceAppDependencies;
   #explorerEvals: TraceInstantEvalRunService | null;
   #sharedRead: TraceSharedReadService | null;
+  #transcriptRead: TraceTranscriptReadService;
+  #exportProgress: TraceExportProgressService;
   private constructor(dependencies: TraceAppDependencies) {
     this.#dependencies = dependencies;
+    this.#transcriptRead = TraceTranscriptReadService.create();
+    this.#exportProgress = TraceExportProgressService.create({
+      broadcast: dependencies.broadcast,
+    });
     this.#sharedRead =
       dependencies.protections && dependencies.shareReadLimiter
         ? TraceSharedReadService.create({
@@ -1849,6 +1861,43 @@ export class TraceApp implements TraceApi, CollectorApp {
     input: Parameters<CodingAgentApi["findSessionForTrace"]>[0],
   ): ReturnType<CodingAgentApi["findSessionForTrace"]> {
     return this.#dependencies.codingAgents.findSessionForTrace(input);
+  }
+
+  /** Port of main's `codingAgentTranscript`: the viewer's protections, then the shared read. */
+  async readCodingAgentTranscript(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+    viewerUserId: string;
+  }): Promise<CodingAgentTranscript> {
+    const protections = await this.resolveViewerProtections({
+      projectId: input.projectId,
+      userId: input.viewerUserId,
+    });
+
+    return this.#transcriptRead.readCodingAgentTranscript({
+      app: this,
+      ports: {
+        getVisibilityWindow: async () => ({
+          visibilityCutoffMs: protections.visibilityCutoffMs ?? null,
+        }),
+        mappers: traceReadMapperPorts,
+        derivedAttrPrefixes: traceDerivedAttrPrefixes,
+      },
+      projectId: input.projectId,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      protections,
+    });
+  }
+
+  /** One export's progress frames, ending at `done` or `error` (main's `export` router). */
+  streamExportProgress(input: {
+    projectId: string;
+    exportId: string;
+    signal?: AbortSignal | undefined;
+  }): AsyncGenerator<ExportProgressEvent> {
+    return this.#exportProgress.stream(input);
   }
 
   // -------------------------------------------------------------------------

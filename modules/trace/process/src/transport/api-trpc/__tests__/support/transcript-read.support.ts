@@ -29,7 +29,10 @@ export type TranscriptStoreMock = ReturnType<
 >;
 
 // Real TraceApp required: readSpans decides tenant key and visibility cutoff.
-export function createTranscriptApp(codingAgents: CodingAgentApi): {
+export function createTranscriptApp(
+  codingAgents: CodingAgentApi,
+  protections?: { resolve(input: unknown): Promise<unknown> },
+): {
   app: TraceApp;
   getSpansByTraceId: TranscriptStoreMock;
   getLogsByTraceId: TranscriptStoreMock;
@@ -43,6 +46,7 @@ export function createTranscriptApp(codingAgents: CodingAgentApi): {
       canonicalisation: undefined,
     },
     codingAgents,
+    protections,
   } as unknown as Parameters<typeof TraceApp.create>[0]);
   return { app, getSpansByTraceId, getLogsByTraceId };
 }

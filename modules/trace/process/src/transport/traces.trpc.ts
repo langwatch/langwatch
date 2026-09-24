@@ -716,6 +716,23 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     );
   })
 
+  .procedure("codingAgentTranscript")
+  .withPermission("traces:view")
+  .handle(({ app, input, actor }) =>
+    app.readCodingAgentTranscript({
+      projectId: input.projectId,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      viewerUserId: actor.id,
+    }),
+  )
+
+  .procedure("codingAgentSession")
+  .withPermission("traces:view")
+  .handle(({ app, input }) =>
+    app.readCodingAgentSession({ projectId: input.projectId, traceId: input.traceId }),
+  )
+
   .procedure("spansPaginated")
   .withPermission("traces:view")
   .handle(async ({ app, input, actor }) => {

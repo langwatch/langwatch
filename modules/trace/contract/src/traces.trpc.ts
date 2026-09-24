@@ -451,6 +451,30 @@ export const tracesTrpc = defineTrpcContract("traces")
   )
   .withOutput(tracesTraceLogsSchema)
 
+  /**
+   * The coding-agent transcript derived from the trace's redacted spans and logs.
+   * Unshaped here because coding-agent's contract depends on this one.
+   */
+  .query("codingAgentTranscript")
+  .withInput(
+    z.object({
+      projectId: z.string(),
+      traceId: z.string(),
+      ...spanReadHintShape,
+    }),
+  )
+  .withOutput(z.unknown())
+
+  /** The coding-agent session a trace belongs to, or null. Shaped by coding-agent. */
+  .query("codingAgentSession")
+  .withInput(
+    z.object({
+      projectId: z.string(),
+      traceId: z.string(),
+    }),
+  )
+  .withOutput(z.unknown())
+
   .query("spansPaginated")
   .withInput(
     z.object({
