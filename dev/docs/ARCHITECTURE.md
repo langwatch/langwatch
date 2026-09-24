@@ -1029,6 +1029,8 @@ never thinks about resolution at all. The per-module resolver adapters
   arrives as `actor`/`scope` from the runtime's credential authentication (2026-09-23).
 - A key-authenticated door's actor carries the key's owner, set by the runtime's credential
   authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
+- A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
+  project on the request; no handler reads the key's headers (Alex, 2026-09-25).
 - `publicRoute`/raw results only for genuinely non-JSON protocols (SCIM,
   OAuth device flow, MCP streams, webhook raw bodies) and the documented
   `*-legacy.rest.ts` family, each carrying a one-line reason.
