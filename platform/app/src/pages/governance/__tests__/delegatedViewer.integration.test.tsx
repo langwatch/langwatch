@@ -17,14 +17,11 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+
+import { builtinRolePermissions } from "@langwatch/authz";
 import type React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import {
-  getOrganizationRolePermissions,
-  getTeamRolePermissions,
-} from "~/server/api/rbac";
 
 const harness = vi.hoisted(() => ({
   /** The grants the viewer under test holds. */
@@ -43,11 +40,14 @@ vi.mock("~/features/guided-onboarding/home/GuidedOnboardingOffer", () => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
   const rbac =
-    await vi.importActual<typeof import("~/server/api/rbac")>(
-      "~/server/api/rbac",
+    await vi.importActual<typeof import("@langwatch/authz")>(
+      "@langwatch/authz",
     );
   const holds = (permission: string) =>
-    rbac.hasPermissionWithHierarchy(harness.permissions, permission);
+    rbac.permissionSatisfiedBy({
+      granted: new Set(harness.permissions),
+      requested: permission,
+    });
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,
@@ -214,12 +214,8 @@ const DELEGATED_VIEWER = ["organization:view", "governance:view"];
  * source), which this test does not need.
  */
 const ORGANIZATION_ADMIN: string[] = [
-  ...getOrganizationRolePermissions(
-    "ADMIN" as Parameters<typeof getOrganizationRolePermissions>[0],
-  ),
-  ...getTeamRolePermissions(
-    "ADMIN" as Parameters<typeof getTeamRolePermissions>[0],
-  ),
+  ...builtinRolePermissions("org-admin"),
+  ...builtinRolePermissions("admin"),
 ];
 
 function renderPage({

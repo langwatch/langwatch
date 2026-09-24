@@ -82,6 +82,12 @@ const registry = {
       "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
     ],
   },
+  filter_too_complex: {
+    tips: [
+      "Wrap a sentence in double quotes so it counts as one phrase instead of one term per word",
+      "Keep the filter under meta.maxNodes nodes in total; every term, operator, negation and pair of parentheses counts as one",
+    ],
+  },
   filter_field_unknown: {
     tips: [
       "Use one of the fields listed in meta.knownFields",
@@ -526,6 +532,7 @@ const registry = {
     tips: [
       "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "An agent started in development with a personal key is visible only to its owner, so other keys never find it online; set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared and start it again",
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
@@ -545,6 +552,7 @@ const registry = {
   },
   agent_owner_only: {
     tips: [
+      "Run it with the same key that connected the agent; a project or service key names no person, so it never reaches a personal agent, even the caller's own",
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],
@@ -801,6 +809,11 @@ const registry = {
   langy_ui_save_failed: {
     tips: [
       "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
+    ],
+  },
+  langy_ui_page_not_ready: {
+    tips: [
+      "The page was open but still loading and never became ready; run the same action once more, and if it fails again tell the user the page did not load",
     ],
   },
   langy_ui_timeout: {

@@ -15,6 +15,7 @@ import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { PermissionAlert } from "~/components/PermissionAlert";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { displayNameFor } from "~/features/auth/logic/displayName";
 import { showErrorToast } from "~/features/errors";
 import type { TeamUserRole } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
@@ -85,7 +86,7 @@ function teamMemberToFormMember(
 ) {
   return {
     userId: {
-      label: `${member.user.name} (${member.user.email})`,
+      label: `${displayNameFor(member.user)} (${member.user.email})`,
       value: member.user.id,
     },
     role: memberToRoleFormOption(member.assignedRole, member.role),

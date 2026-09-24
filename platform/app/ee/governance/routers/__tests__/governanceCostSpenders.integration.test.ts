@@ -33,6 +33,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
@@ -147,15 +148,14 @@ describe("governanceCost.spenders — router integration", () => {
       await prisma.teamUser.create({
         data: { userId: user.id, teamId: team.id, role: teamRole },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId,
-          userId: user.id,
-          role: customRoleId ? TeamUserRole.CUSTOM : teamRole,
-          customRoleId: customRoleId ?? null,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-        },
+      await seedRoleBinding(prisma, {
+        id: `gov-cost-${user.id}`,
+        organizationId,
+        userId: user.id,
+        role: customRoleId ? TeamUserRole.CUSTOM : teamRole,
+        customRoleId: customRoleId ?? null,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
       });
       return user.id;
     };
@@ -168,12 +168,11 @@ describe("governanceCost.spenders — router integration", () => {
     );
     // The finance-shaped delegation: the cost screen's own permission and
     // nothing of the identity screens.
-    const costOnlyRole = await prisma.customRole.create({
-      data: {
-        organizationId,
-        name: `Cost only ${ns}`,
-        permissions: ["organization:view", "governanceCost:view"],
-      },
+    const costOnlyPermissions = ["organization:view", "governanceCost:view"];
+    const costOnlyRole = await seedCustomRole(prisma, {
+      organizationId,
+      name: `Cost only ${ns}`,
+      permissions: costOnlyPermissions,
     });
     costOnlyUserId = await principal(
       "Cost Only",
@@ -222,6 +221,8 @@ describe("governanceCost.spenders — router integration", () => {
     await cleanupTestRows(prisma, [
       ["discoveredPerson", { organizationId }],
       ["roleBinding", { organizationId }],
+      ["grant", { organizationId }],
+      ["role", { organizationId }],
       ["customRole", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],

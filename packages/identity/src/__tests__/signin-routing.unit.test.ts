@@ -398,8 +398,8 @@ describe("the identifier-first sign-in router", () => {
   });
 
   describe("given a self-hosted installation with exactly one ACTIVE connection", () => {
-    /** @scenario "A sole ACTIVE connection auto-redirects before any email is asked" */
-    it("redirects immediately, with no address asked for", () => {
+    /** @scenario "A sole ACTIVE connection is selected before any email is asked" */
+    it("selects the provider with no address asked for", () => {
       const decision = route({ activeConnections: [connection()] });
 
       expect(decision).toEqual({
@@ -484,6 +484,7 @@ describe("the identifier-first sign-in router", () => {
         ).toBe(false);
       }
       expect(withEmail.reasonCode).toBe("method_not_licensed");
+      expect(withEmail.domainManaged).toBe(true);
     });
   });
 
@@ -496,6 +497,7 @@ describe("the identifier-first sign-in router", () => {
 
       expect(decision.methodSet).toEqual([PASSWORD]);
       expect(decision.reasonCode).toBe("method_not_configured");
+      expect(decision.domainManaged).toBe(true);
     });
   });
 

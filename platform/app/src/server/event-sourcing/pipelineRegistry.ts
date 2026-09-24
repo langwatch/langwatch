@@ -2,6 +2,11 @@ import {
   type EnterprisePipelineSetConfig,
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
+import { createScimSyncPipeline } from "@ee/event-sourcing/pipelines/scim-sync/pipeline";
+import type { ScimSyncFoldState } from "@ee/event-sourcing/pipelines/scim-sync/projections/scimSyncState.foldProjection";
+import { createSsoConnectionPipeline } from "@ee/event-sourcing/pipelines/sso-connections/pipeline";
+import type { ConnectionTeardownPort } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/connectionTeardown.process";
+import type { SsoConnectionFoldState } from "@ee/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
 import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
 import {
@@ -17,6 +22,19 @@ import {
   isGovernanceOcsfTrace,
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
+import type { ScimSyncReadRepository } from "@ee/scim/scim-sync.repository";
+import { ScimSyncGuards } from "@ee/scim/scim-sync-guards";
+import type {
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+  SsoLicenseAuthorityRepository,
+  SsoPlatformOperatorRepository,
+} from "@ee/sso/sso-connection.repository";
+import { SsoConnectionGuards } from "@ee/sso/sso-connection-guards";
+import type { SsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.repository";
+import { PrismaSsoDomainProofNotificationPort } from "@ee/sso/sso-self-serve-adapters";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
@@ -25,19 +43,12 @@ import type {
   JoinRequestReadRepository,
   LinkProposalReadsRepository,
   MfaEnrollmentRepository,
-  ScimSyncReadRepository,
-  SsoBreakGlassBindingRepository,
-  SsoConnectionReadRepository,
-  SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
   JoinRequestGuards,
   LinkProposalGuards,
   MfaGuards,
-  ScimSyncGuards,
-  SsoConnectionGuards,
 } from "@langwatch/identity-server";
 import type {
   LangyConversationStateData,
@@ -50,6 +61,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { reapExpiredAgentSandboxApiKeys } from "~/server/api-key/agent-sandbox-key";
 import { reapExpiredCliLoginKeys } from "~/server/api-key/cli-login-key-reaper";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
+import { reapFinishedSignInLocks } from "~/server/app-layer/identity/sign-in-security-adapters";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
@@ -68,7 +80,10 @@ import {
 } from "~/server/onboarding/project-active-day";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
-import { queryInstantEvalSpendTotal } from "../../../ee/billing/services/instantEvalSpendQuery";
+import {
+  queryConnectedInstantEvalCeiling,
+  queryInstantEvalSpendTotal,
+} from "../../../ee/billing/services/instantEvalSpendQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
@@ -85,6 +100,7 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import { ssoBreakGlass, ssoDomainReproof } from "../app-layer/identity/runtime";
 import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
 import {
   mintLangySessionApiKeyForUser,
@@ -228,8 +244,7 @@ import {
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
 import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
-import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
-import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
+import { createSignInLockMaintenancePipeline } from "./pipelines/sign-in-lock-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -246,9 +261,6 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
-import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
-import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
-import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -456,6 +468,7 @@ export interface PipelineRepositories {
   ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
   /** Postgres reads the connection guards run against (ADR-117 §5). */
   ssoConnectionReads: SsoConnectionReadRepository;
+  ssoConnectionRegistrationSlots: SsoConnectionRegistrationRepository;
   /** Who a teardown would strand, read over the identity heads. */
   ssoConnectionStranding: SsoConnectionStrandingRepository;
   /** Activation's break-glass precondition (D05 hardens it). */
@@ -463,6 +476,9 @@ export interface PipelineRepositories {
   /** Whether an actor is a LangWatch platform operator — what makes deciding
    *  a domain claim and attesting a domain operator acts (D05 tier 1). */
   ssoPlatformOperators: SsoPlatformOperatorRepository;
+  /** What the installation's licence may authorize — the tier-2 path where
+   *  a self-hosted customer's licence stands in for our approval (D05). */
+  ssoLicenseAuthority: SsoLicenseAuthorityRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
   /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
@@ -710,6 +726,25 @@ export class PipelineRegistry {
       }),
     );
 
+    // Sign-in lock-out maintenance (GAC-09), on the same footing. The
+    // counter is keyed on the address somebody typed rather than on an
+    // account — which is what stops a lock-out revealing who has an account
+    // here — so anybody can make rows appear by getting an address wrong, and
+    // this is what clears the finished ones away. It releases nothing.
+    this.deps.eventSourcing.register(
+      createSignInLockMaintenancePipeline({
+        lockReap: {
+          reap: ({ settledBefore }) =>
+            reapFinishedSignInLocks({
+              prisma: this.deps.prisma,
+              settledBefore,
+            }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
     // Pull-request linkage maintenance, on the same footing. It used to be a
     // `setTimeout` chain on every replica with no lock, so the fleet ran the
     // same cross-tenant scan N times every ten minutes.
@@ -851,20 +886,39 @@ export class PipelineRegistry {
         }),
       }),
     );
-    // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
-    // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
-    // projection and no `Organization.ssoDomain` write stops.
+    // The SSO connection pipeline (ADR-117 §5, D04). Its rollout is the
+    // connection itself: nothing routes off this projection for an
+    // organization that has not registered and turned one on, and the
+    // grandfather migration is paced by per-organization enrollment like
+    // every other in-place migration — a deploy changes nothing on its own.
     this.deps.eventSourcing.register(
       createSsoConnectionPipeline({
         connectionProjectionStore:
           this.deps.repositories.ssoConnectionProjection,
         connectionGuards: new SsoConnectionGuards({
           connections: this.deps.repositories.ssoConnectionReads,
+          registrationSlots:
+            this.deps.repositories.ssoConnectionRegistrationSlots,
           breakGlass: this.deps.repositories.ssoBreakGlassBindings,
           stranding: this.deps.repositories.ssoConnectionStranding,
           platformOperators: this.deps.repositories.ssoPlatformOperators,
+          licenseAuthority: this.deps.repositories.ssoLicenseAuthority,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
+        expiryWarn: {
+          warn: () => ssoBreakGlass().sweepWarnings(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+        domainReproof: {
+          sweep: () => ssoDomainReproof().sweep(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+        domainProofNotifications: new PrismaSsoDomainProofNotificationPort(
+          this.deps.prisma,
+          this.deps.repositories.processStore,
+        ),
       }),
     );
     // The directory-sync pipeline (D08). Ships dark: `SCIM_V2_GRANTS`
@@ -881,11 +935,22 @@ export class PipelineRegistry {
         scimSyncGuards: new ScimSyncGuards({
           syncs: this.deps.repositories.scimSyncReads,
         }),
+        logRetention: {
+          sweep: () =>
+            ScimRequestLogService.create(this.deps.prisma).sweepExpired({
+              now: new Date(),
+            }),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
       }),
     );
 
-    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
-    // defaults off, so nothing dispatches a join command.
+    // The join-request pipeline (ADR-117, D12). The `JOIN_REQUESTS` flag that
+    // used to keep this dark is retired: nothing dispatches a join command
+    // unless an address is verified, its domain is a company one, and an
+    // organization opted in — which is the gate that was always doing the
+    // work. Rollback is the customer's own joining setting.
     this.deps.eventSourcing.register(
       createJoinRequestPipeline({
         joinRequestProjectionStore:
@@ -2027,6 +2092,7 @@ export class PipelineRegistry {
       queryInstantEvalSpendTotal,
       isInstantEvalMeterProvisioned: () =>
         meters.INSTANT_EVAL_USD !== undefined,
+      connectedUsageCeiling: queryConnectedInstantEvalCeiling,
       selfDispatch: (data) => {
         const pipeline = this.deps.eventSourcing.getPipeline(
           BILLING_REPORTING_PIPELINE_NAME,

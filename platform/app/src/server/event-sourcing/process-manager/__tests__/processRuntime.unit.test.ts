@@ -261,6 +261,39 @@ describe("ProcessRuntime", () => {
     });
   });
 
+  describe("given a scheduled process manager is registered without consumers", () => {
+    it("does not arm its singleton schedule outside the worker role", async () => {
+      const store = new InMemoryProcessStore();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: false });
+      const definition = buildProcessManager<AutomationEvent>({
+        name: "webOnlySchedule",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .schedule({ everyMs: 60_000 })
+            .onWake((state) => ({ state }))
+            .intent("noop", z.object({}), async () => {}),
+      });
+
+      runtime.registerPipeline<AutomationEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["webOnlySchedule", definition]]),
+      });
+
+      await new Promise((resolve) => setImmediate(resolve));
+      const process = await store.findByRef({
+        ref: {
+          processName: "webOnlySchedule",
+          projectId: SCHEDULED_SINGLETON_PROJECT_ID,
+          processKey: "webOnlySchedule",
+        },
+      });
+      expect(process).toBeNull();
+
+      await runtime.stop();
+    });
+  });
+
   describe("given schedule arming rejects", () => {
     it("logs the failure via the runtime logger instead of throwing", async () => {
       const store = makeStubStore({

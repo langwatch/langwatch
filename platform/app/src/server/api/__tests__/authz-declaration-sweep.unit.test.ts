@@ -31,7 +31,7 @@ import {
 } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { authorizeInResolver } from "../rbac";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import { appRouter } from "../root";
 
 const SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];

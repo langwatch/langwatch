@@ -1,35 +1,52 @@
-import { ForkAwarePermissionDecisionRepository } from "~/server/app-layer/permissions/permission-decision.repository";
+import {
+  hasOrganizationPermission,
+  organizationDenialReason,
+  resolveProjectPermission,
+  resolveProjectPermissionAny,
+  resolveTeamPermission,
+} from "~/server/app-layer/authz/permission-adapters";
 import { PermissionsService } from "~/server/app-layer/permissions/permissions.service";
+import { prisma } from "~/server/db";
 
-/**
- * Factory body for `vi.mock("~/server/app-layer/app", ...)` in tests that
- * drive a declared permission check (`.permission()` / `.permissionAny()` /
- * the REST credential middlewares) without initializing a real App.
- *
- * The returned App exposes the REAL `PermissionsService` over the REAL
- * `ForkAwarePermissionDecisionRepository`, so a test's existing
- * `vi.mock("~/server/api/rbac")` resolver stubs keep deciding every check —
- * only the App lookup is faked. The client handed to the repository is inert:
- * the fork-aware resolvers receive it as an argument and the stubs never
- * touch it.
- *
- * Usage:
- * ```ts
- * vi.mock("~/server/app-layer/app", async () => {
- *   const { appPermissionsMock } = await import(
- *     "~/test-utils/appPermissionsMock"
- *   );
- *   return appPermissionsMock();
- * });
- * ```
- */
-/**
- * Just the service, for tests whose own `vi.mock("~/server/app-layer/app")`
- * fake carries other groups — merge this in as `permissions`.
- */
+/** Existing transport tests stub these adapters; production uses the engine directly. */
+function contextFor(userId: string) {
+  return { prisma, session: { user: { id: userId }, expires: "" } };
+}
+
 export function appPermissionsService(): PermissionsService {
   return new PermissionsService({
-    decisions: new ForkAwarePermissionDecisionRepository({} as never),
+    decisions: {
+      findProjectDecision: ({ userId, projectId, permission }) =>
+        resolveProjectPermission(contextFor(userId), projectId, permission),
+      findProjectAnyDecision: ({ userId, projectId, permissions }) =>
+        resolveProjectPermissionAny(contextFor(userId), projectId, permissions),
+      findTeamDecision: ({ userId, teamId, permission }) =>
+        resolveTeamPermission(contextFor(userId), teamId, permission),
+      findOrganizationDecision: async ({
+        userId,
+        organizationId,
+        permission,
+      }) => {
+        const ctx = contextFor(userId);
+        const permitted = await hasOrganizationPermission(
+          ctx,
+          organizationId,
+          permission,
+        );
+        return {
+          permitted,
+          organizationRole: null,
+          ...(permitted
+            ? {}
+            : {
+                denialReason: await organizationDenialReason({
+                  ctx,
+                  organizationId,
+                }),
+              }),
+        };
+      },
+    },
     // Credential (API-key) checks are a different seam with a heavier module
     // graph; a test that needs them mocks the credential path itself.
     credentials: {

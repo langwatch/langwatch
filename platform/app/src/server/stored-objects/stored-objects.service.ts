@@ -254,6 +254,10 @@ export class StoredObjectsService {
    * Used by the tRPC `storedObjects.headById` probe from the renderer to
    * distinguish "blob is gone" (graceful missing-badge) from "row never
    * existed" (404) without round-tripping the body.
+   *
+   * The purpose comes back so the caller applies the same per-purpose
+   * permission the read route applies. It is for that gate, not for the
+   * browser.
    */
   async headById({
     projectId,
@@ -262,16 +266,20 @@ export class StoredObjectsService {
     projectId: string;
     id: string;
   }): Promise<
-    | { status: "available"; mediaType: string }
-    | { status: "missing"; mediaType: string }
+    | { status: "available"; mediaType: string; purpose: string }
+    | { status: "missing"; mediaType: string; purpose: string }
     | { status: "not_found" }
   > {
     const row = await this.repository.findById({ projectId, id });
     if (!row) return { status: "not_found" };
     const bytesPresent = await this.registry.exists(row.storage_uri);
     return bytesPresent
-      ? { status: "available", mediaType: row.media_type }
-      : { status: "missing", mediaType: row.media_type };
+      ? {
+          status: "available",
+          mediaType: row.media_type,
+          purpose: row.purpose,
+        }
+      : { status: "missing", mediaType: row.media_type, purpose: row.purpose };
   }
 
   /**

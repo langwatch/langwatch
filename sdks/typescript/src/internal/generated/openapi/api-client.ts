@@ -1270,6 +1270,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/dataset/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field. */
+        post: operations["postApiDatasetAttachments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dataset/direct-upload": {
         parameters: {
             query?: never;
@@ -1976,6 +1993,46 @@ export interface paths {
          * @description Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited.
          */
         post: operations["postApiWorkflowsByWorkflowIdByVersionIdRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/checkup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run the free checks of a self-hosted install
+         * @description The checkup `langwatch doctor` and the Settings > Checkup page show: one row per check with a pass, fail or not checked verdict. Checks that open a connection or spend money are reported as not checked here and run through `POST /api/checkup/run`. The response also carries the usage report this install would send next. Answers 404 on LangWatch Cloud.
+         */
+        get: operations["getApiCheckup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/checkup/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the checks that open a connection or spend money
+         * @description Runs the egress and paid checks of a self-hosted install: reaching the connect and gateway hosts, the storage write, the SMTP connection, one model provider call and the pipeline canaries. Name the checks to run, or leave the list out to run them all. The scenario canary launches a real run and needs a run plan id. Answers 404 on LangWatch Cloud.
+         */
+        post: operations["postApiCheckupRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5468,6 +5525,17 @@ export interface operations {
                                 id: string;
                                 url: string;
                                 parameterNotes: string[];
+                                scope: {
+                                    /** @constant */
+                                    kind: "shared";
+                                } | {
+                                    /** @constant */
+                                    kind: "owner";
+                                } | {
+                                    /** @constant */
+                                    kind: "host";
+                                    hostLabel: string;
+                                };
                             }[];
                             heartbeatIntervalMs: number;
                             instanceId: string;
@@ -9987,7 +10055,7 @@ export interface operations {
                     /** @default [] */
                     columnTypes?: {
                         name: string;
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -10003,6 +10071,134 @@ export interface operations {
         };
         requestBody?: never;
         responses: never;
+    };
+    postApiDatasetAttachments: {
+        parameters: {
+            query: {
+                /** @description The project the file is stored for. */
+                projectId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description The file to store.
+                     */
+                    file: string;
+                    /** @description The dataset that owns the file. Omit it while the dataset is still a draft. */
+                    datasetId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The reference the cell holds, and the file's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The value to write into the cell, and the address the file is served from. */
+                        url: string;
+                        /** @description The file name the reference carries. */
+                        name: string;
+                        /** @description The media type the file is stored under. */
+                        mediaType: string;
+                        /** @description The size of the stored file, in bytes. */
+                        sizeBytes: number;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The file is larger than the upload limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description The media type is not accepted. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Too many uploads for this project in one minute. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
     };
     postApiDatasetDirectUpload: {
         parameters: {
@@ -10263,7 +10459,7 @@ export interface operations {
                     name?: string;
                     columnTypes?: {
                         name: string;
-                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                     }[];
                 };
             };
@@ -14284,6 +14480,120 @@ export interface operations {
                         [key: string]: unknown;
                     };
                 };
+            };
+        };
+    };
+    getApiCheckup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The checkup report and the usage report preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        ranAt: string;
+                        rows: {
+                            /** @description The check, one of the ids `POST /api/checkup/run` accepts. */
+                            id: string;
+                            name: string;
+                            /** @enum {string} */
+                            group: "install" | "langwatch" | "integrations" | "pipelines";
+                            /**
+                             * @description Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+                             * @enum {string}
+                             */
+                            cost: "free" | "egress" | "paid";
+                            verdict: {
+                                /** @enum {string} */
+                                outcome: "verified" | "refused" | "unchecked";
+                                detail: string;
+                                /** @description Present on a refused verdict: the stable error code. */
+                                code?: string;
+                                fix?: string;
+                                docsPath?: string;
+                            };
+                        }[];
+                        usageReport: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            /** @description The install is LangWatch Cloud, or the key's project has no organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postApiCheckupRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description The check ids to run. Omit to run every explicit check. */
+                    checks?: string[];
+                    /** @description The run plan the scenario canary launches. */
+                    scenarioRunPlanId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The rows of the checks that ran. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        ranAt: string;
+                        rows: {
+                            /** @description The check, one of the ids `POST /api/checkup/run` accepts. */
+                            id: string;
+                            name: string;
+                            /** @enum {string} */
+                            group: "install" | "langwatch" | "integrations" | "pipelines";
+                            /**
+                             * @description Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`.
+                             * @enum {string}
+                             */
+                            cost: "free" | "egress" | "paid";
+                            verdict: {
+                                /** @enum {string} */
+                                outcome: "verified" | "refused" | "unchecked";
+                                detail: string;
+                                /** @description Present on a refused verdict: the stable error code. */
+                                code?: string;
+                                fix?: string;
+                                docsPath?: string;
+                            };
+                        }[];
+                    };
+                };
+            };
+            /** @description The install is LangWatch Cloud, or the key's project has no organization. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -19897,7 +20207,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -19922,7 +20232,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -19939,7 +20249,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20046,7 +20356,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -20100,7 +20410,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20125,7 +20435,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20142,7 +20452,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20666,7 +20976,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20691,7 +21001,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20708,7 +21018,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -20840,7 +21150,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -20865,7 +21175,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -20882,7 +21192,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21019,7 +21329,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -21044,7 +21354,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -21061,7 +21371,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21176,7 +21486,7 @@ export interface operations {
                     inputs?: {
                         identifier: string;
                         /** @enum {string} */
-                        type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                     }[];
                     outputs?: {
                         identifier: string;
@@ -21233,7 +21543,7 @@ export interface operations {
                         inputs: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -21258,7 +21568,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -21275,7 +21585,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21484,7 +21794,7 @@ export interface operations {
                         inputs?: {
                             identifier: string;
                             /** @enum {string} */
-                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                            type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                         }[];
                         outputs: {
                             identifier: string;
@@ -21521,7 +21831,7 @@ export interface operations {
                                 columnTypes: {
                                     id?: string;
                                     name: string;
-                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                 }[];
                             };
                         };
@@ -21538,7 +21848,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21597,7 +21907,7 @@ export interface operations {
                             inputs: {
                                 identifier: string;
                                 /** @enum {string} */
-                                type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                             }[];
                             outputs: {
                                 identifier: string;
@@ -21622,7 +21932,7 @@ export interface operations {
                                     columnTypes: {
                                         id?: string;
                                         name: string;
-                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                     }[];
                                 };
                             };
@@ -21639,7 +21949,7 @@ export interface operations {
                                         columnTypes: {
                                             id?: string;
                                             name: string;
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -21680,7 +21990,7 @@ export interface operations {
                                 inputs: {
                                     identifier: string;
                                     /** @enum {string} */
-                                    type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                                    type: "str" | "float" | "bool" | "image" | "file" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
                                 }[];
                                 outputs: {
                                     identifier: string;
@@ -21717,7 +22027,7 @@ export interface operations {
                                         columnTypes: {
                                             id?: string;
                                             name: string;
-                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                            type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                         }[];
                                     };
                                 };
@@ -21734,7 +22044,7 @@ export interface operations {
                                             columnTypes: {
                                                 id?: string;
                                                 name: string;
-                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                                type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image" | "file";
                                             }[];
                                         };
                                     };
@@ -23734,7 +24044,6 @@ export interface operations {
                         scopeId: string;
                         scopeName: string | null;
                         createdAt: string;
-                        hasLegacyAccessNotice?: boolean;
                     };
                 };
             };
@@ -29252,7 +29561,7 @@ export interface operations {
                             sql: string;
                             /** @description The values the statement's parameters were filled with. */
                             parameters: {
-                                [key: string]: string | number | boolean | null;
+                                [key: string]: (string | number | boolean | null) | string[];
                             };
                             /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
                             questions: {
@@ -29398,7 +29707,7 @@ export interface operations {
                         sql: string;
                         /** @description The values the statement's parameters were filled with. */
                         parameters: {
-                            [key: string]: string | number | boolean | null;
+                            [key: string]: (string | number | boolean | null) | string[];
                         };
                         /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
                         questions: {
@@ -29581,7 +29890,7 @@ export interface operations {
                         sql: string;
                         /** @description The values the statement's parameters were filled with. */
                         parameters: {
-                            [key: string]: string | number | boolean | null;
+                            [key: string]: (string | number | boolean | null) | string[];
                         };
                         /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
                         questions: {
@@ -29686,7 +29995,7 @@ export interface operations {
                         sql: string;
                         /** @description The values the statement's parameters were filled with. */
                         parameters: {
-                            [key: string]: string | number | boolean | null;
+                            [key: string]: (string | number | boolean | null) | string[];
                         };
                         /** @description One entry per eval function the statement projects, derived from it when the run was accepted. */
                         questions: {

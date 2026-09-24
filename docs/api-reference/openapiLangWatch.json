@@ -2409,6 +2409,50 @@
                                     "items": {
                                       "type": "string"
                                     }
+                                  },
+                                  "scope": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "shared"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "owner"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind"
+                                        ]
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "host"
+                                          },
+                                          "hostLabel": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "hostLabel"
+                                        ]
+                                      }
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -2416,7 +2460,8 @@
                                   "environment",
                                   "id",
                                   "url",
-                                  "parameterNotes"
+                                  "parameterNotes",
+                                  "scope"
                                 ]
                               }
                             },
@@ -15064,6 +15109,10 @@
                             {
                               "type": "string",
                               "const": "image"
+                            },
+                            {
+                              "type": "string",
+                              "const": "file"
                             }
                           ]
                         }
@@ -15095,6 +15144,235 @@
         "operationId": "postApiDatasetUpload",
         "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
         "responses": {},
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/dataset/attachments": {
+      "post": {
+        "operationId": "postApiDatasetAttachments",
+        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "description": "The project the file is stored for.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to store."
+                  },
+                  "datasetId": {
+                    "type": "string",
+                    "description": "The dataset that owns the file. Omit it while the dataset is still a draft."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The reference the cell holds, and the file's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The value to write into the cell, and the address the file is served from."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The file name the reference carries."
+                    },
+                    "mediaType": {
+                      "type": "string",
+                      "description": "The media type the file is stored under."
+                    },
+                    "sizeBytes": {
+                      "type": "number",
+                      "description": "The size of the stored file, in bytes."
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "name",
+                    "mediaType",
+                    "sizeBytes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is larger than the upload limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The media type is not accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many uploads for this project in one minute.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "security": [
           {
             "project_api_key": []
@@ -15633,6 +15911,10 @@
                             {
                               "type": "string",
                               "const": "image"
+                            },
+                            {
+                              "type": "string",
+                              "const": "file"
                             }
                           ]
                         }
@@ -25979,6 +26261,254 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/checkup": {
+      "get": {
+        "operationId": "getApiCheckup",
+        "summary": "Run the free checks of a self-hosted install",
+        "description": "The checkup `langwatch doctor` and the Settings > Checkup page show: one row per check with a pass, fail or not checked verdict. Checks that open a connection or spend money are reported as not checked here and run through `POST /api/checkup/run`. The response also carries the usage report this install would send next. Answers 404 on LangWatch Cloud.",
+        "tags": [
+          "Checkup"
+        ],
+        "responses": {
+          "200": {
+            "description": "The checkup report and the usage report preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ranAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The check, one of the ids `POST /api/checkup/run` accepts."
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "install",
+                              "langwatch",
+                              "integrations",
+                              "pipelines"
+                            ]
+                          },
+                          "cost": {
+                            "type": "string",
+                            "enum": [
+                              "free",
+                              "egress",
+                              "paid"
+                            ],
+                            "description": "Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`."
+                          },
+                          "verdict": {
+                            "type": "object",
+                            "properties": {
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "verified",
+                                  "refused",
+                                  "unchecked"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "description": "Present on a refused verdict: the stable error code."
+                              },
+                              "fix": {
+                                "type": "string"
+                              },
+                              "docsPath": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "outcome",
+                              "detail"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "group",
+                          "cost",
+                          "verdict"
+                        ]
+                      }
+                    },
+                    "usageReport": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "ranAt",
+                    "rows",
+                    "usageReport"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The install is LangWatch Cloud, or the key's project has no organization."
+          }
+        },
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/checkup/run": {
+      "post": {
+        "operationId": "postApiCheckupRun",
+        "summary": "Run the checks that open a connection or spend money",
+        "description": "Runs the egress and paid checks of a self-hosted install: reaching the connect and gateway hosts, the storage write, the SMTP connection, one model provider call and the pipeline canaries. Name the checks to run, or leave the list out to run them all. The scenario canary launches a real run and needs a run plan id. Answers 404 on LangWatch Cloud.",
+        "tags": [
+          "Checkup"
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "checks": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The check ids to run. Omit to run every explicit check."
+                  },
+                  "scenarioRunPlanId": {
+                    "type": "string",
+                    "description": "The run plan the scenario canary launches."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The rows of the checks that ran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ranAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "The check, one of the ids `POST /api/checkup/run` accepts."
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "install",
+                              "langwatch",
+                              "integrations",
+                              "pipelines"
+                            ]
+                          },
+                          "cost": {
+                            "type": "string",
+                            "enum": [
+                              "free",
+                              "egress",
+                              "paid"
+                            ],
+                            "description": "Free checks run on every call; egress and paid ones only through `POST /api/checkup/run`."
+                          },
+                          "verdict": {
+                            "type": "object",
+                            "properties": {
+                              "outcome": {
+                                "type": "string",
+                                "enum": [
+                                  "verified",
+                                  "refused",
+                                  "unchecked"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string",
+                                "description": "Present on a refused verdict: the stable error code."
+                              },
+                              "fix": {
+                                "type": "string"
+                              },
+                              "docsPath": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "outcome",
+                              "detail"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "group",
+                          "cost",
+                          "verdict"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ranAt",
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The install is LangWatch Cloud, or the key's project has no organization."
+          }
+        },
         "security": [
           {
             "project_api_key": []
@@ -40117,6 +40647,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -40262,6 +40793,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -40370,6 +40905,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }
@@ -40672,6 +41211,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -40817,6 +41357,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -40925,6 +41469,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -41215,6 +41763,7 @@
                             "float",
                             "bool",
                             "image",
+                            "file",
                             "list",
                             "list[str]",
                             "list[float]",
@@ -42120,6 +42669,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -42265,6 +42815,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -42373,6 +42927,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }
@@ -42708,6 +43266,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -42853,6 +43412,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -42961,6 +43524,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -43333,6 +43900,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -43478,6 +44046,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -43586,6 +44158,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -43908,6 +44484,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -44053,6 +44630,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -44161,6 +44742,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -44460,6 +45045,7 @@
                             "float",
                             "bool",
                             "image",
+                            "file",
                             "list",
                             "list[str]",
                             "list[float]",
@@ -44831,6 +45417,7 @@
                                   "float",
                                   "bool",
                                   "image",
+                                  "file",
                                   "list",
                                   "list[str]",
                                   "list[float]",
@@ -44976,6 +45563,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -45084,6 +45675,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "image"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "file"
                                               }
                                             ]
                                           }
@@ -45249,6 +45844,7 @@
                                       "float",
                                       "bool",
                                       "image",
+                                      "file",
                                       "list",
                                       "list[str]",
                                       "list[float]",
@@ -45430,6 +46026,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "image"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "file"
                                               }
                                             ]
                                           }
@@ -45538,6 +46138,10 @@
                                                   {
                                                     "type": "string",
                                                     "const": "image"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "const": "file"
                                                   }
                                                 ]
                                               }
@@ -45762,6 +46366,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -45943,6 +46548,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -46051,6 +46660,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }
@@ -51074,9 +51687,6 @@
                     },
                     "createdAt": {
                       "type": "string"
-                    },
-                    "hasLegacyAccessNotice": {
-                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -64284,16 +64894,26 @@
                       "additionalProperties": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         ]
                       },
@@ -64672,16 +65292,26 @@
                             "additionalProperties": {
                               "anyOf": [
                                 {
-                                  "type": "string"
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 },
                                 {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "boolean"
-                                },
-                                {
-                                  "type": "null"
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 }
                               ]
                             },
@@ -65161,16 +65791,26 @@
                       "additionalProperties": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         ]
                       },
@@ -65432,16 +66072,26 @@
                       "additionalProperties": {
                         "anyOf": [
                           {
-                            "type": "string"
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           {
-                            "type": "number"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "null"
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         ]
                       },

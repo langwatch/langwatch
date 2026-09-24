@@ -43,6 +43,7 @@
 
 import { prisma as defaultPrisma } from "~/server/db";
 import { generateLicenseKey } from "../ee/licensing/licenseGenerationService";
+import { createLicenseRecorderService } from "../ee/licensing/registry/composition";
 import type { PrismaClient } from "../src/generated/prisma/client";
 
 interface ApplyLicenseInput {
@@ -101,17 +102,29 @@ export async function applyLicenseToOrg(
     privateKey: input.privateKey,
   });
 
-  await input.prisma.organization.update({
-    where: { id: org.id },
-    data: {
-      license: licenseKey,
-      licenseExpiresAt: new Date(licenseData.expiresAt),
-      // Cleared so the stamp describes this license rather than the one it
-      // replaced. Nothing reads it as a cache or a TTL: the license is read
-      // from this row and verified on every request, so the new one takes
-      // effect on the next call either way.
-      licenseLastValidatedAt: null,
-    },
+  // One transaction, so the registry row and the license on the organization
+  // are both there or neither is. Either write failing alone would leave an
+  // active license in the registry that the organization never got, and the
+  // retry would mint a second one beside it (ADR-141).
+  await input.prisma.$transaction(async (tx) => {
+    await createLicenseRecorderService(tx).record({
+      licenseKey,
+      source: "SCRIPT",
+      organizationId: org.id,
+    });
+
+    await tx.organization.update({
+      where: { id: org.id },
+      data: {
+        license: licenseKey,
+        licenseExpiresAt: new Date(licenseData.expiresAt),
+        // Cleared so the stamp describes this license rather than the one it
+        // replaced. Nothing reads it as a cache or a TTL: the license is read
+        // from this row and verified on every request, so the new one takes
+        // effect on the next call either way.
+        licenseLastValidatedAt: null,
+      },
+    });
   });
 
   return {

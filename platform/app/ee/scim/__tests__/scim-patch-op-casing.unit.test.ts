@@ -15,14 +15,28 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { PrismaClient } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
 import { scimPatchRequestSchema } from "../scim.types";
 import { ScimGroupService } from "../scim-group.service";
+import { resourceStore } from "./scim-user-resource.fixture";
 
 // An App carrying no Redis, so the revoke helper reachable from the SCIM
 // deactivation paths takes its Postgres-only path instead of talking to a real
 // Redis from a unit test.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  offboardMember: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
   tryGetApp: () => ({ redis: null }),
@@ -42,21 +56,30 @@ function parsePatch(body: unknown) {
 
 function createMockPrisma() {
   const mock = {
+    scimUserResource: resourceStore(),
     user: {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn(),
       update: vi.fn(),
     },
     organizationUser: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([{ userId: "user-1" }]),
     },
     roleBinding: {
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
+      // A deactivation revokes on the previous write path as a deletion
+      // always did, and that reads the grants it can see first.
+      findMany: vi.fn().mockResolvedValue([]),
     },
     session: {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    grant: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
     group: {
       findFirst: vi.fn().mockResolvedValue({
@@ -80,10 +103,13 @@ function createMockPrisma() {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findMany: vi.fn().mockResolvedValue([]),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn(),
   };
+  mock.$transaction.mockImplementation((operation: unknown) => {
+    if (typeof operation === "function") return operation(mock);
+    if (Array.isArray(operation)) return Promise.all(operation);
+    throw new Error("unexpected transaction input");
+  });
   return mock as unknown as PrismaClient & typeof mock;
 }
 
@@ -92,6 +118,7 @@ describe("SCIM PATCH op casing", () => {
 
   beforeEach(() => {
     prisma = createMockPrisma();
+    ledger.revokeBindingsWhere.mockResolvedValue(undefined);
   });
 
   describe("given an identity provider sends a capitalized op value", () => {
@@ -126,7 +153,10 @@ describe("SCIM PATCH op casing", () => {
         };
         (
           prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
-        ).mockResolvedValue({ userId: "user-1", organizationId: "org-1" });
+        ).mockResolvedValue({
+          userId: "user-1",
+          organizationId: "org-1",
+        });
         (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...user,
           deactivatedAt: new Date(),
@@ -145,10 +175,12 @@ describe("SCIM PATCH op casing", () => {
           }),
         });
 
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { id: "user-1" },
-          data: { deactivatedAt: expect.any(Date) },
-        });
+        expect(prisma.user.update).not.toHaveBeenCalled();
+        expect(prisma.scimUserResource.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            update: expect.objectContaining({ active: false }),
+          }),
+        );
         expect(result).toHaveProperty("active", false);
       });
     });

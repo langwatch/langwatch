@@ -63,6 +63,9 @@ vi.mock("~/features/guided-onboarding/guidedPathActive", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
+    checkup: {
+      startupNotice: { useQuery: () => ({ data: undefined }) },
+    },
     scenarios: {
       getSuiteRunData: {
         useQuery: (...args: unknown[]) => suiteRunDataQuery(...args),
@@ -735,10 +738,22 @@ describe("the test suites rail", () => {
 
   /** @scenario "The rail carries the new-simulations announcement" */
   it("carries the new-simulations announcement", () => {
-    renderRail();
+    // The card retires on 2026-09-22 and reads the retirement per render, so
+    // the rail is checked at a moment the card still shows, whatever the
+    // machine's clock says. The callout's own suite pins the clock the same
+    // way. Closes langwatch#8254, which skipped this case when the date passed.
+    vi.useFakeTimers({
+      toFake: ["Date"],
+      now: new Date("2026-09-05T12:00:00Z"),
+    });
+    try {
+      renderRail();
 
-    expect(
-      screen.getByText("Welcome to the new simulations screen"),
-    ).toBeInTheDocument();
+      expect(
+        screen.getByText("Welcome to the new simulations screen"),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

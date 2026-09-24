@@ -1,14 +1,51 @@
 import { passkey } from "@better-auth/passkey";
+import {
+  type SSOUserResolution,
+  type SSOUserResolutionInput,
+  sso,
+} from "@better-auth/sso";
 import { buildGenericOAuthConfigs } from "@ee/sso/providers";
+import { createLogger } from "@langwatch/observability";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
+
 import { env } from "~/env.mjs";
 import { deploymentOffersPasskeys } from "~/server/app-layer/identity/runtime";
+
 import type { PasskeySignUpRegistration } from "../passkey-signup";
 import { passkeySignUpRegistration } from "../passkey-signup";
 import { passkeyRelyingParty } from "../passkeyRelyingParty";
 import type { ConfirmSignUpAddressContext } from "../sign-up-confirmation";
 import { signUpConfirmation } from "../sign-up-confirmation";
+
+const logger = createLogger("langwatch:better-auth:plugins");
+
+/** Whether a customer's identity provider may assert this address. */
+export interface SsoAssertionPort {
+  decide(args: {
+    providerId: string;
+    accountId: string;
+    email: string | null | undefined;
+  }): Promise<
+    | { action: "continue" }
+    // The refusal states itself as a handled error rather than a bare code,
+    // so the one place that knows WHY also owns the stable code, the customer
+    // -safe message and the fault. This seam reads `code` off it and nothing
+    // else; see the translation in `resolveUser` for why it is never thrown.
+    | { action: "reject"; error: { code: string } }
+  >;
+}
+
+export interface SsoCallbackEvidencePort {
+  recordAuthenticatedSsoAccount(args: {
+    providerId: string;
+    providerAccountId: string;
+  }): void;
+}
+
+export interface SsoProvisionedUsersPort {
+  resolve(input: SSOUserResolutionInput): Promise<SSOUserResolution>;
+}
 
 export interface PluginsDeps {
   /**
@@ -25,6 +62,10 @@ export interface PluginsDeps {
   passkeySignUp: () => PasskeySignUpRegistration;
   /** Spending the sign-up confirmation link, and opening a session with it. */
   confirmSignUpAddress: (ctx: ConfirmSignUpAddressContext) => Promise<unknown>;
+  /** Whether an assertion may become a session, and may link to an account. */
+  ssoAssertion: () => SsoAssertionPort;
+  ssoCallbackEvidence: () => SsoCallbackEvidencePort;
+  ssoProvisionedUsers: () => SsoProvisionedUsersPort;
 }
 
 /**
@@ -56,6 +97,9 @@ export function plugins({
   backupCodeCount,
   passkeySignUp,
   confirmSignUpAddress,
+  ssoAssertion,
+  ssoCallbackEvidence,
+  ssoProvisionedUsers,
 }: PluginsDeps) {
   const genericOAuthConfigs = buildGenericOAuthConfigs(env);
   const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
@@ -113,10 +157,10 @@ export function plugins({
             // passkey is refused as unrecognized. See `passkeyRelyingParty.ts`.
             // Null when the deployment names neither address, and the plugin keeps
             // its own default there rather than the boot failing.
-            ...(passkeyRelyingParty({
+            ...passkeyRelyingParty({
               baseHost: env.BASE_HOST,
               nextAuthUrl: env.NEXTAUTH_URL,
-            }) ?? {}),
+            }),
 
             // Signing UP with a passkey, not only adding one to an account that
             // already exists. This is what drops the session requirement from
@@ -130,5 +174,126 @@ export function plugins({
     // The sign-up confirmation link, spent where a session can be opened for
     // it. See `sign-up-confirmation.ts` for why this is not a tRPC procedure.
     signUpConfirmation({ confirmSignUpAddress }),
+    /**
+     * Per-organization single sign-on (D09 — see
+     * specs/identity/sso-idp-termination.feature).
+     *
+     * Mounted BESIDE `genericOAuth`, never instead of it. The deployment's own
+     * provider — `NEXTAUTH_PROVIDER`, which is what every existing enterprise
+     * customer signs in through, Auth0-brokered SAML included — keeps its
+     * routes, its accounts and its behavior exactly as they were. This plugin
+     * adds a second way for a sign-in to arrive, keyed per connection, and the
+     * two coexist for as long as anybody is using either.
+     *
+     * Unconditional rather than flag-gated, and the two are different things.
+     * What the plugin being registered does is mount routes that answer for
+     * providers in a table; with no rows, `/sso/*` answers "no such provider"
+     * and nothing about anybody's sign-in changes. What decides whether a
+     * sign-in ROUTES to a connection is whether that connection is live, and
+     * that decision is the router's rather than the engine's.
+     *
+     * The provider rows themselves are never written through this plugin's own
+     * registration endpoint. They are folded from the connection log
+     * (`sso-connection-projection.prisma.repository.ts`), which is what keeps
+     * the aggregate the only source of truth and makes the engine's table
+     * rebuildable by replay.
+     */
+    sso({
+      // Better Auth validates OIDC endpoints, redirects, state, and PKCE.
+      // Provider rows are projections of the managed connection log. The
+      // plugin's session-authenticated registration route must never become a
+      // second writer for the same configuration.
+      providersLimit: 0,
+      // The identity provider's word on whether it verified the address.
+      //
+      // This is what lets an organization move from the brokered provider to
+      // its own without minting a second account for everybody: the subject an
+      // identity provider asserts natively is not the subject Auth0 brokered
+      // (`samlp|...`), so the new account can only find the existing person by
+      // ADDRESS. better-auth links on a verified address and refuses on an
+      // unverified one, and without this the plugin reports every address as
+      // unverified — so every cutover would be a fresh set of duplicates.
+      //
+      // Trusting it is warranted here in a way it would not be for a public
+      // provider: the domain is DNS-proved before the connection may route, and
+      // the assertion comes from the identity provider that domain named.
+      // The transaction-bound resolver also selects locally verified SAML
+      // users and SCIM-owned users without changing local verification.
+      trustEmailVerified: true,
+      // Somebody with no LangWatch account who signs in through their
+      // employer's provider gets one, which is what an enterprise rollout
+      // means. Whether they then land in the organization is the connection's
+      // the arrival policy and the join policy's business, not this plugin's.
+      disableImplicitSignUp: false,
+      /**
+       * What makes trusting the flag above defensible.
+       *
+       * `trustEmailVerified` hands the decision "is this address real" to the
+       * customer's own identity provider, and better-auth will link a verified
+       * address onto an existing account. On its own that is an account
+       * takeover: register a connection, point it at a server you control,
+       * assert somebody else's address. The comment above this option claims
+       * "the domain is DNS-proved before the connection may route" — this hook
+       * is what makes that sentence true, because nothing else on the link path
+       * ever looked at the connection's proved domains.
+       *
+       * The only pre-link callback the plugin offers, which is why the check
+       * lives here and not in a database hook.
+       */
+      resolveUser: async (input) => {
+        // WE LOG OUR OWN FAILURE, because nobody else will. The plugin wraps
+        // this call in a bare `catch {}` and answers
+        // `SSO_USER_RESOLUTION_FAILED` — it never inspects the error, never
+        // logs it, and never puts it anywhere a reader can reach. So a
+        // customer sees "something went wrong signing you in" and the only
+        // record of WHY is the exception object the plugin just discarded.
+        //
+        // The refusal itself is unchanged: this rethrows, so the plugin still
+        // answers exactly what it answered before. All that is added is that
+        // the cause survives.
+        try {
+          const decision = await ssoAssertion().decide({
+            providerId: input.providerId,
+            accountId: input.accountKey.accountId,
+            email: input.providerUser.email,
+          });
+          if (decision.action === "continue") {
+            const resolution = await ssoProvisionedUsers().resolve(input);
+            if (resolution.action === "reject") return resolution;
+
+            ssoCallbackEvidence().recordAuthenticatedSsoAccount({
+              providerId: input.providerId,
+              providerAccountId: input.accountKey.accountId,
+            });
+            return resolution;
+          }
+
+          // The refusal, translated into the shape the plugin understands.
+          //
+          // RETURNED, NEVER THROWN, and that is the whole reason the gate
+          // states its refusals as handled errors instead of throwing them:
+          // `resolveSSOUser` wraps this callback in a bare `catch` and answers
+          // `SSO_USER_RESOLUTION_FAILED`, so a thrown handled error would be
+          // destroyed by the very mechanism it exists to survive. Returned,
+          // the plugin raises `APIError("FORBIDDEN")` carrying our code
+          // verbatim, and the code is what both the sign-in error screen and
+          // the single sign-on settings screen render their copy from.
+          return { action: "reject", code: decision.error.code } as const;
+        } catch (error) {
+          logger.error(
+            {
+              error,
+              providerId: input.providerId,
+              // The address is the one thing that makes a failed sign-in
+              // findable afterwards, and it is already ours — the person
+              // typed it at the provider and the provider handed it back.
+              email: input.providerUser.email,
+            },
+            "deciding whether a single sign-on account may be linked threw; the plugin will answer SSO_USER_RESOLUTION_FAILED and discard this error",
+          );
+          throw error;
+        }
+      },
+    }),
   ];
 }

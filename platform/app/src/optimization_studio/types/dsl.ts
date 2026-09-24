@@ -13,6 +13,7 @@ import type { ChatMessage } from "../../server/tracer/types";
 export const FIELD_TYPES = [
   "str",
   "image",
+  "file",
   "float",
   "int",
   "bool",

@@ -60,7 +60,12 @@ import {
  * decoration — the store refuses a write whose event is older than the row.
  */
 export type GrantProjectionWrite =
-  | { kind: "grant.upsert"; row: GrantRowShape }
+  | {
+      kind: "grant.upsert";
+      row: GrantRowShape;
+      membershipStamp?: string;
+      membershipBootstrap?: boolean;
+    }
   | {
       kind: "grant.setRole";
       grantId: string;
@@ -113,6 +118,12 @@ export class AuthzGrantsWriteProjection
     const { data } = event;
     return {
       kind: "grant.upsert",
+      ...(data.membershipStamp
+        ? { membershipStamp: data.membershipStamp }
+        : {}),
+      ...(data.membershipBootstrap
+        ? { membershipBootstrap: data.membershipBootstrap }
+        : {}),
       row: {
         id: data.grantId,
         // The organization is the event's TENANT (ADR-110): the aggregate is

@@ -287,11 +287,14 @@
           {
             "group": "Platform",
             "pages": [
+              "platform/command-bar",
               {
                 "group": "Administration",
                 "pages": [
                   "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/sso",
+                  "platform/sso-update",
                   "platform/api-keys",
                   "platform/audit-log",
                   "platform/data-privacy",
@@ -299,8 +302,7 @@
                   "platform/secrets",
                   "platform/scim",
                   "platform/scim-groups",
-                  "platform/model-providers",
-                  "platform/command-bar"
+                  "platform/model-providers"
                 ]
               }
             ]
@@ -976,6 +978,9 @@
             "pages": [
               "self-hosting/overview",
               "self-hosting/licensing",
+              "self-hosting/connect",
+              "self-hosting/data-and-telemetry",
+              "self-hosting/usage-report-dictionary",
               "hybrid-setup/overview",
               "self-hosting/troubleshooting"
             ]
@@ -1073,6 +1078,7 @@
               "api-reference/datasets/overview",
               "api-reference/datasets/list-dataset",
               "api-reference/datasets/create-dataset",
+              "api-reference/datasets/create-attachments",
               "api-reference/datasets/create-direct-upload",
               "api-reference/datasets/evaluate-a-dataset",
               "api-reference/datasets/create-upload",

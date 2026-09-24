@@ -840,6 +840,11 @@
 					"name": "Auxiliary",
 					"type": "Bool",
 					"comment": ""
+				},
+				{
+					"name": "UsageByContext",
+					"type": "Array(Tuple(String, String, String, String, UInt64, UInt64, UInt64, UInt64, Float64))",
+					"comment": ""
 				}
 			]
 		},
@@ -4339,6 +4344,11 @@
 				},
 				{
 					"name": "Evaluations.InputsJson",
+					"type": "Array(String)",
+					"comment": ""
+				},
+				{
+					"name": "InconclusiveCriteria",
 					"type": "Array(String)",
 					"comment": ""
 				}

@@ -136,6 +136,13 @@ function buildHarness() {
     }),
     signInAfterPasswordReset: async () => {},
     addressRoutesToConnection: async () => false,
+    // Locks nobody: these cases are about the last-door guard, and a
+    // lock-out threshold nobody set must not colour them (GAC-09).
+    signInLockout: () => ({
+      refuseIfLockedOut: async () => {},
+      recordFailure: async () => {},
+      recordSuccess: async () => {},
+    }),
   });
   const beforeHook = configuredHooks?.before;
   if (!beforeHook) {

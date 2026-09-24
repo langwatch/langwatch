@@ -155,6 +155,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
     });
 
     /** @scenario Blocks upgrade from Lite Member to full member when at member limit */
+    /** @scenario The licensed seat count is the hard cap */
     it("throws when at limit", async () => {
       const mockRepo = createMockRepo(5); // 5 members, limit is 5
       const limits = createLimits(5);

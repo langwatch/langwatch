@@ -69,7 +69,10 @@ vi.mock("~/components/LoadingScreen", () => ({
   LoadingScreen: () => <div data-testid="loading" />,
 }));
 
-vi.mock("~/utils/auth-client", () => ({ signOut: vi.fn() }));
+vi.mock("~/utils/auth-client", () => ({
+  signOut: vi.fn(),
+  useSession: () => ({ data: { user: { name: "Rogerio Chaves" } } }),
+}));
 
 vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({
@@ -141,8 +144,22 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    // The organization screen now leads with the join-your-team nudge.
+    joinRequests: {
+      lookup: { useQuery: () => ({ data: undefined }) },
+      offer: { useQuery: () => ({ data: undefined }) },
+      mine: { useQuery: () => ({ data: undefined }) },
+      request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      dismissOffer: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
     useUtils: () => ({
       organization: { getAll: { invalidate: invalidateOrganizations } },
+      joinRequests: {
+        mine: { invalidate: vi.fn() },
+        offer: { invalidate: vi.fn() },
+      },
     }),
   },
 }));

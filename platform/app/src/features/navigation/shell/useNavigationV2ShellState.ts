@@ -33,7 +33,7 @@ export interface NavigationV2ShellReadyState {
   /** Null on the settings detour, which is not a product. */
   activeProductId: ProductId | null;
   isSettingsRoute: boolean;
-  isDevelopment: boolean;
+  showDevelopmentIndicator: boolean;
   isCompactSidebar: boolean;
   /** Phone-width viewport: the mobile bar + menu replace the sidebar chrome. */
   isMobile: boolean;
@@ -118,7 +118,9 @@ export function useNavigationV2ShellState({
     project,
     route,
     pathname: router.pathname,
-    isDevelopment: publicEnv.data?.NODE_ENV === "development",
+    showDevelopmentIndicator:
+      publicEnv.data?.NODE_ENV === "development" &&
+      !publicEnv.data.HIDE_DEV_INDICATOR,
     isCompactSidebar: isSmallScreen === true,
     isMobile,
     langyDockInset,
@@ -131,7 +133,7 @@ function toReadyState({
   project,
   route,
   pathname,
-  isDevelopment,
+  showDevelopmentIndicator,
   isCompactSidebar,
   isMobile,
   langyDockInset,
@@ -140,7 +142,7 @@ function toReadyState({
   project: OrganizationTeamProject["project"];
   route: ShellRoute;
   pathname: string;
-  isDevelopment: boolean;
+  showDevelopmentIndicator: boolean;
   isCompactSidebar: boolean;
   isMobile: boolean;
   langyDockInset: number;
@@ -152,7 +154,7 @@ function toReadyState({
     currentRoute: findCurrentRoute(pathname),
     activeProductId: route.activeProductId,
     isSettingsRoute: route.isSettingsRoute,
-    isDevelopment,
+    showDevelopmentIndicator,
     isCompactSidebar,
     isMobile,
     menuWidth: isCompactSidebar

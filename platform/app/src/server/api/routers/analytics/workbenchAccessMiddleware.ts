@@ -19,7 +19,7 @@
 
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
 import { LangWatchQLNotEnabledError } from "~/server/analytics/lwql/errors";
-import type { PermissionMiddleware } from "~/server/api/rbac";
+import type { PermissionMiddleware } from "~/server/app-layer/authz/permission-adapters";
 
 /**
  * Refuses unless the workbench switch is on for this project.

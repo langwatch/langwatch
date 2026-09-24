@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDrawerStore } from "../../stores/drawerStore";
-import { useFilterStore } from "../../stores/filterStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 const BASE_TITLE = "LangWatch";
 const TRACE_ID_LENGTH = 8;
@@ -50,8 +50,8 @@ export function useTracesPageTitle(): void {
   const { project } = useOrganizationTeamProject();
   const drawerOpen = useDrawerStore((s) => s.isOpen);
   const drawerTraceId = useDrawerStore((s) => s.traceId);
-  const queryText = useFilterStore((s) => s.queryText);
-  const timeRangeLabel = useFilterStore((s) => s.timeRange.label);
+  const queryText = useExplorerStore((s) => s.queryText);
+  const timeRangeLabel = useExplorerStore((s) => s.timeRange.label);
 
   const activeTraceId = drawerOpen ? drawerTraceId : null;
 

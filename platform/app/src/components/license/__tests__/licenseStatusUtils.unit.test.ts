@@ -59,6 +59,7 @@ function createValidLicenseStatus(expiresAt = "2099-12-31") {
   return {
     hasLicense: true as const,
     valid: true as const,
+    connected: false,
     plan: "team",
     planName: "Team",
     expiresAt,

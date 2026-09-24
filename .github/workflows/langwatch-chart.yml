@@ -214,6 +214,15 @@ jobs:
         if: "!cancelled()"
         run: ./tests/lwql-connection-env.sh
 
+      # Connect's upgrade guarantee is a claim about absence: an install that
+      # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
+      # in the app can decide to call LangWatch. A wrong `{{- if }}` emits the
+      # block anyway and the source looks the same either way, so it is only
+      # visible in the render (ADR-139).
+      - name: "assert Connect emits nothing by default and reaches both workloads when on"
+        if: "!cancelled()"
+        run: ./tests/connect-env.sh
+
   # The render job above proves the chart PARSES; these vitest suites
   # assert on what it EMITS (env selection per provider, identity guards,
   # migration postures, validation failures). They normally run inside the

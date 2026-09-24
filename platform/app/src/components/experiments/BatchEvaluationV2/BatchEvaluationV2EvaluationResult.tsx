@@ -19,12 +19,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { cellPictureUrl } from "~/components/datasets/cellPictureUrl";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { ExperimentRunWithItems } from "../../../server/experiments-v3/services/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
-import { ExternalImage, getImageUrl } from "../../ExternalImage";
+import { ExternalImage } from "../../ExternalImage";
 import { ExpandedTextDialog, HoverableBigText } from "../../HoverableBigText";
 import { getEvaluationColumns } from "./utils";
 
@@ -117,8 +118,7 @@ export function BatchEvaluationV2EvaluationResult({
     const firstEntry = Object.values(datasetByIndex)[0];
     for (const column of Array.from(datasetColumns)) {
       const mightHaveImages =
-        typeof firstEntry?.entry?.[column] === "string" &&
-        getImageUrl(firstEntry.entry[column]!);
+        cellPictureUrl(firstEntry?.entry?.[column]) !== null;
       cols.push({
         id: `dataset_${column}`,
         header: `Dataset Input (${column})`,
@@ -126,7 +126,7 @@ export function BatchEvaluationV2EvaluationResult({
         render: (row) => {
           const val = row.datasetEntry?.entry?.[column];
           if (mightHaveImages) {
-            const img = getImageUrl((val as string) ?? "");
+            const img = cellPictureUrl(val);
             if (img) {
               return (
                 <ExternalImage

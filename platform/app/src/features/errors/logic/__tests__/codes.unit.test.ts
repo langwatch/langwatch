@@ -105,6 +105,12 @@ const CLIENT_MINTED_CODES = new Set([
   // model came from a menu, so the remediation is a different one and needs
   // its own words.
   "langy_model_unavailable",
+  // Minted by `PasskeySignUpButton` from better-auth's transport-level
+  // `ALREADY_SIGNED_IN` (a sign-up ceremony run with a session already open,
+  // refused server-side in `passkey-signup.ts`). The button translates it to
+  // this registry code for copy, the same way it maps a status to
+  // `identity_passkey_not_recognized`; nothing throws it as a HandledError.
+  "identity_passkey_already_signed_in",
 ]);
 
 /**
@@ -147,7 +153,16 @@ const PARAMETERIZED_CODES = new Set([
  * registry entry from it. A code that only ever appears in a log line is not
  * one of these and should not be in `APP_ERROR_CODES` at all.
  */
-const RUN_STATUS_CODES = new Set(["instant_eval_stalled"]);
+const RUN_STATUS_CODES = new Set([
+  "instant_eval_stalled",
+  // `license_sync_failed` is the same shape one level up: the daily license
+  // sync of a connected install runs with no request to refuse, so a failure
+  // nothing else named is written to `Organization.connectLastSyncError` and
+  // Settings, Connect renders the registry entry for whatever that column
+  // holds. Codes the sync copies from a refusal it caught are declared at
+  // their own throw sites and need no entry here.
+  "license_sync_failed",
+]);
 
 /**
  * Codes MINTED BY BETTER-AUTH ITSELF, not by a `HandledError` subclass.

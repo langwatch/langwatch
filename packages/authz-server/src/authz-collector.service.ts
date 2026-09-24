@@ -9,11 +9,13 @@
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
+  CollectedBinding,
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
   ShareableResourceKind,
 } from "@langwatch/authz";
+
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
@@ -155,7 +157,6 @@ export class AuthzCollectorService {
           isOrgMember: false,
           membershipDisabled: false,
           bindings: [],
-          legacyTeamMemberships: [],
           customRolePermissions: new Map(),
         };
       // One pass, one head. A collect is several reads and the reader in
@@ -277,11 +278,10 @@ export class AuthzCollectorService {
       // owner's own snapshot reports it.
       membershipDisabled: false,
       bindings,
-      legacyTeamMemberships: [],
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,
         organizationId,
-        customRoleIds: dedupeCustomRoleIds(bindings, []),
+        customRoleIds: dedupeCustomRoleIds(bindings),
         reader,
       }),
     };
@@ -296,27 +296,17 @@ export class AuthzCollectorService {
     organizationId: string;
     reader: AuthzReadRepository;
   }): Promise<CollectedGrants> {
-    const [membership, directBindings, groupBindings, legacyRows] =
-      await Promise.all([
-        reader.findOrganizationMembership({
-          userId: principal.id,
-          organizationId,
-        }),
-        reader.findUserBindings({ userId: principal.id, organizationId }),
-        reader.findGroupBindings({
-          userId: principal.id,
-          organizationId,
-        }),
-        // LEGACY-QUIRK(B): TeamUser fallback rows. Always fetched because
-        // the org-scope path unions them on any denial even when bindings
-        // exist (the TeamUser union at the end of legacy
-        // hasOrganizationPermissionLegacy); the engine applies the
-        // per-scope gating rules.
-        reader.findLegacyTeamMemberships({
-          userId: principal.id,
-          organizationId,
-        }),
-      ]);
+    const [membership, directBindings, groupBindings] = await Promise.all([
+      reader.findOrganizationMembership({
+        userId: principal.id,
+        organizationId,
+      }),
+      reader.findUserBindings({ userId: principal.id, organizationId }),
+      reader.findGroupBindings({
+        userId: principal.id,
+        organizationId,
+      }),
+    ]);
 
     const bindings = [...directBindings, ...groupBindings];
     // A seat-disabled membership is NOT a membership: the person keeps their
@@ -338,11 +328,10 @@ export class AuthzCollectorService {
       isOrgMember,
       membershipDisabled: membership?.disabled ?? false,
       bindings,
-      legacyTeamMemberships: legacyRows,
       customRolePermissions: await this.prefetchCustomRolePermissions({
         principal,
         organizationId,
-        customRoleIds: dedupeCustomRoleIds(bindings, legacyRows),
+        customRoleIds: dedupeCustomRoleIds(bindings),
         reader,
       }),
     };
@@ -373,11 +362,8 @@ export class AuthzCollectorService {
 /**
  * Lenient parse, matching the legacy tRPC resolver's net behaviour:
  * malformed or non-array permission JSON degrades to an empty list, which
- * the engine treats as "fall through to the built-in bag", never as a
- * grant. The legacy API-key resolver is STRICTER here - it rejects a mixed
- * array outright rather than dropping the non-string entries - so on that
- * path this parse is deliberately the more permissive of the two, and the
- * shadow comparison is where that shows up.
+ * the engine treats as no permission. Mixed arrays retain their string entries
+ * at this boundary; invalid values never become permissions.
  */
 function parseCustomRolePermissions(
   rows: CustomRolePermissionsRow[],
@@ -459,16 +445,14 @@ function audienceForVisibility({
   }
 }
 
-function dedupeCustomRoleIds(
-  bindings: ReadonlyArray<{ customRoleId: string | null }>,
-  legacyRows: ReadonlyArray<{ customRoleId: string | null }>,
-): string[] {
-  return Array.from(
-    new Set(
-      [
-        ...bindings.map((binding) => binding.customRoleId),
-        ...legacyRows.map((row) => row.customRoleId),
-      ].filter((id): id is string => id != null),
+function dedupeCustomRoleIds(bindings: readonly CollectedBinding[]): string[] {
+  return [
+    ...new Set(
+      bindings.flatMap(({ roleKey }) => {
+        if (!roleKey.startsWith("custom:")) return [];
+        const roleId = roleKey.slice("custom:".length);
+        return roleId.length > 0 ? [roleId] : [];
+      }),
     ),
-  );
+  ];
 }

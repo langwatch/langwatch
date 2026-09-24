@@ -2,11 +2,10 @@
  * The role name pre-check (ADR-092 §13).
  *
  * A role definition is a ledger command now, so the `(organizationId, name)`
- * unique index can no longer be what refuses a duplicate: the fold, not the
- * caller, writes the row, and a constraint failure there parks the
- * organization's projection lane instead of answering the person who typed
- * the name. `assertNameFree` is the read that moved that refusal back in
- * front of the append, and these are its semantics.
+ * lookup on the Role projection is what refuses a duplicate before the append.
+ * The projection's `(organizationId, name)` key includes retired heads, so
+ * this check deliberately sees tombstones and returns the same domain error
+ * before the fold reaches the database constraint.
  */
 import type { LedgerActor } from "@langwatch/actor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,8 +18,8 @@ const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
 
 function harness() {
   const db = {
-    customRole: {
-      findUnique: vi.fn().mockResolvedValue(null),
+    role: {
+      findFirst: vi.fn().mockResolvedValue(null),
     },
   };
   const writer = {
@@ -43,6 +42,7 @@ function storedRole(overrides: Record<string, unknown> = {}) {
     description: null,
     permissions: ["traces:read"],
     kind: "custom",
+    occurredAt: new Date(1_700_000_000_000),
     createdAt: new Date(1_700_000_000_000),
     updatedAt: new Date(1_700_000_000_000),
     ...overrides,
@@ -51,6 +51,30 @@ function storedRole(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe("given a canonical Role head", () => {
+  it("returns the legacy role shape without projection-only fields", async () => {
+    const { repository, db } = harness();
+    db.role.findFirst.mockResolvedValue({
+      ...storedRole(),
+      deletedAt: null,
+    });
+
+    await expect(repository.findById("role_1")).resolves.toEqual({
+      id: "role_1",
+      organizationId: ORG_ID,
+      name: "Auditor",
+      description: null,
+      permissions: ["traces:read"],
+      kind: "custom",
+      createdAt: new Date(1_700_000_000_000),
+      updatedAt: new Date(1_700_000_000_000),
+    });
+    expect(db.role.findFirst).toHaveBeenCalledWith({
+      where: { id: "role_1", deletedAt: null },
+    });
+  });
 });
 
 describe("given a role being created", () => {
@@ -89,16 +113,12 @@ describe("given a role being created", () => {
         actor: ACTOR,
       });
 
-      // Scoped and unnormalized: the lookup is the compound unique itself, so
-      // another organization's identically named role is never consulted, and
-      // a name differing only in case is a different name — the same answer
-      // the index would have given.
-      expect(db.customRole.findUnique).toHaveBeenCalledWith({
+      // Scoped and unnormalized: another organization's identically named
+      // role is never consulted, and the projection key owns the answer.
+      expect(db.role.findFirst).toHaveBeenCalledWith({
         where: {
-          organizationId_name: {
-            organizationId: ORG_ID,
-            name: "Data Auditor",
-          },
+          organizationId: ORG_ID,
+          name: "Data Auditor",
         },
         select: { id: true },
       });
@@ -108,7 +128,7 @@ describe("given a role being created", () => {
   describe("when another role already holds the name", () => {
     it("refuses before the append, naming the conflict", async () => {
       const { repository, db, writer } = harness();
-      db.customRole.findUnique.mockResolvedValue({ id: "role_existing" });
+      db.role.findFirst.mockResolvedValue({ id: "role_existing" });
 
       await expect(
         repository.create({
@@ -130,7 +150,7 @@ describe("given a role being redefined", () => {
   describe("when the name is left as it was", () => {
     it("does not look for a collision at all, so a role never blocks itself", async () => {
       const { repository, db, writer } = harness();
-      db.customRole.findUnique.mockResolvedValueOnce(storedRole());
+      db.role.findFirst.mockResolvedValueOnce(storedRole());
 
       await repository.update({
         roleId: "role_1",
@@ -139,7 +159,7 @@ describe("given a role being redefined", () => {
       });
 
       // One read only: the role itself. The natural-key lookup never ran.
-      expect(db.customRole.findUnique).toHaveBeenCalledTimes(1);
+      expect(db.role.findFirst).toHaveBeenCalledTimes(1);
       expect(writer.defineRole).toHaveBeenCalledTimes(1);
     });
   });
@@ -147,7 +167,7 @@ describe("given a role being redefined", () => {
   describe("when the renamed-to name is held by a different role", () => {
     it("refuses before the append, naming the conflict", async () => {
       const { repository, db, writer } = harness();
-      db.customRole.findUnique
+      db.role.findFirst
         .mockResolvedValueOnce(storedRole())
         .mockResolvedValueOnce({ id: "role_other" });
 
@@ -166,7 +186,7 @@ describe("given a role being redefined", () => {
   describe("when the only holder of the name is the role being renamed", () => {
     it("lets it through", async () => {
       const { repository, db, writer } = harness();
-      db.customRole.findUnique
+      db.role.findFirst
         .mockResolvedValueOnce(storedRole())
         // A row still carrying the old name under this id — what a re-run of
         // the same rename reads back. It is the role's own id, so it is not a
@@ -188,7 +208,7 @@ describe("given a role being redefined", () => {
   describe("when the role is gone", () => {
     it("says so rather than defining a role that no longer exists", async () => {
       const { repository, db, writer } = harness();
-      db.customRole.findUnique.mockResolvedValueOnce(null);
+      db.role.findFirst.mockResolvedValueOnce(null);
 
       await expect(
         repository.update({
@@ -206,14 +226,11 @@ describe("given a role being redefined", () => {
 describe("given an api key's exclusive roles being retired", () => {
   function retireHarness() {
     const db = {
-      customRole: {
-        findUnique: vi.fn().mockResolvedValue(null),
+      role: {
+        findFirst: vi.fn().mockResolvedValue({ organizationId: ORG_ID }),
       },
-      roleBinding: {
-        count: vi.fn().mockResolvedValue(0),
-      },
-      teamUser: {
-        count: vi.fn().mockResolvedValue(0),
+      grant: {
+        findMany: vi.fn().mockResolvedValue([]),
       },
     };
     const writer = {
@@ -245,16 +262,11 @@ describe("given an api key's exclusive roles being retired", () => {
           where: { apiKeyId: "key_1", customRoleId: { in: ["role_1"] } },
         }),
       );
-      // The exclusivity count must satisfy the tenancy guard: a RoleBinding
-      // query whose only api-key predicate is `{ not: ... }` is refused
-      // without an organizationId, and that refusal 500s the key retirement.
-      expect(db.roleBinding.count).toHaveBeenCalledWith({
-        where: {
-          organizationId: ORG_ID,
-          customRoleId: "role_1",
-          apiKeyId: { not: "key_1" },
-        },
-      });
+      expect(db.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ organizationId: ORG_ID }),
+        }),
+      );
       expect(writer.deleteRole).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: ORG_ID, roleId: "role_1" }),
       );
@@ -264,7 +276,28 @@ describe("given an api key's exclusive roles being retired", () => {
   describe("when another key still holds the role", () => {
     it("keeps the shared role", async () => {
       const { db, writer, repository } = retireHarness();
-      db.roleBinding.count.mockResolvedValueOnce(1);
+      db.grant.findMany.mockResolvedValueOnce([
+        {
+          id: "grant_1",
+          organizationId: ORG_ID,
+          principalType: "API_KEY",
+          principalId: "key_2",
+          roleKey: "custom:role_1",
+          legacyRole: "CUSTOM",
+          source: "grants-service",
+          scopeType: "TEAM",
+          scopeId: "team_1",
+          token: null,
+          permission: null,
+          resourceKind: null,
+          projectId: null,
+          createdByUserId: null,
+          expiresAt: null,
+          maxViews: null,
+          occurredAt: new Date(1),
+          updatedAt: new Date(1),
+        },
+      ]);
 
       await repository.deleteExclusiveToApiKey({
         roleIds: ["role_1"],

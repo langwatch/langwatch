@@ -1041,3 +1041,24 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       # Asking again inside the run turns one request into several at a
       # provider that has just asked for silence, and spends the wait it
       # named arguing rather than waiting.
+
+  Rule: The report kind is fixed once a source has pulled
+
+    # The adapter's two reports price the same spend twice over. A changed
+    # report no longer matches the stored cursor, so the new report replays
+    # from the configured start and its events land beside the old ones under
+    # different ids, and the same money is counted twice. The full rule is
+    # specified beside the edit form, in
+    # platform/app/specs/governance/edit-pull-source-config.feature; this
+    # scenario is the half only a real database can prove.
+
+    @integration
+    Scenario: A report change that waited on a pull run's cursor is refused
+      Given a source that has never pulled
+      And an admin submits a change of report
+      When a pull run commits its cursor while the change is waiting to be written
+      Then the save is refused rather than applied
+      And the source keeps the report and the cursor the pull run left it with
+      # The write waits on the pull run's row lock and re-reads the cursor as
+      # the pull run left it, rather than deciding on the row as it read it
+      # before the wait.

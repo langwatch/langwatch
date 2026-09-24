@@ -13,7 +13,7 @@ vi.mock("~/server/app-layer/permissions/imperative", () => ({
 }));
 
 // batchScopePermissions stays a legacy rbac read (it is the seam itself).
-vi.mock("~/server/api/rbac", () => ({
+vi.mock("~/server/app-layer/authz/permission-adapters", () => ({
   batchScopePermissions: rbacMocks.batchScopePermissions,
 }));
 

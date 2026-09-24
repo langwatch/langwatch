@@ -252,6 +252,22 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     When a run is requested
     Then the response is 403 with code instant_eval_not_enabled
 
+  @unit
+  Scenario: A deployment with no query identity answers as not enabled
+    Given a project with a query key
+    And a deployment that provisions no LangWatchQL identity to run statements as
+    When the project's query capability is resolved
+    Then it has none, so a run or an estimate is refused with instant_eval_not_enabled
+    And no unknown error reaches the caller
+
+  @unit
+  Scenario: A run whose deployment has no query identity says so, not that the run is gone
+    Given a run the project holds
+    And a deployment that provisions no LangWatchQL identity to run statements as
+    When the executor loads the run
+    Then it fails with instant_eval_not_enabled
+    And it does not report the run as missing
+
   @integration
   Scenario: A read-only key cannot create or cancel a run
     Given a key carrying analytics:view only

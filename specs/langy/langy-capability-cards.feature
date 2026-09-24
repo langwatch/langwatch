@@ -232,6 +232,26 @@ Feature: Langy renders domain-capability cards for tool calls
     And it does not claim that zero traces matched
     And the card still offers the way into Traces
 
+  # An oversized result is reduced before it is recorded: arrays keep a head and
+  # wide objects keep a few keys. Keys were kept in alphabetical order, so a
+  # trace row kept "error" to "metrics" and lost "trace_id". The card then read
+  # a total of 13 and no row it could name, and said "13 traces, showing 0. No
+  # traces matched."
+  @unit
+  Scenario: A reduced result keeps the id of every row it keeps
+    Given a trace search result too large to record whole
+    When the result is reduced to fit
+    Then every row that is kept still carries its trace id
+    And the total the search reported is kept
+
+  @integration
+  Scenario: Rows the card cannot identify render as unreadable, never as an empty result
+    When Langy runs the trace-search capability and the recorded rows carry no trace id
+    And the result still reports 13 matches
+    Then the card says it could not read the result
+    And it does not claim that no traces matched
+    And the card still offers the way into Traces
+
   @integration
   Scenario: A genuinely empty result still reads as a real answer
     When Langy runs the trace-search capability and it returns zero traces
@@ -453,6 +473,32 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A scenario card with an id opens that scenario
       When Langy shows a card for one named scenario
       Then the card's link opens that scenario in the library
+
+  # The card that says "Created and ready to use" was the end of the road:
+  # running the scenario meant leaving the panel for Simulations. The card now
+  # offers the run in words, through the composer, so Langy resolves the
+  # target and asks what it has to ask, exactly as it does for a typed request.
+  Rule: A created scenario offers its first run
+
+    @integration
+    Scenario: A created scenario offers to run against the connected agent
+      Given Langy created a scenario in a live conversation
+      When the card renders
+      Then it offers "Run against my agent" beside the deep link
+      And the offer waits while Langy is still answering
+
+    @integration
+    Scenario: Choosing the run offer asks Langy in words, through the composer
+      Given a created-scenario card with the run offer
+      When the reader chooses the offer
+      Then the composer sends "Run scenario "<name>" against my connected agent" as the reader's message
+      And the card itself schedules nothing
+
+    @integration
+    Scenario: A created scenario in a replayed conversation offers no run
+      Given a created-scenario card rendered while the reader replays an earlier turn
+      When the card renders
+      Then no run offer is drawn, since the replay can route no request
 
   # WHICH card a result renders in is decided once, at the command boundary,
   # from the command's name and the result's own shape together (ADR-079). The

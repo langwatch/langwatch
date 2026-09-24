@@ -17,6 +17,10 @@ import {
   resourceSchema,
   spanSchema,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import {
+  storableSpanTimesOf,
+  type UnstorableSpanTime,
+} from "../../event-sourcing/pipelines/trace-processing/utils/storableSpanTime";
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import {
   codexHelperThreadMarkersOf,
@@ -34,6 +38,13 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
  * so arbitrarily old timestamps never land in cold ClickHouse partitions.
  */
 export const SPAN_MAX_PAST_MS = 31 * ONE_DAY_MS;
+
+/** What the producer is told, naming the field it has to fix. */
+function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {
+  return field === "startTimeUnixMs"
+    ? "span start time is not a valid timestamp"
+    : "span end time is not a valid timestamp";
+}
 
 export type SpanIngestionStatus =
   | "collected"
@@ -378,14 +389,21 @@ export class TraceRequestCollectionService {
       };
     }
 
-    const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(
-        spanParseResult.data.startTimeUnixNano,
-      ),
-    );
-    const now = Date.now();
+    // A time span storage cannot hold — undecodable, zero, or past the storage
+    // ceiling, which nothing bounded before — is refused at the door: minted
+    // into a record id after the event is appended it throws permanently, on a
+    // retrying lane. It is one span's problem, not the batch's, so its siblings
+    // are still dispatched. The same decision the replay edge makes.
+    const decoded = storableSpanTimesOf(spanParseResult.data);
+    if ("unstorable" in decoded) {
+      return {
+        status: "dropped",
+        error: unstorableSpanTimeMessage(decoded.unstorable),
+      };
+    }
+    const { startTimeUnixMs } = decoded.times;
 
-    if (startTimeUnixMs < now - SPAN_MAX_PAST_MS) {
+    if (startTimeUnixMs < Date.now() - SPAN_MAX_PAST_MS) {
       return {
         status: "dropped",
         error: PUBLIC_REJECTION_MESSAGE.age,

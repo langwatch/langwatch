@@ -1,27 +1,11 @@
-/**
- * RoleBinding fixtures for router integration suites.
- *
- * Not a `*.test.ts` file on purpose — it holds no assertions, only the setup.
- *
- * WHY THIS EXISTS. Creating an `OrganizationUser` with `role: ADMIN` does not
- * make the caller an admin. `hasOrganizationPermission` gives every org member
- * only MEMBER's base bag as a floor and resolves everything above it through
- * ORGANIZATION-scoped `RoleBinding` rows; the legacy `TeamUser` union
- * deliberately cannot confer `organization:*` (ADR-021). A suite that creates
- * only the membership rows is therefore refused at the permission gate, before
- * reaching whatever guard it was written to exercise — which is exactly how
- * several suites came to assert nothing while still reporting green (#6327).
- */
+/** RoleBinding fixtures for router integration suites. */
+import { roleFactToRow } from "@langwatch/authz-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import { parseCustomRolePermissions } from "~/server/app-layer/authz/custom-role-permissions";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 
-/**
- * Grants a user real admin rights in an organization, and optionally in one
- * team within it, by creating the bindings the RBAC resolver actually reads.
- *
- * Pass `teamId` when the suite calls a team-scoped procedure
- * (`checkTeamPermission`); omit it for org-only surfaces.
- */
+/** Grant a user organization admin rights and, when requested, team admin rights. */
 export async function grantOrganizationAdmin({
   prisma,
   organizationId,
@@ -33,38 +17,26 @@ export async function grantOrganizationAdmin({
   userId: string;
   teamId?: string;
 }): Promise<void> {
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organizationId,
   });
 
   if (teamId) {
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
     });
   }
 }
 
-/**
- * Binds a custom role to a user at TEAM scope.
- *
- * The legacy `TeamUser.assignedRoleId` column is NOT enough: the guards read
- * the assignment through `getUserCustomRoleBinding`, a RoleBinding lookup. With
- * only the legacy column set, a caller's old permissions read as undefined and
- * `getRoleChangeType` sees no role change at all — so the limit under test is
- * never asserted and the procedure returns success.
- */
+/** Bind a projected custom role to a user at TEAM scope. */
 export async function bindCustomRoleToTeam({
   prisma,
   organizationId,
@@ -78,6 +50,78 @@ export async function bindCustomRoleToTeam({
   teamId: string;
   customRoleId: string;
 }): Promise<void> {
+  const customRole = await prisma.customRole.findUnique({
+    where: { id: customRoleId },
+    select: {
+      organizationId: true,
+      name: true,
+      description: true,
+      permissions: true,
+      createdAt: true,
+    },
+  });
+  if (customRole == null || customRole.organizationId !== organizationId) {
+    throw new Error(`Custom role ${customRoleId} is not in the organization`);
+  }
+  const existingRole = await prisma.role.findUnique({
+    where: { id: customRoleId },
+    select: { organizationId: true, deletedAt: true },
+  });
+  if (
+    existingRole?.organizationId !== undefined &&
+    existingRole.organizationId !== organizationId
+  ) {
+    throw new Error(
+      `Custom role ${customRoleId} is projected in another organization`,
+    );
+  }
+  if (existingRole?.deletedAt != null) {
+    throw new Error(`Custom role ${customRoleId} has been deleted`);
+  }
+  const permissions = parseCustomRolePermissions({
+    customRoleId,
+    permissions: customRole.permissions,
+  });
+  await prisma.role.upsert({
+    where: { id: customRoleId },
+    create: roleFactToRow({
+      organizationId,
+      role: {
+        roleId: customRoleId,
+        name: customRole.name,
+        description: customRole.description ?? undefined,
+        permissions,
+        kind: "custom",
+        occurredAtMs: customRole.createdAt.getTime(),
+      },
+    }),
+    update: {
+      name: customRole.name,
+      description: customRole.description,
+      permissions,
+      kind: "custom",
+      occurredAt: customRole.createdAt,
+    },
+  });
+  const previousBindings = await prisma.roleBinding.findMany({
+    where: {
+      organizationId,
+      userId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+    },
+    select: { id: true },
+  });
+  const previousBindingIds = previousBindings.map(({ id }) => id);
+  if (previousBindingIds.length > 0) {
+    await prisma.grant.updateMany({
+      where: { id: { in: previousBindingIds }, revokedAt: null },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: "fixture_replaced",
+      },
+    });
+  }
   await prisma.roleBinding.deleteMany({
     where: {
       organizationId,
@@ -86,14 +130,12 @@ export async function bindCustomRoleToTeam({
       scopeId: teamId,
     },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId,
-      role: TeamUserRole.CUSTOM,
-      customRoleId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId,
+    role: TeamUserRole.CUSTOM,
+    customRoleId,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: teamId,
   });
 }

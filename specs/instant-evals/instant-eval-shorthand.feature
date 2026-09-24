@@ -219,6 +219,35 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     And it says a statement can ask what a shorthand cannot
 
   @unit
+  Scenario: A filter the trace view cannot answer is bound as a selection when the caller resolved it
+    Given a filter naming an evaluator result
+    And the trace ids the explorer's own compiler resolved for it
+    When the shorthand is expanded with that selection
+    Then the statement keeps only traces whose id is in the bound instant_eval_selection_ids parameter
+    And the filter text is not compiled into the statement
+
+  @unit
+  Scenario: A selection on a target other than traces is applied to the view's own trace column
+    Given a shorthand naming the threads target and a resolved selection
+    When it is expanded
+    Then the statement compares the view's own trace column to the bound selection
+
+  @unit
+  Scenario: A refusal for a field the trace view cannot answer is told apart from any other refusal
+    Given a filter naming an evaluator result
+    When the filter is compiled
+    Then the refusal carries the code that says the field is outside the trace view
+    And a filter the language cannot parse carries no such code
+
+  @unit
+  Scenario: The run service resolves the selection itself when the dialect refuses the filter
+    Given a shorthand whose filter names an evaluator result
+    And a selection resolver that answers the explorer's trace ids
+    When the statement is resolved
+    Then the statement carries the bound selection instead of the filter
+    And the resolver was asked once, with the shorthand's window and filter
+
+  @unit
   Scenario: A filter the language cannot parse is refused
     Given a filter with unbalanced brackets
     When the shorthand is expanded

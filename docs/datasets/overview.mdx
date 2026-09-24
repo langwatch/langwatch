@@ -31,7 +31,7 @@ The menu has two entries:
 
 ### Create an empty dataset
 
-In the **New Dataset** drawer, type a **Name**; the slug under it is what the SDKs and the CLI use. Then define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**. The type select on each column offers `string`, `number`, `boolean`, `date`, `list`, `json`, `image (URL)`, `json chat messages (OpenAI format)` and `json spans`.
+In the **New Dataset** drawer, type a **Name**; the slug under it is what the SDKs and the CLI use. Then define the **Columns**. A new dataset starts with `trace_id`, `timestamp`, `input`, `output`, `contexts`, `total_cost` and `annotations`. Remove the columns you do not need, click **Add Column** for the ones you do, and click **Create Dataset**. The type select on each column offers `string`, `number`, `boolean`, `date`, `list`, `json`, `image`, `file`, `json chat messages (OpenAI format)` and `json spans`.
 
 <Frame>
 <img src="/images/datasets/dataset-new-drawer.png" alt="The New Dataset drawer with the name, its slug, and the default columns with their types" />
@@ -47,7 +47,8 @@ Column names must be unique and cannot be `id` or `selected`. Each column has on
 | `date` | A timestamp. |
 | `list` | A list of strings, for example retrieved contexts. |
 | `json` | Any JSON value. |
-| `image (URL)` | The URL of an image. The grid renders it as a thumbnail. See [Images in datasets](/datasets/dataset-images). |
+| `image` | A picture. The cell takes an uploaded file, a URL or a data URL, and the grid renders it as a thumbnail. See [Images and files in datasets](/datasets/dataset-images). |
+| `file` | Any other document, for example a PDF, an audio clip or a CSV. The cell takes an uploaded file, a URL or a data URL. See [Images and files in datasets](/datasets/dataset-images). |
 | `json chat messages (OpenAI format)` | A list of chat messages with `role` and `content`. |
 | `json spans` | The spans of a trace, as JSON. |
 

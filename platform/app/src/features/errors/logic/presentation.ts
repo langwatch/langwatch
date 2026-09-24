@@ -339,6 +339,12 @@ const presentations = {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",
   },
+  filter_too_complex: {
+    // fault: customer. The ceiling is deliberate; a sentence typed as bare
+    // words is one node per word, and quoting it makes it one node.
+    title: "Too many separate terms",
+    describe: () => "Put the sentence in quotes to search it as one phrase.",
+  },
   filter_field_unknown: {
     title: "Unknown filter field",
     describe: (error) => {
@@ -615,6 +621,94 @@ const presentations = {
     describe: () =>
       "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
   },
+  checkup_clickhouse_migrations_pending: {
+    title: "ClickHouse migrations are pending",
+    describe: () =>
+      "Run the ClickHouse migrations, then run the checkup again.",
+  },
+  checkup_clickhouse_not_configured: {
+    title: "ClickHouse is not configured",
+    describe: () => "Set CLICKHOUSE_URL on the app and worker deployments.",
+  },
+  checkup_clickhouse_unreachable: {
+    title: "ClickHouse did not answer",
+    describe: () =>
+      "Check CLICKHOUSE_URL and that ClickHouse accepts connections from the app.",
+  },
+  checkup_email_not_configured: {
+    title: "Email is not configured",
+    describe: () =>
+      "Set EMAIL_PROVIDER to smtp, ses, sendgrid or resend with its credentials, and restart.",
+  },
+  checkup_gateway_control_plane_mismatch: {
+    title: "The AI Gateway reports another control plane",
+    describe: () => "Point the gateway's control plane URL at this app.",
+  },
+  checkup_gateway_unreachable: {
+    title: "The AI Gateway did not answer",
+    describe: () =>
+      "Check that the gateway is running and that the app can reach it.",
+  },
+  checkup_license_corrupted: {
+    title: "The license could not be read",
+    describe: () => "Enter the activation code or license key again.",
+  },
+  checkup_license_expired: {
+    title: "The license has expired",
+    describe: () =>
+      "Renew it, then enter the new activation code on the License page.",
+  },
+  checkup_license_invalid: {
+    title: "The license does not verify",
+    describe: () =>
+      "Enter the activation code or license key again, or contact support.",
+  },
+  checkup_lwql_not_provisionable: {
+    title: "LWQL functions cannot be provisioned",
+    describe: () =>
+      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+  },
+  checkup_model_provider_refused: {
+    title: "A model provider refused the test call",
+    describe: () =>
+      "Check the provider's key and quota on the Model Providers page.",
+  },
+  checkup_no_model_provider: {
+    title: "No model provider is configured",
+    describe: () => "Add a model provider on the Model Providers page.",
+  },
+  checkup_postgres_migration_failed: {
+    title: "A Postgres migration failed",
+    describe: () =>
+      "Resolve the failed migration, then run the migrations again.",
+  },
+  checkup_postgres_migrations_pending: {
+    title: "Postgres migrations are pending",
+    describe: () => "Run the Postgres migrations, then run the checkup again.",
+  },
+  checkup_postgres_unreachable: {
+    title: "Postgres did not answer",
+    describe: () =>
+      "Check DATABASE_URL and that the database accepts connections from the app.",
+  },
+  checkup_redis_not_configured: {
+    title: "Redis is not configured",
+    describe: () => "Set REDIS_URL on the app and worker deployments.",
+  },
+  checkup_redis_unreachable: {
+    title: "Redis did not answer",
+    describe: () =>
+      "Check REDIS_URL and that Redis accepts connections from the app.",
+  },
+  checkup_smtp_refused: {
+    title: "The SMTP server refused the connection",
+    describe: () => "Check the SMTP host, port and credentials.",
+  },
+  checkup_storage_write_failed: {
+    title: "Writing to storage failed",
+    describe: () =>
+      "Check the bucket or path exists and that the app's credentials allow put and delete.",
+  },
   cli_key_selection_invalid: {
     title: "Check the access selection",
     describe: (error) => {
@@ -718,10 +812,10 @@ const presentations = {
     },
   },
   agent_owner_only: {
-    title: "This development agent belongs to someone else",
+    title: "This development agent belongs to one person",
     describe: (error) => {
       const owner = str(error, "ownerName", "its owner");
-      return `Only ${owner} can run simulations against it. Connect your own copy of the agent, or ask them to run it.`;
+      return `Only ${owner}'s own key can run simulations against it, so a project or service key is refused even when it belongs to the same person. Run it with the key that connected the agent, connect your own copy, or give the agent a shared environment name.`;
     },
   },
   agent_call_timeout: {
@@ -1220,6 +1314,22 @@ const presentations = {
         : "This key belongs to a different Google service. If it is a Gemini Enterprise Agent Platform key, fill in the Google Cloud Project and Location fields and save again; otherwise allow the Generative Language API in the Google Cloud console.";
     },
   },
+  provider_out_of_credit: {
+    // fault: customer, and the only refusal on this screen that a key will
+    // never fix. It is also the one a models listing cannot see, which is why
+    // the check sends a real generation.
+    title: "That account is out of credit",
+    describe: () =>
+      "The provider took the key and refused to generate: the account behind it has no credit or quota left. Top it up with the provider, then try again.",
+  },
+  provider_usage_limit_reached: {
+    // fault: customer, but nothing to buy and nothing to fix — a plan-billed
+    // lane (a ChatGPT plan behind Codex, for one) refuses until its window
+    // rolls over. The copy says wait, not "check your key".
+    title: "That plan is over its usage limit",
+    describe: () =>
+      "The provider took the key and refused to generate until the plan's allowance resets. Wait for the window to roll over, or use a provider billed per request.",
+  },
   provider_refused: {
     // fault: provider. It answered and said no, but not in terms we can map —
     // a 429 or a 503 is theirs to fix, so the copy must not send the customer
@@ -1281,18 +1391,62 @@ const presentations = {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
+  license_sync_failed: {
+    // The reader is the administrator of a self-hosted install, in Settings,
+    // Connect or on the License page. The daily sync runs on its own and the
+    // License page can run it now; what they need to know is that the license
+    // they hold keeps working meanwhile.
+    title: "The license sync did not complete",
+    describe: () =>
+      "It runs again in a day, or now from the License page. Your license and its seats are unchanged.",
+  },
   license_signing_key_not_pem: {
-    title: "That doesn't look like a private key",
-    describe: () => "Paste the whole key, including its BEGIN and END lines.",
+    title: "The signing key on the server isn't a private key",
+    describe: () =>
+      "The license signing secret must hold the whole key, including its BEGIN and END lines.",
   },
   license_signing_key_encrypted: {
-    title: "That private key is passphrase-protected",
-    describe: () => "Use an unencrypted private key to sign licenses.",
+    title: "The signing key on the server is passphrase-protected",
+    describe: () =>
+      "Store an unencrypted private key in the license signing secret.",
   },
   license_signing_failed: {
-    title: "That private key couldn't sign the license",
+    title: "The signing key on the server couldn't sign the license",
     describe: () =>
-      "Check it is the license signing key and was copied in full.",
+      "Check the license signing secret holds the license signing key, stored in full.",
+  },
+  license_signing_not_configured: {
+    title: "License signing isn't set up",
+    describe: () =>
+      "Add the license signing key as a server secret, then issue the license again.",
+  },
+  license_already_registered: {
+    title: "This license is already in the registry",
+    describe: () => "Search for it in the list. Nothing was changed.",
+  },
+  license_already_reissued: {
+    title: "This license was already reissued",
+    describe: () => "Open its replacement and reissue that one instead.",
+  },
+  license_overage_max_requires_overage: {
+    title: "An overage maximum needs overage switched on",
+    describe: () =>
+      "Switch on-demand overage on to set a maximum, or clear the maximum.",
+  },
+  issued_license_not_found: {
+    title: "That license isn't in the registry",
+    describe: () => "It may have been registered under another customer.",
+  },
+  issued_license_not_active: {
+    title: "This license can't be changed this way",
+    describe: (error) => {
+      const status = str(error, "status", "");
+      if (status === "revoked") return "It was revoked. Issue a new license.";
+      if (status === "superseded") {
+        return "It was replaced. Open the license that replaced it.";
+      }
+      return "Its term has ended. Reissue it to renew.";
+    },
   },
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
@@ -1658,13 +1812,22 @@ const presentations = {
     describe: () =>
       "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
   },
+  join_policy_not_licensed: {
+    // Read by an administrator opening the door, so it says what they can
+    // still do today as well as what the plan adds. Closing the door is
+    // never refused for this reason, so the copy never suggests they are
+    // stuck with a policy they cannot turn off.
+    title: "Choosing who can join needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. You can still invite people by email, and you can stop colleagues joining at any time. Talk to your account team about upgrading.",
+  },
   // Company domains only, and the copy stops there. Listing what counts as a
   // consumer mail provider would turn the refusal into a way to enumerate
   // the deny-list.
   join_auto_domain_unproven: {
-    title: "That domain is not proven yet",
+    title: "That domain is not verified yet",
     describe: () =>
-      "Automatic joining works for company domains that at least two of your members have verified. Personal email domains are never eligible.",
+      "Automatic joining works once you have verified the domain is yours — publish the record or serve the file from the Authentication page, then try again. Personal email domains are never eligible.",
   },
   join_auto_connection_admits: {
     title: "Your identity provider already admits that domain",
@@ -1756,8 +1919,12 @@ const presentations = {
     describe: () =>
       "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
   },
+  // ---- the sign-in and sign-up screens ----
   auth_rate_limited: {
     title: "Too many attempts",
+    // The countdown when the limit named one, the vague version when it did
+    // not. "A few minutes" is the honest floor rather than a guess dressed up
+    // as a number.
     describe: (error) => {
       const seconds = num(error, "retryAfterSeconds", 0);
       if (seconds <= 0) return "Wait a few minutes, then try again.";
@@ -1819,12 +1986,44 @@ const presentations = {
     describe: () =>
       "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
   },
+  scim_token_too_short: {
+    title: "That token is too short",
+    // The number is written here rather than read off the error: `meta` is a
+    // client contract of named fields, and adding one that only this sentence
+    // reads would be a field with no consumer. The service and this string
+    // are two lines apart in review, which is what keeps them in step.
+    describe: () =>
+      "A token you choose yourself has to be at least 32 characters — it is the whole password your identity provider uses to reach us. Use a longer one, or let us generate it.",
+  },
+  scim_token_unavailable: {
+    title: "Choose a different token value",
+    // Says nothing about why it cannot be used. "Somebody else has it" would
+    // confirm to one customer that another customer holds a particular secret,
+    // which is a probe rather than an explanation.
+    describe: () =>
+      "That value cannot be used. Pick a different one, or let us generate a token for you.",
+  },
   scim_connection_not_found: {
     // Reads the same for a connection that never existed and one belonging to
     // somebody else, on purpose: the copy must not confirm the second.
     title: "Connection not found",
     describe: () =>
       "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
+  },
+  scim_apply_not_retired: {
+    // Read only by a platform operator on the oversight surface, so it may
+    // name the mechanism: they are the person who decides whether to wait.
+    title: "That operation is still being retried",
+    describe: () =>
+      "Only an operation that has stopped being retried can be sent through again. Wait for it to be retired, then re-drive it.",
+  },
+  scim_apply_not_redrivable: {
+    // The history keeps ids and reason codes, never the directory's payload
+    // (the D01 rule), so an addition or a group mapping cannot be
+    // reconstructed from it. Say what does put it right instead.
+    title: "That operation cannot be sent through again",
+    describe: () =>
+      "Only a removal can be re-driven. For anything the directory adds or maps, its next push re-asserts what it still believes.",
   },
   scim_write_outside_connection: {
     // The identity provider is pointed at the wrong connection. Nothing about
@@ -2235,6 +2434,9 @@ const presentations = {
     describe: () => "Nothing was charged. Try again in a moment.",
   },
   session_is_current: {
+    // fault: customer. Signing out of the browser you are reading this in is
+    // a different act with a different control, so the refusal points at it
+    // rather than just saying no.
     title: "This is the browser you're using",
     describe: () =>
       "Signing out here would end this visit. Use the sign-out control instead.",
@@ -2379,16 +2581,26 @@ const presentations = {
       "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
   },
   identity_mfa_password_invalid: {
+    // Named where the code refusal is not, and deliberately so: this says
+    // nothing the sign-in screen does not already say, and somebody who
+    // mistyped a password has to be sent to the right field.
     title: "That password didn't match",
     describe: () =>
       "Enter the password you sign in to LangWatch with, then try again.",
   },
   identity_mfa_required_by_organization: {
     title: "An organization you belong to requires two-step verification",
+    // The two honest ways out, and nothing else. An administrator's reset
+    // starts a fresh setup — it does not lift the requirement — so it is
+    // named as what it is.
     describe: () =>
-      "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
+      "You can't turn it off while you're a member. Leave that organization, or ask an administrator to reset two-step verification for you, which starts a fresh setup.",
   },
   identity_mfa_requirement_not_licensed: {
+    // Read by an administrator who is turning a security control on, so it
+    // says what they can still do today as well as what the plan adds.
+    // Turning the requirement OFF is never refused for this reason, so the
+    // copy never suggests they are stuck with it.
     title: "Requiring two-step verification needs the Enterprise plan",
     describe: () =>
       "Your organization's plan doesn't include this control. Members can still set two-step verification up on their own accounts. Talk to your account team about upgrading to require it of everybody.",
@@ -2411,22 +2623,68 @@ const presentations = {
     describe: () =>
       "You can sign in with it now. To add a different one, use another device or security key.",
   },
+  identity_passkey_already_signed_in: {
+    // Creating an account with a passkey is a signed-out gesture. Run from a
+    // browser that already holds a session, it would attach the new address's
+    // passkey to the account already signed in, so it is refused with the one
+    // thing that resolves it.
+    title: "You're already signed in",
+    describe: () =>
+      "Sign out first to create a new account with a passkey, or add this passkey to the account you're in from your security settings.",
+  },
   identity_password_rejected: {
+    // The policy is one module's (`passwordProblem`), and this says the same
+    // thing the field-level rejection says, for the case where the server was
+    // the first to see it.
     title: "That password wasn't accepted",
     describe: () =>
       "Choose one of at least 8 characters, with at least one character that is not a space.",
   },
   identity_reset_link_invalid: {
+    // Expired, already spent and never issued collapse to one answer on
+    // purpose: the remedy is the same for all three, and telling them apart
+    // would say whether a link had been used, which is not our news to give.
     title: "That password reset link no longer works",
     describe: () =>
       "It may have expired or already been used. Request a new one and open the newest email.",
   },
+  identity_session_max_lifetime_too_short: {
+    // The maximum length has to be readable ALONGSIDE the idle timeout, since
+    // that is the only way the mistake this refuses ever gets made — two
+    // numbers typed into the same form, one of which quietly disables the
+    // other.
+    title: "The maximum session length is shorter than the idle timeout",
+    describe: () =>
+      "A session would always hit the maximum before it could ever go idle. Raise the maximum, or lower the idle timeout, so both can apply.",
+  },
+  identity_sign_in_locked_out: {
+    // Deliberately says NOTHING about the account: not whether it exists, not
+    // whether the password was right, not how many attempts are left. An
+    // address nobody holds is answered with these exact words, which is what
+    // keeps a lock-out from naming the addresses worth attacking.
+    //
+    // It does say the two things the person needs — that waiting is the
+    // remedy, and that a reset is the shortcut — because somebody locked out
+    // of their own account with no idea what to do next simply contacts
+    // support, and the point of the copy is to prevent that.
+    title: "Too many sign-in attempts",
+    describe: () =>
+      "Wait a little while and try again. Resetting your password from the sign-in screen also lets you straight back in.",
+  },
   identity_sign_in_refused: {
+    // Says nothing about which half was wrong, and nothing about whether the
+    // address has an account. The two are indistinguishable by design
+    // (specs/auth/sign-in-failure-messages.feature), and this copy is what
+    // keeps them that way once the wire carries a stable code.
     title: "That email or password is wrong",
     describe: () =>
       "Check both and try again. If you have forgotten the password, reset it from the sign-in screen.",
   },
   identity_identifier_already_held: {
+    // Only ever raised for an address already on the CALLER'S OWN account, so
+    // it can say so plainly. An address somebody else holds is not refused
+    // here at all — that check belongs at verification, where it is not an
+    // existence oracle (`identity_email_in_use`).
     title: "That address is already on your account",
     describe: () =>
       "You can already sign in with it. To add another way in, use a different address.",
@@ -2434,9 +2692,18 @@ const presentations = {
   identity_passkey_not_recognized: {
     // Same answer whether the credential belongs to somebody else or to
     // nobody: this endpoint does not tell callers which passkeys exist.
-    title: "We couldn't use that passkey",
+    //
+    // Naming both ORDINARY reasons is not a leak and is the whole use of this
+    // sentence. The old copy said "check which passkeys are on your account",
+    // which assumes an account — and this is a SIGNED-OUT screen, where the
+    // two likely readers are somebody whose password manager offered a
+    // credential saved for a different site, and somebody who has not signed
+    // up yet. Neither could act on the old sentence. Saying "it may be" of
+    // both confirms nothing about the address in the field, so it is still no
+    // oracle.
+    title: "That passkey isn't one we recognize",
     describe: () =>
-      "Try again, or sign in another way and check which passkeys are on your account.",
+      "It may have been saved for another site, or belong to an account that doesn't exist here yet. Sign in with your email address instead, or create an account.",
   },
   cannot_impersonate_without_second_factor: {
     title: "Set up two-step verification first",
@@ -2447,6 +2714,11 @@ const presentations = {
     title: "This single sign-on connection has moved on",
     describe: () =>
       "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
+  },
+  sso_connection_not_found: {
+    title: "That single sign-on connection is not here any more",
+    describe: () =>
+      "It may have been removed while this page was open. Refresh to see what your organization has now.",
   },
   sso_connection_domain_taken: {
     // Says the domain is spoken for and stops there: which organization holds
@@ -2460,6 +2732,47 @@ const presentations = {
     title: "This connection isn't ready to go live",
     describe: () =>
       "Turning it on needs a verified domain, a successful test sign-in, and a way for someone to get in without the identity provider.",
+  },
+  // The same three preconditions as above, one code each. The one above is
+  // what the aggregate refuses with and it is right for an operator who
+  // commanded an activation directly; these are what somebody looking at
+  // their own setup screen gets, and each says which step to go back to.
+  sso_activation_domain_unproved: {
+    title: "Prove a domain first",
+    describe: () =>
+      "Nobody can be sent to your identity provider until a domain is proved to be yours. Claim the domain and publish the record we give you.",
+  },
+  sso_activation_test_sign_in_missing: {
+    title: "Sign in through it once first",
+    describe: () =>
+      "Going live rests on a sign-in that actually worked. Use the test sign-in to go to your identity provider and come back, then try again.",
+  },
+  sso_break_glass_expiry_out_of_range: {
+    title: "Choose a date inside the allowed window",
+    describe: (error) => {
+      const days = num(error, "maxWindowDays", 90);
+      return `A way back in is temporary on purpose, so it can be granted for up to ${days} days at a time. Pick a date in the future and inside that window, and renew it if you still need it.`;
+    },
+  },
+  sso_break_glass_holder_ineligible: {
+    title: "Choose an administrator for the way back in",
+    describe: () =>
+      "The way back in has to belong to somebody who could actually use it, so it can only be granted to an administrator of this organization.",
+  },
+  sso_break_glass_last_way_in: {
+    title: "That grant is the only way back in",
+    describe: () =>
+      "While single sign-on decides who gets in, someone has to be able to sign in without it. Grant another person a way in first, or remove the connection itself.",
+  },
+  sso_activation_break_glass_missing: {
+    title: "Name someone who can still get in",
+    describe: () =>
+      "Before single sign-on decides who gets in, one person needs to be able to sign in with a password in case the identity provider stops working. Grant a way back in, then try again.",
+  },
+  sso_activation_arrivals_undecided: {
+    title: "Say who this connection lets in",
+    describe: () =>
+      "Somebody signs in through your identity provider and you have never seen them before — they can join on a domain you verified, they can ask and wait for your approval, or they can be turned away. Choose one, then turn the connection on.",
   },
   sso_connection_string_edit_retired: {
     title: "Single sign-on is configured on the connection now",
@@ -2489,18 +2802,174 @@ const presentations = {
     describe: () =>
       "Enter the issuer URL your identity provider publishes, starting with https. An address that only works inside a private network cannot be used here.",
   },
-  sso_saml_not_self_serve: {
-    title: "SAML connections are set up with us",
+  sso_connection_already_registered: {
+    // Says there is one and what to do with it. Never says "rate limit": the
+    // bound is a rate limit in effect, but to the administrator reading this
+    // it is simply that they already did this.
+    title: "This organization already has an identity provider",
     describe: () =>
-      "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
+      "Only one can be set up at a time. Remove the one that is there before registering another, or add the domains you need to it.",
   },
-  identity_link_proposed: {
-    title: "An administrator needs to confirm this sign-in",
-    // Deliberately says nothing about whether an account exists, who holds the
-    // address, or what the evidence was. This is answered to whoever arrived,
-    // and that is not necessarily the owner of the address.
+  sso_credentials_required: {
+    // Names the two shapes rather than the field that was empty, because the
+    // form is what says which box is blank and the reader is looking at it.
+    title: "Some of the identity provider's details are missing",
     describe: () =>
-      "Your workspace administrator has been asked to confirm it. Try again once they have.",
+      "For OpenID Connect we need the issuer address, the client id and the client secret. For SAML we need the sign-in address, and either your identity provider's metadata or its entity id and signing certificate.",
+  },
+  sso_issuer_unreachable: {
+    // Says the address did not answer and nothing about our side of the call.
+    // A timeout, a refused connection and a 404 are one thing to the person
+    // reading: the address is not the one to use.
+    title: "That address did not answer as an identity provider",
+    describe: () =>
+      "Check the issuer address with whoever administers your identity provider — it is usually the one its OpenID Connect settings call the issuer or the domain. Then try again.",
+  },
+  sso_saml_metadata_invalid: {
+    title: "That is not identity provider metadata",
+    describe: () =>
+      "Paste the metadata your identity provider publishes for itself. A file describing LangWatch, or an application's own settings, will not work here.",
+  },
+  sso_certificate_invalid: {
+    title: "The signing certificate could not be read",
+    describe: () =>
+      "Copy the whole certificate from your identity provider, including the BEGIN and END lines, and paste it again.",
+  },
+  sso_license_required: {
+    // Names activating a licence and nothing else. An environment variable,
+    // a hostname or a service name would be useless to whoever is reading
+    // and an internals leak on a screen an administrator opens.
+    title: "Single sign-on needs an active licence",
+    describe: () =>
+      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+  },
+  sso_domain_claim_pending: {
+    // Reached by one claim only now: one on a domain somebody else already
+    // proved. Says the claim is being looked at and nothing about who is
+    // looking or who holds the domain — neither is the reader's to know.
+    title: "We're still reviewing this domain",
+    describe: () =>
+      "You can prove the domain as soon as the review is done. We'll let you know, and nothing else about your setup is waiting on it.",
+  },
+  sso_domain_not_eligible: {
+    // Names the shape of domain that works and lists nothing: printing the
+    // deny-list would turn the refusal into a way to read it back.
+    title: "That domain can't be used for single sign-on",
+    describe: () =>
+      "Use a domain your company owns, like the one in your work email addresses. Shared mail providers and domain endings can't be claimed by one company.",
+  },
+  sso_domain_claim_throttled: {
+    title: "You've claimed a lot of domains just now",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      const unaffected = "The domains you've already claimed are unaffected.";
+      if (seconds <= 0) return `Try that again shortly. ${unaffected}`;
+      const minutes = Math.ceil(seconds / 60);
+      return `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}. ${unaffected}`;
+    },
+  },
+  sso_domain_proof_not_found: {
+    title: "We couldn't find that record yet",
+    describe: () =>
+      "Publish the record shown here on your domain, then check again. Changes to DNS can take a while to reach us.",
+  },
+  sso_domain_file_not_found: {
+    title: "We couldn't find that file yet",
+    describe: () =>
+      "Serve the value shown here as a plain-text file at the well-known address, then check again.",
+  },
+  sso_domain_fetch_failed: {
+    // Deliberately not the words above: we did not look and find nothing —
+    // we could not read the file at all. The domain may be mid-deploy or
+    // refusing us, so the only true instruction is to try again.
+    title: "We couldn't reach that file just now",
+    describe: () =>
+      "Fetching the file from your domain didn't work this time. Nothing about your setup changed — check the address is served over https and try again in a few minutes.",
+  },
+  sso_domain_lookup_failed: {
+    // Deliberately NOT the words above. We did not look and find nothing —
+    // we could not look, so "publish it and check again" would send an
+    // administrator to change a record that is already correct. The words
+    // say to try again and name no resolver, nameserver or timeout.
+    title: "We couldn't check your domain just now",
+    describe: () =>
+      "Looking your domain's records up didn't work this time. Nothing about your setup changed — try again in a few minutes, and tell us if it keeps happening.",
+  },
+  sso_domain_proof_expired: {
+    title: "That record has expired",
+    describe: () =>
+      "Ask for a fresh one and publish it — your approved domain is unaffected, and you don't start over.",
+  },
+  sso_self_serve_unavailable: {
+    // Offers a conversation and names no flag: a customer cannot act on a
+    // flag name, and printing one turns a rollback lever into something
+    // support has to explain away.
+    title: "Setting single sign-on up yourself isn't switched on yet",
+    describe: () =>
+      "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
+  },
+  // The single sign-on gate's refusals
+  // (specs/identity/sso-assertion-refusals.feature).
+  //
+  // WRITTEN FOR THE PERSON BOUNCED TO THE SIGN-IN SCREEN, who is usually not
+  // the person who can fix any of this — so each one says which kind of thing
+  // is wrong and who to ask, and none of them says "check your settings" to
+  // somebody with no settings to check. The administrator reads the same codes
+  // on the single sign-on settings screen, where they are rendered as the
+  // remedy instead; see `useTestSignIn`.
+  sso_sign_in_refused: {
+    // The general one, for the causes we will not name. It must not borrow a
+    // word from the credential refusal: nobody on this path typed a password,
+    // and `identity_sign_in_refused` has to keep meaning exactly one thing.
+    title: "Your sign-in wasn't accepted",
+    describe: () =>
+      "Your identity provider signed you in, but LangWatch would not accept it. Ask whoever manages single sign-on for your organization.",
+  },
+  sso_test_arrival_cannot_create_organization: {
+    // The reader is an administrator two steps from finishing their own
+    // setup, wearing somebody else's sign-in. What they need is to be told
+    // the test WORKED — the screen they landed on implies it did not — and
+    // that the way on is back to their own account, not forward into a new
+    // organization. Naming no mechanism: "the connection is not live yet" is
+    // the whole of the reason and the thing they are about to fix.
+    title: "That sign-in was a test, so there is nothing to set up here",
+    describe: () =>
+      "Your identity provider signed you in, which is what the test was for. It signed you in as someone who is not a member of your organization yet, because the connection is not turned on. Sign back in as yourself to finish turning it on — creating an organization here would leave your setup behind in the first one.",
+  },
+  sso_assertion_without_address: {
+    // Names the missing thing rather than the mechanism: "release the email
+    // claim" is what the administrator needs and what they will read on the
+    // settings screen, and it is not something this reader can act on.
+    title: "Your identity provider didn't send an email address",
+    describe: () =>
+      "It signed you in without one, and LangWatch has nothing to match to an account. Ask whoever manages single sign-on to include your email address.",
+  },
+  sso_setup_address_mismatch: {
+    // NAMES THE ADDRESS, NOT THE LIFECYCLE. The previous wording led with
+    // "single sign-on isn't finished being set up", which is true and useless
+    // — and actively confusing for the one reader most likely to see it, the
+    // administrator running the test sign-in that setup asked them for. They
+    // are told they cannot do the thing they are being told to do.
+    //
+    // Still names nobody: which address would have worked is not a fact this
+    // screen's reader is entitled to. The administrator gets that on the
+    // settings screen, where they are already signed in as the account that
+    // holds it.
+    title: "That address can't sign in through this connection yet",
+    describe: () =>
+      "Your organization is still setting single sign-on up, and until its domain is verified this connection only accepts the address of the person setting it up. Sign in the way you did before, or ask whoever is setting it up.",
+  },
+  sso_domain_not_verified: {
+    title: "That address isn't on a verified domain",
+    describe: () =>
+      "Your organization hasn't verified the domain of the address your identity provider sent. Ask whoever manages single sign-on to verify it.",
+  },
+  sso_domain_proof_lapsed: {
+    // Says why a colleague can sign in and this reader cannot, because that
+    // is the question a lapsed proof actually produces.
+    title: "Your organization's domain verification has lapsed",
+    describe: () =>
+      "People who already sign in this way are unaffected, but it can't vouch for a new account until the record is published again. Ask whoever manages single sign-on to republish it.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",
@@ -2509,6 +2978,10 @@ const presentations = {
   },
   identity_link_proposal_resolved: {
     title: "Somebody already decided this sign-in",
+    // Names the decision and the hand that made it, because the way this
+    // refusal actually happens is two operators on the same support case —
+    // and "already decided" on its own sends the second one hunting for a
+    // bug instead of talking to the first.
     describe: (error) => {
       const outcome =
         str(error, "decidedOutcome", "decided") === "confirmed"
@@ -2519,6 +2992,14 @@ const presentations = {
         ? `It was ${outcome} by ${by}. Reload the person to see what changed, and talk to them before deciding anything else here.`
         : `It was ${outcome} already. Reload the person to see what changed.`;
     },
+  },
+  identity_link_proposed: {
+    title: "An administrator needs to confirm this sign-in",
+    // Deliberately says nothing about whether an account exists, who holds the
+    // address, or what the evidence was. This is answered to whoever arrived,
+    // and that is not necessarily the owner of the address.
+    describe: () =>
+      "Your workspace administrator has been asked to confirm it. Try again once they have.",
   },
   identity_jit_disabled: {
     title: "This workspace does not create accounts automatically",
@@ -2611,6 +3092,35 @@ const presentations = {
   },
 
   // ---- datasets ----
+  dataset_attachment_too_large: {
+    title: "That file is too large",
+    describe: (error) => {
+      const maxBytes = error.meta.maxBytes;
+      return typeof maxBytes === "number"
+        ? `Pick a file under ${Math.round(maxBytes / 1024 / 1024)} MB.`
+        : "Pick a smaller file.";
+    },
+  },
+  dataset_attachment_type_refused: {
+    // `meta.refused` is our own list of media types, not customer input. The
+    // copy names the kinds of file someone recognises rather than the list,
+    // which is long and reads as jargon next to a cell.
+    title: "That kind of file isn't accepted",
+    describe: () =>
+      "Web pages, scripts and scalable vector images cannot be attached. Pick a picture, a document, an audio file or a video.",
+  },
+  dataset_attachment_unavailable: {
+    // The reference in the cell no longer reads back: the object was removed,
+    // or the bytes never landed. Uploading again is a real action, so this is
+    // not the "we've been notified" shape.
+    title: "That attachment could not be read",
+    describe: (error) => {
+      const name = str(error, "fileName", "");
+      return name
+        ? `"${name}" is no longer available. Upload it again, then run the row.`
+        : "It is no longer available. Upload it again, then run the row.";
+    },
+  },
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
@@ -3298,6 +3808,105 @@ const presentations = {
     title: "This key has expired",
     describe: () =>
       "Extend its expiration date in settings, or create a new key.",
+  },
+  // Refusals of a self-hosted license on LangWatch-hosted services. The reader
+  // is the administrator of the install, in its own Settings.
+  connect_instance_required: {
+    title: "This install did not identify itself",
+    describe: () =>
+      "Hosted services need the install's instance id with every call. Upgrade LangWatch, then try again.",
+  },
+  connect_license_not_registered: {
+    title: "This license is not set up for hosted services",
+    describe: () =>
+      "Contact LangWatch to have hosted services enabled for your license.",
+  },
+  connect_license_revoked: {
+    title: "This license is no longer active",
+    describe: () =>
+      "Hosted services are closed to it. Contact LangWatch for a new license.",
+  },
+  connect_license_expired: {
+    title: "This license has expired",
+    describe: () => "Renew the license to use hosted services again.",
+  },
+  connect_wrong_instance: {
+    title: "This license is in use by another install",
+    describe: () =>
+      "A license works with one install. If you rebuilt or moved this one, ask LangWatch to reset the license binding.",
+  },
+  connect_service_not_entitled: {
+    title: "This hosted service is not part of your license",
+    describe: () => "Contact LangWatch to add it to your license.",
+  },
+  connect_license_required: {
+    title: "Only a self-hosted license can change this cap",
+    describe: () =>
+      "This cap belongs to a self-hosted license. Budgets of a virtual key are managed in the AI Gateway settings.",
+  },
+  connect_budget_not_set: {
+    title: "No hosted usage budget is set up yet",
+    describe: () =>
+      "Contact LangWatch to agree a usage commit for hosted services. There is no cap to change until then.",
+  },
+  connect_budget_above_contract_maximum: {
+    title: "That cap is above what your license allows",
+    describe: (error) => {
+      const maximum = num(error, "maximumUsd", 0);
+      return maximum > 0
+        ? `The highest cap you can set is ${maximum.toFixed(2)} USD. Contact LangWatch to raise it.`
+        : "Contact LangWatch to raise the maximum.";
+    },
+  },
+  connect_budget_exhausted: {
+    title: "The hosted usage budget is spent",
+    describe: (error) => {
+      const cap = num(error, "capUsd", 0);
+      const raise =
+        "An organization admin can raise the cap in Settings, Connect.";
+      return cap > 0
+        ? `The cap is ${cap.toFixed(2)} USD and it has been reached. ${raise}`
+        : `The cap for hosted services has been reached. ${raise}`;
+    },
+  },
+  connect_disabled: {
+    title: "Connect is switched off for this deployment",
+    describe: () =>
+      "An operator turns it on in the deployment configuration. Until then this install calls no hosted service.",
+  },
+  // Invoice billing for a connected customer. The reader is an operator in
+  // the backoffice, never the customer.
+  connected_billing_commit_mismatch: {
+    title: "The commit does not match the license",
+    describe: () =>
+      "Billing follows the commit agreed on the license. Set the license terms first, then run this with the same amount.",
+  },
+  connected_billing_not_onboarded: {
+    title: "This customer has no billing account yet",
+    describe: () =>
+      "Onboard the customer first: that creates the billing customer, the usage subscription and the commit.",
+  },
+  connected_billing_unavailable: {
+    title: "Billing is only available on LangWatch Cloud",
+    describe: () =>
+      "This deployment has no payment provider. Connected customers are billed from LangWatch Cloud.",
+  },
+  connect_unreachable: {
+    // The reader runs the network this install sits in, so the sentence names
+    // what an outbound rule has to allow rather than describing the failure.
+    title: "LangWatch could not be reached",
+    describe: (error) => {
+      const host = str(error, "host", "");
+      const port = num(error, "port", 0);
+      return host && port > 0
+        ? `Allow outbound traffic to ${host} on port ${port}, then try again.`
+        : "Allow outbound traffic to LangWatch from this install, then try again.";
+    },
+  },
+  hosted_service_unavailable: {
+    title: "The hosted service did not answer",
+    describe: () =>
+      "Nothing was judged and nothing was charged. Try again in a moment.",
   },
   rate_limited: {
     title: "Too many requests",

@@ -26,6 +26,12 @@ const PASSKEY: SignInMethod = {
 const EMAIL_ALREADY_REGISTERED = "EMAIL_ALREADY_REGISTERED";
 
 /**
+ * The server's code for a sign-up ceremony run while a session is already
+ * open. Kept in step with `server/better-auth/passkey-signup.ts`.
+ */
+const ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
+
+/**
  * The `code` off a client error, where it carried one. The client types the
  * error as "a code, or not" depending on which leg failed — the ceremony's own
  * failures always name one, a server refusal names one only if the endpoint
@@ -94,6 +100,15 @@ async function createAccountWithPasskey(
 function readRefusal(error: { status: number } & object): Refusal {
   const code = readCode(error);
   if (code === EMAIL_ALREADY_REGISTERED) return { kind: "address_taken" };
+  // A session was already open. Named rather than folded into the generic
+  // refusal, because its remedy — sign out, or add from settings — is the one
+  // thing "something went wrong" would not tell them.
+  if (code === ALREADY_SIGNED_IN) {
+    return {
+      kind: "report",
+      error: { error: "identity_passkey_already_signed_in" },
+    };
+  }
   // Saying "something went wrong" about a cancelled prompt would be telling
   // somebody off for deciding, and the password fields are still on screen.
   // Only the explicit abort is that decision, though: a client-side failure
