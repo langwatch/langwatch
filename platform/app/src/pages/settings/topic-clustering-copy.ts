@@ -115,6 +115,23 @@ export function runDetail(run: ClusteringRunDetail): string {
 }
 
 /**
+ * The named guidance for a failed run, or null when there is none to show: a
+ * failure that is not the customer's to fix, or a code we have no copy for.
+ * The one place both the status card and the run-history link consult, so the
+ * "actionable AND known code" rule lives once.
+ */
+export function failureGuidance({
+  errorCode,
+  isErrorUserActionable,
+}: {
+  errorCode: string | null;
+  isErrorUserActionable: boolean;
+}): { title: string; description: string } | null {
+  if (!isErrorUserActionable) return null;
+  return copyFor(CLUSTERING_FAILURE_GUIDANCE, errorCode) ?? null;
+}
+
+/**
  * Whether a failed run should offer the "Open Model Providers" link: the
  * failure is the customer's to fix AND we have named guidance for it.
  */
@@ -123,9 +140,5 @@ export function showsModelProvidersLink(run: {
   errorCode: string | null;
   isErrorUserActionable: boolean;
 }): boolean {
-  return (
-    run.outcome === "failed" &&
-    run.isErrorUserActionable &&
-    copyFor(CLUSTERING_FAILURE_GUIDANCE, run.errorCode) !== undefined
-  );
+  return run.outcome === "failed" && failureGuidance(run) !== null;
 }

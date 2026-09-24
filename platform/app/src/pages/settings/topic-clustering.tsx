@@ -20,8 +20,8 @@ import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
-  CLUSTERING_FAILURE_GUIDANCE,
   copyFor,
+  failureGuidance,
   MODEL_PROVIDERS_HREF,
   RUN_MODE_COPY,
   runDetail,
@@ -244,12 +244,11 @@ function ClusteringStatusCard({
               )}
             {status.data.lastRunOutcome === "failed" &&
               (() => {
-                const guidance = status.data.isLastRunErrorUserActionable
-                  ? copyFor(
-                      CLUSTERING_FAILURE_GUIDANCE,
-                      status.data.lastRunErrorCode,
-                    )
-                  : undefined;
+                const guidance = failureGuidance({
+                  errorCode: status.data.lastRunErrorCode,
+                  isErrorUserActionable:
+                    status.data.isLastRunErrorUserActionable,
+                });
                 return guidance ? (
                   <Alert.Root status="warning">
                     <Alert.Indicator />

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CLUSTERING_FAILURE_GUIDANCE,
+  failureGuidance,
   runDetail,
   showsModelProvidersLink,
 } from "../topic-clustering-copy";
@@ -39,6 +40,41 @@ describe("topic-clustering-copy", () => {
         "The topic clustering model is not allowed for this feature",
       );
       expect(showsModelProvidersLink(run)).toBe(true);
+    });
+  });
+
+  describe("failureGuidance", () => {
+    describe("given an actionable failure with a known code", () => {
+      it("returns the guidance entry for that code", () => {
+        expect(
+          failureGuidance({
+            errorCode: "model_restricted",
+            isErrorUserActionable: true,
+          }),
+        ).toBe(CLUSTERING_FAILURE_GUIDANCE.model_restricted);
+      });
+    });
+
+    describe("given a non-actionable failure", () => {
+      it("returns null even for a known code", () => {
+        expect(
+          failureGuidance({
+            errorCode: "model_restricted",
+            isErrorUserActionable: false,
+          }),
+        ).toBeNull();
+      });
+    });
+
+    describe("given an unknown code", () => {
+      it("returns null", () => {
+        expect(
+          failureGuidance({
+            errorCode: "internal",
+            isErrorUserActionable: true,
+          }),
+        ).toBeNull();
+      });
     });
   });
 

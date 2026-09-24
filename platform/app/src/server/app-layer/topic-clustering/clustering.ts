@@ -591,8 +591,11 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   // It can also throw ModelRestrictedForFeatureError when the only configured
   // value is a codex model: FAST=codex resolves for coding assists, but topic
   // clustering runs through langevals/litellm (never the gateway), so the
-  // resolver skips codex for this feature. That surfaces as the user-actionable
-  // model_restricted code with its own guidance (issue #8287).
+  // resolver keeps walking the scope chain (project → team → organization)
+  // skipping codex values and raises this error when no other configured value
+  // exists — it never substitutes a model or falls back to another role. That
+  // surfaces as the user-actionable model_restricted code with its own guidance
+  // (issue #8287).
   const resolved = await resolveModelForFeature(
     "analytics.topic_clustering_llm",
     { prisma, projectId: project.id },

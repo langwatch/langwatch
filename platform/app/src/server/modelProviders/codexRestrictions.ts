@@ -11,9 +11,12 @@
  *
  * FAST stays a legal role for a codex default — the Codex connect flows write
  * FAST=codex on purpose. A FAST feature that codex cannot actually run is
- * excluded from the allowed FEATURE set instead, so the cascade resolver
- * skips it per-feature (falling through to a wider tier) rather than the role
- * being closed wholesale (see CODEX_EXCLUDED_FAST_FEATURE_KEYS).
+ * excluded from the allowed FEATURE set instead, so the cascade resolver skips
+ * the codex value per-feature and keeps walking the scope chain (project →
+ * team → organization), raising ModelRestrictedForFeatureError if no other
+ * configured value exists — it never substitutes a model or falls back to
+ * another role, and the role is not closed wholesale (see
+ * CODEX_EXCLUDED_FAST_FEATURE_KEYS).
  *
  * Consumed by:
  *   - the provider registry entry (`restrictedToFeatureKeys`),
@@ -52,8 +55,10 @@ export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
  * refusing it at EXECUTION produced a daily silent failure: scheduled
  * clustering resolved FAST=codex, then threw at the litellm layer with a
  * customer-hostile "coding-assistant surfaces only" message (issue #8287).
- * Excluding it here makes the cascade resolver skip codex for this feature and
- * fall through to a wider tier instead.
+ * Excluding it here makes the cascade resolver skip the codex value and keep
+ * walking the scope chain (project → team → organization) for this feature,
+ * raising ModelRestrictedForFeatureError when no other configured value exists
+ * rather than resolving FAST=codex.
  */
 export const CODEX_EXCLUDED_FAST_FEATURE_KEYS: readonly string[] = [
   "analytics.topic_clustering_llm",
@@ -120,8 +125,10 @@ export function isModelAllowedForFeature({
  * This is deliberately a role-wide "yes" for FAST even though a few FAST
  * features cannot run codex (CODEX_EXCLUDED_FAST_FEATURE_KEYS): those are
  * skipped per-feature by the cascade resolver via `isModelAllowedForFeature`,
- * so the default stays writable while the unrunnable feature falls through to
- * a wider tier rather than closing the whole role.
+ * so the default stays writable while the resolver skips the codex value for
+ * the unrunnable feature and walks the scope chain (raising
+ * ModelRestrictedForFeatureError if no other configured value exists), rather
+ * than closing the whole role.
  */
 export function isModelAllowedAsRoleDefault(
   modelId: string,
