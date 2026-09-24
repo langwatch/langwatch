@@ -6,6 +6,7 @@ import { anomalyDetectionEventing } from "#eventing/ops-anomaly-detection.pipeli
 import { storageStatsEventing } from "#eventing/ops-storage-stats.pipeline";
 import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
+import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
 import { adminRest } from "#transport/admin.rest";
 import { checkupRest } from "#transport/checkup.rest";
 import { checkupTrpcTransport } from "#transport/checkup.trpc";
@@ -41,7 +42,10 @@ export const opsServer = defineServerModule("ops")
   ])
   .withEventing(usageReportEventing)
   .withEventing(anomalyDetectionEventing)
-  .withEventing(storageStatsEventing);
+  .withEventing(storageStatsEventing)
+  .withTasks(({ repositories }) => [
+    ProcessManagerPurgeTask.create({ repository: () => repositories.processManagerPurge }),
+  ]);
 
 /** One request's presented project credential, unverified, or none at all. */
 function apiKeyRequestCredentialOf(

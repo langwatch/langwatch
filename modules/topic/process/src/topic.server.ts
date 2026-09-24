@@ -13,10 +13,7 @@ export const topicServer = defineServerModule("topic")
   .withApp(TopicApp)
   .withTransports(topicTrpcTransport)
   .withEventing(topicClusteringEventing)
-  .withTasks(({ app }) => {
-    if (!(app instanceof TopicApp)) throw new Error("topic's tasks need the TopicApp it installed");
-    return [TopicClusteringRunTask.create({ topics: app })];
-  });
+  .withTasks(({ app }) => [TopicClusteringRunTask.create({ topics: app })]);
 
 /** The OTel-backed page metrics a worker composition mounts beside the installer. */
 export function createTopicClusteringMetrics(): TopicClusteringMetrics {

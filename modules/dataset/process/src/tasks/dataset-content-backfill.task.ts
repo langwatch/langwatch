@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import type { PrismaDatasetMigrationRepository } from "#repositories/prisma/prisma.dataset-migration.repository";
+import type { DatasetMigrationRepository } from "#repositories/dataset-migration.repository";
 
 const logger = createLogger("langwatch:tasks:backfill-dataset-content-to-object-storage");
 
@@ -37,14 +37,8 @@ export class DatasetContentBackfillSweep {
   }
 }
 
-type DatasetBackfillOutcome = Awaited<
-  ReturnType<ReturnType<typeof PrismaDatasetMigrationRepository.create>["run"]>
->;
-
-/** What the sweep needs of the Postgres migration adapter, and nothing more. */
-export type DatasetContentMigration = {
-  run(input: { dryRun: boolean }): Promise<DatasetBackfillOutcome>;
-};
+/** What the sweep needs of the migration repository, and nothing more. */
+export type DatasetContentMigration = Pick<DatasetMigrationRepository, "run">;
 
 /**
  * The task-launcher entry — `pnpm --filter @langwatch/tasks task dataset-content-backfill`.
@@ -77,8 +71,11 @@ export class DatasetContentBackfillTask extends Task {
     return new DatasetContentBackfillTask(migration, skipped, dryRun);
   }
 
-  async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
+  async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const sweep = DatasetContentBackfillSweep.withMigration(this.migration());
-    await sweep.execute({ skipped: this.skipped, dryRun: this.dryRun });
+    await sweep.execute({
+      skipped: this.skipped,
+      dryRun: this.dryRun || args.includes("--dry-run"),
+    });
   }
 }

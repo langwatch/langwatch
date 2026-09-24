@@ -1,5 +1,6 @@
 import type { BatchEvaluationRepository } from "./batch-evaluation.repository.ts";
 import type { DatasetContentRepository } from "./dataset-content.repository.ts";
+import type { DatasetMigrationRepository } from "./dataset-migration.repository.ts";
 import type { DatasetRecordContentRepository } from "./dataset-record-content.repository.ts";
 import type { DatasetRecordRepository } from "./dataset-record.repository.ts";
 import type { DatasetUsageRepository } from "./dataset-usage.repository.ts";
@@ -18,4 +19,6 @@ export interface DatasetRepositories {
   readonly batchEvaluations: BatchEvaluationRepository;
   /** The usage report's counts over the three tables above. */
   readonly usage: DatasetUsageRepository;
+  /** The one-off content move only the dataset-content-backfill task runs. */
+  readonly migration: DatasetMigrationRepository;
 }

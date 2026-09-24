@@ -134,12 +134,14 @@ export interface ModuleTaskSetup<
   App,
 > extends ModuleTransportFactSetup<Dependencies, Members, App> {
   readonly repositories: Repositories;
+  /** The secrets this module's App declared, scoped to it; resolve with `secrets.into`. */
+  readonly secrets: ScopedSecrets;
 }
 
 /** Builds a module's one-shot tasks over its booted App, once at install in the tasks role. */
 export type ModuleTaskBinder<Dependencies extends TokenMap, Members, Repositories, App> = (
   setup: ModuleTaskSetup<Dependencies, Members, Repositories, App>,
-) => readonly unknown[];
+) => readonly unknown[] | Promise<readonly unknown[]>;
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
@@ -999,6 +1001,7 @@ type RepositoryAppDefinition<
   Config,
   Repositories,
   App,
+  Created extends App = App,
 > = AppContract<Dependencies, App> &
   Readonly<{
     /** Present when the App declared its own slice instead (§6). */
@@ -1007,7 +1010,7 @@ type RepositoryAppDefinition<
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, never, NoInfer<Config>, Repositories> &
         Readonly<{ members: Members }>,
-    ) => NoInfer<App> | Promise<NoInfer<App>>;
+    ) => Created | Promise<Created>;
   }>;
 
 /**
@@ -1020,6 +1023,7 @@ type RepositoryDeclaredConfigAppDefinition<
   Slice extends ConfigSlice,
   Repositories,
   App,
+  Created extends App = App,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly config: Slice;
@@ -1027,7 +1031,7 @@ type RepositoryDeclaredConfigAppDefinition<
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, never, ConfigOf<Slice>, Repositories> &
         Readonly<{ members: Members }>,
-    ) => NoInfer<App> | Promise<NoInfer<App>>;
+    ) => Created | Promise<Created>;
   }>;
 
 type RepositoryAppDefinitionWithoutConfig<
@@ -1035,13 +1039,14 @@ type RepositoryAppDefinitionWithoutConfig<
   Members,
   Repositories,
   App,
+  Created extends App = App,
 > = AppContract<Dependencies, App> &
   Readonly<{
     readonly reads?: readonly string[];
     readonly create: (
       setup: FeatureSetup<NoInfer<Dependencies>, never, undefined, Repositories> &
         Readonly<{ members: Members }>,
-    ) => NoInfer<App> | Promise<NoInfer<App>>;
+    ) => Created | Promise<Created>;
   }>;
 
 class RepositoryDefinedFeatureBuilder<
@@ -1059,6 +1064,7 @@ class RepositoryDefinedFeatureBuilder<
     Members extends object,
     Config,
     App,
+    Created extends App,
     const Reads extends readonly string[],
   >(
     app: RepositoryAppDefinition<
@@ -1066,44 +1072,83 @@ class RepositoryDefinedFeatureBuilder<
       Members,
       Config,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     > & { readonly reads: Reads },
-  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>;
+  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads, Created>;
   withApp<
     Dependencies extends TokenMap,
     Members extends object,
     App,
+    Created extends App,
     const Reads extends readonly string[],
   >(
     app: RepositoryAppDefinitionWithoutConfig<
       Dependencies,
       Members,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     > & { readonly reads: Reads },
-  ): RepositoryUnconfiguredAppBuilder<Name, Live, Memory, Dependencies, Members, App, Reads>;
-  withApp<Dependencies extends TokenMap, Members extends object, Config, App>(
+  ): RepositoryUnconfiguredAppBuilder<
+    Name,
+    Live,
+    Memory,
+    Dependencies,
+    Members,
+    App,
+    Reads,
+    Created
+  >;
+  withApp<Dependencies extends TokenMap, Members extends object, Config, App, Created extends App>(
     app: RepositoryAppDefinition<
       Dependencies,
       Members,
       Config,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     >,
-  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, readonly []>;
-  withApp<Dependencies extends TokenMap, Members extends object = object, App = unknown>(
+  ): RepositoryAppBuilder<
+    Name,
+    Live,
+    Memory,
+    Dependencies,
+    Members,
+    Config,
+    App,
+    readonly [],
+    Created
+  >;
+  withApp<
+    Dependencies extends TokenMap,
+    Members extends object = object,
+    App = unknown,
+    Created extends App = App,
+  >(
     app: RepositoryAppDefinitionWithoutConfig<
       Dependencies,
       Members,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     >,
-  ): RepositoryUnconfiguredAppBuilder<Name, Live, Memory, Dependencies, Members, App, readonly []>;
+  ): RepositoryUnconfiguredAppBuilder<
+    Name,
+    Live,
+    Memory,
+    Dependencies,
+    Members,
+    App,
+    readonly [],
+    Created
+  >;
   withApp<
     Dependencies extends TokenMap,
     Members extends object,
     Slice extends ConfigSlice,
     App,
+    Created extends App,
     const Reads extends readonly string[],
   >(
     app: RepositoryDeclaredConfigAppDefinition<
@@ -1111,16 +1156,34 @@ class RepositoryDefinedFeatureBuilder<
       Members,
       Slice,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     > & { readonly reads: Reads },
-  ): RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, ConfigOf<Slice>, App, Reads>;
-  withApp<Dependencies extends TokenMap, Members extends object, Slice extends ConfigSlice, App>(
+  ): RepositoryAppBuilder<
+    Name,
+    Live,
+    Memory,
+    Dependencies,
+    Members,
+    ConfigOf<Slice>,
+    App,
+    Reads,
+    Created
+  >;
+  withApp<
+    Dependencies extends TokenMap,
+    Members extends object,
+    Slice extends ConfigSlice,
+    App,
+    Created extends App,
+  >(
     app: RepositoryDeclaredConfigAppDefinition<
       Dependencies,
       Members,
       Slice,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     >,
   ): RepositoryAppBuilder<
     Name,
@@ -1130,7 +1193,8 @@ class RepositoryDefinedFeatureBuilder<
     Members,
     ConfigOf<Slice>,
     App,
-    readonly []
+    readonly [],
+    Created
   >;
   withApp(
     app:
@@ -1166,6 +1230,7 @@ class RepositoryAppBuilder<
   Config,
   App,
   Reads extends readonly string[] = readonly [],
+  Created extends App = App,
 > {
   constructor(
     private readonly name: Name,
@@ -1175,7 +1240,8 @@ class RepositoryAppBuilder<
       Members,
       Config,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     > & { readonly reads?: Reads },
   ) {}
 
@@ -1188,7 +1254,8 @@ class RepositoryAppBuilder<
     ModuleRepositories<Live, Memory>,
     App,
     Dependencies,
-    Members
+    Members,
+    Created
   > {
     return withContributions<
       ReturnType<
@@ -1197,7 +1264,8 @@ class RepositoryAppBuilder<
       ModuleRepositories<Live, Memory>,
       App,
       Dependencies,
-      Members
+      Members,
+      Created
     >({
       declaration: { ...this.build(), transports, namespace: publicNamespace(this.name) },
       workers: [],
@@ -1212,7 +1280,10 @@ class RepositoryAppBuilder<
         RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
       >,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Dependencies,
+      Members,
+      Created
     >({ declaration: this.build(), workers, tasks: [] });
   }
 
@@ -1223,7 +1294,10 @@ class RepositoryAppBuilder<
         RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
       >,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Dependencies,
+      Members,
+      Created
     >({ declaration: this.build(), workers: [], tasks });
   }
 
@@ -1248,16 +1322,25 @@ class RepositoryAppBuilder<
     const setup = serverFeature<Members>(name)
       .withConfigType<Config>()
       .withDependencies(app.dependencies)
-      .withSetup(({ dependencies, members, config, secrets, resources, repositories }) => {
-        return app.create({
+      .withSetup(
+        ({
           dependencies,
           members,
           config,
           secrets,
           resources,
-          repositories: repositories as ModuleRepositories<Live, Memory>,
-        });
-      })
+          repositories,
+        }): App | Promise<App> => {
+          return app.create({
+            dependencies,
+            members,
+            config,
+            secrets,
+            resources,
+            repositories: repositories as ModuleRepositories<Live, Memory>,
+          });
+        },
+      )
       .provides(app.contract)
       .build();
     return {
@@ -1295,14 +1378,20 @@ class RepositoryAppBuilder<
       RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
     >,
     ModuleRepositories<Live, Memory>,
-    App
+    App,
+    Dependencies,
+    Members,
+    Created
   > {
     return withContributions<
       ReturnType<
         RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, Config, App, Reads>["build"]
       >,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Dependencies,
+      Members,
+      Created
     >({ declaration: this.build(), workers: [], tasks: [], eventing: eventing as FeatureEventing });
   }
 }
@@ -1315,7 +1404,18 @@ class RepositoryUnconfiguredAppBuilder<
   Members extends object,
   App,
   Reads extends readonly string[] = readonly [],
-> extends RepositoryAppBuilder<Name, Live, Memory, Dependencies, Members, undefined, App, Reads> {
+  Created extends App = App,
+> extends RepositoryAppBuilder<
+  Name,
+  Live,
+  Memory,
+  Dependencies,
+  Members,
+  undefined,
+  App,
+  Reads,
+  Created
+> {
   constructor(
     name: Name,
     repositories: RepositoryRegistry<Live, Memory>,
@@ -1323,7 +1423,8 @@ class RepositoryUnconfiguredAppBuilder<
       Dependencies,
       Members,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     > & { readonly reads?: Reads },
   ) {
     // Named member by member: an app is usually a class, and spreading a class
@@ -1339,7 +1440,8 @@ class RepositoryUnconfiguredAppBuilder<
       Members,
       undefined,
       ModuleRepositories<Live, Memory>,
-      App
+      App,
+      Created
     > & { readonly reads?: Reads });
   }
 }
@@ -1565,6 +1667,7 @@ export type ModuleContributions<
   App = unknown,
   Dependencies extends TokenMap = TokenMap,
   Members = unknown,
+  Created = App,
 > = Declaration &
   Readonly<{
     readonly workers: readonly unknown[];
@@ -1572,24 +1675,25 @@ export type ModuleContributions<
     readonly eventing: FeatureEventing | undefined;
     withWorkers(
       ...workers: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     withTasks(
-      bind: ModuleTaskBinder<Dependencies, Members, Repositories, App>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+      bind: ModuleTaskBinder<Dependencies, Members, Repositories, Created>,
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     withTasks(
       ...tasks: readonly unknown[]
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     /** What this module binds for the facts its own declarations name. */
     withTransportFacts(
       bind: ModuleTransportFacts<Dependencies, Members, App>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
     withEventing<Definition>(
       eventing: FeatureEventing<Repositories, App, unknown, Definition>,
-    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+    ): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
   }>;
 
-/** A built declaration, as the facts wrapper reads the two fields it needs. */
+/** A built declaration, as the facts and tasks wrappers read the fields they need. */
 interface InstallableDeclaration {
+  readonly name: string;
   readonly dependencies: TokenMap;
   readonly install: (args: FeatureInstallArguments<never>) => Promise<InstalledFeatureState>;
 }
@@ -1635,7 +1739,7 @@ function bindingTasks<Declaration extends object>(
       const state = await installable.install(args);
       if (args.role !== "tasks") return state;
 
-      const built = bind({
+      const built = await bind({
         app: state.provided as never,
         repositories: state.repositories,
         dependencies: resolveTokens(
@@ -1643,6 +1747,7 @@ function bindingTasks<Declaration extends object>(
           args.resolve,
         ) as ResolvedTokens<TokenMap>,
         members: args.members,
+        secrets: args.secrets ?? undeclaredSecrets(installable.name),
       });
       return { ...state, tasks: [...(state.tasks ?? []), ...built] };
     },
@@ -1656,6 +1761,7 @@ function withContributions<
   App = unknown,
   Dependencies extends TokenMap = TokenMap,
   Members = unknown,
+  Created = App,
 >({
   declaration,
   workers,
@@ -1666,7 +1772,7 @@ function withContributions<
   workers: readonly unknown[];
   tasks: readonly unknown[];
   eventing?: FeatureEventing;
-}): ModuleContributions<Declaration, Repositories, App, Dependencies, Members> {
+}): ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created> {
   const contributions = {
     ...declaration,
     workers,
@@ -1700,7 +1806,7 @@ function withContributions<
         tasks,
         eventing: withAnotherPipeline(eventing, next),
       }),
-  } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members>;
+  } as ModuleContributions<Declaration, Repositories, App, Dependencies, Members, Created>;
 
   return contributions;
 }

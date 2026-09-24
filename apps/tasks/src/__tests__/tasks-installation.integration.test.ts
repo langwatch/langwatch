@@ -142,6 +142,10 @@ describe("the tasks process installation", () => {
       expect(names).toEqual([
         "backfill-annotations-to-clickhouse",
         "slack-alert",
+        "stripe-prices-sync",
+        "dataset-content-backfill",
+        "model-registry-sync",
+        "process-manager-purge",
         "stalled-runs-backfill",
         "topic-clustering-run",
       ]);

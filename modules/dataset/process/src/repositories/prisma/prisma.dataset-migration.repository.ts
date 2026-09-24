@@ -4,6 +4,12 @@ import { z } from "zod";
 
 import { StreamingChunkWriterService } from "../../services/dataset-chunk-writer.service.ts";
 import type { DatasetChunkRepository } from "../dataset-chunk.repository.ts";
+import type {
+  DatasetMigrationOutcome,
+  DatasetMigrationRepository,
+  DatasetMigrationRunResult,
+  DatasetMigrationSummary,
+} from "../dataset-migration.repository.ts";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
   DATASET_MUTATION_TXN_TIMEOUT_MS,
@@ -13,30 +19,12 @@ const logger = createLogger("langwatch:dataset:migration");
 const DATASET_PAGE_SIZE = 50;
 const RECORD_PAGE_SIZE = 1000;
 
-export type DatasetMigrationOutcome =
-  | "migrated"
-  | "already-migrated"
-  | "would-migrate"
-  | "skipped-concurrent-write";
-
-export type DatasetMigrationSummary = {
-  migrated: number;
-  wouldMigrate: number;
-  alreadyMigrated: number;
-  skippedConcurrentWrite: number;
-  failed: number;
-};
-
-export type DatasetMigrationRunResult =
-  | { status: "completed"; summary: DatasetMigrationSummary }
-  | { status: "schema-pending" };
-
 /**
  * Process adapter for the one-off Postgres-to-object-storage migration. Takes
  * the process's own typed client, since Prisma's `aggregate` return type is
  * derived from its call arguments and no hand-written delegate can state it.
  */
-export class PrismaDatasetMigrationRepository {
+export class PrismaDatasetMigrationRepository implements DatasetMigrationRepository {
   static create(options: {
     database: PrismaClient;
     storage: DatasetChunkRepository;

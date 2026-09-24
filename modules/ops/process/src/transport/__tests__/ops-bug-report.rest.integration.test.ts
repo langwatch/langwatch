@@ -22,6 +22,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
 import type { BugReportNotifier, BugReportRateLimiter } from "../../app/ops.app.ts";
+import { MemoryProcessManagerPurgeRepository } from "../../repositories/memory/memory.process-manager-purge.repository.ts";
 import { PrismaBugReportRepository } from "../../repositories/prisma/prisma.bug-report.repository.ts";
 import { bugReportCredential, opsBugReportRest } from "../ops-bug-report.rest.ts";
 
@@ -93,6 +94,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       repositories: {
         bugReports: repository,
         processStore: InMemoryProcessStore.createForTesting(),
+        processManagerPurge: MemoryProcessManagerPurgeRepository.create(),
       },
       ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
       members: {

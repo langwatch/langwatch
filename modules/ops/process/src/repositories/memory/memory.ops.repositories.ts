@@ -3,6 +3,7 @@ import { InMemoryProcessStore } from "@langwatch/eventing";
 import type { OpsRepositories } from "../ops.repositories.ts";
 import { MemoryBugReportRepository } from "./memory.bug-report.repository.ts";
 import { MemoryOpsStore } from "./memory.ops.store.ts";
+import { MemoryProcessManagerPurgeRepository } from "./memory.process-manager-purge.repository.ts";
 
 /**
  * One store per composed process, shared by every twin, so a row one
@@ -17,6 +18,7 @@ export class MemoryOpsRepositories {
     return {
       bugReports: MemoryBugReportRepository.create({ store }),
       processStore: InMemoryProcessStore.createForLocalDevelopment(),
+      processManagerPurge: MemoryProcessManagerPurgeRepository.create(),
     };
   }
 }

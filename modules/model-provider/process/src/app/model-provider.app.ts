@@ -209,7 +209,7 @@ export class ModelProviderApp implements ModelProviderApi {
    * one is optional: a deployment holding none dispatches on customer
    * credentials alone, which is what a self-hosted install does.
    */
-  static readonly secrets = {
+  static readonly platformCredentials = {
     openai: openAiApiKey,
     openai_codex: Secret.load("CODEX_ACCESS_TOKEN", { optional: true }),
     anthropic: Secret.load("ANTHROPIC_API_KEY", { optional: true }),
@@ -224,6 +224,14 @@ export class ModelProviderApp implements ModelProviderApi {
     voyage: Secret.load("VOYAGE_API_KEY", { optional: true }),
     elevenlabs: Secret.load("ELEVENLABS_API_KEY", { optional: true }),
     custom: Secret.load("CUSTOM_API_KEY", { optional: true }),
+  } as const;
+  /** What the module's own operations spend, never a platform provider credential. */
+  static readonly operationalSecrets = {
+    openRouter: Secret.load("OPENROUTER_API_KEY", { optional: true }),
+  } as const;
+  static readonly secrets = {
+    ...ModelProviderApp.platformCredentials,
+    ...ModelProviderApp.operationalSecrets,
   } as const;
   static readonly reads = [...reads("redis"), "nlpServiceUrl"] as const;
 
@@ -242,7 +250,7 @@ export class ModelProviderApp implements ModelProviderApi {
     secrets: ModelProviderSetup["secrets"],
   ): Promise<PlatformProviderChainService> {
     let chain = PlatformProviderChainService.create();
-    for (const [provider, handle] of Object.entries(ModelProviderApp.secrets)) {
+    for (const [provider, handle] of Object.entries(ModelProviderApp.platformCredentials)) {
       chain = await secrets.into(handle, (credential) => chain.with(provider, credential));
     }
 

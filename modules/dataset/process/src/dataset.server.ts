@@ -8,6 +8,7 @@ import { datasetRepositories } from "#repositories/dataset-repositories.registry
 import { DatasetNormalizationService } from "#services/dataset-normalization.service";
 import { DatasetNormalizeAdapter } from "#services/dataset-normalize.service";
 import type { DatasetNormalizeDeps } from "#services/dataset-normalize.service";
+import { DatasetContentBackfillTask } from "#tasks/dataset-content-backfill.task";
 import { batchRecordTrpcTransport } from "#transport/batch-record.trpc";
 import { datasetRecordTrpcTransport } from "#transport/dataset-record.trpc";
 import { createDatasetRest } from "#transport/dataset.rest";
@@ -21,7 +22,10 @@ export const datasetServer = defineServerModule("dataset")
     datasetTrpcTransport,
     datasetRecordTrpcTransport,
     batchRecordTrpcTransport,
-  );
+  )
+  .withTasks(({ repositories }) => [
+    DatasetContentBackfillTask.create({ migration: () => repositories.migration }),
+  ]);
 
 /** Normalization seams for a composing process. */
 export function createDatasetNormalize(deps: DatasetNormalizeDeps): DatasetNormalize {

@@ -50,6 +50,7 @@ import { UnavailableModelProviderCredentialProbeAdapter } from "./services/unava
 import { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
 import { VercelAiModelTranslationAdapter } from "./services/vercel-ai.model-translation.service.ts";
 import { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
+import { ModelRegistrySyncTask } from "./tasks/model-registry-sync.task.ts";
 import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
 import { modelDefaultsRest, modelDefaultsRestCredential } from "./transport/model-defaults.rest.ts";
 import { modelProviderRest } from "./transport/model-provider.rest.ts";
@@ -81,6 +82,11 @@ export const modelProviderServer = defineServerModule("model-provider")
         organizationId: credential.organizationId,
       };
     }),
+  ])
+  .withTasks(async ({ secrets }) => [
+    await secrets.into(ModelProviderApp.operationalSecrets.openRouter, (apiKey) =>
+      ModelRegistrySyncTask.create({ apiKey: () => apiKey }),
+    ),
   ]);
 
 // Model Provider's composition seam: a process composes the gateway through the factories below

@@ -36,6 +36,7 @@ import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "./services/usage-reporting.service.ts";
+import { StripePricesSyncTask } from "./tasks/stripe-prices-sync.task.ts";
 import { connectedBillingTrpcTransport } from "./transport/connected-billing.trpc.ts";
 
 /**
@@ -47,7 +48,12 @@ export const billingServer = defineServerModule("billing")
   .withApp(BillingApp)
   .withTransports(connectedBillingTrpcTransport)
   .withEventing(connectedBillingEventing)
-  .withEventing(billingReportingEventing);
+  .withEventing(billingReportingEventing)
+  .withTasks(async ({ secrets }) => [
+    await secrets.into(BillingApp.secrets.stripeSecretKey, (secretKey) =>
+      StripePricesSyncTask.create({ secretKey: () => secretKey }),
+    ),
+  ]);
 
 /** The billable-events totals a reporting run reads, over the process's own endpoints. */
 export function createBillableEventsQuery(options: {
