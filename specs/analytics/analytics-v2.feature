@@ -70,6 +70,21 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
     Then the page shows a single message saying LangWatchQL is not enabled for this project
     And no widget cards are rendered
 
+  @integration
+  Scenario: The page waits while the organization is still resolving
+    Given a member opens /[project]/analytics-v2
+    When the organization or the LangWatchQL flag has not resolved yet
+    Then the page shows a loading spinner
+    And neither the disabled message nor any widget card is rendered
+
+  @integration
+  Scenario: A failed LangWatchQL flag check offers a retry
+    Given a member opens /[project]/analytics-v2
+    When the LangWatchQL flag check fails
+    Then the page says it could not check whether LangWatchQL is enabled for this project
+    And a Try again control re-runs the flag check
+    And the page never claims LangWatchQL is disabled
+
   @unit
   Scenario: Reverting the change needs no data migration
     Given the change is reverted
@@ -93,5 +108,7 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
   # AC7  (starter dashboard seed still resolves)              -> The starter dashboard seed still resolves every widget file
   # AC8  (one widget failure isolated from the rest)          -> One failing widget does not take the other eight down
   # AC9  (LangWatchQL-disabled project message)               -> A project without LangWatchQL sees one clear message
+  # AC9  (supporting)                                         -> The page waits while the organization is still resolving
+  # AC9  (supporting)                                         -> A failed LangWatchQL flag check offers a retry
   # AC10 (rollback needs no data migration)                   -> Reverting the change needs no data migration
   # AC11 (query API only, no legacy analytics router reads)   -> Every chart reads its data through the LangWatchQL query API only

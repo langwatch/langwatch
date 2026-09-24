@@ -182,7 +182,7 @@ describe("the Analytics v2 page", () => {
   });
 
   describe("when the organization is still resolving", () => {
-    /** @scenario "A project without LangWatchQL sees one clear message" */
+    /** @scenario "The page waits while the organization is still resolving" */
     it("shows the spinner and neither the disabled message nor a widget card", async () => {
       state.organization = undefined;
       const { default: AnalyticsV2Page } = await import("../index");
@@ -196,7 +196,7 @@ describe("the Analytics v2 page", () => {
   });
 
   describe("when the LangWatchQL flag check fails", () => {
-    /** @scenario "A project without LangWatchQL sees one clear message" */
+    /** @scenario "A failed LangWatchQL flag check offers a retry" */
     it("shows a retryable error and clicking Try again refetches", async () => {
       state.lwqlIsError = true;
       const { default: AnalyticsV2Page } = await import("../index");
