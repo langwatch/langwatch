@@ -113,7 +113,7 @@ export function createPullRequestMappingHandler(
 /** The production fold subscriber, shared by composition and policy tests. */
 export function createPullRequestMappingSubscriber(
   github: CodingAgentPullRequestMapping,
-): SubscriberSpec<CodingAgentProcessingEvent> & {
+): SubscriberSpec<CodingAgentProcessingEvent, CodingAgentSessionState> & {
   fold: "codingAgentSession";
   map?: never;
 } {

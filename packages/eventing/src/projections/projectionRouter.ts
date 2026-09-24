@@ -38,12 +38,21 @@ import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.typ
 import { toError } from "../utils/errors.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
-import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
+import type { FoldProjectionDefinition, FoldStateRead } from "./foldProjection.types.ts";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor.ts";
 import type { MapProjectionDefinition } from "./mapProjection.types.ts";
 import { MapProjectionExecutor } from "./mapProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 import type { ReplayMarkerChecker } from "./replayMarkerCheck.ts";
+import {
+  type SealedFoldProjection,
+  type MapProjectionView,
+  type SealedMapProjection,
+  type SealedStateProjection,
+  sealFoldProjection,
+  sealMapProjection,
+  sealStateProjection,
+} from "./sealedProjection.ts";
 import type { StateProjectionDefinition } from "./stateProjection.types.ts";
 import { StateProjectionExecutor } from "./stateProjectionExecutor.ts";
 
@@ -93,9 +102,9 @@ export class ProjectionRouter<
   private readonly stateProjectionExecutor = new StateProjectionExecutor();
   private readonly mapExecutor = new MapProjectionExecutor();
 
-  private readonly foldProjections = new Map<string, FoldProjectionDefinition<any, EventType>>();
-  private readonly stateProjections = new Map<string, StateProjectionDefinition<any, EventType>>();
-  private readonly mapProjections = new Map<string, MapProjectionDefinition<any, EventType>>();
+  private readonly foldProjections = new Map<string, SealedFoldProjection<EventType>>();
+  private readonly stateProjections = new Map<string, SealedStateProjection<EventType>>();
+  private readonly mapProjections = new Map<string, SealedMapProjection<EventType>>();
   private readonly subscribersForFold = new Map<
     string,
     SubscriberDispatchDefinition<EventType>[]
@@ -120,7 +129,7 @@ export class ProjectionRouter<
     this.killSwitch = options.killSwitch;
   }
 
-  registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
+  registerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
     if (this.foldProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -130,15 +139,15 @@ export class ProjectionRouter<
     }
     this.assertCoalesceWithinAppliedIdCap(projection);
     this.assertTrustedAbsenceIsTimeLocal(projection);
-    this.foldProjections.set(projection.name, projection);
+    this.foldProjections.set(projection.name, sealFoldProjection(projection));
   }
 
   /**
    * `trustAbsentMiss` treats an absent windowed read as proof nothing was
    * committed — only true for aggregate types whose rows never outlive the window.
    */
-  private assertTrustedAbsenceIsTimeLocal(
-    projection: FoldProjectionDefinition<any, EventType>,
+  private assertTrustedAbsenceIsTimeLocal<State>(
+    projection: FoldProjectionDefinition<State, EventType>,
   ): void {
     if (projection.options?.trustAbsentMiss !== true) return;
     if (projection.options.readWindow === undefined) return;
@@ -159,8 +168,8 @@ export class ProjectionRouter<
    * while ClickHouse doesn't — coalescing at or above that cap lets a
    * cache-hit retry double-count ids surviving only in ClickHouse.
    */
-  private assertCoalesceWithinAppliedIdCap(
-    projection: FoldProjectionDefinition<any, EventType>,
+  private assertCoalesceWithinAppliedIdCap<State>(
+    projection: FoldProjectionDefinition<State, EventType>,
   ): void {
     const hasDurableWatermark =
       typeof (projection.store as { getWithApplied?: unknown }).getWithApplied === "function";
@@ -180,7 +189,7 @@ export class ProjectionRouter<
     );
   }
 
-  registerStateProjection(projection: StateProjectionDefinition<any, EventType>): void {
+  registerStateProjection<State>(projection: StateProjectionDefinition<State, EventType>): void {
     if (this.stateProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -188,10 +197,12 @@ export class ProjectionRouter<
         { projectionName: projection.name },
       );
     }
-    this.stateProjections.set(projection.name, projection);
+    this.stateProjections.set(projection.name, sealStateProjection(projection));
   }
 
-  registerMapProjection(projection: MapProjectionDefinition<any, EventType>): void {
+  registerMapProjection<MapRecord>(
+    projection: MapProjectionDefinition<MapRecord, EventType>,
+  ): void {
     if (this.mapProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRouter",
@@ -199,7 +210,7 @@ export class ProjectionRouter<
         { projectionName: projection.name },
       );
     }
-    this.mapProjections.set(projection.name, projection);
+    this.mapProjections.set(projection.name, sealMapProjection(projection));
   }
 
   registerSubscriber(foldName: string, subscriber: SubscriberDispatchDefinition<EventType>): void {
@@ -427,7 +438,7 @@ export class ProjectionRouter<
       }
     > = {};
 
-    for (const [name, projection] of this.stateProjections) {
+    for (const [name, { definition: projection, open: openProjection }] of this.stateProjections) {
       projectionDefs[name] = {
         name,
         groupKeyFn: projection.key,
@@ -451,12 +462,14 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents({
-          projectionName,
-          projection,
-          events: [event],
-          context,
-        });
+        await projection.open((definition) =>
+          this.processStateProjectionEvents({
+            projectionName,
+            projection: definition,
+            events: [event],
+            context,
+          }),
+        );
       },
       async (projectionName, events, context) => {
         const projection = this.stateProjections.get(projectionName);
@@ -467,7 +480,14 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents({ projectionName, projection, events, context });
+        await projection.open((definition) =>
+          this.processStateProjectionEvents({
+            projectionName,
+            projection: definition,
+            events,
+            context,
+          }),
+        );
       },
     );
   }
@@ -490,7 +510,7 @@ export class ProjectionRouter<
       }
     > = {};
 
-    for (const [name, fold] of this.foldProjections) {
+    for (const [name, { definition: fold, open: openFold }] of this.foldProjections) {
       projectionDefs[name] = {
         name,
         groupKeyFn: fold.key,
@@ -517,17 +537,19 @@ export class ProjectionRouter<
           );
         }
 
-        await this.processFoldProjectionEvent({
-          projectionName,
-          fold,
-          event: triggerEvent,
-          context: {
-            tenantId: triggerEvent.tenantId,
-            ...(context.deliveryAttempt !== undefined
-              ? { deliveryAttempt: context.deliveryAttempt }
-              : {}),
-          },
-        });
+        await fold.open((definition) =>
+          this.processFoldProjectionEvent({
+            projectionName,
+            fold: definition,
+            event: triggerEvent,
+            context: {
+              tenantId: triggerEvent.tenantId,
+              ...(context.deliveryAttempt !== undefined
+                ? { deliveryAttempt: context.deliveryAttempt }
+                : {}),
+            },
+          }),
+        );
       },
       async (projectionName, events, context) => {
         const fold = this.foldProjections.get(projectionName);
@@ -539,24 +561,26 @@ export class ProjectionRouter<
           );
         }
 
-        await this.processFoldProjectionBatch({
-          projectionName,
-          fold,
-          events,
-          context: {
-            tenantId: events[0]!.tenantId,
-            ...(context.deliveryAttempt !== undefined
-              ? { deliveryAttempt: context.deliveryAttempt }
-              : {}),
-            // A bisected sub-batch after the first commit of its dispatch: the
-            // fold commit must extend the applied-id set, not replace it
-            // (#6578). Dropping this here silently re-enables the double-apply
-            // this chain exists to prevent.
-            ...(context.isDeliveryContinuation !== undefined
-              ? { isDeliveryContinuation: context.isDeliveryContinuation }
-              : {}),
-          },
-        });
+        await fold.open((definition) =>
+          this.processFoldProjectionBatch({
+            projectionName,
+            fold: definition,
+            events,
+            context: {
+              tenantId: events[0]!.tenantId,
+              ...(context.deliveryAttempt !== undefined
+                ? { deliveryAttempt: context.deliveryAttempt }
+                : {}),
+              // A bisected sub-batch after the first commit of its dispatch: the
+              // fold commit must extend the applied-id set, not replace it
+              // (#6578). Dropping this here silently re-enables the double-apply
+              // this chain exists to prevent.
+              ...(context.isDeliveryContinuation !== undefined
+                ? { isDeliveryContinuation: context.isDeliveryContinuation }
+                : {}),
+            },
+          }),
+        );
       },
     );
   }
@@ -581,7 +605,7 @@ export class ProjectionRouter<
       }
     > = {};
 
-    for (const [name, mapProj] of this.mapProjections) {
+    for (const [name, { definition: mapProj, open: openMap }] of this.mapProjections) {
       handlerDefs[name] = {
         name,
         handler: {
@@ -595,7 +619,8 @@ export class ProjectionRouter<
 
             const context = await this.buildStoreContext({ event });
             const record = await withMetrics({
-              fn: () => this.mapExecutor.execute(mapProj, event, context),
+              fn: () =>
+                openMap((definition) => this.mapExecutor.execute(definition, event, context)),
               onComplete: (ms) => {
                 incrementEsMapProjectionTotal({
                   pipelineName: this.pipelineName,
@@ -653,7 +678,10 @@ export class ProjectionRouter<
               tenantId: event.tenantId,
             }));
             const mapped = await withMetrics({
-              fn: () => this.mapExecutor.executeBatch(mapProj, toApply, contexts),
+              fn: () =>
+                openMap((definition) =>
+                  this.mapExecutor.executeBatch(definition, toApply, contexts),
+                ),
               onComplete: (ms) => {
                 for (const _event of toApply) {
                   incrementEsMapProjectionTotal({
@@ -832,7 +860,7 @@ export class ProjectionRouter<
 
     if (hasProjectionQueues) {
       // Async dispatch via queues using batching
-      for (const [projectionName, fold] of this.foldProjections) {
+      for (const [projectionName, { definition: fold, open: openFold }] of this.foldProjections) {
         const matching =
           fold.eventTypes.length > 0
             ? events.filter((e) => fold.eventTypes.includes(e.type))
@@ -870,12 +898,14 @@ export class ProjectionRouter<
     } else {
       // Inline sync processing
       for (const event of events) {
-        for (const [projectionName, fold] of this.foldProjections) {
+        for (const [projectionName, { definition: fold, open: openFold }] of this.foldProjections) {
           if (fold.eventTypes.length > 0 && !fold.eventTypes.includes(event.type)) {
             continue;
           }
           try {
-            await this.processFoldProjectionEvent({ projectionName, fold, event, context });
+            await openFold((definition) =>
+              this.processFoldProjectionEvent({ projectionName, fold: definition, event, context }),
+            );
           } catch (error) {
             const category = categorizeError(error);
             handleError(error, category, this.logger, {
@@ -897,7 +927,7 @@ export class ProjectionRouter<
     }
   }
 
-  private async sendToStateProjection({
+  private async sendToStateProjection<State>({
     name,
     projection,
     matching,
@@ -905,7 +935,7 @@ export class ProjectionRouter<
     queued,
   }: {
     name: string;
-    projection: StateProjectionDefinition<unknown, EventType>;
+    projection: StateProjectionDefinition<State, EventType>;
     matching: EventType[];
     context: EventStoreReadContext<EventType>;
     queued: boolean;
@@ -935,7 +965,7 @@ export class ProjectionRouter<
     const queued = this.queueManager.hasStateProjectionQueues();
     const errors: Error[] = [];
 
-    for (const [name, projection] of this.stateProjections) {
+    for (const [name, { definition: projection, open: openProjection }] of this.stateProjections) {
       const matching =
         projection.eventTypes.length === 0
           ? [...events]
@@ -943,7 +973,9 @@ export class ProjectionRouter<
       if (matching.length === 0) continue;
 
       try {
-        await this.sendToStateProjection({ name, projection, matching, context, queued });
+        await openProjection((definition) =>
+          this.sendToStateProjection({ name, projection: definition, matching, context, queued }),
+        );
       } catch (error) {
         this.logger.error(
           {
@@ -970,13 +1002,13 @@ export class ProjectionRouter<
    * the replay-marker gate, the metered execute, and the subscriber dispatch
    * that a produced record earns.
    */
-  private async executeInlineMapProjection({
+  private async executeInlineMapProjection<MapRecord>({
     name,
     mapProj,
     event,
   }: {
     name: string;
-    mapProj: MapProjectionDefinition<any, EventType>;
+    mapProj: MapProjectionDefinition<MapRecord, EventType>;
     event: EventType;
   }): Promise<void> {
     if (this.replayMarkerChecker) {
@@ -1032,7 +1064,7 @@ export class ProjectionRouter<
 
     if (hasHandlerQueues) {
       // Async dispatch via queues using batching per handler
-      for (const [name, mapProj] of this.mapProjections) {
+      for (const [name, { definition: mapProj, open: openMap }] of this.mapProjections) {
         if (mapProj.options?.disabled) continue;
 
         // Filter events for this handler
@@ -1100,7 +1132,7 @@ export class ProjectionRouter<
     } else {
       // Inline sync processing
       for (const event of events) {
-        for (const [name, mapProj] of this.mapProjections) {
+        for (const [name, { definition: mapProj, open: openMap }] of this.mapProjections) {
           if (mapProj.options?.disabled) continue;
 
           if (
@@ -1141,7 +1173,9 @@ export class ProjectionRouter<
           });
 
           try {
-            await this.executeInlineMapProjection({ name, mapProj, event });
+            await openMap((definition) =>
+              this.executeInlineMapProjection({ name, mapProj: definition, event }),
+            );
           } catch (error) {
             handleError(error, categorizeError(error), this.logger, {
               handlerName: name,
@@ -1170,7 +1204,7 @@ export class ProjectionRouter<
     name,
     event,
   }: {
-    mapProj: MapProjectionDefinition<any, EventType>;
+    mapProj: MapProjectionView<EventType>;
     name: string;
     event: EventType;
   }): boolean {
@@ -1394,14 +1428,14 @@ export class ProjectionRouter<
     return kept;
   }
 
-  private async processStateProjectionEvents({
+  private async processStateProjectionEvents<State>({
     projectionName,
     projection,
     events,
     context,
   }: {
     projectionName: string;
-    projection: StateProjectionDefinition<any, EventType>;
+    projection: StateProjectionDefinition<State, EventType>;
     events: EventType[];
     context: EventStoreReadContext<EventType>;
   }): Promise<void> {
@@ -1521,14 +1555,14 @@ export class ProjectionRouter<
    * Processes a single event for a fold projection (incremental).
    * The fold state in the store serves as the checkpoint — no separate checkpoint tracking needed.
    */
-  private async processFoldProjectionEvent({
+  private async processFoldProjectionEvent<State>({
     projectionName,
     fold,
     event,
     context,
   }: {
     projectionName: string;
-    fold: FoldProjectionDefinition<any, EventType>;
+    fold: FoldProjectionDefinition<State, EventType>;
     event: EventType;
     context: EventStoreReadContext<EventType>;
   }): Promise<void> {
@@ -1684,14 +1718,14 @@ export class ProjectionRouter<
    * `FoldProjectionExecutor.executeBatch`), used by the GroupQueue's coalescing
    * path. Subscribers fire once with the final folded state.
    */
-  private async processFoldProjectionBatch({
+  private async processFoldProjectionBatch<State>({
     projectionName,
     fold,
     events,
     context,
   }: {
     projectionName: string;
-    fold: FoldProjectionDefinition<any, EventType>;
+    fold: FoldProjectionDefinition<State, EventType>;
     events: EventType[];
     context: EventStoreReadContext<EventType>;
   }): Promise<void> {
@@ -2086,14 +2120,16 @@ export class ProjectionRouter<
       tenantId: context.tenantId,
     };
 
-    const read = await fold.store.get(lookupKey, storeContext);
+    const read = await fold.open<Promise<FoldStateRead<unknown>>>((definition) =>
+      definition.store.get(lookupKey, storeContext),
+    );
     if (read.kind === "empty") return null;
 
     return {
       id: `${projectionName}:${context.tenantId}:${aggregateId}`,
       aggregateId,
       tenantId: context.tenantId,
-      version: fold.version,
+      version: fold.definition.version,
       data: read.state,
     } as ProjectionTypes[ProjectionName];
   }

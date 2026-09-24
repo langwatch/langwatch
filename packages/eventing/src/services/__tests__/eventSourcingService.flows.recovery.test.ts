@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealFoldProjection, sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
@@ -36,7 +37,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
     });
 
@@ -161,7 +162,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const event1 = createTestEvent(
@@ -197,7 +198,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const event1 = createTestEvent(

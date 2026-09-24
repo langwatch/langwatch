@@ -8,6 +8,11 @@ import type { FoldProjectionDefinition } from "../projections/foldProjection.typ
 import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck.ts";
+import type {
+  SealedFoldProjection,
+  SealedMapProjection,
+  SealedStateProjection,
+} from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
@@ -52,13 +57,13 @@ export interface EventSourcingServiceOptions<
   /**
    * Fold projections (stateful, reduce events into accumulated state).
    */
-  foldProjections?: FoldProjectionDefinition<any, EventType>[];
+  foldProjections?: SealedFoldProjection<EventType>[];
   /** Default operational projections (direct store load/apply/store). */
-  stateProjections?: StateProjectionDefinition<any, EventType>[];
+  stateProjections?: SealedStateProjection<EventType>[];
   /**
    * Map projections (stateless, transform individual events into records).
    */
-  mapProjections?: MapProjectionDefinition<any, EventType>[];
+  mapProjections?: SealedMapProjection<EventType>[];
   /**
    * Service-level options (e.g., event ordering strategy).
    */

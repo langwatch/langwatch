@@ -64,13 +64,7 @@ export function passesTraceOriginGuards(
  */
 export type TraceSummarySubscriber = {
   name: string;
-  spec: SubscriberSpec<TraceProcessingEvent> & {
-    fold: "traceSummary";
-    handler: (
-      event: TraceProcessingEvent,
-      context: TriggerContext<TraceSummaryData>,
-    ) => Promise<void>;
-  };
+  spec: SubscriberSpec<TraceProcessingEvent, TraceSummaryData> & { fold: "traceSummary" };
 };
 
 /**

@@ -12,6 +12,7 @@ import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealFoldProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcedQueueProcessorMemory } from "../../queues/memory.ts";
 import type { ReplayEvent } from "../../replay/replayEventSource.ts";
 import { replayEvents } from "../../replay/replayExecutor.ts";
@@ -190,7 +191,7 @@ describe("event-subscriber runtime boundary", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [fold],
+        foldProjections: [sealFoldProjection(fold)],
         subscribers: [subscriber],
         globalQueue,
         globalJobRegistry: registry,

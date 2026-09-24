@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
@@ -35,7 +36,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
     });
 
@@ -190,7 +191,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const event1 = createTestEvent(
@@ -229,7 +230,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const event1 = createTestEvent(
@@ -268,7 +269,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const event1 = createTestEvent(
@@ -314,7 +315,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef1, mapDef2],
+        mapProjections: [sealMapProjection(mapDef1), sealMapProjection(mapDef2)],
       });
 
       const event1 = createTestEvent(
@@ -356,7 +357,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const aggregateId1 = "aggregate-1";
@@ -410,7 +411,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const event1 = createTestEvent(

@@ -1,9 +1,10 @@
-import type { CommandHandler } from "../commands/command.ts";
+import type { Command, CommandHandler } from "../commands/command.ts";
 import type {
   CommandHandlerClass,
   CommandHandlerClassStatic,
   ExtractCommandHandlerPayload,
 } from "../commands/commandHandlerClass.ts";
+import type { CommandType } from "../domain/commandType.ts";
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type {
@@ -21,6 +22,14 @@ import type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "../projections/mapProjection.types.ts";
+import {
+  type SealedFoldProjection,
+  type SealedMapProjection,
+  type SealedStateProjection,
+  sealFoldProjection,
+  sealMapProjection,
+  sealStateProjection,
+} from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
@@ -60,19 +69,13 @@ export class PipelineBuilder<
 > {
   private foldProjections = new Map<
     string,
-    {
-      definition: FoldProjectionDefinition<any, EventType>;
-      options?: FoldProjectionOptions;
-    }
+    SealedFoldProjection<EventType> & { options?: FoldProjectionOptions }
   >();
   private mapProjections = new Map<
     string,
-    {
-      definition: MapProjectionDefinition<any, EventType>;
-      options?: MapProjectionOptions;
-    }
+    SealedMapProjection<EventType> & { options?: MapProjectionOptions }
   >();
-  private stateProjections = new Map<string, StateProjectionDefinition<any, EventType>>();
+  private stateProjections = new Map<string, SealedStateProjection<EventType>>();
   private commands: {
     name: string;
     handlerClass: CommandHandlerClass<any, any, any>;
@@ -131,8 +134,8 @@ export class PipelineBuilder<
   }
 
   /** Register a ClickHouse replacing/map projection. */
-  withClickHouseMapProjection<MapName extends string>(
-    definition: MapProjectionDefinition<any, EventType> & {
+  withClickHouseMapProjection<MapName extends string, MapRecord>(
+    definition: MapProjectionDefinition<MapRecord, EventType> & {
       readonly name: MapName;
     },
     options?: MapProjectionOptions,
@@ -148,7 +151,7 @@ export class PipelineBuilder<
   }
 
   /** Register a Postgres load/evolve/store projection. */
-  withPostgresProjection(definition: StateProjectionDefinition<any, EventType>): this {
+  withPostgresProjection<State>(definition: StateProjectionDefinition<State, EventType>): this {
     return this.registerStateProjection(definition);
   }
 
@@ -180,7 +183,7 @@ export class PipelineBuilder<
       );
     }
 
-    this.foldProjections.set(name, { definition, options });
+    this.foldProjections.set(name, { ...sealFoldProjection(definition), options });
 
     return this;
   }
@@ -193,9 +196,9 @@ export class PipelineBuilder<
    * @param options - Optional configuration for projection processing
    * @returns Builder instance for method chaining
    */
-  private registerMapProjection<MapName extends string>(
+  private registerMapProjection<MapName extends string, MapRecord>(
     name: MapName,
-    definition: MapProjectionDefinition<any, EventType>,
+    definition: MapProjectionDefinition<MapRecord, EventType>,
     options?: MapProjectionOptions,
   ): PipelineBuilder<
     EventType,
@@ -213,7 +216,7 @@ export class PipelineBuilder<
       );
     }
 
-    this.mapProjections.set(name, { definition, options });
+    this.mapProjections.set(name, { ...sealMapProjection(definition), options });
 
     return this;
   }
@@ -223,10 +226,12 @@ export class PipelineBuilder<
    * repository load/apply/store cycle under the queue's per-key lock,
    * intentionally not a valid parent for `.withProjectionSubscriber()`.
    */
-  private registerStateProjection(definition: StateProjectionDefinition<any, EventType>): this {
+  private registerStateProjection<State>(
+    definition: StateProjectionDefinition<State, EventType>,
+  ): this {
     const name = definition.name;
     this.assertProjectionNameAvailable(name);
-    this.stateProjections.set(name, definition);
+    this.stateProjections.set(name, sealStateProjection(definition));
     return this;
   }
 
@@ -334,27 +339,18 @@ export class PipelineBuilder<
     );
   }
 
-  /** Register a subscriber that receives committed projection state. */
-  withProjectionSubscriber<Fold extends FoldNames & keyof RegisteredFoldStates & string>(
+  /** Register a subscriber that receives committed projection state, typed through its fold's name. */
+  withProjectionSubscriber<Name extends FoldNames & keyof RegisteredFoldStates & string>(
     subscriberName: string,
-    spec: SubscriberSpec<EventType> & {
-      fold: Fold;
-      map?: never;
-      when?: (event: EventType, context: TriggerContext<RegisteredFoldStates[Fold]>) => boolean;
-      handler: (
-        event: EventType,
-        context: TriggerContext<RegisteredFoldStates[Fold]>,
-      ) => Promise<void>;
-    },
+    spec: SubscriberSpec<EventType, RegisteredFoldStates[Name]> & { fold: Name; map?: never },
   ): this;
   withProjectionSubscriber(
     subscriberName: string,
-    spec: SubscriberSpec<EventType> &
-      ({ fold: FoldNames & string; map?: never } | { map: MapNames & string; fold?: never }),
+    spec: SubscriberSpec<EventType> & { map: MapNames & string; fold?: never },
   ): this;
   withProjectionSubscriber(
     subscriberName: string,
-    spec: SubscriberSpec<EventType> &
+    spec: SubscriberSpec<EventType, any> &
       ({ fold: FoldNames & string; map?: never } | { map: MapNames & string; fold?: never }),
   ): this {
     this.assertSubscriberNameAvailable(subscriberName);
@@ -503,11 +499,13 @@ export class PipelineBuilder<
         handlerClassName: `MapProjection(${def.definition.name})`,
         eventTypes: def.definition.eventTypes as string[],
       })),
-      stateProjections: Array.from(this.stateProjections.entries()).map(([name, definition]) => ({
-        name,
-        handlerClassName: `Projection(${definition.name})`,
-        eventTypes: [...definition.eventTypes],
-      })),
+      stateProjections: Array.from(this.stateProjections.entries()).map(
+        ([name, { definition }]) => ({
+          name,
+          handlerClassName: `Projection(${definition.name})`,
+          eventTypes: [...definition.eventTypes],
+        }),
+      ),
       subscribers: Array.from(this.eventSubscribers.values()).map((subscriber) => ({
         name: subscriber.name,
         eventTypes: [...subscriber.eventTypes],

@@ -12,6 +12,7 @@ import {
   EventSourcingService,
   type FoldProjectionStore,
   type JobRegistryEntry,
+  sealFoldProjection,
 } from "@langwatch/eventing";
 import { EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
@@ -133,12 +134,16 @@ describe("evaluation processing live FIFO", () => {
       allowedEventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
       eventStore: EventStoreMemory.createForTesting(),
       foldProjections: [
-        new EvaluationRunFoldProjection({
-          store: foldStore<EvaluationRunData>(),
-        }),
-        new EvaluationAnalyticsFoldProjection({
-          store: foldStore<EvaluationAnalyticsData>(),
-        }),
+        sealFoldProjection(
+          new EvaluationRunFoldProjection({
+            store: foldStore<EvaluationRunData>(),
+          }),
+        ),
+        sealFoldProjection(
+          new EvaluationAnalyticsFoldProjection({
+            store: foldStore<EvaluationAnalyticsData>(),
+          }),
+        ),
       ],
       globalQueue: sharedQueue(),
       globalJobRegistry: registry,

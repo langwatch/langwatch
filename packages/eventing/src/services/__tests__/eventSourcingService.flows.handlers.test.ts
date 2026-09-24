@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   cleanupTestEnvironment,
@@ -49,7 +50,7 @@ describe("EventSourcingService - Handler Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
         logger: logger as any,
       });
 
@@ -81,7 +82,7 @@ describe("EventSourcingService - Handler Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef1, mapDef2],
+        mapProjections: [sealMapProjection(mapDef1), sealMapProjection(mapDef2)],
       });
 
       const event = createTestEvent(
@@ -115,7 +116,7 @@ describe("EventSourcingService - Handler Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
         globalQueue,
         globalJobRegistry,
       });

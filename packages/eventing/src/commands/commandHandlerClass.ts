@@ -55,9 +55,9 @@ export type CommandHandlerClass<
  * Type helper to extract the payload type from a CommandHandlerClass.
  */
 export type ExtractCommandHandlerPayload<T> =
-  T extends CommandHandlerClass<infer Payload, any, any>
+  T extends CommandHandlerClass<infer Payload, infer _Type, infer _Event>
     ? Payload
-    : T extends CommandHandlerClassStatic<infer Payload, any>
+    : T extends CommandHandlerClassStatic<infer Payload, infer _Type>
       ? Payload
       : never;
 
@@ -65,10 +65,10 @@ export type ExtractCommandHandlerPayload<T> =
  * Type helper to extract the command type from a CommandHandlerClass.
  */
 export type ExtractCommandHandlerType<T> =
-  T extends CommandHandlerClass<any, infer Type, any> ? Type : never;
+  T extends CommandHandlerClass<infer _Payload, infer Type, infer _Event> ? Type : never;
 
 /**
  * Type helper to extract the event type from a CommandHandlerClass.
  */
 export type ExtractCommandHandlerEvent<T> =
-  T extends CommandHandlerClass<any, any, infer EventType> ? EventType : never;
+  T extends CommandHandlerClass<infer _Payload, infer _Type, infer EventType> ? EventType : never;

@@ -142,8 +142,8 @@ describe("given the pipeline the worker registers", () => {
     it("keys the run's counters by the run, so one row is one run", () => {
       const projection = pipeline().stateProjections?.get("instantEvalRun");
 
-      expect(projection?.key?.(requestedEvent())).toBe(RUN_ID);
-      expect(projection?.eventTypes).toEqual(INSTANT_EVAL_PROCESSING_EVENT_TYPES);
+      expect(projection?.definition.key?.(requestedEvent())).toBe(RUN_ID);
+      expect(projection?.definition.eventTypes).toEqual(INSTANT_EVAL_PROCESSING_EVENT_TYPES);
     });
   });
 });

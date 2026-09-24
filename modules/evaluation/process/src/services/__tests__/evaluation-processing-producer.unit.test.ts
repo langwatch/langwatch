@@ -42,9 +42,11 @@ describe("given a process that only SENDS evaluation commands", () => {
       const [projection] = [...producer().foldProjections.values()];
 
       await expect(
-        projection!.definition.store.store(
-          {},
-          { aggregateId: "evaluation-1", tenantId: createTenantId("project-1") },
+        projection!.open((fold) =>
+          fold.store.store(fold.init(), {
+            aggregateId: "evaluation-1",
+            tenantId: createTenantId("project-1"),
+          }),
         ),
       ).rejects.toThrow(
         /langwatch-api registered the evaluation_processing pipeline as a producer only/,

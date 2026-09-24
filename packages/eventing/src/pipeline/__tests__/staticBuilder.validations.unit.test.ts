@@ -204,7 +204,7 @@ describe("PipelineBuilder validations", () => {
 
       const pipeline = testPipeline<Event>().withPostgresProjection(projection).build();
 
-      expect(pipeline.stateProjections?.get("conversationState")).toBe(projection);
+      expect(pipeline.stateProjections?.get("conversationState")?.definition).toBe(projection);
       expect(pipeline.foldProjections.size).toBe(0);
       expect(pipeline.foldSubscribers.size).toBe(0);
       expect(pipeline.mapSubscribers.size).toBe(0);

@@ -52,7 +52,9 @@ function compose() {
 function requestStore(pipeline: JoinRequestPipeline): StateProjectionStore<JoinRequestFoldState> {
   const projection = pipeline.stateProjections?.get("joinRequestState");
   expect(projection, "the pipeline registered no joinRequestState projection").toBeDefined();
-  return projection!.store as StateProjectionStore<JoinRequestFoldState>;
+  return projection!.open(
+    (definition): object => definition.store,
+  ) as StateProjectionStore<JoinRequestFoldState>;
 }
 
 function foldedState(): JoinRequestFoldState {

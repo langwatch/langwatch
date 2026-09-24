@@ -5,9 +5,9 @@ import { buildTestCodingAgentProcessingPipeline } from "../../../__tests__/fixtu
 describe("coding-agent Eventing fold cache", () => {
   it("forwards the process-configured TTL to its session cache", () => {
     const pipeline = buildTestCodingAgentProcessingPipeline(undefined, 600);
-    const definition = pipeline.foldProjections.get("codingAgentSession")?.definition;
-    const store = definition?.store as { ttlSeconds?: number } | undefined;
+    const fold = pipeline.foldProjections.get("codingAgentSession");
+    const store = fold?.open((definition): object => definition.store);
 
-    expect(store?.ttlSeconds).toBe(600);
+    expect(store && "ttlSeconds" in store ? store.ttlSeconds : undefined).toBe(600);
   });
 });

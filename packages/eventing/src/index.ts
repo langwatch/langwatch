@@ -87,6 +87,16 @@ export type {
 } from "./projections/mapProjection.types.ts";
 export { RepositoryFoldStore } from "./projections/repositoryFoldStore.ts";
 export type {
+  SealedFoldProjection,
+  SealedMapProjection,
+  SealedStateProjection,
+} from "./projections/sealedProjection.ts";
+export {
+  sealFoldProjection,
+  sealMapProjection,
+  sealStateProjection,
+} from "./projections/sealedProjection.ts";
+export type {
   ProjectionCursor,
   StateProjectionDefinition,
   StateProjectionOptions,

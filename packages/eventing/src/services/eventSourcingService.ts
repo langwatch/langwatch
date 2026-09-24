@@ -192,7 +192,7 @@ export class EventSourcingService<
     eventStore: EventStore<EventType>,
   ): void {
     if (!foldProjections) return;
-    for (const fold of foldProjections) {
+    for (const { definition: fold, open } of foldProjections) {
       // If the projection doesn't already have an eventLoader, provide one
       // that fetches events from the event store sorted by occurredAt.
       if (!fold.eventLoader && eventStore) {
@@ -259,7 +259,7 @@ export class EventSourcingService<
           return [...events];
         };
       }
-      this.router.registerFoldProjection(fold);
+      open((definition) => this.router.registerFoldProjection(definition));
     }
   }
 
@@ -269,8 +269,8 @@ export class EventSourcingService<
     stateProjections: EventSourcingServiceOptions<EventType, ProjectionTypes>["stateProjections"],
   ): void {
     if (!stateProjections) return;
-    for (const projection of stateProjections) {
-      this.router.registerStateProjection(projection);
+    for (const { open } of stateProjections) {
+      open((definition) => this.router.registerStateProjection(definition));
     }
   }
 
@@ -281,7 +281,7 @@ export class EventSourcingService<
     eventStore: EventStore<EventType>,
   ): void {
     if (!mapProjections) return;
-    for (const mapProj of mapProjections) {
+    for (const { definition: mapProj, open } of mapProjections) {
       // Auto-wire the log-ordered history loader for
       // `options.dedupeByIdempotencyKey` — same shape as the fold
       // projections' eventLoaderUpTo.
@@ -302,7 +302,7 @@ export class EventSourcingService<
           return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
         };
       }
-      this.router.registerMapProjection(mapProj);
+      open((definition) => this.router.registerMapProjection(definition));
     }
   }
 
@@ -583,7 +583,7 @@ export class EventSourcingService<
   /**
    * Gets the command queue dispatchers created during initialization.
    */
-  getCommandQueues(): Map<string, EventSourcedQueueProcessor<any>> {
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<Record<string, unknown>>> {
     return this.queueManager.getCommandQueues();
   }
 

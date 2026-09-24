@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealFoldProjection, sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   createMockEventStore,
@@ -61,8 +62,8 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
-        foldProjections: [foldDef],
+        mapProjections: [sealMapProjection(mapDef)],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const events = [
@@ -103,7 +104,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
 
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
         logger: logger as any,
       });
 
@@ -133,7 +134,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
 
-        mapProjections: [mapDef1, mapDef2],
+        mapProjections: [sealMapProjection(mapDef1), sealMapProjection(mapDef2)],
       });
 
       const event = createTestEvent(
@@ -162,7 +163,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
 
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const event = createTestEvent(
@@ -192,7 +193,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const events = [
@@ -219,7 +220,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef1, foldDef2],
+        foldProjections: [sealFoldProjection(foldDef1), sealFoldProjection(foldDef2)],
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -245,7 +246,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -278,7 +279,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
@@ -331,7 +332,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [createMockFoldProjectionDefinition("projection")],
+        foldProjections: [sealFoldProjection(createMockFoldProjectionDefinition("projection"))],
       });
 
       await expect(

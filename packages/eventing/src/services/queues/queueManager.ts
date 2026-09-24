@@ -197,7 +197,16 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
   private readonly killSwitch?: KillSwitch;
-  private readonly queues = new Map<string, EventSourcedQueueProcessor<any>>();
+  private readonly eventQueues = new Map<string, EventSourcedQueueProcessor<EventType>>();
+  private readonly reactorQueues = new Map<
+    string,
+    EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
+  >();
+  private readonly commandQueues = new Map<
+    string,
+    EventSourcedQueueProcessor<Record<string, unknown>>
+  >();
+  private readonly jobQueueClosers = new Map<string, () => Promise<void>>();
   private handlerCount = 0;
   private subscriberCount = 0;
   private stateProjectionCount = 0;
@@ -497,7 +506,7 @@ export class QueueManager<EventType extends Event = Event> {
       };
 
       const facade = this.createFacade<EventType>(jobType, handlerName, entry);
-      this.queues.set(this.key(jobType, handlerName), facade);
+      this.eventQueues.set(this.key(jobType, handlerName), facade);
       incrementCount();
     }
   }
@@ -587,7 +596,7 @@ export class QueueManager<EventType extends Event = Event> {
       };
 
       const facade = this.createFacade<EventType>(lane.queueType, projectionName, entry);
-      this.queues.set(this.key(lane.queueType, projectionName), facade);
+      this.eventQueues.set(this.key(lane.queueType, projectionName), facade);
       if (lane.queueType === "stateProjection") {
         this.stateProjectionCount++;
       } else {
@@ -663,7 +672,7 @@ export class QueueManager<EventType extends Event = Event> {
     const commandName = handlerClass.dispatcherName ?? registration.name;
     const commandKey = this.key("command", commandName);
 
-    if (this.queues.has(commandKey)) {
+    if (this.commandQueues.has(commandKey)) {
       throw new ConfigurationError(
         "QueueManager",
         `Command handler with name "${commandName}" already exists. Command handler names must be unique within a pipeline.`,
@@ -695,7 +704,7 @@ export class QueueManager<EventType extends Event = Event> {
     const validatingFacade = buildValidatingCommandFacade(cmdEntry, baseFacade, (identities) =>
       this.registerPreflightAggregateTargets(identities),
     );
-    this.queues.set(this.key("command", cmdName), validatingFacade);
+    this.commandQueues.set(this.key("command", cmdName), validatingFacade);
   }
 
   /** Builds the job-registry entry (group key, score, process/processBatch) for one command. */
@@ -870,7 +879,7 @@ export class QueueManager<EventType extends Event = Event> {
         event: EventType;
         foldState: unknown;
       }>("reactor", subscriberName, entry);
-      this.queues.set(this.key("reactor", subscriberName), facade);
+      this.reactorQueues.set(this.key("reactor", subscriberName), facade);
       this.projectionSubscriberCount++;
     }
   }
@@ -897,54 +906,44 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   getHandlerQueue(handlerName: string): EventSourcedQueueProcessor<EventType> | undefined {
-    return this.queues.get(this.key("handler", handlerName)) as
-      | EventSourcedQueueProcessor<EventType>
-      | undefined;
+    return this.eventQueues.get(this.key("handler", handlerName));
   }
 
   getSubscriberQueue(subscriberName: string): EventSourcedQueueProcessor<EventType> | undefined {
-    return this.queues.get(this.key("subscriber", subscriberName)) as
-      | EventSourcedQueueProcessor<EventType>
-      | undefined;
+    return this.eventQueues.get(this.key("subscriber", subscriberName));
   }
 
   // An arrow instance property, for the same reason as initializeProjectionQueues above.
   getProjectionQueue = (
     projectionName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined => {
-    return this.queues.get(this.key("projection", projectionName)) as
-      | EventSourcedQueueProcessor<EventType>
-      | undefined;
+    return this.eventQueues.get(this.key("projection", projectionName));
   };
 
   getStateProjectionQueue(
     projectionName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined {
-    return this.queues.get(this.key("stateProjection", projectionName)) as
-      | EventSourcedQueueProcessor<EventType>
-      | undefined;
+    return this.eventQueues.get(this.key("stateProjection", projectionName));
   }
 
   getProjectionSubscriberQueue(
     subscriberName: string,
   ): EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }> | undefined {
-    return this.queues.get(this.key("reactor", subscriberName)) as
-      | EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
-      | undefined;
+    return this.reactorQueues.get(this.key("reactor", subscriberName));
   }
 
   getCommandQueue<Payload extends Record<string, unknown>>(
     commandName: string,
   ): EventSourcedQueueProcessor<Payload> | undefined {
-    return this.queues.get(this.key("command", commandName)) as
+    return this.commandQueues.get(this.key("command", commandName)) as
       | EventSourcedQueueProcessor<Payload>
       | undefined;
   }
 
-  getCommandQueues(): Map<string, EventSourcedQueueProcessor<any>> {
-    const result = new Map<string, EventSourcedQueueProcessor<any>>();
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<Record<string, unknown>>> {
+    const result = new Map<string, EventSourcedQueueProcessor<Record<string, unknown>>>();
     const prefix = "command:";
-    for (const [key, value] of this.queues) {
+    for (const [key, value] of this.commandQueues) {
       if (key.startsWith(prefix)) {
         result.set(key.slice(prefix.length), value);
       }
@@ -952,18 +951,34 @@ export class QueueManager<EventType extends Event = Event> {
     return result;
   }
 
+  private queueCount(): number {
+    return (
+      this.eventQueues.size +
+      this.reactorQueues.size +
+      this.commandQueues.size +
+      this.jobQueueClosers.size
+    );
+  }
+
   async waitUntilReady(): Promise<void> {
     if (this.globalQueue) {
       await this.globalQueue.waitUntilReady();
     }
-    this.logger.debug({ queueCount: this.queues.size }, "All queues ready");
+    this.logger.debug({ queueCount: this.queueCount() }, "All queues ready");
   }
 
   async close(): Promise<void> {
     // Global queue lifecycle is owned by EventSourcing — facade close is a no-op.
     // We still call close on all facades for consistent behavior.
-    await Promise.allSettled([...this.queues.values()].map((q) => q.close()));
-    this.logger.debug({ queueCount: this.queues.size }, "All queues closed");
+    await Promise.allSettled([
+      ...[
+        ...this.eventQueues.values(),
+        ...this.reactorQueues.values(),
+        ...this.commandQueues.values(),
+      ].map((queue) => queue.close()),
+      ...[...this.jobQueueClosers.values()].map((close) => close()),
+    ]);
+    this.logger.debug({ queueCount: this.queueCount() }, "All queues closed");
   }
 
   /**
@@ -1016,7 +1031,7 @@ export class QueueManager<EventType extends Event = Event> {
     };
 
     const facade = this.createFacade<P>("job", name, entry);
-    this.queues.set(this.key("job", name), facade);
+    this.jobQueueClosers.set(this.key("job", name), () => facade.close());
     return facade;
   }
 }

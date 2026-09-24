@@ -844,14 +844,10 @@ function buildServiceOptions<
 >(definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>) {
   // Pass class instances directly — do NOT spread.
   // Getters like `eventTypes` live on the prototype and are lost by `{...obj}`.
-  const foldProjections = Array.from(definition.foldProjections.values()).map(
-    ({ definition: fold }) => fold,
-  );
+  const foldProjections = Array.from(definition.foldProjections.values());
   const stateProjections = Array.from(definition.stateProjections?.values() ?? []);
 
-  const mapProjections = Array.from(definition.mapProjections.values()).map(
-    ({ definition: mapProj }) => mapProj,
-  );
+  const mapProjections = Array.from(definition.mapProjections.values());
 
   const commandRegistrations =
     definition.commands.length > 0

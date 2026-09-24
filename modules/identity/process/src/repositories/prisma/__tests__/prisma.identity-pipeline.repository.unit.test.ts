@@ -81,7 +81,9 @@ function compose() {
 function identityStore(pipeline: IdentityPipeline): StateProjectionStore<IdentityFoldState> {
   const projection = pipeline.stateProjections?.get("identityState");
   expect(projection, "the pipeline registered no identityState projection").toBeDefined();
-  return projection!.store as StateProjectionStore<IdentityFoldState>;
+  return projection!.open(
+    (definition): object => definition.store,
+  ) as StateProjectionStore<IdentityFoldState>;
 }
 
 function verifiedIdentifier(overrides: Partial<IdentifierFact> = {}): IdentifierFact {

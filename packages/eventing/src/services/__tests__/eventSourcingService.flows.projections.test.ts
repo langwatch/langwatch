@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealFoldProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   cleanupTestEnvironment,
@@ -43,7 +44,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const result = await service.getProjectionByName(
@@ -69,7 +70,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [createMockFoldProjectionDefinition("projection")],
+        foldProjections: [sealFoldProjection(createMockFoldProjectionDefinition("projection"))],
       });
 
       await expect(
@@ -112,7 +113,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const result = await service.hasProjectionByName(
@@ -138,7 +139,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const result = await service.hasProjectionByName(
@@ -157,7 +158,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [createMockFoldProjectionDefinition("projection")],
+        foldProjections: [sealFoldProjection(createMockFoldProjectionDefinition("projection"))],
       });
 
       await expect(
@@ -189,9 +190,9 @@ describe("EventSourcingService - Projection Flows", () => {
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         foldProjections: [
-          createMockFoldProjectionDefinition("projection1"),
-          createMockFoldProjectionDefinition("projection2"),
-          createMockFoldProjectionDefinition("projection3"),
+          sealFoldProjection(createMockFoldProjectionDefinition("projection1")),
+          sealFoldProjection(createMockFoldProjectionDefinition("projection2")),
+          sealFoldProjection(createMockFoldProjectionDefinition("projection3")),
         ],
       });
 
@@ -218,7 +219,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       await service.storeEvents(events, context);
@@ -242,7 +243,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef1, foldDef2],
+        foldProjections: [sealFoldProjection(foldDef1), sealFoldProjection(foldDef2)],
       });
 
       await service.storeEvents(events, context);
@@ -269,7 +270,7 @@ describe("EventSourcingService - Projection Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       await service.storeEvents(events, context);

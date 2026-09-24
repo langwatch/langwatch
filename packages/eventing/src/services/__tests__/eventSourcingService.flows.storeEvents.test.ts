@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealFoldProjection, sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   createMockEventStore,
@@ -72,7 +73,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [failingMapDef],
+        mapProjections: [sealMapProjection(failingMapDef)],
         logger: logger as any,
       });
 
@@ -102,7 +103,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const events = [
@@ -126,7 +127,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const events = [
@@ -149,7 +150,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const aggregate1 = "aggregate-1";
@@ -176,7 +177,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef1, foldDef2],
+        foldProjections: [sealFoldProjection(foldDef1), sealFoldProjection(foldDef2)],
       });
 
       const events = [
@@ -293,8 +294,8 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
-        foldProjections: [foldDef],
+        mapProjections: [sealMapProjection(mapDef)],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const events = [
@@ -334,8 +335,8 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
-        foldProjections: [foldDef],
+        mapProjections: [sealMapProjection(mapDef)],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       const events = [

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AggregateType } from "../../domain/aggregateType.ts";
 import type { Event } from "../../domain/types.ts";
+import { sealFoldProjection, sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   createMockEventStore,
@@ -107,7 +108,7 @@ describe("EventSourcingService - Security Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context1);
@@ -181,7 +182,7 @@ describe("EventSourcingService - Security Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context);
@@ -294,7 +295,7 @@ describe("EventSourcingService - Security Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const events = [
@@ -320,7 +321,7 @@ describe("EventSourcingService - Security Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        foldProjections: [foldDef],
+        foldProjections: [sealFoldProjection(foldDef)],
       });
 
       await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context1);
@@ -348,7 +349,7 @@ describe("EventSourcingService - Security Flows", () => {
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const events1 = [

@@ -6,6 +6,11 @@ import type { FoldProjectionDefinition } from "../projections/foldProjection.typ
 import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
 import type { ProjectionRegistry } from "../projections/projectionRegistry.ts";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck.ts";
+import type {
+  SealedFoldProjection,
+  SealedMapProjection,
+  SealedStateProjection,
+} from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
@@ -55,9 +60,9 @@ export interface EventSourcingPipelineDefinition<
   aggregateType: AggregateType;
   allowedEventTypes: readonly string[];
   eventStore: EventStore<EventType>;
-  foldProjections?: FoldProjectionDefinition<any, EventType>[];
-  stateProjections?: StateProjectionDefinition<any, EventType>[];
-  mapProjections?: MapProjectionDefinition<any, EventType>[];
+  foldProjections?: SealedFoldProjection<EventType>[];
+  stateProjections?: SealedStateProjection<EventType>[];
+  mapProjections?: SealedMapProjection<EventType>[];
   foldSubscribers?: {
     foldName: string;
     definition: SubscriberDispatchDefinition<EventType>;

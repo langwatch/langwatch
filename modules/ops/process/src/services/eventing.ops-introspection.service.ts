@@ -81,11 +81,12 @@ export class EventingOpsIntrospectionAdapter implements OpsEventingIntrospection
 
   dejaViewProjections(): OpsDejaViewProjection[] {
     return this.definitions().flatMap((def) =>
-      Array.from(def.foldProjections.values()).map(({ definition: d }) => ({
+      Array.from(def.foldProjections.values()).map(({ definition: d, open }) => ({
         projectionName: d.name,
         eventTypes: d.eventTypes,
         init: () => d.init(),
-        apply: (state: unknown, event: { type: string }) => d.apply(state, event as any),
+        apply: (state: unknown, event: { type: string }) =>
+          open((fold) => fold.apply(state as any, event)),
       })),
     );
   }

@@ -11,6 +11,12 @@ import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.typ
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import type { MapProjectionDefinition } from "./mapProjection.types.ts";
 import { ProjectionRouter } from "./projectionRouter.ts";
+import {
+  type SealedFoldProjection,
+  type SealedMapProjection,
+  sealFoldProjection,
+  sealMapProjection,
+} from "./sealedProjection.ts";
 
 /**
  * Global projection registry for projections that subscribe to events from
@@ -19,8 +25,8 @@ import { ProjectionRouter } from "./projectionRouter.ts";
  */
 export class ProjectionRegistry<EventType extends Event = Event> {
   private readonly logger = createLogger("langwatch:event-sourcing:projection-registry");
-  private readonly foldProjections = new Map<string, FoldProjectionDefinition<any, EventType>>();
-  private readonly mapProjections = new Map<string, MapProjectionDefinition<any, EventType>>();
+  private readonly foldProjections = new Map<string, SealedFoldProjection<EventType>>();
+  private readonly mapProjections = new Map<string, SealedMapProjection<EventType>>();
   private readonly subscribers = new Map<
     string,
     { foldName: string; definition: SubscriberDispatchDefinition<EventType> }
@@ -32,7 +38,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
   private router?: ProjectionRouter<EventType>;
   private queueManager?: QueueManager<EventType>;
 
-  registerFoldProjection(projection: FoldProjectionDefinition<any, EventType>): void {
+  registerFoldProjection<State>(projection: FoldProjectionDefinition<State, EventType>): void {
     if (this.foldProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
@@ -40,10 +46,12 @@ export class ProjectionRegistry<EventType extends Event = Event> {
         { projectionName: projection.name },
       );
     }
-    this.foldProjections.set(projection.name, projection);
+    this.foldProjections.set(projection.name, sealFoldProjection(projection));
   }
 
-  registerMapProjection(projection: MapProjectionDefinition<any, EventType>): void {
+  registerMapProjection<MapRecord>(
+    projection: MapProjectionDefinition<MapRecord, EventType>,
+  ): void {
     if (this.mapProjections.has(projection.name)) {
       throw new ConfigurationError(
         "ProjectionRegistry",
@@ -51,7 +59,7 @@ export class ProjectionRegistry<EventType extends Event = Event> {
         { projectionName: projection.name },
       );
     }
-    this.mapProjections.set(projection.name, projection);
+    this.mapProjections.set(projection.name, sealMapProjection(projection));
   }
 
   registerSubscriber(foldName: string, subscriber: SubscriberDispatchDefinition<EventType>): void {
@@ -134,16 +142,17 @@ export class ProjectionRegistry<EventType extends Event = Event> {
     });
 
     // Create router — all projections are incremental
-    this.router = new ProjectionRouter<EventType>(aggregateType, "global", this.queueManager, {
+    const router = new ProjectionRouter<EventType>(aggregateType, "global", this.queueManager, {
       executionTarget,
     });
+    this.router = router;
 
-    for (const fold of this.foldProjections.values()) {
-      this.router.registerFoldProjection(fold);
+    for (const { open } of this.foldProjections.values()) {
+      open((definition) => router.registerFoldProjection(definition));
     }
 
-    for (const mapProj of this.mapProjections.values()) {
-      this.router.registerMapProjection(mapProj);
+    for (const { open } of this.mapProjections.values()) {
+      open((definition) => router.registerMapProjection(definition));
     }
 
     for (const { foldName, definition } of this.subscribers.values()) {

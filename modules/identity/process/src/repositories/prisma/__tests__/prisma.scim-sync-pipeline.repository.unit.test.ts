@@ -34,7 +34,9 @@ function compose() {
 function syncStore(pipeline: ScimSyncPipeline): StateProjectionStore<ScimSyncFoldState> {
   const projection = pipeline.stateProjections?.get("scimSyncState");
   expect(projection, "the pipeline registered no scimSyncState projection").toBeDefined();
-  return projection!.store as StateProjectionStore<ScimSyncFoldState>;
+  return projection!.open(
+    (definition): object => definition.store,
+  ) as StateProjectionStore<ScimSyncFoldState>;
 }
 
 function foldedState(): ScimSyncFoldState {

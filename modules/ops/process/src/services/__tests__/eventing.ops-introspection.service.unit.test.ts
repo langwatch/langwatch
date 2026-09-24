@@ -18,7 +18,7 @@ function definitionWith({
     foldProjections: new Map([["grantsFold", { definition: { name: "grantsFold" } }]]),
     mapProjections: new Map(),
     stateProjections: new Map([
-      ["authzGrantsState", { name: "authzGrantsState", options: stateOptions }],
+      ["authzGrantsState", { definition: { name: "authzGrantsState", options: stateOptions } }],
     ]),
     commands: [],
     foldSubscribers: new Map(),

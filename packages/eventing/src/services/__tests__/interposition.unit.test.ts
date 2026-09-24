@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
 import {
   createMockEventStore,
@@ -60,7 +61,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const events = [
@@ -92,7 +93,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
-        mapProjections: [{ ...mapDef, eventTypes: [] }],
+        mapProjections: [sealMapProjection({ ...mapDef, eventTypes: [] })],
       });
 
       const events = [
@@ -125,7 +126,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
-        mapProjections: [mapDef],
+        mapProjections: [sealMapProjection(mapDef)],
       });
 
       const events = [
@@ -169,7 +170,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         prepareEventForProjection: leanMock,
-        mapProjections: [{ ...mapDef, eventTypes: [] }],
+        mapProjections: [sealMapProjection({ ...mapDef, eventTypes: [] })],
       });
 
       const events = [

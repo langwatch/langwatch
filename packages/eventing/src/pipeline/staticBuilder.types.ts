@@ -11,6 +11,11 @@ import type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "../projections/mapProjection.types.ts";
+import type {
+  SealedFoldProjection,
+  SealedMapProjection,
+  SealedStateProjection,
+} from "../projections/sealedProjection.ts";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
 import type { DeduplicationStrategy } from "../queues/queue.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
@@ -94,23 +99,14 @@ export interface StaticPipelineDefinition<
   /** Fold projections (stateful, reduce events into state) registered in this pipeline */
   foldProjections: Map<
     string,
-    {
-      definition: FoldProjectionDefinition<any, EventType>;
-      options?: FoldProjectionOptions;
-    }
+    SealedFoldProjection<EventType> & { options?: FoldProjectionOptions }
   >;
 
   /** Postgres operational state projections registered by the pipeline. */
-  stateProjections?: Map<string, StateProjectionDefinition<any, EventType>>;
+  stateProjections?: Map<string, SealedStateProjection<EventType>>;
 
   /** Map projections (stateless, transform individual events) registered in this pipeline */
-  mapProjections: Map<
-    string,
-    {
-      definition: MapProjectionDefinition<any, EventType>;
-      options?: MapProjectionOptions;
-    }
-  >;
+  mapProjections: Map<string, SealedMapProjection<EventType> & { options?: MapProjectionOptions }>;
 
   /** Command handlers registered in this pipeline */
   commands: {

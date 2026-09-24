@@ -194,9 +194,9 @@ describe("langy-conversation-processing pipeline shape", () => {
   describe("given the analytics map projection from the static definition", () => {
     function analyticsDefinition() {
       const { pipeline, analyticsAppend } = buildPipeline();
-      const definition = pipeline.mapProjections.get("langyAnalyticsEvent")?.definition;
-      if (!definition) throw new Error("langyAnalyticsEvent not registered");
-      return { definition, analyticsAppend };
+      const projection = pipeline.mapProjections.get("langyAnalyticsEvent");
+      if (!projection) throw new Error("langyAnalyticsEvent not registered");
+      return { definition: projection.definition, projection, analyticsAppend };
     }
 
     describe("when comparing consumed event types to the durable vocabulary", () => {
@@ -211,7 +211,7 @@ describe("langy-conversation-processing pipeline shape", () => {
 
     describe("when a queued event is mapped into the store", () => {
       it("appends the event-derived record without any load/read method on the store", async () => {
-        const { definition, analyticsAppend } = analyticsDefinition();
+        const { projection, analyticsAppend } = analyticsDefinition();
         const event = agentRespondedEvent({
           id: "evt_agent_responded",
           occurredAt: 1_752_600_500_000,
@@ -223,9 +223,12 @@ describe("langy-conversation-processing pipeline shape", () => {
         };
 
         // The framework's per-event step: pure map -> append. No prior read.
-        const record = definition.map(event as LangyConversationProcessingEvent);
-        expect(record).not.toBeNull();
-        await definition.store.append(record!, context);
+        const record = await projection.open(async (definition) => {
+          const mapped = definition.map(event as LangyConversationProcessingEvent);
+          expect(mapped).not.toBeNull();
+          await definition.store.append(mapped!, context);
+          return mapped;
+        });
 
         expect(analyticsAppend).toHaveBeenCalledTimes(1);
         expect(analyticsAppend).toHaveBeenCalledWith(record, context);
@@ -241,10 +244,11 @@ describe("langy-conversation-processing pipeline shape", () => {
         });
 
         // The store is append-only: it exposes no operational read path.
-        expect(typeof definition.store.append).toBe("function");
-        expect(definition.store).not.toHaveProperty("load");
-        expect(definition.store).not.toHaveProperty("read");
-        expect(definition.store).not.toHaveProperty("get");
+        const store = projection.open((definition): object => definition.store);
+        expect(store).toHaveProperty("append", expect.any(Function));
+        expect(store).not.toHaveProperty("load");
+        expect(store).not.toHaveProperty("read");
+        expect(store).not.toHaveProperty("get");
       });
     });
   });

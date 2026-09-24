@@ -14,7 +14,7 @@ export type TriggerSpec =
   | { fold: string; events?: readonly string[]; map?: never }
   | { map: string; events?: readonly string[]; fold?: never };
 
-export interface TriggerOptions<E extends Event = Event> {
+export interface TriggerOptions<E extends Event = Event, State = unknown> {
   delay?: number;
   ttl?: number;
   /**
@@ -33,7 +33,7 @@ export interface TriggerOptions<E extends Event = Event> {
    * the handler. Fold/map-bound subscribers see committed state in
    * `context.state`; a throwing guard fails open (treated as relevant).
    */
-  when?: (event: E, context: TriggerContext<any>) => boolean;
+  when?: (event: E, context: TriggerContext<State>) => boolean;
   /** Process roles where this subscriber runs. Omit to run everywhere. */
   runIn?: ExecutionTarget[];
   /** Statically disable the subscriber (e.g. a transport dependency is absent). */
@@ -48,9 +48,9 @@ export interface TriggerContext<State = unknown> {
   state: State;
 }
 
-export type SubscriberSpec<E extends Event = Event> = TriggerSpec &
-  TriggerOptions<E> & {
-    handler: (event: E, context: TriggerContext<any>) => Promise<void>;
+export type SubscriberSpec<E extends Event = Event, State = unknown> = TriggerSpec &
+  TriggerOptions<E, State> & {
+    handler: (event: E, context: TriggerContext<State>) => Promise<void>;
   };
 
 export type IntentFactories<Intents extends Record<string, IntentSpec<any>>> = {

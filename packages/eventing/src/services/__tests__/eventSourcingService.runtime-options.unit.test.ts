@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import { sealMapProjection } from "../../projections/sealedProjection.ts";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
@@ -34,7 +35,7 @@ describe("EventSourcingService runtime warning policy", () => {
       logger,
       mapProjections: options?.eventSubscriberOnly
         ? undefined
-        : [createMockMapProjectionDefinition("test-map")],
+        : [sealMapProjection(createMockMapProjectionDefinition("test-map"))],
       subscribers: options?.eventSubscriberOnly ? [eventSubscriber] : undefined,
       warnWhenProjectionsRunInline: options?.warnWhenProjectionsRunInline,
     });

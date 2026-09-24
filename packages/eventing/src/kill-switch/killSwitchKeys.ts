@@ -51,7 +51,7 @@ export interface KillSwitchComponentSource {
   metadata: { name: string; aggregateType: string };
   foldProjections: Map<string, { definition: KillSwitchComponent }>;
   mapProjections: Map<string, { definition: KillSwitchComponent }>;
-  stateProjections?: Map<string, { options?: { killSwitch?: KillSwitchOptions } }>;
+  stateProjections?: Map<string, { definition: { options?: { killSwitch?: KillSwitchOptions } } }>;
   commands: readonly { name: string; options?: { killSwitch?: KillSwitchOptions } }[];
   eventSubscribers: Map<string, KillSwitchComponent>;
 }
@@ -88,7 +88,7 @@ export function killSwitchDescriptorsFor(
     push("mapProjection", entry.definition.name ?? name, entry.definition.options?.killSwitch);
   }
   for (const [name, projection] of definition.stateProjections ?? []) {
-    push("projection", name, projection?.options?.killSwitch);
+    push("projection", name, projection.definition.options?.killSwitch);
   }
   for (const command of definition.commands) {
     push("command", command.name, command.options?.killSwitch);

@@ -5,6 +5,7 @@ import type { Event, Projection } from "../../domain/types.ts";
 import type { EventSourcingPipelineDefinition } from "../../pipeline/types.ts";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import { sealFoldProjection, sealMapProjection } from "../../projections/sealedProjection.ts";
 import { EventSourcingPipeline } from "../../runtimePipeline.ts";
 import {
   createMockEventStore,
@@ -89,8 +90,8 @@ describe("EventSourcingPipeline", () => {
         aggregateType,
         allowedEventTypes: ["test.event"],
         eventStore: mockEventStore,
-        foldProjections: [mockFoldProjection],
-        mapProjections: [mockMapProjection],
+        foldProjections: [sealFoldProjection(mockFoldProjection)],
+        mapProjections: [sealMapProjection(mockMapProjection)],
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -138,8 +139,8 @@ describe("EventSourcingPipeline", () => {
         aggregateType,
         allowedEventTypes: ["test.event"],
         eventStore: mockEventStore,
-        foldProjections: [mockFoldProjection],
-        mapProjections: [mockMapProjection],
+        foldProjections: [sealFoldProjection(mockFoldProjection)],
+        mapProjections: [sealMapProjection(mockMapProjection)],
       };
 
       const pipeline = new EventSourcingPipeline(definition);
