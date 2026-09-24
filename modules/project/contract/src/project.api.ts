@@ -40,6 +40,19 @@ export interface ProjectUsageCount {
 
 export interface ProjectApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
+  /** Every non-governance project with its department (main `department.service.ts:126-133`). */
+  findProjectsWithDepartments(input: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
+  /**
+   * Points one project at a department, or clears it; false when no such project (main
+   * `department.service.ts:334-352`).
+   */
+  assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean>;
   findOrganizationId(projectId: string): Promise<string | undefined>;
   isPresenceEnabled(input: { projectId: string }): Promise<boolean>;
   findSummaryById(projectId: string): Promise<{ name: string; slug: string } | null>;

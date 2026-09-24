@@ -4,7 +4,6 @@ import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contr
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import type { DepartmentRepository } from "../repositories/department.repository.ts";
 import type { DiscoveredPersonRepository } from "../repositories/discovered-person.repository.ts";
 import type { IdentityMatchRepository } from "../repositories/identity-match.repository.ts";
 import { extraString, provenUserId } from "../rules/directory-department.rules.ts";
@@ -16,11 +15,10 @@ const logger = createLogger("langwatch:governance:directory-departments");
 
 export interface DirectoryDepartmentSyncDependencies {
   departments: Pick<DepartmentService, "resolveByNameOrCreate" | "assignUser">;
-  openMemberships: Pick<DepartmentRepository, "findOpenMemberships">;
   matcher: Pick<IdentityMatchService, "loadAccountIndex">;
   discoveredPeople: Pick<DiscoveredPersonRepository, "findByActorIds">;
   matches: Pick<IdentityMatchRepository, "findOpenByOrganization">;
-  organizations: Pick<OrganizationApi, "findMemberDepartments">;
+  organizations: Pick<OrganizationApi, "findMemberDepartments" | "findOpenMemberDepartmentLinks">;
 }
 
 /**
@@ -115,7 +113,7 @@ export class DirectoryDepartmentSyncService {
     const userIds = [...desired.keys()];
     const [memberships, openLinks] = await Promise.all([
       this.deps.organizations.findMemberDepartments({ organizationId, userIds }),
-      this.deps.openMemberships.findOpenMemberships({ organizationId, userIds }),
+      this.deps.organizations.findOpenMemberDepartmentLinks({ organizationId, userIds }),
     ]);
     const currentByUser = new Map(memberships.map((m) => [m.userId, m.departmentId]));
     const openLinkByUser = new Map(openLinks.map((link) => [link.userId, link.departmentId]));

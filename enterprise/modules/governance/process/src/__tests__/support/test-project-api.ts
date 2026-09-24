@@ -6,6 +6,14 @@ import type { ProjectApi } from "@langwatch/project-contract";
  * everything else refuses by name.
  */
 export class TestProjectApi implements ProjectApi {
+  findProjectsWithDepartments(): ReturnType<ProjectApi["findProjectsWithDepartments"]> {
+    throw new Error("TestProjectApi.findProjectsWithDepartments is not configured");
+  }
+
+  assignProjectDepartment(): ReturnType<ProjectApi["assignProjectDepartment"]> {
+    throw new Error("TestProjectApi.assignProjectDepartment is not configured");
+  }
+
   countUsage(): Promise<{ projects: number; teams: number; updatedProjects: number }> {
     return Promise.resolve({ projects: 0, teams: 0, updatedProjects: 0 });
   }

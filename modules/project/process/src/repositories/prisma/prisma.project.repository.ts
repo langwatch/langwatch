@@ -45,6 +45,30 @@ export class PrismaProjectRepository
   extends PrismaRepository.for("Project", "Team")
   implements ProjectRepository
 {
+  async findProjectsWithDepartments({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.prisma.project.findMany({
+      where: { team: { organizationId }, kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } },
+      select: { id: true, name: true, departmentId: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const result = await this.prisma.project.updateMany({
+      where: { id: input.projectId, team: { organizationId: input.organizationId } },
+      data: { departmentId: input.departmentId },
+    });
+    return result.count > 0;
+  }
+
   async findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
     const projects = await this.prisma.project.findMany({
       where: { id: { in: input.projectIds } },

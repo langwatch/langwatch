@@ -95,6 +95,20 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#projectService.listPaths(input);
   }
 
+  findProjectsWithDepartments(input: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.#projectService.findProjectsWithDepartments(input);
+  }
+
+  assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    return this.#projectService.assignProjectDepartment(input);
+  }
+
   static readonly contract = ProjectApi;
   static readonly dependencies: ProjectDependencies = {
     organizations: OrganizationApi,

@@ -94,6 +94,8 @@ const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
 
 class StubRepository implements ProjectRepository {
   findPaths = vi.fn(async () => []);
+  findProjectsWithDepartments = vi.fn(async () => []);
+  assignProjectDepartment = vi.fn(async () => false);
   existing: InternalProject | null = null;
   findInternalByOrganization = vi.fn(async () => this.existing);
   findInternalBySlug = vi.fn(async () => null);

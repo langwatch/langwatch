@@ -1,175 +1,126 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   DepartmentAssignmentTargetNotFoundError,
   DepartmentNotFoundError,
-  type Department,
-  type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
-import { Temporal } from "@langwatch/time";
-import { describe, expect, it, vi } from "vitest";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { describe, expect, it } from "vitest";
 
-import { DepartmentRepository } from "../../repositories/department.repository.ts";
+import { MemoryDepartmentRepository } from "../../repositories/memory/memory.department.repository.ts";
+import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { DepartmentService } from "../department.service.ts";
 
-function department(overrides: Partial<Department> = {}): Department {
-  return {
-    id: "department-1",
-    name: "Engineering",
-    organizationId: "organization-1",
-    createdAt: new Date("2026-08-24T00:00:00.000Z"),
-    updatedAt: new Date("2026-08-24T00:00:00.000Z"),
-    ...overrides,
-  };
-}
+const ORG = "organization-1";
 
-class MemoryDepartmentRepository extends DepartmentRepository {
-  readonly recordMembership = vi.fn(async () => undefined);
-  readonly findOpenMemberships = vi.fn(async () => []);
-  readonly assignTeam = vi.fn(async () => true);
-  readonly assignProject = vi.fn(async () => true);
-  renameResult = true;
-  archiveResult = true;
-
-  constructor(private readonly row: Department | null = department()) {
-    super();
-  }
-
-  async findAll(): Promise<Department[]> {
-    return this.row ? [this.row] : [];
-  }
-
-  async findById(input: { id: string; organizationId: string }): Promise<Department | null> {
-    return this.row?.id === input.id && this.row.organizationId === input.organizationId
-      ? this.row
-      : null;
-  }
-
-  async getTeamAndProjectAssignments(): Promise<Pick<DepartmentAssignments, "teams" | "projects">> {
-    return { teams: [], projects: [] };
-  }
-
-  async departmentsOnDay(): Promise<Map<string, string>> {
-    return new Map();
-  }
-
-  async create(): Promise<Department> {
-    return this.row ?? department();
-  }
-
-  async resolveByNameOrCreate(): Promise<Department> {
-    return this.row ?? department();
-  }
-
-  async rename(): Promise<boolean> {
-    return this.renameResult;
-  }
-
-  async archive(): Promise<boolean> {
-    return this.archiveResult;
-  }
-}
-
-function members(assigned = true) {
-  return createApiFixture<OrganizationApi>({
-    findMembersWithDepartments: async () => [],
-    assignMemberDepartment: async () => assigned,
+async function harness(options: { targetExists?: boolean } = {}) {
+  const repository = MemoryDepartmentRepository.create(MemoryGovernanceStore.create());
+  const department = await repository.create({ organizationId: ORG, name: "Engineering" });
+  const writes: string[] = [];
+  const exists = options.targetExists ?? true;
+  const organizations = createApiFixture<OrganizationApi>({
+    assignMemberDepartment: async ({ userId }) => (writes.push(`user:${userId}`), exists),
+    assignTeamDepartment: async ({ teamId }) => (writes.push(`team:${teamId}`), exists),
+    findMembersWithDepartments: async () => [
+      { userId: "user-2", departmentId: null, user: { name: null, email: "zed@acme.com" } },
+      {
+        userId: "user-1",
+        departmentId: department.id,
+        user: { name: "Ada", email: "ada@acme.com" },
+      },
+    ],
+    findTeamsWithDepartments: async () => [{ id: "team-1", name: "Web", departmentId: null }],
+    findMemberDepartmentsOnDay: async () => [{ userId: "user-1", departmentId: department.id }],
   });
+  const projects = createApiFixture<ProjectApi>({
+    assignProjectDepartment: async ({ projectId }) => (writes.push(`project:${projectId}`), exists),
+    findProjectsWithDepartments: async () => [
+      { id: "project-1", name: "Chat", departmentId: department.id },
+    ],
+  });
+  const service = DepartmentService.create({ repository, organizations, projects });
+  return { service, department, writes };
 }
 
 describe("DepartmentService", () => {
   it("rejects a department owned by another organization before assignment", async () => {
-    const repository = new MemoryDepartmentRepository();
-    const service = DepartmentService.create({ repository, members: members() });
+    const { service, department, writes } = await harness();
 
     await expect(
       service.assignUser({
         organizationId: "organization-2",
         userId: "user-1",
-        departmentId: "department-1",
+        departmentId: department.id,
       }),
     ).rejects.toBeInstanceOf(DepartmentNotFoundError);
-    expect(repository.recordMembership).not.toHaveBeenCalled();
+    expect(writes).toEqual([]);
   });
 
   it("allows clearing an assignment without looking up a department", async () => {
-    const repository = new MemoryDepartmentRepository(null);
-    const service = DepartmentService.create({ repository, members: members() });
+    const { service, writes } = await harness();
 
-    await service.assignTeam({
-      organizationId: "organization-1",
-      teamId: "team-1",
-      departmentId: null,
-    });
+    await service.assignTeam({ organizationId: ORG, teamId: "team-1", departmentId: null });
 
-    expect(repository.assignTeam).toHaveBeenCalledOnce();
+    expect(writes).toEqual(["team:team-1"]);
   });
 
   it("does not report a missing assignment target as success", async () => {
-    const repository = new MemoryDepartmentRepository();
-    repository.assignProject.mockResolvedValue(false);
-    const service = DepartmentService.create({ repository, members: members() });
+    const { service, department } = await harness({ targetExists: false });
 
     await expect(
       service.assignProject({
-        organizationId: "organization-1",
-        projectId: "missing-project",
-        departmentId: "department-1",
+        organizationId: ORG,
+        projectId: "missing",
+        departmentId: department.id,
       }),
+    ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
+    await expect(
+      service.assignUser({ organizationId: ORG, userId: "ghost", departmentId: null }),
     ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
   });
 
   it("returns the tenant-scoped row after renaming", async () => {
-    const repository = new MemoryDepartmentRepository();
-    const renamed = await DepartmentService.create({ repository, members: members() }).rename({
-      id: "department-1",
-      organizationId: "organization-1",
+    const { service, department } = await harness();
+
+    const renamed = await service.rename({
+      id: department.id,
+      organizationId: ORG,
       name: "Platform",
     });
 
-    expect(renamed.id).toBe("department-1");
+    expect(renamed).toMatchObject({ id: department.id, name: "Platform" });
   });
 
   it("rejects archiving a department outside the organization", async () => {
-    const repository = new MemoryDepartmentRepository();
-    repository.archiveResult = false;
+    const { service, department } = await harness();
 
     await expect(
-      DepartmentService.create({ repository, members: members() }).archive({
-        id: "department-1",
-        organizationId: "organization-2",
-      }),
+      service.archive({ id: department.id, organizationId: "organization-2" }),
     ).rejects.toBeInstanceOf(DepartmentNotFoundError);
   });
 
-  describe("when a member is assigned", () => {
-    it("points the member through organization and dates the link in governance", async () => {
-      const repository = new MemoryDepartmentRepository();
-      const at = Temporal.Instant.from("2026-09-03T00:00:00Z");
-      const service = DepartmentService.create({ repository, members: members(), now: () => at });
+  it("lists members by display name, falling back to email, beside teams and projects", async () => {
+    const { service, department } = await harness();
 
-      await service.assignUser({
-        organizationId: "organization-1",
-        userId: "user-1",
-        departmentId: "department-1",
-      });
+    expect(await service.getAssignments({ organizationId: ORG })).toEqual({
+      users: [
+        { id: "user-1", name: "Ada", departmentId: department.id },
+        { id: "user-2", name: "zed@acme.com", departmentId: null },
+      ],
+      teams: [{ id: "team-1", name: "Web", departmentId: null }],
+      projects: [{ id: "project-1", name: "Chat", departmentId: department.id }],
+    });
+  });
 
-      expect(repository.recordMembership).toHaveBeenCalledWith({
-        organizationId: "organization-1",
-        userId: "user-1",
-        departmentId: "department-1",
-        at,
-      });
+  it("answers a past day's departments keyed by member", async () => {
+    const { service, department } = await harness();
+
+    const onDay = await service.departmentsOnDay({
+      organizationId: ORG,
+      userIds: ["user-1"],
+      dayUtc: "2026-01-20",
     });
 
-    it("refuses a member organization does not have, and dates nothing", async () => {
-      const repository = new MemoryDepartmentRepository();
-      const service = DepartmentService.create({ repository, members: members(false) });
-
-      await expect(
-        service.assignUser({ organizationId: "organization-1", userId: "ghost", departmentId: null }),
-      ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
-      expect(repository.recordMembership).not.toHaveBeenCalled();
-    });
+    expect([...onDay]).toEqual([["user-1", department.id]]);
   });
 });

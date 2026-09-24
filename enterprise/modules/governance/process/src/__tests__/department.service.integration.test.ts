@@ -1,11 +1,12 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { DepartmentAssignmentTargetNotFoundError } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   OrganizationUserRole,
   Prisma,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/departments.feature
@@ -29,7 +30,7 @@ describe.skipIf(!databaseUrl)("DepartmentService", () => {
   const PROJECT_ID = `proj-${ns}`;
   const ROBIN = `usr-robin-${ns}`;
 
-  const members = createApiFixture<OrganizationApi>({
+  const organizations = createApiFixture<OrganizationApi>({
     findMembersWithDepartments: ({ organizationId }) =>
       prisma.organizationUser.findMany({
         where: { organizationId },
@@ -42,9 +43,29 @@ describe.skipIf(!databaseUrl)("DepartmentService", () => {
           data: { departmentId },
         })
       ).count > 0,
+    assignTeamDepartment: async ({ organizationId, teamId, departmentId }) =>
+      (
+        await prisma.team.updateMany({
+          where: { id: teamId, organizationId },
+          data: { departmentId },
+        })
+      ).count > 0,
+  });
+  const projects = createApiFixture<ProjectApi>({
+    assignProjectDepartment: async ({ organizationId, projectId, departmentId }) =>
+      (
+        await prisma.project.updateMany({
+          where: { id: projectId, team: { organizationId } },
+          data: { departmentId },
+        })
+      ).count > 0,
   });
   const service = () =>
-    DepartmentService.create({ repository: PrismaDepartmentRepository.create(prisma), members });
+    DepartmentService.create({
+      repository: PrismaDepartmentRepository.create(prisma),
+      organizations,
+      projects,
+    });
 
   beforeAll(async () => {
     await prisma.organization.createMany({

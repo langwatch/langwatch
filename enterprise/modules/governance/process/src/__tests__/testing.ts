@@ -3,6 +3,9 @@
  * a suite needs, built here. Repositories and services stay private to the
  * feature server — a suite states which substrates it has, not which classes to construct.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ProjectApi } from "@langwatch/project-contract";
+
 import type { GovernanceClickHouseResolver } from "../app/governance.members.ts";
 import {
   PrismaDepartmentRepository,
@@ -12,7 +15,11 @@ import {
   PrismaActivityMonitorRepository,
   type ActivityMonitorDatabase,
 } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
-import { type DepartmentMemberDirectory, DepartmentService } from "../services/department.service.ts";
+import {
+  type DepartmentOrganizations,
+  type DepartmentProjects,
+  DepartmentService,
+} from "../services/department.service.ts";
 import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 
 /**
@@ -29,7 +36,12 @@ export function createActivityMonitorTestService(options: {
 /** The department directory over a suite's own Postgres connection. */
 export function createDepartmentTestService(
   database: DepartmentDatabase,
-  members: DepartmentMemberDirectory,
+  organizations: DepartmentOrganizations,
+  projects: DepartmentProjects = createApiFixture<ProjectApi>({}),
 ): DepartmentService {
-  return DepartmentService.create({ repository: PrismaDepartmentRepository.create(database), members });
+  return DepartmentService.create({
+    repository: PrismaDepartmentRepository.create(database),
+    organizations,
+    projects,
+  });
 }

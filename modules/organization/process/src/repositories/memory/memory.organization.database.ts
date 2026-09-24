@@ -42,6 +42,17 @@ export interface MemoryTeamRow {
   archivedAt: Instant | null;
   createdAt: Instant;
   updatedAt: Instant;
+  departmentId?: string | null;
+}
+
+/** One dated member-to-department link; `validTo` is null while it is open. */
+export interface MemoryDepartmentMembershipRow {
+  id: string;
+  organizationId: string;
+  userId: string;
+  departmentId: string;
+  validFrom: Instant;
+  validTo: Instant | null;
 }
 
 /** One organization-level membership row. */
@@ -148,6 +159,7 @@ export class MemoryOrganizationDatabase {
   readonly teamUsers: MemoryTeamUserRow[] = [];
   readonly customRoles = new Map<string, MemoryCustomRoleRow>();
   readonly auditLogs: MemoryAuditLogRow[] = [];
+  readonly departmentMemberships: MemoryDepartmentMembershipRow[] = [];
 
   static create(): MemoryOrganizationDatabase {
     return new MemoryOrganizationDatabase();

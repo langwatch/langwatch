@@ -37,6 +37,14 @@ export interface ProjectWithOrgAdmin {
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
+  findProjectsWithDepartments(input: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
+  assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean>;
   findInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
   findInternalBySlug(slug: string): Promise<InternalProject | null>;
   findLiveInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;

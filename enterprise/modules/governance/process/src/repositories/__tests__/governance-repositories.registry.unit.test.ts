@@ -34,24 +34,6 @@ describe("given the memory-backed governance repositories", () => {
     });
   });
 
-  describe("when a department assignment names a department of another organization", () => {
-    it("refuses the assignment rather than crossing the tenant line", async () => {
-      const repositories = memoryTier();
-      const mine = await repositories.departments.create({
-        organizationId: "org-1",
-        name: "Platform",
-      });
-
-      await expect(
-        repositories.departments.assignTeam({
-          organizationId: "org-2",
-          teamId: "team-1",
-          departmentId: mine.id,
-        }),
-      ).resolves.toBe(false);
-    });
-  });
-
   describe("when a routing policy is made the organization default", () => {
     it("leaves exactly one default behind", async () => {
       const repositories = memoryTier();

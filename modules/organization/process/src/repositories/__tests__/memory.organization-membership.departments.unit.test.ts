@@ -16,7 +16,12 @@ const EPOCH = Temporal.Instant.fromEpochMilliseconds(0);
 function harness() {
   const memory = MemoryOrganizationDatabase.create();
   const member = (userId: string, organizationId: string, departmentId: string | null = null) => {
-    memory.users.set(userId, { id: userId, name: null, email: `${userId}@acme.com`, deactivatedAt: null });
+    memory.users.set(userId, {
+      id: userId,
+      name: null,
+      email: `${userId}@acme.com`,
+      deactivatedAt: null,
+    });
     memory.organizationUsers.push({
       userId,
       organizationId,
@@ -27,7 +32,7 @@ function harness() {
       departmentId,
     });
   };
-  return { member, repository: MemoryOrganizationMembershipRepository.create({ memory }) };
+  return { member, memory, repository: MemoryOrganizationMembershipRepository.create({ memory }) };
 }
 
 describe("the member department column", () => {
@@ -58,7 +63,11 @@ describe("the member department column", () => {
       member("tom", OTHER);
 
       expect(await repository.findMembersWithDepartments({ organizationId: ACME })).toEqual([
-        { userId: "maria", departmentId: "dept_eng", user: { name: null, email: "maria@acme.com" } },
+        {
+          userId: "maria",
+          departmentId: "dept_eng",
+          user: { name: null, email: "maria@acme.com" },
+        },
       ]);
     });
   });
@@ -70,17 +79,130 @@ describe("the member department column", () => {
       member("maria", OTHER, "dept_elsewhere");
 
       await expect(
-        repository.assignMemberDepartment({ organizationId: ACME, userId: "maria", departmentId: "dept_eng" }),
+        repository.assignMemberDepartment({
+          organizationId: ACME,
+          userId: "maria",
+          departmentId: "dept_eng",
+          at: EPOCH,
+        }),
       ).resolves.toBe(true);
       await expect(
-        repository.assignMemberDepartment({ organizationId: ACME, userId: "nobody", departmentId: null }),
+        repository.assignMemberDepartment({
+          organizationId: ACME,
+          userId: "nobody",
+          departmentId: null,
+          at: EPOCH,
+        }),
       ).resolves.toBe(false);
 
-      expect(await repository.findMemberDepartments({ organizationId: OTHER, userIds: ["maria"] })).toEqual([
-        { userId: "maria", departmentId: "dept_elsewhere" },
-      ]);
-      expect(await repository.findMemberDepartments({ organizationId: ACME, userIds: ["maria"] })).toEqual([
-        { userId: "maria", departmentId: "dept_eng" },
+      expect(
+        await repository.findMemberDepartments({ organizationId: OTHER, userIds: ["maria"] }),
+      ).toEqual([{ userId: "maria", departmentId: "dept_elsewhere" }]);
+      expect(
+        await repository.findMemberDepartments({ organizationId: ACME, userIds: ["maria"] }),
+      ).toEqual([{ userId: "maria", departmentId: "dept_eng" }]);
+    });
+  });
+
+  describe("when a member is reassigned over several days", () => {
+    const at = (iso: string) => Temporal.Instant.from(iso);
+    const assign = (
+      repository: ReturnType<typeof harness>["repository"],
+      departmentId: string | null,
+      iso: string,
+    ) =>
+      repository.assignMemberDepartment({
+        organizationId: ACME,
+        userId: "maria",
+        departmentId,
+        at: at(iso),
+      });
+
+    it("dates each move so a past day resolves to where the member ended it", async () => {
+      const { member, repository } = harness();
+      member("maria", ACME);
+      await assign(repository, "dept_eng", "2026-01-10T09:00:00Z");
+      await assign(repository, "dept_ops", "2026-02-03T12:00:00Z");
+      const onDay = (dayUtc: string) =>
+        repository.findMemberDepartmentsOnDay({ organizationId: ACME, userIds: ["maria"], dayUtc });
+
+      expect(await onDay("2026-01-09")).toEqual([]);
+      expect(await onDay("2026-01-20")).toEqual([{ userId: "maria", departmentId: "dept_eng" }]);
+      expect(await onDay("2026-02-03")).toEqual([{ userId: "maria", departmentId: "dept_ops" }]);
+    });
+
+    it("keeps the open link when the standing department is asserted again", async () => {
+      const { member, memory, repository } = harness();
+      member("maria", ACME);
+      await assign(repository, "dept_eng", "2026-01-10T09:00:00Z");
+      await assign(repository, "dept_eng", "2026-01-11T09:00:00Z");
+
+      expect(memory.departmentMemberships).toHaveLength(1);
+      expect(
+        await repository.findOpenMemberDepartmentLinks({
+          organizationId: ACME,
+          userIds: ["maria"],
+        }),
+      ).toEqual([{ userId: "maria", departmentId: "dept_eng" }]);
+    });
+
+    it("closes the open link and opens none when the department is cleared", async () => {
+      const { member, repository } = harness();
+      member("maria", ACME);
+      await assign(repository, "dept_eng", "2026-01-10T09:00:00Z");
+      await assign(repository, null, "2026-01-12T09:00:00Z");
+
+      expect(
+        await repository.findOpenMemberDepartmentLinks({
+          organizationId: ACME,
+          userIds: ["maria"],
+        }),
+      ).toEqual([]);
+    });
+
+    it("writes no link for someone who is not a member", async () => {
+      const { memory, repository } = harness();
+      await expect(assign(repository, "dept_eng", "2026-01-10T09:00:00Z")).resolves.toBe(false);
+      expect(memory.departmentMemberships).toEqual([]);
+    });
+  });
+
+  describe("when a team is pointed at a department", () => {
+    it("moves only that organization's team and lists teams by name", async () => {
+      const { memory, repository } = harness();
+      const team = (id: string, name: string, organizationId: string) =>
+        memory.teams.set(id, {
+          id,
+          name,
+          slug: id,
+          organizationId,
+          isPersonal: false,
+          ownerUserId: null,
+          archivedAt: null,
+          createdAt: EPOCH,
+          updatedAt: EPOCH,
+        });
+      team("team_web", "Web", ACME);
+      team("team_api", "Api", ACME);
+      team("team_far", "Far", OTHER);
+
+      await expect(
+        repository.assignTeamDepartment({
+          organizationId: ACME,
+          teamId: "team_web",
+          departmentId: "dept_eng",
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        repository.assignTeamDepartment({
+          organizationId: ACME,
+          teamId: "team_far",
+          departmentId: "dept_eng",
+        }),
+      ).resolves.toBe(false);
+      expect(await repository.findTeamsWithDepartments({ organizationId: ACME })).toEqual([
+        { id: "team_api", name: "Api", departmentId: null },
+        { id: "team_web", name: "Web", departmentId: "dept_eng" },
       ]);
     });
   });

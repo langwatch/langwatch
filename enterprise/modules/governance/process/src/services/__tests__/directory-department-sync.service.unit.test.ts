@@ -3,7 +3,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { Temporal } from "@langwatch/time";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryDepartmentRepository } from "../../repositories/memory/memory.department.repository.ts";
@@ -18,7 +18,15 @@ const OID = "f6481ec4-0000-4000-8000-0000000000a1";
 const MARIA = "user_maria";
 const OTHER = "user_other";
 
-function row({ actor = OID, mail = "", department }: { actor?: string; mail?: string; department: string }): NormalizedPullEvent {
+function row({
+  actor = OID,
+  mail = "",
+  department,
+}: {
+  actor?: string;
+  mail?: string;
+  department: string;
+}): NormalizedPullEvent {
   return {
     source_event_id: `dir_${actor}`,
     event_timestamp: "2026-09-03T00:00:00.000Z",
@@ -41,14 +49,23 @@ function harness(input: {
 }) {
   const store = MemoryGovernanceStore.create();
   const repository = MemoryDepartmentRepository.create(store);
-  const pointers = new Map(Object.entries(input.memberDepartments ?? { [MARIA]: null, [OTHER]: null }));
+  const pointers = new Map(
+    Object.entries(input.memberDepartments ?? { [MARIA]: null, [OTHER]: null }),
+  );
+  /** Organization's open dated links, kept as its `assignMemberDepartment` keeps them. */
+  const links: { userId: string; departmentId: string }[] = [];
   const organizations = createApiFixture<OrganizationApi>({
-    findMembersWithDepartments: async () => [],
     assignMemberDepartment: async ({ userId, departmentId }) => {
       if (!pointers.has(userId)) return false;
       pointers.set(userId, departmentId);
+      const open = links.findIndex((link) => link.userId === userId);
+      if (open >= 0 && links[open]?.departmentId === departmentId) return true;
+      if (open >= 0) links.splice(open, 1);
+      if (departmentId !== null) links.push({ userId, departmentId });
       return true;
     },
+    findOpenMemberDepartmentLinks: async ({ userIds }) =>
+      links.filter((link) => userIds.includes(link.userId)),
     findMemberDepartments: async ({ userIds }) =>
       userIds.flatMap((userId) =>
         pointers.has(userId) ? [{ userId, departmentId: pointers.get(userId) ?? null }] : [],
@@ -56,12 +73,11 @@ function harness(input: {
   });
   const departments = DepartmentService.create({
     repository,
-    members: organizations,
-    now: () => Temporal.Instant.from("2026-09-03T00:00:00Z"),
+    organizations,
+    projects: createApiFixture<ProjectApi>({}),
   });
   const sync = DirectoryDepartmentSyncService.create({
     departments,
-    openMemberships: repository,
     matcher: {
       loadAccountIndex: async () => ({
         usersByVerifiedEmail: new Map(input.byEmail ?? []),
@@ -73,20 +89,34 @@ function harness(input: {
     },
     matches: {
       findOpenByOrganization: async () =>
-        input.linkedUserId ? [{ discoveredPersonId: "person_1", userId: input.linkedUserId, evidenceKind: "confirmed" }] : [],
+        input.linkedUserId
+          ? [
+              {
+                discoveredPersonId: "person_1",
+                userId: input.linkedUserId,
+                evidenceKind: "confirmed",
+              },
+            ]
+          : [],
     },
     organizations,
   });
   const apply = (events: NormalizedPullEvent[]) =>
-    sync.applyDirectoryEvents({ organizationId: ORG, provider: COPILOT_STUDIO_DATAVERSE_ADAPTER_ID, events });
+    sync.applyDirectoryEvents({
+      organizationId: ORG,
+      provider: COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+      events,
+    });
   const named = (name: string) => store.departments.find((department) => department.name === name);
-  return { apply, pointers, store, repository, named };
+  return { apply, pointers, links, store, repository, named };
 }
 
 describe("DirectoryDepartmentSyncService", () => {
   /** @scenario "A directory department lands on the member it proves" */
   it("assigns a member their directory department through a confirmed address", async () => {
-    const { apply, pointers, repository, named } = harness({ byEmail: [["maria@acme.example", [MARIA]]] });
+    const { apply, pointers, repository, named } = harness({
+      byEmail: [["maria@acme.example", [MARIA]]],
+    });
     const existing = await repository.create({ organizationId: ORG, name: "Engineering" });
 
     const outcome = await apply([row({ mail: "maria@acme.example", department: "Engineering" })]);
@@ -119,15 +149,17 @@ describe("DirectoryDepartmentSyncService", () => {
 
   /** @scenario "Conflicting directory and confirmed email proof changes no department" */
   it("leaves both assignments and their histories untouched", async () => {
-    const { apply, pointers, store, named } = harness({
+    const { apply, pointers, links, named } = harness({
       byDirectoryId: [[OID, [MARIA]]],
       byEmail: [["other@acme.example", [OTHER]]],
       memberDepartments: { [MARIA]: "dept_a", [OTHER]: "dept_b" },
     });
 
-    expect(await apply([row({ mail: "other@acme.example", department: "Brand new" })])).toEqual({ assigned: 0 });
+    expect(await apply([row({ mail: "other@acme.example", department: "Brand new" })])).toEqual({
+      assigned: 0,
+    });
     expect([pointers.get(MARIA), pointers.get(OTHER)]).toEqual(["dept_a", "dept_b"]);
-    expect(store.departmentMemberships).toEqual([]);
+    expect(links).toEqual([]);
     expect(named("Brand new")).toBeUndefined();
   });
 
@@ -149,11 +181,11 @@ describe("DirectoryDepartmentSyncService", () => {
   });
 
   it("costs nothing to run twice: one department, one open link, no write reported", async () => {
-    const { apply, store } = harness({ byDirectoryId: [[OID, [MARIA]]] });
+    const { apply, links, store } = harness({ byDirectoryId: [[OID, [MARIA]]] });
 
     await apply([row({ department: "Engineering" })]);
     expect(await apply([row({ department: "Engineering" })])).toEqual({ assigned: 0 });
     expect(store.departments).toHaveLength(1);
-    expect(store.departmentMemberships.filter((link) => link.validToMs === null)).toHaveLength(1);
+    expect(links).toHaveLength(1);
   });
 });

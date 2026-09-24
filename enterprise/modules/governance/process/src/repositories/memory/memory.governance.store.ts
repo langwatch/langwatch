@@ -51,16 +51,6 @@ export class MemoryGovernanceStore {
   readonly members: MemoryGovernanceMember[] = [];
   readonly projects: MemoryGovernanceProject[] = [];
   readonly departments: Department[] = [];
-  /** The `DepartmentMembershipHistory` twin: dated links, `validTo` null while open. */
-  readonly departmentMemberships: {
-    organizationId: string;
-    userId: string;
-    departmentId: string;
-    validFromMs: number;
-    validToMs: number | null;
-  }[] = [];
-  readonly departmentOfTeam = new Map<string, string | null>();
-  readonly departmentOfProject = new Map<string, string | null>();
   readonly ingestionTemplates: IngestionTemplate[] = [];
   readonly anomalyRules: AnomalyRule[] = [];
   readonly routingPolicies: RoutingPolicy[] = [];

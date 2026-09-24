@@ -115,8 +115,8 @@ import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
 import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
-import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
+import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
 import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
 import {
   GovernanceCliAccessService,
@@ -296,7 +296,13 @@ export interface GovernanceAppDependencies {
    */
   projects: Pick<
     ProjectApi,
-    "getOrganizationId" | "findInternal" | "findWithTeam" | "ensureInternal" | "findInternalIds"
+    | "getOrganizationId"
+    | "findInternal"
+    | "findWithTeam"
+    | "ensureInternal"
+    | "findInternalIds"
+    | "findProjectsWithDepartments"
+    | "assignProjectDepartment"
   >;
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
@@ -317,6 +323,10 @@ export interface GovernanceAppDependencies {
       | "findMemberDepartments"
       | "findMembersWithDepartments"
       | "assignMemberDepartment"
+      | "findMemberDepartmentsOnDay"
+      | "findOpenMemberDepartmentLinks"
+      | "findTeamsWithDepartments"
+      | "assignTeamDepartment"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -464,7 +474,8 @@ export class GovernanceApp implements GovernanceRestApi {
     this.encryption = encryption;
     this.departments = DepartmentService.create({
       repository: repositories.departments,
-      members: dependencies.organizations,
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
     });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
@@ -732,7 +743,6 @@ export class GovernanceApp implements GovernanceRestApi {
       unpricedWindows: this.repositories.ingestionSources,
       departmentSync: DirectoryDepartmentSyncService.create({
         departments: this.departments,
-        openMemberships: this.repositories.departments,
         matcher: this.identityMatches,
         discoveredPeople: this.repositories.discoveredPeople,
         matches: this.repositories.identityMatches,

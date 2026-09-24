@@ -29,7 +29,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import { fromDate } from "@langwatch/time";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
 
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
 import {
@@ -776,8 +776,16 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return users.map(userFromRecord);
   }
 
-  async findMembersWithDepartments({ organizationId }: { organizationId: string }): Promise<
-    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+  async findMembersWithDepartments({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<
+    {
+      userId: string;
+      departmentId: string | null;
+      user: { name: string | null; email: string | null };
+    }[]
   > {
     return this.prisma.organizationUser.findMany({
       where: { organizationId },
@@ -789,9 +797,91 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     organizationId: string;
     userId: string;
     departmentId: string | null;
+    at: Instant;
   }): Promise<boolean> {
-    const result = await this.prisma.organizationUser.updateMany({
-      where: { userId: input.userId, organizationId: input.organizationId },
+    const { organizationId, userId, departmentId } = input;
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.organizationUser.updateMany({
+        where: { userId, organizationId },
+        data: { departmentId },
+      });
+      if (result.count === 0) return false;
+
+      const open = await tx.departmentMembershipHistory.findFirst({
+        where: { organizationId, userId, validTo: null },
+      });
+      if (open?.departmentId === departmentId) return true;
+
+      const at = toDate(input.at);
+      if (open) {
+        await tx.departmentMembershipHistory.update({
+          where: { id: open.id },
+          data: { validTo: at },
+        });
+      }
+      if (departmentId !== null) {
+        await tx.departmentMembershipHistory.create({
+          data: { organizationId, userId, departmentId, validFrom: at },
+        });
+      }
+      return true;
+    });
+  }
+
+  async findMemberDepartmentsOnDay({
+    organizationId,
+    userIds,
+    dayUtc,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    if (userIds.length === 0) return [];
+    const endOfDay = new Date(`${dayUtc}T23:59:59.999Z`);
+    return this.prisma.departmentMembershipHistory.findMany({
+      where: {
+        organizationId,
+        userId: { in: [...userIds] },
+        validFrom: { lte: endOfDay },
+        OR: [{ validTo: null }, { validTo: { gt: endOfDay } }],
+      },
+      select: { userId: true, departmentId: true },
+    });
+  }
+
+  async findOpenMemberDepartmentLinks({
+    organizationId,
+    userIds,
+  }: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]> {
+    return this.prisma.departmentMembershipHistory.findMany({
+      where: { organizationId, userId: { in: [...userIds] }, validTo: null },
+      select: { userId: true, departmentId: true },
+    });
+  }
+
+  async findTeamsWithDepartments({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.prisma.team.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, departmentId: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async assignTeamDepartment(input: {
+    organizationId: string;
+    teamId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const result = await this.prisma.team.updateMany({
+      where: { id: input.teamId, organizationId: input.organizationId },
       data: { departmentId: input.departmentId },
     });
     return result.count > 0;

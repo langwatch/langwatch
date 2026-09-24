@@ -324,9 +324,16 @@ export interface OrganizationApi {
   findMembersWithDepartments(input: {
     organizationId: string;
   }): Promise<
-    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+    {
+      userId: string;
+      departmentId: string | null;
+      user: { name: string | null; email: string | null };
+    }[]
   >;
-  /** Points one member at a department, or clears it; false when no such member (main `department.service.ts:241-244`). */
+  /**
+   * Points one member at a department (or clears it) and dates the link, in one transaction; false
+   * when no such member (main `department.service.ts:229-282`).
+   */
   assignMemberDepartment(input: {
     organizationId: string;
     userId: string;
@@ -337,6 +344,36 @@ export interface OrganizationApi {
     organizationId: string;
     userIds: readonly string[];
   }): Promise<{ userId: string; departmentId: string | null }[]>;
+  /**
+   * Each named member's department on a UTC day, from the link open at the day's end (main
+   * `department.service.ts:293-316`).
+   */
+  findMemberDepartmentsOnDay(input: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<{ userId: string; departmentId: string }[]>;
+  /**
+   * Each named member's open dated department link (main
+   * `directoryDepartmentSync.service.ts:220-227`).
+   */
+  findOpenMemberDepartmentLinks(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]>;
+  /** Every team with its department (main `department.service.ts:121-125`). */
+  findTeamsWithDepartments(input: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
+  /**
+   * Points one team at a department, or clears it; false when no such team (main
+   * `department.service.ts:320-330`).
+   */
+  assignTeamDepartment(input: {
+    organizationId: string;
+    teamId: string;
+    departmentId: string | null;
+  }): Promise<boolean>;
   /** Why each member is here, keyed by user id; explains, never grants. */
   getMemberProvenance(
     input: Readonly<{ organizationId: string }>,

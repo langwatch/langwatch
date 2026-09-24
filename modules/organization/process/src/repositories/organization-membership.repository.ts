@@ -16,6 +16,7 @@ import type {
   TeamUserRole,
   User,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
 
 import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
 
@@ -334,12 +335,41 @@ export abstract class OrganizationMembershipRepository {
   abstract findMembersWithDepartments(input: {
     organizationId: string;
   }): Promise<
-    { userId: string; departmentId: string | null; user: { name: string | null; email: string | null } }[]
+    {
+      userId: string;
+      departmentId: string | null;
+      user: { name: string | null; email: string | null };
+    }[]
   >;
 
+  /**
+   * The column and its dated history, in one transaction (main `department.service.ts:229-282`).
+   */
   abstract assignMemberDepartment(input: {
     organizationId: string;
     userId: string;
+    departmentId: string | null;
+    at: Instant;
+  }): Promise<boolean>;
+
+  abstract findMemberDepartmentsOnDay(input: {
+    organizationId: string;
+    userIds: readonly string[];
+    dayUtc: string;
+  }): Promise<{ userId: string; departmentId: string }[]>;
+
+  abstract findOpenMemberDepartmentLinks(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; departmentId: string }[]>;
+
+  abstract findTeamsWithDepartments(input: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]>;
+
+  abstract assignTeamDepartment(input: {
+    organizationId: string;
+    teamId: string;
     departmentId: string | null;
   }): Promise<boolean>;
 

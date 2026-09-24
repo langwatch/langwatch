@@ -1,4 +1,4 @@
-import { ProjectNotFoundError, type Team } from "@langwatch/project-contract";
+import { PROJECT_KIND, ProjectNotFoundError, type Team } from "@langwatch/project-contract";
 import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -327,6 +327,38 @@ describe("MemoryProjectRepository", () => {
           scopeId: "team_personal",
         }),
       ).toBeNull();
+    });
+  });
+
+  describe("when projects are pointed at departments", () => {
+    it("lists the organization's projects by name, leaving the governance project out", async () => {
+      const { database, repository } = seeded();
+      await repository.create(creation);
+      const internal = await repository.create({
+        ...creation,
+        id: "project_gov",
+        name: "Aaa",
+        slug: "gov",
+      });
+      database.putProject({ ...internal, kind: PROJECT_KIND.INTERNAL_GOVERNANCE });
+
+      await expect(
+        repository.assignProjectDepartment({
+          organizationId: ORGANIZATION_ID,
+          projectId: "project_1",
+          departmentId: "dept_eng",
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        repository.assignProjectDepartment({
+          organizationId: "elsewhere",
+          projectId: "project_1",
+          departmentId: null,
+        }),
+      ).resolves.toBe(false);
+      expect(
+        await repository.findProjectsWithDepartments({ organizationId: ORGANIZATION_ID }),
+      ).toEqual([{ id: "project_1", name: "Checkout assistant", departmentId: "dept_eng" }]);
     });
   });
 });

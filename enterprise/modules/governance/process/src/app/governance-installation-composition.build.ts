@@ -5,7 +5,6 @@ import type {
   GovernanceOttlGateway,
   GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
-import type { DepartmentMemberDirectory } from "../services/department.service.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -21,6 +20,7 @@ import { PrismaActivityMonitorRepository } from "../repositories/prisma/prisma.i
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
 import { DefaultGovernanceCliTokenRevocationService } from "../services/cli-token-revocation.service.ts";
+import type { DepartmentOrganizations } from "../services/department.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import { GovernanceActivityOperationsService } from "../services/governance-activity-operations.service.ts";
 import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service.ts";
@@ -69,7 +69,7 @@ import type {
 export type GovernanceInstallationOptions = {
   database: ProcessMembers["prisma"];
   organizations: OrganizationService;
-  memberDepartments: DepartmentMemberDirectory;
+  memberDepartments: DepartmentOrganizations;
   projects: ProjectApi;
   gatewayBaseUrl: string;
   eventing: GovernanceEventingChannel;
@@ -129,7 +129,8 @@ export class GovernanceInstallationComposition {
     });
     const departments = DepartmentService.create({
       repository: PrismaDepartmentRepository.create(this.options.database),
-      members: this.options.memberDepartments,
+      organizations: this.options.memberDepartments,
+      projects: this.options.projects,
     });
     const personalUsage = DefaultGovernancePersonalUsageService.create({
       reader: this.options.personalUsageReader,

@@ -66,6 +66,33 @@ export class MemoryProjectRepository implements ProjectRepository {
     });
   }
 
+  async findProjectsWithDepartments({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (row) =>
+          row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          this.#database.isInOrganization(row, organizationId),
+      )
+      .map((row) => ({ id: row.id, name: row.name, departmentId: row.departmentId }))
+      .toSorted((left, right) => left.name.localeCompare(right.name));
+  }
+
+  async assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const project = this.#database.findProject(input.projectId);
+    if (!project || !this.#database.isInOrganization(project, input.organizationId)) return false;
+    this.#database.putProject({ ...project, departmentId: input.departmentId });
+    return true;
+  }
+
   async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     const project = this.#database
       .projects()

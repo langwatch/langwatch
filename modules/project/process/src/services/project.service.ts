@@ -73,6 +73,20 @@ export class ProjectService {
     return this.repository.findPaths(input);
   }
 
+  findProjectsWithDepartments(input: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.repository.findProjectsWithDepartments(input);
+  }
+
+  assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    return this.repository.assignProjectDepartment(input);
+  }
+
   private readonly metadata: ProjectMetadataService;
   private readonly repository: ProjectRepository;
   private readonly credentials: ProjectCredentials;

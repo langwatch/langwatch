@@ -70,7 +70,11 @@ import {
 } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 import type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
 import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
-import { type DepartmentMemberDirectory, DepartmentService } from "./services/department.service.ts";
+import {
+  type DepartmentOrganizations,
+  type DepartmentProjects,
+  DepartmentService,
+} from "./services/department.service.ts";
 import {
   GovernanceEventsAdapter,
   type GovernanceEventsPipelineDeps,
@@ -216,9 +220,14 @@ export function createGovernanceSignals(
 /** The department directory, over the process's own connection. */
 export function createDepartmentDirectory(
   database: DepartmentDatabase,
-  members: DepartmentMemberDirectory,
+  organizations: DepartmentOrganizations,
+  projects: DepartmentProjects,
 ): DepartmentService {
-  return DepartmentService.create({ repository: PrismaDepartmentRepository.create(database), members });
+  return DepartmentService.create({
+    repository: PrismaDepartmentRepository.create(database),
+    organizations,
+    projects,
+  });
 }
 
 /**
