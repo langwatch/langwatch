@@ -36,19 +36,46 @@ export const legacyWorkbenchStateSchema = z
   .record(z.string(), z.unknown())
   .describe("The wizard's stored setup: read it, change it, send it back whole.");
 
+/** `saveExperiment`: the legacy wizard's setup and the graph it writes a version of. */
+export const experimentWizardSaveInputSchema = z.object({
+  ...projectScopeSchema.shape,
+  experimentId: z.string().optional(),
+  workbenchState: legacyWorkbenchStateSchema,
+  dsl: studioWorkflowSchema,
+  commitMessage: z.string().optional(),
+});
+export type ExperimentWizardSaveInput = z.infer<typeof experimentWizardSaveInputSchema>;
+
+/** `getExperimentBySlugOrId`: one experiment, named by either key. */
+export const experimentIdOrSlugInputSchema = z.object({
+  ...projectScopeSchema.shape,
+  experimentId: z.string().optional(),
+  experimentSlug: z.string().optional(),
+});
+export type ExperimentIdOrSlugInput = z.infer<typeof experimentIdOrSlugInputSchema>;
+
+/** `getAllForEvaluationsList`: which page of the evaluations list. */
+export const experimentEvaluationsListInputSchema = z.object({
+  ...projectScopeSchema.shape,
+  pageOffset: z.number().optional(),
+  pageSize: z.number().optional(),
+});
+export type ExperimentEvaluationsListInput = z.infer<typeof experimentEvaluationsListInputSchema>;
+
+/** `copy`: an experiment from a source project into the target project. */
+export const experimentCopyInputSchema = z.object({
+  experimentId: z.string(),
+  projectId: z.string(),
+  sourceProjectId: z.string(),
+  copyDatasets: z.boolean().optional(),
+});
+export type ExperimentCopyInput = z.infer<typeof experimentCopyInputSchema>;
+
 export const experimentsTrpc = defineTrpcContract("experiments")
   // ── The workbench a tab has open ─────────────────────────────────
 
   .mutation("saveExperiment")
-  .withInput(
-    z.object({
-      ...projectScopeSchema.shape,
-      experimentId: z.string().optional(),
-      workbenchState: legacyWorkbenchStateSchema,
-      dsl: studioWorkflowSchema,
-      commitMessage: z.string().optional(),
-    }),
-  )
+  .withInput(experimentWizardSaveInputSchema)
   .withOutput(experimentSchema)
 
   /**
@@ -126,13 +153,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   // ── The experiments a project lists ──────────────────────────────
 
   .query("getExperimentBySlugOrId")
-  .withInput(
-    z.object({
-      ...projectScopeSchema.shape,
-      experimentId: z.string().optional(),
-      experimentSlug: z.string().optional(),
-    }),
-  )
+  .withInput(experimentIdOrSlugInputSchema)
   .withOutput(experimentSchema)
 
   .query("getExperimentWithDSLBySlug")
@@ -150,13 +171,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   .withOutput(z.array(experimentSchema))
 
   .query("getAllForEvaluationsList")
-  .withInput(
-    z.object({
-      ...projectScopeSchema.shape,
-      pageOffset: z.number().optional(),
-      pageSize: z.number().optional(),
-    }),
-  )
+  .withInput(experimentEvaluationsListInputSchema)
   .withOutput(experimentEvaluationsListPageSchema)
 
   /** Whether the project's last experiment is still a draft. */
@@ -174,14 +189,7 @@ export const experimentsTrpc = defineTrpcContract("experiments")
   .withOutput(experimentArchivedSchema)
 
   .mutation("copy")
-  .withInput(
-    z.object({
-      experimentId: z.string(),
-      projectId: z.string(),
-      sourceProjectId: z.string(),
-      copyDatasets: z.boolean().optional(),
-    }),
-  )
+  .withInput(experimentCopyInputSchema)
   .withOutput(experimentCopiedSchema)
 
   // ── The runs recorded against one ────────────────────────────────

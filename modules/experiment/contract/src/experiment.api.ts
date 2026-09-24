@@ -35,8 +35,19 @@ import type {
   WorkbenchStateView,
   WorkbenchVersionsPage,
 } from "./experiment-workbench-version.ts";
-import type { ExperimentPublishedMonitor, ExperimentUpdateFrame } from "./experiment.responses.ts";
+import type {
+  ExperimentCopied,
+  ExperimentEvaluationsListPage,
+  ExperimentPublishedMonitor,
+  ExperimentUpdateFrame,
+} from "./experiment.responses.ts";
 import type { ExperimentRunLookupInput } from "./experiment.rest.ts";
+import type {
+  ExperimentCopyInput,
+  ExperimentEvaluationsListInput,
+  ExperimentIdOrSlugInput,
+  ExperimentWizardSaveInput,
+} from "./experiment.trpc.ts";
 import type {
   Experiment,
   ExperimentLookup,
@@ -187,6 +198,24 @@ export interface ExperimentApi {
   withRunAggregates(
     input: Readonly<{ projectId: string; experiments: readonly Experiment[] }>,
   ): Promise<ExperimentWithRuns[]>;
+
+  // ── The legacy wizard and the evaluations list ─────────────────────
+
+  /** One experiment by its id when given, else by its slug; neither is a 400. */
+  getByIdOrSlug(input: ExperimentIdOrSlugInput): Promise<Experiment>;
+  /** Saves the wizard's setup, writing a version of its graph into the experiment's workflow. */
+  saveWithWorkflow(input: ExperimentWizardSaveInput): Promise<Experiment>;
+  /** Publishes a wizard experiment's evaluator as a monitor, refusing one not ready to be. */
+  saveAsMonitor(
+    input: Readonly<{ projectId: string; experimentId: string }>,
+  ): Promise<ExperimentPublishedMonitor>;
+  /** One page of the evaluations list, legacy online evaluations excluded, newest run first. */
+  listForEvaluations(input: ExperimentEvaluationsListInput): Promise<ExperimentEvaluationsListPage>;
+  /** Copies an experiment from a source project the caller may also manage evaluations in. */
+  copyToProject(
+    input: ExperimentCopyInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<ExperimentCopied>;
 
   // ── The other verticals an experiment reaches through this api ─────
 

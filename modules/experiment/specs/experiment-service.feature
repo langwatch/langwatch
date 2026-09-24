@@ -92,3 +92,39 @@ Feature: Experiment service boundary
     Given a browser caller that lacks evaluations:manage for the project in the abort body
     When it calls the workbench abort door
     Then it is refused at 403 before the abort operation runs
+
+  @unit
+  Scenario: Saving a wizard experiment whose workflow is gone is refused
+    Given a wizard experiment whose workflow no longer resolves in the project
+    When the wizard saves it
+    Then experiment_workflow_not_found is reported with status 404 and no version is written
+
+  @unit
+  Scenario: A wizard experiment without an evaluator is not saved as a monitor
+    Given a wizard experiment whose graph has no evaluator node
+    When it is saved as a monitor
+    Then experiment_not_ready_for_monitor is reported with status 400 and no monitor is written
+
+  @unit
+  Scenario: A wizard experiment with an evaluator is published as a monitor
+    Given a wizard experiment whose graph has an evaluator with parameters
+    When it is saved as a monitor
+    Then the monitor carries the evaluator's check type and its parameters by identifier
+
+  @unit
+  Scenario: A lookup naming neither an id nor a slug is refused
+    Given a lookup with neither an experiment id nor a slug
+    When the experiment is looked up
+    Then validation_error is reported with status 400
+
+  @unit
+  Scenario: Copying from a project the caller cannot manage evaluations in is refused
+    Given the caller cannot manage evaluations in the source project
+    When they copy an experiment from it
+    Then permission_denied is reported with status 401 and nothing is read from the source
+
+  @unit
+  Scenario: Copying a workflow experiment whose workflow is gone is refused
+    Given a workflow-backed experiment whose workflow no longer resolves
+    When the caller copies it into another project
+    Then experiment_workflow_not_found is reported with status 404

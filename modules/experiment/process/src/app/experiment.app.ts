@@ -60,6 +60,12 @@ import {
   type WorkbenchStateView,
   type WorkbenchVersionsPage,
   type ExperimentUsageCount,
+  type ExperimentCopied,
+  type ExperimentCopyInput,
+  type ExperimentEvaluationsListInput,
+  type ExperimentEvaluationsListPage,
+  type ExperimentIdOrSlugInput,
+  type ExperimentWizardSaveInput,
 } from "@langwatch/experiment-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
@@ -69,7 +75,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import {
   WorkflowApi,
-  WorkflowNotFoundError,
   type StudioWorkflow,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
@@ -81,13 +86,16 @@ import type {
 
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
+import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import {
   ExperimentWorkbenchRunService,
   type WorkbenchExecutionRequest,
 } from "../services/experiment-workbench-run.service.ts";
 import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
+import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
 import type { ExperimentService } from "../services/experiment.service.ts";
 import { buildExperimentInfrastructure } from "./experiment-composition.build.ts";
 
@@ -241,6 +249,9 @@ export class ExperimentApp implements ExperimentApi {
   #dependencies: ExperimentAppDependencies;
   #workbenchRuns: ExperimentWorkbenchRunService;
   #workbenchVersions: ExperimentWorkbenchVersionService;
+  #workflowLinks: ExperimentWorkflowLinkService;
+  #copies: ExperimentCopyService;
+  #listing: ExperimentListingService;
 
   private constructor(dependencies: ExperimentAppDependencies) {
     this.#dependencies = dependencies;
@@ -251,6 +262,27 @@ export class ExperimentApp implements ExperimentApi {
     });
     this.#workbenchVersions = ExperimentWorkbenchVersionService.create({
       experiments: dependencies.experiments,
+    });
+    this.#workflowLinks = ExperimentWorkflowLinkService.create({
+      experiments: dependencies.experiments,
+      workflows: dependencies.workflows,
+      workflowAuthoring: dependencies.workflowAuthoring,
+      dataset: dependencies.dataset,
+      monitors: dependencies.monitors,
+      slugify: (value) => dependencies.slugify(value),
+    });
+    this.#copies = ExperimentCopyService.create({
+      experiments: dependencies.experiments,
+      links: this.#workflowLinks,
+      workflowAuthoring: dependencies.workflowAuthoring,
+      dataset: dependencies.dataset,
+      permissions: dependencies.permissions,
+      slugify: (value) => dependencies.slugify(value),
+    });
+    this.#listing = ExperimentListingService.create({
+      experiments: dependencies.experiments,
+      links: this.#workflowLinks,
+      dataset: dependencies.dataset,
     });
   }
 
@@ -566,15 +598,44 @@ export class ExperimentApp implements ExperimentApi {
    * The workflow behind an experiment, or null when it is gone. Also what the
    * wizard save and the copy ask to know an id still resolves in a project.
    */
-  async findWorkflow(
+  findWorkflow(
     input: Readonly<{ id: string; projectId: string; includeVersion?: boolean }>,
   ): Promise<WorkflowWithVersion | null> {
-    try {
-      return await this.#dependencies.workflows.getById(input);
-    } catch (error) {
-      if (error instanceof WorkflowNotFoundError) return null;
-      throw error;
-    }
+    return this.#workflowLinks.findWorkflow(input);
+  }
+
+  // ── The legacy wizard and the evaluations list ─────────────────
+
+  /** One experiment by its id when given, else by its slug; neither is a 400. */
+  getByIdOrSlug(input: ExperimentIdOrSlugInput): Promise<Experiment> {
+    return this.#listing.getByIdOrSlug(input);
+  }
+
+  /** Saves the wizard's setup, writing a version of its graph into the experiment's workflow. */
+  saveWithWorkflow(input: ExperimentWizardSaveInput): Promise<Experiment> {
+    return this.#workflowLinks.saveWithWorkflow(input);
+  }
+
+  /** Publishes a wizard experiment's evaluator as a monitor, refusing one not ready to be. */
+  saveAsMonitor(
+    input: Readonly<{ projectId: string; experimentId: string }>,
+  ): Promise<ExperimentPublishedMonitor> {
+    return this.#workflowLinks.saveAsMonitor(input);
+  }
+
+  /** One page of the evaluations list, legacy online evaluations excluded, newest run first. */
+  listForEvaluations(
+    input: ExperimentEvaluationsListInput,
+  ): Promise<ExperimentEvaluationsListPage> {
+    return this.#listing.listForEvaluations(input);
+  }
+
+  /** Copies an experiment from a source project the caller may also manage evaluations in. */
+  copyToProject(
+    input: ExperimentCopyInput,
+    by: Readonly<{ id: string }>,
+  ): Promise<ExperimentCopied> {
+    return this.#copies.copyToProject(input, by);
   }
 
   // ── Datasets ───────────────────────────────────────────────────

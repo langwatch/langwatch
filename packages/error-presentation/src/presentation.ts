@@ -819,6 +819,14 @@ const presentations = {
     title: "That's too much text for this evaluator",
     describe: () => "Shorten the input and try again.",
   },
+  experiment_not_ready_for_monitor: {
+    title: "This evaluation can't run as a monitor yet",
+    describe: () => "Add an evaluator to it and save, then try again.",
+  },
+  experiment_workflow_not_found: {
+    title: "This evaluation's workflow is gone",
+    describe: () => "It may have been archived. Reload the page, or create the evaluation again.",
+  },
   experiment_not_found: {
     title: "Experiment not found",
     describe: () => "It may have been deleted. Reload to see the current list.",

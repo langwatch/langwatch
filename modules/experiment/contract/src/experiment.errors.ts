@@ -158,3 +158,56 @@ export class ExperimentVersionNotFoundError extends NotFoundError {
     this.name = "ExperimentVersionNotFoundError";
   }
 }
+
+/** The workflow an experiment writes its versions into is gone, or it never had one. */
+export class ExperimentWorkflowNotFoundError extends NotFoundError {
+  declare readonly code: "experiment_workflow_not_found";
+
+  constructor(experimentId: string) {
+    super("experiment_workflow_not_found", "Experiment workflow", experimentId, {
+      meta: { experimentId },
+    });
+    this.name = "ExperimentWorkflowNotFoundError";
+  }
+}
+
+/** The wizard has no stored setup, graph or evaluator yet, so there is no monitor to publish. */
+export class ExperimentNotReadyForMonitorError extends HandledError {
+  declare readonly code: "experiment_not_ready_for_monitor";
+
+  constructor(experimentId: string) {
+    super("experiment_not_ready_for_monitor", "Experiment is not ready to be saved as a monitor", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { experimentId },
+    });
+    this.name = "ExperimentNotReadyForMonitorError";
+  }
+}
+
+/** A lookup that named neither the experiment's id nor its slug. */
+export class ExperimentIdOrSlugRequiredError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor() {
+    super("validation_error", "Either experimentId or experimentSlug must be provided", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "ExperimentIdOrSlugRequiredError";
+  }
+}
+
+/** The caller may not manage evaluations in a second project the declared check never covered. */
+export class ExperimentPermissionDeniedError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor({ permission, message }: { permission: string; message: string }) {
+    super("permission_denied", message, {
+      httpStatus: 401,
+      fault: "customer",
+      meta: { permission },
+    });
+    this.name = "ExperimentPermissionDeniedError";
+  }
+}

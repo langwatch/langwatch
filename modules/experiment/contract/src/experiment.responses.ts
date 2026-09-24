@@ -105,6 +105,7 @@ export const experimentEvaluationsListPageSchema = z.object({
   ),
   totalHits: z.number(),
 });
+export type ExperimentEvaluationsListPage = z.infer<typeof experimentEvaluationsListPageSchema>;
 
 /** `getExperimentBatchEvaluationRuns`: every run of one experiment. */
 export const experimentRunListSchema = z.object({ runs: z.array(experimentRunSchema) });
@@ -120,6 +121,7 @@ export const experimentCopiedSchema = z.object({
   experiment: experimentSchema,
   workflow: z.object({ id: z.string() }).nullable(),
 });
+export type ExperimentCopied = z.infer<typeof experimentCopiedSchema>;
 
 /** `onExperimentUpdate`: one freshness signal as the browser receives it. */
 export const experimentUpdateFrameSchema = z.object({

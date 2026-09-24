@@ -2,237 +2,47 @@
  * Server transport for experiments.*: permission and delegation.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import type { Dataset } from "@langwatch/dataset-contract";
 import {
   ExperimentApi,
-  ExperimentDspyStepNotFoundError,
   experimentsTrpc,
-  isLegacyOnlineEvaluationWorkbenchState,
   type DSPyStep,
-  type SaveExperimentInput,
+  type ExperimentDspyStep,
 } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
-import {
-  parseStudioWorkflow,
-  studioWorkflowSchema,
-  type StudioWorkflow,
-} from "@langwatch/workflow-contract";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-
-/** The dataset a workflow's entry node draws from, when it names one. */
-const extractDatasetId = (dsl: unknown): string | undefined => {
-  const parsed = studioWorkflowSchema.safeParse(dsl);
-  if (!parsed.success) return undefined;
-  const entry = parsed.data.nodes.find((node) => node.type === "entry");
-
-  return (entry?.data as { dataset?: { id?: string } } | undefined)?.dataset?.id;
-};
-
-/** The most recently created run in a list, or undefined for an empty list. */
-function pickLatestRun<T extends { timestamps: { createdAt: number } }>(
-  runs: readonly T[],
-): T | undefined {
-  return runs.slice().toSorted((a, b) => b.timestamps.createdAt - a.timestamps.createdAt)[0];
-}
-
-const copySavedDatasets = async ({
-  app,
-  datasets,
-  sourceProjectId,
-  targetProjectId,
-}: {
-  app: ExperimentApi;
-  datasets: readonly { type: string; datasetId?: string }[];
-  sourceProjectId: string;
-  targetProjectId: string;
-}): Promise<Record<string, string>> => {
-  const datasetIdMap: Record<string, string> = {};
-
-  for (const entry of datasets) {
-    if (entry.type === "saved" && entry.datasetId) {
-      try {
-        const newDataset = await app.copyDataset({
-          sourceDatasetId: entry.datasetId,
-          sourceProjectId,
-          targetProjectId,
-        });
-        datasetIdMap[entry.datasetId] = newDataset.id;
-      } catch {
-        // A dataset that cannot be copied (for example one already removed)
-        // keeps its original reference rather than failing the whole copy.
-        continue;
-      }
-    }
-  }
-
-  return datasetIdMap;
-};
+import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 
 /**
- * Copies an EVALUATIONS_V3 experiment to another project: the state in
- * `workbenchState` plus, optionally, the saved datasets it references.
+ * The domain type is camelCase; the page reads the snake_case wire shape
+ * the optimization studio has always published.
  */
-const copyEvaluationsV3Experiment = async ({
-  app,
-  experiment,
-  targetProjectId,
-  sourceProjectId,
-  copyDatasets,
-}: {
-  app: ExperimentApi;
-  experiment: Readonly<{
-    id: string;
-    name: string | null;
-    slug: string;
-    workbenchState: unknown;
-  }>;
-  targetProjectId: string;
-  sourceProjectId: string;
-  copyDatasets?: boolean;
-}) => {
-  const workbenchState = JSON.parse(JSON.stringify(experiment.workbenchState ?? {})) as Record<
-    string,
-    unknown
-  >;
-
-  // Execution results are not copied into the new project.
-  delete workbenchState.results;
-
-  if (copyDatasets && Array.isArray(workbenchState.datasets)) {
-    const datasetIdMap = await copySavedDatasets({
-      app,
-      datasets: workbenchState.datasets as {
-        id: string;
-        type: string;
-        datasetId?: string;
-      }[],
-      sourceProjectId,
-      targetProjectId,
-    });
-
-    for (const entry of workbenchState.datasets as {
-      id: string;
-      type: string;
-      datasetId?: string;
-    }[]) {
-      const mapped = entry.datasetId ? datasetIdMap[entry.datasetId] : undefined;
-      if (entry.type === "saved" && mapped) {
-        entry.datasetId = mapped;
-      }
-    }
-  }
-
-  const experimentName = experiment.name ?? experiment.slug;
-  const newExperiment = await app.save({
-    id: generate("eval").toString(),
-    name: experimentName,
-    requestedSlug: app.slugFor(experimentName),
-    slugMode: "deduplicate",
-    projectId: targetProjectId,
-    type: "EVALUATIONS_V3",
-    workflowId: null,
-    workbenchState: z.json().parse(workbenchState),
-  });
-
-  return { experiment: newExperiment, workflow: null };
-};
-
-/** The workbench state the legacy wizard stored, as this transport reads it. */
-type LegacyWorkbenchState = Readonly<{
-  name?: string | null;
-  realTimeExecution?: { preconditions?: unknown; sample?: number };
-  realTimeTraceMappings?: unknown;
-}>;
+const toDspyStepWire = (step: ExperimentDspyStep): DSPyStep => ({
+  project_id: step.tenantId,
+  run_id: step.runId,
+  workflow_version_id: step.workflowVersionId,
+  experiment_id: step.experimentId,
+  index: step.stepIndex,
+  score: step.score,
+  label: step.label,
+  optimizer: {
+    name: step.optimizerName,
+    parameters: step.optimizerParameters as DSPyStep["optimizer"]["parameters"],
+  },
+  predictors: step.predictors as DSPyStep["predictors"],
+  examples: step.examples as DSPyStep["examples"],
+  llm_calls: step.llmCalls as DSPyStep["llm_calls"],
+  timestamps: {
+    created_at: step.createdAt,
+    inserted_at: step.insertedAt,
+    updated_at: step.updatedAt,
+  },
+});
 
 export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimentsTrpc)
   // ── The workbench a tab has open ─────────────────────────────────
 
   .procedure("saveExperiment")
   .withPermission("workflows:create")
-  .handle(async ({ app, input }) => {
-    const state = input.workbenchState as LegacyWorkbenchState;
-
-    let workflowId = input.dsl.workflow_id;
-    const name = state.name ?? (await app.findNextDraftName({ projectId: input.projectId }));
-
-    if (input.experimentId) {
-      const currentExperiment = await app.getById({
-        projectId: input.projectId,
-        id: input.experimentId,
-      });
-
-      if (currentExperiment.workflowId) {
-        const workflow = await app.findWorkflow({
-          id: currentExperiment.workflowId,
-          projectId: input.projectId,
-        });
-
-        if (!workflow) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Workflow not found" });
-        }
-
-        workflowId = workflow.id;
-      }
-
-      // Rename the experiment's datasets alongside it, so a renamed experiment
-      // does not leave its datasets pointing at the old name.
-      if (currentExperiment.name && currentExperiment.name !== name) {
-        const datasetIds = input.dsl.nodes
-          .filter((node) => node.type === "dataset")
-          .map((node) => (node.data as { dataset?: { id?: string } }).dataset?.id)
-          .filter((id): id is string => !!id);
-
-        const datasets = await app.getDatasets({ datasetIds, projectId: input.projectId });
-
-        for (const dataset of datasets) {
-          if (dataset.name.startsWith(currentExperiment.name)) {
-            await app.renameDataset({
-              datasetId: dataset.id,
-              projectId: input.projectId,
-              name: dataset.name.replace(currentExperiment.name, name),
-            });
-          }
-        }
-      }
-    }
-
-    const workflowName = `${name} - Workflow`;
-    if (!workflowId) {
-      const workflow = await app.createWorkflow({
-        projectId: input.projectId,
-        name: workflowName,
-        icon: input.dsl.icon,
-        description: input.dsl.description,
-      });
-
-      workflowId = workflow.id;
-    }
-
-    await app.saveWorkflowVersion({
-      projectId: input.projectId,
-      workflowId,
-      dsl: { ...input.dsl, workflow_id: workflowId, name: workflowName },
-      autoSaved: !input.commitMessage,
-      commitMessage: input.commitMessage ?? "Autosaved",
-      setAsLatestVersion: true,
-    });
-
-    const experimentId = input.experimentId ?? generate("experiment").toString();
-
-    return app.save({
-      id: experimentId,
-      projectId: input.projectId,
-      name,
-      type: "BATCH_EVALUATION_V2",
-      requestedSlug: app.slugFor(name),
-      slugMode: input.experimentId ? "preserve-existing" : "deduplicate",
-      workflowId,
-      // The stored state is whatever the declaration admitted, which is JSON
-      // by construction; the service stores it verbatim.
-      workbenchState: input.workbenchState as SaveExperimentInput["workbenchState"],
-    });
-  })
+  .handle(({ app, input }) => app.saveWithWorkflow(input))
 
   .procedure("saveEvaluationsV3")
   .withPermission("experiments:update")
@@ -357,66 +167,13 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
 
   .procedure("saveAsMonitor")
   .withPermission("workflows:create")
-  .handle(async ({ app, input }) => {
-    const experiment = await app.getById({ projectId: input.projectId, id: input.experimentId });
-    const workflow = experiment.workflowId
-      ? await app.findWorkflow({
-          id: experiment.workflowId,
-          projectId: input.projectId,
-          includeVersion: true,
-        })
-      : null;
-
-    const workbenchState = experiment.workbenchState as LegacyWorkbenchState | undefined;
-    const dsl = workflow?.currentVersion?.dsl as StudioWorkflow | undefined;
-    const evaluator = dsl?.nodes.find((node) => node.type === "evaluator");
-    const evaluatorData = evaluator?.data as
-      | { evaluator?: string; parameters?: readonly { identifier: string; value: unknown }[] }
-      | undefined;
-
-    if (!workbenchState || !dsl || !evaluatorData?.evaluator) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Experiment is not ready to be saved as a monitor",
-      });
-    }
-
-    return app.publishAsMonitor({
-      projectId: input.projectId,
-      experimentId: input.experimentId,
-      monitor: {
-        name: experiment.name ?? "Unknown",
-        checkType: evaluatorData.evaluator,
-        slug: experiment.slug,
-        preconditions: workbenchState.realTimeExecution?.preconditions ?? [],
-        parameters: Object.fromEntries(
-          (evaluatorData.parameters ?? []).map((param) => [param.identifier, param.value]),
-        ),
-        mappings: workbenchState.realTimeTraceMappings,
-        sample: workbenchState.realTimeExecution?.sample ?? 1,
-        enabled: true,
-        executionMode: "ON_MESSAGE",
-      },
-    });
-  })
+  .handle(({ app, input }) => app.saveAsMonitor(input))
 
   // ── The experiments a project lists ──────────────────────────────
 
   .procedure("getExperimentBySlugOrId")
   .withPermission("experiments:view")
-  .handle(async ({ app, input }) => {
-    if (input.experimentId) {
-      return app.getById({ projectId: input.projectId, id: input.experimentId });
-    }
-    if (input.experimentSlug) {
-      return app.getBySlug({ projectId: input.projectId, slug: input.experimentSlug });
-    }
-
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Either experimentId or experimentSlug must be provided",
-    });
-  })
+  .handle(({ app, input }) => app.getByIdOrSlug(input))
 
   .procedure("getExperimentWithDSLBySlug")
   .withPermission("experiments:view")
@@ -448,71 +205,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
 
   .procedure("getAllForEvaluationsList")
   .withPermission("experiments:view")
-  .handle(async ({ app, input }) => {
-    const pageOffset = input.pageOffset ?? 0;
-    const pageSize = input.pageSize ?? 25;
-
-    // Every active experiment with its workflow join, then filter and paginate
-    // in memory: JSON-path filtering on `task` inside `workbenchState` is
-    // unreliable, so the count and the page slice run off the same array.
-    const allExperiments = await Promise.all(
-      (await app.list({ projectId: input.projectId })).map(async (experiment) => ({
-        ...experiment,
-        workflow: experiment.workflowId
-          ? await app.findWorkflow({
-              id: experiment.workflowId,
-              projectId: input.projectId,
-              includeVersion: true,
-            })
-          : null,
-      })),
-    );
-    const nonLegacyExperiments = allExperiments.filter(
-      (experiment) => !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
-    );
-    const totalHits = nonLegacyExperiments.length;
-
-    // Pagination is applied after excluding legacy online evaluations.
-    const pagedExperiments = nonLegacyExperiments.slice(pageOffset, pageOffset + pageSize);
-
-    const datasetIds = pagedExperiments
-      .map((experiment) => extractDatasetId(experiment.workflow?.currentVersion?.dsl))
-      .filter((id): id is string => !!id);
-
-    const datasetsById = Object.fromEntries(
-      (await app.getDatasets({ projectId: input.projectId, datasetIds })).map(
-        (dataset: Dataset) => [dataset.id, { id: dataset.id, name: dataset.name }],
-      ),
-    );
-
-    const runsByExperimentId = await app.listRuns({
-      projectId: input.projectId,
-      experimentIds: pagedExperiments.map((experiment) => experiment.id),
-    });
-
-    const experimentsWithDatasetsAndRuns = pagedExperiments
-      .map((experiment) => {
-        const runs = runsByExperimentId[experiment.id] ?? [];
-        const latestRun = pickLatestRun(runs);
-        const primaryMetric = latestRun
-          ? Object.values(latestRun.summary.evaluations)[0]
-          : undefined;
-
-        return {
-          ...experiment,
-          runsSummary: {
-            count: runs.length,
-            primaryMetric,
-            latestRun: { timestamps: latestRun?.timestamps },
-          },
-          dataset: datasetsById[extractDatasetId(experiment.workflow?.currentVersion?.dsl) ?? ""],
-          updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
-        };
-      })
-      .toSorted((a, b) => b.updatedAt - a.updatedAt);
-
-    return { experiments: experimentsWithDatasetsAndRuns, totalHits };
-  })
+  .handle(({ app, input }) => app.listForEvaluations(input))
 
   .procedure("getLastExperiment")
   .withPermission("experiments:view")
@@ -530,103 +223,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
 
   .procedure("copy")
   .withPermission("evaluations:manage")
-  .handle(async ({ app, input, actor }) => {
-    // The declared check covers the TARGET project. The source is a second
-    // project it never saw, so it is probed before anything is read.
-    const mayReadSource = await app.mayManageEvaluations({
-      actorId: actor.id,
-      projectId: input.sourceProjectId,
-    });
-
-    if (!mayReadSource) {
-      throw new TRPCError({
-        code: "UNAUTHORIZED",
-        message: "You do not have permission to manage evaluations in the source project",
-      });
-    }
-
-    const experiment = await app.getById({
-      projectId: input.sourceProjectId,
-      id: input.experimentId,
-    });
-
-    // V3 experiments have no workflow; their state lives in workbenchState.
-    if (experiment.type === "EVALUATIONS_V3") {
-      return copyEvaluationsV3Experiment({
-        app,
-        experiment,
-        targetProjectId: input.projectId,
-        sourceProjectId: input.sourceProjectId,
-        ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
-      });
-    }
-
-    if (!experiment.workflowId) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
-    }
-    const sourceWorkflow = await app.findWorkflow({
-      id: experiment.workflowId,
-      projectId: input.sourceProjectId,
-      includeVersion: true,
-    });
-    if (!sourceWorkflow?.latestVersion?.dsl) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Experiment workflow not found" });
-    }
-
-    const { workflowId, dsl } = await app.copyWorkflowWithDatasets({
-      workflow: {
-        id: sourceWorkflow.id,
-        name: sourceWorkflow.name,
-        icon: sourceWorkflow.icon,
-        description: sourceWorkflow.description,
-        ...(sourceWorkflow.isEvaluator === undefined
-          ? {}
-          : { isEvaluator: sourceWorkflow.isEvaluator }),
-        ...(sourceWorkflow.isComponent === undefined
-          ? {}
-          : { isComponent: sourceWorkflow.isComponent }),
-        latestVersion: {
-          ...sourceWorkflow.latestVersion,
-          dsl: z.json().parse(sourceWorkflow.latestVersion.dsl),
-        },
-      },
-      targetProjectId: input.projectId,
-      sourceProjectId: input.sourceProjectId,
-      ...(input.copyDatasets === undefined ? {} : { copyDatasets: input.copyDatasets }),
-      copiedFromWorkflowId: experiment.workflowId,
-    });
-
-    const newWorkflow = await app.findWorkflow({ id: workflowId, projectId: input.projectId });
-
-    if (!newWorkflow) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to create workflow",
-      });
-    }
-
-    await app.saveWorkflowVersion({
-      projectId: input.projectId,
-      workflowId,
-      dsl,
-      autoSaved: false,
-      commitMessage: `Copied from ${sourceWorkflow.name}`,
-    });
-
-    const experimentName = experiment.name ?? experiment.slug;
-    const newExperiment = await app.save({
-      id: generate("experiment").toString(),
-      name: experimentName,
-      requestedSlug: app.slugFor(experimentName),
-      slugMode: "deduplicate",
-      projectId: input.projectId,
-      type: experiment.type,
-      workflowId,
-      workbenchState: experiment.workbenchState,
-    });
-
-    return { experiment: newExperiment, workflow: { id: newWorkflow.id } };
-  })
+  .handle(({ app, input, actor }) => app.copyToProject(input, { id: actor.id }))
 
   // ── The runs recorded against one ────────────────────────────────
 
@@ -648,46 +245,14 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
       projectId: input.projectId,
       slug: input.experimentSlug,
     });
+    const step = await app.getDspyStep({
+      tenantId: input.projectId,
+      experimentId: experiment.id,
+      runId: input.runId,
+      stepIndex: input.index,
+    });
 
-    try {
-      const step = await app.getDspyStep({
-        tenantId: input.projectId,
-        experimentId: experiment.id,
-        runId: input.runId,
-        stepIndex: input.index,
-      });
-
-      // The domain type is camelCase; the page reads the snake_case wire shape
-      // the optimization studio has always published.
-      const result: DSPyStep = {
-        project_id: step.tenantId,
-        run_id: step.runId,
-        workflow_version_id: step.workflowVersionId,
-        experiment_id: step.experimentId,
-        index: step.stepIndex,
-        score: step.score,
-        label: step.label,
-        optimizer: {
-          name: step.optimizerName,
-          parameters: step.optimizerParameters as DSPyStep["optimizer"]["parameters"],
-        },
-        predictors: step.predictors as DSPyStep["predictors"],
-        examples: step.examples as DSPyStep["examples"],
-        llm_calls: step.llmCalls as DSPyStep["llm_calls"],
-        timestamps: {
-          created_at: step.createdAt,
-          inserted_at: step.insertedAt,
-          updated_at: step.updatedAt,
-        },
-      };
-
-      return result;
-    } catch (error) {
-      if (error instanceof ExperimentDspyStepNotFoundError) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "DSPy step not found" });
-      }
-      throw error;
-    }
+    return toDspyStepWire(step);
   })
 
   .procedure("getExperimentBatchEvaluationRuns")

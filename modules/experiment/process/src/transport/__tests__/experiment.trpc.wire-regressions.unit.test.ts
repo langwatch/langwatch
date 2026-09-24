@@ -2,14 +2,18 @@ import { createApiFixture } from "@langwatch/api-fixture";
 /** @vitest-environment node */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import {
+  ExperimentDspyStepNotFoundError,
+  ExperimentIdOrSlugRequiredError,
   ExperimentNotFoundError,
+  ExperimentNotReadyForMonitorError,
+  ExperimentPermissionDeniedError,
   ExperimentTypeMismatchError,
+  ExperimentWorkflowNotFoundError,
   type Experiment,
   type ExperimentApi,
   type ExperimentPublishedMonitor,
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
-import type { WorkflowWithVersion } from "@langwatch/workflow-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -57,48 +61,16 @@ const MONITOR: ExperimentPublishedMonitor = {
   createdAt: NOW,
   updatedAt: NOW,
 };
-const WORKFLOW: WorkflowWithVersion = {
-  id: "workflow-1",
-  projectId: "project-1",
+const WORKFLOW_DSL = {
+  workflow_id: "workflow-1",
+  spec_version: "1.4",
   name: "Support classifier",
-  icon: null,
-  description: null,
-  latestVersionId: "version-1",
-  currentVersionId: "version-1",
-  publishedId: null,
-  publishedById: null,
-  copiedFromWorkflowId: null,
-  isEvaluator: false,
-  isComponent: false,
-  archivedAt: null,
-  createdAt: NOW,
-  updatedAt: NOW,
-  currentVersion: {
-    id: "version-1",
-    workflowId: "workflow-1",
-    projectId: "project-1",
-    version: "1",
-    autoSaved: false,
-    commitMessage: "Initial",
-    authorId: "user-1",
-    parentId: null,
-    dsl: {
-      version: "1",
-      name: "Support classifier",
-      nodes: [
-        {
-          type: "evaluator",
-          data: {
-            evaluator: "langevals/llm_boolean",
-            parameters: [{ identifier: "model", value: "openai/gpt-5-mini" }],
-          },
-        },
-      ],
-      edges: [],
-    },
-    createdAt: NOW,
-    updatedAt: NOW,
-  },
+  icon: "x",
+  description: "x",
+  version: "1",
+  nodes: [],
+  edges: [],
+  state: {},
 };
 
 function mount(app: ExperimentApi) {
@@ -167,19 +139,16 @@ describe("given the experiments tRPC wire", () => {
 
   describe("when a wizard is saved as a monitor", () => {
     it("returns the monitor row written by the monitor application", async () => {
-      const publishAsMonitor = vi.fn(async () => MONITOR);
-      const caller = mount(
-        createApiFixture<ExperimentApi>({
-          getById: async () => EXPERIMENT,
-          findWorkflow: async () => WORKFLOW,
-          publishAsMonitor,
-        }),
-      );
+      const saveAsMonitor = vi.fn(async () => MONITOR);
+      const caller = mount(createApiFixture<ExperimentApi>({ saveAsMonitor }));
 
       await expect(
         caller.saveAsMonitor({ projectId: "project-1", experimentId: "experiment-1" }),
       ).resolves.toEqual(MONITOR);
-      expect(publishAsMonitor).toHaveBeenCalledOnce();
+      expect(saveAsMonitor).toHaveBeenCalledWith({
+        projectId: "project-1",
+        experimentId: "experiment-1",
+      });
     });
   });
 
@@ -222,6 +191,132 @@ describe("given the experiments tRPC wire", () => {
         code: "BAD_REQUEST",
         message: "This experiment is not an evaluation workbench",
       });
+    });
+  });
+
+  describe("when a refusal moved from the router into the module", () => {
+    it("keeps a wizard experiment's missing workflow as NOT_FOUND", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          saveWithWorkflow: async () => {
+            throw new ExperimentWorkflowNotFoundError("experiment-1");
+          },
+        }),
+      );
+
+      await expect(
+        caller.saveExperiment({
+          projectId: "project-1",
+          experimentId: "experiment-1",
+          workbenchState: {},
+          dsl: WORKFLOW_DSL,
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    it("keeps an experiment not ready for a monitor as BAD_REQUEST", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          saveAsMonitor: async () => {
+            throw new ExperimentNotReadyForMonitorError("experiment-1");
+          },
+        }),
+      );
+
+      await expect(
+        caller.saveAsMonitor({ projectId: "project-1", experimentId: "experiment-1" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("keeps a lookup with neither id nor slug as BAD_REQUEST", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          getByIdOrSlug: async () => {
+            throw new ExperimentIdOrSlugRequiredError();
+          },
+        }),
+      );
+
+      await expect(
+        caller.getExperimentBySlugOrId({ projectId: "project-1" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("keeps a copy from a source the caller cannot manage as UNAUTHORIZED", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          copyToProject: async () => {
+            throw new ExperimentPermissionDeniedError({
+              permission: "evaluations:manage",
+              message: "You do not have permission to manage evaluations in the source project",
+            });
+          },
+        }),
+      );
+
+      await expect(
+        caller.copy({
+          experimentId: "experiment-1",
+          projectId: "project-2",
+          sourceProjectId: "project-1",
+        }),
+      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    it("keeps a copy whose experiment workflow is gone as NOT_FOUND", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          copyToProject: async () => {
+            throw new ExperimentWorkflowNotFoundError("experiment-1");
+          },
+        }),
+      );
+
+      await expect(
+        caller.copy({
+          experimentId: "experiment-1",
+          projectId: "project-2",
+          sourceProjectId: "project-1",
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    it("keeps a copy whose new workflow cannot be read as INTERNAL_SERVER_ERROR", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          copyToProject: async () => {
+            throw new Error("Failed to create workflow");
+          },
+        }),
+      );
+
+      await expect(
+        caller.copy({
+          experimentId: "experiment-1",
+          projectId: "project-2",
+          sourceProjectId: "project-1",
+        }),
+      ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    });
+
+    it("answers a missing DSPy step as NOT_FOUND without a router remap", async () => {
+      const caller = mount(
+        createApiFixture<ExperimentApi>({
+          getBySlug: async () => EXPERIMENT,
+          getDspyStep: async () => {
+            throw new ExperimentDspyStepNotFoundError("run-1:3");
+          },
+        }),
+      );
+
+      await expect(
+        caller.getExperimentDSPyStep({
+          projectId: "project-1",
+          experimentSlug: "support-classifier",
+          runId: "run-1",
+          index: "3",
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
     });
   });
 });
