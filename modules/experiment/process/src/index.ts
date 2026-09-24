@@ -29,12 +29,7 @@ export type {
   ExperimentPermissions,
   ExperimentWorkflowAuthoring,
 } from "./app/experiment.app.ts";
-export {
-  experimentServer,
-  createExperimentProcessing,
-  type ExperimentProcessingCapability,
-  createExperimentIdLookup,
-} from "./experiment.server.ts";
+export { experimentServer } from "./experiment.server.ts";
 export { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 export { ExperimentWorkbenchUpdates } from "./services/experiment-workbench.service.ts";

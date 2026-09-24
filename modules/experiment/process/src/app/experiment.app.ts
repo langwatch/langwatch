@@ -5,9 +5,11 @@ import { on, type EventEmitter } from "node:events";
  */
 import { AgentApi } from "@langwatch/agent-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { EventingCommands } from "@langwatch/eventing";
 import {
   ExperimentApi,
   type ExperimentCaller,
@@ -18,6 +20,8 @@ import {
   type ExperimentWorkflowVersionInput,
   type CommitWorkbenchVersionInput,
   type CompleteExperimentRunInput,
+  type ComputeExperimentRunMetricsCommandData,
+  type ExperimentIdLookupResult,
   type CreateEvaluationsV3Input,
   type DSPyRunsSummary,
   type Experiment,
@@ -84,11 +88,14 @@ import type {
   ExperimentWorkbenchObserver,
 } from "#app/experiment-workbench.members";
 
+import type { ExperimentRunProcessingPipeline } from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
+import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
+import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import {
   ExperimentWorkbenchRunService,
@@ -97,7 +104,11 @@ import {
 import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
 import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
 import type { ExperimentService } from "../services/experiment.service.ts";
-import { buildExperimentInfrastructure } from "./experiment-composition.build.ts";
+import {
+  buildExperimentIdLookup,
+  buildExperimentInfrastructure,
+  buildExperimentRunProcessing,
+} from "./experiment-composition.build.ts";
 
 /**
  * The project-scoped signal fan-out an editor tab follows. Declared as the two
@@ -195,6 +206,12 @@ export interface ExperimentAppDependencies {
   runLoop: ExperimentV3RunLoop;
   /** Where a run is recorded and an unnamed failure reported. Both best-effort. */
   workbenchObserver: ExperimentWorkbenchObserver;
+  /** `experiment_run_processing`, its senders and run lookup; absent where a suite builds none. */
+  runProcessing?: Readonly<{
+    pipeline: ExperimentRunProcessingPipeline;
+    commands: ExperimentRunCommandDispatcherService;
+    idLookup: ExperimentIdLookupRepository;
+  }>;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -220,20 +237,34 @@ export class ExperimentApp implements ExperimentApi {
     projects: ProjectApi,
     /** The tier-effective row bound an execution's dataset must fit under. */
     entitlement: EntitlementApi,
+    /** Owns the platform default retention a run's rows are stamped with, read lazily. */
+    retention: DataRetentionApi,
   };
   static readonly reads = reads("prisma", "clickhouse", "redis", "logger");
 
   static create(setup: ExperimentSetup): ExperimentApp {
+    const { members, dependencies } = setup;
+    const commands = ExperimentRunCommandDispatcherService.create();
     const built = buildExperimentInfrastructure({
-      prisma: setup.members.prisma,
-      clickhouse: setup.members.clickhouse,
-      redis: setup.members.redis,
-      logger: setup.members.logger,
-      dependencies: setup.dependencies,
+      prisma: members.prisma,
+      clickhouse: members.clickhouse,
+      redis: members.redis,
+      logger: members.logger,
+      execution: commands,
+      dependencies,
     });
     return new ExperimentApp({
       ...built,
       runLookup: ExperimentFindOrCreateService.create(built.experiments),
+      runProcessing: {
+        pipeline: buildExperimentRunProcessing({
+          clickhouse: members.clickhouse,
+          redis: members.redis,
+          defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
+        }),
+        commands,
+        idLookup: buildExperimentIdLookup(members.clickhouse),
+      },
     });
   }
 
@@ -493,6 +524,38 @@ export class ExperimentApp implements ExperimentApi {
   /** Closes a run, whether it finished or was stopped. */
   completeExperimentRun(input: CompleteExperimentRunInput): Promise<void> {
     return this.#dependencies.experiments.completeExperimentRun(input);
+  }
+
+  /** One trace's cost, folded into its run by the run pipeline. */
+  computeRunMetrics(input: ComputeExperimentRunMetricsCommandData): Promise<void> {
+    return this.#runProcessing().commands.computeRunMetrics(input);
+  }
+
+  /** The experiment a run was recorded against, or that no experiment recorded it. */
+  async lookupExperimentId(input: {
+    tenantId: string;
+    runId: string;
+  }): Promise<ExperimentIdLookupResult> {
+    const experimentId = await this.#runProcessing().idLookup.findExperimentId(input);
+    return experimentId ? { kind: "recorded", experimentId } : { kind: "not_recorded" };
+  }
+
+  /** The pipeline `experiment_run_processing` registers, built once by {@link create}. */
+  eventingPipeline(): ExperimentRunProcessingPipeline {
+    return this.#runProcessing().pipeline;
+  }
+
+  /** Binds the registered pipeline's own senders; every run write goes through them. */
+  connectCommands(commands: EventingCommands<ExperimentRunProcessingPipeline>): void {
+    this.#runProcessing().commands.connect(commands);
+  }
+
+  #runProcessing(): NonNullable<ExperimentAppDependencies["runProcessing"]> {
+    if (!this.#dependencies.runProcessing) {
+      throw new Error("Experiment was asked for its run pipeline, but none was built");
+    }
+
+    return this.#dependencies.runProcessing;
   }
 
   // ── Optimization runs ──────────────────────────────────────────

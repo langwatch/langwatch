@@ -28,6 +28,7 @@ import {
 } from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
 import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
+import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
 import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
@@ -37,7 +38,7 @@ import type {
   ExecutionDataServices,
   ExperimentWorkflowDsl,
 } from "../services/experiment-execution-data.service.ts";
-import { ExperimentService } from "../services/experiment.service.ts";
+import { type ExperimentExecution, ExperimentService } from "../services/experiment.service.ts";
 import type {
   ExperimentV3RunLoop,
   ExperimentWorkbenchObserver,
@@ -272,12 +273,24 @@ export function buildExperimentRunProcessing(input: {
   });
 }
 
+/** Which experiment a run was recorded against, over the same routing ClickHouse member. */
+export function buildExperimentIdLookup(
+  clickhouse: ClickHouseQueryClient,
+): ExperimentIdLookupRepository {
+  return ExperimentEventingAdapter.create({
+    resolveClient: memberSessionResolver(clickhouse),
+    clickhouseEnabled: true,
+  }).idLookup();
+}
+
 export function buildExperimentInfrastructure(input: {
   prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
   /** Where a run's progress is written and polled; shared across replicas. */
   redis: ProcessMembers["redis"] | undefined;
   logger: Logger;
+  /** Where a run's writes are sent: the run pipeline's own senders. */
+  execution: ExperimentExecution;
   dependencies: {
     workflows: WorkflowApi;
     dataset: DatasetApi;
@@ -292,7 +305,7 @@ export function buildExperimentInfrastructure(input: {
     entitlement: EntitlementApi;
   };
 }): Omit<ExperimentAppDependencies, "runLookup"> {
-  const { prisma, clickhouse, redis, logger, dependencies } = input;
+  const { prisma, clickhouse, redis, logger, execution, dependencies } = input;
   const resolveClient = memberSessionResolver(clickhouse);
   const runHistoryTelemetry = LoggedExperimentRunHistoryTelemetry.create(logger);
   const tupleParam = (values: string[]) => new TupleParam(values);
@@ -310,6 +323,7 @@ export function buildExperimentInfrastructure(input: {
       retention: FixedExperimentDspyRetention.create(DSPY_DEFAULT_RETENTION_DAYS),
       telemetry: runHistoryTelemetry,
     }),
+    execution,
     slugify: slugifyExperimentName,
     newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
     references: {

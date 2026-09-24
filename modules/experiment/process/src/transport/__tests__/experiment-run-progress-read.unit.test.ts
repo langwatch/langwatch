@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { buildExperimentInfrastructure } from "../../app/experiment-composition.build.ts";
 import type { ExperimentV3RunLoop } from "../../app/experiment-workbench.members.ts";
 import { runLoopOf, runProgressOf } from "../../rules/experiment-run-loop.rules.ts";
+import { UnavailableExperimentExecution } from "../../services/experiment.service.ts";
 
 function infrastructure(redis: unknown) {
   // Nothing below the redis member is reached: building the infrastructure
@@ -19,6 +20,7 @@ function infrastructure(redis: unknown) {
     clickhouse: {} as never,
     redis: redis as never,
     logger: createTestLogger().logger,
+    execution: UnavailableExperimentExecution.create(),
     dependencies: {} as never,
   });
 }

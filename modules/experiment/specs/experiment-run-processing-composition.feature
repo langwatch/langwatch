@@ -82,3 +82,33 @@ Feature: Composing durable experiment-run processing
     Given a process that composed no progress store
     When a caller polls a run
     Then the read is refused by name rather than crashing
+
+  @unit
+  Scenario: A run write before the run pipeline is registered refuses by name
+    Given an experiment process whose run pipeline senders are not connected yet
+    When a run is started or a trace's cost is sent
+    Then the write is refused naming experiment_run_processing
+
+  @unit
+  Scenario: Run writes and a trace's cost go out on the run pipeline's own senders
+    Given an experiment process whose run pipeline senders are connected
+    When a run is started and a trace's cost is sent for it
+    Then each lands on its own command's sender, unchanged
+
+  @integration
+  Scenario: The worker registers the run pipeline from experiment's own declaration
+    Given the experiment module installed in a worker over memory stores
+    When the process boots
+    Then experiment_run_processing is among the pipelines it hosts
+
+  @integration
+  Scenario: Building the run pipeline reads no retention from its peer
+    Given the experiment module installed in a worker
+    When the process boots and builds the run pipeline
+    Then the platform default retention has not been read yet
+
+  @integration
+  Scenario: A run no experiment recorded answers not recorded
+    Given a worker whose ClickHouse holds no run for the id
+    When the experiment a run was recorded against is looked up
+    Then the answer is that no experiment recorded it
