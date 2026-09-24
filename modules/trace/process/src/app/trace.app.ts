@@ -126,6 +126,8 @@ import {
   type TraceTopicClusteringPageInput,
   type TraceServerConfig,
   traceConfig,
+  TraceIdAmbiguousError,
+  TraceNotFoundError,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -183,6 +185,7 @@ import { TraceProcessingPipelineService } from "../services/trace-processing-pip
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
 import type { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
+import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
 import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import type {
@@ -213,6 +216,7 @@ import type {
   CollectorSpanIngest,
 } from "../services/trace-collector-dispatch.service.ts";
 import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
+import { AmbiguousTraceIdPrefixError } from "../services/trace-legacy-read.service.ts";
 import { TraceSharedReadService } from "../services/trace-shared-read.service.ts";
 import { TraceTranscriptReadService } from "../services/trace-transcript-read.service.ts";
 import {
@@ -669,6 +673,10 @@ export class TraceApp implements TraceApi, CollectorApp {
       }),
     );
     app.#processingCommands = commands;
+    app.#usageCounts = TraceUsageCountService.create({
+      projects: input.dependencies.projects,
+      usageCount: input.repositories.usageCount,
+    });
     const tokenizer = tokenCounterChannels.live.create(input.config.tokenizer);
     input.resources.own("Trace tokenizer", () => tokenizer.close());
     app.#processing = TraceProcessingPipelineService.create({
@@ -687,6 +695,17 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   #processing: TraceProcessingPipelineService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
+  #usageCounts: TraceUsageCountService | null = null;
+
+  async countTracesByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<{ projectId: string; count: number }[]> {
+    if (!this.#usageCounts) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace usage count");
+    }
+    return this.#usageCounts.countByProjects(input);
+  }
 
   /** trace_processing for this process's role: producers send, consumers fold and react. */
   traceProcessingPipeline(setup: {
@@ -1875,6 +1894,52 @@ export class TraceApp implements TraceApi, CollectorApp {
       userId: input.viewerUserId,
     });
 
+    return this.#readTranscriptWithProtections({ ...input, protections });
+  }
+
+  /** Port of main's REST transcript route: the key's protections, the trace, its transcript. */
+  async readTraceTranscript(input: {
+    projectId: string;
+    traceId: string;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<CodingAgentTranscript> {
+    const protections = await this.resolveApiKeyProtections(input);
+    const trace = await this.#getTraceByIdOrPrefix({ ...input, protections });
+
+    return this.#readTranscriptWithProtections({
+      projectId: input.projectId,
+      traceId: trace.trace_id,
+      occurredAtMs: trace.timestamps.started_at,
+      protections,
+    });
+  }
+
+  async #getTraceByIdOrPrefix(input: {
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+  }): Promise<Trace> {
+    let trace: Trace | undefined;
+    try {
+      trace = await this.findTrace(input);
+    } catch (err) {
+      if (err instanceof AmbiguousTraceIdPrefixError) {
+        throw new TraceIdAmbiguousError(input.traceId, err.candidateTraceIds);
+      }
+      throw err;
+    }
+    if (!trace) throw new TraceNotFoundError(input.traceId);
+    return trace;
+  }
+
+  #readTranscriptWithProtections(input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number | undefined;
+    protections: Protections;
+  }): Promise<CodingAgentTranscript> {
+    const { protections } = input;
     return this.#transcriptRead.readCodingAgentTranscript({
       app: this,
       ports: {

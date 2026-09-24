@@ -286,24 +286,13 @@ function resolveTraceFormat({
   return "json";
 }
 
-/** What a caller supplies beyond `TraceApi` itself; both members may be absent. */
+/** What a caller supplies beyond `TraceApi` itself; the member may be absent. */
 export type TracesRestOptions = Readonly<{
   /** Absent where the process registered no command queue; the route is not registered at all. */
   updateTraceMetadata?:
     | ((
         input: Readonly<{ projectId: string; traceId: string; metadata: unknown }>,
       ) => Promise<void>)
-    | undefined;
-  /** Absent when coding-agent session store not composed; route unregistered. */
-  readCodingAgentTranscript?:
-    | ((
-        input: Readonly<{
-          projectId: string;
-          traceId: string;
-          occurredAtMs: number;
-          protections: unknown;
-        }>,
-      ) => Promise<unknown>)
     | undefined;
 }>;
 
@@ -406,7 +395,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
   namespace: string;
   router: () => RestTransportDeclaration<TraceApi>;
 }> {
-  const { updateTraceMetadata, readCodingAgentTranscript } = options;
+  const { updateTraceMetadata } = options;
 
   let router = defineRestRouter(TraceApi)
     .withNamespace("traces")
@@ -451,40 +440,44 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       answerTraceFacets({ app, input, scope, caller }),
     );
 
-  // GET /:traceId/transcript - registered only where the process composed the
-  // coding-agent join it reads.
-  if (readCodingAgentTranscript) {
-    router = router
-      .get("/:traceId/transcript", "getTraceTranscript")
-      .withParams(traceIdParamsSchema)
-      .withPermission("traces:view")
-      .withOutput(transcriptRestResponseSchema)
-      .withMiddleware(projectRestFacts, tracesRestCredential)
-      .withDocs({
-        description:
-          "Derived coding-agent transcript for a trace: what the agent did, in order, " +
-          "with per-call token and cost economics. Empty entries for traces without " +
-          "coding-agent content.",
-      })
-      .handle(async ({ app, input, scope }, _project, caller) => {
-        const { traceId } = input;
-        logger.info({ projectId: scope.id, traceId }, "Getting trace transcript");
-
-        const protections = await app.resolveApiKeyProtections({
+  router = router
+    .get("/:traceId/transcript", "getTraceTranscript")
+    .withParams(traceIdParamsSchema)
+    .withPermission("traces:view")
+    .withOutput(transcriptRestResponseSchema)
+    .withMiddleware(projectRestFacts, tracesRestCredential)
+    .withDocs({
+      description:
+        "Derived coding-agent transcript for a trace: what the agent did, in order, " +
+        "with per-call token and cost economics. Empty entries for traces without " +
+        "coding-agent content.",
+      responses: {
+        200: {
+          description:
+            "The transcript: ordered entries plus per-session totals and sub-agent tool counts",
+          content: { "application/json": { schema: resolver(transcriptRestResponseSchema) } },
+        },
+        ...SHARED_ERROR_ANSWERS,
+        404: {
+          description: "Trace not found",
+          content: { "application/json": { schema: resolver(traceNotFoundBodySchema) } },
+        },
+        409: {
+          description: "Ambiguous trace ID prefix \u2014 the prefix matches more than one trace",
+          content: { "application/json": { schema: resolver(traceAmbiguousPrefixBodySchema) } },
+        },
+      },
+    })
+    .handle(async ({ app, input, scope }, _project, caller) =>
+      transcriptRestResponseSchema.parse(
+        await app.readTraceTranscript({
           projectId: scope.id,
+          traceId: input.traceId,
           apiKeyId: caller.apiKeyId,
           userId: caller.userId,
-        });
-        const trace = await readOneTraceOrThrow({ app, projectId: scope.id, traceId, protections });
-
-        return readCodingAgentTranscript({
-          projectId: scope.id,
-          traceId: trace.trace_id,
-          occurredAtMs: trace.timestamps.started_at,
-          protections,
-        }) as never;
-      });
-  }
+        }),
+      ),
+    );
 
   // PATCH /:traceId/metadata - registered only where the process registered a
   // command queue for the amendment.
@@ -591,11 +584,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
   return router.build();
 }
 
-/**
- * `POST /search` and `GET /:traceId`. The metadata amendment and the
- * coding-agent transcript stay absent - no module member answers their
- * collaborators, and an unregistered route beats one that always 500s.
- */
+/** The metadata amendment stays absent: no module member answers its command queue. */
 export const tracesRest = createTracesRest();
 
 export { traceSearchBodyExtensions };

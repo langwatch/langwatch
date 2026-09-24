@@ -504,6 +504,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     occurredAtMs?: number | undefined;
     viewerUserId: string;
   }): Promise<unknown>;
+  /**
+   * Main's `GET /api/traces/:traceId/transcript`: the key's protections, the trace by id or
+   * prefix, then its transcript.
+   */
+  readTraceTranscript(input: {
+    projectId: string;
+    traceId: string;
+    apiKeyId: string | null;
+    userId: string | null;
+  }): Promise<unknown>;
   /** One export's progress frames from the tenant broadcast, ending at `done` or `error`. */
   streamExportProgress(input: {
     projectId: string;
@@ -591,6 +601,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): boolean;
   readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
+  /** This UTC billing month's distinct traces per project; refuses a project foreign to the organization. */
+  countTracesByProjects(input: {
+    organizationId: string;
+    projectIds: string[];
+  }): Promise<{ projectId: string; count: number }[]>;
 }
 
 export const TraceApi = moduleApi<TraceApi>()("trace");
