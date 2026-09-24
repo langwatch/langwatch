@@ -1,4 +1,5 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   ProjectNotFoundError,
   type Project,
@@ -30,6 +31,11 @@ type ProjectOperationsDependencies = Readonly<{
     }): Promise<void>;
   };
   readonly now: () => number;
+  readonly auditLog: AuditLogApi;
+  /** Where a best-effort failure is reported when nothing can be done about it. */
+  readonly logger: Readonly<{
+    error(payload: Readonly<Record<string, unknown>>, message: string): void;
+  }>;
 }>;
 
 type ProjectCaller = Readonly<{ id: string }>;
@@ -123,6 +129,24 @@ export class ProjectOperationsService {
 
   regenerateLegacyProjectKey(input: Readonly<{ projectId: string }>): Promise<string> {
     return this.dependencies.apiKeys.regenerateLegacyProjectKey(input);
+  }
+
+  /** Best effort: an audit failure must not stop the rotated key reaching its caller. */
+  async recordApiKeyRegenerated(
+    entry: Readonly<{ userId: string; projectId: string }>,
+  ): Promise<void> {
+    try {
+      await this.dependencies.auditLog.record({
+        action: "project.apiKey.regenerated",
+        userId: entry.userId,
+        projectId: entry.projectId,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { error, projectId: entry.projectId },
+        "Recording the API key rotation in the audit log failed.",
+      );
+    }
   }
 
   async requestTopicClustering(

@@ -16,18 +16,51 @@ Feature: The project.* browser namespace is served by the application the compos
   # These scenarios are bound to tests that build the REAL ProjectApp over its
   # own repository interface and reach it through that same proxy.
   #
-  # Three members of the witness are NOT served by the application and are not
-  # the application's to serve: captured-content protections belong to the
-  # trace module, the Langy virtual key to the gateway, and the audit record to
-  # the audit-log module, and `apps/worker` installs this module beside none of
-  # them. The first scenario states which members the application answers, so
-  # that the list is a fact a test holds rather than a claim in a comment.
+  # The five scenarios below drive each procedure through the INSTALLED module
+  # on the production tRPC runtime (door audit 2026-09-24). Each failed first
+  # with "exposes operations only: <member> is not callable".
 
-  Scenario: a mounted door reaches only members the application serves
-    Given the project application as the composition builds it
-    When a door reaches it through the feature-API proxy
-    Then every member the application serves is callable
-    And every member it does not serve refuses by name
+  Scenario: rotating the base key hands the new key back to the caller
+    Given the project module installed over memory repositories
+    When somebody who manages the project rotates its base key
+    Then they are answered with the key the rotation minted
+    And the rotation is recorded in the audit trail without blocking that answer
+
+  Scenario: creating a project answers with the new project's slug
+    Given the project module installed over memory repositories
+    When somebody creates a project into a new team
+    Then they are answered with the slug of the project created
+    And Langy's virtual key is provisioned on a best-effort basis
+
+  Scenario: the redaction status reads the caller's own protections
+    Given the project module installed over memory repositories
+    When somebody reads the project's field redaction status
+    Then the answer is resolved from the caller's own captured-content protections
+
+  Scenario: a failing audit trail does not withhold the rotated key
+    Given the project module installed over memory repositories
+    And an audit trail that cannot be written
+    When somebody who manages the project rotates its base key
+    Then they are still answered with the key the rotation minted
+
+  Scenario: a Langy key that cannot be minted does not fail the project's creation
+    Given the gateway key cannot be minted for a new project
+    When Langy is asked to provision the project's virtual key
+    Then the failure is reported and the request answers normally
+
+  # Moves to the audit-log module, which owns the entries (Alex, 2026-09-24): the audit-log lane.
+  @unimplemented
+  Scenario: the home strip answers an empty trail with no items
+    Given the project module installed over memory repositories
+    When somebody with no recent activity reads the home strip
+    Then they are answered with no items
+
+  # Moves to the onboarding module, its own lane (Alex, 2026-09-24).
+  @unimplemented
+  Scenario: the setup checklist answers for the project
+    Given the project module installed over memory repositories
+    When somebody reads the project's setup checklist
+    Then they are answered with the project's setup counts
 
   Scenario: the browser door reads the project the composition built
     Given somebody signed in to a project

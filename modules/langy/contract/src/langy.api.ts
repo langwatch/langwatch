@@ -159,6 +159,12 @@ export interface LangyApi {
   }): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
+  /** Mints a new project's gateway key so it is listed from day one; best effort, never raises. */
+  provisionVirtualKey(input: {
+    projectId: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<void>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

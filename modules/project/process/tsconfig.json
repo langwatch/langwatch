@@ -22,6 +22,9 @@
       "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
+      "path": "../../audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -29,6 +32,9 @@
     },
     {
       "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../onboarding/contract/tsconfig.build.json"
@@ -50,6 +56,9 @@
     },
     {
       "path": "../../topic/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api-fixture/tsconfig.build.json"

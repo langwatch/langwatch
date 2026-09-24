@@ -1,6 +1,8 @@
 import { ApiKeyApi, type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   ProjectApi,
@@ -29,13 +31,18 @@ import type * as projectContractModule from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { TopicApi } from "@langwatch/topic-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
 import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 import type { ProjectManagementApi } from "../transport/project.rest.ts";
-import type { ProjectBrowserApi, ProjectPermissionScope } from "../transport/project.trpc.ts";
+import type {
+  ProjectBrowserApi,
+  ProjectFieldProtections,
+  ProjectPermissionScope,
+} from "../transport/project.trpc.ts";
 
 export type ProjectInfrastructure = Readonly<{
   topicClustering: {
@@ -76,6 +83,9 @@ type ProjectDependencies = Readonly<{
    * a dependency rather than an answer the door has to carry in.
    */
   authorization: typeof AuthzApi;
+  trace: typeof TraceApi;
+  auditLog: typeof AuditLogApi;
+  langy: typeof LangyApi;
 }>;
 type ProjectSetup = FeatureSetup<
   ProjectDependencies,
@@ -85,21 +95,11 @@ type ProjectSetup = FeatureSetup<
 >;
 
 /**
- * The browser door's witness answered today. Trace protections, the Langy
- * key mint and the audit record are excluded — naming one as a dependency
- * refuses boot in `apps/worker`; see `.claude/handoffs/project-trpc-witness-alignment.md`.
- */
-type ServedBrowserApi = Pick<
-  ProjectBrowserApi,
-  "projects" | "encryptProjectSecret" | "probePermission" | "reportTopicClusteringFailure"
->;
-
-/**
  * The project application: what peer modules, `/api/projects` and the browser
  * door each call, handed through the operations-only proxy — an unserved
  * member throws at first request, which `implements` turns into a build failure.
  */
-export class ProjectApp implements ProjectApiContract, ProjectManagementApi, ServedBrowserApi {
+export class ProjectApp implements ProjectApiContract, ProjectManagementApi, ProjectBrowserApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
     return this.#projectService.listPaths(input);
   }
@@ -111,6 +111,9 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     share: ShareApi,
     topics: TopicApi,
     authorization: AuthzApi,
+    trace: TraceApi,
+    auditLog: AuditLogApi,
+    langy: LangyApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["encryption", "logger", "topicClustering"] as const;
@@ -119,6 +122,8 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
   readonly #operations: ProjectOperationsService;
   readonly #apiKeys: ApiKeyApi;
   readonly #authorization: AuthzApi;
+  readonly #trace: TraceApi;
+  readonly #langy: LangyApi;
   readonly #encryption: ProjectProcessMembers["encryption"];
   readonly #logger: ProjectProcessMembers["logger"];
   private constructor({
@@ -126,6 +131,8 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     operations,
     apiKeys,
     authorization,
+    trace,
+    langy,
     encryption,
     logger,
   }: {
@@ -133,6 +140,8 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     operations: ProjectOperationsService;
     apiKeys: ApiKeyApi;
     authorization: AuthzApi;
+    trace: TraceApi;
+    langy: LangyApi;
     encryption: ProjectProcessMembers["encryption"];
     logger: ProjectProcessMembers["logger"];
   }) {
@@ -140,6 +149,8 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     this.#operations = operations;
     this.#apiKeys = apiKeys;
     this.#authorization = authorization;
+    this.#trace = trace;
+    this.#langy = langy;
     this.#encryption = encryption;
     this.#logger = logger;
   }
@@ -157,12 +168,16 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
       topics: dependencies.topics,
       topicClustering: members.topicClustering,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
+      auditLog: dependencies.auditLog,
+      logger: members.logger,
     });
     return new ProjectApp({
       projectService: projects,
       operations,
       apiKeys: dependencies.apiKeys,
       authorization: dependencies.authorization,
+      trace: dependencies.trace,
+      langy: dependencies.langy,
       encryption: members.encryption,
       logger: members.logger,
     });
@@ -210,6 +225,29 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
           organizationId: scope.id,
         });
     }
+  }
+
+  /** `by`'s captured-content visibility, as the trace module resolves it for a viewer. */
+  getFieldProtections(input: {
+    projectId: string;
+    by: Readonly<{ id: string }>;
+  }): Promise<ProjectFieldProtections> {
+    return this.#trace.resolveViewerProtections({
+      projectId: input.projectId,
+      userId: input.by.id,
+    });
+  }
+
+  provisionLangyVirtualKey(input: {
+    projectId: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<void> {
+    return this.#langy.provisionVirtualKey(input);
+  }
+
+  recordApiKeyRegenerated(entry: { userId: string; projectId: string }): Promise<void> {
+    return this.#operations.recordApiKeyRegenerated(entry);
   }
 
   /**

@@ -55,6 +55,7 @@ import {
   SETTLEMENT_POLL_MS,
 } from "../services/langy-turn-tail.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
+import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-otel.service.ts";
 import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
 import type { LangyService } from "../services/langy.service.ts";
@@ -89,6 +90,7 @@ type LangyAppDependencies = {
   presence: PresenceApi;
   /** The per-project window every turn is counted against before it dispatches. */
   turnBounds: LangyTurnsBoundsService;
+  virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
   /** The maintenance sweep's own service: no aggregate, no commands, just the reap. */
   sessionKeyReap: LangySessionKeyReapService;
 };
@@ -193,6 +195,9 @@ export class LangyApp implements LangyApiContract {
         projects: setup.dependencies.projects,
         rateLimiter: setup.members.rateLimiter,
       }),
+      virtualKeyProvisioning: LangyVirtualKeyProvisioningService.create({
+        virtualKeys: built.credentials.virtualKeys,
+      }),
       sessionKeyReap: LangySessionKeyReapService.create({
         repository: PrismaLangySessionKeyReapRepository.create(setup.members.prisma),
         metrics: OtelLangySessionKeyMetricsAdapter.create(),
@@ -292,6 +297,14 @@ export class LangyApp implements LangyApiContract {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
     return this.dependencies.langy.countUsage(input);
+  }
+
+  provisionVirtualKey(input: {
+    projectId: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<void> {
+    return this.dependencies.virtualKeyProvisioning.provision(input);
   }
 
   getAllByConversation(
