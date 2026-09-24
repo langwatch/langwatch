@@ -2448,6 +2448,9 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../packages/eventing
+      '@langwatch/feature-flag-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/feature-flag/contract
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract

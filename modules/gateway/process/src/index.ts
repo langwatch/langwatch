@@ -211,12 +211,7 @@ export type { GatewayVirtualKeyCrypto } from "./app/gateway.members.ts";
 export type { GatewaySpanIngestion } from "./app/gateway.members.ts";
 export type { GatewaySpendConfirmation } from "./app/gateway.members.ts";
 export type { GatewaySpendRating } from "./app/gateway.members.ts";
-export {
-  ModelCatalogGatewaySpendRatingService,
-  NANO_USD_PER_USD,
-  NO_RATE_RULE_CODE,
-  UNPRICED_QUANTITIES_CODE,
-} from "./services/model-catalog-gateway-spend-rating.service.ts";
+export { ModelCatalogGatewaySpendRatingService } from "./services/model-catalog-gateway-spend-rating.service.ts";
 
 // The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
 export {

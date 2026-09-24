@@ -13,6 +13,7 @@ import type {
   GovernanceTraceIngestionClient,
   GovernanceTraceRequest,
   IngestionPullDiagnosticsSink,
+  IngestionPullRunResult,
   IngestionPullSourceReader,
   PulledUsageDispatcher,
   PulledUsageEntitlements,
@@ -25,6 +26,7 @@ import { COPILOT_ROUTING_PROFILE } from "../rules/copilot-studio-trace-mapper-se
 import * as CopilotStudioTraceMapperService from "../rules/copilot-studio-trace-mapper-service.rules.ts";
 import { GENIE_ROUTING_PROFILE } from "../rules/genie-trace-mapper-service.rules.ts";
 import * as GenieTraceMapperService from "../rules/genie-trace-mapper-service.rules.ts";
+import { pullReadThrough } from "../rules/pull-read-through.rules.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
 import type { PullerRegistryService } from "./puller-registry.service.ts";
@@ -155,7 +157,7 @@ export class IngestionPullWorkerService {
     sourceId: string;
     cursor: string | null;
     pulledUsage?: PulledUsageDispatcher;
-  }): Promise<{ nextCursor: string | null; eventCount: number }> {
+  }): Promise<IngestionPullRunResult> {
     const source = await this.sources.findById(input.sourceId);
     if (!source) {
       throw new Error(`IngestionSource ${input.sourceId} not found`);
@@ -167,7 +169,14 @@ export class IngestionPullWorkerService {
         status: source.status,
       });
 
-      return { nextCursor: input.cursor, eventCount: 0 };
+      // A run that never started: nothing read, nothing half-read, no claim to have read up to now.
+      return {
+        nextCursor: input.cursor,
+        eventCount: 0,
+        errorCount: 0,
+        completeness: "complete",
+        readThroughAt: null,
+      };
     }
 
     const pullConfig = source.parserConfig;
@@ -212,9 +221,22 @@ export class IngestionPullWorkerService {
       throw error;
     }
 
-    const madeProgress = result.cursor !== input.cursor;
-    if (result.errorCount > 0 && !madeProgress) {
-      throw new Error(`Ingestion pull adapter reported ${result.errorCount} error(s)`);
+    if (result.errorCount > 0) {
+      const cursorAdvanced = result.cursor !== null && result.cursor !== input.cursor;
+      if (!cursorAdvanced) {
+        throw new Error(`Ingestion pull adapter reported ${result.errorCount} error(s)`);
+      }
+      this.diagnostics.warn(
+        "adapter advanced past input it could not read — keeping the events it did collect and persisting the advance",
+        {
+          ingestionSourceId: source.id,
+          adapterId,
+          errorCount: result.errorCount,
+          eventCount: result.events.length,
+          fromCursor: input.cursor,
+          toCursor: result.cursor,
+        },
+      );
     }
 
     if (result.events.length > 0) {
@@ -226,7 +248,15 @@ export class IngestionPullWorkerService {
       await this.routeConversations({ events: result.events, source });
     }
 
-    return { nextCursor: result.cursor, eventCount: result.events.length };
+    const readThrough = pullReadThrough({ result, nowMs: this.now() });
+    return {
+      nextCursor: result.cursor,
+      eventCount: result.events.length,
+      errorCount: result.errorCount,
+      completeness: result.completeness ?? "complete",
+      ...(result.unreadPage === true ? { unreadPage: true as const } : {}),
+      readThroughAt: readThrough.outcome === "read-through" ? readThrough.at : null,
+    };
   }
 
   private async routeConversations(input: {

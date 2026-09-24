@@ -48,6 +48,9 @@
       "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/gateway/contract/tsconfig.build.json"
     },
     {

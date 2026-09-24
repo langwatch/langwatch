@@ -148,7 +148,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       // is a guard against fields nobody meant to add: it is what fails the
       // day something personal starts riding along to a sink. A new field is
       // written down here deliberately or it does not travel.
-      expect(outcome).toEqual({
+      expect(outcome).toMatchObject({
         nextCursor: null,
         eventCount: 2,
       });

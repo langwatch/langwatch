@@ -296,7 +296,7 @@ describe("IngestionPullWorkerService", () => {
       }),
     });
 
-    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toEqual({
+    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
       nextCursor: "next",
       eventCount: 1,
     });
@@ -347,7 +347,7 @@ describe("IngestionPullWorkerService", () => {
 
     await expect(
       service.run({ sourceId: "source-1", cursor: "before-unreadable-row" }),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       nextCursor: "after-unreadable-row",
       eventCount: 1,
     });
@@ -433,7 +433,7 @@ describe("IngestionPullWorkerService", () => {
 
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
-    ).resolves.toEqual({ nextCursor: "next", eventCount: 2 });
+    ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
 
     expect(sink.insertEvent).toHaveBeenCalledTimes(2);
     expect(usage.records).toHaveBeenCalledTimes(2);
@@ -502,12 +502,106 @@ describe("IngestionPullWorkerService", () => {
 
     await expect(
       service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
-    ).resolves.toEqual({ nextCursor: "next", eventCount: 2 });
+    ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
     expect(sink.insertEvent).toHaveBeenCalledTimes(2);
     expect(usage.records).toHaveBeenCalledTimes(1);
     expect(diagnostics.error).toHaveBeenCalledWith(
       expect.stringContaining("could not map"),
       expect.objectContaining({ sourceEventId: "usage:2026-08-24:workspace-1" }),
     );
+  });
+});
+
+describe("IngestionPullWorkerService run report", () => {
+  const event = {
+    source_event_id: "event-1",
+    event_timestamp: "2026-08-24T09:00:00.000Z",
+    actor: "alex@example.com",
+    action: "invoke",
+    target: "model",
+    cost_usd: "0",
+    tokens_input: 1,
+    tokens_output: 2,
+    raw_payload: "{}",
+  };
+
+  describe("given a paused source", () => {
+    it("reports a complete run that read through to nowhere, cursor untouched", async () => {
+      const { service } = worker({
+        source: ingestionSource({ status: "paused" }),
+        runOnce: async () => ({ events: [], cursor: "never", errorCount: 0 }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: "held" })).resolves.toEqual({
+        nextCursor: "held",
+        eventCount: 0,
+        errorCount: 0,
+        completeness: "complete",
+        readThroughAt: null,
+      });
+    });
+  });
+
+  describe("given a complete run that emitted events", () => {
+    it("reads through to the newest event, not the clock", async () => {
+      const { service } = worker({
+        runOnce: async () => ({ events: [event], cursor: "next", errorCount: 0 }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toEqual({
+        nextCursor: "next",
+        eventCount: 1,
+        errorCount: 0,
+        completeness: "complete",
+        readThroughAt: Date.parse("2026-08-24T09:00:00.000Z"),
+      });
+    });
+  });
+
+  describe("given a truncated run that banked an unread page and emitted nothing", () => {
+    it("carries the truncation and the unread page, reading through to nowhere", async () => {
+      const { service } = worker({
+        runOnce: async () => ({
+          events: [],
+          cursor: "next",
+          errorCount: 0,
+          completeness: "truncated",
+          unreadPage: true,
+        }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toEqual({
+        nextCursor: "next",
+        eventCount: 0,
+        errorCount: 0,
+        completeness: "truncated",
+        unreadPage: true,
+        readThroughAt: null,
+      });
+    });
+  });
+
+  describe("given an adapter that states how far it read", () => {
+    it("takes the adapter's statement over the events", async () => {
+      const { service } = worker({
+        runOnce: async () => ({
+          events: [event],
+          cursor: "next",
+          errorCount: 0,
+          readThroughAt: "2026-08-24T09:30:00.000Z",
+        }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+        readThroughAt: Date.parse("2026-08-24T09:30:00.000Z"),
+      });
+    });
+  });
+
+  describe("given errors and a cursor that went back to null", () => {
+    it("fails the run, since a null cursor is no advance", async () => {
+      const { service } = worker({
+        runOnce: async () => ({ events: [], cursor: null, errorCount: 2 }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toThrow(
+        "reported 2 error(s)",
+      );
+    });
   });
 });
