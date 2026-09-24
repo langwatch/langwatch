@@ -63,7 +63,7 @@ function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
     },
     perDayPrCap: 5,
     sessionKeys: { mint, revoke: vi.fn(async () => undefined) },
-    context: { tryRender: vi.fn(() => null) },
+    context: { render: vi.fn(() => null) },
     uiActionSurface: { resolve: vi.fn(async () => true) },
     metrics: { count: vi.fn() },
     admission: { claim, commit, abort, release: vi.fn(async () => undefined) },

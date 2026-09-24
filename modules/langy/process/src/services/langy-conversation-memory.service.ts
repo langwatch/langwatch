@@ -97,7 +97,7 @@ export class LangyConversationMemoryService {
   /**
    * Render the conversation's memory as a system block, or null when there is nothing to say.
    */
-  static tryRender(entries: LangyConversationMemoryEntry[]): string | null {
+  static render(entries: LangyConversationMemoryEntry[]): string | null {
     if (entries.length === 0) {
       return null;
     }
@@ -125,7 +125,7 @@ export class LangyConversationMemoryService {
    * Render the conversation's durable messages as the transcript block (what has already been said,
    * oldest first), or null when there is nothing to say.
    */
-  static tryRenderTranscript({
+  static renderTranscript({
     messages,
     currentPrompt,
   }: {

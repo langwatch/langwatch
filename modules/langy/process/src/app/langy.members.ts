@@ -378,7 +378,7 @@ export abstract class LangyTurnMetrics {
 
 /** Renders the already-validated transport context into Langy's system prompt. */
 export abstract class LangyTurnContextRenderer {
-  abstract tryRender(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
+  abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
 }
 
 /** The rollout flag `LangyUiActionSurface.resolve` evaluates. */

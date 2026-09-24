@@ -9,7 +9,7 @@ import {
   type LangyBackendActor,
   type LangyUiActionBackend,
 } from "../app/langy.members.ts";
-import { tryReadTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
+import { extractTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
 import { LangyExplorerActionService } from "./langy-explorer-action.service.ts";
 
 /**
@@ -145,7 +145,7 @@ export class LangyUiActionBackendService {
     try {
       applied = transform({ state: current.state, payload });
     } catch (error) {
-      const refusal = tryReadTransformRefusalCode(error);
+      const refusal = extractTransformRefusalCode(error);
       if (refusal) {
         throw new LangyUiHandlerFailedError(kind, refusal);
       }

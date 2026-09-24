@@ -12,6 +12,11 @@ import { nowInstant } from "@langwatch/time";
 import { OpenRouter } from "@openrouter/sdk";
 import type { Model } from "@openrouter/sdk/models";
 
+import { HttpLitellmPriceChannel } from "../channels/http/http.litellm-price.channel.ts";
+import type {
+  LitellmPriceChannel,
+  LitellmPriceRegistry,
+} from "../channels/litellm-price.channel.ts";
 import {
   auditCatalog,
   blockingFindings,
@@ -20,10 +25,8 @@ import {
   type AuditReport,
 } from "../rules/catalog-price-audit.rules.ts";
 import {
-  fetchLitellmPrices,
   litellmPricingById,
   mapLitellmAudioModels,
-  type LitellmPriceEntry,
   type UnrepresentableModel,
 } from "../rules/litellm-audio-prices.rules.ts";
 import {
@@ -227,11 +230,13 @@ function auditAndReport({
 }: {
   generated: Record<string, LLMModelEntry>;
   overlay: Record<string, LLMModelEntry>;
-  litellmPrices: Record<string, LitellmPriceEntry> | null;
+  litellmPrices: LitellmPriceRegistry;
   unrepresentable: UnrepresentableModel[];
 }): AuditReport {
   const upstream: Record<string, Record<string, LLMModelPricing>> = {};
-  if (litellmPrices) upstream.litellm = litellmPricingById(litellmPrices);
+  if (litellmPrices.outcome === "fetched") {
+    upstream.litellm = litellmPricingById(litellmPrices.prices);
+  }
 
   const report = auditCatalog({ overlay, generated, upstream, unrepresentable });
   const blocking = blockingFindings(report, readAuditBaseline());
@@ -268,8 +273,10 @@ export type ModelRegistrySyncResult = {
  */
 export async function syncModelRegistry({
   apiKey,
+  litellm,
 }: {
   apiKey: string;
+  litellm: LitellmPriceChannel;
 }): Promise<ModelRegistrySyncResult> {
   logger.info("Fetching models from OpenRouter API");
   const openRouter = new OpenRouter({ apiKey });
@@ -307,18 +314,21 @@ export async function syncModelRegistry({
 
   logger.info("Fetching audio model prices from litellm");
   const overlayModels = readOverlayModels();
-  const litellmPrices = await fetchLitellmPrices();
+  const litellmPrices = await litellm.fetchPriceRegistry();
   let unrepresentable: UnrepresentableModel[] = [];
-  if (litellmPrices) {
+  if (litellmPrices.outcome === "fetched") {
     const excludeIds = new Set([...Object.keys(overlayModels), ...Object.keys(transformedModels)]);
-    const mapping = mapLitellmAudioModels(litellmPrices, excludeIds);
+    const mapping = mapLitellmAudioModels(litellmPrices.prices, excludeIds);
     unrepresentable = mapping.unrepresentable;
     for (const entry of mapping.entries) {
       transformedModels[entry.id] = entry;
     }
     logger.info({ count: mapping.entries.length }, "Merged audio models from litellm");
   } else {
-    logger.warn("litellm price fetch failed; audio models not merged this run");
+    logger.warn(
+      { reason: litellmPrices.reason, detail: litellmPrices.detail },
+      "litellm price fetch failed; audio models not merged this run",
+    );
   }
 
   auditAndReport({
@@ -350,12 +360,15 @@ export class ModelRegistrySyncTask extends Task {
   readonly description =
     "Regenerates model-catalog.json from OpenRouter and litellm's price registry.";
 
-  private constructor(private readonly apiKey: () => string | undefined) {
+  private constructor(
+    private readonly apiKey: () => string | undefined,
+    private readonly litellm: LitellmPriceChannel,
+  ) {
     super();
   }
 
   static create({ apiKey }: { apiKey: () => string | undefined }): ModelRegistrySyncTask {
-    return new ModelRegistrySyncTask(apiKey);
+    return new ModelRegistrySyncTask(apiKey, HttpLitellmPriceChannel.create());
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -363,6 +376,6 @@ export class ModelRegistrySyncTask extends Task {
     if (!apiKey) {
       throw new Error("OPENROUTER_API_KEY environment variable is not set");
     }
-    await syncModelRegistry({ apiKey });
+    await syncModelRegistry({ apiKey, litellm: this.litellm });
   }
 }

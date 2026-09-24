@@ -4,7 +4,7 @@
  */
 
 /* Read structurally: the error type belongs to the page family, not here. */
-export const tryReadTransformRefusalCode = (error: unknown): string | null => {
+export const extractTransformRefusalCode = (error: unknown): string | null => {
   if (!(error instanceof Error) || error.name !== "TransformError") return null;
   const code = (error as { code?: unknown }).code;
   return typeof code === "string" ? code : null;

@@ -6,12 +6,12 @@
 import { CLI_COLLECTION_VERBS } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { resolveLangyCapabilityProgress } from "../langy-capability-progress.rules.ts";
+import { deriveLangyCapabilityProgress } from "../langy-capability-progress.rules.ts";
 
 const headline = (name: string): string | undefined =>
-  resolveLangyCapabilityProgress(name)?.headline;
+  deriveLangyCapabilityProgress(name)?.headline;
 
-describe("resolveLangyCapabilityProgress", () => {
+describe("deriveLangyCapabilityProgress", () => {
   describe("given a verb the contract counts as a collection", () => {
     it("pluralises the resource for every one of them", () => {
       for (const verb of CLI_COLLECTION_VERBS) {
@@ -42,8 +42,8 @@ describe("resolveLangyCapabilityProgress", () => {
 
   describe("given a name that is not a capability", () => {
     it("answers nothing rather than inventing wording", () => {
-      expect(resolveLangyCapabilityProgress("not.a.capability.name")).toBeNull();
-      expect(resolveLangyCapabilityProgress("langwatch.trace")).toBeNull();
+      expect(deriveLangyCapabilityProgress("not.a.capability.name")).toBeNull();
+      expect(deriveLangyCapabilityProgress("langwatch.trace")).toBeNull();
     });
   });
 });

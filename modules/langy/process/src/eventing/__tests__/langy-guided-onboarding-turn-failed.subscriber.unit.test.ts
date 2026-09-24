@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   createGuidedOnboardingTurnFailedSubscriber,
   type GuidedOnboardingForProject,
-  turnFailureOf,
+  extractTurnFailure,
 } from "../langy-guided-onboarding-turn-failed.subscriber.ts";
 import {
   agentRespondedEvent,
@@ -95,7 +95,7 @@ describe("given the organization's guided onboarding conversation", () => {
 
     it("reads an unparseable error as unknown", () => {
       const failed = agentResponseFailedEvent({ id: "evt", occurredAt: T0, turnId: "turn-1" });
-      expect(turnFailureOf(failed)).toEqual({ turnId: "turn-1", code: "unknown" });
+      expect(extractTurnFailure(failed)).toEqual({ turnId: "turn-1", code: "unknown" });
     });
   });
 

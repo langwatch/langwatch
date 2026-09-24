@@ -43,6 +43,6 @@ const RESOURCE_PREFIXES: readonly (readonly [string, LangyNavigateResourceKind])
 ];
 
 /** The resource this id names, or null when no prefix claims it. */
-export function navigateResourceKindFor(resourceId: string): LangyNavigateResourceKind | null {
+export function detectNavigateResourceKind(resourceId: string): LangyNavigateResourceKind | null {
   return RESOURCE_PREFIXES.find(([prefix]) => resourceId.startsWith(prefix))?.[1] ?? null;
 }

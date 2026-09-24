@@ -1,4 +1,5 @@
 import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-contract";
+import { z } from "zod";
 
 /**
  * Audio/transcription/realtime prices from litellm's registry — OpenRouter routes none of these
@@ -6,23 +7,22 @@ import type { LLMModelEntry, LLMModelPricing } from "@langwatch/model-provider-c
  * `unrepresentable` rather than dropped, so it never bills confidently on a partial price.
  */
 
-export const LITELLM_PRICES_URL =
-  "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
+/** The subset of a litellm price entry this mapper reads, parsed where the body enters. */
+export const litellmPriceEntrySchema = z.object({
+  mode: z.string().optional(),
+  litellm_provider: z.string().optional(),
+  input_cost_per_character: z.number().optional(),
+  input_cost_per_second: z.number().optional(),
+  input_cost_per_token: z.number().optional(),
+  input_cost_per_audio_token: z.number().optional(),
+  output_cost_per_token: z.number().optional(),
+  output_cost_per_audio_token: z.number().optional(),
+  output_cost_per_second: z.number().optional(),
+  output_cost_per_character: z.number().optional(),
+  cache_read_input_token_cost: z.number().optional(),
+});
 
-/** The subset of a litellm price entry this mapper reads. */
-export type LitellmPriceEntry = {
-  mode?: string;
-  litellm_provider?: string;
-  input_cost_per_character?: number;
-  input_cost_per_second?: number;
-  input_cost_per_token?: number;
-  input_cost_per_audio_token?: number;
-  output_cost_per_token?: number;
-  output_cost_per_audio_token?: number;
-  output_cost_per_second?: number;
-  output_cost_per_character?: number;
-  cache_read_input_token_cost?: number;
-};
+export type LitellmPriceEntry = z.infer<typeof litellmPriceEntrySchema>;
 
 /** A model upstream prices but the catalog cannot express yet. */
 export type UnrepresentableModel = {
@@ -180,17 +180,6 @@ export function litellmPricingById(
     byId[rawId.includes("/") ? rawId : `${provider}/${rawId}`] = pricing;
   }
   return byId;
-}
-
-/** Fetches litellm's price registry. Returns null on any transport failure. */
-export async function fetchLitellmPrices(): Promise<Record<string, LitellmPriceEntry> | null> {
-  try {
-    const response = await fetch(LITELLM_PRICES_URL);
-    if (!response.ok) return null;
-    return (await response.json()) as Record<string, LitellmPriceEntry>;
-  } catch {
-    return null;
-  }
 }
 
 function audioModalityOf({ isRealtime, isSpeech }: { isRealtime: boolean; isSpeech: boolean }) {

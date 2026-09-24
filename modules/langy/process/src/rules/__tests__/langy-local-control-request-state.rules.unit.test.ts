@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ControlRequestHistoryEvent,
   controlRequestState,
-  latestControlRequest,
+  pickLatestControlRequest,
 } from "../langy-local-control-request-state.rules.ts";
 
 const NOW = 1_700_000_000_000;
@@ -42,7 +42,7 @@ function stateOf({
 }) {
   return controlRequestState({
     open,
-    latest: latestControlRequest(events),
+    latest: pickLatestControlRequest(events),
     claimed,
     connected: isConnected,
     now: NOW,
@@ -107,10 +107,10 @@ describe("controlRequestState", () => {
   });
 });
 
-describe("latestControlRequest", () => {
+describe("pickLatestControlRequest", () => {
   describe("when the conversation asked more than once", () => {
     it("reads the last request, and only a connection made through it", () => {
-      const latest = latestControlRequest([
+      const latest = pickLatestControlRequest([
         requested("lcr_1", NOW - FIFTEEN_MINUTES),
         connected("lcr_1"),
         disconnected(),
@@ -128,7 +128,7 @@ describe("latestControlRequest", () => {
   describe("when a request event carries no readable expiry", () => {
     it("skips it rather than guessing", () => {
       expect(
-        latestControlRequest([
+        pickLatestControlRequest([
           {
             type: LANGY_CONVERSATION_EVENT_TYPES.LOCAL_CONTROL_REQUESTED,
             data: { requestId: "lcr_1" },

@@ -21,7 +21,6 @@ import {
   type LangyLocalRecord,
   type LangyMessagePart,
   type LangyMessageRole,
-  type LangyStreamEntry,
   LangyApi,
   type LangyApi as LangyApiContract,
   assertLangyServerConfig,
@@ -40,20 +39,13 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
-import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
 import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { OtelLangySessionKeyMetricsAdapter } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
-import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
-import {
-  SETTLEMENT_CONFIRM_POLLS,
-  SETTLEMENT_POLL_MS,
-} from "../services/langy-turn-tail.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-otel.service.ts";
@@ -100,13 +92,6 @@ export interface LangyEgressState {
   allowlist: LangyEgressAllowlist;
   /** `false` is monitor-only: watch, never block. */
   enforcing: boolean;
-}
-
-/** One live turn's durable buffer, plus the connection it borrowed. */
-export interface LangyTurnStream {
-  buffer: LangyTokenBuffer;
-  /** Releases the dedicated blocking connection. Always call it. */
-  close(): void;
 }
 
 /** What a turn-start asks for, before the caller's session is attached. */
@@ -641,69 +626,6 @@ export class LangyApp implements LangyApiContract {
       userId,
     });
     return !!conversation;
-  }
-
-  /**
-   * The durable token buffer for one turn, with its own blocking connection. Null when the
-   * deployment has no Redis: there is then no live buffer and the client falls back to the
-   * Postgres conversation/message read.
-   */
-  tryOpenTurnStream(): LangyTurnStream | null {
-    const connection = this.dependencies.redis;
-    if (!connection) return null;
-    const blocking = connection.duplicate();
-    return {
-      buffer: this.dependencies.repositories.tokenBuffer.open({
-        redis: connection,
-        blockingRedis: blocking,
-      }),
-      close: () => blocking.disconnect(),
-    };
-  }
-
-  /**
-   * Polls the durable fold and the per-turn heartbeat while the live edge is tailed, and
-   * answers with the terminal to synthesize once the turn has settled without one — or null if
-   * it never does.
-   */
-  async tryWatchForMissedTerminal(input: {
-    projectId: string;
-    conversationId: string;
-    turnId: string;
-    userId: string;
-    buffer: {
-      liveness(a: { conversationId: string; turnId: string }): Promise<{ stale: boolean }>;
-    };
-    signal: AbortSignal;
-  }): Promise<LangyStreamEntry | null> {
-    const { projectId, conversationId, turnId, userId, buffer, signal } = input;
-    let settledStreak = 0;
-    while (!signal.aborted) {
-      if (!(await LangyTurnSettlementWaiterService.abortableDelay(SETTLEMENT_POLL_MS, signal)))
-        return null;
-      const [conversation, liveness] = await Promise.all([
-        this.dependencies.langy
-          .getById({ id: conversationId, projectId, userId })
-          .catch(() => null),
-        buffer.liveness({ conversationId, turnId }).catch(() => null),
-      ]);
-      if (!conversation || !liveness) {
-        settledStreak = 0;
-        continue;
-      }
-      const decision = decideSyntheticTerminal({
-        status: conversation.status,
-        lastError: conversation.lastError,
-        heartbeatStale: liveness.stale,
-      });
-      if (!decision) {
-        settledStreak = 0;
-        continue;
-      }
-      settledStreak += 1;
-      if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
-    }
-    return null;
   }
 }
 

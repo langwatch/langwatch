@@ -19,6 +19,11 @@ export type TurnSettlement =
     }
   | { succeeded: false; outcome: "failed"; text: null; error: string };
 
+/** `stopped`: the caller's signal ended the wait before the turn settled. */
+export type TurnSettlementWait =
+  | { kind: "settled"; settlement: TurnSettlement }
+  | { kind: "stopped" };
+
 export type LangyTurnSettlementReader = {
   getEventsAfter(input: {
     projectId: string;
@@ -70,7 +75,7 @@ export class LangyTurnSettlementWaiterService {
     });
   }
 
-  static trySettlementFromEvents(
+  static deriveSettlementFromEvents(
     events: LangyConversationTurnWireEvent[],
     turnId: string,
   ): TurnSettlement | null {
@@ -153,7 +158,7 @@ export class LangyTurnSettlementWaiterService {
         return null;
       }
 
-      const settlement = LangyTurnSettlementWaiterService.trySettlementFromEvents(
+      const settlement = LangyTurnSettlementWaiterService.deriveSettlementFromEvents(
         page.events,
         input.turnId,
       );
@@ -244,7 +249,7 @@ export class LangyTurnSettlementWaiterService {
     return Promise.race([terminal, delay]);
   }
 
-  static async tryAwaitTurnSettlement(input: {
+  static async awaitTurnSettlement(input: {
     langy: LangyTurnSettlementReader;
     openBuffer: OpenLangyTurnBuffer | null;
     projectId: string;
@@ -253,7 +258,7 @@ export class LangyTurnSettlementWaiterService {
     userId: string;
     signal: AbortSignal;
     pollIntervalMs?: number;
-  }): Promise<TurnSettlement | null> {
+  }): Promise<TurnSettlementWait> {
     const armed = LangyTurnSettlementWaiterService.armBufferWatch(input);
     let terminalSeen = armed.terminalSeen;
     let pollMs = terminalSeen ? bufferedPollMs : (input.pollIntervalMs ?? fallbackPollMs);
@@ -262,7 +267,7 @@ export class LangyTurnSettlementWaiterService {
       while (!input.signal.aborted) {
         const settlement = await LangyTurnSettlementWaiterService.readSettlementFromFold(input);
         if (settlement) {
-          return settlement;
+          return { kind: "settled", settlement };
         }
 
         const outcome = await LangyTurnSettlementWaiterService.waitForNextPoll(
@@ -271,7 +276,7 @@ export class LangyTurnSettlementWaiterService {
           input.signal,
         );
         if (outcome === "abort") {
-          return null;
+          return { kind: "stopped" };
         }
 
         if (outcome === "terminal") {
@@ -280,7 +285,7 @@ export class LangyTurnSettlementWaiterService {
         }
       }
 
-      return null;
+      return { kind: "stopped" };
     } finally {
       armed.release();
     }

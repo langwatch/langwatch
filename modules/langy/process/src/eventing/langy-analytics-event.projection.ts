@@ -58,7 +58,7 @@ import {
  * carry an outcome answer; everything else has none, which is not the same as
  * a failure.
  */
-function outcomeOf(event: LangyConversationProcessingEvent): string | null {
+function extractOutcome(event: LangyConversationProcessingEvent): string | null {
   if (event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED) {
     return event.data.outcome;
   }
@@ -278,7 +278,7 @@ export class LangyAnalyticsEventMapProjection
       userId: "userId" in data ? (data.userId ?? null) : null,
       role: "role" in data ? data.role : null,
       toolName: "toolName" in data ? data.toolName : null,
-      outcome: outcomeOf(event),
+      outcome: extractOutcome(event),
       model:
         event.type === LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED ? event.data.model : null,
       durationMs: "durationMs" in data ? (data.durationMs ?? null) : null,

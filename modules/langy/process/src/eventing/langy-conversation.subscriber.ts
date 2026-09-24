@@ -131,7 +131,7 @@ export interface LangyConversationUpdateBroadcastSubscriberDeps {
 function projectionNotReadyError(params: { projectionName: string; eventId: string }): Error {
   return new Error(`${params.projectionName} has not projected event ${params.eventId} yet`);
 }
-function turnIdOf(event: LangyConversationProcessingEvent): string | null {
+function extractTurnId(event: LangyConversationProcessingEvent): string | null {
   return "turnId" in event.data ? (event.data.turnId ?? null) : null;
 }
 
@@ -146,14 +146,14 @@ export function createAgentTurnLivenessSubscriber(
       delay: LANGY_HEARTBEAT_GRACE_MS,
       deduplication: {
         makeId: (event) =>
-          `langy-liveness:${event.tenantId}:${String(event.aggregateId)}:${turnIdOf(event) ?? "?"}`,
+          `langy-liveness:${event.tenantId}:${String(event.aggregateId)}:${extractTurnId(event) ?? "?"}`,
         ttlMs: LANGY_HEARTBEAT_GRACE_MS * 2,
       },
     },
     async handle(event): Promise<void> {
       const projectId = event.tenantId;
       const conversationId = String(event.aggregateId);
-      const eventTurnId = turnIdOf(event);
+      const eventTurnId = extractTurnId(event);
       if (!eventTurnId) return;
       const conversation = await deps.conversations.read({ projectId, conversationId });
       if (!conversation || !cursorHasReachedEvent(conversation.cursor, event)) {

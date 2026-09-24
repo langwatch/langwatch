@@ -74,7 +74,7 @@ const humanize = (value: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-export function resolveLangyCapabilityProgress(rawName: string): { headline: string } | null {
+export function deriveLangyCapabilityProgress(rawName: string): { headline: string } | null {
   const match = /^langwatch\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)$/.exec(rawName);
   if (!match) return null;
   const resource = match[1]!;

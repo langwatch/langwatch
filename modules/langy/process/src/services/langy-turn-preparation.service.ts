@@ -267,11 +267,11 @@ export class LangyTurnPreparationService {
     }
 
     const durableMessages = memoryResult.status === "fulfilled" ? memoryResult.value : [];
-    const transcript = LangyConversationMemoryService.tryRenderTranscript({
+    const transcript = LangyConversationMemoryService.renderTranscript({
       messages: durableMessages,
       currentPrompt: args.userText,
     });
-    const memory = LangyConversationMemoryService.tryRender(
+    const memory = LangyConversationMemoryService.render(
       LangyConversationMemoryService.extract({ messages: durableMessages }),
     );
     const override =
@@ -295,7 +295,7 @@ export class LangyTurnPreparationService {
     const isUiActionSurfaceOpen =
       uiActionsOpenResult.status === "fulfilled" ? uiActionsOpenResult.value : false;
     const { prompt, labelled } = LANGY_TURN_SHARED.composeLangyTurnPrompt({
-      contextBlock: this.deps.context.tryRender({
+      contextBlock: this.deps.context.render({
         context: args.turnContext,
         isUiActionSurfaceOpen,
       }),

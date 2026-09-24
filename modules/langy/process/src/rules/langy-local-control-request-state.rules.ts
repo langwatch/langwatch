@@ -33,7 +33,7 @@ const field = (data: unknown, key: string): unknown =>
   typeof data === "object" && data !== null ? (data as Record<string, unknown>)[key] : undefined;
 
 /** The last request in the log, or nothing when the conversation never asked. */
-export function latestControlRequest(
+export function pickLatestControlRequest(
   events: readonly ControlRequestHistoryEvent[],
 ): LatestControlRequest | null {
   let latest: LatestControlRequest | null = null;

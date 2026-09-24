@@ -136,7 +136,7 @@ describe("LangyCliEnvelopeService", () => {
         input: { command: "langwatch scenario create Checkout --format json" },
       });
 
-      expect(service.tryShellCommandOf(local)).toBe(
+      expect(service.extractShellCommand(local)).toBe(
         "langwatch scenario create Checkout --format json",
       );
       const frame = service.normalizeToolFrame({ frame: local });

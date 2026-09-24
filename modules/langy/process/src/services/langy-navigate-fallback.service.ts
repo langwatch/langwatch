@@ -7,8 +7,8 @@ import {
   type LangyNavigateProject,
   type LangyNavigateResourceLocator,
 } from "../app/langy.members.ts";
-import { navigatePageFor } from "../rules/langy-navigate-pages.rules.ts";
-import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules.ts";
+import { pickNavigatePage } from "../rules/langy-navigate-pages.rules.ts";
+import { detectNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
 
 /** Builds a deep link into the product from a project slug and a path. */
 export type LangyNavigatePlatformUrl = (input: { projectSlug: string; path: string }) => string;
@@ -62,7 +62,7 @@ export class LangyNavigateFallbackService {
    * answers to it.
    */
   async tryResolveUrl(input: { projectId: string; resourceId: string }): Promise<string | null> {
-    const page = navigatePageFor(input.resourceId);
+    const page = pickNavigatePage(input.resourceId);
     if (page?.scope === "organization") {
       return this.organizationUrl({ path: page.path });
     }
@@ -89,7 +89,7 @@ export class LangyNavigateFallbackService {
     projectId: string;
     resourceId: string;
   }): Promise<string | null> {
-    const kind = navigateResourceKindFor(resourceId);
+    const kind = detectNavigateResourceKind(resourceId);
     if (!kind || !this.resources) {
       return null;
     }

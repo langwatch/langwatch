@@ -71,7 +71,7 @@ const HONO_NOT_FOUND = {
 /** What a turn route publishes: its JSON answers, and the dark surface's bare 404. */
 const TURN_PRODUCES = ["application/json", "text/plain;charset=UTF-8"] as const;
 
-function requestedWaitSeconds(request: Request): number | null {
+function parseRequestedWaitSeconds(request: Request): number | null {
   const prefer = request.headers.get("prefer");
   if (!prefer) return null;
   // RFC 7240 §2: the value may be a token or a quoted-string (`wait="30"`).
@@ -155,12 +155,12 @@ async function startTurn(input: {
   // HTTP client (or a scenario HTTP agent) needs, since this surface has no
   // public poll or stream endpoint yet. On timeout the response degrades to
   // the 202 below, indistinguishable from never having asked.
-  const waitSeconds = requestedWaitSeconds(request);
+  const waitSeconds = parseRequestedWaitSeconds(request);
 
   if (waitSeconds && waitSeconds > 0) {
     // Client disconnect and the wait deadline are one signal: an abandoned
     // hold stops consuming fold reads (and its blocking Redis read) at once.
-    const settlement = await LangyTurnSettlementWaiterService.tryAwaitTurnSettlement({
+    const wait = await LangyTurnSettlementWaiterService.awaitTurnSettlement({
       langy: app,
       openBuffer: members.openTurnBuffer,
       projectId: caller.projectId,
@@ -170,7 +170,8 @@ async function startTurn(input: {
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(waitSeconds * 1000)]),
     });
 
-    if (settlement) {
+    if (wait.kind === "settled") {
+      const { settlement } = wait;
       // 200 even when the turn itself failed: the REQUEST succeeded - it was
       // authorized, accepted and settled - and `status`/`error` carry the
       // turn's own outcome. Failure here is a domain result, not a transport
