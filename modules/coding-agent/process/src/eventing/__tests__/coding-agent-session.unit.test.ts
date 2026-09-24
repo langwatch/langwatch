@@ -12,6 +12,7 @@ import {
   type LogFactsContributedEvent,
   type MetricFactsContributedEvent,
   type SpanFactsContributedEvent,
+  admitsCodingAgentSpan,
 } from "@langwatch/coding-agent-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
@@ -19,7 +20,6 @@ import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
 import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
-import { CodingAgentSessionSpanProjection } from "../coding-agent-session-span.projection.ts";
 import {
   CodingAgentSessionStateProjection,
   contextUsageKey,
@@ -2075,13 +2075,13 @@ describe("coding-agent session fold, codex", () => {
   describe("given codex's bare-named spans", () => {
     it("admits the turn span on the codex scope and declines it elsewhere", () => {
       expect(
-        CodingAgentSessionSpanProjection.admits({
+        admitsCodingAgentSpan({
           name: "session_task.turn",
           scopeName: "codex_exec",
         }),
       ).toBe(true);
       expect(
-        CodingAgentSessionSpanProjection.admits({
+        admitsCodingAgentSpan({
           name: "session_task.turn",
           scopeName: "com.acme.pipeline",
         }),
@@ -2089,14 +2089,14 @@ describe("coding-agent session fold, codex", () => {
       // handle_responses repeats the turn's tokens and carries a tokio
       // thread.id the session-key resolution would read as the session.
       expect(
-        CodingAgentSessionSpanProjection.admits({
+        admitsCodingAgentSpan({
           name: "handle_responses",
           scopeName: "codex_exec",
         }),
       ).toBe(false);
       // Claude's names carry their own namespace and need no scope.
       expect(
-        CodingAgentSessionSpanProjection.admits({
+        admitsCodingAgentSpan({
           name: "claude_code.tool",
           scopeName: null,
         }),

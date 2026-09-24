@@ -38,3 +38,11 @@ export const automationTraceSubscriberContextSchema = z.object({
 export type AutomationTraceSubscriberContext = z.infer<
   typeof automationTraceSubscriberContextSchema
 >;
+
+/** Locked ADR-034 Phase 5 real-time debounce for graph-alert sweeps. */
+export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
+
+/** One queue lane per tenant, shared by every pipeline that wakes a graph-alert sweep. */
+export function graphTriggerActivityGroupKey(event: { tenantId: string }): string {
+  return `graph-trigger-activity:${event.tenantId}`;
+}

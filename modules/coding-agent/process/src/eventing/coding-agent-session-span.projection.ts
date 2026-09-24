@@ -1,8 +1,6 @@
 import {
-  CODING_AGENT_REGISTRY,
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
   LOGS_ONLY_AGENT_IDS,
-  detectCodingAgent,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -33,17 +31,6 @@ const CODEX = {
     RESPONSE_MODEL: "gen_ai.response.model",
   },
 } as const;
-const SELF_NAMESPACED_SPAN_NAMES: ReadonlySet<string> = new Set([
-  CLAUDE.SPAN.LLM_REQUEST,
-  CLAUDE.SPAN.TOOL,
-  CLAUDE.SPAN.TOOL_EXECUTION,
-  CLAUDE.SPAN.BLOCKED_ON_USER,
-  CLAUDE.SPAN.SUBAGENT_SPAWN,
-]);
-const DECLARED_SPAN_NAMES: ReadonlySet<string> = new Set(
-  CODING_AGENT_REGISTRY.flatMap((agent) => agent.sessionSpanNames ?? []),
-);
-
 /**
  * The spans whose tokens the fold counts as a model call, across every span-bearing agent. The
  * contribute service stamps exactly these with the session's declared working context, so the fold
@@ -53,11 +40,6 @@ export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE.SPAN.LLM_REQUEST,
   CODEX.SPAN.TURN,
 ]);
-
-export interface CodingAgentSessionSpanCandidate {
-  name: string;
-  scopeName?: string | null;
-}
 
 export interface SpanFactsView {
   name: string;
@@ -97,12 +79,6 @@ export class CodingAgentSessionSpanProjection {
       deps.traceCanonicalisation,
       deps.modelProviders,
     );
-  }
-
-  static admits({ name, scopeName }: CodingAgentSessionSpanCandidate): boolean {
-    if (SELF_NAMESPACED_SPAN_NAMES.has(name)) return true;
-    if (!DECLARED_SPAN_NAMES.has(name)) return false;
-    return detectCodingAgent({ recordName: name, scopeName }) !== "unknown";
   }
 
   private applySubagentSpawn(

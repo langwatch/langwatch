@@ -1,4 +1,5 @@
 import type { AutomationApi } from "@langwatch/automation-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -20,6 +21,7 @@ import type {
   TraceProcessingPipelineDefinition,
   TraceSpanCostEnrichment,
 } from "../app/trace.members.ts";
+import { createCodingAgentSpanFactsDispatchSubscriber } from "../eventing/coding-agent-span-facts-dispatch.subscriber.ts";
 import { CustomEvaluationSync } from "../eventing/custom-evaluation-sync.subscriber.ts";
 import { createEvaluationTriggerSubscriber } from "../eventing/evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "../eventing/experiment-metrics-sync.subscriber.ts";
@@ -50,6 +52,7 @@ import { TraceProcessingProducerAdapter } from "./trace-processing-producer.serv
 import { TraceSpanNormalizationAdapter } from "./trace-span-normalization-adapter.service.ts";
 
 export interface TraceProcessingPeers {
+  codingAgents: Pick<CodingAgentApi, "contributeReceivedSpan">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays">;
   automations: Pick<
@@ -157,6 +160,7 @@ export class TraceProcessingPipelineService {
 
   #reactions(): Parameters<typeof buildTraceProcessingConsumer>[1] {
     const { peers, commands } = this.input;
+    const normalization = TraceSpanNormalizationAdapter.create(this.input.canonicalisation);
     const refusing = (capability: string) => () => Promise.reject(this.#refuse(capability));
     const resolveOrigin = TraceDeferredOriginEventingAdapter.createDeferredOriginHandler((data) =>
       commands.resolveOrigin(data),
@@ -210,6 +214,16 @@ export class TraceProcessingPipelineService {
           event: { occurredAt: event.occurredAt },
           context: { tenantId: String(context.tenantId) },
         }),
+      codingAgentSpanFactsDispatch: createCodingAgentSpanFactsDispatchSubscriber({
+        normalize: (event) =>
+          normalization.normalizeSpanReceived(
+            String(event.tenantId),
+            event.data.span,
+            event.data.resource,
+            event.data.instrumentationScope,
+          ),
+        contributeReceivedSpan: (input) => peers.codingAgents.contributeReceivedSpan(input),
+      }),
       spanStorageBroadcast: refusing("the span storage broadcast"),
       broadcastDisabled: true,
     };

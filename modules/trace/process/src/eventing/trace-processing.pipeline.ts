@@ -1,6 +1,11 @@
 import {
+  GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+  graphTriggerActivityGroupKey,
+} from "@langwatch/automation-contract";
+import {
   defineEventingModule,
   throttledWindow,
+  type EventSubscriberDefinition,
   type EventingSetup,
   type TriggerContext,
 } from "@langwatch/eventing";
@@ -48,13 +53,6 @@ import {
   TrackedEventSync,
 } from "./tracked-event-sync.subscriber.ts";
 
-/** Automation's graph-alert debounce, restated as evaluation-processing.service.ts:37 does. */
-const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
-
-function graphTriggerActivityGroupKey(event: { tenantId: string }): string {
-  return `graph-trigger-activity:${event.tenantId}`;
-}
-
 type SummaryHandler = (
   event: TraceProcessingEvent,
   context: TriggerContext<TraceSummaryData>,
@@ -71,6 +69,7 @@ export interface TraceProcessingReactions {
   simulationMetricsSync: SummaryHandler;
   experimentMetricsSync: SummaryHandler;
   triggerMatch: SummaryHandler;
+  codingAgentSpanFactsDispatch: EventSubscriberDefinition<TraceProcessingEvent>;
   graphTriggerActivity: (
     event: TraceProcessingEvent,
     context: { tenantId: string },
@@ -172,6 +171,10 @@ export function buildTraceProcessingConsumer(
       groupKeyFn: graphTriggerActivityGroupKey,
       handler: (event, context) => reactions.graphTriggerActivity(event, context),
     })
+    .withEventSubscriber(
+      reactions.codingAgentSpanFactsDispatch.name,
+      reactions.codingAgentSpanFactsDispatch,
+    )
     .withProjectionSubscriber("spanStorageBroadcast", {
       map: "spanStorage",
       runIn: ["worker"],

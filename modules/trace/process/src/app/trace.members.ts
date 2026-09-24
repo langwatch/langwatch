@@ -342,11 +342,6 @@ export type DeferredOriginPayload = {
   traceId: string;
 };
 
-/** The pipeline builder receives this named scheduler before its queue exists. */
-export interface TraceDeferredOriginScheduler {
-  schedule(payload: DeferredOriginPayload): Promise<void>;
-}
-
 export type TraceSpanSpoolIdentity = {
   spoolRef: string;
   projectId: string;

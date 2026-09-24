@@ -9,17 +9,6 @@ import type { AutomationGraphActivity } from "../app/automation.members.ts";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");
 
-/** Locked ADR-034 Phase 5 real-time debounce. */
-export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
-
-/**
- * Per-tenant queue lane serializes graph-trigger sweeps; per-trace grouping
- * previously caused concurrent sweep storms saturating ClickHouse selects.
- */
-export function graphTriggerActivityGroupKey(event: { tenantId: string }): string {
-  return `graph-trigger-activity:${event.tenantId}`;
-}
-
 /**
  * ADR-052: the real-time graph-alert path as a plain subscriber, no
  * process state -- the shared evaluator owns idempotency, redelivery is

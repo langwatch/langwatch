@@ -71,11 +71,7 @@ export type {
   TriggerMatchRecordedEvent,
 } from "./eventing/automation.pipeline.ts";
 export { TriggerSettlement } from "./eventing/trigger-settlement.process.ts";
-export {
-  GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-  createGraphTriggerActivityHandler,
-  graphTriggerActivityGroupKey,
-} from "./eventing/graph-trigger-activity.subscriber.ts";
+export { createGraphTriggerActivityHandler } from "./eventing/graph-trigger-activity.subscriber.ts";
 export { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 export { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 export type {

@@ -27,3 +27,4 @@ export type {
 } from "./coding-agent-transcript.ts";
 export * from "./injected-notice.ts";
 export * from "./leading-context.ts";
+export * from "./coding-agent-span-admission.ts";

@@ -19,7 +19,6 @@ export type {
 } from "./app/coding-agent.members.ts";
 export { createCodingAgentLogFactsDispatchSubscriber } from "./eventing/coding-agent-log-facts-dispatch.subscriber.ts";
 export { createCodingAgentMetricFactsDispatchSubscriber } from "./eventing/coding-agent-metric-facts-dispatch.subscriber.ts";
-export { createCodingAgentSpanFactsDispatchSubscriber } from "./eventing/coding-agent-span-facts-dispatch.subscriber.ts";
 export { createPullRequestMappingSubscriber } from "./eventing/pull-request-mapping.subscriber.ts";
 export { NoopCodingAgentReadMetrics } from "./services/coding-agent-read-metrics-noop.service.ts";
 export {

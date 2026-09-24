@@ -31,6 +31,7 @@ import {
   type CodingAgentTracePullRequestLink,
   type CodingAgentTranscript,
   type ContributeSpanFactsCommandData,
+  type CodingAgentReceivedSpan,
 } from "@langwatch/coding-agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -50,6 +51,7 @@ import {
   gateSessionListCost,
   gateSessionListTitles,
 } from "../rules/coding-agent-gates.rules.ts";
+import { liftSpanContribution } from "../rules/coding-agent-span-facts.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockAdapter } from "../services/coding-agent-clock.service.ts";
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
@@ -280,6 +282,10 @@ export class CodingAgentApp implements CodingAgentApi {
 
   contributeSpanFacts(data: ContributeSpanFactsCommandData): Promise<void> {
     return this.#commands.contributeSpanFacts(data);
+  }
+
+  contributeReceivedSpan(input: CodingAgentReceivedSpan): Promise<void> {
+    return this.contributeSpanFacts(liftSpanContribution(input));
   }
 
   /** Pure derivation, no session store read: which log fields an event name captures. */

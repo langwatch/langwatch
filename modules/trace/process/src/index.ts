@@ -30,7 +30,6 @@ export {
   type EventingTracePipelineAdapterOptions,
 } from "./services/eventing.trace-pipeline.service.ts";
 export type {
-  TraceDeferredOriginScheduler,
   TraceSpanTokenEstimation,
   TraceSpoolLegacyObject,
   TraceSpoolStorage,
@@ -42,11 +41,7 @@ export type {
   TraceEvaluationLoopBlockReason,
   TraceEvaluationDispatch,
 } from "./app/trace.members.ts";
-export {
-  ORIGIN_GATE_DEDUP_TTL_MS,
-  ORIGIN_GATE_DELAY_MS,
-  TraceDeferredOriginEventingAdapter,
-} from "./services/eventing.deferred-origin.service.ts";
+export { TraceDeferredOriginEventingAdapter } from "./services/eventing.deferred-origin.service.ts";
 export {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
