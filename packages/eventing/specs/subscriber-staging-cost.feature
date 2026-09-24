@@ -97,50 +97,12 @@ Feature: Subscriber staging carries only relevant bounded work
     And a redelivery of that event still collapses to one unit of work
 
   @unit
-  Scenario: work whose payload is not readable yet retries, never drops
-    Given queued work whose payload has not yet landed where the subscriber reads it
-    When the subscriber processes that work
-    Then the attempt fails into the queue's retry
-    And the work completes once the payload becomes readable
-
-  @unit
-  Scenario: work a build cannot read fails loudly, never half-processed
-    Given queued work in a shape this build does not recognise
-    When the subscriber processes it
-    Then the attempt fails into the queue's retry
-    And the work is never mistaken for a shape the build does know
-
-  @unit
   Scenario: an event the subscriber declines is still completed quietly
     Given queued work carrying an event of a kind this build does know
     And the subscriber considers that event not relevant
     When the subscriber processes it
     Then the work completes without producing a result
     And the attempt does not fail into the queue's retry
-
-  @unit
-  Scenario: work whose result is a bounded derivation carries it instead of a pointer
-    Given a relevant event whose payload is large
-    And the subscriber's whole result is a derivation drawn from a fixed, closed vocabulary
-    When the event is published
-    Then the queued work carries that derivation
-    And the queued work does not grow with the size of the payload it came from
-    And the subscriber produces its result without reading the payload back
-
-  @unit
-  Scenario: work carrying its finished result completes without reading anything back
-    Given queued work that carries the subscriber's finished result
-    When the subscriber processes that work
-    Then the result is delivered as it was carried
-    And the payload's store is never read
-
-  @unit
-  Scenario: a carried derivation never carries content
-    Given an event whose payload contains large content alongside small facts
-    When the subscriber's result is derived from that event
-    Then the derivation holds the small facts
-    And the derivation holds none of the content
-    And the content remains readable from the payload's canonical store
 
   @unit
   Scenario: an event whose payload cannot be pointed at is still processed

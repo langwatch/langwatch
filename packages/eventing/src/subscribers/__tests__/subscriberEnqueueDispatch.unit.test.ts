@@ -408,6 +408,39 @@ describe("subscriber enqueue-time contract", () => {
       });
     });
 
+    describe("when two distinct events on one aggregate carry identical payloads", () => {
+      /** @scenario two relevant events that share no payload identity are still delivered separately */
+      it("delivers each as its own unit of work", async () => {
+        const received: Event[] = [];
+        const before = await enqueueOutcomeCount("staged");
+        const sameAggregate = (id: string) =>
+          createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            aggregateType,
+            tenantId,
+            TEST_CONSTANTS.EVENT_TYPE_1,
+            1000,
+            "2025-12-17",
+            { marker: "shared" },
+            id,
+          );
+        const first = sameAggregate("evt-first");
+        const second = sameAggregate("evt-second");
+        const router = makeRouter({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async (event) => {
+            received.push(event);
+          },
+        });
+
+        await router.dispatch([first, second], readContext);
+
+        expect(received).toEqual([first, second]);
+        expect(await enqueueOutcomeCount("staged")).toBe(before + 2);
+      });
+    });
+
     describe("when the subscriber's queue rejects the send", () => {
       /** @scenario work that never reaches the queue is not counted as queued */
       it("reports the failure and does not count the event as staged", async () => {
