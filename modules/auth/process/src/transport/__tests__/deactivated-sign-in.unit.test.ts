@@ -3,11 +3,11 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { SsoMigrationAuthenticationDecision } from "@langwatch/identity-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BetterAuthHookCollaborators } from "../../channels/http/http.better-auth-hooks.channel.ts";
-import { beforeSessionCreate } from "../../channels/http/http.better-auth-hooks.channel.ts";
+import { createBeforeSessionCreateHook } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 
 vi.mock("@langwatch/observability", () => ({
@@ -47,9 +47,22 @@ function collaboratorsAnswering(
   });
 }
 
+/** The session row better-auth hands the hook, for one user. */
+function sessionFor(userId: string) {
+  const now = toDate(nowInstant());
+  return {
+    id: "session-1",
+    userId,
+    token: "token-1",
+    expiresAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 const CONTINUING = collaboratorsAnswering({ action: "continue" });
 
-describe("beforeSessionCreate", () => {
+describe("the before-session-create hook", () => {
   describe("given a user account with a non-null deactivatedAt", () => {
     describe("when a session is about to be created for them", () => {
       /** @scenario "Deactivated user is blocked from signing in" */
@@ -58,12 +71,10 @@ describe("beforeSessionCreate", () => {
         const { repo } = repoAnswering(nowInstant());
 
         await expect(
-          beforeSessionCreate({
+          createBeforeSessionCreateHook({
             repo,
-            session: { userId: "user-1" },
-            path: "/sign-in/email",
             collaborators: CONTINUING,
-          }),
+          })(sessionFor("user-1"), null),
         ).resolves.toBe(false);
       });
     });
@@ -76,12 +87,10 @@ describe("beforeSessionCreate", () => {
         const { repo, getUserForHooks } = repoAnswering(null);
 
         await expect(
-          beforeSessionCreate({
+          createBeforeSessionCreateHook({
             repo,
-            session: { userId: "user-1" },
-            path: "/sign-in/email",
             collaborators: CONTINUING,
-          }),
+          })(sessionFor("user-1"), null),
         ).resolves.toBeUndefined();
         expect(getUserForHooks).toHaveBeenCalled();
       });
@@ -95,12 +104,10 @@ describe("beforeSessionCreate", () => {
         const pending = repoAnswering(null, true);
         const confirmed = repoAnswering(null, false);
         const attempt = (repo: BetterAuthHooksRepository) =>
-          beforeSessionCreate({
+          createBeforeSessionCreateHook({
             repo,
-            session: { userId: "user-1" },
-            path: "/sign-in/email",
             collaborators: CONTINUING,
-          });
+          })(sessionFor("user-1"), null);
 
         await expect(attempt(pending.repo)).resolves.toBe(false);
         await expect(attempt(confirmed.repo)).resolves.toBeUndefined();
@@ -114,15 +121,13 @@ describe("beforeSessionCreate", () => {
         const { repo } = repoAnswering(null);
 
         await expect(
-          beforeSessionCreate({
+          createBeforeSessionCreateHook({
             repo,
-            session: { userId: "user-1" },
-            path: "/callback/auth0",
             collaborators: collaboratorsAnswering({
               action: "reject",
               code: "SSO_LEGACY_AUTH_RETIRED",
             }),
-          }),
+          })(sessionFor("user-1"), null),
         ).rejects.toMatchObject({ body: { code: "SSO_LEGACY_AUTH_RETIRED" } });
       });
     });

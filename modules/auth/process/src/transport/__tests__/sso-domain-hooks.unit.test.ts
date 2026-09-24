@@ -11,6 +11,7 @@ import type {
  * @see specs/auth/phase-1-better-auth-config.feature
  */
 import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type {
@@ -20,13 +21,27 @@ import type {
 } from "../../channels/better-auth.channel.ts";
 import {
   afterUserCreate,
-  tryBeforeAccountCreate,
+  createBeforeAccountCreateHook,
 } from "../../channels/http/http.better-auth-hooks.channel.ts";
 import type {
   BetterAuthHookOrganization,
   BetterAuthHookUser,
   BetterAuthHooksRepository,
 } from "../../repositories/better-auth-hooks.repository.ts";
+
+/** The Google account row better-auth hands the hook, for one user. */
+function googleAccountFor(userId: string) {
+  const now = toDate(nowInstant());
+  return {
+    id: "account-1",
+    userId,
+    providerId: "google",
+    issuer: "google",
+    accountId: "google|123",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
 
 class LicensedFederation implements BetterAuthFederation {
   federationCapable(): boolean {
@@ -245,11 +260,10 @@ describe("signing in through a domain-matched organization's identity provider",
     it("lets the account row be created and leaves the pending flag alone", async () => {
       const { double: repo, mocks } = accountRepo({ organization: ACME, accountCount: 1 });
 
-      await tryBeforeAccountCreate({
-        repo,
-        account: { userId: "user_1", providerId: "google", accountId: "google|123" },
-        federation: new LicensedFederation(),
-      });
+      await createBeforeAccountCreateHook({ repo, federation: new LicensedFederation() })(
+        googleAccountFor("user_1"),
+        null,
+      );
 
       expect(mocks.flagPendingSsoSetup).not.toHaveBeenCalled();
     });
@@ -263,11 +277,10 @@ describe("signing in through a domain-matched organization's identity provider",
         accountCount: 1,
       });
 
-      await tryBeforeAccountCreate({
-        repo,
-        account: { userId: "user_1", providerId: "google", accountId: "google|123" },
-        federation: new LicensedFederation(),
-      });
+      await createBeforeAccountCreateHook({ repo, federation: new LicensedFederation() })(
+        googleAccountFor("user_1"),
+        null,
+      );
 
       expect(mocks.flagPendingSsoSetup).toHaveBeenCalledWith({ userId: "user_1" });
     });

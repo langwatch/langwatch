@@ -14,6 +14,7 @@ import type {
 } from "@langwatch/identity-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
@@ -50,13 +51,11 @@ const logger = createLogger("langwatch:better-auth:hooks");
 /**
  * Called before a new user is created (via OAuth signup or email+password signup).
  */
-export const beforeUserCreate = async ({
-  user,
-}: {
-  repo: BetterAuthHooksRepository;
-  // Better Auth hands the stored column value back untyped; only its presence is read.
-  user: { email: string; deactivatedAt?: unknown } & Record<string, unknown>;
-}): Promise<boolean | undefined> => {
+export const beforeUserCreate: NonNullable<
+  NonNullable<
+    NonNullable<NonNullable<BetterAuthOptions["databaseHooks"]>["user"]>["create"]
+  >["before"]
+> = async (user) => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
     return false;
@@ -254,107 +253,122 @@ export const afterUserCreate = async ({
   }
 };
 
+/** A first sign-up through a provider the SSO-enforced organization does not use is refused. */
+async function assertNotFirstSignupThroughWrongProvider({
+  repo,
+  userId,
+  attemptedProvider,
+  orgSsoProvider,
+}: {
+  repo: BetterAuthHooksRepository;
+  userId: string;
+  attemptedProvider: string;
+  orgSsoProvider: string;
+}): Promise<void> {
+  const existingAccountCount = await repo.countAccountsForUser({ userId });
+  if (existingAccountCount !== 0) return;
+  logger.warn(
+    { userId, attemptedProvider, orgSsoProvider },
+    "Blocked new signup: provider does not match SSO-enforced org",
+  );
+  // Throw APIError so BetterAuth surfaces the specific code in the
+  // callback redirect (?error=SSO_PROVIDER_NOT_ALLOWED), which the
+  // /auth/error page knows how to render with a friendly message.
+  throw APIError.from("FORBIDDEN", {
+    code: "SSO_PROVIDER_NOT_ALLOWED",
+    message: "SSO_PROVIDER_NOT_ALLOWED",
+  });
+}
+
 /**
  * Called before a new Account row is created. Ports the provider-linking and
  * pendingSsoSetup logic from the NextAuth signIn callback.
  */
-export const tryBeforeAccountCreate = async ({
+export function createBeforeAccountCreateHook({
   repo,
-  account,
   federation,
 }: {
   repo: BetterAuthHooksRepository;
-  account: {
-    userId: string;
-    providerId: string;
-    accountId: string;
-  };
   federation: BetterAuthFederation;
-}): Promise<void> => {
-  const user = await repo
-    .getUserForHooks({ userId: account.userId })
-    .catch(skipOn("user_not_found"));
-  if (!user?.email) return;
+}): NonNullable<
+  NonNullable<
+    NonNullable<NonNullable<BetterAuthOptions["databaseHooks"]>["account"]>["create"]
+  >["before"]
+> {
+  return async (account) => {
+    const user = await repo
+      .getUserForHooks({ userId: account.userId })
+      .catch(skipOn("user_not_found"));
+    if (!user?.email) return;
 
-  if (user.deactivatedAt) {
-    // signIn hook will also block this via session.create.before, but fail
-    // fast to avoid leaving a stray Account row. Throw APIError so BetterAuth
-    // preserves the error code in the OAuth callback redirect URL.
-    throw APIError.from("FORBIDDEN", {
-      code: "USER_DEACTIVATED",
-      message: "USER_DEACTIVATED",
-    });
-  }
-
-  // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
-  // off (site #4, mirroring `afterUserCreate`).
-  if (!(await federation.platformSsoAllowed())) {
-    // warn for the same reason the `afterUserCreate` site does: an operator
-    // grepping warn for "why is federation not happening" has to find both
-    // halves of the answer, not one.
-    logger.warn(
-      { userId: user.id, providerId: account.providerId },
-      "Skipped ssoDomain enforcement: platform SSO gate denies (no genuine license)",
-    );
-    return;
-  }
-
-  const domain = extractEmailDomain(user.email);
-  if (!domain) return;
-
-  const org = await repo
-    .getOrganizationBySsoDomain({ domain })
-    .catch(skipOn("organization_not_found"));
-  if (!org) return;
-
-  const matchesSso = isSsoProviderMatch(org, {
-    providerId: account.providerId,
-    accountId: account.accountId,
-  });
-
-  if (matchesSso) {
-    // Correct SSO provider — let BetterAuth create the Account row. Stale-row
-    // reconciliation is deferred to `afterAccountCreate` so it only runs after
-    // the new Account row has committed, avoiding a window where the user has
-    // `pendingSsoSetup=false` and zero OAuth rows if account creation fails.
-    return;
-  }
-
-  // Wrong provider for this SSO org. Determine whether this is a first-time
-  // signup (hard block) or an existing user trying a different provider
-  // (soft block via pendingSsoSetup banner).
-  if (account.providerId !== "credential" && org.ssoProvider) {
-    const existingAccountCount = await repo.countAccountsForUser({ userId: user.id });
-    if (existingAccountCount === 0) {
-      logger.warn(
-        {
-          userId: user.id,
-          attemptedProvider: account.providerId,
-          orgSsoProvider: org.ssoProvider,
-        },
-        "Blocked new signup: provider does not match SSO-enforced org",
-      );
-      // Throw APIError so BetterAuth surfaces the specific code in the
-      // callback redirect (?error=SSO_PROVIDER_NOT_ALLOWED), which the
-      // /auth/error page knows how to render with a friendly message.
+    if (user.deactivatedAt) {
+      // signIn hook will also block this via session.create.before, but fail
+      // fast to avoid leaving a stray Account row. Throw APIError so BetterAuth
+      // preserves the error code in the OAuth callback redirect URL.
       throw APIError.from("FORBIDDEN", {
-        code: "SSO_PROVIDER_NOT_ALLOWED",
-        message: "SSO_PROVIDER_NOT_ALLOWED",
+        code: "USER_DEACTIVATED",
+        message: "USER_DEACTIVATED",
       });
     }
-  }
 
-  // Existing user with wrong provider → soft block via banner.
-  await repo.flagPendingSsoSetup({ userId: user.id });
-  logger.info(
-    {
-      userId: user.id,
-      attemptedProvider: account.providerId,
-      orgSsoProvider: org.ssoProvider,
-    },
-    "Flagged existing user with pendingSsoSetup (wrong SSO provider)",
-  );
-};
+    // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
+    // off (site #4, mirroring `afterUserCreate`).
+    if (!(await federation.platformSsoAllowed())) {
+      // warn for the same reason the `afterUserCreate` site does: an operator
+      // grepping warn for "why is federation not happening" has to find both
+      // halves of the answer, not one.
+      logger.warn(
+        { userId: user.id, providerId: account.providerId },
+        "Skipped ssoDomain enforcement: platform SSO gate denies (no genuine license)",
+      );
+      return;
+    }
+
+    const domain = extractEmailDomain(user.email);
+    if (!domain) return;
+
+    const org = await repo
+      .getOrganizationBySsoDomain({ domain })
+      .catch(skipOn("organization_not_found"));
+    if (!org) return;
+
+    const matchesSso = isSsoProviderMatch(org, {
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+
+    if (matchesSso) {
+      // Correct SSO provider — let BetterAuth create the Account row. Stale-row
+      // reconciliation is deferred to `afterAccountCreate` so it only runs after
+      // the new Account row has committed, avoiding a window where the user has
+      // `pendingSsoSetup=false` and zero OAuth rows if account creation fails.
+      return;
+    }
+
+    // Wrong provider for this SSO org. Determine whether this is a first-time
+    // signup (hard block) or an existing user trying a different provider
+    // (soft block via pendingSsoSetup banner).
+    if (account.providerId !== "credential" && org.ssoProvider) {
+      await assertNotFirstSignupThroughWrongProvider({
+        repo,
+        userId: user.id,
+        attemptedProvider: account.providerId,
+        orgSsoProvider: org.ssoProvider,
+      });
+    }
+
+    // Existing user with wrong provider → soft block via banner.
+    await repo.flagPendingSsoSetup({ userId: user.id });
+    logger.info(
+      {
+        userId: user.id,
+        attemptedProvider: account.providerId,
+        orgSsoProvider: org.ssoProvider,
+      },
+      "Flagged existing user with pendingSsoSetup (wrong SSO provider)",
+    );
+  };
+}
 
 /**
  * The connection's own arrival door. The provider a sign-in arrived through
@@ -418,7 +432,7 @@ const decideMigrationLink = async ({
 
 /**
  * Called after a new Account row is created. Runs the SSO reconciliation that
- * `tryBeforeAccountCreate` used to perform inline, but deferred to this hook so the cleanup
+ * the before-account-create hook used to perform inline, but deferred to this hook so the cleanup
  * only commits once the new Account row exists.
  */
 export const afterAccountCreate = async ({
@@ -536,49 +550,54 @@ export const afterAccountUpdate = async ({
  * cutover retired: a member linked before it started creates no account row,
  * so this is the only hook their sign-in passes through.
  */
-export const beforeSessionCreate = async ({
+export function createBeforeSessionCreateHook({
   repo,
-  session,
-  path,
   collaborators,
 }: {
   repo: BetterAuthHooksRepository;
-  session: { userId: string };
-  /** better-auth's own endpoint path, which names the callback. */
-  path: string | undefined;
   collaborators: BetterAuthHookCollaborators;
-}): Promise<boolean | undefined> => {
-  const user = await repo
-    .getUserForHooks({ userId: session.userId })
-    .catch(skipOn("user_not_found"));
-  if (user?.deactivatedAt) {
-    logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
-    return false;
-  }
-  if (user?.signupConfirmationPending) {
-    logger.warn({ userId: session.userId }, "Blocked session create: sign-up confirmation pending");
-    return false;
-  }
+}): NonNullable<
+  NonNullable<
+    NonNullable<NonNullable<BetterAuthOptions["databaseHooks"]>["session"]>["create"]
+  >["before"]
+> {
+  return async (session, context) => {
+    const path = context?.path;
+    const user = await repo
+      .getUserForHooks({ userId: session.userId })
+      .catch(skipOn("user_not_found"));
+    if (user?.deactivatedAt) {
+      logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
+      return false;
+    }
+    if (user?.signupConfirmationPending) {
+      logger.warn(
+        { userId: session.userId },
+        "Blocked session create: sign-up confirmation pending",
+      );
+      return false;
+    }
 
-  const authentication = await collaborators.ssoMigration.authorizeAndRecordAuthentication({
-    userId: session.userId,
-    callbackPath: path,
-    accounts: await repo.findFederatedAccountsForUser({ userId: session.userId }),
-  });
-  if (authentication.action === "reject") {
-    logger.warn(
-      { userId: session.userId, code: authentication.code },
-      "Blocked session create: the connection this callback arrived through no longer authenticates",
-    );
-    // Thrown rather than returned false, so Better Auth carries the code to
-    // the sign-in screen as `?error=` instead of a bare failure.
-    throw APIError.from("FORBIDDEN", {
-      code: authentication.code,
-      message: authentication.code,
+    const authentication = await collaborators.ssoMigration.authorizeAndRecordAuthentication({
+      userId: session.userId,
+      callbackPath: path,
+      accounts: await repo.findFederatedAccountsForUser({ userId: session.userId }),
     });
-  }
-  return undefined;
-};
+    if (authentication.action === "reject") {
+      logger.warn(
+        { userId: session.userId, code: authentication.code },
+        "Blocked session create: the connection this callback arrived through no longer authenticates",
+      );
+      // Thrown rather than returned false, so Better Auth carries the code to
+      // the sign-in screen as `?error=` instead of a bare failure.
+      throw APIError.from("FORBIDDEN", {
+        code: authentication.code,
+        message: authentication.code,
+      });
+    }
+    return undefined;
+  };
+}
 
 /**
  * Called after a Session is created. Updates User.lastLoginAt and fires fire-and-forget

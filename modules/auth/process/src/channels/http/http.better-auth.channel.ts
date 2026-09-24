@@ -45,8 +45,8 @@ import {
   afterAccountUpdate,
   afterSessionCreate,
   afterUserCreate,
-  tryBeforeAccountCreate,
-  beforeSessionCreate,
+  createBeforeAccountCreateHook,
+  createBeforeSessionCreateHook,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
 } from "./http.better-auth-hooks.channel.ts";
@@ -491,7 +491,7 @@ export const createAuthOptions = ({
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => beforeUserCreate({ repo, user }),
+        before: beforeUserCreate,
         after: async (user) => {
           await afterUserCreate({
             repo,
@@ -518,16 +518,8 @@ export const createAuthOptions = ({
     },
     account: {
       create: {
-        before: async (account) => {
-          await tryBeforeAccountCreate({
-            repo,
-            account: {
-              userId: account.userId,
-              providerId: account.providerId,
-              accountId: account.accountId,
-            },
-            federation,
-          });
+        before: async (account, context) => {
+          await createBeforeAccountCreateHook({ repo, federation })(account, context);
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
@@ -589,12 +581,7 @@ export const createAuthOptions = ({
       create: {
         before: async (session, context) => {
           await credentialGuard.beforeSessionCreate({ userId: session.userId, context });
-          return beforeSessionCreate({
-            repo,
-            session: { userId: session.userId },
-            path: context?.path,
-            collaborators: hooks,
-          });
+          return createBeforeSessionCreateHook({ repo, collaborators: hooks })(session, context);
         },
         after: async (session) => {
           await afterSessionCreate({
