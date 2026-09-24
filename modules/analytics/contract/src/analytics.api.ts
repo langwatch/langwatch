@@ -22,6 +22,7 @@ import type {
 import type {
   AnalyticsFeedbacksResult,
   AnalyticsFilterOption,
+  AnalyticsMetricSource,
   AnalyticsReadInput,
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
@@ -89,6 +90,15 @@ export interface AnalyticsApi {
   appendEvaluationAnalyticsRollupBatch(
     input: AnalyticsEvaluationRollupAppendBatchInput,
   ): Promise<void>;
+  /**
+   * When the project's newest trace or evaluation since `since` occurred, from the analytics
+   * tables this module owns; empty when none did. The graph-alert heartbeat reads it.
+   */
+  findLastOccurredAt(input: {
+    readonly projectId: string;
+    readonly source: AnalyticsMetricSource;
+    readonly since: Instant;
+  }): Promise<Instant[]>;
   isLangWatchQLAvailable(): boolean;
   /**
    * Whether the LangWatchQL app functions can be created so every replica sees

@@ -12,6 +12,7 @@ import {
   MAX_LWQL_LENGTH,
   type AnalyticsFeedbacksResult,
   type AnalyticsFilterOption,
+  type AnalyticsMetricSource,
   type AnalyticsReadInput,
   type AnalyticsService,
   type AnalyticsTimeseriesInput,
@@ -53,13 +54,16 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
+import type { Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
 import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
 import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
 import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
 import { applyLwqlTargetOverrides, LWQL_CONNECTION_DEFAULTS } from "../langwatch-ql/connection.ts";
+import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
+import { ClickHouseAnalyticsRecencyRepository } from "../repositories/clickhouse/clickhouse.analytics-recency.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
@@ -150,6 +154,8 @@ export interface AnalyticsAppDependencies {
   traces: TraceApi;
   /** Where the server would keep the app functions, for the checkup's provisioning probe. */
   appFunctionStore: LangWatchQLAppFunctionStoreRepository;
+  /** The newest slim-table row per source, which the graph-alert heartbeat reads. */
+  recency: AnalyticsRecencyRepository;
   /** The access model's owner probe and convergence; no-ops where LangWatchQL is unavailable. */
   lwqlProvisioning: LwqlProvisioningOperations;
 }
@@ -449,6 +455,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
         }),
         traces: setup.dependencies.traces,
         appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
+        recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),
         lwqlProvisioning,
       },
       setup.members.publicBaseUrl,
@@ -534,6 +541,15 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
    */
   isLangWatchQLAvailable(): boolean {
     return this.#dependencies.langWatchQL.available;
+  }
+
+  /** When the project's newest row of one source since `since` occurred; empty when none did. */
+  findLastOccurredAt(input: {
+    readonly projectId: string;
+    readonly source: AnalyticsMetricSource;
+    readonly since: Instant;
+  }): Promise<Instant[]> {
+    return this.#dependencies.recency.findLastOccurredAt(input);
   }
 
   /** Whether every replica would see the app functions; empty where the server did not say. */
