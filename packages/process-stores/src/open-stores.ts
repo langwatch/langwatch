@@ -118,19 +118,21 @@ export function openProcessStores(options: {
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.redis, (redis) =>
-        secrets.into(storesOwner.secrets.encryption, (encryption) =>
-          withStorageSecrets(secrets, (storage) =>
-            createProcessMembers({
-              config: processConfigOf({
-                name,
-                config,
-                pipelines,
-                urls: { database, clickhouse, redis },
-                encryption,
-                storage,
-                production,
+        secrets.into(storesOwner.secrets.encryption, (credentials) =>
+          secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+            withStorageSecrets(secrets, (storage) =>
+              createProcessMembers({
+                config: processConfigOf({
+                  name,
+                  config,
+                  pipelines,
+                  urls: { database, clickhouse, redis },
+                  encryption: credentials ?? session,
+                  storage,
+                  production,
+                }),
               }),
-            }),
+            ),
           ),
         ),
       ),

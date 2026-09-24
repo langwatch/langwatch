@@ -1,5 +1,5 @@
 import { Config, type ProcessConfigOf } from "@langwatch/config";
-import { Secret } from "@langwatch/secrets";
+import { Secret, sessionSecret } from "@langwatch/secrets";
 import { z } from "zod";
 
 export const storesOwner = {
@@ -45,6 +45,7 @@ export const storesOwner = {
     clickhouse: Secret.load("CLICKHOUSE_URL", { optional: true }),
     redis: Secret.load("REDIS_URL", { optional: true }),
     encryption: Secret.load("CREDENTIALS_SECRET", { optional: true }),
+    encryptionFallback: sessionSecret,
     s3AccessKeyId: Secret.load("S3_ACCESS_KEY_ID", { optional: true }),
     s3SecretAccessKey: Secret.load("S3_SECRET_ACCESS_KEY", { optional: true }),
     s3SessionToken: Secret.load("S3_SESSION_TOKEN", { optional: true }),
