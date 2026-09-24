@@ -296,7 +296,7 @@ export function applyLegacySpanFields(
   spans: Span[],
   nullableTraceId: string | null | undefined,
 ): void {
-  spans.forEach((span, index) => {
+  spans.forEach((span) => {
     // We changed "id" to "span_id", but we still support "id" for retrocompatibility for a while
     if ("id" in span) {
       span.span_id = span.id as string;
@@ -314,9 +314,20 @@ export function applyLegacySpanFields(
       span.error.has_error = true;
     }
 
-    spans[index] = langWatchSpanSchema.parse(span);
+    // Strips, never parses: validation is findSpanRejection's, which answers 400.
+    dropUnknownSpanFields(span);
   });
 }
+
+function dropUnknownSpanFields(span: Record<string, unknown>): void {
+  for (const key of Object.keys(span)) {
+    if (!SPAN_FIELDS.has(key)) delete span[key];
+  }
+}
+
+const SPAN_FIELDS: ReadonlySet<string> = new Set(
+  langWatchSpanSchema.options.flatMap((option) => Object.keys(option.shape)),
+);
 
 /** The one trace id every span in the body belongs to, or the refusal it earned. */
 export function resolveTraceId(
