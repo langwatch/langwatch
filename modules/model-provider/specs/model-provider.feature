@@ -9,6 +9,12 @@ Feature: Model Provider service
     And the provider repository remains private to the service
 
   @unit
+  Scenario: every saved provider row in the project's scope is readable with its skip list
+    Given a project can see a saved provider row with a stored list of models allowed to skip permission checks
+    When a peer reads every provider row accessible to the project
+    Then the row comes back with its stored skip list and a masked credential value
+
+  @unit
   Scenario: an unknown provider cannot be persisted
     Given the provider catalog does not know the requested provider
     When the Model Provider service receives a write

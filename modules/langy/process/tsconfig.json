@@ -40,6 +40,9 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
+      "path": "../../github/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -80,6 +83,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/api-fixture/tsconfig.build.json"

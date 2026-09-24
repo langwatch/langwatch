@@ -1,6 +1,8 @@
 import { EventEmitter } from "node:events";
 
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
@@ -9,12 +11,14 @@ import {
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type {
   LangyConversationCommands,
   LangyEventingMembers,
   LangyTurnTechnicalMembers,
 } from "@langwatch/langy-process";
 import { LangyBlockOtelMetricsAdapter, PostgresLangyAdapter } from "@langwatch/langy-process";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
@@ -23,10 +27,11 @@ import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyApp } from "../app/langy.app.ts";
-import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
 import { LangyService } from "../services/langy.service.ts";
 
@@ -244,10 +249,16 @@ function createApp(): Promise<LangyApp> {
     dependencies: {
       presence: testPresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
+      users: createApiFixture<UserApi>(),
+      github: createApiFixture<GithubApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
+      authz: createApiFixture<AuthzApi>(),
       projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org_1" }),
       plans: createApiFixture<EntitlementApi>(),
     },
     members: {
+      publicBaseUrl: undefined,
       prisma: undefined!,
       redis: createApiFixture<RedisConnection>(),
       eventing: producerEventing(),
@@ -256,7 +267,7 @@ function createApp(): Promise<LangyApp> {
     config: { agentUrl: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,
-    repositories: {} as LangyRepositories,
+    repositories: MemoryLangyRepositories.create(),
   });
 }
 

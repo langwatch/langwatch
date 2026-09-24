@@ -184,6 +184,10 @@ export class ModelProviderService {
     return this.query.listForProject(input);
   }
 
+  findAllAccessibleForProject(input: { projectId: string }): Promise<ModelProviderSummary[]> {
+    return this.query.findAllAccessibleForProject(input);
+  }
+
   listForOrganization(input: { organizationId: string }): Promise<ModelProviderSummary[]> {
     return this.query.listForOrganization(input);
   }

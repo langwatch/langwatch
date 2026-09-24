@@ -177,6 +177,13 @@ export interface ModelProviderUsageCount {
 export interface ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number;
   listForProject(input: ModelProviderListProjectInput): Promise<ModelProviderSummary[]>;
+  /**
+   * Every saved row in the project's scope chain, unfiltered and keys masked; empty for a
+   * missing project.
+   */
+  findAllAccessibleForProject(
+    input: ModelProviderListProjectInput,
+  ): Promise<ModelProviderSummary[]>;
   listForOrganization(input: ModelProviderListOrganizationInput): Promise<ModelProviderSummary[]>;
   getForProject(
     input: ModelProviderListProjectInput & { provider?: string },

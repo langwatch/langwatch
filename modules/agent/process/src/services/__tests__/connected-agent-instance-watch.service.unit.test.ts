@@ -1,6 +1,6 @@
 import { AgentSessionUnknownError } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
 import { instanceChannel } from "../../rules/connected-agent-keys.rules.ts";
@@ -29,7 +29,7 @@ const session: SessionInfo = {
 };
 
 function fixture() {
-  const store = SessionStateStoreFactory.memory();
+  const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({ store });
   const watches = InstanceWatchService.create({
     core: createApiFixture<AgentSessionService>({ runtime }),

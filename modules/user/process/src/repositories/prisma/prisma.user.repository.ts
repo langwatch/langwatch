@@ -19,6 +19,7 @@ import {
   type UserPasskeyNudgeStatus,
   type UserProfile,
   type UserTourPreference,
+  type UserCodeAccessPreference,
   type CreatedUser,
   type SetFirstUserPasswordResult,
   type UserUsageCount,
@@ -262,6 +263,15 @@ export class PrismaUserRepository
     const row = await this.prisma.user.findUnique({ where: { id }, select: { createdAt: true } });
 
     return row ? userAccountInfoSchema.parse(row) : null;
+  }
+
+  async getLangyCodeAccessPreference(id: string): Promise<UserCodeAccessPreference> {
+    const row = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      select: { langyCodeAccessPreference: true },
+    });
+
+    return { preference: row.langyCodeAccessPreference === "github" ? "github" : null };
   }
 
   async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {

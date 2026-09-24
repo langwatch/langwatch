@@ -19,15 +19,15 @@ export class PostgresLangyRepositories {
 
   static create(members: Readonly<{ redis: RedisConnection }>): LangyRepositories {
     const redis = members.redis;
+    const sessionState = SessionStateStoreFactory.redis(redis);
 
     return {
       turnAccess: LangyTurnAccessRedisRepository.create({ redis }),
       turnHandoff: LangyTurnHandoffRedisRepository.create({ redis }),
       frameDedup: LangyFrameDedupRedisRepository.create({ redis }),
       resourceLinks: LangyResourceLinksRedisRepository.create({ redis }),
-      localPresence: LangyLocalPresenceRedisRepository.create({
-        store: SessionStateStoreFactory.redis(redis),
-      }),
+      localPresence: LangyLocalPresenceRedisRepository.create({ store: sessionState }),
+      sessionState,
       // A factory row, not a fixed instance: the blocking tail duplicates its
       // own connection per stream, so every call builds a fresh repository
       // over whatever connection the caller borrowed for that stream.

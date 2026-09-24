@@ -1,4 +1,4 @@
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * What one heartbeat does to the folder record: moves it on, writes it
@@ -38,7 +38,7 @@ function workspace(instanceId = "lci_1"): ConnectedWorkspace {
 
 beforeEach(() => {
   now = 1_700_000_000_000;
-  store = SessionStateStoreFactory.memory({ now: () => now });
+  store = memorySessionState({ now: () => now });
   presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
 });
 

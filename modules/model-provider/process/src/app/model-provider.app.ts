@@ -432,6 +432,13 @@ export class ModelProviderApp implements ModelProviderApi {
     return this.#modelProviders.listForProject(input);
   }
 
+  /** Every saved row in the project's scope chain, unfiltered, keys masked. */
+  findAllAccessibleForProject(
+    input: ModelProviderListProjectInput,
+  ): Promise<ModelProviderSummary[]> {
+    return this.#modelProviders.findAllAccessibleForProject(input);
+  }
+
   /** Every provider attached anywhere inside the organization, keys masked. */
   listForOrganization(input: ModelProviderListOrganizationInput): Promise<ModelProviderSummary[]> {
     return this.#modelProviders.listForOrganization(input);

@@ -18,6 +18,7 @@ export type MemoryUserRow = {
   deactivatedAt: Instant | null;
   lastHomePath: string | null;
   tracesExplorerTourDismissedAt: Instant | null;
+  langyCodeAccessPreference?: string | null;
   passkeyNudgeDismissedAt: Instant | null;
   /** Two-step verification confirmed on the account, as the plugin records it. */
   twoFactorEnabled: boolean;

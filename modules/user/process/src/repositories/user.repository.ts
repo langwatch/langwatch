@@ -12,6 +12,7 @@ import type {
   UserPasskeyNudgeStatus,
   UserProfile,
   UserTourPreference,
+  UserCodeAccessPreference,
   UserUsageCount,
 } from "@langwatch/user-contract";
 
@@ -45,6 +46,7 @@ export interface UserRepository {
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
   findTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
+  getLangyCodeAccessPreference(id: string): Promise<UserCodeAccessPreference>;
   setTraceExplorerTourDismissedAt(input: {
     id: string;
     dismissedAt: Instant;

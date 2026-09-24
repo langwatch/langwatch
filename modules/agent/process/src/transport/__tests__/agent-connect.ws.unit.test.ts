@@ -9,7 +9,7 @@ import type { Duplex } from "node:stream";
 
 import { PROTOCOL_VERSION, relayPayloadCaps } from "@langwatch/agent-contract";
 import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
 
@@ -97,7 +97,7 @@ describe("ConnectGateway without Redis", () => {
   beforeAll(async () => {
     const runtime = ConnectedAgentRuntimeService.create({
       podId: "pod_solo",
-      store: SessionStateStoreFactory.memory(),
+      store: memorySessionState(),
     });
     server = createServer((_request, response) => {
       response.statusCode = 404;
@@ -203,7 +203,7 @@ async function startPod({
 } = {}) {
   const runtime = ConnectedAgentRuntimeService.create({
     podId: `pod_${Math.random().toString(36).slice(2)}`,
-    store: SessionStateStoreFactory.memory(),
+    store: memorySessionState(),
   });
   const server = createServer((_request, response) => {
     response.statusCode = 404;
@@ -366,7 +366,7 @@ describe("ConnectGateway socket lifecycle", () => {
 
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_slow",
-        store: SessionStateStoreFactory.memory(),
+        store: memorySessionState(),
       });
       const server = createServer((_request, response) => {
         response.statusCode = 404;
@@ -498,7 +498,7 @@ describe("AgentSessionService.findCallForSession", () => {
   describe("given an instance that registered agent A only, and a call routed at it for agent B", () => {
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("is not handed the call and leaves its result unchanged", async () => {
-      const store = SessionStateStoreFactory.memory();
+      const store = memorySessionState();
       const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
       const core = AgentSessionService.create({
         runtime,

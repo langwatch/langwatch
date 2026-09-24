@@ -1,5 +1,5 @@
 import type { StoredCall } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 /**
  * The instance-agent fence a session reads a call through: an instance only
  * ever sees calls for the agents it registered itself (ADR-128, "No inbound access").
@@ -28,7 +28,7 @@ const fakeCredentials: ConnectedAgentCredentials = {
 };
 
 function build() {
-  const store = SessionStateStoreFactory.memory();
+  const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
   const core = AgentSessionService.create({
     runtime,

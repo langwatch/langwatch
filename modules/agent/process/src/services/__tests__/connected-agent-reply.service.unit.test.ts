@@ -1,4 +1,4 @@
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
 import { INSTANCE_GONE_CHANNEL, replyChannel } from "../../rules/connected-agent-keys.rules.ts";
@@ -6,7 +6,7 @@ import { ConnectedAgentReplyService } from "../connected-agent-reply.service.ts"
 
 describe("ConnectedAgentReplyService lifecycle", () => {
   it("shares concurrent startup and releases both subscriptions on close", async () => {
-    const store = SessionStateStoreFactory.memory();
+    const store = memorySessionState();
     const subscribe = vi.spyOn(store, "subscribe");
     const replies = ConnectedAgentReplyService.create({ podId: "pod", store, pollMs: 10 });
 
@@ -21,7 +21,7 @@ describe("ConnectedAgentReplyService lifecycle", () => {
   });
 
   it("rolls back the first subscription when the second fails and can start again", async () => {
-    const store = SessionStateStoreFactory.memory();
+    const store = memorySessionState();
     const subscribe = store.subscribe.bind(store);
     const failure = new Error("subscription failed");
     const subscribeSpy = vi
@@ -43,7 +43,7 @@ describe("ConnectedAgentReplyService lifecycle", () => {
   });
 
   it("settles an already cancelled call without waiting for its deadline", async () => {
-    const store = SessionStateStoreFactory.memory();
+    const store = memorySessionState();
     const replies = ConnectedAgentReplyService.create({ podId: "pod", store, pollMs: 10 });
     const controller = new AbortController();
     controller.abort();

@@ -1,4 +1,5 @@
 import { defineRepositories } from "@langwatch/kernel";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
 import type {
   LangyFrameDedupRepository,
@@ -25,6 +26,7 @@ export interface LangyRepositories {
   readonly frameDedup: LangyFrameDedupRepository;
   readonly resourceLinks: LangyResourceLinksRepository;
   readonly localPresence: LangyLocalPresence;
+  readonly sessionState: SessionStateStore;
   /**
    * Opens the live edge over one turn's own borrowed connection (ADR-044 part
    * 3): a blocking tail duplicates a connection per stream, so this row is a

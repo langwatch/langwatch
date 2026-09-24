@@ -1,8 +1,10 @@
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   BearerIdentity,
   type RestIdentity,
   type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
 /**
@@ -10,6 +12,7 @@ import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
  * capability the feature's api files reach, and it is the one typed thing a transport is given.
  */
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { GithubApi } from "@langwatch/github-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -36,15 +39,22 @@ import {
   type RelayTally,
 } from "@langwatch/langy-contract";
 import type * as langyContractModule from "@langwatch/langy-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { PresenceApi, type PresenceTenantEmitter } from "@langwatch/presence-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { UserApi } from "@langwatch/user-contract";
 
 import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { PrismaLangySessionKeyReapRepository } from "../repositories/prisma/prisma.langy-session-key-reap.repository.ts";
+import {
+  RedisLangyLocalControlRuntimeRepository,
+  type LocalControlRuntime,
+} from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
+import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
@@ -60,6 +70,7 @@ import { langyRestPrometheusMetrics } from "../services/prometheus.langy-rest-me
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
 import { buildLangyConversationCommands } from "./langy-eventing.build.ts";
+import type { LangyConversationCommands } from "./langy.members.ts";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -93,7 +104,17 @@ type LangyAppDependencies = {
   sessionKeyReap: LangySessionKeyReapService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
+  /** What the local doors reach beyond `LangyApi` (ADR-129). */
+  localControl: LangyLocalControl;
 };
+
+/** The local-control runtime, its durable commands, its peer reads and this origin. */
+export interface LangyLocalControl {
+  runtime: LocalControlRuntime;
+  commands: LangyConversationCommands;
+  workspace: LangyLocalWorkspaceService;
+  baseHost: string | undefined;
+}
 
 /** The project's egress allow-list, told the way both egress procedures tell it. */
 export interface LangyEgressState {
@@ -116,9 +137,12 @@ export interface LangyTurnRequest {
   turnContext: object;
 }
 
+const langyStores = reads("prisma", "redis", "eventing", "rateLimiter");
+
+/** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type LangySetup = FeatureSetup<
   typeof LangyApp.dependencies,
-  MembersRead<typeof LangyApp.reads>,
+  MembersRead<typeof langyStores> & Readonly<{ publicBaseUrl: string | undefined }>,
   LangyServerConfig,
   LangyRepositories
 >;
@@ -136,6 +160,12 @@ export class LangyApp implements LangyApiContract {
     projects: ProjectApi,
     /** The plan the turn window resolves through. */
     plans: EntitlementApi,
+    /** The local doors' peer reads and the session key a control request mints. */
+    users: UserApi,
+    github: GithubApi,
+    modelProviders: ModelProviderApi,
+    apiKeys: ApiKeyApi,
+    authz: AuthzApi,
   };
   static readonly config = langyConfig;
   static readonly secrets = langySecrets;
@@ -144,7 +174,7 @@ export class LangyApp implements LangyApiContract {
    * (`langy-eventing.build.ts`). `rateLimiter` is the per-project counter
    * every turn is checked against.
    */
-  static readonly reads = reads("prisma", "redis", "eventing", "rateLimiter");
+  static readonly reads = [...langyStores, "publicBaseUrl"] as const;
 
   static async create(setup: LangySetup): Promise<LangyApp> {
     const { channel, door } = await setup.secrets.into(langySecrets.internal, (internalSecret) => {
@@ -176,6 +206,17 @@ export class LangyApp implements LangyApiContract {
       ...built,
       commands,
     });
+    const workspace = LangyLocalWorkspaceService.create({
+      users: setup.dependencies.users,
+      github: setup.dependencies.github,
+      projects: setup.dependencies.projects,
+      modelProviders: setup.dependencies.modelProviders,
+    });
+    const sessionKeys = adapter.createSessionKeys({
+      apiKeys: setup.dependencies.apiKeys,
+      authz: setup.dependencies.authz,
+      metrics: OtelLangySessionKeyMetricsAdapter.create(),
+    });
     return new LangyApp({
       langy,
       internalDoor: door,
@@ -198,6 +239,18 @@ export class LangyApp implements LangyApiContract {
         featureFlags: setup.dependencies.featureFlags,
         actors: setup.members.prisma,
       }),
+      localControl: {
+        runtime: RedisLangyLocalControlRuntimeRepository.create({
+          store: setup.repositories.sessionState,
+          projects: workspace,
+          mintSessionKey: (input) => sessionKeys.mintForUser(input),
+          events: commands,
+          buffer: setup.repositories.tokenBuffer.open({ redis: setup.members.redis }),
+        }),
+        commands,
+        workspace,
+        baseHost: setup.members.publicBaseUrl,
+      },
     });
   }
 
@@ -263,6 +316,11 @@ export class LangyApp implements LangyApiContract {
 
   receiveInternalFrames(body: ReadableStream<Uint8Array> | null): Promise<RelayTally> {
     return this.#internal.receiveFrames(body);
+  }
+
+  /** What the local doors reach beyond `LangyApi`. */
+  get localControl(): LangyLocalControl {
+    return this.dependencies.localControl;
   }
 
   /** The rows this application persists outside its own event log. */

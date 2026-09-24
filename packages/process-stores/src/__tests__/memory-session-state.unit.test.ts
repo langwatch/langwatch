@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { SessionStateStoreFactory } from "../session-state.factory.ts";
+import { memorySessionState } from "../memory-session-state.ts";
 
 describe("session state claims", () => {
   it("admits one competing value and renews only that value", async () => {
     let now = 0;
-    const store = SessionStateStoreFactory.memory({ now: () => now });
+    const store = memorySessionState({ now: () => now });
     const claims = await Promise.all([
       store.setIfAbsentOrEqual("claim", "alice", 10),
       store.setIfAbsentOrEqual("claim", "bob", 10),

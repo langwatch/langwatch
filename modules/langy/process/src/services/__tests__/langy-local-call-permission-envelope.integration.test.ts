@@ -4,7 +4,7 @@
  * @see specs/langy/langy-local-control.feature
  */
 
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -34,7 +34,7 @@ function connectedFolder(now: number) {
 }
 
 async function callWaitingOnACard(clock: { now: number }) {
-  const store: SessionStateStore = SessionStateStoreFactory.memory({
+  const store: SessionStateStore = memorySessionState({
     now: () => clock.now,
   });
   const presence = LangyLocalPresenceRedisRepository.create({ store, now: () => clock.now });

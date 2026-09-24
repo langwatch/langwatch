@@ -5,7 +5,7 @@ import {
   type StoredResult,
   storedCallSchema,
 } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 /**
  * The dispatcher against the in-memory store, with a fake instance that plays the
  * gateway's part: it reads envelopes off the store and writes acks and results back the
@@ -151,7 +151,7 @@ async function connectInstance({
 async function startRuntime(overrides: { firstTurnGraceMs?: number } = {}): Promise<void> {
   runtime = ConnectedAgentRuntimeService.create({
     podId: "pod_a",
-    store: SessionStateStoreFactory.memory(),
+    store: memorySessionState(),
     firstTurnGraceMs: 300,
     firstTurnPollMs: 20,
     resultPollMs: 50,

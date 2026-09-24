@@ -6,6 +6,7 @@ export default defineConfig({
     kind: "node",
     test: {
       exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
+      isolate: true,
     },
   }),
 });

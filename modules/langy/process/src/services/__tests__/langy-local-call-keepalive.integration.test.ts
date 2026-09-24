@@ -11,11 +11,8 @@ import {
   LANGY_CONVERSATION_STATUS,
   CALL_POLL_HOLD_MS,
 } from "@langwatch/langy-contract";
-import {
-  type RedisConnection,
-  RedisConnectionService,
-  SessionStateStoreFactory,
-} from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
+import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -131,7 +128,7 @@ beforeAll(() => {
   })!;
   if (!connection) throw new Error("This test needs a real Redis");
   buffer = LangyTokenBufferRedisRepository.create({ redis: connection });
-  store = SessionStateStoreFactory.memory({ now: () => now });
+  store = memorySessionState({ now: () => now });
 });
 
 afterAll(async () => {

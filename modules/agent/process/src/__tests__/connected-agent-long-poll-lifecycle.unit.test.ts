@@ -8,7 +8,7 @@ import {
   PRESENCE_TTL_SECONDS,
   PROTOCOL_VERSION,
 } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AgentService } from "../services/agent.service.ts";
@@ -90,7 +90,7 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: SessionStateStoreFactory.memory(),
+        store: memorySessionState(),
       });
       const transport = createLongPollFixture({
         runtime,
@@ -127,7 +127,7 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: SessionStateStoreFactory.memory(),
+        store: memorySessionState(),
       });
       const transport = createLongPollFixture({
         runtime,
@@ -174,7 +174,7 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: SessionStateStoreFactory.memory(),
+        store: memorySessionState(),
       });
       const transport = createLongPollFixture({
         runtime,
@@ -223,7 +223,7 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     it("fails a call dispatched to its agent with agent_offline", async () => {
       let now = Date.now();
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
-      const store = SessionStateStoreFactory.memory({ now: () => now });
+      const store = memorySessionState({ now: () => now });
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
         store,
@@ -253,7 +253,7 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
 });
 
 function build() {
-  const store = SessionStateStoreFactory.memory();
+  const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
   const transport = createLongPollFixture({
     runtime,

@@ -57,6 +57,7 @@ export { consumingEventing, producerEventing } from "./eventing-role.ts";
 export type { EventingEventLogMembers } from "./eventing-members.ts";
 export { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
 export { memoryStores } from "./memory-stores.ts";
+export { memorySessionState } from "./memory-session-state.ts";
 export {
   cachedTenantDirectory,
   prismaTenantDirectory,

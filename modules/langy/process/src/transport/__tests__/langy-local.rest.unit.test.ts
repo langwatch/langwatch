@@ -113,8 +113,10 @@ function buildApi(options: { granted: boolean; own?: boolean }) {
         requests: { findOpenForConversation: async () => [] },
       }) as never,
     commands: () => ({}) as never,
-    users: () => ({ tryReadPreference: async () => null }),
-    github: () => ({ readInstallation: async () => ({ installed: false }) }),
+    workspace: () => ({
+      getCodeAccessPreference: async () => ({ preference: null }),
+      getGithubInstallation: async () => ({ installed: false }),
+    }),
     baseHost: undefined,
     skipGate: (() => true) as never,
   };

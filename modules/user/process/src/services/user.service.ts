@@ -34,6 +34,7 @@ import {
   type UserProfilesInput,
   type UserSsoStatus,
   type UserTourPreference,
+  type UserCodeAccessPreference,
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
@@ -237,6 +238,12 @@ export class UserService {
     const parsed = userIdInputSchema.parse(input);
 
     return this.repository.findTraceExplorerTourPreference(parsed.id);
+  }
+
+  getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.getLangyCodeAccessPreference(parsed.id);
   }
 
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {

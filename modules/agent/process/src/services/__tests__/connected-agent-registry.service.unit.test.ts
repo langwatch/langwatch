@@ -4,7 +4,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { PRESENCE_TTL_SECONDS } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import type { InstanceMeta } from "../../services/connected-agent-runtime.service.ts";
@@ -30,7 +30,7 @@ describe("ConnectedAgentRegistryService", () => {
   describe("when one instance is connected", () => {
     /** @scenario "An agent is online while one instance is connected" */
     it("lists the instance with its hostname and pid", async () => {
-      const store = SessionStateStoreFactory.memory();
+      const store = memorySessionState();
       const registry = ConnectedAgentRegistryService.create(store);
 
       await registry.register({ meta: meta(), agentIds: ["agent_1"] });
@@ -46,7 +46,7 @@ describe("ConnectedAgentRegistryService", () => {
     /** @scenario "An agent goes offline after the presence TTL" */
     it("reads as offline", async () => {
       let now = Date.now();
-      const store = SessionStateStoreFactory.memory({ now: () => now });
+      const store = memorySessionState({ now: () => now });
       const registry = ConnectedAgentRegistryService.create(store);
 
       await registry.register({ meta: meta(), agentIds: ["agent_1"], now });

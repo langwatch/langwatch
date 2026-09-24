@@ -15,6 +15,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve(Object.values(this.providers));
   }
 
+  findAllAccessibleForProject(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+
   listForOrganization(): Promise<ModelProviderSummary[]> {
     return Promise.resolve(Object.values(this.providers));
   }

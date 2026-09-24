@@ -19,6 +19,7 @@ import {
   type UserPasskeyNudgeStatus,
   type UserProfile,
   type UserTourPreference,
+  type UserCodeAccessPreference,
   type UserUsageCount,
 } from "@langwatch/user-contract";
 
@@ -182,6 +183,12 @@ export class MemoryUserRepository implements UserRepository {
     const row = this.#database.user(id);
 
     return row ? userAccountInfoSchema.parse({ createdAt: toDate(row.createdAt) }) : null;
+  }
+
+  async getLangyCodeAccessPreference(id: string): Promise<UserCodeAccessPreference> {
+    const row = this.#require(id);
+
+    return { preference: row.langyCodeAccessPreference === "github" ? "github" : null };
   }
 
   async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {

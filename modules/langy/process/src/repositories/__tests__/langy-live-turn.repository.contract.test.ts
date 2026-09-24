@@ -212,6 +212,7 @@ describe("given the langy repository registry", () => {
         "frameDedup",
         "localPresence",
         "resourceLinks",
+        "sessionState",
         "tokenBuffer",
         "turnAccess",
         "turnHandoff",

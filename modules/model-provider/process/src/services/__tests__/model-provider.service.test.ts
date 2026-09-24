@@ -1180,6 +1180,14 @@ describe("ModelProviderService", () => {
     const result = await service().listForProject({ projectId: "project_1" });
     expect(result[0]?.customKeys).toEqual({ apiKey: "••••" });
   });
+  /** @scenario "every saved provider row in the project's scope is readable with its skip list" */
+  it("reads every saved row in scope with its stored skip list, keys masked", async () => {
+    const providers = new Providers();
+    providers.rows = [provider({ langySkipPermissionsModels: ["^gpt-5"] })];
+    const [row] = await service(providers).findAllAccessibleForProject({ projectId: "project_1" });
+    expect(row?.langySkipPermissionsModels).toEqual(["^gpt-5"]);
+    expect(row?.customKeys).toEqual({ apiKey: "••••" });
+  });
   /** @scenario "an unknown provider cannot be persisted" */
   it("rejects unknown providers before persistence", async () => {
     const providers = new Providers();

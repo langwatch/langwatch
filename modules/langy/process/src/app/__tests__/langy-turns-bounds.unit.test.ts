@@ -7,6 +7,8 @@
 import { EventEmitter } from "node:events";
 
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
@@ -15,15 +17,18 @@ import {
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GithubApi } from "@langwatch/github-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { LangyRepositories } from "../../repositories/langy-repositories.registry.ts";
+import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangyApp } from "../langy.app.ts";
 
 /** No handle is ever resolved through it in these tests. */
@@ -89,6 +94,11 @@ async function harness() {
     dependencies: {
       presence: fakePresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
+      users: createApiFixture<UserApi>(),
+      github: createApiFixture<GithubApi>(),
+      modelProviders: createApiFixture<ModelProviderApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
+      authz: createApiFixture<AuthzApi>(),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: async (projectId) =>
           projectId === "project-enterprise" ? "org-enterprise" : "org-free",
@@ -99,6 +109,7 @@ async function harness() {
       }),
     },
     members: {
+      publicBaseUrl: undefined,
       prisma: undefined!,
       // A throwing double rather than a Redis-less build: the turn paths this
       // suite exercises never reach the member, and a reach is a loud failure.
@@ -109,7 +120,7 @@ async function harness() {
     config: { agentUrl: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: noSecrets,
-    repositories: {} as LangyRepositories,
+    repositories: MemoryLangyRepositories.create(),
   });
 
   const dispatched = vi

@@ -5,7 +5,7 @@
  */
 import { AgentCallForeignProjectError, CALL_KEY_SLACK_SECONDS } from "@langwatch/agent-contract";
 import type { StoredCall } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -41,7 +41,7 @@ const fakeCredentials: ConnectedAgentCredentials = {
 type MemoryStore = SessionStateStore;
 
 function build() {
-  const store = SessionStateStoreFactory.memory();
+  const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
   const options = {
     runtime,

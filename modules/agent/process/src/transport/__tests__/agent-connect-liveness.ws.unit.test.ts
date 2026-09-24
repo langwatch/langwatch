@@ -9,7 +9,7 @@ import type { Duplex } from "node:stream";
 
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import type { ConnectUpgradeRouter, UpgradeHandler } from "@langwatch/api";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
@@ -72,7 +72,7 @@ function registerFrame(instanceId: string) {
 async function startGateway(options: { pingIntervalMs: number; pongWaitMs: number }) {
   const runtime = ConnectedAgentRuntimeService.create({
     podId: "pod_a",
-    store: SessionStateStoreFactory.memory(),
+    store: memorySessionState(),
   });
   const server = createServer((_request, response) => {
     response.statusCode = 404;
@@ -186,7 +186,7 @@ describe("ConnectGateway liveness", () => {
       }
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_a",
-        store: SessionStateStoreFactory.memory(),
+        store: memorySessionState(),
       });
       const server = createServer((_request, response) => {
         response.statusCode = 404;

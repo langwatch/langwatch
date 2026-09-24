@@ -1,5 +1,6 @@
 import { PROTOCOL_VERSION, type RegisterFrame } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory, type SessionStateStore } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
+import { type SessionStateStore } from "@langwatch/redis-client";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAgentRepository } from "../../repositories/memory/memory.agent.repository.ts";
@@ -28,7 +29,7 @@ function resolved(principalId: string, projectId = "project") {
   return { principalId, userId: principalId, project: { id: projectId, slug: projectId } };
 }
 
-function fixture(store: SessionStateStore = SessionStateStoreFactory.memory()) {
+function fixture(store: SessionStateStore = memorySessionState()) {
   const agents = AgentService.create(MemoryAgentRepository.create());
   const runtime = ConnectedAgentRuntimeService.create({ store, podId: "pod-a" });
   const otherRuntime = ConnectedAgentRuntimeService.create({ store, podId: "pod-b" });
@@ -97,7 +98,7 @@ describe("connected instance ownership", () => {
   /** @scenario "An expired session cannot overwrite a new instance owner" */
   it("rejects stale presence and retirement after another principal acquires an expired claim", async () => {
     let now = Date.now();
-    const store = SessionStateStoreFactory.memory({ now: () => now });
+    const store = memorySessionState({ now: () => now });
     const { first, second, agents, runtime } = fixture(store);
     const original = await first.registerInstance({
       frame,

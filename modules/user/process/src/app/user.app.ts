@@ -66,6 +66,7 @@ import type {
   UserSsoStatus,
   UserTestArrival,
   UserTourPreference,
+  UserCodeAccessPreference,
   UserVerificationCompleted,
   UpdateUserProfileInput,
   UserUsageCount,
@@ -328,6 +329,10 @@ export class UserApp implements UserApi {
   /** Records that this user has seen the trace explorer's introduction. */
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
     return this.#users.dismissTraceExplorerTour(input);
+  }
+
+  getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference> {
+    return this.#users.getLangyCodeAccessPreference(input);
   }
 
   /**

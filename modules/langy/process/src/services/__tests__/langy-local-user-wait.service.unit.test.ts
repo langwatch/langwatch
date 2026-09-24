@@ -3,7 +3,7 @@ import {
   PERMISSION_WAIT_BUDGET_MS,
   QUESTION_WAIT_BUDGET_MS,
 } from "@langwatch/langy-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * User wait, the primitive behind permission/question cards, tested over in-memory stand-ins.
@@ -118,7 +118,7 @@ function startQuestion() {
 
 beforeEach(() => {
   now = 1_700_000_000_000;
-  store = SessionStateStoreFactory.memory({ now: () => now });
+  store = memorySessionState({ now: () => now });
   events = recordingEvents();
   buffer = recordingBuffer();
   sendPermission = vi.fn(async () => undefined);

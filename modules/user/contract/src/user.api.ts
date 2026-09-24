@@ -6,6 +6,7 @@ import type {
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
 
+import type { UserCodeAccessPreference } from "./user-code-access.ts";
 import type {
   MeProject,
   MePersonalCredential,
@@ -85,6 +86,7 @@ export interface UserApi {
   recordSignIn(input: { caller: UserCaller }): Promise<void>;
   getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference>;
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference>;
+  getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference>;
   isAdmin(identity: Readonly<{ email?: string | null }>): boolean;
   /** Whether the account behind an id is a platform operator, by its own address. */
   isOperator(input: { userId: string }): Promise<boolean>;

@@ -267,8 +267,6 @@ export type {
 export {
   langyLocalRest,
   langyLocalRestMembers,
-  type LangyCodeAccessPreferenceReader,
-  type LangyGithubInstallationReader,
   type LangyLocalRestCommands,
   type LangyLocalRestMembers,
 } from "./transport/langy-local.rest.ts";

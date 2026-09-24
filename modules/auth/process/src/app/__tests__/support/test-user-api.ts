@@ -47,6 +47,10 @@ export class TestUserApi implements UserApi {
     this.overrides.dismissTraceExplorerTour?.(input) ??
     this.unimplemented("dismissTraceExplorerTour");
 
+  getLangyCodeAccessPreference: UserApi["getLangyCodeAccessPreference"] = (input) =>
+    this.overrides.getLangyCodeAccessPreference?.(input) ??
+    this.unimplemented("getLangyCodeAccessPreference");
+
   isAdmin: UserApi["isAdmin"] = (identity) =>
     this.overrides.isAdmin?.(identity) ?? this.refuse("isAdmin");
 

@@ -45,6 +45,21 @@ export class ModelProviderQueryService {
     ].map((provider) => modelProviderSummarySchema.parse(provider));
   }
 
+  /** Main's `findAllAccessibleForProject` read: no system rows, no `shouldKeep`. */
+  findAllAccessibleForProject(input: { projectId: string }): Promise<ModelProviderSummary[]> {
+    const parsed = modelProviderListProjectInputSchema.parse(input);
+    return this.options.scopes
+      .getProjectScopes(parsed.projectId)
+      .then((projectScopes) => this.options.repository.findForProject(projectScopes))
+      .then((saved) =>
+        saved.map((provider) => modelProviderSummarySchema.parse(this.toSummary(provider))),
+      )
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
+        throw error;
+      });
+  }
+
   async listForOrganization(input: { organizationId: string }): Promise<ModelProviderSummary[]> {
     const parsed = modelProviderListOrganizationInputSchema.parse(input);
     const [saved, system] = await Promise.all([

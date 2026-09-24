@@ -1,4 +1,4 @@
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 /**
  * What the agents list reads about presence, including what it shows when the registry
  * cannot answer for one agent.
@@ -33,7 +33,7 @@ let runtime: ConnectedAgentRuntime;
 
 beforeEach(() => {
   listLive.mockReset();
-  runtime = ConnectedAgentRuntimeService.create({ store: SessionStateStoreFactory.memory() });
+  runtime = ConnectedAgentRuntimeService.create({ store: memorySessionState() });
   vi.spyOn(runtime.registry, "listLive").mockImplementation(listLive);
 });
 

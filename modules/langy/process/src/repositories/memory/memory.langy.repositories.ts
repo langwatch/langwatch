@@ -1,3 +1,5 @@
+import { memorySessionState } from "@langwatch/process-stores";
+
 import type { LangyRepositories } from "../langy-repositories.registry.ts";
 import { LangyMemoryStore } from "./langy-memory.store.ts";
 import {
@@ -25,6 +27,7 @@ export class MemoryLangyRepositories {
       frameDedup: LangyFrameDedupMemoryRepository.create(store),
       resourceLinks: LangyResourceLinksMemoryRepository.create(store),
       localPresence: LangyLocalPresenceMemoryRepository.create(store),
+      sessionState: memorySessionState(),
       // Every call returns the twin over the SAME shared store, the way one
       // Redis connection serves every open() on the postgres tier.
       tokenBuffer: { open: () => LangyTokenBufferMemoryRepository.create(store) },

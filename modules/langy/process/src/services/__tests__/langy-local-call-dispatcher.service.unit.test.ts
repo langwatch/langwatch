@@ -1,4 +1,4 @@
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * The local call state machine over the in-memory store, with a stand-in
@@ -55,7 +55,7 @@ async function collectNudges(): Promise<WorkspaceNudge[]> {
 
 beforeEach(() => {
   now = 1_700_000_000_000;
-  store = SessionStateStoreFactory.memory({ now: () => now });
+  store = memorySessionState({ now: () => now });
   presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
   dispatcher = LocalCallDispatcherService.create({
     store,

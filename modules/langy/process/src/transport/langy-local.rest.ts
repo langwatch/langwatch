@@ -36,6 +36,7 @@ import type { ControlSkipGate } from "#rules/langy-local-session-contract.rules"
 import { conversationTitle, conversationUrl } from "#rules/langy-local-session-text.rules";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import { ControlRequestService } from "#services/langy-local-control-request.service";
+import type { LangyLocalWorkspaceService } from "#services/langy-local-workspace.service";
 
 import type { UserWaitEvents } from "../rules/langy-local-user-wait-record.rules.ts";
 
@@ -71,16 +72,6 @@ export type LangyLocalRestCommands = UserWaitEvents &
     }): Promise<unknown>;
   }>;
 
-/** Whether the person behind the key chose GitHub over a shared folder. */
-export type LangyCodeAccessPreferenceReader = Readonly<{
-  tryReadPreference(userId: string): Promise<string | null>;
-}>;
-
-/** Whether the organization installed the GitHub App, for the code access card. */
-export type LangyGithubInstallationReader = Readonly<{
-  readInstallation(projectId: string): Promise<{ installed: boolean; accountLogin?: string }>;
-}>;
-
 /**
  * Everything the local surface reaches that neither `LangyApi` nor the
  * framework's project door supplies: the local-control runtime and the
@@ -91,10 +82,11 @@ export type LangyLocalRestMembers = Readonly<{
   runtime: () => LocalControlRuntime;
   /** The durable record of a request and of a revoked skip policy. */
   commands: () => LangyLocalRestCommands;
-  /** The person's own code access choice. */
-  users: () => LangyCodeAccessPreferenceReader;
-  /** The GitHub half of the code access card. */
-  github: () => LangyGithubInstallationReader;
+  /** The person's own code access choice and the GitHub half of the card. */
+  workspace: () => Pick<
+    LangyLocalWorkspaceService,
+    "getCodeAccessPreference" | "getGithubInstallation"
+  >;
   /** This deployment's own origin, for the follow-along link. */
   baseHost: string | undefined;
   /** Whether the conversation's model may skip permission cards. */
@@ -194,8 +186,8 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       userId: auth.userId,
       conversationId,
     });
-    const preference = await members.users().tryReadPreference(auth.userId);
-    const github = await members.github().readInstallation(auth.projectId);
+    const { preference } = await members.workspace().getCodeAccessPreference(auth.userId);
+    const github = await members.workspace().getGithubInstallation(auth.projectId);
 
     return response.write({
       status: 200,
@@ -204,7 +196,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
         workspaceStatusSchema.parse({
           connected: connected !== null,
           ...(connected ? { workspace: connected.workspace } : {}),
-          codeAccessPreference: preference === "github" ? "github" : null,
+          codeAccessPreference: preference,
           github,
           ...(pendingRequest
             ? { pendingRequest: ControlRequestService.toWire(pendingRequest) }

@@ -11,7 +11,7 @@ import {
   PROTOCOL_VERSION,
 } from "@langwatch/agent-contract";
 import type { StoredCall } from "@langwatch/agent-contract";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -40,7 +40,7 @@ const fakeCredentials: ConnectedAgentCredentials = {
 };
 
 function build({ pollWaitMs }: { pollWaitMs: number }) {
-  const store = SessionStateStoreFactory.memory();
+  const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
   const transport = createLongPollFixture({
     runtime,
@@ -180,7 +180,7 @@ describe("LongPollTransportService with a memory store", () => {
      * @scenario "An HTTP register is refused without Redis on a deployment with several replicas"
      */
     it("refuses the register with replica_count_unsupported before any credential read", async () => {
-      const store = SessionStateStoreFactory.memory();
+      const store = memorySessionState();
       const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
       const transport = createLongPollFixture({
         runtime,
@@ -236,7 +236,7 @@ describe("LongPollTransportService registration and polling, against a memory st
       const registerSpy = vi.spyOn(agents, "registerConnected");
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: SessionStateStoreFactory.memory(),
+        store: memorySessionState(),
       });
       const registeringTransport = createLongPollFixture({
         runtime,
@@ -262,7 +262,7 @@ describe("LongPollTransportService registration and polling, against a memory st
     it("answers a refused frame naming the reason", async () => {
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: SessionStateStoreFactory.memory(),
+        store: memorySessionState(),
       });
       const permissionDenied = createLongPollFixture({
         runtime,
@@ -313,7 +313,7 @@ describe("LongPollTransportService registration and polling, against a memory st
     /** @scenario "A poll refreshes presence" */
     it("is live for its agent, and a read after the TTL with no poll finds it offline", async () => {
       let now = Date.now();
-      const store = SessionStateStoreFactory.memory({ now: () => now });
+      const store = memorySessionState({ now: () => now });
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
         store,
@@ -374,7 +374,7 @@ describe("LongPollTransportService registration and polling, against a memory st
   describe("when an instance registered over HTTP stops polling", () => {
     /** @scenario "A process that stops polling goes offline after the presence TTL" */
     it("fails a call dispatched to its agent with agent_offline", async () => {
-      const store = SessionStateStoreFactory.memory();
+      const store = memorySessionState();
       const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
         store,
@@ -437,7 +437,7 @@ describe("LongPollTransportService registration and polling, against a memory st
 
 /** One instance registered over HTTP, with a real dispatcher call in flight. */
 async function registerAndDispatch(signal?: AbortSignal) {
-  const store = SessionStateStoreFactory.memory();
+  const store = memorySessionState();
   const runtime = ConnectedAgentRuntimeService.create({
     podId: "pod_solo",
     store,
