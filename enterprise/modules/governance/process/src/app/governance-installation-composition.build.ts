@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type {
   GovernanceOttlGateway,
@@ -86,6 +87,7 @@ export type GovernanceInstallationOptions = {
   aiToolProviders: AiToolProviderCatalog;
   cliContacts: CliAdminContactReader;
   auth: Pick<AuthApi, "findCliTokenRecordsForUser" | "revokeCliTokens">;
+  apiKeys: Pick<ApiKeyApi, "revokeCliSessionKey">;
   diagnostics?: GovernanceDiagnosticsSink;
   adminWorkspaceOcsf?: AdminWorkspaceViewOcsfChannel;
   adminWorkspaceDiagnostics?: GovernanceDiagnosticsSink;
@@ -199,6 +201,7 @@ export class GovernanceInstallationComposition {
     });
     const cliSessions = DefaultGovernanceCliSessionInventoryService.create({
       auth: this.options.auth,
+      loginKeys: this.options.apiKeys,
     });
     const cliTokenRevocation = DefaultGovernanceCliTokenRevocationService.create({
       auth: this.options.auth,

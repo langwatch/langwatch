@@ -33,6 +33,7 @@ import {
   apiKeyServerConfig,
   type ApiKeyServerConfig,
   type CliKeyScopeSummary,
+  type CliSessionKeyRevocation,
 } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
@@ -311,6 +312,13 @@ export class ApiKeyApp implements ApiKeyApi {
     refreshWindowMs: number;
   }): Promise<void> {
     return this.#service.extendCliLoginKeyExpiry(input);
+  }
+  async revokeCliSessionKey(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<CliSessionKeyRevocation> {
+    return this.#service.revokeCliSessionKey(input);
   }
   async revokeCliLoginKeyForLogout(input: {
     apiKeyId: string;

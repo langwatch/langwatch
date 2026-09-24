@@ -587,6 +587,7 @@ export class CliDeviceSessionService {
     return {
       tokenKey,
       organizationId: record.organization_id,
+      ...(record.cli_api_key_id ? { cliApiKeyId: record.cli_api_key_id } : {}),
       issuedAtMs: record.issued_at,
       expiresAtMs: record.expires_at,
       ...(info

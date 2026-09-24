@@ -2,7 +2,7 @@
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { initTRPC } from "@trpc/server";
 
-export type GovernanceTrpcTestContext = { actor: { id: string } };
+export type GovernanceTrpcTestContext = { actor: { id: string; impersonatorId?: string } };
 
 /** The runtime's members, permitting what `permits` allows and recording each permission asked. */
 export function governanceTrpcMembers({
@@ -13,7 +13,7 @@ export function governanceTrpcMembers({
   asked: string[];
 }): TrpcRuntimeMembers<GovernanceTrpcTestContext> {
   return {
-    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
+    identity: { caller: (ctx) => ({ actor: { type: "user", ...ctx.actor } }) },
     authorization: {
       forRequest: () => ({
         getDecision: async ({ permission }) => {

@@ -258,6 +258,16 @@ export class ApiKeyLifecycleService {
     return revoked;
   }
 
+  /** Retires the live keys minted under one key and answers how many it retired. */
+  revokeChildren(input: {
+    parentApiKeyId: string;
+    organizationId: string;
+    callerUserId: string | null;
+    cause: ApiKeyRevocationCause;
+  }): Promise<number> {
+    return this.revokeChildrenOf(input);
+  }
+
   /**
    * Retires the keys minted under one key — best effort, never fails the
    * triggering revoke (parent already dead; an orphan is refused at auth
@@ -273,7 +283,7 @@ export class ApiKeyLifecycleService {
     organizationId: string;
     callerUserId: string | null;
     cause: ApiKeyRevocationCause;
-  }): Promise<void> {
+  }): Promise<number> {
     let children: { id: string }[];
     try {
       children = await this.repository.findLiveChildren({ parentApiKeyId, organizationId });
@@ -282,7 +292,7 @@ export class ApiKeyLifecycleService {
         { err, parentApiKeyId, organizationId },
         "could not read the keys minted under a revoked key",
       );
-      return;
+      return 0;
     }
 
     // A person's revoke of the parent is not a decision about each child, so
@@ -290,6 +300,7 @@ export class ApiKeyLifecycleService {
     // them. Every other cause describes the session itself and passes down.
     const childCause: ApiKeyRevocationCause = cause === "user" ? "session" : cause;
 
+    let revoked = 0;
     for (const child of children) {
       try {
         await this.revoke({
@@ -301,6 +312,7 @@ export class ApiKeyLifecycleService {
           cause: childCause,
           cascadeToChildren: false,
         });
+        revoked += 1;
       } catch (err) {
         if (err instanceof ApiKeyAlreadyRevokedError) continue;
         logger.warn(
@@ -309,6 +321,7 @@ export class ApiKeyLifecycleService {
         );
       }
     }
+    return revoked;
   }
 
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {

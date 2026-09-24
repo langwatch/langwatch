@@ -21,6 +21,7 @@ import {
   type ResolvedApiKeyCredential,
   type RevokeApiKeyInput,
   type UpdateApiKeyInput,
+  type CliSessionKeyRevocation,
 } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -256,6 +257,14 @@ export class ApiKeyService {
     createdBefore?: Instant;
   }): Promise<void> {
     return this.cli.revokeCliLoginKeysForDevice(input);
+  }
+
+  async revokeCliSessionKey(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<CliSessionKeyRevocation> {
+    return this.cli.revokeCliSessionKey(input);
   }
 
   async revokeCliLoginKeyForLogout(input: {

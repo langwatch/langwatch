@@ -52,6 +52,7 @@ class FakeApiKeyApi implements ApiKeyApi {
   resolveVisibleProjects = unsupported<ApiKeyApi["resolveVisibleProjects"]>();
   revoke = unsupported<ApiKeyApi["revoke"]>();
   revokeCliLoginKeyForLogout = unsupported<ApiKeyApi["revokeCliLoginKeyForLogout"]>();
+  revokeCliSessionKey = unsupported<ApiKeyApi["revokeCliSessionKey"]>();
   revokeCliLoginKeysForDevice = unsupported<ApiKeyApi["revokeCliLoginKeysForDevice"]>();
   revokeKey = unsupported<ApiKeyApi["revokeKey"]>();
   update = unsupported<ApiKeyApi["update"]>();

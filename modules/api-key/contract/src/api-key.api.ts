@@ -68,6 +68,15 @@ export type UpdateApiKeyManagementInput = Readonly<{
   bindings?: UpdateApiKeyInput["bindings"];
 }>;
 
+/**
+ * What revoking one CLI session's login key retired: the key itself, and the
+ * ingest keys minted under it.
+ */
+export type CliSessionKeyRevocation = Readonly<{
+  loginKeyRevoked: boolean;
+  ingestKeysRevoked: number;
+}>;
+
 export interface ApiKeyApi {
   create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }>;
   update(input: UpdateApiKeyInput): Promise<ApiKey>;
@@ -151,6 +160,12 @@ export interface ApiKeyApi {
     exceptApiKeyId?: string;
     createdBefore?: Instant;
   }): Promise<void>;
+  /** A person revoking one of their own CLI sessions: main's `revokeSessionKey`, counted. */
+  revokeCliSessionKey(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<CliSessionKeyRevocation>;
   revokeCliLoginKeyForLogout(input: {
     apiKeyId: string;
     userId: string;

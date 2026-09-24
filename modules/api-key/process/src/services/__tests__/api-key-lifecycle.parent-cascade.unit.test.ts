@@ -163,3 +163,43 @@ describe("ApiKeyLifecycleService.revoke", () => {
     });
   });
 });
+
+describe("ApiKeyLifecycleService.revokeChildren", () => {
+  describe("given a revoked login key with two ingest keys under it", () => {
+    it("retires both and answers the count main's session revoke reported", async () => {
+      const { service, revoke } = makeService({
+        children: [{ id: "ak_child_1" }, { id: "ak_child_2" }],
+      });
+
+      await expect(
+        service.revokeChildren({
+          parentApiKeyId: LOGIN_ID,
+          organizationId: ORG_ID,
+          callerUserId: USER_ID,
+          cause: "user",
+        }),
+      ).resolves.toBe(2);
+      expect(revoke.mock.calls.map(([input]) => input.cause)).toEqual(["session", "session"]);
+    });
+
+    it("does not count a child an earlier attempt already revoked", async () => {
+      const { service, revoke } = makeService({
+        children: [{ id: "ak_child_1" }, { id: "ak_gone" }],
+      });
+      const revokeRow = revoke.getMockImplementation();
+      revoke.mockImplementation(async (input) => {
+        if (input.id === "ak_gone") throw new ApiKeyAlreadyRevokedError(input.id);
+        return revokeRow!(input);
+      });
+
+      await expect(
+        service.revokeChildren({
+          parentApiKeyId: LOGIN_ID,
+          organizationId: ORG_ID,
+          callerUserId: USER_ID,
+          cause: "user",
+        }),
+      ).resolves.toBe(1);
+    });
+  });
+});

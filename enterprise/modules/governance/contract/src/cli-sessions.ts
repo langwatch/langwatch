@@ -28,6 +28,8 @@ export const cliSessionSchema = z
     hostname: z.string().nullable(),
     uname: z.string().nullable(),
     platform: z.string().nullable(),
+    organizationId: z.string(),
+    cliApiKeyId: z.string().nullable(),
     lastSeenMs: z.number().int().nonnegative(),
     expiresAtMs: z.number().int().nonnegative(),
     tokenKeys: z.array(z.string().min(1)),
@@ -40,12 +42,19 @@ export type CliSession = z.infer<typeof cliSessionSchema>;
  * except the token keys, which identify live credentials and belong to the
  * revocation path rather than to a card on a screen.
  */
-export const cliSessionCardSchema = cliSessionSchema.omit({ tokenKeys: true });
+export const cliSessionCardSchema = cliSessionSchema.omit({
+  tokenKeys: true,
+  organizationId: true,
+});
 export type CliSessionCard = z.infer<typeof cliSessionCardSchema>;
 
 /** What a revocation answers: that it happened, and how many tokens it took. */
 export const cliSessionRevocationSchema = z
-  .object({ ok: z.boolean(), revokedTokens: z.number().int().nonnegative() })
+  .object({
+    ok: z.boolean(),
+    revokedTokens: z.number().int().nonnegative(),
+    revokedKeys: z.number().int().nonnegative(),
+  })
   .strict();
 export type CliSessionRevocation = z.infer<typeof cliSessionRevocationSchema>;
 

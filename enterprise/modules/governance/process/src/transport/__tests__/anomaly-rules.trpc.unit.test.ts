@@ -52,6 +52,20 @@ describe("the anomalyRules tRPC namespace", () => {
     ]);
   });
 
+  it("carries an impersonating operator through to the application's plan check", async () => {
+    const { router, calls } = mount();
+    const caller = router.createCaller({ actor: { id: "user_1", impersonatorId: "staff_1" } });
+
+    await caller.list({ organizationId: "org_1" });
+
+    expect(calls).toEqual([
+      {
+        input: { organizationId: "org_1" },
+        by: expect.objectContaining({ id: "user_1", impersonatorId: "staff_1" }),
+      },
+    ]);
+  });
+
   it("refuses a create without anomalyRules:manage before the application is reached", async () => {
     const { caller, calls } = mount((permission) => permission === "anomalyRules:view");
 

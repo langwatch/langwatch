@@ -34,6 +34,8 @@ export type CliAccessSession = Readonly<{
 export type CliTokenRecordEntry = Readonly<{
   tokenKey: string;
   organizationId: string;
+  /** The login key the session minted at sign-in, where it minted one. */
+  cliApiKeyId?: string | undefined;
   issuedAtMs: number;
   expiresAtMs: number;
   clientInfo?: Readonly<{

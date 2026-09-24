@@ -7,6 +7,7 @@ import {
   CLI_LOGIN_KEY_NAME_PREFIX,
   type CliKeyScopeSummary,
   type CliKeySelection,
+  type CliSessionKeyRevocation,
 } from "@langwatch/api-key-contract";
 import {
   ALL_PERMISSIONS,
@@ -256,6 +257,41 @@ export class ApiKeyCliService {
         cause: "rotation",
       });
     }
+  }
+
+  /**
+   * Retires a session's login key, then counts the keys minted under it.
+   * A key already gone counts as not revoked; the children are still swept.
+   */
+  async revokeCliSessionKey(input: {
+    apiKeyId: string;
+    userId: string;
+    organizationId: string;
+  }): Promise<CliSessionKeyRevocation> {
+    let loginKeyRevoked = true;
+    try {
+      await this.lifecycle.revoke({
+        id: input.apiKeyId,
+        callerUserId: input.userId,
+        callerIsAdmin: false,
+        organizationId: input.organizationId,
+        cause: "user",
+        cascadeToChildren: false,
+      });
+    } catch (error) {
+      if (error instanceof ApiKeyNotFoundError)
+        return { loginKeyRevoked: false, ingestKeysRevoked: 0 };
+      if (!(error instanceof ApiKeyAlreadyRevokedError)) throw error;
+      loginKeyRevoked = false;
+    }
+
+    const ingestKeysRevoked = await this.lifecycle.revokeChildren({
+      parentApiKeyId: input.apiKeyId,
+      organizationId: input.organizationId,
+      callerUserId: input.userId,
+      cause: "user",
+    });
+    return { loginKeyRevoked, ingestKeysRevoked };
   }
 
   async revokeCliLoginKeyForLogout(input: {

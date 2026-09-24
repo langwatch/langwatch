@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   bindRestHeader,
   bindRestMiddleware,
@@ -134,6 +135,7 @@ async function buildApi(
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
     },
     members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),

@@ -150,10 +150,10 @@ describe("the apiKey tRPC transport", () => {
         roleBindings: [],
       };
 
-      expect(output?.safeParse([entry]).success).toBe(true);
+      expect(output?.validate([entry])).toBe(true);
       // Strict by declaration: a row carrying the lookup id — five characters
       // of which are the public prefix — does not fit the wire shape.
-      expect(output?.safeParse([{ ...entry, lookupId: "abcdefghij" }]).success).toBe(false);
+      expect(output?.validate([{ ...entry, lookupId: "abcdefghij" }])).toBe(false);
     });
 
     it("answers the pickers through the caller-scoped reads", async () => {

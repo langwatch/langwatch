@@ -4,6 +4,7 @@
  * per-organization refusal here, and a bad config reads as main's handled complaint.
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { DEFAULT_SPEND_SPIKE_CONFIG } from "@langwatch/enterprise-governance-contract";
@@ -57,6 +58,7 @@ async function buildApp(planType: string) {
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
     },
     members: {
       prisma: createApiFixture<GovernanceMemberDatabase>(),
@@ -107,6 +109,21 @@ describe("anomaly rules from the console", () => {
       await app.anomalyRuleList({ organizationId: "org-1" }, ADMIN);
 
       expect(plansAsked).toEqual([{ organizationId: "org-1", operator: { id: "user-1" } }]);
+    });
+  });
+
+  describe("given a platform operator impersonating the admin", () => {
+    it("resolves the plan as the admin, naming the impersonating operator", async () => {
+      const { app, plansAsked } = await buildApp("ENTERPRISE");
+
+      await app.anomalyRuleList(
+        { organizationId: "org-1" },
+        { id: ADMIN.id, impersonatorId: "staff-1" },
+      );
+
+      expect(plansAsked).toEqual([
+        { organizationId: "org-1", operator: { id: "user-1", impersonatorId: "staff-1" } },
+      ]);
     });
   });
 

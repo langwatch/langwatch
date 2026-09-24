@@ -5,6 +5,7 @@ export * from "./ingestion-source-activity.queries.ts";
 export * from "./admin-workspace-view-audit.ts";
 export * from "./ai-tool-catalog.ts";
 export * from "./cli-sessions.ts";
+export * from "./personal-sessions.trpc.ts";
 export * from "./cli-bootstrap.ts";
 export * from "./canonical-cost.ts";
 export * from "./department.ts";

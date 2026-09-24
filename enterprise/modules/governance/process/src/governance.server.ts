@@ -94,6 +94,7 @@ import {
 } from "./transport/governance.rest.ts";
 import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
 import { ingestionTemplatesTrpcTransport } from "./transport/ingestion-templates.trpc.ts";
+import { personalSessionsTrpcTransport } from "./transport/personal-sessions.trpc.ts";
 
 /**
  * The whole module, declared: one application and the REST family it answers.
@@ -117,6 +118,7 @@ export const governanceServer = defineServerModule("governance")
     ingestionTemplatesTrpcTransport,
     governanceTrpcTransport,
     anomalyRulesTrpcTransport,
+    personalSessionsTrpcTransport,
   )
   // The member behind the project credential, and which surface asked. A
   // legacy project key names no member, which is what the admin routes refuse.

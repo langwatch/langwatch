@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthApi, type CliAccessSession } from "@langwatch/auth-contract";
 /**
  * The governance feature's application: what all three of its doors call.
@@ -78,9 +79,12 @@ import {
   type GovernanceProjectCaller,
   GovernanceRestApi,
   type IngestionTemplate,
+  type CliSessionCard,
+  type CliSessionRevocation,
+  type CliUserInput,
+  type RevokeCliSessionInput,
   type AnomalyRule,
   type CreateAnomalyRuleInput,
-  type GovernanceOperator,
   type UpdateAnomalyRuleInput,
   type ArchiveIngestionTemplateInput,
   type CloneIngestionTemplateInput,
@@ -102,6 +106,7 @@ import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
   assertEnterprisePlanType,
   EntitlementApi,
+  type EntitlementOperator,
   type EnterpriseFeature,
   ENTERPRISE_FEATURE_ERRORS,
 } from "@langwatch/entitlement-contract";
@@ -131,6 +136,7 @@ import { ratePulledUsage } from "../rules/pulled-usage-rate.rules.ts";
 import { AgentDiscoveryService } from "../services/agent-discovery.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
+import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
@@ -325,8 +331,15 @@ export interface GovernanceAppDependencies {
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
   traces: Pick<TraceApi, "otlpTraces">;
+  apiKeys: Pick<ApiKeyApi, "revokeCliSessionKey">;
   /** Auth owns CLI bearer validation and revocation. */
-  auth: Pick<AuthApi, "findCliAccessSession" | "revokeCliAccessToken">;
+  auth: Pick<
+    AuthApi,
+    | "findCliAccessSession"
+    | "revokeCliAccessToken"
+    | "findCliTokenRecordsForUser"
+    | "revokeCliTokens"
+  >;
   /** Entitlements resolve the actual caller organization, never a deployment-global plan. */
   entitlements: Pick<EntitlementApi, "getActivePlan">;
   /**
@@ -434,6 +447,7 @@ export class GovernanceApp implements GovernanceRestApi {
     scim: ScimApi,
     featureFlags: FeatureFlagApi,
     traces: TraceApi,
+    apiKeys: ApiKeyApi,
   };
   static readonly secrets = governanceSecrets;
 
@@ -468,6 +482,7 @@ export class GovernanceApp implements GovernanceRestApi {
         scim: dependencies.scim,
         featureFlags: dependencies.featureFlags,
         traces: dependencies.traces,
+        apiKeys: dependencies.apiKeys,
       },
       repositories,
       erasureSuppression,
@@ -490,6 +505,10 @@ export class GovernanceApp implements GovernanceRestApi {
     this.repositories = repositories;
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
+    this.cliSessions = DefaultGovernanceCliSessionInventoryService.create({
+      auth: dependencies.auth,
+      loginKeys: dependencies.apiKeys,
+    });
     this.departments = DepartmentService.create({
       repository: repositories.departments,
       organizations: dependencies.organizations,
@@ -604,6 +623,7 @@ export class GovernanceApp implements GovernanceRestApi {
 
   private readonly dependencies: GovernanceAppDependencies;
   private readonly anomalyRules: AnomalyRuleService;
+  private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly departments: DepartmentService;
   private readonly agentDiscovery: AgentDiscoveryService;
   private readonly personListing: PersonListingService;
@@ -1024,11 +1044,28 @@ export class GovernanceApp implements GovernanceRestApi {
     });
   }
 
+  // ── Personal CLI sessions: the caller's own devices, answered for their user id alone ──
+
+  async cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]> {
+    const sessions = await this.cliSessions.listForUser(input);
+    return sessions.map(
+      ({ tokenKeys: _tokenKeys, organizationId: _organizationId, ...card }) => card,
+    );
+  }
+
+  async cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation> {
+    return { ok: true, ...(await this.cliSessions.revokeSession(input)) };
+  }
+
+  async cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation> {
+    return { ok: true, ...(await this.cliSessions.revokeAllSessions(input)) };
+  }
+
   // ── Anomaly rules: Enterprise-only, refused per organization as main's gate did ──
 
   async anomalyRuleList(
     input: { organizationId: string },
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule[]> {
     await this.assertEnterprise({
       organizationId: input.organizationId,
@@ -1040,7 +1077,7 @@ export class GovernanceApp implements GovernanceRestApi {
 
   async anomalyRuleGetById(
     input: { id: string; organizationId: string },
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule> {
     await this.assertEnterprise({
       organizationId: input.organizationId,
@@ -1052,7 +1089,7 @@ export class GovernanceApp implements GovernanceRestApi {
 
   async anomalyRuleCreate(
     input: CreateAnomalyRuleInput,
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule> {
     await this.assertEnterprise({
       organizationId: input.organizationId,
@@ -1066,7 +1103,7 @@ export class GovernanceApp implements GovernanceRestApi {
 
   async anomalyRuleUpdate(
     input: UpdateAnomalyRuleInput,
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule> {
     await this.assertEnterprise({
       organizationId: input.organizationId,
@@ -1080,7 +1117,7 @@ export class GovernanceApp implements GovernanceRestApi {
 
   async anomalyRuleArchive(
     input: { id: string; organizationId: string },
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule> {
     await this.assertEnterprise({
       organizationId: input.organizationId,
@@ -1103,7 +1140,7 @@ export class GovernanceApp implements GovernanceRestApi {
     feature,
   }: {
     organizationId: string;
-    by: GovernanceOperator;
+    by: EntitlementOperator;
     feature: EnterpriseFeature;
   }): Promise<void> {
     const operator = by.impersonatorId

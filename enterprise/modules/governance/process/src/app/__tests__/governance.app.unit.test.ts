@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
@@ -64,6 +65,7 @@ async function buildApp() {
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
     },
     members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),
@@ -101,6 +103,7 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       traces: createApiFixture<TraceApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
     },
     members: {
       prisma: unreachablePrisma,
@@ -269,6 +272,7 @@ describe("GovernanceApp as the module a process installs", () => {
 
       expect(governanceServer.transports.map((transport) => transport.protocol)).toEqual([
         "rest",
+        "trpc",
         "trpc",
         "trpc",
         "trpc",

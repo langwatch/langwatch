@@ -41,6 +41,20 @@ describe("the CLI token records a peer reads and revokes", () => {
       }
     });
 
+    it("names the login key the session minted, so revoking the session can retire it", async () => {
+      const { sessions } = setup();
+      await sessions.mintSession({
+        userId: "alice",
+        organizationId: "org",
+        clientInfo,
+        cliApiKeyId: "ak_login",
+      });
+
+      const records = await sessions.findTokenRecordsForUser({ userId: "alice" });
+
+      expect(records.map(({ cliApiKeyId }) => cliApiKeyId)).toEqual(["ak_login", "ak_login"]);
+    });
+
     it("answers nothing to anybody else", async () => {
       const { sessions } = setup();
       await sessions.mintSession({ userId: "alice", organizationId: "org", clientInfo });

@@ -1,3 +1,4 @@
+import type { EntitlementOperator } from "@langwatch/entitlement-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 
 import type {
@@ -23,7 +24,13 @@ import type {
 } from "./anomaly-rule.ts";
 import type { CanonicalCostEvent, OtlpLogsRequest } from "./canonical-cost.ts";
 import type { CliBootstrapInput, CliBootstrapResult } from "./cli-bootstrap.ts";
-import type { CliSession, CliUserInput, RevokeCliSessionInput } from "./cli-sessions.ts";
+import type {
+  CliSession,
+  CliSessionCard,
+  CliSessionRevocation,
+  CliUserInput,
+  RevokeCliSessionInput,
+} from "./cli-sessions.ts";
 import type { TraceDepartmentInput, Department, DepartmentAssignments } from "./department.ts";
 import type { GovernanceCallSurface } from "./governance-audit.ts";
 import type {
@@ -384,12 +391,6 @@ export interface GovernanceTemplateDraft {
   ottlRules?: string;
 }
 
-/** The signed-in person a console call acts as, and the operator impersonating them, if any. */
-export interface GovernanceOperator {
-  readonly id: string;
-  readonly impersonatorId?: string;
-}
-
 /** The ingestion-template operations the governance REST family calls. */
 export interface GovernanceRestApi {
   cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer>;
@@ -441,17 +442,17 @@ export interface GovernanceRestApi {
 
   anomalyRuleList(
     input: { organizationId: string },
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule[]>;
   anomalyRuleGetById(
     input: { id: string; organizationId: string },
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule>;
-  anomalyRuleCreate(input: CreateAnomalyRuleInput, by: GovernanceOperator): Promise<AnomalyRule>;
-  anomalyRuleUpdate(input: UpdateAnomalyRuleInput, by: GovernanceOperator): Promise<AnomalyRule>;
+  anomalyRuleCreate(input: CreateAnomalyRuleInput, by: EntitlementOperator): Promise<AnomalyRule>;
+  anomalyRuleUpdate(input: UpdateAnomalyRuleInput, by: EntitlementOperator): Promise<AnomalyRule>;
   anomalyRuleArchive(
     input: { id: string; organizationId: string },
-    by: GovernanceOperator,
+    by: EntitlementOperator,
   ): Promise<AnomalyRule>;
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
@@ -460,6 +461,9 @@ export interface GovernanceRestApi {
   templateUpdateOttlRules(input: UpdateIngestionTemplateOttlInput): Promise<IngestionTemplate>;
   templateArchiveOrg(input: ArchiveIngestionTemplateInput): Promise<void>;
   templateCloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate>;
+  cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
+  cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
+  cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;
   findActorWorkspace(input: {
     organizationId: string;
     actor: string;
