@@ -60,11 +60,11 @@ export const INSTANT_EVAL_AUTO_RUN_USD = 0.5;
  * The refusal codes that get a popover of their own, rather than the
  * registry's copy.
  *
- * `instant_eval_not_enabled` is still mapped here even though the flag read
- * in the search bar is meant to catch this first: that read can be stale or
- * still loading, and the server's refusal is the authority, so a request
- * that reaches it anyway still gets the right popover. Dismissing it leaves
- * the typed query alone, the same as the client-side flag-off path.
+ * The flag-off case never reaches here: {@link bailUnreleased} catches it
+ * client-side before any request goes out. So a `not_enabled` refusal that
+ * does arrive is from a released project the deployment cannot judge yet —
+ * no classifier configured — the same case as `classifier_unavailable`, and
+ * gets the same popover.
  */
 function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   const handled = readHandledError(error);
@@ -72,10 +72,10 @@ function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   if (handled.code === "instant_eval_free_budget_exhausted") {
     return { kind: "budget" };
   }
-  if (handled.code === "instant_eval_not_enabled") {
-    return { kind: "unreleased" };
-  }
-  if (handled.code === "instant_eval_classifier_unavailable") {
+  if (
+    handled.code === "instant_eval_not_enabled" ||
+    handled.code === "instant_eval_classifier_unavailable"
+  ) {
     return { kind: "model" };
   }
   return null;
@@ -193,11 +193,6 @@ function useInstantEvalOutcome(): {
       setConfirmation(null);
       const popover = refusalOf({ error });
       if (popover) {
-        // Unreleased has no sentence to fall back to: dismissing it must
-        // just close the popover, not apply the stale pending fallback.
-        if (popover.kind === "unreleased") {
-          pendingRef.current = null;
-        }
         setRefusal(popover);
         return;
       }

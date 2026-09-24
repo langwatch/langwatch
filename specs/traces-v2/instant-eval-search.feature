@@ -373,7 +373,7 @@ Feature: Instant Evals inside the Trace Explorer
 
     @integration
     Scenario: A missing classifier opens the model popover and the phrase search runs
-      Given the deployment has no classifier
+      Given the deployment has no classifier, or the server refuses the run as not enabled for a released project
       When the Explorer receives an Instant Eval payload
       Then a closable popover says to configure a model
       And closing it applies the phrase search

@@ -379,43 +379,22 @@ describe("given the organization has spent its free budget", () => {
 describe("given the deployment has no classifier", () => {
   describe("when the Explorer receives the payload", () => {
     /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
-    it("opens the model popover, and closing it applies the phrase search", () => {
+    it.each([
+      "instant_eval_classifier_unavailable",
+      "instant_eval_not_enabled",
+    ] as const)("opens the model popover, and closing it applies the phrase search (%s)", (code) => {
       const { result } = renderHook(() =>
         useInstantEvalRoute({ isInstantEvalAvailable: true }),
       );
       act(() => result.current.onInstantEvalRoute(payload));
       act(() =>
-        lastCall(mutations.estimate).options.onError?.(
-          handledError("instant_eval_classifier_unavailable"),
-        ),
+        lastCall(mutations.estimate).options.onError?.(handledError(code)),
       );
       expect(result.current.refusal).toEqual({ kind: "model" });
       act(() => result.current.dismissRefusal());
       expect(useExplorerStore.getState().queryText).toBe(
         'service:api AND "annoyed users"',
       );
-    });
-  });
-});
-
-describe("given the server refuses a run as not enabled while the flag read is stale", () => {
-  describe("when the Explorer receives the payload", () => {
-    /** @scenario "Instant Evals switched off open the contact-us popover and nothing is searched" */
-    it("opens the unreleased popover, and dismissing it leaves the typed query alone", () => {
-      const { result } = renderHook(() =>
-        useInstantEvalRoute({ isInstantEvalAvailable: true }),
-      );
-      const queryBefore = useExplorerStore.getState().queryText;
-      act(() => result.current.onInstantEvalRoute(payload));
-      act(() =>
-        lastCall(mutations.estimate).options.onError?.(
-          handledError("instant_eval_not_enabled"),
-        ),
-      );
-      expect(result.current.refusal).toEqual({ kind: "unreleased" });
-      act(() => result.current.dismissRefusal());
-      expect(result.current.refusal).toBeNull();
-      expect(useExplorerStore.getState().queryText).toBe(queryBefore);
     });
   });
 });
