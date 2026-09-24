@@ -64,10 +64,7 @@ function makePuller(): OpenAiAdminPullerAdapter {
 const usageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new TestRate()),
 );
-const buildPulledUsageRecord = ({
-  governanceProjectId: _governanceProjectId,
-  ...input
-}: Parameters<typeof usageRecords.findBuilt>[0] & { governanceProjectId?: string }) =>
+const buildPulledUsageRecord = ({ ...input }: Parameters<typeof usageRecords.findBuilt>[0]) =>
   usageRecords.findBuilt(input);
 
 const SOURCE = {

@@ -40,11 +40,8 @@ import type {
   ProjectWithTeam,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
-import type {
-  exportTraceServiceRequestSchema,
-  TraceProcessingEvent,
-} from "@langwatch/trace-contract";
-import type { z } from "zod";
+import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 export type AnomalyAlertHttpResponse = {
   status: number;
   ok: boolean;
@@ -296,10 +293,7 @@ export type IngestionPullRun = {
 };
 
 export interface IngestionPullRunner {
-  run(input: {
-    sourceId: string;
-    cursor: string | null;
-  }): Promise<IngestionPullRunResult>;
+  run(input: { sourceId: string; cursor: string | null }): Promise<IngestionPullRunResult>;
 }
 
 /** What one run read; the optional fields stay absent until the runner reports them. */
@@ -380,7 +374,8 @@ export interface IngestionPullTenantResolver {
   resolveTenantId(organizationId: string): Promise<string>;
 }
 
-export type GovernanceTraceRequest = z.input<typeof exportTraceServiceRequestSchema>;
+/** Main's shape: the mappers build the same OTLP request the trace door takes. */
+export type GovernanceTraceRequest = IExportTraceServiceRequest;
 
 export interface GovernanceTraceIngestionClient {
   ingest(input: { projectId: string; request: GovernanceTraceRequest }): Promise<{

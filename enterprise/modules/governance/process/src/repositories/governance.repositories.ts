@@ -28,6 +28,7 @@ import type {
 import type { GovernanceTenantHistoryRepository } from "./governance-tenant-history.repository.ts";
 import type { IdentityMatchSuggestionRepository } from "./identity-match-suggestion.repository.ts";
 import type { IdentityMatchRepository } from "./identity-match.repository.ts";
+import type { IngestionPullLifecycleRepository } from "./ingestion-pull-lifecycle.repository.ts";
 import type { IngestionPullRunRepository } from "./ingestion-pull-run.repository.ts";
 import type { IngestionSourceRepository } from "./ingestion-source.repository.ts";
 import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
@@ -59,6 +60,7 @@ export interface GovernanceRepositories {
   readonly erasedIdentifierSuppressions: ErasedIdentifierSuppressionRepository;
   readonly identityMatches: IdentityMatchRepository;
   readonly identityMatchSuggestions: IdentityMatchSuggestionRepository;
+  readonly ingestionPullLifecycle: IngestionPullLifecycleRepository;
   readonly ingestionPullRuns: IngestionPullRunRepository;
   readonly ingestionSources: IngestionSourceRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;

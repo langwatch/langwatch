@@ -48,10 +48,7 @@ class TestRate {
 const pulledUsageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new TestRate()),
 );
-const buildPulledUsageRecord = ({
-  governanceProjectId: _governanceProjectId,
-  ...input
-}: Parameters<typeof pulledUsageRecords.findBuilt>[0] & { governanceProjectId?: string }) =>
+const buildPulledUsageRecord = ({ ...input }: Parameters<typeof pulledUsageRecords.findBuilt>[0]) =>
   pulledUsageRecords.findBuilt(input);
 
 function makePuller(): AnthropicAdminPullerAdapter {

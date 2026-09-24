@@ -17,6 +17,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
@@ -79,6 +80,7 @@ async function buildApp(options: {
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
+      traces: createApiFixture<TraceApi>(),
     },
     members: { prisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),

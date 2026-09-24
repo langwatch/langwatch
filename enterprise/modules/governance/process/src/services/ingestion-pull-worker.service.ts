@@ -376,6 +376,7 @@ export class IngestionPullWorkerService {
             organizationId: input.source.organizationId,
             teamId: input.source.teamId,
           },
+          governanceProjectId: project.id,
           observedAt,
         });
       } catch (error) {

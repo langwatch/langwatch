@@ -100,7 +100,8 @@ import {
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
 import { reads } from "@langwatch/process-stores/members";
-import { ProjectApi } from "@langwatch/project-contract";
+import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import { governanceListingChannels } from "../channels/governance-listing-channels.registry.ts";
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
@@ -150,6 +151,7 @@ import {
   IngestionPullEventingAdapter,
   type IngestionPullDefinition,
 } from "../services/ingestion-pull-eventing.service.ts";
+import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
 import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
 import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
@@ -297,6 +299,8 @@ export interface GovernanceAppDependencies {
   >;
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
+  /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
+  traces: Pick<TraceApi, "otlpTraces">;
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<AuthApi, "findCliAccessSession" | "revokeCliAccessToken">;
   /** Entitlements resolve the actual caller organization, never a deployment-global plan. */
@@ -395,6 +399,7 @@ export class GovernanceApp implements GovernanceRestApi {
     permissions: AuthzApi,
     scim: ScimApi,
     featureFlags: FeatureFlagApi,
+    traces: TraceApi,
   };
   static readonly secrets = governanceSecrets;
 
@@ -428,6 +433,7 @@ export class GovernanceApp implements GovernanceRestApi {
         permissions: dependencies.permissions,
         scim: dependencies.scim,
         featureFlags: dependencies.featureFlags,
+        traces: dependencies.traces,
       },
       repositories,
       erasureSuppression,
@@ -638,6 +644,27 @@ export class GovernanceApp implements GovernanceRestApi {
     this.ingestionPullCommands = commands;
   }
 
+  /** Main's boot reconciliation (`pipelineSet.ts:132-150`): every source's schedule sent to its pull process. */
+  reconcileIngestionPulls(): Promise<{ reconciled: number; failed: number }> {
+    const { projects } = this.dependencies;
+    return IngestionPullLifecycleService.create({
+      repository: this.repositories.ingestionPullLifecycle,
+      tenant: {
+        resolveTenantId: async (organizationId) =>
+          (
+            await projects.ensureInternal({
+              organizationId,
+              kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+            })
+          ).id,
+      },
+      commands: {
+        configure: (input) => this.ingestionPullSender("configure").send(input),
+        disable: (input) => this.ingestionPullSender("disable").send(input),
+      },
+    }).reconcile();
+  }
+
   connectPulledUsage(commands: EventingSenders): void {
     this.pulledUsageCommands = commands;
   }
@@ -686,6 +713,21 @@ export class GovernanceApp implements GovernanceRestApi {
         PulledUsagePricingService.create({ rate: ratePulledUsage }),
       ),
       diagnostics,
+      traceIngestion: {
+        ingest: async ({ projectId, request }) => {
+          const result = await dependencies.traces.otlpTraces({
+            tenantId: projectId,
+            traceRequest: request,
+          });
+          return {
+            rejectedSpans: result.rejectedSpans ?? 0,
+            ingestionFailures: result.ingestionFailures ?? 0,
+            ...(result.ingestionFailureMessage
+              ? { ingestionFailureMessage: result.ingestionFailureMessage }
+              : {}),
+          };
+        },
+      },
     });
     const pulledUsage: PulledUsageDispatcher = {
       recordPulledUsage: (input) => this.pulledUsageSender("recordPulledUsage").send(input),

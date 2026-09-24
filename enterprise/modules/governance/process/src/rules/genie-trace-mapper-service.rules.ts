@@ -38,8 +38,7 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
-import type { z } from "zod";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 
 import type {
   GenieMessageFrame,
@@ -54,7 +53,7 @@ import type {
 } from "./conversation-trace-assembly-service.rules.ts";
 import * as GenieSpanAttributesService from "./genie-span-attributes-service.rules.ts";
 
-type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
+type ExportTraceServiceRequest = IExportTraceServiceRequest;
 
 /** Root span (the turn itself, `llm`-typed so the estimator runs). */
 /**

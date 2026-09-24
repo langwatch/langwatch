@@ -26,6 +26,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
@@ -132,6 +133,7 @@ async function buildApi(
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
+      traces: createApiFixture<TraceApi>(),
     },
     members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),

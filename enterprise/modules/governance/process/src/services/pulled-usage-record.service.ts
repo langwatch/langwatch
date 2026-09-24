@@ -130,10 +130,13 @@ export class PulledUsageRecordService {
   findBuilt({
     event,
     source,
+    governanceProjectId,
     observedAt,
   }: {
     event: NormalizedPullEvent;
     source: PulledUsageSourceAttribution;
+    /** Where the row is stored: the org's hidden governance project (main `pulledUsageRecord.ts:319-327`, ADR-128). */
+    governanceProjectId: string;
     observedAt: Instant;
   }): PulledUsageObservedEventData | null {
     const raw = event.extra?.[PULLED_USAGE_HINT_KEY];
@@ -201,11 +204,8 @@ export class PulledUsageRecordService {
       ingestionSourceId: source.ingestionSourceId,
       organizationId: source.organizationId,
       teamId: source.teamId,
-      // Deferred: `IngestionSource` carries no project yet (ADR-088 Decision 4).
-      // Null says unattributed. The hidden governance project every other pull
-      // writer uses is not an option here — it is invisible to the customer, so
-      // filing their money there would be worse than saying we do not know.
-      projectId: null,
+      // The row's home, as main stores it: who owns the money stays on organizationId/teamId (ADR-128).
+      projectId: governanceProjectId,
       model,
       ...quantities,
       // The three money fields travel as one unit, straight off the price the

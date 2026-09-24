@@ -154,6 +154,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("governance_events_processing");
       expect(pipelines).toContain("pulled_usage_processing");
       expect(pipelines).toContain("ingestion_pull_processing");
+      expect(pipelines).toContain("ingestion_pull_reconcile");
       expect(pipelines).toContain("blob_maintenance");
       expect(pipelines).toContain("process_manager_maintenance");
       // Every process that is not producing resolves trace commands from this registration.

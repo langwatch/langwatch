@@ -35,11 +35,12 @@
 
 import { createHash } from "node:crypto";
 
-import type { exportTraceServiceRequestSchema, spanSchema } from "@langwatch/trace-contract";
+import type { spanSchema } from "@langwatch/trace-contract";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { z } from "zod";
 
 const PROVENANCE_ATTR_SOURCE = "langwatch.source";
-type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
+type ExportTraceServiceRequest = IExportTraceServiceRequest;
 
 /**
  * Every agent a routing profile is allowed to name.

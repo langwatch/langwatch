@@ -56,6 +56,7 @@ import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.ch
 import { HttpPollingPullerAdapter } from "./channels/http/http.polling.channel.ts";
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
 import { governanceEventsEventing } from "./eventing/governance-events.pipeline.ts";
+import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
 import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
 import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 import type { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
@@ -139,7 +140,8 @@ export const governanceServer = defineServerModule("governance")
   ])
   .withEventing(governanceEventsEventing)
   .withEventing(pulledUsageEventing)
-  .withEventing(ingestionPullEventing);
+  .withEventing(ingestionPullEventing)
+  .withEventing(ingestionPullReconcileEventing);
 
 /** The substrates one ingestion-pull worker installation is built over. */
 export type IngestionPullWorkerSubstrates = Readonly<{

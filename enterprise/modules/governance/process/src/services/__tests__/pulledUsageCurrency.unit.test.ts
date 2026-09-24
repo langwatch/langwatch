@@ -75,6 +75,7 @@ function record(hint: Record<string, unknown>) {
   return records.findBuilt({
     event: costEvent(hint),
     source: SOURCE,
+    governanceProjectId: "proj_governance",
     observedAt: OBSERVED_AT,
   });
 }
@@ -144,6 +145,7 @@ describe("currency on a pulled usage record", () => {
           cost_currency: "EUR",
         },
         source: SOURCE,
+        governanceProjectId: "proj_governance",
         observedAt: OBSERVED_AT,
       });
 
@@ -160,6 +162,7 @@ describe("currency on a pulled usage record", () => {
           cost_currency: "EUR",
         },
         source: SOURCE,
+        governanceProjectId: "proj_governance",
         observedAt: OBSERVED_AT,
       });
 

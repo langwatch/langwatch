@@ -444,7 +444,7 @@ describe("IngestionPullWorkerService", () => {
       tenantId: "gov-project",
       organizationId: "org-1",
       teamId: null,
-      projectId: null,
+      projectId: "gov-project",
       occurredAt: Date.parse("2026-08-24T09:00:00.000Z"),
     });
     expect(second?.observedAtMs).toBe(first?.observedAtMs);

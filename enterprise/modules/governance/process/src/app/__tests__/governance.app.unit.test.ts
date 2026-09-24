@@ -17,6 +17,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { GovernanceEncryptor } from "../../app/governance.members.ts";
@@ -62,6 +63,7 @@ async function buildApp() {
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
+      traces: createApiFixture<TraceApi>(),
     },
     members: { prisma: unreachablePrisma, encryption: createApiFixture<GovernanceEncryptor>() },
     resources: new ResourceScope(),
@@ -98,6 +100,7 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
+      traces: createApiFixture<TraceApi>(),
     },
     members: {
       prisma: unreachablePrisma,

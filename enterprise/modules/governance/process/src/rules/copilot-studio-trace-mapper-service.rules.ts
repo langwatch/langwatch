@@ -35,8 +35,7 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { toEpochMs } from "@langwatch/time";
-import type { exportTraceServiceRequestSchema } from "@langwatch/trace-contract";
-import type { z } from "zod";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 
 import {
   type BotFacts,
@@ -56,7 +55,7 @@ import type {
 import * as CopilotTranscriptGroupingService from "./copilot-transcript-grouping-service.rules.ts";
 import * as CopilotTurnAssemblyService from "./copilot-turn-assembly-service.rules.ts";
 
-type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
+type ExportTraceServiceRequest = IExportTraceServiceRequest;
 
 /** The puller action that marks a pulled row as a conversation to route. */
 export const COPILOT_CONVERSATION_ACTION = "copilot_conversation" as const;

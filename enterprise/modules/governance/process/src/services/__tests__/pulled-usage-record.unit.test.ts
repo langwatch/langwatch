@@ -33,10 +33,7 @@ class FixedRateReader implements PulledUsageRateReader {
 const pulledUsageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new FixedRateReader()),
 );
-const buildPulledUsageRecord = ({
-  governanceProjectId: _governanceProjectId,
-  ...input
-}: Parameters<typeof pulledUsageRecords.findBuilt>[0] & { governanceProjectId?: string }) =>
+const buildPulledUsageRecord = ({ ...input }: Parameters<typeof pulledUsageRecords.findBuilt>[0]) =>
   pulledUsageRecords.findBuilt(input);
 
 const SOURCE: PulledUsageSourceAttribution = {
@@ -131,10 +128,11 @@ describe("building one pulled usage record", () => {
       // outright rather than attributed one level up.
       expect(record?.organizationId).toBe("org_acme");
       expect(record?.teamId).toBeNull();
-      expect(record?.projectId).toBeNull();
+      // The home is where the row is stored, and it does not move with the team (main).
+      expect(record?.projectId).toBe(GOV_PROJECT_ID);
     });
 
-    it("leaves a source with no project attribution unassigned", () => {
+    it("stores the row under the governance home without attributing to it", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent(),
         source: SOURCE,
@@ -142,7 +140,7 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
-      expect(record?.projectId).toBeNull();
+      expect(record?.projectId).toBe(GOV_PROJECT_ID);
       expect(record?.organizationId).toBe("org_acme");
       expect(record?.teamId).toBe("team_platform");
     });
