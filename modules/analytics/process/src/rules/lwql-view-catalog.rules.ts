@@ -7,10 +7,17 @@
  */
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
+import { CLICKHOUSE_OVERRIDES } from "./lwql-clickhouse-overrides.rules.ts";
 import { CODING_TOOL_RESULTS } from "./lwql-coding-overrides.rules.ts";
 import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
-import { LWQL_DERIVED_CATALOG } from "./lwql-derived-view-catalog.rules.ts";
+import { defineCatalogTable } from "./lwql-dataset-derivation.rules.ts";
 import { LWQL_POSTGRES_CATALOG } from "./lwql-postgres-view-catalog.rules.ts";
+
+/** One opt-in ClickHouse catalog entry; `joinKeys` reaching another view are stated here. */
+function clickhouseView(table: string, joinKeys?: readonly string[]): LangWatchQLViewDefinition {
+  const override = CLICKHOUSE_OVERRIDES[table] ?? {};
+  return defineCatalogTable(table, joinKeys ? { ...override, joinKeys } : override);
+}
 
 /**
  * How long after a write a row can be missing from these views. The projections are folded by
@@ -656,8 +663,7 @@ const SIMULATIONS: LangWatchQLViewDefinition = {
     {
       name: "InconclusiveCriteria",
       type: "Array(String)",
-      description:
-        "Criteria the judge could not decide; each is also in UnmetCriteria.",
+      description: "Criteria the judge could not decide; each is also in UnmetCriteria.",
       gates: [],
       sourceColumns: ["InconclusiveCriteria"],
     },
@@ -2710,7 +2716,82 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   CODING_AGENT_SESSION_EVENTS,
   CODING_TOOL_RESULTS,
   JUDGMENTS,
-  ...LWQL_DERIVED_CATALOG,
+  // ClickHouse derived views — opt-in, one explicit entry per source table.
+  clickhouseView("automation_audit", ["TenantId", "EventId", "TraceId"]),
+  clickhouseView("billable_events", ["TenantId", "OrganizationId", "EventId"]),
+  clickhouseView("coding_agent_trace_sessions", ["TenantId", "TraceId", "SessionId"]),
+  clickhouseView("dspy_steps", ["TenantId", "ExperimentId", "RunId", "WorkflowVersionId"]),
+  clickhouseView("experiment_run_items", [
+    "TenantId",
+    "ProjectionId",
+    "RunId",
+    "ExperimentId",
+    "TraceId",
+  ]),
+  clickhouseView("experiment_runs", [
+    "TenantId",
+    "ProjectionId",
+    "RunId",
+    "ExperimentId",
+    "WorkflowVersionId",
+  ]),
+  clickhouseView("gateway_budget_ledger_events", [
+    "TenantId",
+    "BudgetId",
+    "ScopeId",
+    "VirtualKeyId",
+    "GatewayRequestId",
+  ]),
+  clickhouseView("gateway_budget_scope_totals", [
+    "TenantId",
+    "Scope",
+    "ScopeId",
+    "Window",
+    "PeriodStart",
+    "BudgetId",
+  ]),
+  clickhouseView("gateway_spend", [
+    "TenantId",
+    "GatewayRequestId",
+    "OrganizationId",
+    "VirtualKeyId",
+    "TraceId",
+  ]),
+  clickhouseView("governance_cost_rollup_restatement_index", [
+    "TenantId",
+    "IngestionSourceId",
+    "AgentId",
+    "RawActorId",
+  ]),
+  clickhouseView("governance_cost_rollup_1d", [
+    "TenantId",
+    "IngestionSourceId",
+    "AgentId",
+    "RawActorId",
+    "OrganizationId",
+  ]),
+  clickhouseView("governance_kpis", ["TenantId", "SourceId", "TraceId"]),
+  clickhouseView("governance_ocsf_events", ["TenantId", "EventId", "TraceId", "SourceId"]),
+  clickhouseView("langy_messages", ["TenantId"]),
+  clickhouseView("langy_analytics_events", ["TenantId", "EventId", "AggregateId"]),
+  clickhouseView("event_log", ["TenantId", "AggregateId", "EventId"]),
+  clickhouseView("stored_log_records", ["TenantId", "ProjectionId", "TraceId", "SpanId"]),
+  clickhouseView("stored_metric_records", ["TenantId", "ProjectionId", "TraceId", "SpanId"]),
+  clickhouseView("log_usage_estimates", ["TenantId", "OrganizationId", "RecordId"]),
+  clickhouseView("log_records", ["TenantId", "TraceId", "SpanId"]),
+  clickhouseView("metric_usage_estimates", ["TenantId", "OrganizationId", "PointId", "SeriesId"]),
+  clickhouseView("metric_data_points", ["TenantId", "PointId", "SeriesId"]),
+  clickhouseView("metric_time_rollups", ["TenantId", "SeriesId"]),
+  clickhouseView("metric_series", ["TenantId", "SeriesId"]),
+  clickhouseView("stored_objects", ["TenantId"]),
+  clickhouseView("session_metric_series", ["TenantId", "SessionId", "SeriesId"]),
+  clickhouseView("simulation_run_metrics_rollup", ["TenantId", "ScenarioRunId", "TraceId"]),
+  clickhouseView("simulation_run_metrics", ["TenantId", "ScenarioRunId", "TraceId", "EventId"]),
+  clickhouseView("suite_runs", ["TenantId", "ProjectionId"]),
+  // Deliberately excluded (absent = unqueryable), see specs/lwql/catalog-inclusion.feature:
+  // the *_mv materialised-view objects (their targets are included), goose_db_version (tooling,
+  // no tenant column), instant_eval_runs (read through the runs API) and
+  // lwql_api_key_tenant_map (access-control plumbing the row policy reads).
   ...LWQL_POSTGRES_CATALOG,
 ];
 

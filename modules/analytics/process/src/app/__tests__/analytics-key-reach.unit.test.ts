@@ -69,13 +69,13 @@ const KEY: LangWatchQLKeyReach = {
 };
 
 /** The app over an organization of `listed` projects, the key granted exactly `grants`. */
-function appOver(input: {
+async function appOver(input: {
   listed: readonly Project[];
   grants: readonly string[];
   flaggedProjects?: readonly string[];
 }) {
   const flagsAsked: string[] = [];
-  const app = AnalyticsApp.create({
+  const app = await AnalyticsApp.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: (_key, target) => {
@@ -108,14 +108,22 @@ function appOver(input: {
       clickhouse: createApiFixture<ClickHouseQueryClient>(),
       rateLimiter: { check: () => Promise.resolve({ allowed: true }) } satisfies RateLimiter,
       publicBaseUrl: "https://app.langwatch.test",
+      langwatchQl: {
+        admin: { configured: false },
+        postgres: { configured: false },
+        database: () => {
+          throw new Error("no database in this test");
+        },
+      },
     },
     config: {
       langwatchQl: {
         url: void 0,
         username: void 0,
-        password: void 0,
         database: void 0,
         tenantSetting: void 0,
+        accessModelMode: void 0,
+        sqlSingleNode: void 0,
       },
     },
     resources: { own: () => void 0, ownService: () => void 0 },
@@ -125,8 +133,8 @@ function appOver(input: {
   return { app, flagsAsked };
 }
 
-function referenceFor(input: { listed: readonly Project[]; grants: readonly string[] }) {
-  return appOver(input).app.describeQueryReferenceForKey({ reach: KEY });
+async function referenceFor(input: { listed: readonly Project[]; grants: readonly string[] }) {
+  return (await appOver(input)).app.describeQueryReferenceForKey({ reach: KEY });
 }
 
 describe("AnalyticsApp.describeQueryReferenceForKey", () => {
@@ -153,7 +161,9 @@ describe("AnalyticsApp.describeQueryReferenceForKey", () => {
     it("embeds the very schema the schema endpoint publishes", async () => {
       const input = { listed: [project(PROJECT_ID)], grants: ["analytics:view", "traces:view"] };
       const reference = await referenceFor(input);
-      const schema = await appOver(input).app.describeLangWatchQLSchemaForKey({ reach: KEY });
+      const schema = await (
+        await appOver(input)
+      ).app.describeLangWatchQLSchemaForKey({ reach: KEY });
 
       expect(reference.lwql.schema).toEqual(schema);
     });
@@ -209,7 +219,7 @@ describe("AnalyticsApp.describeLangWatchQLSchemaForKey", () => {
   describe("given a key that reads more than one project", () => {
     /** @scenario "An eval function is refused for a key that reads more than one project" */
     it("closes the eval functions without asking either project's flag", async () => {
-      const { app, flagsAsked } = appOver({
+      const { app, flagsAsked } = await appOver({
         listed: [project("project-a"), project("project-b")],
         grants: ["analytics:view"],
         flaggedProjects: ["project-a", "project-b"],
@@ -225,12 +235,15 @@ describe("AnalyticsApp.describeLangWatchQLSchemaForKey", () => {
   describe("given a key that reads one project", () => {
     /** @scenario "A key that reads one project is judged on that project's own flag" */
     it("answers with that project's own flag", async () => {
-      const flagged = appOver({
+      const flagged = await appOver({
         listed: [project("project-a")],
         grants: ["analytics:view"],
         flaggedProjects: ["project-a"],
       });
-      const unflagged = appOver({ listed: [project("project-c")], grants: ["analytics:view"] });
+      const unflagged = await appOver({
+        listed: [project("project-c")],
+        grants: ["analytics:view"],
+      });
 
       expect(
         isEvalAvailable(await flagged.app.describeLangWatchQLSchemaForKey({ reach: KEY })),
@@ -244,7 +257,7 @@ describe("AnalyticsApp.describeLangWatchQLSchemaForKey", () => {
 
   describe("given a key that reads no project at all", () => {
     it("closes the eval functions rather than treating an empty scope as unrestricted", async () => {
-      const { app, flagsAsked } = appOver({ listed: [], grants: ["analytics:view"] });
+      const { app, flagsAsked } = await appOver({ listed: [], grants: ["analytics:view"] });
 
       expect(isEvalAvailable(await app.describeLangWatchQLSchemaForKey({ reach: KEY }))).toBe(
         false,

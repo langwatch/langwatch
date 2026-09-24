@@ -1,23 +1,18 @@
-/** The Postgres catalog derivation: tenant scope, safe defaults and label columns. */
+/** The Postgres catalog per-model builder: tenant scope, safe defaults and label columns. */
 
 import { describe, expect, it } from "vitest";
 
 import {
-  derivePostgresCatalog,
+  type DerivedPostgresView,
   detectDefaultStripReason,
   resolveTenantScope,
   sanitizeDescription,
-} from "../lwql-postgres-catalog-derivation.rules.ts";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "../lwql-postgres-skipped-models.rules.ts";
-import { LWQL_POSTGRES_ALL_OVERRIDES } from "../lwql-postgres-view-catalog.rules.ts";
+} from "../lwql-postgres-catalog-model.rules.ts";
+import { LWQL_POSTGRES_CATALOG } from "../lwql-postgres-view-catalog.rules.ts";
 import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "../lwql-prisma-manifest.rules.ts";
 import { organizationTenantPath, teamTenantPath } from "../lwql-tenant-paths.rules.ts";
 
-const catalog = derivePostgresCatalog({
-  manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
-  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-});
+const catalog = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 const byModel = new Map(catalog.map((view) => [view.postgres!.baseRelation, view]));
 const byName = new Map(catalog.map((view) => [view.name, view]));
 
@@ -79,7 +74,7 @@ describe("given the derived Postgres catalog", () => {
       });
       // The parent is organization-scoped, so the tail is the org helper.
       expect(view.postgres!.tenantPath?.slice(1)).toEqual(organizationTenantPath());
-      expect(LWQL_POSTGRES_SKIPPED_MODELS.GatewayBudgetLedger).toBeUndefined();
+      expect(byName.has("gateway_budget_ledgers")).toBe(true);
     });
   });
 

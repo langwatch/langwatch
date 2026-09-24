@@ -10030,7 +10030,8 @@
           "grain": "one row per DatasetId",
           "joinKeys": [
             "TenantId",
-            "DatasetId"
+            "DatasetId",
+            "SourceStoredObjectId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -10153,6 +10154,14 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "SourceStoredObjectId",
+              "type": "Nullable(String)",
+              "description": "SourceStoredObjectId",
+              "unit": null,
+              "gates": [],
               "available": true
             },
             {

@@ -10,7 +10,8 @@ import { defineServerModule } from "@langwatch/kernel";
 import { z } from "zod";
 
 import { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
-import { AnalyticsApp } from "./app/analytics.app.ts";
+import { AnalyticsApp, type LangWatchQlSupply } from "./app/analytics.app.ts";
+import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "./repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import type { GenerateFilterConditionsResult } from "./repositories/clickhouse/clickhouse.filter-shapes.mapper.ts";
 import { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
@@ -37,7 +38,14 @@ export const analyticsServer = defineServerModule("analytics")
   // The query door fans the key it authenticated out to the projects it may read.
   .withTransportFacts(() => [
     bindRestMiddleware(langWatchQLKeyReach, (context) => keyCredentialOfRequest(context.req.raw)),
-  ]);
+  ])
+  // Worker-hosted: the access-model reconvergence watch (ADR-159).
+  .withEventing(lwqlReconvergenceEventing);
+
+/** The process's answer to analytics' `langwatchQl` member: the stores' two targets and Prisma. */
+export function langWatchQlSupply(supply: LangWatchQlSupply): LangWatchQlSupply {
+  return supply;
+}
 
 /**
  * The tenant-bound session analytics' ClickHouse reads run through. It opens

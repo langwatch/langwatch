@@ -201,7 +201,7 @@ describe("given the closed member list", () => {
 
     it("names no audit member: the sink is the audit-log module's app", () => {
       expect([...MEMBER_NAMES]).not.toContain("audit");
-      expect(MEMBER_NAMES).toHaveLength(14);
+      expect(MEMBER_NAMES).toHaveLength(16);
     });
 
     it("reads a module's declaration back as the tuple it wrote", () => {

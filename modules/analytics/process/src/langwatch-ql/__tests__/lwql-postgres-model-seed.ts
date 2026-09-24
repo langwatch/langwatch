@@ -4,13 +4,31 @@
  * stripped strings marked `excluded-`, nullable columns left null, required ones filled
  */
 
-import type { DerivedPostgresView } from "../../rules/lwql-postgres-catalog-derivation.rules.ts";
+import type { DerivedPostgresView } from "../../rules/lwql-postgres-catalog-model.rules.ts";
 import { prismaManifestEnum } from "../../rules/lwql-prisma-manifest.rules.ts";
 import type {
   PrismaField,
   PrismaManifest,
   PrismaModel,
 } from "../../rules/lwql-prisma-schema.rules.ts";
+
+/** The subset of a derived view this seeder reads; a supertype of `DerivedPostgresView`. */
+export interface SeedableView {
+  readonly postgres?: {
+    /** Application table the view reads. */
+    readonly baseRelation: string;
+    /** Column read on the last tenant-path alias to yield `TenantId`. */
+    readonly tenantSourceColumn: string;
+    /** Join chain to the relation carrying the owning project (absent = none). */
+    readonly tenantPath?: readonly {
+      readonly relation: string;
+      readonly alias: string;
+      readonly on: { readonly from: string; readonly to: string };
+    }[];
+  };
+  /** Source columns the builder stripped, mapped to the reason. */
+  readonly skipColumns: Readonly<Record<string, string>>;
+}
 
 /** A fixed timestamp for every `DateTime` column, matching the explicit seeds. */
 const SEED_STAMP = "2026-01-01T00:00:00Z";

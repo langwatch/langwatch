@@ -11,17 +11,19 @@ import { clearTimeout, setTimeout } from "node:timers";
 import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness/clickhouse";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { expect } from "vitest";
 
-import { derivePostgresCatalog } from "../../rules/lwql-postgres-catalog-derivation.rules.ts";
-import { LWQL_POSTGRES_SKIPPED_MODELS } from "../../rules/lwql-postgres-skipped-models.rules.ts";
-import { LWQL_POSTGRES_ALL_OVERRIDES } from "../../rules/lwql-postgres-view-catalog.rules.ts";
+import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../../rules/langwatch-ql-config-store.rules.ts";
+import type { DerivedPostgresView } from "../../rules/lwql-postgres-catalog-model.rules.ts";
+import { LWQL_POSTGRES_CATALOG } from "../../rules/lwql-postgres-view-catalog.rules.ts";
 import { LWQL_PRISMA_MANIFEST } from "../../rules/lwql-prisma-manifest.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
@@ -51,6 +53,7 @@ const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 
 const accessModel = LangWatchQLAccessModelService.create();
+const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const serverConfig = LangWatchQLServerConfigService.create();
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
@@ -86,8 +89,23 @@ export const CLICKHOUSE_ERROR_CODE = {
   SYNTAX_ERROR: 62,
   /** A setting change refused by `readonly = 1`. */
   READONLY: 164,
+  /**
+   * An entity owned by the read-only `users_xml` config store cannot be created
+   * or altered through SQL — what provisioning tolerates and skips.
+   */
+  ACCESS_STORAGE_READONLY: CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY,
   /** Refused by grants. */
   ACCESS_DENIED: 497,
+  /**
+   * A `DROP NAMED COLLECTION` of a config-XML-defined collection — the SQL store
+   * has no copy to remove, reported even with `IF EXISTS`. Tolerated and skipped.
+   */
+  NAMED_COLLECTION_DOESNT_EXIST: CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+  /** A named collection already defined in a config XML — tolerated and skipped. */
+  NAMED_COLLECTION_ALREADY_EXISTS:
+    CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
+  /** An immutable, config-XML-owned named collection under ALTER/DROP — tolerated. */
+  NAMED_COLLECTION_IS_IMMUTABLE: CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
 } as const;
 
 /** PostgreSQL SQLSTATEs this proof discriminates between. */
@@ -148,6 +166,53 @@ export const LWQL_FACT_TABLES: LangWatchQLTable[] = [
 ];
 
 /**
+ * The fixture fact tables as REAL LangWatchQL view definitions (#8258).
+ * The toy tables (`traces`, `spans`) are not in the shipped catalog, so a suite
+ * that wants them policed registers them as ordinary view definitions in the
+ */
+const LWQL_FIXTURE_VIEWS: LangWatchQLViewDefinition[] = LWQL_FACT_TABLES.map(
+  (table): LangWatchQLViewDefinition => ({
+    name: table.table,
+    sourceTable: table.table,
+    description: `harness fixture view over ${table.table}`,
+    gates: [],
+    grain: `one ${table.table} row`,
+    grainColumns: ["TenantId"],
+    joinKeys: [],
+    freshness: "test",
+    tenantColumn: table.tenantColumn === "TenantId" ? undefined : table.tenantColumn,
+    dedup: { strategy: "none", keyColumns: ["TenantId"] },
+    columns: [
+      {
+        name: "TenantId",
+        type: "String",
+        description: "owning tenant",
+        gates: [],
+        sourceColumns: [table.tenantColumn],
+      },
+    ],
+  }),
+);
+
+/**
+ * The named-collection stub the harness carries in a definition when it is not
+ * rendering the collection itself (only {@link renderLwqlNamedCollectionDdl}
+ * reads it, and the access-model emitter ignores it).
+ */
+const HARNESS_NAMED_COLLECTION_STUB = {
+  collection: "lwql_postgres",
+  host: "unused",
+  port: 0,
+  database: "unused",
+  user: "unused",
+  password: "unused",
+} as const;
+
+/** The sha256 hex the restricted user is identified by (never the plaintext). */
+const RESTRICTED_PASSWORD_SHA256_HEX = (): string =>
+  createHash("sha256").update(RESTRICTED_PASSWORD).digest("hex");
+
+/**
  * Where the fact tables the proof reads come from.
  */
 export type LangWatchQLFactTableMode = "fixture" | "migrated";
@@ -179,6 +244,17 @@ export interface LangWatchQLClickHouseHarness {
   };
   /** Runs statements as the administrator, in order. */
   applyAsAdmin(statements: string[]): Promise<void>;
+  /**
+   * Renders the whole access model from one definition and applies it, exactly
+   * as production does (#8258). Run after the views exist. `views` overrides the
+   * base fixtures outright; `extraViews` appends the suite's own view
+   */
+  applyAccessModel(opts?: {
+    views?: readonly LangWatchQLViewDefinition[];
+    extraViews?: readonly LangWatchQLViewDefinition[];
+    limits?: LangWatchQLResourceLimits;
+    sourceDatabase?: string;
+  }): Promise<void>;
   container: StartedClickHouseContainer;
   stop(): Promise<void>;
 }
@@ -212,17 +288,24 @@ function writeConfigFile(directory: string, name: string, contents: string): str
 export async function startLangWatchQLClickHouse({
   suite,
   facts = "fixture",
+  extraConfigFiles = [],
 }: {
   suite: string;
   facts?: LangWatchQLFactTableMode;
+  /** Extra server config files to install before ClickHouse starts. */
+  extraConfigFiles?: { name: string; target: string; contents: string }[];
 }): Promise<LangWatchQLClickHouseHarness> {
   const names = lwqlNamesForSuite(suite);
   const accessManagementXml = serverConfig.accessManagementConfigXml({
     administrativeUser: ADMIN_USER,
   });
-  const configDigest = createHash("sha256")
-    .update(CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML)
-    .update(accessManagementXml)
+  const configDigest = extraConfigFiles
+    .reduce(
+      (hash, file) => hash.update(file.target).update(file.contents),
+      createHash("sha256")
+        .update(CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML)
+        .update(accessManagementXml),
+    )
     .digest("hex")
     .slice(0, 16);
 
@@ -250,6 +333,10 @@ export async function startLangWatchQLClickHouse({
         source: writeConfigFile(configDirectory, "access-management.xml", accessManagementXml),
         target: CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
       },
+      ...extraConfigFiles.map((file) => ({
+        source: writeConfigFile(configDirectory, file.name, file.contents),
+        target: file.target,
+      })),
     ])
     // Reaching PostgreSQL on the docker host; see the module comment.
     .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
@@ -294,16 +381,35 @@ export async function startLangWatchQLClickHouse({
     );
   }
 
-  await applyAsAdmin(
-    accessModel.setupStatements({
-      names,
-      password: RESTRICTED_PASSWORD,
-      lwqlTables,
-    }),
-  );
+  // The fixture fact tables, registered as view definitions so the emitter polices them like
+  // any catalog source (#8258). Empty under `migrated`: the suite applies the real views.
+  const baseViews: LangWatchQLViewDefinition[] = facts === "migrated" ? [] : LWQL_FIXTURE_VIEWS;
 
-  // The access model provisions the key map in the LangWatchQL database, whatever the facts mode.
-  await seedKeyMap({ admin, names, keyMapDatabase: names.database });
+  /** Renders the whole access model from ONE definition and applies it, as production does. */
+  const applyAccessModel = async (opts?: {
+    views?: readonly LangWatchQLViewDefinition[];
+    extraViews?: readonly LangWatchQLViewDefinition[];
+    limits?: LangWatchQLResourceLimits;
+    sourceDatabase?: string;
+  }): Promise<void> => {
+    const definition = accessModelDefinition.build({
+      names,
+      passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+      namedCollection: HARNESS_NAMED_COLLECTION_STUB,
+      sourceDatabase: opts?.sourceDatabase ?? factDatabase,
+      ...(opts?.limits ? { limits: opts.limits } : {}),
+      views: opts?.views ?? [...baseViews, ...(opts?.extraViews ?? [])],
+    });
+    await applyAsAdmin(accessModelDefinition.renderDdl(definition));
+  };
+
+  // The setup statements carry only the structural objects; the access model is
+  // single-sourced from the definition above.
+  await applyAsAdmin(accessModel.setupStatements({ names, sourceDatabase: factDatabase }));
+  await applyAccessModel();
+
+  // The key map lives in the facts database, as a real deploy's lives in the app's own.
+  await seedKeyMap({ admin, names, keyMapDatabase: factDatabase });
   if (facts === "migrated") {
     await seedRealFactRows({ admin, database: factDatabase });
   } else {
@@ -319,6 +425,7 @@ export async function startLangWatchQLClickHouse({
     factDatabase,
     container,
     applyAsAdmin,
+    applyAccessModel,
     async restrictedClient(options) {
       const keyHash = options?.keyHash;
       const client = createClient({
@@ -1619,12 +1726,8 @@ export const LWQL_EXPLICITLY_SEEDED_MODELS = [
   "VirtualKey",
 ] as const;
 
-/** The derived Postgres catalog, from the manifest, skip map and overrides the shipped one uses. */
-const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS = derivePostgresCatalog({
-  manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
-  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-});
+/** Built once and shared by the seed and the view/reader-role setup, so the two never drift. */
+const LWQL_HARNESS_DERIVED_POSTGRES_VIEWS = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 
 /**
  * One tenant's rows in every mapped base relation, column-named against the migrated tables,
@@ -1944,19 +2047,27 @@ export async function mapPostgresIntoClickHouse({
       tenantColumn: PG_MAPPED_TENANT_COLUMN,
     }));
   const collection = lwqlTestNamedCollection(harness.names);
+  // Only the named collection reads these fields; the access model (grants and
+  // row policies) is single-sourced from the shipped catalog and applied by the
+  // suite through `harness.applyAccessModel({ views: lwqlPostgresViews(...) })`
+  // once the views exist — exactly as production orders it (#8258).
+  const pgDefinition = accessModelDefinition.build({
+    names: harness.names,
+    passwordSha256Hex: RESTRICTED_PASSWORD_SHA256_HEX(),
+    namedCollection: {
+      collection,
+      // The docker host as seen from inside the ClickHouse container; see the
+      // module comment for why this is not a shared docker network.
+      host: "host.docker.internal",
+      port: postgres.container.getPort(),
+      database: PG_DATABASE,
+      user: PG_READER_ROLE,
+      password: PG_READER_PASSWORD,
+    },
+    sourceDatabase: harness.names.database,
+  });
   await harness.applyAsAdmin([
-    ...postgresMapping.namedCollectionStatements({
-      connection: {
-        collection,
-        // The docker host as seen from inside the ClickHouse container; see the
-        // module comment for why this is not a shared docker network.
-        host: "host.docker.internal",
-        port: postgres.container.getPort(),
-        database: PG_DATABASE,
-        user: PG_READER_ROLE,
-        password: PG_READER_PASSWORD,
-      },
-    }),
+    ...accessModelDefinition.renderNamedCollectionDdl(pgDefinition),
     ...lwqlTables.map(
       (lwqlTable) => `DROP TABLE IF EXISTS ${harness.names.database}.${lwqlTable.table}`,
     ),
@@ -1964,13 +2075,6 @@ export async function mapPostgresIntoClickHouse({
       names: harness.names,
       collection,
     }),
-    // No grant here on purpose. `viewProvisioning.setupStatements` issues the
-    // column-scoped one for every source it reads, and ClickHouse grants are
-    // additive: a whole-table grant issued here would sit underneath it and
-    // quietly widen it back out — the same trap the fixture fact tables carry.
-    ...lwqlTables.map((lwqlTable) =>
-      accessModel.rowPolicyStatement({ names: harness.names, lwqlTable }),
-    ),
   ]);
   return lwqlTables;
 }

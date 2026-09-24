@@ -4,30 +4,27 @@
  * @see specs/lwql/api.feature
  */
 
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
-import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
+import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import type { LangWatchQLProvisioningRepository } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
-import {
-  KEY_MAP_COLUMNS,
-  type LangWatchQLNames,
-} from "../services/langwatch-ql-access-model.service.ts";
-import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service.ts";
+import { clickHouseErrorSummary } from "../rules/langwatch-ql-config-store.rules.ts";
+import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
-  type LwqlKeyMapBackfillPlan,
 } from "../services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlSelfProvisionRequest,
 } from "../services/langwatch-ql-self-provisioning.service.ts";
+import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
-const lwqlExecutors = LangWatchQLExecutorService.create();
+const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 
 /** One global key: the self-provision convergence is a singleton, not per tenant. */
@@ -54,31 +51,21 @@ export type LwqlProvisioningDatabase = {
   };
 };
 
-/**
- * The admin ClickHouse connection — `CLICKHOUSE_URL`, the app's own
- * credentials — never the restricted `LWQL_CLICKHOUSE_*` identity, which has
- * no DDL privileges by design.
- */
-async function withAdminClickHouseClient<T>({
-  url,
+async function withProvisioningRepository<T>({
+  open,
   fn,
 }: {
-  url: string | undefined;
-  fn: (client: ClickHouseClient) => Promise<T>;
+  open: () => LangWatchQLProvisioningRepository;
+  fn: (repository: LangWatchQLProvisioningRepository) => Promise<T>;
 }): Promise<T> {
-  const client = createClient({ url });
+  const repository = open();
   try {
-    return await fn(client);
+    return await fn(repository);
   } finally {
-    await client.close();
+    await repository.close();
   }
 }
 
-/**
- * Every raw statement goes through the app's guarded `prisma` client, so each
- * needs the `-- @tenancy:` opt-out `guardProjectId` requires for a raw query
- * with no tenancy predicate — these statements are catalog-wide by design.
- */
 async function runPostgresStatements({
   database,
   statements,
@@ -91,152 +78,54 @@ async function runPostgresStatements({
   }
 }
 
-async function planBackfillFromCurrentState({
-  client,
-  database,
-  names,
-  sourceDatabase,
-}: {
-  client: ClickHouseClient;
-  database: LwqlProvisioningDatabase;
-  names: LangWatchQLNames;
-  sourceDatabase: string;
-}): Promise<LwqlKeyMapBackfillPlan> {
-  const projects = await database.project.findMany({
-    select: { id: true, lwqlKey: true },
-  });
-
-  const table = lwqlProvisioning.keyMapTableQualifiedName({ names, sourceDatabase });
-  // Deliberately unfiltered: this admin scan collects key hashes across ALL
-  // tenants to diff against every project's key — the one query shape the
-  // "every ClickHouse query MUST filter on TenantId" rule cannot apply to.
-  // `qualified()` (via lwqlProvisioning.keyMapTableQualifiedName) validates the
-  // interpolated database and table identifiers.
-  const existingResult = await client.query({
-    query: `SELECT DISTINCT ${KEY_MAP_COLUMNS.keyHash} FROM ${table}`,
-    format: "JSONEachRow",
-  });
-  const existingRows = (await existingResult.json()) as Record<string, string>[];
-  // `noUncheckedIndexedAccess` types the lookup as `string | undefined` even
-  // though every row genuinely carries this column (it is the only thing the
-  // query selects) — filtered, not defaulted, so a row that somehow lacked it
-  // is dropped rather than coerced into a bogus "" entry in the set.
-  const existingHashes = new Set(
-    existingRows
-      .map((row) => row[KEY_MAP_COLUMNS.keyHash])
-      .filter((hash): hash is string => hash !== undefined),
-  );
-
-  return lwqlProvisioning.planKeyMapBackfill({ projects, existingHashes });
-}
-
+/** Inserts only the rows the key map lacks; a blank key is reported, never written. */
 async function backfillKeyMap({
-  client,
+  repository,
   database,
   names,
   sourceDatabase,
 }: {
-  client: ClickHouseClient;
+  repository: LangWatchQLProvisioningRepository;
   database: LwqlProvisioningDatabase;
   names: LangWatchQLNames;
   sourceDatabase: string;
 }): Promise<void> {
-  const plan = await planBackfillFromCurrentState({
-    client,
-    database,
-    names,
-    sourceDatabase,
-  });
-
-  // Surfaced loudly, never silently skipped: a blank key is a project that
-  // cannot authenticate to LangWatchQL at all, which is the exact class of
-  // outage this backfill exists to close.
+  const projects = await database.project.findMany({ select: { id: true, lwqlKey: true } });
+  const table = lwqlProvisioning.keyMapTableQualifiedName({ names, sourceDatabase });
+  const existingHashes = new Set(await repository.findKeyMapHashes({ table }));
+  const plan = lwqlProvisioning.planKeyMapBackfill({ projects, existingHashes });
   if (plan.blankKeyProjectIds.length > 0) {
     logger.error(
-      {
-        count: plan.blankKeyProjectIds.length,
-        projectIds: plan.blankKeyProjectIds,
-      },
+      { count: plan.blankKeyProjectIds.length, projectIds: plan.blankKeyProjectIds },
       "lwql key-map backfill found projects with an empty lwqlKey — these projects cannot authenticate to LangWatchQL until their key is regenerated",
     );
   }
-
   if (plan.rowsToInsert.length === 0) {
     logger.info("lwql key-map backfill: no missing rows");
     return;
   }
-
-  const table = lwqlProvisioning.keyMapTableQualifiedName({ names, sourceDatabase });
-  await client.insert({
-    table,
-    values: plan.rowsToInsert,
-    format: "JSONEachRow",
-    clickhouse_settings: LWQL_KEY_MAP_INSERT_SETTINGS,
-  });
+  await repository.insertKeyMapRows({ table, rows: plan.rowsToInsert });
   logger.info(
     { inserted: plan.rowsToInsert.length },
     "lwql key-map backfill: inserted missing rows",
   );
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/**
- * One statement per round trip, so a failure names which one. The error is
- * redacted first: a ClickHouse error echoes the DDL, which embeds passwords.
- */
-async function runClickHouseStatements({
-  client,
-  statements,
-  secrets = [],
-}: {
-  client: ClickHouseClient;
-  statements: string[];
-  secrets?: readonly (string | undefined)[];
-}): Promise<void> {
-  for (const [index, statement] of statements.entries()) {
-    try {
-      await client.command({ query: statement });
-    } catch (error) {
-      logger.error(
-        {
-          error: selfProvisioning.redactSecrets({ text: errorMessage(error), secrets }),
-          statement: `${index + 1}/${statements.length}`,
-        },
-        "lwql provisioning failed creating ClickHouse objects",
-      );
-      throw error;
-    }
-  }
-}
-
-/**
- * Whether this server holds the app functions on every replica. A server that
- * cannot say, or would hold them on one replica only, is provisioned without
- * them: half the replicas answering UNKNOWN_FUNCTION is worse than none.
- */
-async function appFunctionsProvisionable(client: ClickHouseClient): Promise<boolean> {
+async function appFunctionsProvisionable(
+  repository: LangWatchQLProvisioningRepository,
+): Promise<boolean> {
   try {
     const [replicas, setting] = await Promise.all([
-      client
-        .query({
-          query: "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-          format: "JSONEachRow",
-        })
-        .then((result) => result.json<{ max_total_replicas: string }>()),
-      client
-        .query({
-          query:
-            "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-          format: "JSONEachRow",
-        })
-        .then((result) => result.json<{ value: string }>()),
+      repository.queryRows(
+        "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
+      ),
+      repository.queryRows(
+        "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
+      ),
     ]);
     const probe = {
       maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
-      userDefinedZookeeperPath: setting[0]?.value ?? "",
+      userDefinedZookeeperPath: typeof setting[0]?.value === "string" ? setting[0].value : "",
     };
     if (canProvisionAppFunctions(probe)) return true;
     logger.error(
@@ -246,7 +135,7 @@ async function appFunctionsProvisionable(client: ClickHouseClient): Promise<bool
     return false;
   } catch (error) {
     logger.error(
-      { error: errorMessage(error) },
+      { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
     );
     return false;
@@ -254,18 +143,11 @@ async function appFunctionsProvisionable(client: ClickHouseClient): Promise<bool
 }
 
 /**
- * With `connection_limit=1` the lock's transaction pins the only connection
- * and the convergence body can never borrow one, so refuse that up front.
+ * The lock's transaction pins one connection for the whole run; with a pool of one the
+ * convergence body can never borrow one, so refuse that up front.
  */
-function assertPoolFitsSelfProvisionLock(databaseUrl: string | undefined): void {
-  if (!databaseUrl) return;
-  let connectionLimit: string | null;
-  try {
-    connectionLimit = new URL(databaseUrl).searchParams.get("connection_limit");
-  } catch {
-    return;
-  }
-  if (connectionLimit === "1") {
+function assertPoolFitsSelfProvisionLock(connectionLimit: number | undefined): void {
+  if (connectionLimit === 1) {
     throw new Error(
       "LWQL self-provision lock requires a connection pool of at least 2 (DATABASE_URL has connection_limit=1): the lock's transaction would pin the only connection and the convergence could never acquire one. Raise connection_limit to 2 or more.",
     );
@@ -279,14 +161,14 @@ function assertPoolFitsSelfProvisionLock(databaseUrl: string | undefined): void 
  */
 async function withSelfProvisionLock<T>({
   database,
-  databaseUrl,
+  connectionLimit,
   fn,
 }: {
   database: LwqlProvisioningDatabase;
-  databaseUrl: string | undefined;
+  connectionLimit: number | undefined;
   fn: () => Promise<T>;
 }): Promise<T> {
-  assertPoolFitsSelfProvisionLock(databaseUrl);
+  assertPoolFitsSelfProvisionLock(connectionLimit);
   return database.$transaction(
     async (tx) => {
       await tx.$executeRawUnsafe(
@@ -301,41 +183,91 @@ async function withSelfProvisionLock<T>({
   );
 }
 
-/**
- * The `LWQL_SELF_PROVISION=true` path: the whole model, and never a thrown
- * error. It ships default-on for external ClickHouse, so a server refusing
- * the DDL degrades to a loud log and a fail-closed endpoint, not a crashloop.
- */
-async function selfProvisionAll({
+/** Inventory, app-function probe, SQL-mode guard, the statements, then a non-fatal backfill. */
+async function convergeClickHouse({
+  repository,
   database,
   source,
   request,
   names,
   sourceDatabase,
 }: {
+  repository: LangWatchQLProvisioningRepository;
   database: LwqlProvisioningDatabase;
-  source: Record<string, string | undefined>;
+  source: Readonly<Record<string, string | undefined>>;
   request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
   names: LangWatchQLNames;
   sourceDatabase: string;
 }): Promise<void> {
-  logger.info(
-    { database: names.database, sourceDatabase },
-    "self-provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views (LWQL_SELF_PROVISION)",
-  );
-  const secrets = [
-    request.connection.password,
-    request.postgresReaderPassword,
-    source.CLICKHOUSE_URL,
-    source.DATABASE_URL,
-  ];
-
+  const configStoreEntities = await repository.inventoryConfigStore({ names });
+  const includeAppFunctions = await appFunctionsProvisionable(repository);
+  const mode = selfProvisioning.accessModelMode({ source });
+  if (mode === "sql") {
+    await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
+  }
+  const result = await repository.runStatements({
+    configStoreEntities,
+    statements: selfProvisioning.clickHouseStatements({
+      names,
+      restrictedPassword: request.connection.password,
+      sourceDatabase,
+      postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+      includeAppFunctions,
+      mode,
+    }),
+  });
+  if (result.skipped.length > 0) {
+    logger.warn(
+      { skippedCount: result.skipped.length },
+      "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
+    );
+  }
+  // Non-fatal here: the backfill converges, and project creation syncs rows inline.
   try {
+    await backfillKeyMap({ repository, database, names, sourceDatabase });
+  } catch (error) {
+    logger.error(
+      { error: clickHouseErrorSummary(error) },
+      "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
+    );
+  }
+}
+
+/** Everything one convergence needs, from the deploy task's environment or the worker's members. */
+export interface LwqlConvergencePlan {
+  readonly request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
+  readonly names: LangWatchQLNames;
+  /** Resolved inside the never-throwing run: an unparsable database name must not crash boot. */
+  readonly sourceDatabase: () => string;
+  readonly schema: string;
+  readonly connectionLimit?: number;
+  /** `LWQL_ACCESS_MODEL_MODE` and `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`. */
+  readonly settings: Readonly<Record<string, string | undefined>>;
+  readonly openRepository: () => LangWatchQLProvisioningRepository;
+}
+
+/**
+ * Every configured boot converges the whole model, and never throws: a server refusing
+ * the DDL degrades to a loud log and a fail-closed endpoint, not a crashloop (ADR-159).
+ */
+export async function convergeLwqlAccessModel({
+  database,
+  plan,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+}): Promise<void> {
+  const { request, names, schema } = plan;
+  try {
+    const sourceDatabase = plan.sourceDatabase();
+    logger.info(
+      { database: names.database, sourceDatabase },
+      "self-provisioning the full LangWatchQL model — access model, PostgreSQL bridge, views",
+    );
     await withSelfProvisionLock({
       database,
-      databaseUrl: source.DATABASE_URL,
+      connectionLimit: plan.connectionLimit,
       fn: async () => {
-        const schema = lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL);
         await runPostgresStatements({
           database,
           statements: [
@@ -345,50 +277,42 @@ async function selfProvisionAll({
             }),
             // After the views: the reader role's grants name them.
             ...selfProvisioning.postgresReaderStatements({
-              mode: "manage-role",
               readerPassword: request.postgresReaderPassword,
               schema,
-            }).statements,
+            }),
           ],
         });
 
-        await withAdminClickHouseClient({
-          url: source.CLICKHOUSE_URL,
-          fn: async (client) => {
-            const includeAppFunctions = await appFunctionsProvisionable(client);
-            await runClickHouseStatements({
-              client,
-              secrets,
-              statements: selfProvisioning.clickHouseStatements({
-                names,
-                restrictedPassword: request.connection.password,
-                sourceDatabase,
-                postgres: {
-                  endpoint: request.endpoint,
-                  readerPassword: request.postgresReaderPassword,
-                },
-                includeAppFunctions,
-              }),
-            });
-            // Non-fatal here: the backfill converges, and project creation syncs rows inline.
-            try {
-              await backfillKeyMap({ client, database, names, sourceDatabase });
-            } catch (error) {
-              logger.error(
-                { error: selfProvisioning.redactSecrets({ text: errorMessage(error), secrets }) },
-                "lwql key-map backfill failed — continuing; project creation syncs rows inline and the next deploy retries the rest",
-              );
-            }
-          },
+        await withProvisioningRepository({
+          open: plan.openRepository,
+          fn: (repository) =>
+            convergeClickHouse({
+              repository,
+              database,
+              source: plan.settings,
+              request,
+              names,
+              sourceDatabase,
+            }),
         });
       },
     });
     logger.info("LangWatchQL self-provisioning complete");
   } catch (error) {
     logger.error(
-      { error: selfProvisioning.redactSecrets({ text: errorMessage(error), secrets }) },
+      { error: clickHouseErrorSummary(error) },
       "lwql self-provisioning failed — continuing boot; LangWatchQL queries stay refused (fail-closed) until a later deploy converges",
     );
+  }
+}
+
+/** The pool size `DATABASE_URL` names, as plan fields: empty where it names none. */
+function connectionLimitFields(databaseUrl: string | undefined): { connectionLimit?: number } {
+  try {
+    const limit = Number(new URL(databaseUrl ?? "").searchParams.get("connection_limit"));
+    return Number.isInteger(limit) && limit > 0 ? { connectionLimit: limit } : {};
+  } catch {
+    return {};
   }
 }
 
@@ -401,99 +325,35 @@ export async function runLwqlProvisioningTask({
   source: Record<string, string | undefined>;
 }): Promise<void> {
   const selfProvision = selfProvisioning.request({ source });
-  if (selfProvision.requested && !selfProvision.complete) {
+  if (!selfProvision.requested) {
+    logger.info("LWQL not configured, skipping");
+    return;
+  }
+  if (!selfProvision.complete) {
     logger.warn(
       { missing: selfProvision.missing },
-      "LWQL_SELF_PROVISION is true but its inputs are incomplete — skipping provisioning this boot; LangWatchQL queries stay refused (fail-closed) until the configuration is complete",
+      "LangWatchQL is partially configured — skipping provisioning this boot; queries stay refused (fail-closed) until the configuration is complete",
     );
     return;
   }
 
-  const connection = selfProvision.requested
-    ? selfProvision.connection
-    : lwqlExecutors.parseConnectionFromEnvironment(source);
-  if (!connection) {
-    logger.info("LWQL not configured, skipping");
-    return;
-  }
-
-  const names = lwqlProvisioning.names({ connection });
-  const { database: sourceDatabase } = parseConnectionUrl({
-    connectionUrl: source.CLICKHOUSE_URL,
-    clusterName: source.CLICKHOUSE_CLUSTER,
-  });
-
-  if (selfProvision.requested) {
-    await selfProvisionAll({ database, source, request: selfProvision, names, sourceDatabase });
-    return;
-  }
-
-  logger.info(
-    { database: names.database, sourceDatabase },
-    "provisioning LangWatchQL objects — the ClickHouse access model and PostgreSQL-mapped views are provisioned by infra, out of band",
-  );
-
-  // The schema the tables actually live in (Prisma's `?schema=` URL
-  // parameter), not a hardcoded `public` — the SaaS cloud deploys with
-  // `schema=langwatch_db`, where `public."Annotation"` does not exist.
-  const postgresSchema = lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL);
-
-  // Chart-managed ClickHouse paired with chart-managed PostgreSQL converges
-  // lwql_ro itself (manage-role); anything else owns the role out of band and
-  // only has the approved views re-granted. Read before the views, whose
-  // fallback path re-grants this same role.
-  const readerMode = selfProvisioning.readerMode({ source });
-  const readerRole =
-    readerMode === "manage-role"
-      ? LWQL_POSTGRES_READER_ROLE
-      : source.LWQL_POSTGRES_READER_ROLE || LWQL_POSTGRES_READER_ROLE;
-
-  try {
-    await runPostgresStatements({
-      database,
-      statements: lwqlProvisioning.postgresApprovedViewStatements({
-        schema: postgresSchema,
-        readerRole,
-      }),
-    });
-    // Straight after creation: a view added by this deploy otherwise has no
-    // grant until someone re-runs the out-of-band job. A no-op where the role is absent.
-    const reader =
-      readerMode === "manage-role"
-        ? selfProvisioning.postgresReaderStatements({
-            mode: "manage-role",
-            readerPassword: source.LWQL_POSTGRES_READER_PASSWORD,
-            schema: postgresSchema,
-          })
-        : selfProvisioning.postgresReaderStatements({
-            mode: "grants-only",
-            role: source.LWQL_POSTGRES_READER_ROLE,
-            schema: postgresSchema,
-          });
-    if (reader.warning) logger.warn(reader.warning);
-    await runPostgresStatements({ database, statements: reader.statements });
-  } catch (error) {
-    logger.error({ error }, "lwql provisioning failed creating PostgreSQL approved views");
-    throw error;
-  }
-
-  await withAdminClickHouseClient({
-    url: source.CLICKHOUSE_URL,
-    fn: async (client) => {
-      await runClickHouseStatements({
-        client,
-        statements: lwqlProvisioning.clickHouseObjectStatements({ names, sourceDatabase }),
-      });
-
-      // Fatal: a failed backfill leaves pre-existing projects without a key-map row (inline sync
-      // only covers projects created after the failure) — silently WRONG, not degraded: row
-      // policies resolve an absent hash to an empty tenant set, so queries return zero rows with
-      // HTTP 200 rather than `lwql_unavailable`, undetected by the request path.
-      await backfillKeyMap({ client, database, names, sourceDatabase });
+  await convergeLwqlAccessModel({
+    database,
+    plan: {
+      request: selfProvision,
+      names: lwqlProvisioning.names({ connection: selfProvision.connection }),
+      sourceDatabase: () =>
+        parseConnectionUrl({
+          connectionUrl: source.CLICKHOUSE_URL,
+          clusterName: source.CLICKHOUSE_CLUSTER,
+        }).database,
+      schema: lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL),
+      ...connectionLimitFields(source.DATABASE_URL),
+      settings: source,
+      openRepository: () =>
+        ClickHouseLangWatchQLProvisioningRepository.open({ url: source.CLICKHOUSE_URL }),
     },
   });
-
-  logger.info("LangWatchQL provisioning complete");
 }
 
 /**

@@ -1,0 +1,476 @@
+/** The provisioning runner tolerates exactly the config-store failures the inventory explains. */
+import type * as Observability from "@langwatch/observability";
+import { describe, expect, it, vi } from "vitest";
+
+import { CLICKHOUSE_ERROR_CODE } from "../../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
+import {
+  CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
+  type ConfigStoreLwqlEntity,
+} from "../../../rules/langwatch-ql-config-store.rules.ts";
+import { clickHouseLiteral } from "../../../rules/langwatch-ql-sql-literal.rules.ts";
+import type { LangWatchQLNames } from "../../../services/langwatch-ql-access-model.service.ts";
+import type { ClickHouseAdminStatements } from "../../langwatch-ql-provisioning.repository.ts";
+import { ClickHouseLangWatchQLProvisioningRepository } from "../clickhouse.langwatch-ql-provisioning.repository.ts";
+
+/** The vendor calls these fakes answer, adapted to the repository's admin statements. */
+interface FakeClickHouse {
+  command?(input: { query: string }): Promise<unknown>;
+  query?(input: {
+    query: string;
+    format?: string;
+    query_params?: Record<string, unknown>;
+  }): Promise<{ json(): Promise<unknown> }>;
+}
+
+const statementsOver = (client: FakeClickHouse): ClickHouseAdminStatements => ({
+  async command(statement) {
+    if (!client.command) throw new Error("this fake answers no command");
+    await client.command({ query: statement });
+  },
+  async rows(sql, params) {
+    if (!client.query) throw new Error("this fake answers no query");
+    const result = await client.query({
+      query: sql,
+      format: "JSONEachRow",
+      ...(params ? { query_params: { ...params } } : {}),
+    });
+    const rows = await result.json();
+    return Array.isArray(rows) ? rows : [];
+  },
+  insert: () => Promise.reject(new Error("this fake answers no insert")),
+});
+
+const provisioning = (client: FakeClickHouse) =>
+  ClickHouseLangWatchQLProvisioningRepository.create({ statements: statementsOver(client) });
+
+// The runner logs through the module logger; capture every call so a test can
+// prove no argument carries the statement text or the password it embeds.
+const { logCalls } = vi.hoisted(() => ({ logCalls: [] as unknown[][] }));
+vi.mock("@langwatch/observability", async (importActual) => {
+  const actual = await importActual<typeof Observability>();
+  const record = (...args: unknown[]) => {
+    logCalls.push(args);
+  };
+  return {
+    ...actual,
+    createLogger: () => ({
+      warn: record,
+      error: record,
+      info: record,
+      debug: record,
+    }),
+  };
+});
+
+/** The shape `@clickhouse/client` throws: a `code` string on the error. */
+class FakeClickHouseError extends Error {
+  constructor(public readonly code: string) {
+    super(`Code: ${code}. DB::Exception`);
+    this.name = "ClickHouseError";
+  }
+}
+
+/**
+ * A client that rejects the statements named in `rejections` with the given
+ * code and runs everything else, recording the order it ran them in.
+ */
+function fakeClient({
+  rejections,
+  ran,
+}: {
+  rejections: Record<string, string>;
+  ran: string[];
+}): FakeClickHouse {
+  return {
+    async command({ query }: { query: string }) {
+      const code = rejections[query];
+      if (code) throw new FakeClickHouseError(code);
+      ran.push(query);
+      return undefined as never;
+    },
+  };
+}
+
+describe("runClickHouseStatements", () => {
+  describe("when a statement's entity is owned by the config store", () => {
+    // # Issue #8258
+    /** @scenario "A config-store readonly error on one statement does not abort the rest" */
+    it("skips the 495, 669, 670 and 671 statements, runs the rest, and reports the skips", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: {
+          "CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY 's3cr3t'":
+            String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY),
+          "DROP NAMED COLLECTION IF EXISTS lwql_postgres": String(
+            CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+          ),
+          "ALTER NAMED COLLECTION lwql_postgres SET host = 'pg'": String(
+            CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
+          ),
+          "CREATE NAMED COLLECTION lwql_postgres AS host = 'pg'": String(
+            CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
+          ),
+        },
+      });
+
+      const statements = [
+        "CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY 's3cr3t'",
+        "DROP NAMED COLLECTION IF EXISTS lwql_postgres",
+        "ALTER NAMED COLLECTION lwql_postgres SET host = 'pg'",
+        "CREATE NAMED COLLECTION lwql_postgres AS host = 'pg'",
+        "CREATE OR REPLACE VIEW langwatch.traces AS SELECT 1",
+      ];
+
+      const result = await provisioning(client).runStatements({
+        statements,
+        // The 495 is tolerated because the failing CREATE USER names an
+        // inventoried config-store entity; the 669/670/671 need no inventory.
+        configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
+      });
+
+      // The one non-config-store statement still ran.
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW langwatch.traces AS SELECT 1"]);
+      // All four config-store statements were skipped and named by code.
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
+        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
+      ]);
+      expect(result.skipped.map((s) => s.index)).toEqual([1, 2, 3, 4]);
+      // Only the statement kind is recorded — never the password-bearing text.
+      expect(result.skipped.map((s) => s.kind)).toEqual([
+        "CREATE USER",
+        "DROP NAMED COLLECTION",
+        "ALTER NAMED COLLECTION",
+        "CREATE NAMED COLLECTION",
+      ]);
+      expect(JSON.stringify(result.skipped)).not.toContain("s3cr3t");
+    });
+  });
+
+  describe("when a statement fails for any other reason", () => {
+    it("rethrows and stops the run", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: {
+          "GRANT SELECT ON langwatch.traces TO langwatch_lwql": String(
+            CLICKHOUSE_ERROR_CODE.ACCESS_DENIED,
+          ),
+        },
+      });
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: [
+            "GRANT SELECT ON langwatch.traces TO langwatch_lwql",
+            "CREATE OR REPLACE VIEW langwatch.traces AS SELECT 1",
+          ],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      // Aborted before the statement after the failure.
+      expect(ran).toEqual([]);
+    });
+  });
+
+  describe("when every statement succeeds", () => {
+    it("runs them all and reports no skips", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({ ran, rejections: {} });
+
+      const result = await provisioning(client).runStatements({
+        statements: [
+          "CREATE DATABASE langwatch",
+          "CREATE TABLE langwatch.t (a Int64) ENGINE = Memory",
+        ],
+      });
+
+      expect(result.skipped).toEqual([]);
+      expect(ran).toHaveLength(2);
+    });
+  });
+
+  describe("when a CREATE USER whose password embeds a quote and a backslash fails", () => {
+    // # Issue #8258
+    /** @scenario "A failed self-provisioning run is logged without leaking a password" */
+    it("logs the kind and code, never the statement text or the password in any form", async () => {
+      logCalls.length = 0;
+      // A password with both metacharacters `clickHouseLiteral` escapes: a
+      // value-based redactor would miss it because the DDL carries the escaped
+      // form, not the raw one. Provisioning must never log either.
+      const password = "p'a\\ss";
+      const literal = clickHouseLiteral(password); // 'p''a\\ss' — as in the DDL
+      const CREATE_USER = `CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY ${literal}`;
+
+      // A fake whose error echoes the failing statement, as ClickHouse does —
+      // proving the runner never forwards that message to the log.
+      const client = {
+        async command({ query }: { query: string }) {
+          throw Object.assign(new Error(`Code: 516. DB::Exception: while executing ${query}`), {
+            code: String(CLICKHOUSE_ERROR_CODE.ACCESS_DENIED),
+            name: "ClickHouseError",
+          });
+        },
+      };
+
+      await expect(
+        provisioning(client).runStatements({ statements: [CREATE_USER] }),
+      ).rejects.toBeInstanceOf(Error);
+
+      const logged = JSON.stringify(logCalls);
+      expect(logCalls.length).toBeGreaterThan(0);
+      expect(logged).not.toContain(password);
+      expect(logged).not.toContain(literal);
+      expect(logged).not.toContain("IDENTIFIED");
+      // What it does log: the kind and the numeric code.
+      expect(logged).toContain("CREATE USER");
+      expect(logged).toContain(String(CLICKHOUSE_ERROR_CODE.ACCESS_DENIED));
+    });
+  });
+
+  describe("when a 495 targets an entity the config store does not own", () => {
+    const CREATE_USER =
+      "CREATE USER OR REPLACE langwatch_lwql IDENTIFIED WITH sha256_password BY 'pw'";
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for an entity the config store does not own fails provisioning" */
+    it("aborts rather than skipping the statement", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: {
+          [CREATE_USER]: String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY),
+        },
+      });
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: [CREATE_USER, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+          // A read-only access storage that owns none of the LWQL model: the
+          // inventory is empty, so the 495 is unexplained and must abort.
+          configStoreEntities: [],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      // Aborted before the statement after the unexplained 495.
+      expect(ran).toEqual([]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for an entity the config store does not own fails provisioning" */
+    it("tolerates the 495 once that entity is in the inventory", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: {
+          [CREATE_USER]: String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY),
+        },
+      });
+
+      const inventory: ConfigStoreLwqlEntity[] = [{ kind: "user", name: "langwatch_lwql" }];
+      const result = await provisioning(client).runStatements({
+        statements: [CREATE_USER, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+        configStoreEntities: inventory,
+      });
+
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+      ]);
+      // The statement after the tolerated 495 still ran.
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
+    });
+  });
+
+  describe("when a 495 fails a statement whose own target differs from its grantee", () => {
+    // A row policy names the config-owned user in its `TO` clause, but the
+    // statement's own target is the POLICY. The read-only user must not excuse
+    // a missing row policy — that would boot without tenant isolation.
+    const ROW_POLICY =
+      "CREATE ROW POLICY OR REPLACE traces_tenant ON langwatch.traces\n" +
+      "  USING TenantId = 1\n" +
+      "  TO langwatch_lwql";
+    const readonly = () => String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY);
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy is not excused by the config-owned user" */
+    it("aborts a row-policy 495 when only the user (its grantee) is inventoried", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [ROW_POLICY]: readonly() },
+      });
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: [ROW_POLICY, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+          configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      expect(ran).toEqual([]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy is not excused by the config-owned user" */
+    it("tolerates the row-policy 495 once that policy is inventoried by short name and ON target", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [ROW_POLICY]: readonly() },
+      });
+
+      const result = await provisioning(client).runStatements({
+        statements: [ROW_POLICY, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+        configStoreEntities: [
+          {
+            kind: "row_policy",
+            name: "traces_tenant",
+            database: "langwatch",
+            table: "traces",
+          },
+        ],
+      });
+
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+      ]);
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for an entity the config store does not own fails provisioning" */
+    it("tolerates a GRANT 495 against the inventoried grantee user", async () => {
+      const GRANT = "GRANT SELECT ON langwatch.traces TO langwatch_lwql";
+      const ran: string[] = [];
+      const client = fakeClient({ ran, rejections: { [GRANT]: readonly() } });
+
+      const result = await provisioning(client).runStatements({
+        statements: [GRANT, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+        configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
+      });
+
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+      ]);
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy is not excused by the config-owned user" */
+    it("aborts a settings-profile 495 when only the user is inventoried", async () => {
+      const PROFILE =
+        "CREATE SETTINGS PROFILE OR REPLACE lwql_restricted\n  SETTINGS readonly = 1 CONST";
+      const ran: string[] = [];
+      const client = fakeClient({ ran, rejections: { [PROFILE]: readonly() } });
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: [PROFILE, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+          configStoreEntities: [{ kind: "user", name: "langwatch_lwql" }],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      expect(ran).toEqual([]);
+    });
+  });
+
+  describe("when a row policy's short name is shared across tables", () => {
+    // ClickHouse keys a row policy by short name AND `ON db.table`, so an
+    // inventoried `x_tenant ON langwatch.a` must NOT excuse a read-only
+    // `x_tenant ON langwatch.b`: the second table would otherwise boot with no
+    // tenant policy while its GRANT still runs.
+    const readonly = () => String(CLICKHOUSE_CONFIG_STORE_ERROR_CODE.ACCESS_STORAGE_READONLY);
+    const POLICY_ON_B =
+      "CREATE ROW POLICY OR REPLACE x_tenant ON langwatch.b\n" +
+      "  USING TenantId = 1\n" +
+      "  TO langwatch_lwql";
+    const INVENTORY_ON_A: ConfigStoreLwqlEntity = {
+      kind: "row_policy",
+      name: "x_tenant",
+      database: "langwatch",
+      table: "a",
+    };
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy on one table does not excuse the same short name on another table" */
+    it("aborts a 495 on `x_tenant ON b` when only `x_tenant ON a` is inventoried", async () => {
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [POLICY_ON_B]: readonly() },
+      });
+
+      await expect(
+        provisioning(client).runStatements({
+          statements: [POLICY_ON_B, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+          configStoreEntities: [INVENTORY_ON_A],
+        }),
+      ).rejects.toBeInstanceOf(FakeClickHouseError);
+
+      expect(ran).toEqual([]);
+    });
+
+    // # Issue #8258
+    /** @scenario "A read-only access storage for a row policy on one table does not excuse the same short name on another table" */
+    it("tolerates the 495 on the very table the inventoried policy is on", async () => {
+      const POLICY_ON_A =
+        "CREATE ROW POLICY OR REPLACE x_tenant ON langwatch.a\n" +
+        "  USING TenantId = 1\n" +
+        "  TO langwatch_lwql";
+      const ran: string[] = [];
+      const client = fakeClient({
+        ran,
+        rejections: { [POLICY_ON_A]: readonly() },
+      });
+
+      const result = await provisioning(client).runStatements({
+        statements: [POLICY_ON_A, "CREATE OR REPLACE VIEW v AS SELECT 1"],
+        configStoreEntities: [INVENTORY_ON_A],
+      });
+
+      expect(result.skipped.map((s) => s.code)).toEqual([
+        CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+      ]);
+      expect(ran).toEqual(["CREATE OR REPLACE VIEW v AS SELECT 1"]);
+    });
+  });
+});
+
+describe("inventoryConfigStoreLwqlEntities", () => {
+  const NAMES: LangWatchQLNames = {
+    database: "lwql_prod",
+    restrictedUser: "langwatch_lwql",
+    settingsProfile: "lwql_restricted",
+    keyMapTable: "lwql_api_key_tenant_map",
+    tenantSetting: "custom_api_key_hash",
+  };
+
+  /**
+   * A client whose `query` records whether it was ever called — the quote-name
+   * case must be rejected before any query reaches the server.
+   */
+  function queryRecordingClient(queried: { called: boolean }): FakeClickHouse {
+    return {
+      async query() {
+        queried.called = true;
+        return { json: async () => [] };
+      },
+    };
+  }
+
+  it("rejects an inventory name with a quote before any query is issued", async () => {
+    const queried = { called: false };
+    const client = queryRecordingClient(queried);
+
+    await expect(
+      provisioning(client).inventoryConfigStore({
+        names: { ...NAMES, restrictedUser: "langwatch_lwql'; DROP USER x --" },
+      }),
+    ).rejects.toThrow(/non-identifier name/);
+
+    expect(queried.called).toBe(false);
+  });
+});

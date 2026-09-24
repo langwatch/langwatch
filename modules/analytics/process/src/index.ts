@@ -9,6 +9,7 @@ export {
   createClickHouseFilterConditions,
   createLegacyFilterMatching,
   createPreconditionTraceData,
+  langWatchQlSupply,
 } from "./analytics.server.ts";
 
 /** The transport declarations a process mounts, and the doors they open on. */
@@ -93,3 +94,4 @@ export type {
 } from "./services/langwatch-ql-production-provisioning.service.ts";
 
 export { LwqlProvisionTask } from "./tasks/lwql-provision.task.ts";
+export { LwqlRenderAccessConfigTask } from "./tasks/lwql-render-access-config.task.ts";

@@ -1,6 +1,6 @@
 /** The models that carry no tenant column of their own and reach one through a declared parent. */
 
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 
 /** Tenant-less models, each reaching a tenant through a parent foreign key. */
 export const PARENTS_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {

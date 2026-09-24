@@ -19,7 +19,6 @@ const POSTGRES = {
   readerPassword: "reader-secret",
 };
 const SELF_PROVISION_SOURCE = {
-  LWQL_SELF_PROVISION: "true",
   CLICKHOUSE_URL: "http://admin:admin-secret@clickhouse:8123/langwatch",
   LWQL_CLICKHOUSE_PASSWORD: "restricted-secret",
   LWQL_POSTGRES_READER_PASSWORD: "reader-secret",
@@ -78,6 +77,7 @@ describe("the self-provisioned ClickHouse statements", () => {
   });
 
   it("creates the restricted user before every grant, and the collection before the engine tables", () => {
+    // SQL mode: structural, collection, engine tables, views, then the access model DDL.
     const statements = statementsWith({});
     const user = statements.findIndex((s) => s.startsWith("CREATE USER"));
     const firstGrant = statements.findIndex((s) => s.startsWith("GRANT"));
@@ -86,7 +86,6 @@ describe("the self-provisioned ClickHouse statements", () => {
 
     expect(user).toBeGreaterThanOrEqual(0);
     expect(user).toBeLessThan(firstGrant);
-    expect(collection).toBeGreaterThan(user);
     expect(firstEngineTable).toBeGreaterThan(collection);
   });
 
@@ -100,8 +99,17 @@ describe("the self-provisioned ClickHouse statements", () => {
 });
 
 describe("when the self-provisioning environment is read", () => {
-  it("is not requested without LWQL_SELF_PROVISION=true", () => {
+  it("is not requested without LWQL_CLICKHOUSE_PASSWORD", () => {
     expect(selfProvisioning.request({ source: {} })).toEqual({ requested: false });
+  });
+
+  /** @scenario "Provisioning no longer reads a self-provision switch" */
+  it("derives the connection from the password and URL, ignoring any self-provision switch", () => {
+    for (const LWQL_SELF_PROVISION of [undefined, "false", "true"]) {
+      expect(
+        selfProvisioning.request({ source: { ...SELF_PROVISION_SOURCE, LWQL_SELF_PROVISION } }),
+      ).toMatchObject({ requested: true, complete: true });
+    }
   });
 
   it("declines, rather than demotes, a request whose reader password is missing", () => {
@@ -131,54 +139,27 @@ describe("when the self-provisioning environment is read", () => {
 });
 
 describe("the PostgreSQL reader role", () => {
-  describe("when LWQL_MANAGE_POSTGRES_READER is exactly 'true'", () => {
-    it("is managed, and converged with its password and approved-view grants", () => {
-      expect(selfProvisioning.readerMode({ source: { LWQL_MANAGE_POSTGRES_READER: "true" } })).toBe(
-        "manage-role",
-      );
-
-      const { statements, warning } = selfProvisioning.postgresReaderStatements({
-        mode: "manage-role",
+  describe("when the access model is provisioned", () => {
+    it("converges lwql_ro with its password and approved-view grants on every path", () => {
+      const statements = selfProvisioning.postgresReaderStatements({
         readerPassword: "reader-secret",
         schema: "public",
       });
 
-      expect(warning).toBeUndefined();
       expect(statements.some((s) => s.includes('CREATE ROLE "lwql_ro" LOGIN'))).toBe(true);
       expect(statements.some((s) => s.startsWith('ALTER ROLE "lwql_ro" WITH LOGIN PASSWORD'))).toBe(
         true,
       );
     });
-
-    it("falls back to re-granting the views, with a warning, when the password is missing", () => {
-      const { statements, warning } = selfProvisioning.postgresReaderStatements({
-        mode: "manage-role",
-        readerPassword: undefined,
-        schema: "public",
-      });
-
-      expect(warning).toContain("LWQL_POSTGRES_READER_PASSWORD");
-      expect(statements.some((s) => s.includes("CREATE ROLE"))).toBe(false);
-    });
   });
+});
 
-  describe("when a reader password is present without the flag", () => {
-    it("re-grants only, never inferring management from the password", () => {
-      expect(
-        selfProvisioning.readerMode({
-          source: { LWQL_POSTGRES_READER_PASSWORD: "pw", LWQL_MANAGE_POSTGRES_READER: "1" },
-        }),
-      ).toBe("grants-only");
-
-      const { statements } = selfProvisioning.postgresReaderStatements({
-        mode: "grants-only",
-        role: "operator_reader",
-        schema: "public",
-      });
-
-      expect(statements.join("\n")).toContain("operator_reader");
-      expect(statements.some((s) => s.includes("ALTER ROLE"))).toBe(false);
-    });
+describe("when the access-model mode is read", () => {
+  it("renders by default and runs SQL DDL only when asked", () => {
+    expect(selfProvisioning.accessModelMode({ source: {} })).toBe("rendered");
+    expect(selfProvisioning.accessModelMode({ source: { LWQL_ACCESS_MODEL_MODE: "sql" } })).toBe(
+      "sql",
+    );
   });
 });
 

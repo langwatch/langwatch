@@ -216,6 +216,8 @@ describe("given the coding-agent views provisioned over the shipped migrations",
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies come from the single access-model emitter (#8258).
+    await harness.applyAccessModel({ views: [sessions, sessionEvents], sourceDatabase: facts });
 
     await harness.admin.insert({
       table: `${facts}.coding_agent_sessions`,

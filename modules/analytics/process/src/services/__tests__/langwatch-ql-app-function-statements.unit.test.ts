@@ -13,14 +13,17 @@ import {
 } from "../../rules/langwatch-ql-app-function-catalog.rules.ts";
 import type { LangWatchQLAppFunctionDefinition } from "../../rules/langwatch-ql-app-function-shapes.rules.ts";
 import { LangWatchQLAccessAuditService } from "../langwatch-ql-access-audit.service.ts";
+import { LangWatchQLAccessModelDefinitionService } from "../langwatch-ql-access-model-definition.service.ts";
 import { LangWatchQLAccessModelService } from "../langwatch-ql-access-model.service.ts";
 import {
   LWQL_SQL_UDF_ORIGIN,
   LangWatchQLAppFunctionStatementsService,
 } from "../langwatch-ql-app-function-statements.service.ts";
+import type { PostgresNamedCollection } from "../langwatch-ql-postgres-mapping.service.ts";
 
 const statements = LangWatchQLAppFunctionStatementsService.create();
 const accessModel = LangWatchQLAccessModelService.create();
+const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const accessAudit = LangWatchQLAccessAuditService.create();
 
 const NAMES = {
@@ -29,6 +32,15 @@ const NAMES = {
   settingsProfile: "lwql_test_profile",
   keyMapTable: "api_key_tenants",
   tenantSetting: "custom_api_key_hash",
+};
+
+const NAMED_COLLECTION: PostgresNamedCollection = {
+  collection: "lwql_postgres",
+  host: "pg.internal",
+  port: 5432,
+  database: "lwql_test",
+  user: "lwql_ro",
+  password: "reader-secret",
 };
 
 const singleKey = (definition: LangWatchQLAppFunctionDefinition): boolean =>
@@ -98,31 +110,30 @@ describe("given the app-function catalog", () => {
     });
   });
 
-  describe("when the access model's setup statements are built", () => {
-    it("includes every function's DDL before the first grant", () => {
+  describe("when the structural setup statements are built", () => {
+    it("includes every function's create statement", () => {
       const built = accessModel.setupStatements({
         names: NAMES,
-        password: "secret",
-        lwqlTables: [],
       });
-      const firstGrant = built.findIndex((statement) => statement.startsWith("GRANT"));
 
-      expect(firstGrant).toBeGreaterThan(0);
       for (const definition of LWQL_APP_FUNCTION_CATALOG) {
         const at = built.findIndex((statement) =>
           statement.includes(`FUNCTION ${definition.name} AS (`),
         );
         expect(at, `${definition.name} has no create statement`).toBeGreaterThan(-1);
-        expect(at).toBeLessThan(firstGrant);
       }
     });
 
     it("grants the restricted identity nothing on any function", () => {
-      const built = accessModel.setupStatements({
-        names: NAMES,
-        password: "secret",
-        lwqlTables: [],
-      });
+      // The access model is single-sourced from the definition; its grants never name a function.
+      const built = accessModelDefinition.renderDdl(
+        accessModelDefinition.build({
+          names: NAMES,
+          passwordSha256Hex: "a".repeat(64),
+          namedCollection: NAMED_COLLECTION,
+          sourceDatabase: NAMES.database,
+        }),
+      );
 
       for (const statement of built) {
         if (!statement.startsWith("GRANT")) continue;
@@ -133,8 +144,6 @@ describe("given the app-function catalog", () => {
     it("leaves the functions out where a create would land on one replica of several", () => {
       const built = accessModel.setupStatements({
         names: NAMES,
-        password: "secret",
-        lwqlTables: [],
         includeAppFunctions: false,
       });
 

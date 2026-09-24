@@ -3,7 +3,7 @@
  * external-person identity.
  */
 
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 
 /** Per-model strips for sensitive columns the name rules do not catch. */
 export const SENSITIVE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {

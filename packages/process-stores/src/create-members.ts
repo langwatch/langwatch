@@ -14,6 +14,7 @@ import { buildMail, skippedMail } from "./mail-member.ts";
 import { MEMBER_NAMES, type MemberName, type ProcessMembers } from "./members.ts";
 import { buildObjectStorage } from "./object-storage-member.ts";
 import { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
+import { buildClickHouseAdmin, buildDatabaseTarget } from "./store-targets.ts";
 import { cachedTenantDirectory, prismaTenantDirectory } from "./tenant-directory.ts";
 
 /**
@@ -138,6 +139,9 @@ export function createProcessMembers(options: {
       }
       return buildClickHouse({ config: clickhouse, directory: tenantDirectory() });
     },
+    // "Not configured" is an answer here, not a refusal: LangWatchQL is optional (ADR-159).
+    clickhouseAdmin: () => buildClickHouseAdmin(config.clickhouse),
+    databaseTarget: () => buildDatabaseTarget(config.database),
     objectStorage: () => {
       if (!config.objectStorage) {
         throw new MemberNotConfiguredError(

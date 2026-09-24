@@ -1,33 +1,11 @@
 /** The `judgments` dataset's catalog entry. */
 
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vitest";
 
-import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
 import { pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
-const viewProvisioning = LangWatchQLViewProvisioningService.create();
-
-const MANIFEST_PATH = fileURLToPath(
-  new URL(
-    "../../../../../../infra/clickhouse-serverless/internal/render/lwql_catalog.json",
-    import.meta.url,
-  ),
-);
-
-/** Only the fields the source-table derivation reads. */
-const NAMES: LangWatchQLNames = {
-  database: "langwatch",
-  restrictedUser: "langwatch_lwql",
-  settingsProfile: "lwql_restricted",
-  keyMapTable: "lwql_api_key_tenant_map",
-  tenantSetting: "custom_api_key_hash",
-};
 
 function judgments() {
   const view = pickLwqlViewByName("judgments");
@@ -55,27 +33,6 @@ describe("given the judgments dataset in the LangWatchQL catalog", () => {
       // land on the partition key, or the pruning the column promises does not
       // happen. Migration 00097 partitions by `toYYYYMM(CreatedAt)`.
       expect(view.columns.map((column) => column.name)).toContain(view.timeColumn);
-    });
-  });
-
-  describe("when the shipped catalog manifest is compared with the code", () => {
-    /** @scenario The published catalog and the code catalog agree */
-    it("lists the dataset as a granted view and its table as a granted read", () => {
-      const manifest: {
-        sourceTables: string[];
-        viewNames: string[];
-      } = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
-
-      expect(manifest.viewNames).toContain("judgments");
-      expect(manifest.sourceTables).toContain("instant_eval_judgments");
-      expect(
-        viewProvisioning
-          .sourceTables({
-            names: NAMES,
-            sourceDatabase: NAMES.database,
-          })
-          .map((table) => table.table),
-      ).toContain(judgments().sourceTable);
     });
   });
 });

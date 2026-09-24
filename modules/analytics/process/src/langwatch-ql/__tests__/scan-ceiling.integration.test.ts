@@ -13,14 +13,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import type { LangWatchQLExecutor } from "../../repositories/langwatch-ql-executor.repository.ts";
-import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   recordSeedControl,
   startLangWatchQLClickHouse,
 } from "./lwql-clickhouse-harness.ts";
-
-const accessModel = LangWatchQLAccessModelService.create();
 
 /** 1 rather than 0: ClickHouse reads 0 as "unlimited". */
 const TINY_CEILING = 1;
@@ -43,14 +40,7 @@ describe("given the LangWatchQL settings profile's ceilings", () => {
 
   /** The full statement list: `CREATE USER OR REPLACE` would orphan a lone replaced profile. */
   const provisionWith = async (limits: LangWatchQLResourceLimits) => {
-    await harness.applyAsAdmin(
-      accessModel.setupStatements({
-        names: harness.names,
-        password: harness.restrictedConnection().password,
-        lwqlTables: harness.lwqlTables,
-        limits,
-      }),
-    );
+    await harness.applyAccessModel({ limits });
   };
 
   const run = ({ sql, parameters }: { sql: string; parameters?: Record<string, unknown> }) =>

@@ -72,6 +72,13 @@ describe("given a LangWatchQL view over a project_id-keyed source table", () => 
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     ]);
+    // Install the grant and project_id row policy for the registered view from
+    // the single access-model emitter (#8258) — the view statements are
+    // structural only.
+    await harness.applyAccessModel({
+      extraViews: [PROJECT_ID_VIEW],
+      sourceDatabase: database,
+    });
 
     await harness.admin.insert({
       table: `${database}.scratch_objects`,
@@ -128,12 +135,11 @@ describe("given a LangWatchQL view over a project_id-keyed source table", () => 
         );
         expect(unpoliced.length).toBe(2);
       } finally {
-        await harness.applyAsAdmin([
-          accessModel.rowPolicyStatement({
-            names: harness.names,
-            lwqlTable: { table: "scratch_objects", tenantColumn: "project_id", database },
-          }),
-        ]);
+        // Reconverge from the definition — restores the scratch_objects policy.
+        await harness.applyAccessModel({
+          extraViews: [PROJECT_ID_VIEW],
+          sourceDatabase: database,
+        });
       }
 
       const repoliced = await selectRows<{ TenantId: string }>(

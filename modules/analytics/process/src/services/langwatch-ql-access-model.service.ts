@@ -90,15 +90,17 @@ function renderPredicateTemplate(
 function tenantPredicate({
   names,
   tenantColumn,
+  sourceDatabase,
 }: {
   names: LangWatchQLNames;
   tenantColumn: string;
+  sourceDatabase?: string;
 }): string {
   return renderPredicateTemplate(LWQL_TENANT_PREDICATE_TEMPLATE, {
     tenantColumn: sqlText.assertIdentifier(tenantColumn, "tenantColumn"),
     tenantId: KEY_MAP_COLUMNS.tenantId,
     keyHash: KEY_MAP_COLUMNS.keyHash,
-    keyMap: qualifiedName(names, names.keyMapTable),
+    keyMap: qualifiedName(names, names.keyMapTable, sourceDatabase),
     tenantSetting: sqlText.assertIdentifier(names.tenantSetting, "tenantSetting"),
   });
 }
@@ -120,6 +122,35 @@ export class LangWatchQLAccessModelService {
   }
 
   private constructor() {}
+
+  /** The row-policy predicate that scopes a source table to the caller's resolved tenants. */
+  tenantPredicate({
+    names,
+    tenantColumn,
+    sourceDatabase,
+  }: {
+    names: LangWatchQLNames;
+    tenantColumn: string;
+    sourceDatabase?: string;
+  }): string {
+    return tenantPredicate({ names, tenantColumn, sourceDatabase });
+  }
+
+  /** The key map's own policy predicate: a caller reads only the rows its key hashes name. */
+  keyMapSelfFilter(names: LangWatchQLNames): string {
+    return renderPredicateTemplate(LWQL_KEY_MAP_SELF_FILTER_TEMPLATE, {
+      keyHash: KEY_MAP_COLUMNS.keyHash,
+      tenantSetting: names.tenantSetting,
+    });
+  }
+
+  rowPolicyName(table: string): string {
+    return policyName(table);
+  }
+
+  keyMapPolicyName(keyMapTable: string): string {
+    return keyMapPolicyName(keyMapTable);
+  }
 
   /**
    * Validates every configured name, and that the tenant setting carries the
@@ -153,13 +184,19 @@ export class LangWatchQLAccessModelService {
   /**
    * The key-map table: `KeyHash` to `TenantId`, one row per project — the hash of
    * `Project.lwqlKey`, not of any credential a caller holds. "One row per project" is the
-   * intended shape, not a constraint this table can hold.
+   * intended shape, not a constraint this table can hold. `sourceDatabase` is where it lives.
    */
-  keyMapTableStatement({ names }: { names: LangWatchQLNames }): string {
+  keyMapTableStatement({
+    names,
+    sourceDatabase,
+  }: {
+    names: LangWatchQLNames;
+    sourceDatabase?: string;
+  }): string {
     this.assertNames(names);
 
     return (
-      `CREATE TABLE IF NOT EXISTS ${this.qualified(names, names.keyMapTable)} ` +
+      `CREATE TABLE IF NOT EXISTS ${this.qualified(names, names.keyMapTable, sourceDatabase)} ` +
       `(${KEY_MAP_COLUMNS.keyHash} String, ${KEY_MAP_COLUMNS.tenantId} String) ` +
       `ENGINE = MergeTree ORDER BY ${KEY_MAP_COLUMNS.keyHash}`
     );
@@ -290,43 +327,23 @@ export class LangWatchQLAccessModelService {
     return `DROP ROW POLICY IF EXISTS ${policyName(table)} ON ${this.qualified(names, table, database)}`;
   }
 
-  /**
-   * Every statement that provisions the LangWatchQL access model, in dependency order. Order is
-   * load-bearing, not cosmetic: `CREATE USER OR REPLACE` mints a new access-entity id, so any
-   * grant or policy created before it would still point at the replaced user.
-   */
+  /** The structural statements the access model stands on: database, app functions, key map. */
   setupStatements({
     names,
-    password,
-    lwqlTables,
-    limits = DEFAULT_LWQL_RESOURCE_LIMITS,
+    sourceDatabase,
     includeAppFunctions = true,
   }: {
     names: LangWatchQLNames;
-    password: string;
-    lwqlTables: LangWatchQLTable[];
-    limits?: LangWatchQLResourceLimits;
-    /**
-     * Whether the app functions' UDFs are created. Off only where a create
-     * would land on one replica of several.
-     */
+    sourceDatabase?: string;
+    /** Off where a `CREATE FUNCTION` would reach one replica of several. */
     includeAppFunctions?: boolean;
   }): string[] {
     this.assertNames(names);
 
     return [
       `CREATE DATABASE IF NOT EXISTS ${names.database}`,
-      // The app functions' projection UDFs, alongside the other object
-      // creation and before the grants: they depend on nothing, and calling a
-      // SQL UDF needs no grant, so nothing below refers back to them.
       ...(includeAppFunctions ? appFunctionStatements.functionStatements() : []),
-      this.keyMapTableStatement({ names }),
-      this.settingsProfileStatement({ names, limits }),
-      this.restrictedUserStatement({ names, password }),
-      this.grantStatement({ names, table: names.keyMapTable }),
-      ...lwqlTables.map((lwqlTable) => this.grantStatement({ names, table: lwqlTable.table })),
-      this.keyMapRowPolicyStatement({ names }),
-      ...lwqlTables.map((lwqlTable) => this.rowPolicyStatement({ names, lwqlTable })),
+      this.keyMapTableStatement({ names, sourceDatabase }),
     ];
   }
 }

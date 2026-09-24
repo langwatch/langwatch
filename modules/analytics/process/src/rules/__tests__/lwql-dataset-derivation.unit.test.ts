@@ -1,18 +1,9 @@
-/** The derived-dataset builder and the opt-out catalog it feeds. */
+/** The per-table builder and the safe-default gate classifier over the explicit catalog. */
 
 import { describe, expect, it } from "vitest";
 
-import { type ColumnsManifest, LWQL_COLUMNS_MANIFEST } from "../lwql-columns-manifest.rules.ts";
+import type { ColumnsManifest } from "../lwql-columns-manifest.rules.ts";
 import { defaultColumnGates, defineDatasetFromTable } from "../lwql-dataset-derivation.rules.ts";
-import {
-  LWQL_ALL_OVERRIDES,
-  LWQL_DERIVED_CATALOG,
-  LWQL_HAND_WRITTEN_SOURCE_TABLES,
-} from "../lwql-derived-view-catalog.rules.ts";
-import { LWQL_CATALOG_SKIPPED_TABLES, deriveSkipReason } from "../lwql-skipped-tables.rules.ts";
-// `lwqlViews` is imported before `derivedViews` deliberately — see the same
-// note in tenantTableCoverage.unit.test.ts: both sit in one ESM cycle, and
-// only entering it through lwqlViews resolves cleanly.
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const FAKE_MANIFEST: ColumnsManifest = {
@@ -161,87 +152,8 @@ describe("given the default gate classifier", () => {
   });
 });
 
-describe("given the opt-out catalog over the committed manifest", () => {
-  // Widened to a plain string array: manifest table names are dynamic strings,
-  // not the literal union `LWQL_HAND_WRITTEN_SOURCE_TABLES` carries, and
-  // `.includes` on a `readonly [...] as const` tuple requires an argument of
-  // that exact literal union.
-  const handWritten: readonly string[] = LWQL_HAND_WRITTEN_SOURCE_TABLES;
-  const derived = LWQL_DERIVED_CATALOG;
-  const bySource = new Map(derived.map((view) => [view.sourceTable, view]));
-
-  it("yields a definition for every table that is neither hand-written nor skipped", () => {
-    const expected = LWQL_COLUMNS_MANIFEST.tables
-      .map((table) => table.name)
-      .filter(
-        (name) =>
-          !handWritten.includes(name) &&
-          deriveSkipReason(name, LWQL_CATALOG_SKIPPED_TABLES) === undefined,
-      );
-    expect([...bySource.keys()].toSorted()).toEqual([...expected].toSorted());
-    const catalogSourceTables = new Set(LWQL_VIEW_CATALOG.map((view) => view.sourceTable));
-    for (const table of expected) {
-      expect(
-        catalogSourceTables.has(table),
-        `"${table}" is derived but missing from the merged LWQL_VIEW_CATALOG`,
-      ).toBe(true);
-    }
-    expect(derived.length).toBeGreaterThan(0);
-  });
-
-  it("excludes hand-written and skipped tables", () => {
-    for (const source of bySource.keys()) {
-      expect(handWritten).not.toContain(source);
-      expect(deriveSkipReason(source, LWQL_CATALOG_SKIPPED_TABLES)).toBeUndefined();
-    }
-  });
-
-  it("exposes every manifest column of each derived table, or skips it with a reason", () => {
-    const manifestByTable = new Map(
-      LWQL_COLUMNS_MANIFEST.tables.map((table) => [table.name, table]),
-    );
-    for (const view of derived) {
-      const manifestTable = manifestByTable.get(view.sourceTable);
-      expect(manifestTable, `${view.sourceTable} not in manifest`).toBeDefined();
-      const override = LWQL_ALL_OVERRIDES[view.sourceTable] ?? {};
-      const skip = override.skipColumns ?? {};
-      // A column is covered when it is exposed under its own name or read by an
-      // exposed column (an alias reads its source), and every skip carries a
-      // reason string — so a manifest column can never quietly fall off a view.
-      const exposedNames = new Set(view.columns.map((column) => column.name));
-      const readSources = new Set(
-        view.columns.flatMap((column) => [
-          ...column.sourceColumns,
-          ...(column.joinedSourceColumns ?? []),
-        ]),
-      );
-      for (const column of manifestTable!.columns) {
-        const covered = exposedNames.has(column.name) || readSources.has(column.name);
-        const reason = skip[column.name];
-        expect(
-          covered || (typeof reason === "string" && reason.length > 0),
-          `${view.sourceTable}.${column.name} is neither exposed nor skipped-with-a-reason`,
-        ).toBe(true);
-      }
-      for (const [skipped, reason] of Object.entries(skip)) {
-        expect(
-          typeof reason === "string" && reason.length > 0,
-          `${view.sourceTable} skips ${skipped} with no reason`,
-        ).toBe(true);
-      }
-    }
-  });
-
-  it("gives every table a caller-facing name that is not its physical name", () => {
-    // Either the unrefined default (a `stored_` prefix stripped) or an
-    // override's own `name` — both are required to differ from the physical
-    // table name (`lwqlAllowedTables` guards that invariant catalog-wide in
-    // ../__tests__/lwqlViewCatalog.unit.test.ts); this only checks that every
-    // derived view actually picked ONE of the two, not the raw table name.
-    for (const view of derived) {
-      expect(view.name).not.toBe(view.sourceTable);
-    }
-  });
+describe("given the built ClickHouse catalog over the committed manifest", () => {
+  const bySource = new Map(LWQL_VIEW_CATALOG.map((view) => [view.sourceTable, view]));
 
   it.each([
     // A body column carries a request on one row and a response on the
@@ -252,7 +164,7 @@ describe("given the opt-out catalog over the committed manifest", () => {
     ["metric_series", "SeriesId", []],
   ] as const)("classifies %s.%s as %j", (sourceTable, columnName, expectedGates) => {
     const view = bySource.get(sourceTable);
-    expect(view, `${sourceTable} not derived`).toBeDefined();
+    expect(view, `${sourceTable} not catalogued`).toBeDefined();
     const column = view?.columns.find((c) => c.name === columnName);
     expect(column, `${sourceTable}.${columnName} not exposed`).toBeDefined();
     expect(column?.gates).toEqual(expectedGates);

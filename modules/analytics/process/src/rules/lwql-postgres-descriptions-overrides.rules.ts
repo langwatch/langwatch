@@ -3,7 +3,7 @@
  * still reads wrong for a customer.
  */
 
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 
 /** Description-only refinements, keyed by Prisma model name. */
 export const DESCRIPTIONS_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {

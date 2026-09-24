@@ -3,7 +3,7 @@
  * the gates a same-named ClickHouse column already carries.
  */
 
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 
 /** JSON bodies aliased away from a name that reads as a label elsewhere. */
 export const CONTENT_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {

@@ -1,30 +1,24 @@
 /**
- * The Postgres catalog derivation's override handling: the six formerly-hand-written views, topic
- * clustering internals, re-admit reasons, name-rule-dodging columns and the skip-list guard.
+ * The Postgres catalog's per-model override handling: the six formerly-hand-written views, topic
+ * clustering internals, re-admit reasons and name-rule-dodging columns.
  */
 
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
 import {
-  derivePostgresCatalog,
+  type DerivedPostgresView,
+  defineCatalogModel,
   type PostgresDatasetOverride,
-} from "../lwql-postgres-catalog-derivation.rules.ts";
+} from "../lwql-postgres-catalog-model.rules.ts";
 import {
-  assertPostgresSkipReasons,
-  LWQL_POSTGRES_SKIPPED_MODELS,
-  POSTGRES_SKIP_REASON_PREFIXES,
-} from "../lwql-postgres-skipped-models.rules.ts";
-import { LWQL_POSTGRES_ALL_OVERRIDES } from "../lwql-postgres-view-catalog.rules.ts";
-import { LWQL_PRISMA_MANIFEST } from "../lwql-prisma-manifest.rules.ts";
+  LWQL_POSTGRES_ALL_OVERRIDES,
+  LWQL_POSTGRES_CATALOG,
+} from "../lwql-postgres-view-catalog.rules.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 
-const catalog = derivePostgresCatalog({
-  manifest: LWQL_PRISMA_MANIFEST,
-  skip: LWQL_POSTGRES_SKIPPED_MODELS,
-  overrides: LWQL_POSTGRES_ALL_OVERRIDES,
-});
+const catalog = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 const byModel = new Map(catalog.map((view) => [view.postgres!.baseRelation, view]));
 const byName = new Map(catalog.map((view) => [view.name, view]));
 
@@ -117,38 +111,34 @@ describe("given the derived Postgres catalog's overrides", () => {
   describe("when an override re-admits a stripped column", () => {
     /** @scenario "An override that re-admits a stripped column carries a reason" */
     it("requires a reason and refuses one without", () => {
-      const withReason: Record<string, PostgresDatasetOverride> = {
-        Annotation: { reAdmit: { Email: "the reviewer's own email, opt-in" } },
+      const withReason: PostgresDatasetOverride = {
+        reAdmit: { Email: "the reviewer's own email, opt-in" },
       };
       expect(() =>
-        derivePostgresCatalog({
-          manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
-          overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...withReason },
+        defineCatalogModel({
+          model: "Annotation",
+          override: withReason,
+          overrides: LWQL_POSTGRES_ALL_OVERRIDES,
         }),
       ).not.toThrow();
 
-      const withoutReason: Record<string, PostgresDatasetOverride> = {
-        Annotation: { reAdmit: { Email: "" } },
-      };
+      const withoutReason: PostgresDatasetOverride = { reAdmit: { Email: "" } };
       expect(() =>
-        derivePostgresCatalog({
-          manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
-          overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...withoutReason },
+        defineCatalogModel({
+          model: "Annotation",
+          override: withoutReason,
+          overrides: LWQL_POSTGRES_ALL_OVERRIDES,
         }),
       ).toThrow(/re-admits/);
     });
 
     it("refuses a skipColumns entry naming a column the model does not have", () => {
-      const badOverride: Record<string, PostgresDatasetOverride> = {
-        Annotation: { skipColumns: { notARealColumn: "made up" } },
-      };
+      const badOverride: PostgresDatasetOverride = { skipColumns: { notARealColumn: "made up" } };
       expect(() =>
-        derivePostgresCatalog({
-          manifest: LWQL_PRISMA_MANIFEST,
-          skip: LWQL_POSTGRES_SKIPPED_MODELS,
-          overrides: { ...LWQL_POSTGRES_ALL_OVERRIDES, ...badOverride },
+        defineCatalogModel({
+          model: "Annotation",
+          override: badOverride,
+          overrides: LWQL_POSTGRES_ALL_OVERRIDES,
         }),
       ).toThrow(/skipColumns names "notARealColumn"/);
     });
@@ -240,23 +230,6 @@ describe("given the derived Postgres catalog's overrides", () => {
         expect(statement, `${baseRelation}'s approved-view DO block`).toBeDefined();
         expect(statement).toContain("\nWHERE (");
       }
-    });
-  });
-
-  describe("when the skip list is validated", () => {
-    /** @scenario "A skip needs a recorded reason" */
-    it("accepts every category prefix and refuses empty, low-value or unprefixed reasons", () => {
-      for (const prefix of POSTGRES_SKIP_REASON_PREFIXES) {
-        expect(
-          () => assertPostgresSkipReasons({ X: `${prefix} really` }),
-          `"${prefix}" should be an accepted category`,
-        ).not.toThrow();
-      }
-      expect(() => assertPostgresSkipReasons({ X: "" })).toThrow("has no reason");
-      expect(() => assertPostgresSkipReasons({ X: "low value" })).toThrow("must start with");
-      expect(() => assertPostgresSkipReasons({ X: "some arbitrary unprefixed reason" })).toThrow(
-        "must start with",
-      );
     });
   });
 });

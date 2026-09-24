@@ -1,6 +1,6 @@
 /** The `topics` view — the proving slice for the opt-out Postgres catalog. */
 
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 
 /** The topics override, keyed by its Prisma model name. */
 export const TOPICS_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {

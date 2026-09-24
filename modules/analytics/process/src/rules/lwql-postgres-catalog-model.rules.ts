@@ -1,7 +1,7 @@
 /**
- * Derives the PostgreSQL-resident half of the LangWatchQL catalog from the Prisma manifest,
- * opt-*out* exactly as {@link ./defineDatasetFromTable#deriveDefaultCatalog} does for the
- * ClickHouse half.
+ * Builds the PostgreSQL-resident half of the LangWatchQL catalog opt-*in* from the Prisma
+ * manifest, one named model per {@link defineCatalogModel} call, exactly as
+ * {@link ./lwql-dataset-derivation.rules.ts#defineCatalogTable} does for the ClickHouse half.
  */
 
 import type {
@@ -11,11 +11,7 @@ import type {
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { defaultColumnGates } from "./lwql-dataset-derivation.rules.ts";
 import type { FieldProtection } from "./lwql-field-protection.rules.ts";
-import {
-  type PostgresSkipMap,
-  derivePostgresSkipReason,
-} from "./lwql-postgres-skipped-models.rules.ts";
-import { prismaManifestModel } from "./lwql-prisma-manifest.rules.ts";
+import { LWQL_PRISMA_MANIFEST, prismaManifestModel } from "./lwql-prisma-manifest.rules.ts";
 import type { PrismaField, PrismaManifest, PrismaModel } from "./lwql-prisma-schema.rules.ts";
 import {
   organizationTenantPath,
@@ -848,21 +844,21 @@ function assertAnnotationsExposed(
 // Entry point
 // ---------------------------------------------------------------------------
 
-/**
- * Every tenant-scoped Prisma model that is not skipped, as a derived view definition, in manifest
- * order (the caller sorts by name).
- */
-export function derivePostgresCatalog({
-  manifest,
-  skip,
+/** One catalog entry, built opt-*in* from a named Prisma model and its override. */
+export function defineCatalogModel({
+  model,
+  override = {},
   overrides = {},
+  manifest = LWQL_PRISMA_MANIFEST,
 }: {
-  manifest: PrismaManifest;
-  skip: PostgresSkipMap;
-  overrides?: Readonly<Record<string, PostgresDatasetOverride>>;
-}): DerivedPostgresView[] {
+  /** The Prisma model name to build a view for. */
+  readonly model: string;
+  /** This model's own refinements. */
+  readonly override?: PostgresDatasetOverride;
+  /** Every model's overrides, so a `tenantVia` parent chain resolves. */
+  readonly overrides?: Readonly<Record<string, PostgresDatasetOverride>>;
+  readonly manifest?: PrismaManifest;
+}): DerivedPostgresView {
   const context: TenantResolveContext = { manifest, overrides };
-  return manifest.models
-    .filter((model) => derivePostgresSkipReason(model.name, skip) === undefined)
-    .map((model) => deriveModel({ model, override: overrides[model.name] ?? {}, context }));
+  return deriveModel({ model: prismaManifestModel(manifest, model), override, context });
 }

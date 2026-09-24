@@ -28,9 +28,9 @@ const ORGANIZATION_ID = "org-judging";
  * identity is provisioned, which the schema read does not need and an
  * execution answers `lwql_unavailable` from.
  */
-function harness(flagAnswer: boolean) {
+async function harness(flagAnswer: boolean) {
   const flagReads: { key: string; target: FeatureFlagTarget }[] = [];
-  const app = AnalyticsApp.create({
+  const app = await AnalyticsApp.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({
         isEnabled: (key, target) => {
@@ -54,14 +54,22 @@ function harness(flagAnswer: boolean) {
       clickhouse: createApiFixture<ClickHouseQueryClient>(),
       rateLimiter: { check: () => Promise.resolve({ allowed: true }) } satisfies RateLimiter,
       publicBaseUrl: "https://app.langwatch.test",
+      langwatchQl: {
+        admin: { configured: false },
+        postgres: { configured: false },
+        database: () => {
+          throw new Error("no database in this test");
+        },
+      },
     },
     config: {
       langwatchQl: {
         url: void 0,
         username: void 0,
-        password: void 0,
         database: void 0,
         tenantSetting: void 0,
+        accessModelMode: void 0,
+        sqlSingleNode: void 0,
       },
     },
     resources: { own: () => void 0, ownService: () => void 0 },
@@ -87,7 +95,7 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
   describe("given the Instant Evals flag is off for the project", () => {
     /** @scenario "The schema publishes eval functions as unavailable while they are gated" */
     it("publishes every eval function as unavailable, leaving extraction availability to permissions", async () => {
-      const { app } = harness(false);
+      const { app } = await harness(false);
 
       const schema = await app.describeLangWatchQLSchema({
         projectId: PROJECT_ID,
@@ -105,7 +113,7 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
 
   describe("given the Instant Evals flag is on for the project", () => {
     it("publishes the eval functions as available", async () => {
-      const { app, flagReads } = harness(true);
+      const { app, flagReads } = await harness(true);
 
       const schema = await app.describeLangWatchQLSchema({
         projectId: PROJECT_ID,
@@ -126,7 +134,7 @@ describe("AnalyticsApp.describeLangWatchQLSchema", () => {
 describe("AnalyticsApp.executeLangWatchQL", () => {
   describe("given a statement that calls no eval function", () => {
     it("never resolves the project's Instant Evals gate", async () => {
-      const { execute, flagReads } = harness(true);
+      const { execute, flagReads } = await harness(true);
 
       await execute("SELECT trace_id FROM analytics.traces");
 
@@ -136,7 +144,7 @@ describe("AnalyticsApp.executeLangWatchQL", () => {
 
   describe("given a statement that names an eval function", () => {
     it("resolves the gate on the project the statement runs for", async () => {
-      const { execute, flagReads } = harness(true);
+      const { execute, flagReads } = await harness(true);
 
       await execute("SELECT eval(captured_output, 'is rude') AS rude FROM analytics.traces");
 

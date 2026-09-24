@@ -538,6 +538,7 @@ overrides:
 packageExtensionsChecksum: sha256-m/G/WH1yLdya4bNe65I9ulURa/FU76z3o30vd4qvq6M=
 
 importers:
+
   .:
     devDependencies:
       '@0xdeafcafe/tslsp-cli':
@@ -3904,6 +3905,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
@@ -3947,9 +3951,15 @@ importers:
       '@testcontainers/postgresql':
         specifier: ^12.1.0
         version: 12.1.0
+      '@types/js-yaml':
+        specifier: 'catalog:'
+        version: 4.0.9
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      js-yaml:
+        specifier: 'catalog:'
+        version: 5.2.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

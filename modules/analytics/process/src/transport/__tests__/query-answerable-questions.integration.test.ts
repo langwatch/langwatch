@@ -24,6 +24,7 @@ import {
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { buildQueryReference } from "../../rules/query-reference.rules.ts";
 import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
@@ -726,6 +727,12 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole catalog, from the single
+    // access-model emitter (#8258) — the view statements are structural only.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: facts,
+    });
 
     asking = { id: `asking-${Date.now()}`, lwqlKey: "asking-lwql-secret-DO-NOT-LOG" };
     other = { id: `other-${Date.now()}`, lwqlKey: "other-lwql-secret-DO-NOT-LOG" };

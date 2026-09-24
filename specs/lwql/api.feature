@@ -820,15 +820,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given the chart is rendered with chart-managed ClickHouse at one replica and at three replicas
     Then the application pod template differs between the two renders
 
-  # Design C: whoever owns the ClickHouse server owns the access model. The app
-  # self-provisions ONLY when it owns nothing else — external/BYO ClickHouse. For
-  # chart-managed ClickHouse the owning pod renders the access model as config, so
-  # the app must not also run the provisioning DDL (one owner per entity name).
+  # Issue #8258: the application always owns the LangWatchQL access model. There
+  # is no self-provision switch and no rendered access model — every deployment,
+  # chart-managed or external ClickHouse, hands the app only the two LWQL
+  # passwords, and the app converges the whole model at boot.
   @e2e
-  Scenario: App self-provisioning is exclusive to external ClickHouse under Design C
+  Scenario: The application self-provisions the LangWatchQL access model on every deployment
     Given the chart is rendered once with chart-managed ClickHouse and once with external ClickHouse
-    Then the application carries the LangWatchQL self-provisioning environment variable only in the external-ClickHouse render
-    And the chart-managed render leaves provisioning to the ClickHouse server that owns the access model
+    Then both renders hand the application the two LangWatchQL passwords and no self-provision switch
+    And neither render carries a rendered LangWatchQL access model for the ClickHouse server to own
 
   @e2e
   Scenario: A single-replica deployment provisions LangWatchQL unchanged
@@ -850,11 +850,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the database engine is unchanged
     And provisioning against a database name that differs from the connection URL's is refused
 
-  # P1 (#6635): under LWQL_SELF_PROVISION every app pod runs the convergence at
-  # boot, and it is destructive (CREATE USER OR REPLACE, drop/recreate the
-  # PostgreSQL-engine tables, grants, row policies). Two pods running it at once
-  # race — one recreating the restricted identity while another queries through
-  # it mid-drop. A single global Postgres advisory lock gates entry so the
+  # P1 (#6635): every app pod runs the convergence at boot, and it is
+  # destructive (CREATE USER OR REPLACE, drop/recreate the PostgreSQL-engine
+  # tables, grants, row policies). Two pods running it at once race — one
+  # recreating the restricted identity while another queries through it
+  # mid-drop. A single global Postgres advisory lock gates entry so the
   # sequence runs one pod at a time; the convergence is idempotent, so the pod
   # that waits simply re-runs it.
   @integration
@@ -862,6 +862,133 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given two pods run the LangWatchQL self-provision convergence at the same time
     Then the two locked bodies never overlap
     And one run finishes before the other starts
+
+  # Issue #8258: the app owns the access model on every distribution, so the
+  # connection is derived whenever the password is present — there is no
+  # self-provision switch to read.
+  @unit
+  Scenario: Provisioning no longer reads a self-provision switch
+    Given LWQL_CLICKHOUSE_PASSWORD and CLICKHOUSE_URL are set
+    When the LangWatchQL connection is derived from the environment
+    Then the restricted connection is returned
+
+  # Issue #8258: where the ClickHouse server itself owns an LWQL entity in its
+  # read-only config store (users.xml / config.xml), provisioning yields to it
+  # and provisions the rest, rather than crashing the boot.
+  @integration
+  Scenario: A config-defined LangWatchQL entity is skipped, not fatal
+    Given a ClickHouse whose users.d defines the langwatch_lwql user and lwql_restricted profile
+    And whose config.d defines the lwql_postgres named collection
+    When LangWatchQL provisioning runs against it
+    Then each config-defined entity is logged as skipped at warn and provisioning does not fail
+    And the LangWatchQL views and the config-defined restricted identity both exist afterwards
+
+  @unit
+  Scenario: A config-store readonly error on one statement does not abort the rest
+    Given a statement list where one statement is rejected with a config-store read-only error
+    When the config-store-tolerant runner executes the list
+    Then that statement is skipped and reported while the remaining statements still run
+    And a statement rejected for any other reason still aborts the run
+
+  # Issue #8258: a 495 ACCESS_STORAGE_READONLY is tolerated only when the failing
+  # statement targets an entity the config store actually owns (present in the
+  # inventory). A BYO server whose whole access storage is read-only owns none of
+  # the LWQL model, so its 495s must abort — not boot "ok" with an unprovisioned
+  # access model.
+  @unit
+  Scenario: A read-only access storage for an entity the config store does not own fails provisioning
+    Given a statement rejected with a config-store read-only error whose target entity is not in the config-store inventory
+    When the config-store-tolerant runner executes the list
+    Then the run aborts rather than skipping the statement
+    And a read-only error whose target entity is in the inventory is skipped and the run continues
+
+  # Issue #8258: a 495 is matched against the statement's OWN target — the entity
+  # it creates or grants to — by kind AND name, not any inventoried name appearing
+  # anywhere in the text. A row policy names the restricted user in its `TO`
+  # clause, so a config-owned user must not excuse a read-only row policy: doing
+  # so would skip a missing policy and boot without tenant isolation.
+  @unit
+  Scenario: A read-only access storage for a row policy is not excused by the config-owned user
+    Given a row-policy statement rejected with a read-only error whose only inventoried match is the user named in its TO clause
+    When the config-store-tolerant runner executes the list
+    Then the run aborts rather than skipping the row policy
+    And the same read-only error is skipped only once the row policy itself is in the inventory
+
+  # Issue #8258: ClickHouse keys a row policy by short name AND its `ON db.table`
+  # target, and two tables can share a bare short name. Inventorying and matching
+  # on the short name alone would let a config-owned `x_tenant ON db.a` excuse a
+  # read-only `x_tenant ON db.b`, booting table b with its GRANT applied but no
+  # tenant policy — so the ON target is part of the identity that must match.
+  @unit
+  Scenario: A read-only access storage for a row policy on one table does not excuse the same short name on another table
+    Given a read-only row-policy statement on one table whose only inventoried match is the same short name on a different table
+    When the config-store-tolerant runner executes the list
+    Then the run aborts rather than skipping the row policy
+    And the same read-only error is skipped only when the inventoried policy is on the very table the statement targets
+
+  # Issue #8258: the app owns the LangWatchQL access model on every distribution,
+  # so the chart-managed ClickHouse renderer must render none of it — no
+  # identity, profile, row policy or named collection — while still granting the
+  # default user the management privileges the app's convergence needs at boot.
+  @unit
+  Scenario: Chart-managed ClickHouse renders no LangWatchQL access model
+    Given the clickhouse-serverless renderer runs with any input
+    When the rendered users.d and config.d output is inspected
+    Then no langwatch_lwql user, lwql_restricted profile, row policy or lwql_postgres named collection is rendered
+    And the default user keeps access_management and named_collection_control and the custom_ settings prefix
+
+  # Issue #8258: a helm upgrade can boot the app against the OLD ClickHouse pod,
+  # which still serves users.d/lwql.yaml, so the access-model DDL is skipped as
+  # config-store-owned (495). Moments later the pod rolls to the new chart, which
+  # renders no access model — the XML identity is gone and, without this, nothing
+  # re-provisions until the next app boot. The deploy task is a short-lived
+  # process, so the long-running app server watches instead: it polls a stateless
+  # ownership probe on a backoff and decides from each snapshot alone, never
+  # inferring from history. The probe reports which store owns the model right
+  # now — the config store (the old pod still rendering it), the SQL store (the
+  # app-owned model is already live), or neither. Config store → keep waiting;
+  # SQL store → nothing to do; neither → re-provision the app-owned model once.
+  # A probe that throws (ClickHouse mid-roll) is treated as still-waiting and
+  # never re-provisions on the failure alone, so a transient error can never fire
+  # a re-provision against a healthy install. The first poll fires within seconds
+  # so a pod that rolled before the server listened is still caught, and a config
+  # store that never releases gives up at a ~30-minute budget with a warning.
+  @unit
+  Scenario: The app re-provisions once the ClickHouse config store releases the LangWatchQL access model
+    Given the worker's scheduled reconvergence process polls a stateless LangWatchQL ownership probe after a chart upgrade
+    When a probe finds the model is owned by neither the config store nor the SQL store
+    Then the app re-provisions the app-owned access model, and later probes find the SQL store and do nothing
+    And while the config store still owns the model the process keeps probing on a backoff
+    And when the SQL store already owns the model the probe does nothing
+    And a probe error alone never re-provisions — the process keeps probing until a snapshot is authoritative
+    And a config store that never releases the model gives up at the budget with a warning
+
+  # Shutdown: the watch is a worker-hosted process manager, and the worker drains
+  # its outbox before it closes the app, so a re-provision is never left running
+  # against a torn-down app — the intent awaits the whole convergence.
+  @unit
+  Scenario: A re-provision in flight finishes before the worker lets the app close
+    Given the reconvergence intent has started a re-provision
+    When the worker begins draining for shutdown
+    Then the intent resolves only once the re-provision has finished
+
+  # The re-provision gate is only as trustworthy as the probe behind it, so the
+  # ownership classification is split from its I/O and unit-tested directly: a
+  # pure classifier over two counts (config-store entities, SQL-store users) and
+  # a probe that reads those counts against an injected client. The config store
+  # wins whenever it still renders an entity; else the app-owned SQL-store user
+  # if present; else neither. Connectivity is proven first, so an unreachable
+  # ClickHouse makes the probe throw rather than report a spurious "neither" the
+  # watch would re-provision against. The SQL-store count excludes the config
+  # store's `users_xml` rather than pinning one storage kind.
+  @unit
+  Scenario: The ownership probe classifies who owns the LangWatchQL access model
+    Given the ownership classifier reads a config-store entity count and a SQL-store user count
+    When the config store still renders any entity the classifier reports the config store owns the model
+    And when only the app-owned SQL-store user is present the classifier reports the SQL store owns it
+    And when neither count is positive the classifier reports the model is owned by neither
+    When the probe cannot reach ClickHouse it throws rather than reporting neither owns the model
+    And the probe counts SQL-store users by the restricted user name excluding the config store's users_xml
 
   @integration
   Scenario: The lock is a transaction-scoped Postgres advisory lock on the global key
@@ -1083,15 +1210,29 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 
   # The self-provisioning DDL embeds the restricted identity's password and the
   # named collection's PostgreSQL reader password, and a ClickHouse error echoes
-  # the statement that failed. Self-provisioning is non-fatal by contract (the
-  # pod boots, the endpoint stays refused), so the failure is logged, and what
-  # is logged must not carry either secret.
+  # the statement that failed. Because the DDL escapes those passwords (a quote
+  # or backslash is doubled), a value-based redaction cannot be relied on to
+  # strip them. Self-provisioning is non-fatal by contract (the pod boots, the
+  # endpoint stays refused), so the failure is logged — but never the statement
+  # text or the raw error message. Only the statement kind, its position, and the
+  # numeric error code and exception type are logged.
   @unit
   Scenario: A failed self-provisioning run is logged without leaking a password
     Given the self-provisioned ClickHouse access model whose DDL embeds the restricted user's password
     When a statement fails and the error echoes that DDL
-    Then the password and the connection strings are redacted from the logged error
-    And an empty or unset secret never matches
+    Then the logged failure carries only the statement kind, position and error code
+    And neither the password in any escaped form nor the statement text is logged
+
+  # Self-provisioning is non-fatal by contract, and that must hold for a
+  # misconfigured connection too: a CLICKHOUSE_URL that parses but names an
+  # invalid database identifier makes the migration URL parse throw. It is caught
+  # on the same non-fatal path, so the deploy task returns and the pod boots
+  # (queries stay fail-closed) rather than crashing.
+  @unit
+  Scenario: An unparsable ClickHouse database name does not crash boot
+    Given a CLICKHOUSE_URL that parses but whose database is an invalid identifier
+    When the LangWatchQL provisioning task runs
+    Then the task completes without throwing and the failure is logged
 
   # ---------------------------------------------------------------------------
   # Coding-agent gaps (#8085): scoping, discovery and identity from the caller's
@@ -1222,12 +1363,6 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       When the query door resolves the caller's content protections
       Then a content category is offered only when every readable project grants it
       And an empty readable set offers no content
-
-    @unit
-    Scenario: The tenant predicate and the rendered config predicate are the same text
-      Given the single-sourced LangWatchQL tenant predicate template
-      When the application row policy and the rendered ClickHouse config are compared
-      Then both use the same predicate text, so neither can drift into over-broad or empty results
 
   Rule: Discover what I can ask
 

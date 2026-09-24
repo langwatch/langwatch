@@ -9,10 +9,10 @@ import {
   type ColumnsManifest,
   type ColumnsManifestTable,
   columnsManifestTable,
+  LWQL_COLUMNS_MANIFEST,
 } from "./lwql-columns-manifest.rules.ts";
 import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
 import type { FieldProtection } from "./lwql-field-protection.rules.ts";
-import { deriveSkipReason } from "./lwql-skipped-tables.rules.ts";
 
 /** How a derived view deduplicates, mirroring {@link LangWatchQLViewDedup}. */
 export interface DerivedDatasetDedup {
@@ -557,38 +557,6 @@ function defaultTimeColumn(manifestTable: ColumnsManifestTable): string {
 }
 
 /**
- * The join keys a table gets by default: its `*Id` columns that also appear on
- * another catalogued table, so a join key is one that can actually match
- * another view.
- */
-function defaultJoinKeys({
-  manifestTable,
-  sharedColumns,
-}: {
-  manifestTable: ColumnsManifestTable;
-  sharedColumns: ReadonlySet<string>;
-}): string[] {
-  return manifestTable.columns
-    .map((column) => column.name)
-    .filter((name) => name.endsWith("Id") && sharedColumns.has(name));
-}
-
-/**
- * The names that appear on more than one catalogued table — the candidates for
- * a join key that can match another view.
- */
-function columnsSharedAcrossTables(tables: readonly ColumnsManifestTable[]): Set<string> {
-  const seenOnce = new Set<string>();
-  const shared = new Set<string>();
-  for (const table of tables) {
-    for (const column of table.columns) {
-      if (seenOnce.has(column.name)) shared.add(column.name);
-      else seenOnce.add(column.name);
-    }
-  }
-  return shared;
-}
-
 /**
  * A derived table's dedup, with the override merged onto a computed default rather than replacing
  * it outright.
@@ -666,20 +634,13 @@ function computeJoinKeys({
   aggregating,
   grainColumns,
   override,
-  manifestTable,
-  sharedColumns,
 }: {
   aggregating: boolean;
   grainColumns: readonly string[];
   override?: readonly string[];
-  manifestTable: ColumnsManifestTable;
-  sharedColumns: ReadonlySet<string>;
 }): readonly string[] {
-  if (aggregating) return grainColumns;
-  return [
-    DEFAULT_TENANT_COLUMN,
-    ...(override ?? defaultJoinKeys({ manifestTable, sharedColumns })),
-  ].filter((key, index, all) => all.indexOf(key) === index);
+  if (override) return override;
+  return aggregating ? grainColumns : [DEFAULT_TENANT_COLUMN];
 }
 
 /** The per-table shape {@link deriveDataset} computes before building the input. */
@@ -703,11 +664,9 @@ interface DerivedDatasetShape {
 function deriveDatasetShape({
   manifestTable,
   override,
-  sharedColumns,
 }: {
   manifestTable: ColumnsManifestTable;
   override: Partial<DatasetOverride>;
-  sharedColumns: ReadonlySet<string>;
 }): DerivedDatasetShape {
   const aliases = override.aliases ?? {};
   const skipColumns = override.skipColumns ?? {};
@@ -737,8 +696,6 @@ function deriveDatasetShape({
     aggregating,
     grainColumns,
     override: override.joinKeys,
-    manifestTable,
-    sharedColumns,
   });
 
   return {
@@ -794,51 +751,15 @@ function buildDatasetInput({
   };
 }
 
-/** Derives one manifest table's view definition, applying its override. */
-function deriveDataset({
-  manifestTable,
-  override,
-  sharedColumns,
-  manifest,
-}: {
-  manifestTable: ColumnsManifestTable;
-  override: Partial<DatasetOverride>;
-  sharedColumns: ReadonlySet<string>;
-  manifest: ColumnsManifest;
-}): LangWatchQLViewDefinition {
-  const shape = deriveDatasetShape({ manifestTable, override, sharedColumns });
+/** One catalog entry, built opt-in from a named ClickHouse table and its override. */
+export function defineCatalogTable(
+  table: string,
+  override: Partial<DatasetOverride> = {},
+  manifest: ColumnsManifest = LWQL_COLUMNS_MANIFEST,
+): LangWatchQLViewDefinition {
+  const manifestTable = columnsManifestTable(manifest, table);
+  const shape = deriveDatasetShape({ manifestTable, override });
   return defineDatasetFromTable(buildDatasetInput({ manifestTable, override, shape, manifest }));
-}
-
-/** Every manifest table that is neither hand-written nor skipped, as a derived view definition. */
-export function deriveDefaultCatalog({
-  manifest,
-  skip,
-  handWritten,
-  overrides = {},
-}: {
-  manifest: ColumnsManifest;
-  /** The skip map — {@link ./skippedTables#LWQL_CATALOG_SKIPPED_TABLES}. */
-  skip: Record<string, string>;
-  /** Source tables already carried by hand-written catalog entries. */
-  handWritten: readonly string[];
-  /** Per-table refinements to the defaults. */
-  overrides?: Record<string, Partial<DatasetOverride>>;
-}): LangWatchQLViewDefinition[] {
-  const handWrittenSet = new Set(handWritten);
-  const candidates = manifest.tables.filter(
-    (table) => !handWrittenSet.has(table.name) && deriveSkipReason(table.name, skip) === undefined,
-  );
-  const sharedColumns = columnsSharedAcrossTables(candidates);
-
-  return candidates.map((manifestTable) =>
-    deriveDataset({
-      manifestTable,
-      override: overrides[manifestTable.name] ?? {},
-      sharedColumns,
-      manifest,
-    }),
-  );
 }
 
 /** Refuses an annotation map keyed on a name no exposed column carries. */

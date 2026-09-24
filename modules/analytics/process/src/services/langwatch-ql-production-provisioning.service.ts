@@ -12,21 +12,13 @@ import {
   type LangWatchQLNames,
 } from "../services/langwatch-ql-access-model.service.ts";
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLCatalogShapesService } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLPostgresViewsService } from "../services/langwatch-ql-postgres-views.service.ts";
-import {
-  SHIPPED_LWQL_DEDUP,
-  LangWatchQLViewStatementsService,
-} from "../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
-const viewStatements = LangWatchQLViewStatementsService.create();
 
 const accessModel = LangWatchQLAccessModelService.create();
-
-const catalogShapes = LangWatchQLCatalogShapesService.create();
 
 const lwqlCapability = LangWatchQLCapabilityService.create();
 const sqlText = LangWatchQLSqlTextService.create();
@@ -123,33 +115,6 @@ export class LangWatchQLProductionProvisioningService {
     sourceDatabase: string;
   }): string {
     return accessModel.qualified(names, names.keyMapTable, sourceDatabase);
-  }
-
-  /**
-   * ClickHouse-native views only.
-   */
-  clickHouseObjectStatements({
-    names,
-    sourceDatabase,
-    views = LWQL_VIEW_CATALOG,
-  }: {
-    names: LangWatchQLNames;
-    sourceDatabase: string;
-    views?: readonly LangWatchQLViewDefinition[];
-  }): string[] {
-    return [
-      `CREATE DATABASE IF NOT EXISTS ${names.database}`,
-      ...views
-        .filter((view) => !catalogShapes.isPostgresResident(view))
-        .map((view) =>
-          viewStatements.viewStatement({
-            names,
-            sourceDatabase,
-            view,
-            dedup: SHIPPED_LWQL_DEDUP,
-          }),
-        ),
-    ];
   }
 
   /**

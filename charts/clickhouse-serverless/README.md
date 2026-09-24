@@ -56,25 +56,33 @@ See the [Docker image README](../../infra/clickhouse-serverless/README.md) for t
 
 ### LangWatchQL (LWQL)
 
-When the app's `lwql.enabled` chart passes down its two LWQL passwords, this
-chart's `ch-config` binary also renders the LangWatchQL access model as
-config, re-read at every pod boot: the `langwatch_lwql` restricted user, the
-`lwql_restricted` settings profile (fixed grants, row-level tenant filters),
-and the `lwql_postgres` PostgreSQL-bridge named collection. This is the
-chart-managed half of the ownership contract in
-[ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md) —
-the application self-provisions the same objects via SQL DDL only when
-ClickHouse is **not** chart-managed (BYO / external). See
-`internal/render/lwql.go` for the rendering, and the parent chart's
-[LangWatchQL (LWQL) — BYO ClickHouse prerequisites](../langwatch/README.md#langwatchql-lwql--byo-clickhouse-prerequisites)
-section for the prerequisites an external ClickHouse must satisfy instead.
+This chart renders no LangWatchQL access model — the application owns it (see
+[ADR-159](../../dev/docs/adr/159-the-app-owns-the-lwql-access-model.md)). How the
+model reaches ClickHouse depends on the deployment, and the two paths are
+distinct:
 
-The `lwql_postgres` PostgreSQL reader password is rendered in **plaintext**
-into `config.d/lwql-server.yaml` on the pod's disk — ClickHouse must dial
-PostgreSQL with the real credential, so unlike every other credential this
-chart renders, this one cannot be hashed. See the parent README's
-plaintext-password caveat for the mitigations (file permissions, Secret
-delivery).
+- **Chart-managed ClickHouse (the umbrella chart's default): RENDERED delivery.**
+  A deploy-time Job in the umbrella chart renders the `langwatch_lwql` restricted
+  user, the `<database>_profile` settings profile (`langwatch_profile` by
+  default; fixed grants, row-level tenant filters) and the `lwql_postgres`
+  PostgreSQL-bridge named collection into a Secret, and every ClickHouse pod
+  mounts it into `users.d` / `config.d`. No access SQL DDL runs against the
+  server.
+- **Bring-your-own / external ClickHouse: SQL DDL.** The chart cannot write a
+  server it does not manage, so the app self-provisions the same objects via SQL
+  DDL, degrading to a logged, fail-closed refusal if the server rejects a
+  statement.
+
+Either way this image renders the server-level prerequisites the model needs:
+the `default` user is granted `access_management` and `named_collection_control`
+(the right to create users, profiles, row policies and named collections through
+SQL — exercised by the SQL-DDL path); the `custom_` settings prefix is declared
+so the per-query tenant capability the app's queries rely on is accepted rather
+than rejected with `UNKNOWN_SETTING`; and
+`access_control_improvements.settings_constraints_replace_previous` is set, so
+the settings profile's `CHANGEABLE_IN_READONLY` constraint on
+`custom_api_key_hash` is accepted rather than refused. There is no plaintext
+password caveat — this chart renders no config carrying one.
 
 ## Parameters
 

@@ -56,7 +56,7 @@ function disagreesWithDerivedServer({
   if (explicitOrigin === derivedOrigin) return false;
   logger.error(
     { derivedOrigin },
-    "LWQL_SELF_PROVISION cannot target a ClickHouse other than CLICKHOUSE_URL's own: provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL, or configure the five LWQL_* variables explicitly without LWQL_SELF_PROVISION",
+    "LangWatchQL: LWQL_CLICKHOUSE_URL cannot name a ClickHouse other than CLICKHOUSE_URL's own — provisioning would create the access model on one server while queries ran against another. Unset LWQL_CLICKHOUSE_URL so it derives from CLICKHOUSE_URL",
   );
   return true;
 }
@@ -69,12 +69,12 @@ function disagreesWithDerivedServer({
 function deriveAdminTarget({
   env,
 }: {
-  env: NodeJS.ProcessEnv;
+  env: Readonly<Record<string, string | undefined>>;
 }): { serverUrl: URL; database: string } | null {
   const adminUrl = env.CLICKHOUSE_URL;
   if (!adminUrl) {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but CLICKHOUSE_URL is not set — LangWatchQL stays unconfigured and every query will be refused",
+      "LangWatchQL: CLICKHOUSE_URL is not set — LangWatchQL stays unconfigured and every query will be refused",
     );
     return null;
   }
@@ -83,21 +83,21 @@ function deriveAdminTarget({
     parsed = new URL(adminUrl);
   } catch {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but CLICKHOUSE_URL is not a parseable URL — LangWatchQL stays unconfigured and every query will be refused",
+      "LangWatchQL: CLICKHOUSE_URL is not a parseable URL — LangWatchQL stays unconfigured and every query will be refused",
     );
     return null;
   }
   const database = parsed.pathname.replace(/^\//, "");
   if (!database) {
     logger.warn(
-      "LWQL_SELF_PROVISION is true but CLICKHOUSE_URL names no database in its path — LangWatchQL stays unconfigured and every query will be refused",
+      "LangWatchQL: CLICKHOUSE_URL names no database in its path — LangWatchQL stays unconfigured and every query will be refused",
     );
     return null;
   }
   if (env.LWQL_DATABASE && env.LWQL_DATABASE !== database) {
     logger.error(
       { lwqlDatabase: env.LWQL_DATABASE, adminDatabase: database },
-      "LWQL_SELF_PROVISION cannot target a database other than CLICKHOUSE_URL's own: the key-map row policies and the key-map backfill would disagree. Unset LWQL_DATABASE, or configure the five LWQL_* variables explicitly without LWQL_SELF_PROVISION",
+      "LangWatchQL: LWQL_DATABASE cannot name a database other than CLICKHOUSE_URL's own — the key-map row policies and the key-map backfill would disagree. Unset LWQL_DATABASE so it derives from CLICKHOUSE_URL",
     );
     return null;
   }
@@ -114,20 +114,17 @@ function deriveAdminTarget({
 }
 
 /**
- * Derives the restricted connection from the admin URL under `LWQL_SELF_PROVISION`, or null.
- * The database is the admin URL's own -- views sit beside fact tables, row policies reference it
- * -- so a different `LWQL_DATABASE`/`_URL` is refused: a mismatch is a silent outage.
+ * Derives the restricted connection from the admin `CLICKHOUSE_URL` whenever a
+ * `LWQL_CLICKHOUSE_PASSWORD` is present, or null. The database is the admin URL's own -- a
+ * different `LWQL_DATABASE`/`_URL` is refused: a mismatch is a silent outage (ADR-159).
  */
 export function deriveLwqlConnectionFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): LangWatchQLConnection | null {
-  if (env.LWQL_SELF_PROVISION !== "true") return null;
-
   const password = env.LWQL_CLICKHOUSE_PASSWORD;
   if (!password) {
-    logger.warn(
-      "LWQL_SELF_PROVISION is true but LWQL_CLICKHOUSE_PASSWORD is not set — LangWatchQL stays unconfigured and every query will be refused",
-    );
+    // No password means this deployment is simply not running LangWatchQL —
+    // silent, not a warning, exactly like an unset optional feature.
     return null;
   }
 
@@ -150,4 +147,32 @@ export function deriveLwqlConnectionFromEnv(
     database: target.database,
     tenantSetting: env.LWQL_TENANT_SETTING ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
   };
+}
+
+/** The credential-free ClickHouse target, or unavailable when it cannot be derived safely. */
+export type LwqlClickHouseTarget =
+  | { readonly available: false }
+  | { readonly available: true; readonly url: string; readonly database: string };
+
+/** A stores-supplied target, refused where an explicit LWQL_* override disagrees with it. */
+export function applyLwqlTargetOverrides({
+  target,
+  explicitUrl,
+  explicitDatabase,
+}: {
+  target: Readonly<{ url: string; database: string }>;
+  explicitUrl: string | undefined;
+  explicitDatabase: string | undefined;
+}): LwqlClickHouseTarget {
+  if (disagreesWithDerivedServer({ explicitUrl, derivedOrigin: new URL(target.url).origin })) {
+    return { available: false };
+  }
+  if (explicitDatabase && explicitDatabase !== target.database) {
+    logger.error(
+      { lwqlDatabase: explicitDatabase, adminDatabase: target.database },
+      "LangWatchQL: LWQL_DATABASE cannot name a database other than CLICKHOUSE_URL's own — the key-map row policies and the key-map backfill would disagree. Unset LWQL_DATABASE so it derives from CLICKHOUSE_URL",
+    );
+    return { available: false };
+  }
+  return { available: true, url: target.url, database: target.database };
 }

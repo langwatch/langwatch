@@ -45,8 +45,8 @@ function windowLimiter(): RateLimiter {
  * provisioned, so an ADMITTED execution answers `lwql_unavailable` from the
  * executor door — how a window refusal is told apart from one past it.
  */
-function harness() {
-  const app = AnalyticsApp.create({
+async function harness() {
+  const app = await AnalyticsApp.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       authz: createApiFixture<AuthzApi>(),
@@ -66,14 +66,22 @@ function harness() {
       clickhouse: createApiFixture<ClickHouseQueryClient>(),
       rateLimiter: windowLimiter(),
       publicBaseUrl: "https://app.langwatch.test",
+      langwatchQl: {
+        admin: { configured: false },
+        postgres: { configured: false },
+        database: () => {
+          throw new Error("no database in this test");
+        },
+      },
     },
     config: {
       langwatchQl: {
         url: void 0,
         username: void 0,
-        password: void 0,
         database: void 0,
         tenantSetting: void 0,
+        accessModelMode: void 0,
+        sqlSingleNode: void 0,
       },
     },
     resources: { own: () => void 0, ownService: () => void 0 },
@@ -101,7 +109,7 @@ const FREE_QUERIES_PER_MINUTE = resolveRequestBound("lwqlPerMinute", "FREE");
 describe("AnalyticsApp.executeLangWatchQL", () => {
   describe("given a free-tier project under its query ceiling", () => {
     it("reaches the executor for every query", async () => {
-      const { execute } = harness();
+      const { execute } = await harness();
 
       for (let index = 0; index < FREE_QUERIES_PER_MINUTE; index++) {
         expect(await execute("project-free")).toBe("lwql_unavailable");
@@ -111,7 +119,7 @@ describe("AnalyticsApp.executeLangWatchQL", () => {
 
   describe("given a free-tier project at its query ceiling", () => {
     it("refuses the next query 429 and never reaches the executor", async () => {
-      const { execute } = harness();
+      const { execute } = await harness();
       for (let index = 0; index < FREE_QUERIES_PER_MINUTE; index++) {
         await execute("project-free");
       }
@@ -122,7 +130,7 @@ describe("AnalyticsApp.executeLangWatchQL", () => {
 
   describe("given an enterprise project past the free query ceiling", () => {
     it("still reaches the executor: the ceiling is tier-resolved, not static", async () => {
-      const { execute } = harness();
+      const { execute } = await harness();
       for (let index = 0; index < FREE_QUERIES_PER_MINUTE; index++) {
         await execute("project-enterprise");
       }

@@ -1,5 +1,5 @@
 /**
- * The fourteen members a process hands its modules. Closed on purpose — an
+ * The sixteen members a process hands its modules. Closed on purpose — an
  * open list is the optional collaborator production forgets to supply.
  * `audit` is not on it, since that peer is resolved via `withAudit`.
  */
@@ -142,13 +142,54 @@ export interface Telemetry {
 }
 
 /**
- * What the process hands a module: one record, fourteen keys. `clickhouse`
+ * The shared ClickHouse server's administrative seam, for the LangWatchQL access model
+ * (ADR-159): the credential-free target, and statements that name no tenant. The URL it
+ * was built from never leaves the stores' construction closure (ADR-132).
+ */
+export type ClickHouseAdmin =
+  | Readonly<{ configured: false }>
+  | Readonly<{
+      configured: true;
+      /** The server origin (no credentials, path or query) and the database its path named. */
+      target: Readonly<{ url: string; database: string }>;
+      statements: ClickHouseAdminStatements;
+    }>;
+
+/** Untenanted statements on the shared server: DDL, `system.*` reads, the key-map writes. */
+export interface ClickHouseAdminStatements {
+  command(statement: string): Promise<void>;
+  rows(sql: string, params?: Readonly<Record<string, unknown>>): Promise<Record<string, unknown>[]>;
+  insert(input: {
+    table: string;
+    rows: readonly Readonly<Record<string, unknown>>[];
+    settings?: Readonly<Record<string, string | number>>;
+  }): Promise<void>;
+}
+
+/** The PostgreSQL endpoint `DATABASE_URL` names, without its credentials (ADR-159). */
+export type DatabaseTarget =
+  | Readonly<{ configured: false }>
+  | Readonly<{
+      configured: true;
+      host: string;
+      port: number;
+      database: string;
+      /** Prisma's `?schema=`, `public` when absent. */
+      schema: string;
+      /** Prisma's `?connection_limit=`, where the URL names one. */
+      connectionLimit?: number;
+    }>;
+
+/**
+ * What the process hands a module: one record, sixteen keys. `clickhouse`
  * and `objectStorage` are each ONE client that routes internally, so "every
  * statement names its tenant" is structural, not a rule to remember.
  */
 export interface ProcessMembers {
   readonly prisma: PrismaClient;
   readonly clickhouse: ClickHouseQueryClient;
+  readonly clickhouseAdmin: ClickHouseAdmin;
+  readonly databaseTarget: DatabaseTarget;
   readonly redis: RedisConnection;
   readonly eventing: EventSourcing;
   readonly objectStorage: ObjectStorage;
@@ -178,7 +219,9 @@ export const MEMBER_NAMES = [
   "encryption",
   "telemetry",
   "prisma",
+  "databaseTarget",
   "clickhouse",
+  "clickhouseAdmin",
   "objectStorage",
   "redis",
   "cache",

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { LWQL_SOURCE_ALIAS } from "../../rules/lwql-source-alias.rules.ts";
 import { pickLwqlViewByName } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLAccessModelDefinitionService } from "../langwatch-ql-access-model-definition.service.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
@@ -24,6 +25,29 @@ import {
 const accessModel = LangWatchQLAccessModelService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
+const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
+
+/** The views plus the access model's policies and grants, as a SQL-mode boot runs them. */
+function fullSetup(input: Parameters<typeof viewProvisioning.setupStatements>[0]): string[] {
+  const definition = accessModelDefinition.build({
+    names: input.names,
+    passwordSha256Hex: "a".repeat(64),
+    namedCollection: {
+      collection: "c",
+      host: "h",
+      port: 5432,
+      database: "d",
+      user: "u",
+      password: "p",
+    },
+    sourceDatabase: input.sourceDatabase,
+    ...(input.views ? { views: input.views } : {}),
+  });
+  return [
+    ...viewProvisioning.setupStatements(input),
+    ...accessModelDefinition.renderDdl(definition),
+  ];
+}
 
 const SOURCE_DATABASE = "langwatch";
 
@@ -299,7 +323,7 @@ describe("given a catalog view that joins a second table", () => {
   });
 
   describe("when the full setup is generated", () => {
-    const statements = viewProvisioning.setupStatements({
+    const statements = fullSetup({
       names: SNAPSHOT_NAMES,
       sourceDatabase: SOURCE_DATABASE,
       views: [JOIN_VIEW],
@@ -308,12 +332,13 @@ describe("given a catalog view that joins a second table", () => {
 
     it("creates a row policy for both physical tables", () => {
       for (const table of ["join_left", "join_right"]) {
-        expect(statements).toContain(
-          accessModel.rowPolicyStatement({
-            names: SNAPSHOT_NAMES,
-            lwqlTable: { table, tenantColumn: "TenantId", database: SOURCE_DATABASE },
-          }),
+        const policy = statements.find((statement) =>
+          statement.startsWith(
+            `CREATE ROW POLICY OR REPLACE ${table}_tenant ON ${SOURCE_DATABASE}.${table}\n`,
+          ),
         );
+        expect(policy, `${table} has no row policy`).toBeDefined();
+        expect(policy).toContain("TenantId IN (SELECT any(TenantId)");
       }
     });
 
@@ -426,7 +451,7 @@ describe("given a view joining a project_id-keyed fact table", () => {
       });
 
       expect(
-        viewProvisioning.setupStatements({
+        fullSetup({
           names: NAMES,
           sourceDatabase: SOURCE_DATABASE,
           views: [projectScopedJoin],

@@ -55,6 +55,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
@@ -71,7 +72,9 @@
     "@langwatch/test-harness": "workspace:*",
     "@testcontainers/clickhouse": "catalog:",
     "@testcontainers/postgresql": "^12.1.0",
+    "@types/js-yaml": "catalog:",
     "@types/node": "catalog:",
+    "js-yaml": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

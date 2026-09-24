@@ -5,11 +5,7 @@
  * @see ./langwatch-ql-access-model.service.ts — the access model applied over them
  */
 import { LWQL_VIEW_CATALOG, TENANT_COLUMN } from "../rules/lwql-view-catalog.rules.ts";
-import {
-  LangWatchQLAccessModelService,
-  type LangWatchQLNames,
-  type LangWatchQLTable,
-} from "./langwatch-ql-access-model.service.ts";
+import type { LangWatchQLNames, LangWatchQLTable } from "./langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
@@ -17,7 +13,6 @@ import {
 } from "./langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLViewStatementsService } from "./langwatch-ql-view-statements.service.ts";
 
-const accessModel = LangWatchQLAccessModelService.create();
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
 
@@ -79,47 +74,6 @@ export class LangWatchQLViewProvisioningService {
   }
 
   /**
-   * The columns the restricted identity is granted on each ClickHouse source table, keyed by table
-   * — the map the Go chart renderer mirrors so its SaaS grants are column-scoped like the self-
-   * hosted ones.
-   */
-  sourceColumnGrants({
-    views = LWQL_VIEW_CATALOG,
-  }: {
-    views?: readonly LangWatchQLViewDefinition[];
-  } = {}): Record<string, string[]> {
-    const byTable = new Map<string, Set<string>>();
-    const add = (table: string, columns: readonly string[]): void => {
-      const set = byTable.get(table) ?? new Set<string>();
-      for (const column of columns) {
-        set.add(column);
-      }
-      byTable.set(table, set);
-    };
-
-    for (const view of views) {
-      if (catalogShapes.isPostgresResident(view)) {
-        continue;
-      }
-
-      add(view.sourceTable, viewStatements.grantedSourceColumns(view));
-      if (view.join) {
-        add(view.join.table, [
-          ...view.join.sourceColumns,
-          ...(view.join.onSourceColumns?.joined ?? []),
-        ]);
-      }
-    }
-
-    const grants: Record<string, string[]> = {};
-    for (const [table, columns] of byTable) {
-      grants[table] = [...columns].toSorted();
-    }
-
-    return grants;
-  }
-
-  /**
    * Every statement that provisions the LangWatchQL views, in dependency order.
    */
   setupStatements({
@@ -133,38 +87,9 @@ export class LangWatchQLViewProvisioningService {
     views?: readonly LangWatchQLViewDefinition[];
     dedup: LangWatchQLDedupStrategy;
   }): string[] {
-    return [
-      ...views.map((view) => viewStatements.viewStatement({ names, sourceDatabase, view, dedup })),
-      // Row policies BEFORE grants — load-bearing, not cosmetic. A `SELECT`
-      // grant with no row policy returns every row, so grants-first leaves a
-      // window where the restricted identity reads across every tenant if a
-      // caller dies midway. Policies-first fails closed instead: unpoliced-but-
-      // ungranted refuses reads. Safe to hoist — these tables already exist.
-      ...this.sourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
-        accessModel.rowPolicyStatement({ names, lwqlTable }),
-      ),
-      // A fact table carries far more than the catalog exposes, so its grant is column-scoped.
-      // A PostgreSQL-engine table was *created from* the catalog and its whole column list is
-      // the exposed surface, so it takes the whole-object grant the key map and the views take
-      // — which is also what keeps `SHOW CREATE TABLE` answerable, the surface the
-      // credential-leak assertion inspects.
-      ...views.map((view) =>
-        catalogShapes.isPostgresResident(view)
-          ? accessModel.grantStatement({ names, table: view.sourceTable })
-          : viewStatements.sourceColumnGrantStatement({ names, sourceDatabase, view }),
-      ),
-      // The joined side of a two-table view: its own column-scoped grant, since
-      // an INVOKER view reads that table as the caller too.
-      ...views.flatMap((view) => {
-        const grant = viewStatements.buildJoinSourceColumnGrantStatement({
-          names,
-          sourceDatabase,
-          view,
-        });
-
-        return grant ? [grant] : [];
-      }),
-      ...views.map((view) => accessModel.grantStatement({ names, table: view.name })),
-    ];
+    // Grants and row policies are the access model's (ADR-159), emitted from its definition.
+    return views.map((view) =>
+      viewStatements.viewStatement({ names, sourceDatabase, view, dedup }),
+    );
   }
 }

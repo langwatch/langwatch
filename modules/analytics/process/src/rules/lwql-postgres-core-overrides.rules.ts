@@ -3,7 +3,7 @@
  * derivation.
  */
 
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 
 /** The six formerly-hand-written views, keyed by their Prisma model name. */
 export const CORE_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {

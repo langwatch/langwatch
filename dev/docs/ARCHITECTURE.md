@@ -732,13 +732,29 @@ both want is not evidence that the fact should be process-wide — it is usually
 evidence that one of them owns it and the other should be asking.
 
 Note the two member vocabularies, which are not interchangeable: `reads(...)`
-from `@langwatch/process-stores/members` is a **closed** list of the fourteen
+from `@langwatch/process-stores/members` is a **closed** list of the sixteen
 store members, so `reads("publicBaseUrl")` is a compile error on purpose. A
 module reading anything else declares the raw literal
 `static readonly reads = ["prisma", "publicBaseUrl"] as const` and restates
 the member shapes in its own `Readonly<{…}>` type — a module depends on
 contracts, never on the stores package's types. `modules/platform-health` and
 `modules/project` are the exemplars.
+
+**A credential's owner builds what others need from it** (ruled 2026-09-24,
+ADR-132 applied). The stores own `CLICKHOUSE_URL` and `DATABASE_URL`, and a
+second `Secret.load` of either is refused. So the stores answer two members
+more, sixteen in all, built inside the closure that resolves the URL:
+`clickhouseAdmin` (the credential-free server origin and database, plus an
+untenanted statement client for DDL) and `databaseTarget` (the credential-free
+Postgres endpoint). Each answers `{ configured: false }` rather than refusing.
+A module never re-derives them from `process.env`.
+
+**An availability decision travels as a member the process answers** (ruled
+2026-09-24). LangWatchQL is one: analytics reads a `langwatchQl` member, and
+each process's `main.ts` answers it with one call to the module's exported
+supply function, over `clickhouseAdmin`, `databaseTarget` and `prisma`. Its
+passwords stay the module's own `static readonly secrets`. No password means
+the member answers "unavailable" and every query is refused (ADR-159).
 
 **`configSchema` is deleted, not migrated** (ruled 2026-09-18). The legacy
 static — an App-level Zod schema re-parsed per feature and fed by the deleted

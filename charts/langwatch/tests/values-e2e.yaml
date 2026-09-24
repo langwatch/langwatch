@@ -69,16 +69,12 @@ clickhouse:
     size: 1Gi
   auth:
     password: "e2etest"
-  # LangWatchQL PostgreSQL bridge is NOT overridden here on purpose: this PARENT
-  # chart's own values.yaml default supplies the release-derived host
-  # (<release>-postgresql) into clickhouse.lwqlAccessModel.postgres.host — the
-  # subchart never guesses one — with database defaulting to postgresql.auth.database
-  # and user to the dedicated reader lwql_ro the app converges, so the lwql_postgres
-  # named collection the single-replica scenario asserts (specs/lwql/api.feature)
-  # renders from those DEFAULTS. Exercising the parent's default is the point — a
-  # hand-wired override here would hide a regression in it. The e2e reads an approved view
-  # through the collection after provisioning, so it dials PostgreSQL as lwql_ro
-  # for real, not just as rendered config.
+  # LangWatchQL is not configured here on purpose: the app self-provisions the
+  # whole access model — including the lwql_postgres named collection and the
+  # lwql_ro PostgreSQL reader — from CLICKHOUSE_URL/DATABASE_URL at boot, the
+  # single-replica scenario asserts (specs/lwql/api.feature). The e2e reads an
+  # approved view through the collection after provisioning, so it dials
+  # PostgreSQL as lwql_ro for real, not just against rendered config.
 
 # ── PostgreSQL ─────────────────────────────────────────────────────────────────
 postgresql:

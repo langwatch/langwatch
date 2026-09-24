@@ -71,6 +71,13 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and row policies come from the single access-model emitter (ADR-159).
+    // `extraViews`, not `views`: every apply re-mints the whole model, so it must
+    // keep the base fixture's grants or the native `traces` reads lose theirs.
+    await harness.applyAccessModel({
+      extraViews: POSTGRES_VIEWS,
+      sourceDatabase: harness.factDatabase,
+    });
     tenantA = await harness.restrictedClient({
       keyHash: harness.tenantA.keyHash,
     });

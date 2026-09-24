@@ -1,5 +1,5 @@
 /**
- * The Postgres catalog derivation's naming and type-mapping helpers: model name → view name, field
+ * The Postgres catalog builder's naming and type-mapping helpers: model name → view name, field
  * name → column name, Prisma type → ClickHouse type.
  */
 
@@ -9,7 +9,7 @@ import {
   toClickHouseType,
   exposedColumnName,
   postgresDatasetName,
-} from "../lwql-postgres-catalog-derivation.rules.ts";
+} from "../lwql-postgres-catalog-model.rules.ts";
 import type { PrismaField } from "../lwql-prisma-schema.rules.ts";
 
 const scalarField = (over: Partial<PrismaField>): PrismaField => ({

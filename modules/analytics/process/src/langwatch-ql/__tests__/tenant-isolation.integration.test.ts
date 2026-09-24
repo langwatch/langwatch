@@ -111,12 +111,9 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
         );
         tenantsWithoutPolicy = rows.map((row) => row.TenantId);
       } finally {
-        await harness.applyAsAdmin([
-          accessModel.rowPolicyStatement({
-            names: harness.names,
-            lwqlTable: spans,
-          }),
-        ]);
+        // Reconverge the whole model from the definition — restores the spans
+        // policy detached above (idempotent OR REPLACE).
+        await harness.applyAccessModel();
       }
 
       expect(
@@ -841,8 +838,9 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
           `CREATE VIEW ${database}.${invokerView} SQL SECURITY INVOKER ` +
             `AS SELECT TenantId, TraceId FROM ${database}.traces`,
-          accessModel.grantStatement({ names: harness.names, table: definerView }),
-          accessModel.grantStatement({ names: harness.names, table: invokerView }),
+          // Ad-hoc probe views this test alone creates: a plain whole-object grant (#8258).
+          `GRANT SELECT ON ${database}.${definerView} TO ${harness.names.restrictedUser}`,
+          `GRANT SELECT ON ${database}.${invokerView} TO ${harness.names.restrictedUser}`,
         ]);
 
         definerTenants = (

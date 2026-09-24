@@ -3,7 +3,7 @@
  * view because the reader role sees only the view.
  */
 
-import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-derivation.rules.ts";
+import type { PostgresDatasetOverride } from "./lwql-postgres-catalog-model.rules.ts";
 
 /** A conversation's own `isShared` flag — the base case of the filter. */
 const OWN_CONVERSATION_SHARED = `"m"."isShared" = true`;

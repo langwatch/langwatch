@@ -52,18 +52,23 @@ import { NotFoundError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
+import { Secret } from "@langwatch/secrets";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
 import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
 import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
 import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
+import { applyLwqlTargetOverrides, LWQL_CONNECTION_DEFAULTS } from "../langwatch-ql/connection.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
+import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
+import type { ClickHouseAdminStatements } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import { lwqlHydrationKeyCap } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
+import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-function-catalog.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
@@ -83,10 +88,15 @@ import {
   type LangWatchQLTraceSource,
 } from "../services/langwatch-ql-hydration-read.service.ts";
 import { LangWatchQLHydrationService } from "../services/langwatch-ql-hydration.service.ts";
+import { LangWatchQLProductionProvisioningService } from "../services/langwatch-ql-production-provisioning.service.ts";
 import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
+import {
+  convergeLwqlAccessModel,
+  type LwqlProvisioningDatabase,
+} from "../tasks/lwql-provision.task.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /**
@@ -140,6 +150,8 @@ export interface AnalyticsAppDependencies {
   traces: TraceApi;
   /** Where the server would keep the app functions, for the checkup's provisioning probe. */
   appFunctionStore: LangWatchQLAppFunctionStoreRepository;
+  /** The access model's owner probe and convergence; no-ops where LangWatchQL is unavailable. */
+  lwqlProvisioning: LwqlProvisioningOperations;
 }
 
 export type AnalyticsInfrastructure = Readonly<{
@@ -171,19 +183,100 @@ type AnalyticsMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   rateLimiter: RateLimiter;
   publicBaseUrl: string | undefined;
+  langwatchQl: LangWatchQlSupply;
 }>;
 
-type AnalyticsSetup = FeatureSetup<AnalyticsDependencies, AnalyticsMembers, AnalyticsServerConfig>;
+/**
+ * Whether this deployment offers LangWatchQL, answered by the process (ADR-159): the
+ * credential-free ClickHouse target and identity, plus what self-provisioning reads.
+ */
+export type LangWatchQlSupply = Readonly<{
+  /** The stores' untenanted ClickHouse seam and credential-free target (ADR-159). */
+  admin: Readonly<
+    | { configured: false }
+    | {
+        configured: true;
+        target: Readonly<{ url: string; database: string }>;
+        statements: ClickHouseAdminStatements;
+      }
+  >;
+  /** The PostgreSQL endpoint the named collection dials, without credentials. */
+  postgres: Readonly<
+    | { configured: false }
+    | {
+        configured: true;
+        host: string;
+        port: number;
+        database: string;
+        schema: string;
+        connectionLimit?: number;
+      }
+  >;
+  database: () => LwqlProvisioningDatabase;
+}>;
 
-const isPresent = (value: string | undefined): value is string => Boolean(value);
+export type LwqlProvisioningOperations = Readonly<{
+  probeOwner: () => Promise<LwqlAccessModelOwner>;
+  converge: () => Promise<void>;
+}>;
 
-const langWatchQlConnection = (values: readonly string[]): LangWatchQLConnection => {
-  const [url, username, password, database, tenantSetting] = values;
-  const incomplete = !url || !username || !password || !database || !tenantSetting;
-  if (incomplete) throw new Error("LangWatchQL connection is incomplete");
-
-  return { url, username, password, database, tenantSetting };
+const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
+  probeOwner: () => Promise.resolve("none"),
+  converge: () => Promise.resolve(),
 };
+
+/** The reconvergence watch's two operations over the stores' admin seam (ADR-159). */
+function lwqlProvisioningOperations({
+  admin,
+  postgres,
+  database,
+  connection,
+  readerPassword,
+  settings,
+}: {
+  admin: Extract<LangWatchQlSupply["admin"], { configured: true }>;
+  postgres: Extract<LangWatchQlSupply["postgres"], { configured: true }>;
+  database: LangWatchQlSupply["database"];
+  connection: LangWatchQLConnection;
+  readerPassword: string | undefined;
+  settings: AnalyticsServerConfig["langwatchQl"];
+}): LwqlProvisioningOperations {
+  const names = LangWatchQLProductionProvisioningService.create().names({ connection });
+  const openRepository = () =>
+    ClickHouseLangWatchQLProvisioningRepository.create({ statements: admin.statements });
+  return {
+    probeOwner: () => openRepository().probeOwner({ names }),
+    converge: async () => {
+      // Main arms the watch only in SQL mode; a config store owns the rest.
+      if (settings.accessModelMode !== "sql" || readerPassword === undefined) return;
+      await convergeLwqlAccessModel({
+        database: database(),
+        plan: {
+          request: {
+            requested: true,
+            complete: true,
+            connection,
+            postgresReaderPassword: readerPassword,
+            endpoint: { host: postgres.host, port: postgres.port, database: postgres.database },
+          },
+          names,
+          sourceDatabase: () => admin.target.database,
+          schema: postgres.schema,
+          ...(postgres.connectionLimit === undefined
+            ? {}
+            : { connectionLimit: postgres.connectionLimit }),
+          settings: {
+            LWQL_ACCESS_MODEL_MODE: settings.accessModelMode,
+            LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: settings.sqlSingleNode,
+          },
+          openRepository,
+        },
+      });
+    },
+  };
+}
+
+type AnalyticsSetup = FeatureSetup<AnalyticsDependencies, AnalyticsMembers, AnalyticsServerConfig>;
 
 /**
  * Adapts the process's one routing `clickhouse` member to the per-tenant session
@@ -274,15 +367,20 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     traces: TraceApi,
     retention: DataRetentionApi,
   };
-  static readonly config = analyticsServerConfig;
   /**
    * `rateLimiter` is the per-project counter every LangWatchQL execution is
    * checked against. All three names are from the process's vocabulary; boot
    * refuses by name.
    */
-  static readonly reads = ["clickhouse", "rateLimiter", "publicBaseUrl"] as const;
+  static readonly config = analyticsServerConfig;
+  static readonly reads = ["clickhouse", "rateLimiter", "publicBaseUrl", "langwatchQl"] as const;
+  /** The restricted identity's password and the PostgreSQL reader's (ADR-132). */
+  static readonly secrets = {
+    lwqlClickHousePassword: Secret.load("LWQL_CLICKHOUSE_PASSWORD", { optional: true }),
+    lwqlPostgresReaderPassword: Secret.load("LWQL_POSTGRES_READER_PASSWORD", { optional: true }),
+  } as const;
 
-  static create(setup: AnalyticsSetup): AnalyticsApp {
+  static async create(setup: AnalyticsSetup): Promise<AnalyticsApp> {
     const clickhouse = setup.members.clickhouse;
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
       Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
@@ -296,17 +394,43 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
       // on it refuses the whole process, and two defaults expire rows.
       defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
     });
-    const langwatchQl = setup.config.langwatchQl;
-    const connectionValues = [
-      langwatchQl.url,
-      langwatchQl.username,
-      langwatchQl.password,
-      langwatchQl.database,
-      langwatchQl.tenantSetting,
-    ];
-    const connection: LangWatchQLConnection | null = connectionValues.every(isPresent)
-      ? langWatchQlConnection(connectionValues)
+    const lwqlConfig = setup.config.langwatchQl;
+    const { admin, postgres, database } = setup.members.langwatchQl;
+    const target = admin.configured
+      ? applyLwqlTargetOverrides({
+          target: admin.target,
+          explicitUrl: lwqlConfig.url,
+          explicitDatabase: lwqlConfig.database,
+        })
+      : { available: false as const };
+    const connection: LangWatchQLConnection | null = target.available
+      ? await setup.secrets.into(AnalyticsApp.secrets.lwqlClickHousePassword, (password) =>
+          typeof password === "string" && password
+            ? {
+                url: target.url,
+                database: target.database,
+                username: lwqlConfig.username ?? LWQL_CONNECTION_DEFAULTS.restrictedUser,
+                tenantSetting: lwqlConfig.tenantSetting ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
+                password,
+              }
+            : null,
+        )
       : null;
+    const lwqlProvisioning =
+      admin.configured && postgres.configured && connection
+        ? await setup.secrets.into(
+            AnalyticsApp.secrets.lwqlPostgresReaderPassword,
+            (readerPassword) =>
+              lwqlProvisioningOperations({
+                admin,
+                postgres,
+                database,
+                connection,
+                readerPassword: typeof readerPassword === "string" ? readerPassword : undefined,
+                settings: lwqlConfig,
+              }),
+          )
+        : LWQL_UNAVAILABLE;
     const langWatchQL = createLangWatchQLService({ connection });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
     return new AnalyticsApp(
@@ -325,6 +449,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
         }),
         traces: setup.dependencies.traces,
         appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
+        lwqlProvisioning,
       },
       setup.members.publicBaseUrl,
     );
@@ -350,6 +475,16 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
       // it late: the bounds and the eval-function gate apply to it too.
       runner: { executeLangWatchQL: (input) => this.executeLangWatchQL(input) },
     });
+  }
+
+  /** Who owns the LangWatchQL access model now; the reconvergence watch probes this. */
+  probeLwqlAccessModelOwner(): Promise<LwqlAccessModelOwner> {
+    return this.#dependencies.lwqlProvisioning.probeOwner();
+  }
+
+  /** Re-provisions the access model once a config store released it (SQL mode only). */
+  convergeLwqlAccessModel(): Promise<void> {
+    return this.#dependencies.lwqlProvisioning.converge();
   }
 
   /** The series behind every analytics chart and every dashboard graph card. */

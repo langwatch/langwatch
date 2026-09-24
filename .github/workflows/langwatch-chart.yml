@@ -67,6 +67,9 @@ on:
       - "pnpm-lock.yaml"
       - "package.json"
 
+  workflow_dispatch:
+    # Allow running kind e2e legs on demand against draft branches.
+    # Skipped on draft PRs by the if: conditions at ~line 226 and ~270.
 # The e2e jobs here are the most expensive in the repo — `e2e: infra` runs to
 # 697s and `e2e: overlays` to 348s — and without a group every push to a chart
 # PR left its predecessors running to completion alongside it. Same rule as
@@ -202,23 +205,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/stored-objects-upgrade-ordering.sh
 
-      # Design C rests on one Secret name resolving identically on both sides:
-      # the app reads the langwatch_lwql password from exactly the Secret the
-      # ClickHouse pod mounts to create that identity. The two names come from
-      # two different helpers, only guaranteed equal by shared values — a
-      # divergence is invisible in the source and breaks every LWQL query. Also
-      # pins the chart's default autogen-off posture, which no preset exercises.
-      - name: "assert LWQL query Secret matches the ClickHouse-mounted Secret"
-        if: "!cancelled()"
-        run: ./tests/lwql-secret-parity.sh
-
-      # The password alone is not a working LangWatchQL connection: with
-      # LWQL_SELF_PROVISION off (chart-managed), the executor needs the full
-      # URL/user/database/tenant set too and refuses every query when one is
-      # missing. Pins that chart-managed emits all five on app AND workers, and
-      # that external ClickHouse self-provisions instead — visible only in the
-      # render (review 5115397477).
-      - name: "assert LWQL connection env is complete on both app and workers"
+      # Issue #8258: the app always owns the LWQL access model, on every
+      # ClickHouse/PostgreSQL posture. The chart's only job is handing the app
+      # and workers the two passwords it converges the model with
+      # (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD) — no
+      # rendered connection vars, no DDL switch, nothing else LWQL-shaped.
+      # Visible only in the render.
+      - name: "assert LWQL env is exactly the two query passwords, on every posture"
         if: "!cancelled()"
         run: ./tests/lwql-connection-env.sh
 
@@ -300,7 +293,13 @@ jobs:
           - name: overlays
             script: make test-e2e-overlays
             cluster: lw-overlay
-            build_app: false
+            # The overlays leg installs chart-managed ClickHouse, which now
+            # depends on the app image: the lwql-access-render Job runs it to
+            # write the access Secret every ClickHouse pod mounts (required
+            # mount). Without the image the Job hits ErrImageNeverPull and
+            # ClickHouse never leaves ContainerCreating. Build + load it like
+            # the infra leg (Resolve/Build/Load steps are gated on build_app).
+            build_app: true
     defaults:
       run:
         working-directory: charts/langwatch

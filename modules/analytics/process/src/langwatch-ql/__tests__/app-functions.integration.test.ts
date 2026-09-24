@@ -82,13 +82,7 @@ describe("given the LangWatchQL app functions provisioned on a real server", () 
     });
 
     it("re-applies the whole access model without a function collision", async () => {
-      await harness.applyAsAdmin(
-        accessModel.setupStatements({
-          names: harness.names,
-          password: harness.restrictedConnection().password,
-          lwqlTables: harness.lwqlTables,
-        }),
-      );
+      await harness.applyAsAdmin(accessModel.setupStatements({ names: harness.names }));
 
       expect(statements.findConflicts({ rows: await serverFunctions() })).toEqual([]);
     });

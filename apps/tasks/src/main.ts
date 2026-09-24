@@ -17,6 +17,7 @@ import {
 } from "./config.ts";
 import { openTasksDatabase } from "./database.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
+import { lwqlRenderAccessConfig } from "./lwql-render-access-config.ts";
 import { prismaMigrate } from "./prisma-migrate.ts";
 import { systemMigrationsPass } from "./system-migrations-pass.ts";
 
@@ -24,9 +25,13 @@ const tasks = new Map<string, (input: TaskInput) => Promise<void>>([
   ["prisma-migrate", prismaMigrate],
   ["clickhouse-migrate", clickhouseMigrate],
   ["lwql-provision", lwqlProvision],
+  ["lwql-render-access-config", lwqlRenderAccessConfig],
   ["system-migrations-pass", systemMigrationsPass],
   ["clear-stale-pending-sso-setup", clearStalePendingSsoSetup],
 ]);
+
+/** Tasks that never touch the migration database, so never wait on its advisory lock. */
+const LOCK_FREE_TASKS = new Set(["system-migrations-pass", "lwql-render-access-config"]);
 
 export async function runTasks(argv: readonly string[], input: TaskInput): Promise<void> {
   if (argv.length === 0 || argv.some((name) => !tasks.has(name))) {
@@ -47,7 +52,7 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
   };
 
   const database = input.connections.database;
-  if (database && argv.some((name) => name !== "system-migrations-pass")) {
+  if (database && argv.some((name) => !LOCK_FREE_TASKS.has(name))) {
     await database.hold(run);
   } else {
     await run();
