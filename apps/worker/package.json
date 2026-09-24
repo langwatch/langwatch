@@ -30,7 +30,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
     "@clickhouse/client": "catalog:",
-    "@google-cloud/dlp": "^6.7.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-process": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",

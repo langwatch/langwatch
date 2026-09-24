@@ -1514,9 +1514,6 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@google-cloud/dlp':
-        specifier: ^6.7.0
-        version: 6.7.0
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../modules/agent/contract
@@ -5672,6 +5669,9 @@ importers:
 
   modules/data-privacy/process:
     dependencies:
+      '@google-cloud/dlp':
+        specifier: ^6.7.0
+        version: 6.7.0
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api

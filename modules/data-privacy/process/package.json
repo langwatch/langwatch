@@ -21,6 +21,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@google-cloud/dlp": "^6.7.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
