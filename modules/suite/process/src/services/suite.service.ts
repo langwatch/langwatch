@@ -19,7 +19,6 @@ import {
   type CreateSuiteCommand,
   type Suite,
   type SuiteArchivedNamesInput,
-  type SuiteBatchHistoryInput,
   type SuiteIdInput,
   type SuiteRunAllInput,
   type SuiteRunAllResult,
@@ -27,14 +26,11 @@ import {
   type SuiteRunResult,
   type SuiteRunPlanInput,
   type SuiteRunPlanResult,
-  type SuiteRunStateData,
-  type SuiteRunStateInput,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
-import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
 import { defaultSuiteId, isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules.ts";
 import type { ConnectedPresenceReader } from "./connected-target.service.ts";
@@ -48,7 +44,6 @@ export type SuiteServiceOptions = {
   agents: AgentApi;
   prompts: PromptApi;
   execution: SuiteExecution;
-  runRepository: SuiteRunReadRepository;
   /**
    * Which connected agents have a process attached, so a target naming an
    * agent without environment can be settled. Absent on a process with no
@@ -64,12 +59,9 @@ export class SuiteService {
     return new SuiteService(options);
   }
 
-  private readonly runRepository: SuiteRunReadRepository;
-
   private readonly runs: SuiteRunService;
 
   private constructor(private readonly options: SuiteServiceOptions) {
-    this.runRepository = options.runRepository;
     this.runs = SuiteRunService.create({
       options,
       get: (input) => this.get(input),
@@ -82,10 +74,9 @@ export class SuiteService {
   }
 
   async get(input: SuiteIdInput): Promise<Suite> {
-    const parsed = suiteIdInputSchema.parse(input);
-    const suite = await this.findById(parsed);
+    const suite = await this.findById(input);
     if (!suite) {
-      throw new SuiteNotFoundError(parsed.id);
+      throw new SuiteNotFoundError(input.id);
     }
 
     return suite;
@@ -181,7 +172,7 @@ export class SuiteService {
       : `${suite.slug}${archivedSlugSuffix}-${suite.id.slice(-6)}`;
 
     return this.options.repository.archive({
-      ...suiteIdInputSchema.parse(input),
+      ...input,
       archivedAt: toDate((this.options.now ?? nowInstant)()),
       archivedSlug,
     });
@@ -197,14 +188,6 @@ export class SuiteService {
 
   async runAll(input: SuiteRunAllInput): Promise<SuiteRunAllResult> {
     return this.runs.runAll(input);
-  }
-
-  async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
-    return this.runs.getSuiteRunState(input);
-  }
-
-  async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
-    return this.runs.getBatchHistory(input);
   }
 
   async resolveArchivedNames(input: SuiteArchivedNamesInput): Promise<{

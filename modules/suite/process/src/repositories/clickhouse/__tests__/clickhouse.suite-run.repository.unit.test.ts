@@ -48,30 +48,6 @@ function setup(rows: unknown[] = [stateReadRow]) {
 }
 
 describe("ClickHouseSuiteRunRepository", () => {
-  /** @scenario "Read the latest durable suite run state" */
-  it("maps the complete suite run state shape", async () => {
-    const { repository } = setup();
-    await expect(
-      repository.findSuiteRunState({
-        projectId: "project_1",
-        batchRunId: "batch_1",
-      }),
-    ).resolves.toEqual({ ...stateRow, LastEventOccurredAt: 0 });
-  });
-
-  /** @scenario "Read the latest durable suite run state" */
-  it("deduplicates latest state by the tenant and batch tuple", async () => {
-    const { repository, query } = setup([]);
-    await repository.findSuiteRunState({ projectId: "project_1", batchRunId: "batch_1" });
-    const sql = query.mock.calls[0]?.[0]?.sql as string;
-    expect(sql).toContain("(t.TenantId, t.BatchRunId, t.UpdatedAt) IN");
-    expect(sql).toContain("GROUP BY TenantId, BatchRunId");
-    expect(query.mock.calls[0]?.[0]).toMatchObject({
-      tenantId: "project_1",
-      table: "suite_runs",
-    });
-  });
-
   /** Every write names the tenant the client routes it by. */
   it("names the tenant on the batch it writes", async () => {
     const { repository, insert } = setup([]);
@@ -127,34 +103,6 @@ describe("ClickHouseSuiteRunRepository", () => {
       LastEventOccurredAt: new Date(stateRow.LastEventOccurredAt),
       _retention_days: 14,
     });
-  });
-
-  /** @scenario "Read suite batch history" */
-  it("preserves the default-set compatibility filter and history limits", async () => {
-    const { repository, query } = setup([]);
-    await repository.findBatchHistory({
-      projectId: "project_1",
-      scenarioSetId: "default",
-    });
-    await repository.findBatchHistory({
-      projectId: "project_1",
-      scenarioSetId: "default",
-      limit: 999,
-    });
-    const defaultInput = query.mock.calls[0]?.[0] as {
-      params: Record<string, unknown>;
-    };
-    const cappedInput = query.mock.calls[1]?.[0] as {
-      params: Record<string, unknown>;
-    };
-    expect(defaultInput.params).toMatchObject({
-      scenarioSetIds: ["default", ""],
-      limit: 50,
-    });
-    expect(cappedInput.params.limit).toBe(100);
-    const sql = query.mock.calls[0]?.[0]?.sql as string;
-    expect(sql).toContain("GROUP BY TenantId, ScenarioSetId, BatchRunId");
-    expect(sql).toContain("ORDER BY t.CreatedAt DESC");
   });
 
   it("wraps ClickHouse failures instead of silently succeeding", async () => {

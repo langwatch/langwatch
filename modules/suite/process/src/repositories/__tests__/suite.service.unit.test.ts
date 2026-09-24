@@ -28,7 +28,6 @@ import { z } from "zod";
 
 import type { SuiteExecution } from "../../app/suite.app.ts";
 import { SuiteService, type SuiteServiceOptions } from "../../services/suite.service.ts";
-import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository.ts";
 import type { SuiteRepository } from "../suite.repository.ts";
 
 const suite = (overrides: Partial<Suite> = {}): Suite =>
@@ -112,7 +111,6 @@ function serviceOptions(
     agents: createApiFixture<AgentApi>(),
     prompts: createApiFixture<PromptApi>(),
     execution: new UnusedExecution(),
-    runRepository: MemorySuiteRunRepository.create(),
     ...overrides,
   };
 }
@@ -267,7 +265,6 @@ describe("SuiteService", () => {
         getNamesByIds: vi.fn(),
       }),
       execution: new Execution(),
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await service.run({
@@ -308,7 +305,6 @@ describe("SuiteService", () => {
       agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution: new Execution(),
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(
@@ -535,7 +531,6 @@ describe("SuiteService", () => {
       agents,
       prompts,
       execution,
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     const result = await service.run({
@@ -606,7 +601,6 @@ describe("SuiteService", () => {
       agents,
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution,
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(
@@ -636,7 +630,6 @@ describe("SuiteService", () => {
       agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution,
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(
@@ -669,7 +662,6 @@ describe("SuiteService", () => {
       }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution: targetExecution,
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(
@@ -709,7 +701,6 @@ describe("SuiteService", () => {
         getNamesByIds: vi.fn(),
       }),
       execution,
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(
@@ -747,7 +738,6 @@ describe("SuiteService", () => {
       }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution,
-      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(
@@ -1188,7 +1178,6 @@ describe("SuiteService", () => {
         agents: createApiFixture<AgentApi>(),
         prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
         execution,
-        runRepository: MemorySuiteRunRepository.create(),
       });
 
       await service.run({
@@ -1237,7 +1226,6 @@ describe("SuiteService", () => {
           agents: createApiFixture<AgentApi>(),
           prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
           execution,
-          runRepository: MemorySuiteRunRepository.create(),
         });
         return { service, execution };
       };
@@ -1296,7 +1284,6 @@ describe("SuiteService", () => {
           agents: createApiFixture<AgentApi>(),
           prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
           execution,
-          runRepository: MemorySuiteRunRepository.create(),
         });
         return { service, execution };
       };
@@ -1354,7 +1341,6 @@ describe("SuiteService", () => {
         agents: createApiFixture<AgentApi>(),
         prompts: mockPromptService({ getExistingIds: vi.fn().mockResolvedValue(["prompt_1"]) }),
         execution,
-        runRepository: MemorySuiteRunRepository.create(),
       });
 
       await service.run({

@@ -37,16 +37,3 @@ Feature: Suite service
     When a caller archives that suite
     Then the suite boundary reports suite_not_found
 
-  @unit
-  Scenario: Read the latest durable suite run state
-    Given ClickHouse contains multiple unmerged versions of a suite run
-    When a caller reads the run through app.suites
-    Then the service returns one row for the latest `(tenant, batchRunId, UpdatedAt)` tuple
-    And the response retains the Suite run counters and timestamps
-
-  @unit
-  Scenario: Read suite batch history
-    Given a project has suite runs in the default scenario set
-    When a caller reads batch history through app.suites
-    Then the service returns one latest row per BatchRunId in newest-first order
-    And the legacy default-set values are searched together

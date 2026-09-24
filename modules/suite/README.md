@@ -10,16 +10,12 @@ preview, status configuration, and completion treatment.
 
 The package owns `SimulationSuite` persistence, definition validation, and the
 policy for resolving Scenario, Prompt, and Agent references. It also owns the
-Suite run read boundary: `SuiteService.getSuiteRunState` and
-`SuiteService.getBatchHistory` read the event-sourced `suite_runs` fold through
-a private ClickHouse repository. The application still supplies the execution
-port that dispatches commands and queues work. The same private repository is
-also the Eventing fold store, so projection writes and service reads share one
-`suite_runs` implementation.
+event-sourced `suite_runs` fold, stored through a private ClickHouse
+repository. The application still supplies the execution port that dispatches
+commands and queues work.
 
 When ClickHouse is unavailable, composition selects an in-memory Eventing store
-explicitly; Suite service run reads remain `null`/`[]` rather than pretending a
-durable read model exists.
+explicitly.
 
 ## Remaining migration seams
 

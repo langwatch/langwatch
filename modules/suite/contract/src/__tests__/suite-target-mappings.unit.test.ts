@@ -21,7 +21,7 @@ describe("suiteTargetSchema", () => {
       });
 
       for (const mapping of Object.values(parsed.scenarioMappings ?? {})) {
-        expect(FieldMappingSchema.safeParse(mapping).success).toBe(true);
+        expect(FieldMappingSchema.validate(mapping)).toBe(true);
       }
     });
   });

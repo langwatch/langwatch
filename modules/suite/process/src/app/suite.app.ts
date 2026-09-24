@@ -48,10 +48,7 @@ import type { Instant } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
 
 import { ClickhouseSuiteEventingRepository } from "../repositories/clickhouse/clickhouse.suite-eventing.repository.ts";
-import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
-import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
 import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.suite-run-processing.repository.ts";
-import type { SuiteRunReadRepository } from "../repositories/suite-run.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import {
@@ -124,14 +121,9 @@ export class SuiteApp implements SuiteApi {
       publicBaseUrl: members.publicBaseUrl,
     });
     const defaultRetentionDays = () => dependencies.retention.getPlatformDefaultRetentionDays();
-    const runRepository = ClickHouseSuiteRunRepository.create({
-      clickhouse: members.clickhouse,
-      defaultRetentionDays,
-    });
 
     const suites = SuiteService.create({
       repository: repositories.suites,
-      runRepository,
       scenarios: dependencies.scenarios,
       agents: dependencies.agents,
       prompts: dependencies.prompts,
@@ -182,7 +174,6 @@ export class SuiteApp implements SuiteApi {
   static createForTesting(setup: {
     repositories: SuiteRepositories;
     dependencies: SuiteAppDependencies;
-    runRepository?: SuiteRunReadRepository;
     infrastructure?: Partial<SuiteAppInfrastructure>;
     /** Deterministic ids and a fixed clock are the service's own seams, not infrastructure. */
     generateId?: () => string;
@@ -196,7 +187,6 @@ export class SuiteApp implements SuiteApi {
 
     const suites = SuiteService.create({
       repository: setup.repositories.suites,
-      runRepository: setup.runRepository ?? MemorySuiteRunRepository.create(),
       scenarios: setup.dependencies.scenarios,
       agents: setup.dependencies.agents,
       prompts: setup.dependencies.prompts,

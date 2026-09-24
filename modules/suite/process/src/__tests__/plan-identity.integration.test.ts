@@ -35,7 +35,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { z } from "zod";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
-import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
 import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository.ts";
 import { SuiteService } from "../services/suite.service.ts";
 
@@ -200,7 +199,6 @@ function buildService() {
     agents: fakeAgentApi(agents),
     prompts: fakePromptService(),
     execution: capturingExecution(startedRuns),
-    runRepository: MemorySuiteRunRepository.create(),
   });
 }
 

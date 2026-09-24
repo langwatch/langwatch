@@ -17,17 +17,14 @@ import {
   parseSuiteScope,
   RUN_ALL_SUITE_LABEL,
   RUN_ALL_SUITE_NAME,
-  suiteBatchHistoryInputSchema,
   suiteRunAllInputSchema,
   suiteRunInputSchema,
   suiteRunPlanInputSchema,
-  suiteRunStateInputSchema,
   sortSuiteTargets,
   SuiteScopeEmptyError,
   SuiteTargetsRequiredError,
   withCanonicalOverrides,
   type Suite,
-  type SuiteBatchHistoryInput,
   type SuiteIdInput,
   type SuiteRunAllInput,
   type SuiteRunAllResult,
@@ -35,8 +32,6 @@ import {
   type SuiteRunResult,
   type SuiteRunPlanInput,
   type SuiteRunPlanResult,
-  type SuiteRunStateData,
-  type SuiteRunStateInput,
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
@@ -72,10 +67,6 @@ export class SuiteRunService {
 
   private get options(): SuiteServiceOptions {
     return this.deps.options;
-  }
-
-  private get runRepository(): SuiteServiceOptions["runRepository"] {
-    return this.deps.options.runRepository;
   }
 
   private get(input: SuiteIdInput): Promise<Suite> {
@@ -415,13 +406,5 @@ export class SuiteRunService {
     });
 
     return { ...result, suiteId: suite.id };
-  }
-
-  async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
-    return this.runRepository.findSuiteRunState(suiteRunStateInputSchema.parse(input));
-  }
-
-  async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
-    return this.runRepository.findBatchHistory(suiteBatchHistoryInputSchema.parse(input));
   }
 }

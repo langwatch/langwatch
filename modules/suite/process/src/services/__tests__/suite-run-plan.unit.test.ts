@@ -14,7 +14,6 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import type { SuiteExecution } from "../../app/suite.app.ts";
-import type { SuiteRunReadRepository } from "../../repositories/suite-run.repository.ts";
 import type { SuiteRepository } from "../../repositories/suite.repository.ts";
 import { SuiteService } from "../suite.service.ts";
 
@@ -105,7 +104,6 @@ function buildService(overrides: {
     agents,
     prompts: {} as PromptApi,
     execution,
-    runRepository: {} as SuiteRunReadRepository,
     generateId: () => "suite-generated-1",
   });
   return { service, findOrCreatePlanByName };

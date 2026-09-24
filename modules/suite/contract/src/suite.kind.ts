@@ -10,5 +10,5 @@ export const suiteKindSchema = z.enum(SUITE_KINDS);
 export type SuiteKind = z.infer<typeof suiteKindSchema>;
 
 export function isSuiteKind(value: string): value is SuiteKind {
-  return suiteKindSchema.safeParse(value).success;
+  return suiteKindSchema.validate(value);
 }

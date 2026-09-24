@@ -29,9 +29,9 @@ describe("suite scope", () => {
 
   /** @scenario "The stored shape of every mode is known" */
   it("rejects malformed scopes", () => {
-    expect(suiteScopeSchema.safeParse({ mode: "everything" }).success).toBe(false);
-    expect(suiteScopeSchema.safeParse({ mode: "test_suites" }).success).toBe(false);
-    expect(suiteScopeSchema.safeParse({ mode: "labels" }).success).toBe(false);
+    expect(suiteScopeSchema.validate({ mode: "everything" })).toBe(false);
+    expect(suiteScopeSchema.validate({ mode: "test_suites" })).toBe(false);
+    expect(suiteScopeSchema.validate({ mode: "labels" })).toBe(false);
   });
 
   /** @scenario "The stored shape of every mode is known" */

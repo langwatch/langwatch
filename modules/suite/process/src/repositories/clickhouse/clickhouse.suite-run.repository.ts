@@ -12,14 +12,7 @@ import {
   type ProjectionStoreWriteContext,
 } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import {
-  suiteRunStateDataSchema,
-  type SuiteBatchHistoryInput,
-  type SuiteRunStateData,
-  type SuiteRunStateInput,
-} from "@langwatch/suite-contract";
-
-import { SuiteRunReadRepository } from "../suite-run.repository.ts";
+import { suiteRunStateDataSchema, type SuiteRunStateData } from "@langwatch/suite-contract";
 
 export type SuiteRunClickHouseRepositoryOptions = {
   /**
@@ -36,17 +29,14 @@ const TABLE_NAME = "suite_runs" as const;
 const logger = createLogger("langwatch:suite-run-processing:run-state-repository");
 
 /** Reads the latest event-sourced Suite run rows, before background merges. */
-export class ClickHouseSuiteRunRepository
-  extends SuiteRunReadRepository
-  implements ProjectionStore<Projection<SuiteRunStateData>>
-{
+export class ClickHouseSuiteRunRepository implements ProjectionStore<
+  Projection<SuiteRunStateData>
+> {
   static create(options: SuiteRunClickHouseRepositoryOptions): ClickHouseSuiteRunRepository {
     return new ClickHouseSuiteRunRepository(options);
   }
 
-  private constructor(private readonly options: SuiteRunClickHouseRepositoryOptions) {
-    super();
-  }
+  private constructor(private readonly options: SuiteRunClickHouseRepositoryOptions) {}
 
   async findProjection(
     aggregateId: string,
@@ -172,78 +162,6 @@ export class ClickHouseSuiteRunRepository
     }
   }
 
-  async findSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
-    const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
-      tenantId: input.projectId,
-      table: TABLE_NAME,
-      kind: "read",
-      sql: `
-        SELECT
-          t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
-          t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
-          t.Status AS Status, t.Total AS Total,
-          t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
-          t.FailedCount AS FailedCount, t.Progress AS Progress,
-          t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
-          t.GradedCount AS GradedCount,
-          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-          toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-          toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
-        FROM suite_runs AS t
-        WHERE t.TenantId = {projectId:String}
-          AND t.BatchRunId = {batchRunId:String}
-          AND (t.TenantId, t.BatchRunId, t.UpdatedAt) IN (
-            SELECT TenantId, BatchRunId, max(UpdatedAt)
-            FROM suite_runs
-            WHERE TenantId = {projectId:String}
-              AND BatchRunId = {batchRunId:String}
-            GROUP BY TenantId, BatchRunId
-          )
-        LIMIT 1
-      `,
-      params: { projectId: input.projectId, batchRunId: input.batchRunId },
-    });
-    return rows[0] ? ClickHouseSuiteRunRepository.mapRowToState(rows[0]) : null;
-  }
-
-  async findBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
-    const limit = Math.min(input.limit ?? 50, 100);
-    const scenarioSetIds = ClickHouseSuiteRunRepository.expandSetIdFilter(input.scenarioSetId);
-    const { rows } = await this.options.clickhouse.query<Record<string, unknown>>({
-      tenantId: input.projectId,
-      table: TABLE_NAME,
-      kind: "read",
-      sql: `
-        SELECT
-          t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
-          t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
-          t.Status AS Status, t.Total AS Total,
-          t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
-          t.FailedCount AS FailedCount, t.Progress AS Progress,
-          t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
-          t.GradedCount AS GradedCount,
-          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
-          toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
-          toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
-        FROM suite_runs AS t
-        WHERE t.TenantId = {projectId:String}
-          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
-          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.UpdatedAt) IN (
-            SELECT TenantId, ScenarioSetId, BatchRunId, max(UpdatedAt)
-            FROM suite_runs
-            WHERE TenantId = {projectId:String}
-              AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-            GROUP BY TenantId, ScenarioSetId, BatchRunId
-          )
-        ORDER BY t.CreatedAt DESC
-        LIMIT {limit:UInt32}
-      `,
-      params: { projectId: input.projectId, scenarioSetIds, limit },
-    });
-    return rows.map((row) => ClickHouseSuiteRunRepository.mapRowToState(row));
-  }
   private storeError(input: {
     operation: string;
     message: string;
@@ -262,10 +180,6 @@ export class ClickHouseSuiteRunRepository
       input.context,
       input.error,
     );
-  }
-
-  private static expandSetIdFilter(scenarioSetId: string): string[] {
-    return scenarioSetId === "default" || scenarioSetId === "" ? ["default", ""] : [scenarioSetId];
   }
 
   private static mapRowToState(row: Record<string, unknown>): SuiteRunStateData {
