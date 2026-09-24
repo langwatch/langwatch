@@ -9,7 +9,7 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  projectCredentialOfRequest,
+  type RestCaller,
 } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -53,15 +53,13 @@ export const langyLocalControlRestMembers = defineRestMiddleware(
 );
 
 /**
- * The user behind the caller's key. A legacy project key holds no user and
- * refuses the same way an unknown request id does — the answer never
- * reveals which requests exist.
+ * The user the door put behind the caller's key. A key no person owns refuses
+ * the same way an unknown request id does — the answer never reveals which
+ * requests exist.
  */
-function controlUser(request: Request): string {
-  const resolved = projectCredentialOfRequest(request);
-  const userId = resolved.type === "apiKey" ? resolved.userId : null;
-  if (!userId) throw new LangyLocalRequestInvalidError();
-  return userId;
+function controlUser(actor: RestCaller["actor"]): string {
+  if (actor?.type !== "user") throw new LangyLocalRequestInvalidError();
+  return actor.id;
 }
 
 /** The person's reach over their requests, decided on each request's own project. */
@@ -247,8 +245,8 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "it was made.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ request, response }, members) => {
-    const requests = await accessOf(members).listReadable({ userId: controlUser(request) });
+  .handle(async ({ actor, response }, members) => {
+    const requests = await accessOf(members).listReadable({ userId: controlUser(actor) });
     return response.write({
       status: 200,
       mediaType: "application/json",
@@ -272,8 +270,8 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "again. A request is single use: a second approval is refused.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ input, request, response }, members) => {
-    const userId = controlUser(request);
+  .handle(async ({ input, actor, response }, members) => {
+    const userId = controlUser(actor);
     const addressed = await accessOf(members).getAddressed({
       requestId: input.requestId,
       userId,
@@ -314,8 +312,8 @@ export const langyLocalControlRest = defineRestRouter(LangyApi)
       "cancelled, and Langy's next turn offers the choice again.",
   })
   .withMiddleware(langyLocalControlRestMembers)
-  .handle(async ({ input, request, response }, members) => {
-    const userId = controlUser(request);
+  .handle(async ({ input, actor, response }, members) => {
+    const userId = controlUser(actor);
     const addressed = await accessOf(members).getAddressed({
       requestId: input.requestId,
       userId,

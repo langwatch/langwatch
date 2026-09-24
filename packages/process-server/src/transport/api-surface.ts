@@ -244,7 +244,7 @@ class ApiSurface {
     recordProjectCredential(request, credential.resolved);
 
     return {
-      actor: actorOf(credential.resolved),
+      actor: keyOwner(credential.resolved.type === "apiKey" ? credential.resolved.userId : null),
       scope: { tier: "project", id: credential.project.id },
       markUsed: credential.markUsed,
     };
@@ -283,7 +283,7 @@ class ApiSurface {
   #organizationCaller(request: Request, credential: ApiOrganizationCredential): RestCaller {
     recordOrganizationCredential(request, credential.resolved);
     const caller: RestCaller = {
-      actor: credential.resolved.userId ? { type: "user", id: credential.resolved.userId } : null,
+      actor: keyOwner(credential.resolved.userId),
       scope: { tier: "organization", id: credential.resolved.organizationId },
       markUsed: credential.markUsed,
     };
@@ -308,10 +308,7 @@ class ApiSurface {
     const { principal } = credential;
 
     return {
-      actor:
-        principal.kind === "apiKey" && principal.userId
-          ? { type: "user", id: principal.userId }
-          : null,
+      actor: keyOwner(principal.kind === "apiKey" ? principal.userId : null),
       scope: { tier: "organization", id: credential.organizationId },
       markUsed: credential.markUsed,
     };
@@ -468,10 +465,9 @@ export function bearerDoor(options: { name: string; token: string | undefined })
   };
 }
 
-function actorOf(resolved: ResolvedApiKeyCredential): Actor | null {
-  if (resolved.type !== "apiKey" || !resolved.userId) return null;
-
-  return { type: "user", id: resolved.userId };
+/** Every key door's one actor: the key's owning user, or none for a key no person owns (§8). */
+function keyOwner(userId: string | null): Actor | null {
+  return userId ? { type: "user", id: userId } : null;
 }
 
 function actorIdOf(resolved: ResolvedApiKeyCredential): string {
