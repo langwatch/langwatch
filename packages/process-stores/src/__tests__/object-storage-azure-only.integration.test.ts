@@ -5,12 +5,13 @@
  */
 import { createServer, type Server } from "node:http";
 
+import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { UnreachableStorageLocationError } from "../object-storage-backend.ts";
 import { buildObjectStorage } from "../object-storage-member.ts";
 
-const clock = { now: () => new Date("2026-09-24T12:00:00Z") };
+const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
 const directory = { organizationForTenant: () => Promise.resolve("organization-1") };
 const accountKey = Buffer.from("an account key of some length").toString("base64");
 

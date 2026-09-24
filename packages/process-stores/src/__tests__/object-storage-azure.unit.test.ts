@@ -11,7 +11,7 @@ import {
 import { azureBackend } from "../object-storage-azure.ts";
 import { StoredObjectNotFoundError } from "../object-storage-backend.ts";
 
-const clock = { now: () => new Date("2026-09-24T12:00:00Z") };
+const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
 const at = { projectId: "project-1", key: "project-1/object-1" };
 const accountKey = Buffer.from("an account key of some length").toString("base64");
 
@@ -88,6 +88,7 @@ describe("given object storage on Azure Blob with an account key", () => {
           "content-length": "5",
           "content-type": "text/plain",
           "x-ms-blob-type": "BlockBlob",
+          "x-ms-date": "Thu, 24 Sep 2026 12:00:00 GMT",
           "x-ms-version": "2021-12-02",
         },
       });

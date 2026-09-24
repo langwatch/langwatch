@@ -5,12 +5,13 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 import type { Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 import type { Clock, Encryption, SecretResolver, Telemetry } from "./members.ts";
 
 /** The wall clock. A test swaps this member rather than the code that reads it. */
 export function systemClock(): Clock {
-  return { now: () => new Date() };
+  return { now: () => nowInstant() };
 }
 
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";

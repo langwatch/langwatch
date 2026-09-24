@@ -14,14 +14,14 @@ describe("given a frozen clock", () => {
     it("reads back the moment the test set, and never moves on its own", () => {
       const clock = frozenAt("2026-09-10T12:00:00.000Z");
 
-      expect(clock.now().toISOString()).toBe("2026-09-10T12:00:00.000Z");
-      expect(clock.now().toISOString()).toBe("2026-09-10T12:00:00.000Z");
+      expect(clock.now().toString({ fractionalSecondDigits: 3 })).toBe("2026-09-10T12:00:00.000Z");
+      expect(clock.now().toString({ fractionalSecondDigits: 3 })).toBe("2026-09-10T12:00:00.000Z");
 
       clock.advance(60_000);
-      expect(clock.now().toISOString()).toBe("2026-09-10T12:01:00.000Z");
+      expect(clock.now().toString({ fractionalSecondDigits: 3 })).toBe("2026-09-10T12:01:00.000Z");
 
       clock.set("2020-01-01T00:00:00.000Z");
-      expect(clock.now().toISOString()).toBe("2020-01-01T00:00:00.000Z");
+      expect(clock.now().toString({ fractionalSecondDigits: 3 })).toBe("2020-01-01T00:00:00.000Z");
     });
   });
 });

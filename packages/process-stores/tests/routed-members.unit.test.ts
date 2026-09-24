@@ -3,6 +3,7 @@
  * before a socket: routing and refusal are decided from the directory read and the config alone,
  * which is the point of both.
  */
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { MailConfig } from "../src/config.ts";
@@ -57,7 +58,7 @@ describe("given the directory both routed members place a tenant with", () => {
 });
 
 describe("given object storage with an organization on its own account", () => {
-  const clock = { now: () => new Date("2026-09-24T12:00:00Z") };
+  const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
   const config = {
     backend: "s3",
     s3: { bucket: "shared" },

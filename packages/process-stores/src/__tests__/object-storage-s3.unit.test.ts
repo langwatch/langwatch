@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { ObjectBodyTooLargeError, StoredObjectNotFoundError } from "../object-storage-backend.ts";
 import { s3Backend, s3Client } from "../object-storage-s3.ts";
 
-const clock = { now: () => new Date("2026-09-24T12:00:00Z") };
+const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
 const at = { projectId: "project-1", key: "project-1/object-1" };
 const account = {
   bucket: "objects",

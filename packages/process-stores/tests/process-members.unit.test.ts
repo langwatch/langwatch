@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { nowInstant, Temporal } from "@langwatch/time";
 /**
  * What a process builds, what it refuses, and what it closes. Nothing here opens a socket: every
  * test either hands the member in or reads one this process was not configured for, which is the
@@ -35,7 +36,7 @@ function config(overrides: Partial<ProcessConfig> = {}): ProcessConfig {
 describe("given a process that hands in a member itself", () => {
   describe("when the member is read", () => {
     it("answers with what the caller passed", () => {
-      const clock = { now: () => new Date("2026-09-10T12:00:00.000Z") };
+      const clock = { now: () => Temporal.Instant.from("2026-09-10T12:00:00.000Z") };
 
       const members = createProcessMembers({ config: config(), members: { clock } });
 
@@ -43,7 +44,7 @@ describe("given a process that hands in a member itself", () => {
     });
 
     it("never closes a client the caller owns", async () => {
-      const clock = { now: () => new Date() };
+      const clock = { now: () => nowInstant() };
       const members = createProcessMembers({ config: config(), members: { clock } });
       members.read("clock");
 
@@ -59,7 +60,7 @@ describe("given a process that hands in a member itself", () => {
       expect(() =>
         createProcessMembers({
           config: config(),
-          members: { clock: undefined as unknown as { now(): Date } },
+          members: { clock: undefined },
         }),
       ).toThrow(MemberSuppliedUndefinedError);
     });
@@ -253,7 +254,7 @@ describe("given the members with no client behind them", () => {
 
   describe("when the clock is read", () => {
     it("answers the wall clock", () => {
-      expect(systemClock().now().getTime()).toBeGreaterThan(0);
+      expect(systemClock().now().epochMilliseconds).toBeGreaterThan(0);
     });
   });
 });

@@ -3,27 +3,29 @@
  * imported) to avoid heavy boot dependencies.
  */
 
+import { Temporal, type Instant } from "@langwatch/time";
+
 /** Now, as a module reads it. */
 export interface Clock {
-  now(): Date;
+  now(): Instant;
 }
 
 /** A clock a test moves. It never advances on its own. */
 export interface FrozenClock extends Clock {
   advance(milliseconds: number): void;
-  set(moment: Date | string): void;
+  set(moment: Instant | string): void;
 }
 
 /**
  * A clock stopped at one moment, so a test that asserts on a timestamp asserts
  * on the timestamp rather than on how long the suite took to get there.
  */
-export function frozenAt(moment: Date | string = "2026-01-01T00:00:00.000Z"): FrozenClock {
-  let now = typeof moment === "string" ? new Date(moment) : moment;
+export function frozenAt(moment: Instant | string = "2026-01-01T00:00:00.000Z"): FrozenClock {
+  let now = typeof moment === "string" ? Temporal.Instant.from(moment) : moment;
   return {
-    now: () => new Date(now),
-    advance: (milliseconds) => void (now = new Date(now.getTime() + milliseconds)),
-    set: (next) => void (now = typeof next === "string" ? new Date(next) : next),
+    now: () => now,
+    advance: (milliseconds) => void (now = now.add({ milliseconds })),
+    set: (next) => void (now = typeof next === "string" ? Temporal.Instant.from(next) : next),
   };
 }
 

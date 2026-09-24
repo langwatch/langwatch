@@ -102,7 +102,7 @@ export class UsageReportReceiverService {
     try {
       await this.#registry.recordUsageReport({
         ...report,
-        receivedAt: this.#clock.now().toISOString(),
+        receivedAt: this.#clock.now().toString({ fractionalSecondDigits: 3 }),
       });
     } catch (error) {
       this.#logger.error(

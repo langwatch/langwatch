@@ -12,7 +12,7 @@ import type { Instant } from "@langwatch/time";
 
 /** Now, read from one place, so a test moves time without touching a module. */
 export interface Clock {
-  now(): Date;
+  now(): Instant;
 }
 
 /** Symmetric encryption of a stored value, keyed by the process. */

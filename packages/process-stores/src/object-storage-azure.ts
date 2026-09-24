@@ -10,7 +10,7 @@ import https from "node:https";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
-import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { toDate, type Instant } from "@langwatch/time";
 
 import type {
   Clock,
@@ -147,7 +147,7 @@ async function authorisedHeaders(
 ): Promise<Record<string, string>> {
   const length = request.contentLength;
   const headers: Record<string, string> = {
-    "x-ms-date": place.clock.now().toUTCString(),
+    "x-ms-date": toDate(place.clock.now()).toUTCString(),
     "x-ms-version": API_VERSION,
     ...request.headers,
     ...(length === undefined ? {} : { "content-length": String(length) }),
@@ -282,7 +282,7 @@ function xmlValue(xml: string, element: string): string {
 }
 
 async function userDelegationKey(place: AzurePlace, expiry: string): Promise<string> {
-  const start = sasTime(fromDate(place.clock.now()));
+  const start = sasTime(place.clock.now());
   const keyInfo =
     `<?xml version="1.0" encoding="utf-8"?>` +
     `<KeyInfo><Start>${start}</Start><Expiry>${expiry}</Expiry></KeyInfo>`;
@@ -341,7 +341,7 @@ async function signBlobUpload(
   at: StoredObjectAddress,
   facts: UploadFacts,
 ): Promise<SignedObjectUpload> {
-  secondsUntil({ expiresAt: facts.expiresAt, now: fromDate(place.clock.now()) });
+  secondsUntil({ expiresAt: facts.expiresAt, now: place.clock.now() });
   const { credentials } = place;
   const terms: SasTerms = {
     resource: `/blob/${credentials.accountName}/${credentials.container}/${at.key}`,

@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -10,7 +11,7 @@ import {
 } from "../object-storage-backend.ts";
 import { buildObjectStorage } from "../object-storage-member.ts";
 
-const clock = { now: () => new Date("2026-09-24T12:00:00Z") };
+const clock = { now: () => Temporal.Instant.from("2026-09-24T12:00:00Z") };
 const directory = { organizationForTenant: () => Promise.resolve("organization-1") };
 
 async function* body(text: string): AsyncGenerator<Uint8Array> {

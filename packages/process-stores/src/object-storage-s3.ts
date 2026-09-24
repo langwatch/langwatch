@@ -14,7 +14,6 @@ import {
   S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { fromDate } from "@langwatch/time";
 
 import type { ObjectStorageAccount } from "./config.ts";
 import type {
@@ -128,7 +127,7 @@ async function signObjectUpload(
   at: StoredObjectAddress,
   facts: UploadFacts,
 ): Promise<SignedObjectUpload> {
-  const expiresIn = secondsUntil({ expiresAt: facts.expiresAt, now: fromDate(place.clock.now()) });
+  const expiresIn = secondsUntil({ expiresAt: facts.expiresAt, now: place.clock.now() });
   const url = await getSignedUrl(
     place.client,
     new PutObjectCommand({

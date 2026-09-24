@@ -235,7 +235,7 @@ export function azureTokenSource(options: {
   return {
     async token() {
       const lapsing =
-        expiresAt !== undefined && expiresAt - clock.now().getTime() <= REFRESH_MARGIN_MS;
+        expiresAt !== undefined && expiresAt - clock.now().epochMilliseconds <= REFRESH_MARGIN_MS;
       if (pending === undefined || lapsing) {
         expiresAt = undefined;
         pending = exchange();
