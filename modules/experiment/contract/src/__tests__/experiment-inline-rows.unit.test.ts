@@ -24,15 +24,15 @@ const baseRequest = {
 describe("execution request inline data bound", () => {
   it("executionRequestSchema refuses data above the enterprise ceiling", () => {
     expect(
-      executionRequestSchema.safeParse({ ...baseRequest, data: rows(ENTERPRISE_ROWS + 1) }).success,
+      executionRequestSchema.validate({ ...baseRequest, data: rows(ENTERPRISE_ROWS + 1) }),
     ).toBe(false);
-    expect(
-      executionRequestSchema.safeParse({ ...baseRequest, data: rows(ENTERPRISE_ROWS) }).success,
-    ).toBe(true);
+    expect(executionRequestSchema.validate({ ...baseRequest, data: rows(ENTERPRISE_ROWS) })).toBe(
+      true,
+    );
   });
 
   it("runInputsBodySchema refuses data above the enterprise ceiling", () => {
-    expect(runInputsBodySchema.safeParse({ data: rows(ENTERPRISE_ROWS + 1) }).success).toBe(false);
-    expect(runInputsBodySchema.safeParse({ data: rows(ENTERPRISE_ROWS) }).success).toBe(true);
+    expect(runInputsBodySchema.validate({ data: rows(ENTERPRISE_ROWS + 1) })).toBe(false);
+    expect(runInputsBodySchema.validate({ data: rows(ENTERPRISE_ROWS) })).toBe(true);
   });
 });

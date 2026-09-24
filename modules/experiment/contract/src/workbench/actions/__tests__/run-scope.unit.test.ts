@@ -50,8 +50,8 @@ describe("scopeFromRunPayload", () => {
   describe("when a target id is a blank string", () => {
     /** @scenario "A scoped run names real targets" */
     it("is refused by the payload schema", () => {
-      expect(runPayloadSchema.safeParse({ targetIds: [""] }).success).toBe(false);
-      expect(runPayloadSchema.safeParse({ targetIds: ["t1", ""] }).success).toBe(false);
+      expect(runPayloadSchema.validate({ targetIds: [""] })).toBe(false);
+      expect(runPayloadSchema.validate({ targetIds: ["t1", ""] })).toBe(false);
     });
 
     /** @scenario "A scoped run names real targets" */

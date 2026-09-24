@@ -30,7 +30,13 @@ type Scripted = {
 function installed({ authz, allowed = true }: Scripted) {
   return createApp({ role: "api" })
     .withModules([storedObjectServer])
-    .withConfig({ "stored-object": { azureSpoolRetentionConfirmed: false } })
+    .withConfig({
+      "stored-object": {
+        azureSpoolRetentionConfirmed: false,
+        blockLocalHttpCalls: true,
+        allowedProxyHosts: [],
+      },
+    })
     .withStores(memoryStores())
     .withMember("encryption", {
       encrypt: (value: string) => value,

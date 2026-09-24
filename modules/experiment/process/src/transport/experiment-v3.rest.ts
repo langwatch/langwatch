@@ -38,9 +38,6 @@ import { z } from "zod";
 
 import type { ExperimentApp } from "#app/experiment.app";
 
-import { parseOptionalPositiveInt } from "../rules/experiment-version-number.rules.ts";
-import { workbenchStateAnswer } from "../rules/experiment-workbench-state-answer.rules.ts";
-
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
@@ -59,10 +56,11 @@ export interface ExperimentV3RestApi {
       runId: string;
     }>,
   ): Promise<{ success: true; runId: string; message: "Abort requested" }>;
-  /** The application the workbench's four setup doors answer from. */
-  experiments(): ExperimentApp;
   startSavedRun: ExperimentApp["startSavedRun"];
   restoreWorkbenchVersionBySlug: ExperimentApp["restoreWorkbenchVersionBySlug"];
+  readWorkbenchStateBySlug: ExperimentApp["readWorkbenchStateBySlug"];
+  saveWorkbenchStateBySlug: ExperimentApp["saveWorkbenchStateBySlug"];
+  listWorkbenchVersionsBySlug: ExperimentApp["listWorkbenchVersionsBySlug"];
   executeWorkbenchRun: ExperimentApp["executeWorkbenchRun"];
   listRunsPage: ExperimentApp["listRunsPage"];
   pollRun: ExperimentApp["pollRun"];
@@ -221,13 +219,9 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment in this project" },
     },
   })
-  .handle(async ({ app, input, scope }) => {
-    const workbench = await app
-      .experiments()
-      .getWorkbenchState({ projectId: scope.id, slug: input.slug });
-
-    return workbenchStateAnswer({ workbench, fields: input.fields });
-  })
+  .handle(({ app, input, scope }) =>
+    app.readWorkbenchStateBySlug({ projectId: scope.id, slug: input.slug, fields: input.fields }),
+  )
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────
   .put("/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
@@ -254,22 +248,12 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
-  .handle(async ({ app, input, scope }, _project, credential) => {
-    const { slug } = input;
-
-    const saved = await app.experiments().saveWorkbenchState(
-      {
-        projectId: scope.id,
-        slug,
-        state: input.state,
-        ...(input.expectedVersion !== undefined ? { expectedVersion: input.expectedVersion } : {}),
-        ...(input.commitMessage ? { commitMessage: input.commitMessage } : {}),
-      },
+  .handle(({ app, input, scope }, _project, credential) =>
+    app.saveWorkbenchStateBySlug(
+      { ...input, projectId: scope.id },
       { kind: "credential", credential },
-    );
-
-    return { version: saved.version };
-  })
+    ),
+  )
 
   // ── GET /:slug/versions ─────────────────────────────────────────────
   .get("/:slug/versions", "getApiExperimentsBySlugVersions")
@@ -290,39 +274,9 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
       404: { description: "No such experiment in this project" },
     },
   })
-  .handle(async ({ app, input, scope }) => {
-    const { slug } = input;
-
-    const experiments = app.experiments();
-    const workbench = await experiments.getWorkbenchState({ projectId: scope.id, slug });
-
-    const { versions, nextCursor } = await experiments.listWorkbenchVersions({
-      projectId: scope.id,
-      id: workbench.experimentId,
-      ...(() => {
-        const limit = parseOptionalPositiveInt(input.limit);
-        return limit !== undefined ? { limit } : {};
-      })(),
-      ...(() => {
-        const cursor = parseOptionalPositiveInt(input.cursor);
-        return cursor !== undefined ? { cursor } : {};
-      })(),
-    });
-
-    return {
-      versions: versions.map((version) => ({
-        version: version.version,
-        counterVersion: version.counterVersion,
-        autoSaved: version.autoSaved,
-        commitMessage: version.commitMessage,
-        authorLabel: version.authorLabel,
-        authorId: version.authorId,
-        createdAt: version.createdAt.toISOString(),
-        updatedAt: version.updatedAt.toISOString(),
-      })),
-      nextCursor,
-    };
-  })
+  .handle(({ app, input, scope }) =>
+    app.listWorkbenchVersionsBySlug({ ...input, projectId: scope.id }),
+  )
 
   // ── POST /:slug/versions/:version/restore ────────────────────────────
   .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")

@@ -38,6 +38,7 @@
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",

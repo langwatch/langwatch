@@ -39,6 +39,9 @@
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/egress/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/group-queue/tsconfig.build.json"
     },
     {

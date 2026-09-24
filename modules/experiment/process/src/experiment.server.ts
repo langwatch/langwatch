@@ -11,6 +11,10 @@ import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.a
 import { experimentRunProcessingEventing } from "./eventing/experiment-run-processing.pipeline.ts";
 import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
 import { experimentInitRest } from "./transport/experiment-init.rest.ts";
+import {
+  experimentV3LegacyRest,
+  experimentWorkbenchRunLegacyRest,
+} from "./transport/experiment-v3-legacy.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "./transport/experiment-workbench-run.rest.ts";
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
@@ -30,6 +34,9 @@ export const experimentServer = defineServerModule("experiment")
     // a router names types the handler and nothing more.
     experimentV3Rest,
     experimentWorkbenchRunRest,
+    // `/api/evaluations/v3/*`, the SDKs' older name for the same doors.
+    experimentV3LegacyRest,
+    experimentWorkbenchRunLegacyRest,
     experimentTrpcTransport,
   )
   // This family answers behind the project door, so re-resolving the key here

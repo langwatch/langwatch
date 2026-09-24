@@ -1,11 +1,18 @@
 import {
   ExperimentVersionNotFoundError,
+  type SaveWorkbenchStateBySlugRequest,
   type WorkbenchActor,
+  type WorkbenchSavedVersion,
   type WorkbenchSaveResult,
+  type WorkbenchStateAnswer,
+  type WorkbenchStateBySlugRequest,
+  type WorkbenchVersionsAnswer,
+  type WorkbenchVersionsBySlugRequest,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 
 import { parseOptionalPositiveInt } from "../rules/experiment-version-number.rules.ts";
+import { workbenchStateAnswer } from "../rules/experiment-workbench-state-answer.rules.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
@@ -20,6 +27,57 @@ export class ExperimentWorkbenchVersionService {
 
   private constructor(options: { experiments: ExperimentService }) {
     this.#experiments = options.experiments;
+  }
+
+  async readStateBySlug(input: WorkbenchStateBySlugRequest): Promise<WorkbenchStateAnswer> {
+    const { projectId, slug, fields } = input;
+    const workbench = await this.#experiments.getWorkbenchState({ projectId, slug });
+
+    return workbenchStateAnswer({ workbench, fields });
+  }
+
+  async saveBySlug(
+    input: SaveWorkbenchStateBySlugRequest & Readonly<{ actor: WorkbenchActor }>,
+  ): Promise<WorkbenchSavedVersion> {
+    const { projectId, slug, state, expectedVersion, commitMessage, actor } = input;
+    const saved = await this.#experiments.saveWorkbenchState({
+      projectId,
+      slug,
+      state,
+      ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+      ...(commitMessage ? { commitMessage } : {}),
+      actor,
+    });
+
+    return { version: saved.version };
+  }
+
+  async listBySlug(input: WorkbenchVersionsBySlugRequest): Promise<WorkbenchVersionsAnswer> {
+    const { projectId, slug } = input;
+    const workbench = await this.#experiments.getWorkbenchState({ projectId, slug });
+    const limit = parseOptionalPositiveInt(input.limit);
+    const cursor = parseOptionalPositiveInt(input.cursor);
+
+    const { versions, nextCursor } = await this.#experiments.listWorkbenchVersions({
+      projectId,
+      id: workbench.experimentId,
+      ...(limit !== undefined ? { limit } : {}),
+      ...(cursor !== undefined ? { cursor } : {}),
+    });
+
+    return {
+      versions: versions.map((version) => ({
+        version: version.version,
+        counterVersion: version.counterVersion,
+        autoSaved: version.autoSaved,
+        commitMessage: version.commitMessage,
+        authorLabel: version.authorLabel,
+        authorId: version.authorId,
+        createdAt: version.createdAt.toISOString(),
+        updatedAt: version.updatedAt.toISOString(),
+      })),
+      nextCursor,
+    };
   }
 
   async restoreBySlug(input: {

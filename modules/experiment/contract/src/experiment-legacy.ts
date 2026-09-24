@@ -78,25 +78,22 @@ export const dSPyStepSchema = z.object({
 
 export type DSPyStep = z.infer<typeof dSPyStepSchema>;
 
-export const dSPyStepRESTParamsSchema = dSPyStepSchema
-  .omit({
+export const dSPyStepRESTParamsSchema = z.object({
+  ...dSPyStepSchema.omit({
     timestamps: true,
     project_id: true,
     experiment_id: true,
     examples: true,
     llm_calls: true,
-  })
-  .and(
-    z.object({
-      experiment_id: z.string().optional().nullable(),
-      experiment_slug: z.string().optional().nullable(),
-      timestamps: z.object({
-        created_at: z.number(),
-      }),
-      examples: z.array(dSPyExampleSchema.omit({ hash: true })),
-      llm_calls: z.array(dSPyLLMCallSchema.omit({ hash: true })),
-    }),
-  );
+  }).shape,
+  experiment_id: z.string().optional().nullable(),
+  experiment_slug: z.string().optional().nullable(),
+  timestamps: z.object({
+    created_at: z.number(),
+  }),
+  examples: z.array(dSPyExampleSchema.omit({ hash: true })),
+  llm_calls: z.array(dSPyLLMCallSchema.omit({ hash: true })),
+});
 
 export type DSPyStepRESTParams = z.infer<typeof dSPyStepRESTParamsSchema>;
 
@@ -232,41 +229,34 @@ export type ESBatchEvaluation = z.infer<typeof eSBatchEvaluationSchema>;
  * Target in REST API params - type is optional as it can be
  * extracted from metadata or defaulted to "custom"
  */
-export const eSBatchEvaluationTargetRESTSchema = eSBatchEvaluationTargetSchema
-  .omit({ type: true })
-  .and(
-    z.object({
-      type: eSBatchEvaluationTargetTypeSchema.optional(),
-    }),
-  );
+export const eSBatchEvaluationTargetRESTSchema = z.object({
+  ...eSBatchEvaluationTargetSchema.omit({ type: true }).shape,
+  type: eSBatchEvaluationTargetTypeSchema.optional(),
+});
 
 export type ESBatchEvaluationTargetREST = z.infer<typeof eSBatchEvaluationTargetRESTSchema>;
 
-export const eSBatchEvaluationRESTParamsSchema = eSBatchEvaluationSchema
-  .partial()
-  .omit({
+export const eSBatchEvaluationRESTParamsSchema = z.object({
+  ...eSBatchEvaluationSchema.partial().omit({
     project_id: true,
     experiment_id: true,
     timestamps: true,
     targets: true,
-  })
-  .and(
-    z.object({
-      experiment_id: z.string().optional().nullable(),
-      experiment_slug: z.string().optional().nullable(),
-      run_id: z.string().nullable(),
-      workflow_id: z.string().optional().nullable(),
-      name: z.string().optional().nullable(),
-      targets: z.array(eSBatchEvaluationTargetRESTSchema).optional().nullable(),
-      timestamps: z
-        .object({
-          created_at: z.number().optional().nullable(),
-          finished_at: z.number().optional().nullable(),
-          stopped_at: z.number().optional().nullable(),
-        })
-        .optional(),
-    }),
-  );
+  }).shape,
+  experiment_id: z.string().optional().nullable(),
+  experiment_slug: z.string().optional().nullable(),
+  run_id: z.string(),
+  workflow_id: z.string().optional().nullable(),
+  name: z.string().optional().nullable(),
+  targets: z.array(eSBatchEvaluationTargetRESTSchema).optional().nullable(),
+  timestamps: z
+    .object({
+      created_at: z.number().optional().nullable(),
+      finished_at: z.number().optional().nullable(),
+      stopped_at: z.number().optional().nullable(),
+    })
+    .optional(),
+});
 
 export type ESBatchEvaluationRESTParams = z.infer<typeof eSBatchEvaluationRESTParamsSchema>;
 

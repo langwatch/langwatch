@@ -49,7 +49,7 @@ describe("given an agent adding an evaluator", () => {
   describe("when the name is blank or only spaces", () => {
     /** @scenario "An agent must name the evaluator it adds" */
     it.each(["", "   "])("refuses %j rather than storing an empty name", (name) => {
-      expect(addEvaluatorPayloadSchema.safeParse(exactMatch(name)).success).toBe(false);
+      expect(addEvaluatorPayloadSchema.validate(exactMatch(name))).toBe(false);
     });
   });
 

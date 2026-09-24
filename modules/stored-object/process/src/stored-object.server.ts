@@ -25,13 +25,19 @@ import type {
 import { StoredObjectsService } from "#services/stored-objects.service";
 import type { StoredObjectsServiceOptions } from "#services/stored-objects.service";
 import { storedObjectFileRest } from "#transport/stored-object-file.rest";
+import { storedObjectImageProxyRest } from "#transport/stored-object-image-proxy.rest";
 import { storedObjectRest } from "#transport/stored-object.rest";
 import { storedObjectTrpcTransport } from "#transport/stored-object.trpc";
 
 export const storedObjectServer = defineServerModule("stored-object")
   .withRepositories(storedObjectRepositories)
   .withApp(StoredObjectApp)
-  .withTransports(storedObjectRest, storedObjectFileRest, storedObjectTrpcTransport);
+  .withTransports(
+    storedObjectRest,
+    storedObjectFileRest,
+    storedObjectImageProxyRest,
+    storedObjectTrpcTransport,
+  );
 
 /**
  * Runtime storage and telemetry seams for a composing process: thin

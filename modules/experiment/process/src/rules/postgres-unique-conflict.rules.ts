@@ -28,7 +28,7 @@ const uniqueConflictSchema = z.object({
 });
 
 export function isPostgresUniqueConflict(error: unknown): boolean {
-  return uniqueConflictSchema.safeParse(error).success;
+  return uniqueConflictSchema.validate(error);
 }
 
 /** The columns the collision was on, or none if the driver did not say. */

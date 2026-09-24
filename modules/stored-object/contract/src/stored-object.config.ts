@@ -1,4 +1,10 @@
-import { Config, environmentOneOrTrueSchema, type ConfigOf } from "@langwatch/config";
+import {
+  allowedProxyHosts,
+  blockLocalHttpCalls,
+  Config,
+  environmentOneOrTrueSchema,
+  type ConfigOf,
+} from "@langwatch/config";
 
 /** Object storage's own settings belong to the stores owner (ADR-158 §7). */
 export const storedObjectConfig = Config.define((c) => ({
@@ -7,6 +13,9 @@ export const storedObjectConfig = Config.define((c) => ({
     "AZURE_BLOB_SPOOL_RETENTION_CONFIRMED",
     environmentOneOrTrueSchema,
   ),
+  /** The address fence the image proxy judges an outbound picture by. */
+  blockLocalHttpCalls,
+  allowedProxyHosts,
 }));
 
 export type StoredObjectServerConfig = ConfigOf<typeof storedObjectConfig>;

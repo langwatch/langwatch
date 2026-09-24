@@ -62,6 +62,12 @@ import {
   type WorkbenchActor,
   type WorkbenchSaveResult,
   type WorkbenchStateView,
+  type WorkbenchStateAnswer,
+  type WorkbenchStateBySlugRequest,
+  type WorkbenchSavedVersion,
+  type WorkbenchVersionsAnswer,
+  type WorkbenchVersionsBySlugRequest,
+  type SaveWorkbenchStateBySlugRequest,
   type WorkbenchVersionsPage,
   type ExperimentUsageCount,
   type ExperimentCopied,
@@ -648,6 +654,26 @@ export class ExperimentApp implements ExperimentApi {
     by: ExperimentCaller,
   ): Promise<WorkbenchSaveResult> {
     return this.#workbenchVersions.restoreBySlug({ ...input, actor: ExperimentApp.actorFor(by) });
+  }
+
+  /** `GET /:slug/workbench-state`'s answer, `fields=version` leaving out the setup. */
+  readWorkbenchStateBySlug(input: WorkbenchStateBySlugRequest): Promise<WorkbenchStateAnswer> {
+    return this.#workbenchVersions.readStateBySlug(input);
+  }
+
+  /** `PUT /:slug/workbench-state`: saves the setup as its caller and answers the version. */
+  saveWorkbenchStateBySlug(
+    input: SaveWorkbenchStateBySlugRequest,
+    by: ExperimentCaller,
+  ): Promise<WorkbenchSavedVersion> {
+    return this.#workbenchVersions.saveBySlug({ ...input, actor: ExperimentApp.actorFor(by) });
+  }
+
+  /** `GET /:slug/versions`: one page of the history, as the REST door publishes it. */
+  listWorkbenchVersionsBySlug(
+    input: WorkbenchVersionsBySlugRequest,
+  ): Promise<WorkbenchVersionsAnswer> {
+    return this.#workbenchVersions.listBySlug(input);
   }
 
   /** Records a run's cell results directly against the workbench state. */

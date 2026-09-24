@@ -26,6 +26,10 @@ import type { ExperimentRunCollaborators } from "../../rules/experiment-run-inpu
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
+import {
+  experimentV3LegacyRest,
+  experimentWorkbenchRunLegacyRest,
+} from "../experiment-v3-legacy.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "../experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts";
 
@@ -130,41 +134,49 @@ function harness({ experiments = {}, progress = null, ports = null }: Harness = 
       authorize: () => ({ permitted: true, organizationRole: null }),
     },
   });
-  const keyed = runtime.mount(experimentV3Rest.router(), {
-    app: () => app,
-    credential: "project",
-    onError: canonicalErrorResponse,
-    facts: [
-      bindRestMiddleware(projectRestFacts, () => ({
-        projectSlug: "acme",
-        viewerUserId: "user-1",
-        actorId: "user-1",
-      })),
-      bindRestMiddleware(experimentWorkbenchCredential, () => ({
-        kind: "apiKey" as const,
-        userId: "user-1",
-      })),
-    ],
-  });
-  const browser = runtime.mount(experimentWorkbenchRunRest.router(), {
-    app: () => app,
-    onError: canonicalErrorResponse,
-  });
+  const keyedFacts = [
+    bindRestMiddleware(projectRestFacts, () => ({
+      projectSlug: "acme",
+      viewerUserId: "user-1",
+      actorId: "user-1",
+    })),
+    bindRestMiddleware(experimentWorkbenchCredential, () => ({
+      kind: "apiKey" as const,
+      userId: "user-1",
+    })),
+  ];
+  const keyedFamily = (family: typeof experimentV3Rest) =>
+    runtime.mount(family.router(), {
+      app: () => app,
+      credential: "project",
+      onError: canonicalErrorResponse,
+      facts: keyedFacts,
+    });
+  const browserFamily = (family: typeof experimentWorkbenchRunRest) =>
+    runtime.mount(family.router(), { app: () => app, onError: canonicalErrorResponse });
+  const keyed = keyedFamily(experimentV3Rest);
+  const browser = browserFamily(experimentWorkbenchRunRest);
+  const legacyKeyed = keyedFamily(experimentV3LegacyRest);
+  const legacyBrowser = browserFamily(experimentWorkbenchRunLegacyRest);
 
   return {
     startRun,
     request: (path: string, init?: RequestInit) =>
       keyed.fetch(new Request(`http://api.test/api/experiments${path}`, init)),
-    execute: (body: unknown) =>
-      browser.fetch(
-        new Request("http://api.test/api/experiments/execute", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        }),
-      ),
+    legacy: (path: string, init?: RequestInit) =>
+      legacyKeyed.fetch(new Request(`http://api.test/api/evaluations/v3${path}`, init)),
+    execute: (body: unknown) => browser.fetch(executeRequest("/api/experiments", body)),
+    legacyExecute: (body: unknown) =>
+      legacyBrowser.fetch(executeRequest("/api/evaluations/v3", body)),
   };
 }
+
+const executeRequest = (base: string, body: unknown) =>
+  new Request(`http://api.test${base}/execute`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
 const runOf = (body: string, accept?: string): RequestInit => ({
   method: "POST",
@@ -517,5 +529,103 @@ describe("POST /api/experiments/execute", () => {
     const { execute } = harness();
 
     expect((await execute(request)).status).toBe(503);
+  });
+});
+
+describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", () => {
+  type Answer = { status: number; contentType: string | null; body: string };
+  const answerOf = async (response: Response): Promise<Answer> => ({
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+    body: await response.text(),
+  });
+  const workbench = {
+    experimentId: "experiment-1",
+    slug: "checkout-eval",
+    version: 3,
+    updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+    name: "Checkout eval",
+    state: savedState(),
+  };
+  const version = {
+    version: 2,
+    counterVersion: 3,
+    autoSaved: false,
+    commitMessage: "named",
+    authorLabel: "api",
+    authorId: null,
+    createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-09-02T00:00:00.000Z"),
+  };
+  const setup: Harness = {
+    experiments: {
+      findBySlugAndType: async () => savedExperiment(savedState()),
+      getWorkbenchState: async () => workbench,
+      listWorkbenchVersions: async () => ({ versions: [version], nextCursor: null }),
+      saveWorkbenchState: async () => ({ ...workbench, version: 4 }),
+    },
+  };
+  const save = (): RequestInit => ({
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ state: savedState(), expectedVersion: 3 }),
+  });
+
+  /** @scenario "The evaluations v3 alias answers what the experiments run doors answer" */
+  it.each([
+    ["a started run", setup, "/checkout-eval/run", () => runOf(""), 200],
+    [
+      "an unknown slug",
+      { experiments: { findBySlugAndType: async () => null } },
+      "/nope/run",
+      () => runOf(""),
+      404,
+    ],
+    ["a run list without its slug", {}, "/runs", undefined, 400],
+    ["a run with no progress store", {}, "/runs/run-1", undefined, 503],
+    [
+      "results nothing names",
+      { progress: { findRunState: async () => null } },
+      "/runs/r/results",
+      undefined,
+      404,
+    ],
+    ["a setup read", setup, "/checkout-eval/workbench-state?fields=version", undefined, 200],
+    ["a setup save", setup, "/checkout-eval/workbench-state", save, 200],
+    ["a version page", setup, "/checkout-eval/versions?limit=5", undefined, 200],
+  ] as const)(
+    "answers %s with the canonical status and body",
+    async (_case, options, path, init, status) => {
+      const canonical = await answerOf(await harness(options).request(path, init?.()));
+      const alias = await answerOf(await harness(options).legacy(path, init?.()));
+
+      expect(alias.status).toBe(status);
+      expect(alias).toEqual(canonical);
+    },
+  );
+
+  /** @scenario "The evaluations v3 alias answers what the experiments run doors answer" */
+  it("answers a started run with main's body at the alias path", async () => {
+    const { legacy, startRun } = harness(setup);
+
+    const response = await legacy("/checkout-eval/run", runOf(""));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      runId: "run-9",
+      status: "running",
+      total: 1,
+      runUrl: "https://app.test/run-9",
+    });
+    expect(startRun).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "The evaluations v3 alias answers what the experiments run doors answer" */
+  it("refuses a browser execute at the alias as the canonical door does", async () => {
+    const body = { projectId: PROJECT, experimentId: "experiment-1", name: "Checkout eval" };
+    const canonical = await answerOf(await harness().execute(body));
+    const alias = await answerOf(await harness().legacyExecute(body));
+
+    expect(alias).toEqual(canonical);
   });
 });

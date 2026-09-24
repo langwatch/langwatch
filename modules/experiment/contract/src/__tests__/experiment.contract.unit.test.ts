@@ -10,8 +10,8 @@ import {
 
 describe("Experiment contract", () => {
   it("accepts only the stable experiment type vocabulary", () => {
-    expect(experimentTypeSchema.safeParse("EVALUATIONS_V3").success).toBe(true);
-    expect(experimentTypeSchema.safeParse("OTHER").success).toBe(false);
+    expect(experimentTypeSchema.validate("EVALUATIONS_V3")).toBe(true);
+    expect(experimentTypeSchema.validate("OTHER")).toBe(false);
   });
 
   it("rejects non-JSON workbench state", () => {
@@ -32,7 +32,7 @@ describe("Experiment contract", () => {
 
   it("requires the caller to state the slug policy", () => {
     expect(
-      saveExperimentInputSchema.safeParse({
+      saveExperimentInputSchema.validate({
         id: "experiment_1",
         projectId: "project_1",
         name: "Run",
@@ -40,7 +40,7 @@ describe("Experiment contract", () => {
         requestedSlug: "run",
         workflowId: null,
         workbenchState: null,
-      }).success,
+      }),
     ).toBe(false);
   });
 
@@ -59,7 +59,7 @@ describe("Experiment contract", () => {
 
   it("validates DSPy steps at the Experiment boundary", () => {
     expect(
-      experimentDspyStepSchema.safeParse({
+      experimentDspyStepSchema.validate({
         tenantId: "project_1",
         experimentId: "experiment_1",
         runId: "run_1",
@@ -74,7 +74,7 @@ describe("Experiment contract", () => {
         createdAt: 1,
         insertedAt: 1,
         updatedAt: 1,
-      }).success,
+      }),
     ).toBe(true);
   });
 });

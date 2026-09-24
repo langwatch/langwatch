@@ -26,7 +26,13 @@ function unavailable(name: string): never {
 function installation(role: "api" | "worker" | "tasks") {
   return createApp({ role })
     .withModules([storedObjectServer])
-    .withConfig({ "stored-object": { azureSpoolRetentionConfirmed: false } })
+    .withConfig({
+      "stored-object": {
+        azureSpoolRetentionConfirmed: false,
+        blockLocalHttpCalls: true,
+        allowedProxyHosts: [],
+      },
+    })
     .withStores(memoryStores())
     .withMember("encryption", {
       encrypt: (value: string) => value,

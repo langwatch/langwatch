@@ -118,7 +118,7 @@ describe("payload schemas", () => {
   describe("given a payload an action would really be called with", () => {
     describe("when its own schema parses it", () => {
       it.each(fixtures)("accepts the $kind fixture", ({ schema, payload }) => {
-        expect(schema.safeParse(payload).success).toBe(true);
+        expect(schema.validate(payload)).toBe(true);
       });
     });
   });
@@ -144,8 +144,7 @@ describe("payload schemas", () => {
     describe("when the evaluator is the comparison judge", () => {
       it("accepts it", () => {
         expect(
-          addEvaluatorPayloadSchema.safeParse(withComparison("langevals/select_best_compare"))
-            .success,
+          addEvaluatorPayloadSchema.validate(withComparison("langevals/select_best_compare")),
         ).toBe(true);
       });
     });
@@ -182,31 +181,31 @@ describe("payload schemas", () => {
   describe("given an addEvaluator payload naming a type defined outside the built-in catalog", () => {
     it("accepts the whole-workflow evaluator, which has no id in its type", () => {
       expect(
-        addEvaluatorPayloadSchema.safeParse({
+        addEvaluatorPayloadSchema.validate({
           evaluatorType: "workflow",
           name: "scored",
           inputs: [],
-        }).success,
+        }),
       ).toBe(true);
     });
 
     it("accepts a code evaluator, whose type carries a row id", () => {
       expect(
-        addEvaluatorPayloadSchema.safeParse({
+        addEvaluatorPayloadSchema.validate({
           evaluatorType: "code/evaluator_abc",
           name: "scored",
           inputs: [],
-        }).success,
+        }),
       ).toBe(true);
     });
 
     it("refuses a namespace prefix with no row id behind it", () => {
       expect(
-        addEvaluatorPayloadSchema.safeParse({
+        addEvaluatorPayloadSchema.validate({
           evaluatorType: "custom/",
           name: "scored",
           inputs: [],
-        }).success,
+        }),
       ).toBe(false);
     });
   });
@@ -259,22 +258,22 @@ describe("payload schemas", () => {
   describe("when a generated id is given as a blank string", () => {
     it("rejects it on addTarget and on addEvaluator", () => {
       expect(
-        addTargetPayloadSchema.safeParse({
+        addTargetPayloadSchema.validate({
           id: "",
           type: "prompt",
           promptId: "prompt-1",
           inputs: [],
           outputs: [],
           mappings: {},
-        }).success,
+        }),
       ).toBe(false);
       expect(
-        addEvaluatorPayloadSchema.safeParse({
+        addEvaluatorPayloadSchema.validate({
           id: "",
           evaluatorType: "langevals/exact_match",
           name: "scored",
           inputs: [],
-        }).success,
+        }),
       ).toBe(false);
     });
   });

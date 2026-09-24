@@ -12126,6 +12126,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/egress':
+        specifier: workspace:*
+        version: link:../../../packages/egress
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../../packages/group-queue

@@ -15,6 +15,16 @@ export const slugVersionParamsSchema = z.object({
   version: z.string().min(1),
 });
 
+/** `/api/evaluations/v3`'s slug segment: `:slug`'s position, named for what it identifies. */
+export const evaluationSlugParamsSchema = z.object({
+  evaluationSlug: z.string().min(1).describe("The experiment's slug, or its id"),
+});
+
+export const evaluationSlugVersionParamsSchema = z.object({
+  evaluationSlug: z.string().min(1),
+  version: z.string().min(1),
+});
+
 /** A bad page number falls back rather than refusing; a missing slug 400s in the handler. */
 export const listRunsQuerySchema = z.object({
   experimentSlug: z.string().optional().describe("Slug of the experiment whose runs you want"),
@@ -501,3 +511,18 @@ export type RunStatusAnswer = z.infer<typeof runStatusResponseSchema>;
 
 export type RunResultsRequest = Readonly<{ projectId: string; runId: string }> &
   z.infer<typeof runResultsQuerySchema>;
+
+export type WorkbenchStateAnswer = z.infer<typeof workbenchStateAnswerSchema>;
+
+export type WorkbenchVersionsAnswer = z.infer<typeof listWorkbenchVersionsResponseSchema>;
+
+export type WorkbenchSavedVersion = z.infer<typeof saveWorkbenchStateResponseSchema>;
+
+export type WorkbenchStateBySlugRequest = Readonly<{ projectId: string; slug: string }> &
+  z.infer<typeof workbenchStateQuerySchema>;
+
+export type WorkbenchVersionsBySlugRequest = Readonly<{ projectId: string; slug: string }> &
+  z.infer<typeof listVersionsQuerySchema>;
+
+export type SaveWorkbenchStateBySlugRequest = Readonly<{ projectId: string; slug: string }> &
+  z.infer<typeof saveWorkbenchStateBodySchema>;

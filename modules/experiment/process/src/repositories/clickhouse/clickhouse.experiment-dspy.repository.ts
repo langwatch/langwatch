@@ -1,10 +1,12 @@
-import type {
-  ExperimentDspyExample,
-  ExperimentDspyLlmCall,
-  ExperimentDspyStep,
-  ExperimentDspyStepLookup,
-  ExperimentDspyStepSummary,
-  ExperimentDspyStepsLookup,
+import {
+  experimentDspyStepSchema,
+  experimentDspyStepSummarySchema,
+  type ExperimentDspyExample,
+  type ExperimentDspyLlmCall,
+  type ExperimentDspyStep,
+  type ExperimentDspyStepLookup,
+  type ExperimentDspyStepSummary,
+  type ExperimentDspyStepsLookup,
 } from "@langwatch/experiment-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
@@ -21,6 +23,7 @@ function clickHouseDateTime(epochMs: number): ReturnType<typeof toDate> {
 }
 
 const TABLE_NAME = "dspy_steps";
+const experimentDspyStepSummariesSchema = experimentDspyStepSummarySchema.array();
 
 export type ExperimentDspyClickHouseResult = {
   json<T>(): Promise<T[]>;
@@ -211,20 +214,23 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
         query_params: input,
         format: "JSONEachRow",
       });
-      return (await result.json<ExperimentDspySummaryRow>()).map((row) => ({
-        tenantId: row.TenantId,
-        experimentId: row.ExperimentId,
-        runId: row.RunId,
-        stepIndex: row.StepIndex,
-        workflowVersionId: row.WorkflowVersionId,
-        score: row.Score,
-        label: row.Label,
-        optimizerName: row.OptimizerName,
-        llmCallsTotal: row.LlmCallsTotal,
-        llmCallsTotalTokens: Number(row.LlmCallsTotalTokens),
-        llmCallsTotalCost: row.LlmCallsTotalCost,
-        createdAt: Number(row.CreatedAt),
-      }));
+      const rows = await result.json<ExperimentDspySummaryRow>();
+      return experimentDspyStepSummariesSchema.parse(
+        rows.map((row) => ({
+          tenantId: row.TenantId,
+          experimentId: row.ExperimentId,
+          runId: row.RunId,
+          stepIndex: row.StepIndex,
+          workflowVersionId: row.WorkflowVersionId,
+          score: row.Score,
+          label: row.Label,
+          optimizerName: row.OptimizerName,
+          llmCallsTotal: row.LlmCallsTotal,
+          llmCallsTotalTokens: Number(row.LlmCallsTotalTokens),
+          llmCallsTotalCost: row.LlmCallsTotalCost,
+          createdAt: Number(row.CreatedAt),
+        })),
+      );
     } catch (error) {
       this.options.telemetry.warn(
         { projectId: input.tenantId, error },
@@ -238,7 +244,8 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
     try {
       const client = await this.options.resolveClient(input.tenantId);
       if (!client) return null;
-      return await this.findWithClient(client, input);
+      const step = await this.findWithClient(client, input);
+      return step === null ? null : experimentDspyStepSchema.parse(step);
     } catch (error) {
       this.options.telemetry.warn(
         { projectId: input.tenantId, error },

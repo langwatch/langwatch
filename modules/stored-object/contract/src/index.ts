@@ -1,5 +1,6 @@
 export * from "./audiences.ts";
 export * from "./ids.ts";
+export * from "./image-proxy.ts";
 export * from "./metadata.ts";
 export * from "./references.ts";
 export * from "./safe-media-types.ts";

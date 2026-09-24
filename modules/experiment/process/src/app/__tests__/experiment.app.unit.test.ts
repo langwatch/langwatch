@@ -488,7 +488,7 @@ describe("given the workbench's own doors", () => {
       const answered: ExperimentV3RestApi = app;
 
       expect(typeof answered.abortWorkbenchRun).toBe("function");
-      expect(typeof answered.experiments).toBe("function");
+      expect(typeof answered.readWorkbenchStateBySlug).toBe("function");
       expect(typeof answered.startSavedRun).toBe("function");
       expect(typeof answered.pollRun).toBe("function");
     });

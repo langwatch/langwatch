@@ -12,6 +12,8 @@ import {
   storedObjectConfig,
   type WriteStoredObjectUploadInput,
   type DeleteProjectStoredObjectsResult,
+  type ImageProxyAnswer,
+  type ImageProxyRequest,
   type ReadStoredObjectResult,
   type StoreStoredObjectFromBytesInput,
   type StoreStoredObjectFromBytesResult,
@@ -33,7 +35,10 @@ import {
 } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { ExternalImageChannel } from "../channels/external-image.channel.ts";
+import { HttpExternalImageChannel } from "../channels/http/http.external-image.channel.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
+import { ImageProxyService } from "../services/image-proxy.service.ts";
 import type { StoredObjectUploadSignerService } from "../services/stored-object-upload-signer.service.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
 import type {
@@ -106,6 +111,12 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
       repositories: setup.repositories,
       permissions: setup.dependencies.authz,
       rateLimiter: setup.members.rateLimiter,
+      images: HttpExternalImageChannel.create({
+        policy: {
+          blockLocal: setup.config.blockLocalHttpCalls,
+          allowedHosts: setup.config.allowedProxyHosts,
+        },
+      }),
     });
   }
 
@@ -119,6 +130,7 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
     repositories: StoredObjectRepositories;
     permissions: AuthzApi;
     rateLimiter: RateLimiter;
+    images: ExternalImageChannel;
   }): StoredObjectApp {
     const { infrastructure: members, repositories } = setup;
 
@@ -136,6 +148,7 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
       owners: members.owners,
       permissions: setup.permissions,
       rateLimiter: setup.rateLimiter,
+      images: ImageProxyService.create({ images: setup.images }),
     });
   }
 
@@ -143,17 +156,25 @@ export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
   readonly #owners: StoredObjectOwnerResolver;
   readonly #permissions: AuthzApi;
   readonly #rateLimiter: RateLimiter;
+  readonly #images: ImageProxyService;
 
   private constructor(parts: {
     storage: StoredObjectService;
     owners: StoredObjectOwnerResolver;
     permissions: AuthzApi;
     rateLimiter: RateLimiter;
+    images: ImageProxyService;
   }) {
     this.#storage = parts.storage;
     this.#owners = parts.owners;
     this.#permissions = parts.permissions;
     this.#rateLimiter = parts.rateLimiter;
+    this.#images = parts.images;
+  }
+
+  /** `GET /api/image-proxy`: an outside picture fetched behind the egress fence. */
+  proxyImage(input: ImageProxyRequest): Promise<ImageProxyAnswer> {
+    return this.#images.proxy(input);
   }
 
   /** Who the process's own browser verifier admitted on this request, before the handler ran. */

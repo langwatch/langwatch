@@ -13,6 +13,8 @@ import {
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 
+import type { ExternalImageChannel } from "../../channels/external-image.channel.ts";
+import { MemoryExternalImageChannel } from "../../channels/memory/memory.external-image.channel.ts";
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
 import type { StoredObjectRepositories } from "../../repositories/stored-object.repositories.ts";
 import { StoredObjectUploadSignerService } from "../../services/stored-object-upload-signer.service.ts";
@@ -172,6 +174,7 @@ export function createStoredObjectTestApp(
     repositories?: StoredObjectRepositories;
     members?: Partial<StoredObjectInfrastructure>;
     permissions?: StoredObjectPermissions;
+    images?: ExternalImageChannel;
   }> = {},
 ): StoredObjectApp {
   const permissions = input.permissions ?? new GrantedStoredObjectPermissions();
@@ -183,5 +186,6 @@ export function createStoredObjectTestApp(
     rateLimiter: createApiFixture<RateLimiter>({}),
     repositories: input.repositories ?? MemoryStoredObjectRepositories.create(),
     infrastructure: createStoredObjectTestInfrastructure(input.members ?? {}),
+    images: input.images ?? MemoryExternalImageChannel.create(),
   });
 }

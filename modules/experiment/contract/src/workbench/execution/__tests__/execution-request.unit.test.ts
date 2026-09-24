@@ -131,27 +131,19 @@ describe("executionRequestSchema", () => {
     };
 
     // Valid concurrency
-    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 10 }).success).toBe(
-      true,
-    );
+    expect(executionRequestSchema.validate({ ...baseRequest, concurrency: 10 })).toBe(true);
 
     // Min boundary
-    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 1 }).success).toBe(true);
+    expect(executionRequestSchema.validate({ ...baseRequest, concurrency: 1 })).toBe(true);
 
     // Max boundary
-    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 24 }).success).toBe(
-      true,
-    );
+    expect(executionRequestSchema.validate({ ...baseRequest, concurrency: 24 })).toBe(true);
 
     // Below min
-    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 0 }).success).toBe(
-      false,
-    );
+    expect(executionRequestSchema.validate({ ...baseRequest, concurrency: 0 })).toBe(false);
 
     // Above max
-    expect(executionRequestSchema.safeParse({ ...baseRequest, concurrency: 25 }).success).toBe(
-      false,
-    );
+    expect(executionRequestSchema.validate({ ...baseRequest, concurrency: 25 })).toBe(false);
   });
 
   it("accepts all scope types", () => {
@@ -171,57 +163,57 @@ describe("executionRequestSchema", () => {
 
     // Full scope
     expect(
-      executionRequestSchema.safeParse({
+      executionRequestSchema.validate({
         ...baseRequest,
         scope: { type: "full" },
-      }).success,
+      }),
     ).toBe(true);
 
     // Rows scope
     expect(
-      executionRequestSchema.safeParse({
+      executionRequestSchema.validate({
         ...baseRequest,
         scope: { type: "rows", rowIndices: [0, 1, 2] },
-      }).success,
+      }),
     ).toBe(true);
 
     // Target scope
     expect(
-      executionRequestSchema.safeParse({
+      executionRequestSchema.validate({
         ...baseRequest,
         scope: { type: "target", targetId: "target-1" },
-      }).success,
+      }),
     ).toBe(true);
 
     // Target-rows scope, with and without the row subset
     expect(
-      executionRequestSchema.safeParse({
+      executionRequestSchema.validate({
         ...baseRequest,
         scope: {
           type: "target-rows",
           targetIds: ["target-1"],
           rowIndices: [0, 1],
         },
-      }).success,
+      }),
     ).toBe(true);
     expect(
-      executionRequestSchema.safeParse({
+      executionRequestSchema.validate({
         ...baseRequest,
         scope: { type: "target-rows", targetIds: ["target-1", "target-2"] },
-      }).success,
+      }),
     ).toBe(true);
 
     // Cell scope
     expect(
-      executionRequestSchema.safeParse({
+      executionRequestSchema.validate({
         ...baseRequest,
         scope: { type: "cell", targetId: "target-1", rowIndex: 0 },
-      }).success,
+      }),
     ).toBe(true);
 
     // Evaluator scope
     expect(
-      executionRequestSchema.safeParse({
+      executionRequestSchema.validate({
         ...baseRequest,
         scope: {
           type: "evaluator",
@@ -229,7 +221,7 @@ describe("executionRequestSchema", () => {
           rowIndex: 0,
           evaluatorId: "eval-1",
         },
-      }).success,
+      }),
     ).toBe(true);
   });
 
@@ -253,24 +245,24 @@ describe("executionRequestSchema", () => {
         };
 
         expect(
-          executionRequestSchema.safeParse({
+          executionRequestSchema.validate({
             ...baseRequest,
             data: [{ question: "a" }],
             dataset_id: "dataset-123",
-          }).success,
+          }),
         ).toBe(false);
 
         expect(
-          executionRequestSchema.safeParse({
+          executionRequestSchema.validate({
             ...baseRequest,
             data: [{ question: "a" }],
-          }).success,
+          }),
         ).toBe(true);
         expect(
-          executionRequestSchema.safeParse({
+          executionRequestSchema.validate({
             ...baseRequest,
             dataset_id: "dataset-123",
-          }).success,
+          }),
         ).toBe(true);
       });
     });

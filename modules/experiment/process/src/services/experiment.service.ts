@@ -2,7 +2,6 @@ import {
   completeExperimentRunInputSchema,
   experimentDspyStepLookupSchema,
   experimentDspyStepSchema,
-  experimentDspyStepSummarySchema,
   experimentDspyStepsLookupSchema,
   ExperimentDspyStepNotFoundError,
   ExperimentNotFoundError,
@@ -375,21 +374,16 @@ export class ExperimentService {
   }
 
   async listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
-    const values = await this.options.dspyRepository.findAll(
-      experimentDspyStepsLookupSchema.parse(input),
-    );
-
-    return values.map((value) => experimentDspyStepSummarySchema.parse(value));
+    return this.options.dspyRepository.findAll(experimentDspyStepsLookupSchema.parse(input));
   }
 
   async listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]> {
-    const query = experimentDspyStepsLookupSchema.parse(input);
-    const steps = await this.listDspySteps(query);
+    const steps = await this.listDspySteps(input);
     const versionIds = steps.flatMap((step) =>
       step.workflowVersionId ? [step.workflowVersionId] : [],
     );
     const versions = await this.options.runRepository.findWorkflowVersions(
-      query.tenantId,
+      input.tenantId,
       versionIds,
     );
     const stepsByRun = new Map<string, ExperimentDspyStepSummary[]>();
@@ -434,7 +428,7 @@ export class ExperimentService {
       );
     }
 
-    return experimentDspyStepSchema.parse(value);
+    return value;
   }
 
   getWorkbenchState(input: GetWorkbenchStateInput): Promise<WorkbenchStateView> {
