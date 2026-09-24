@@ -134,4 +134,4 @@ export class ClickHouseGovernanceRepositories {
   }
 }
 
-export { memberGovernanceClickHouseResolver };
+export { memberClickHouseResolver, memberGovernanceClickHouseResolver };

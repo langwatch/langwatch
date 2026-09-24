@@ -20,6 +20,7 @@ import { MemoryIdentityMatchRepository } from "./memory.identity-match.repositor
 import { MemoryIngestionPullRunRepository } from "./memory.ingestion-pull-run.repository.ts";
 import { MemoryIngestionSourceRepository } from "./memory.ingestion-source.repository.ts";
 import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
+import { MemoryOcsfEventsRepository } from "./memory.ocsf-events.repository.ts";
 import { MemoryOrganizationSessionPolicyRepository } from "./memory.organization-session-policy.repository.ts";
 import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
 import { MemoryRollupErasureRepository } from "./memory.rollup-erasure.repository.ts";
@@ -49,6 +50,7 @@ export class MemoryGovernanceRepositories {
       ingestionPullRuns: MemoryIngestionPullRunRepository.create(),
       ingestionSources: MemoryIngestionSourceRepository.create(),
       ingestionTemplates: MemoryIngestionTemplateRepository.create(store),
+      ocsfEvents: MemoryOcsfEventsRepository.create(),
       ocsfExports: MemoryGovernanceOcsfExportRepository.create(store),
       personalVirtualKeys: MemoryPersonalVirtualKeyRepository.create(store),
       rollupErasure: MemoryRollupErasureRepository.create(),

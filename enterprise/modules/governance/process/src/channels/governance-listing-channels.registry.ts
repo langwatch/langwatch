@@ -11,9 +11,11 @@ import { MemoryCopilotBotsChannel } from "./memory/memory.copilot-bots.channel.t
 import { MemoryDatabricksScimUsersChannel } from "./memory/memory.databricks-scim-users.channel.ts";
 import { MemoryGenieSpacesChannel } from "./memory/memory.genie-spaces.channel.ts";
 import { MemoryMicrosoftDirectoryChannel } from "./memory/memory.microsoft-directory.channel.ts";
+import { MemoryObjectStoreChannel } from "./memory/memory.object-store.channel.ts";
 import { MemoryProviderSignInChannel } from "./memory/memory.provider-sign-in.channel.ts";
+import { S3ObjectStoreChannel } from "./s3/s3.object-store.channel.ts";
 
-/** Who and what a provider lists: the people and agent discovery reads, one per subject. */
+/** Who and what a provider lists, one per subject, and the source buckets its pullers read. */
 export const governanceListingChannels = {
   live: {
     adminApiUsers: HttpAdminApiUsersChannel,
@@ -21,6 +23,7 @@ export const governanceListingChannels = {
     databricksScimUsers: HttpDatabricksScimUsersChannel,
     genieSpaces: HttpGenieSpacesChannel,
     microsoftDirectory: HttpMicrosoftDirectoryChannel,
+    objectStore: S3ObjectStoreChannel,
     providerSignIn: HttpProviderSignInChannel,
   },
   memory: {
@@ -29,6 +32,7 @@ export const governanceListingChannels = {
     databricksScimUsers: MemoryDatabricksScimUsersChannel,
     genieSpaces: MemoryGenieSpacesChannel,
     microsoftDirectory: MemoryMicrosoftDirectoryChannel,
+    objectStore: MemoryObjectStoreChannel,
     providerSignIn: MemoryProviderSignInChannel,
   },
 };

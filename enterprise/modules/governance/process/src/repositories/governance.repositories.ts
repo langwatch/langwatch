@@ -62,6 +62,7 @@ export interface GovernanceRepositories {
   readonly ingestionPullRuns: IngestionPullRunRepository;
   readonly ingestionSources: IngestionSourceRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;
+  readonly ocsfEvents: GovernanceClickHouseRepositories["ocsfEvents"];
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly personalVirtualKeys: PersonalVirtualKeyRepository;
   readonly rollupErasure: RollupErasureRepository;

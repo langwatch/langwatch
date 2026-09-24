@@ -28,6 +28,9 @@
       "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     }
   ]

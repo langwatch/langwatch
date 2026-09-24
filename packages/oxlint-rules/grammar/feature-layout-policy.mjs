@@ -72,7 +72,7 @@ export const PROCESS_QUALIFIERS = [
  * filename's first qualifier are the same word, so a file cannot claim one
  * tier while living in another.
  */
-export const CHANNEL_TIERS = ["eventing", "http", "memory", "redis", "ses", "slack", "sqs"];
+export const CHANNEL_TIERS = ["eventing", "http", "memory", "redis", "s3", "ses", "slack", "sqs"];
 const CHANNEL_TIER = CHANNEL_TIERS.join("|");
 
 /** The feature API token has one portable home; other API modules are transports. */

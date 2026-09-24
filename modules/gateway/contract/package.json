@@ -32,6 +32,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },
