@@ -67,11 +67,14 @@ export const createControlRequestResponseSchema = z.object({
   command: z.string(),
 });
 
+export type CreateControlRequestResponse = z.infer<typeof createControlRequestResponseSchema>;
+
 export const startCallBodySchema = localToolCallSchema;
 
 export const startCallResponseSchema = z.object({
   callId: z.string(),
 });
+export type StartCallResponse = z.infer<typeof startCallResponseSchema>;
 
 export const CALL_STATES = ["pending", "running", "awaiting_permission", "done"] as const;
 export type CallState = (typeof CALL_STATES)[number];
@@ -114,6 +117,7 @@ export const startWaitBodySchema = z.object({
 export const startWaitResponseSchema = z.object({
   waitId: z.string(),
 });
+export type StartWaitResponse = z.infer<typeof startWaitResponseSchema>;
 
 export const WAIT_STATES = ["pending", "answered", "expired", "cancelled"] as const;
 

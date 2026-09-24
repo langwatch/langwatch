@@ -264,12 +264,7 @@ export type {
   SkipPermissionsProviderRow,
   SkipPermissionsProviderRows,
 } from "./services/langy-skip-permissions.service.ts";
-export {
-  langyLocalRest,
-  langyLocalRestMembers,
-  type LangyLocalRestCommands,
-  type LangyLocalRestMembers,
-} from "./transport/langy-local.rest.ts";
+export { langyLocalRest } from "./transport/langy-local.rest.ts";
 export {
   langyLocalControlRest,
   langyLocalControlRestMembers,

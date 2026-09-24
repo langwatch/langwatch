@@ -1,29 +1,23 @@
 /**
  * Local surface's declared permission is enforced by the framework's own
- * project door; the identity bridge on top is this family's own.
+ * project door; each route hands the request's credential to one operation.
  * @see specs/langy/langy-local-control.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
-  bindRestMiddleware,
   createRestRuntime,
   recordProjectCredential,
   type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
 import {
   type LangyApi,
-  type LangyConversationDetail,
-  LangyLocalWorkspaceOfflineError,
+  LangyConversationNotFoundError,
+  LangyLocalRecordNotFoundError,
 } from "@langwatch/langy-contract";
-import { nowInstant } from "@langwatch/time";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  langyLocalRest,
-  langyLocalRestMembers,
-  type LangyLocalRestMembers,
-} from "../langy-local.rest.ts";
+import { langyLocalRest } from "../langy-local.rest.ts";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "organization-1";
@@ -78,48 +72,19 @@ function projectDoor(granted: boolean) {
 
 function buildApi(options: { granted: boolean; own?: boolean }) {
   const authenticate = projectDoor(options.granted);
-  const tryFindVisible = vi.fn(async (): Promise<LangyConversationDetail> => ({
-    id: CONVERSATION_ID,
-    title: "Instrument tracing",
-    isShared: false,
-    isOwn: options.own ?? true,
-    lastActivityAt: nowInstant(),
-    messageCount: 1,
-    status: "idle",
-    currentTurnId: null,
-    lastError: null,
-    lastModel: "gpt-5-mini",
-    eventCursor: null,
-  }));
-
-  const app = createApiFixture<LangyApi>({
-    findByIdVisible: tryFindVisible,
-    getLocalCaller: async () => ({
-      userId: USER_ID,
-      projectId: PROJECT_ID,
-      projectName: "Project",
-      projectSlug: "project",
-    }),
+  const getLocalWorkspace = vi.fn<LangyApi["getLocalWorkspace"]>(async (input) => {
+    if (options.own === false) throw new LangyConversationNotFoundError(input.conversationId);
+    return {
+      connected: false,
+      codeAccessPreference: null,
+      github: { installed: false },
+    };
+  });
+  const getLocalCallAnswer = vi.fn<LangyApi["getLocalCallAnswer"]>(async () => {
+    throw new LangyLocalRecordNotFoundError();
   });
 
-  const members: LangyLocalRestMembers = {
-    runtime: () =>
-      ({
-        presence: {
-          getByConversationId: async (conversationId: string) => {
-            throw new LangyLocalWorkspaceOfflineError({ conversationId });
-          },
-        },
-        requests: { findOpenForConversation: async () => [] },
-      }) as never,
-    commands: () => ({}) as never,
-    workspace: () => ({
-      getCodeAccessPreference: async () => ({ preference: null }),
-      getGithubInstallation: async () => ({ installed: false }),
-    }),
-    baseHost: undefined,
-    skipGate: (() => true) as never,
-  };
+  const app = createApiFixture<LangyApi>({ getLocalWorkspace, getLocalCallAnswer });
 
   const runtime = createRestRuntime({
     identity: { authenticate },
@@ -128,13 +93,13 @@ function buildApi(options: { granted: boolean; own?: boolean }) {
   const hono = runtime.mount(langyLocalRest.router(), {
     app: () => app,
     onError: renderHandled,
-    facts: [bindRestMiddleware(langyLocalRestMembers, () => members)],
   });
 
   return {
     authenticate,
-    tryFindVisible,
+    getLocalWorkspace,
     workspace: () => hono.request(WORKSPACE_URL),
+    readCall: (callId: string) => hono.request(`http://api.test/api/langy/local/calls/${callId}`),
   };
 }
 
@@ -150,26 +115,33 @@ describe("given a key held by someone with Langy access", () => {
       expect(api.authenticate).toHaveBeenCalledWith(
         expect.objectContaining({ permission: "langy:create" }),
       );
-      expect(api.tryFindVisible).not.toHaveBeenCalled();
+      expect(api.getLocalWorkspace).not.toHaveBeenCalled();
     });
   });
 
   describe("when the key carries the local surface's permission", () => {
     /** @scenario "A key carrying the permission reaches the local surface" */
-    it("serves the call", async () => {
+    it("serves the call with the key's own credential", async () => {
       const api = buildApi({ granted: true });
 
       const response = await api.workspace();
 
       expect(response.status).toBe(200);
-      expect(api.tryFindVisible).toHaveBeenCalled();
+      expect(await response.json()).toEqual({
+        connected: false,
+        codeAccessPreference: null,
+        github: { installed: false },
+      });
+      expect(api.getLocalWorkspace).toHaveBeenCalledWith({
+        credential: resolvedCredential,
+        conversationId: CONVERSATION_ID,
+      });
     });
   });
 });
 
 describe("given a teammate shared their conversation with the project", () => {
   describe("when a Langy key of mine names that conversation", () => {
-    /** @scenario "A key never reaches the folder of a teammate's shared conversation" */
     it("answers not found, as for a conversation that does not exist", async () => {
       const api = buildApi({ granted: true, own: false });
 
@@ -177,6 +149,20 @@ describe("given a teammate shared their conversation with the project", () => {
 
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ error: "langy_conversation_not_found" });
+    });
+  });
+});
+
+describe("given a call whose record has lapsed", () => {
+  describe("when the worker polls it", () => {
+    /** @scenario "A poll for a lapsed call or question answers a handled not found" */
+    it("answers a handled not found the worker reads as still pending", async () => {
+      const api = buildApi({ granted: true });
+
+      const response = await api.readCall("call-gone");
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "langy_local_record_not_found" });
     });
   });
 });

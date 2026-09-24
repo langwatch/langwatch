@@ -1,5 +1,6 @@
 import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { z } from "zod";
 
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
 import type * as jsonModule from "./json.ts";
@@ -13,7 +14,19 @@ import type {
   LangyStartConversationTurnInput,
   LangyTurnResultInput,
 } from "./langy-conversation.ts";
-import type { RelayTally } from "./langy-rest.schemas.ts";
+import type {
+  langyLocalStartCallRequestSchema,
+  langyLocalStartWaitRequestSchema,
+  RelayTally,
+} from "./langy-rest.schemas.ts";
+import type {
+  CreateControlRequestResponse,
+  PollCallResponse,
+  PollWaitResponse,
+  StartCallResponse,
+  StartWaitResponse,
+  WorkspaceStatus,
+} from "./langy.local-control-http.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 
 /**
@@ -42,6 +55,32 @@ export type LangyLocalCaller = Readonly<{
   projectName: string;
   projectSlug: string;
 }>;
+
+/** A local worker's key, and the conversation it names. */
+export type LangyLocalConversationInput = Readonly<{
+  credential: RestResolvedProjectCredential;
+  conversationId: string;
+}>;
+export type LangyLocalStartCallInput = Readonly<{
+  credential: RestResolvedProjectCredential;
+  call: z.infer<typeof langyLocalStartCallRequestSchema>;
+}>;
+export type LangyLocalStartWaitInput = Readonly<{
+  credential: RestResolvedProjectCredential;
+  wait: z.infer<typeof langyLocalStartWaitRequestSchema>;
+}>;
+/** A long-poll read holds until the record settles or the caller hangs up. */
+export type LangyLocalCallInput = Readonly<{
+  credential: RestResolvedProjectCredential;
+  callId: string;
+  signal?: AbortSignal;
+}>;
+export type LangyLocalWaitInput = Readonly<{
+  credential: RestResolvedProjectCredential;
+  waitId: string;
+  signal?: AbortSignal;
+}>;
+export type LangyLocalCallCancelled = Readonly<{ callId: string; cancelled: true }>;
 
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {
@@ -193,6 +232,18 @@ export interface LangyApi {
   getRestActor(input: { userId: string }): Promise<LangyCredentialSession>;
   /** The owner of a local worker's key, proved against Langy access. */
   getLocalCaller(input: { credential: RestResolvedProjectCredential }): Promise<LangyLocalCaller>;
+  /** The code access card's status for the key owner's own conversation. */
+  getLocalWorkspace(input: LangyLocalConversationInput): Promise<WorkspaceStatus>;
+  createLocalControlRequest(
+    input: LangyLocalConversationInput,
+  ): Promise<CreateControlRequestResponse>;
+  startLocalCall(input: LangyLocalStartCallInput): Promise<StartCallResponse>;
+  /** Holds until the call settles; a lapsed or foreign call throws not found. */
+  getLocalCallAnswer(input: LangyLocalCallInput): Promise<PollCallResponse>;
+  cancelLocalCall(input: LangyLocalCallInput): Promise<LangyLocalCallCancelled>;
+  startLocalWait(input: LangyLocalStartWaitInput): Promise<StartWaitResponse>;
+  /** Holds until the question is answered; a lapsed or foreign wait throws not found. */
+  getLocalWaitAnswer(input: LangyLocalWaitInput): Promise<PollWaitResponse>;
 }
 
 export const LangyApi = moduleApi<LangyApi>()("langy");

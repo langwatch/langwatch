@@ -519,3 +519,9 @@ Feature: Langy works in a folder shared from the developer's machine
       Given a follow-along link, whose path is the site root
       When the root resolves my home page
       Then the conversation parameter travels to the page it lands on
+
+  @unit
+  Scenario: A poll for a lapsed call or question answers a handled not found
+    Given the call or question the worker polls has lapsed
+    When the worker reads its answer
+    Then the platform answers not found with the code langy_local_record_not_found

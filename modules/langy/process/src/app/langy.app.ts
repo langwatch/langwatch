@@ -54,6 +54,7 @@ import {
   type LocalControlRuntime,
 } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { LangyInternalService } from "../services/langy-internal.service.ts";
+import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { EventingLangyMaintenanceAdapter } from "../services/langy-maintenance.service.ts";
 import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
@@ -106,6 +107,7 @@ type LangyAppDependencies = {
   callers: LangyRestCallerService;
   /** What the local doors reach beyond `LangyApi` (ADR-129). */
   localControl: LangyLocalControl;
+  localWorker: LangyLocalWorkerService;
 };
 
 /** The local-control runtime, its durable commands, its peer reads and this origin. */
@@ -217,6 +219,17 @@ export class LangyApp implements LangyApiContract {
       authz: setup.dependencies.authz,
       metrics: OtelLangySessionKeyMetricsAdapter.create(),
     });
+    const callers = LangyRestCallerService.create({
+      featureFlags: setup.dependencies.featureFlags,
+      actors: setup.members.prisma,
+    });
+    const runtime = RedisLangyLocalControlRuntimeRepository.create({
+      store: setup.repositories.sessionState,
+      projects: workspace,
+      mintSessionKey: (input) => sessionKeys.mintForUser(input),
+      events: commands,
+      buffer: setup.repositories.tokenBuffer.open({ redis: setup.members.redis }),
+    });
     return new LangyApp({
       langy,
       internalDoor: door,
@@ -235,22 +248,16 @@ export class LangyApp implements LangyApiContract {
         repository: PrismaLangySessionKeyReapRepository.create(setup.members.prisma),
         metrics: OtelLangySessionKeyMetricsAdapter.create(),
       }),
-      callers: LangyRestCallerService.create({
-        featureFlags: setup.dependencies.featureFlags,
-        actors: setup.members.prisma,
-      }),
-      localControl: {
-        runtime: RedisLangyLocalControlRuntimeRepository.create({
-          store: setup.repositories.sessionState,
-          projects: workspace,
-          mintSessionKey: (input) => sessionKeys.mintForUser(input),
-          events: commands,
-          buffer: setup.repositories.tokenBuffer.open({ redis: setup.members.redis }),
-        }),
+      callers,
+      localControl: { runtime, commands, workspace, baseHost: setup.members.publicBaseUrl },
+      localWorker: LangyLocalWorkerService.create({
+        runtime,
         commands,
         workspace,
+        callers,
+        conversations: langy,
         baseHost: setup.members.publicBaseUrl,
-      },
+      }),
     });
   }
 
@@ -300,6 +307,48 @@ export class LangyApp implements LangyApiContract {
     credential: RestResolvedProjectCredential;
   }): Promise<langyContractModule.LangyLocalCaller> {
     return this.dependencies.callers.getLocalCaller(input);
+  }
+
+  getLocalWorkspace(
+    input: langyContractModule.LangyLocalConversationInput,
+  ): Promise<langyContractModule.WorkspaceStatus> {
+    return this.dependencies.localWorker.getWorkspace(input);
+  }
+
+  createLocalControlRequest(
+    input: langyContractModule.LangyLocalConversationInput,
+  ): Promise<langyContractModule.CreateControlRequestResponse> {
+    return this.dependencies.localWorker.createControlRequest(input);
+  }
+
+  startLocalCall(
+    input: langyContractModule.LangyLocalStartCallInput,
+  ): Promise<langyContractModule.StartCallResponse> {
+    return this.dependencies.localWorker.startCall(input);
+  }
+
+  getLocalCallAnswer(
+    input: langyContractModule.LangyLocalCallInput,
+  ): Promise<langyContractModule.PollCallResponse> {
+    return this.dependencies.localWorker.getCallAnswer(input);
+  }
+
+  cancelLocalCall(
+    input: langyContractModule.LangyLocalCallInput,
+  ): Promise<langyContractModule.LangyLocalCallCancelled> {
+    return this.dependencies.localWorker.cancelCall(input);
+  }
+
+  startLocalWait(
+    input: langyContractModule.LangyLocalStartWaitInput,
+  ): Promise<langyContractModule.StartWaitResponse> {
+    return this.dependencies.localWorker.startWait(input);
+  }
+
+  getLocalWaitAnswer(
+    input: langyContractModule.LangyLocalWaitInput,
+  ): Promise<langyContractModule.PollWaitResponse> {
+    return this.dependencies.localWorker.getWaitAnswer(input);
   }
 
   ingestInternalTurnResult(input: langyContractModule.LangyTurnResultInput): Promise<{

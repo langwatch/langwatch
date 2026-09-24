@@ -24,7 +24,7 @@ import {
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";
 import { langyInternalRest } from "./transport/langy-internal.rest.ts";
-import { langyLocalRest, langyLocalRestMembers } from "./transport/langy-local.rest.ts";
+import { langyLocalRest } from "./transport/langy-local.rest.ts";
 import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
@@ -90,16 +90,6 @@ export const langyServer = defineServerModule("langy")
       throw new TypeError("Langy transport requires its constructed application");
     return [
       bindRestCredential("internalSecret", () => app.internalDoor),
-      bindRestMiddleware(langyLocalRestMembers, () => {
-        const local = app.localControl;
-        return {
-          runtime: () => local.runtime,
-          commands: () => local.commands,
-          workspace: () => local.workspace,
-          baseHost: local.baseHost,
-          skipGate: (input) => local.workspace.canSkipPermissions(input),
-        };
-      }),
       bindRestMiddleware(langyTurnsMembers, () => ({
         // One `Prefer: wait` hold borrows a dedicated connection for its
         // blocking read and gives it back on release, so a held request never
