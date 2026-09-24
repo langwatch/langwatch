@@ -110,6 +110,12 @@
       "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/egress/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/process/tsconfig.build.json"
     },
     {

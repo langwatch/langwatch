@@ -7586,6 +7586,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -11729,6 +11732,12 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@langwatch/egress':
+        specifier: workspace:*
+        version: link:../../../packages/egress
       '@langwatch/model-provider-process':
         specifier: workspace:*
         version: link:../../model-provider/process
