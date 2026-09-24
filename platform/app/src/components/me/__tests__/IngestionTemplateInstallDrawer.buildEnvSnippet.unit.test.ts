@@ -41,27 +41,28 @@ describe("buildEnvSnippet", () => {
       expect(snippet).toContain("export OTEL_EXPORTER_OTLP_PROTOCOL=http/json");
     });
 
-    // claude-code 2.x emits four OTEL_LOG_* unlock knobs. Each is
-    // load-bearing for a distinct slice of the trace surface:
-    //   USER_PROMPTS       lifts user prompt text onto user_prompt events
-    //   TOOL_DETAILS       lifts tool_input/tool_parameters attrs (Bash
-    //                      command, Edit diff, file paths) onto
-    //                      tool_decision + tool_result events. Without
-    //                      it the receiver gets only sizes-in-bytes.
-    //   TOOL_CONTENT       rides the span path, so it carries tool_input
-    //                      only while the experimental tracing flag
-    //                      above is set
-    //   RAW_API_BODIES     emits api_request_body + api_response_body
-    //                      events. THIS is the only OTel surface that
-    //                      carries the assistant response text.
-    // Dropping any of USER_PROMPTS / TOOL_DETAILS / RAW_API_BODIES
-    // silently regresses content visibility in /me/traces. Pin all
-    // four here.
-    it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", () => {
+    // claude-code 2.x emits four OTEL_LOG_* content knobs. We set the
+    // LIGHT content set; each is load-bearing for a slice of the trace:
+    //   USER_PROMPTS        lifts user prompt text onto user_prompt events
+    //   TOOL_DETAILS        lifts tool_input/tool_parameters attrs (Bash
+    //                       command, Edit diff, file paths) onto
+    //                       tool_decision + tool_result events. Without
+    //                       it the receiver gets only sizes-in-bytes.
+    //   TOOL_CONTENT        rides the span path, so it carries tool_input
+    //                       only while the experimental tracing flag
+    //                       above is set
+    //   ASSISTANT_RESPONSES emits the light claude_code.assistant_response
+    //                       event carrying just the reply text. This is
+    //                       the surface we use for assistant text.
+    // We deliberately do NOT set OTEL_LOG_RAW_API_BODIES (the heavy
+    // full-body export). Pin the four light knobs and assert raw bodies
+    // is absent so a regression can't re-add the heavy default (#8284).
+    it("sets the four light claude OTEL_LOG_* content knobs, not raw bodies", () => {
       expect(snippet).toContain("export OTEL_LOG_USER_PROMPTS=1");
       expect(snippet).toContain("export OTEL_LOG_TOOL_DETAILS=1");
       expect(snippet).toContain("export OTEL_LOG_TOOL_CONTENT=1");
-      expect(snippet).toContain("export OTEL_LOG_RAW_API_BODIES=1");
+      expect(snippet).toContain("export OTEL_LOG_ASSISTANT_RESPONSES=1");
+      expect(snippet).not.toContain("OTEL_LOG_RAW_API_BODIES");
     });
 
     it("interpolates the endpoint and token", () => {

@@ -133,6 +133,46 @@ describe("refreshClaudeUserTelemetryEnv", () => {
 		});
 	});
 
+	describe("given a langwatch block that still carries the legacy OTEL_LOG_RAW_API_BODIES", () => {
+		it("strips the legacy flag on refresh, keeping the rest of the block", () => {
+			// A block written by an older CLI: current wiring plus the flag we
+			// no longer set (#8284). Refresh must remove it on upgrade even
+			// though the current vars are otherwise all present.
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, {
+				...currentClaudeVars(),
+				OTEL_LOG_RAW_API_BODIES: "1",
+			});
+
+			const label = refreshClaudeUserTelemetryEnv({
+				vars: currentClaudeVars(),
+			});
+
+			expect(label).toContain("~/.claude/settings.json");
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(after.env.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
+			expect(after.env.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
+			expect(after.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
+		});
+	});
+
+	describe("given the user set OTEL_LOG_RAW_API_BODIES on their own non-langwatch block", () => {
+		it("does not touch it (the block is not langwatch-shaped)", () => {
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, {
+				OTEL_EXPORTER_OTLP_ENDPOINT: "https://api.honeycomb.io",
+				OTEL_EXPORTER_OTLP_HEADERS: "x-honeycomb-team=abc",
+				OTEL_LOG_RAW_API_BODIES: "1",
+			});
+			const before = fs.readFileSync(target.path, "utf8");
+
+			expect(refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() })).toBe(
+				null,
+			);
+			expect(fs.readFileSync(target.path, "utf8")).toBe(before);
+		});
+	});
+
 	describe("given no persisted block at all", () => {
 		it("returns null and writes nothing (the persist offer owns installs)", () => {
 			expect(refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() })).toBe(

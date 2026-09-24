@@ -304,38 +304,37 @@ describe("resolveWrapperMode", () => {
 
 	describe("when claude resolves to ingestion mode", () => {
 		/**
-		 * claude-code 2.x has four documented OTEL_LOG_* unlock knobs
+		 * claude-code 2.x has four documented OTEL_LOG_* content knobs
 		 * (code.claude.com/docs/en/monitoring-usage). Without them the
 		 * OTel wire is metadata-only — tokens, cost, durations, tool
 		 * sizes-in-bytes — and assistant response text + tool I/O text
-		 * are silently absent (quadruple-proven dead end before we
-		 * found these). The four knobs:
+		 * are silently absent. We set the LIGHT content set:
 		 *
-		 *   OTEL_LOG_USER_PROMPTS=1   lifts user prompt text onto
-		 *                             user_prompt events
-		 *   OTEL_LOG_TOOL_DETAILS=1   lifts tool_input/tool_parameters
-		 *                             attrs (Bash command, Edit diff,
-		 *                             file paths) onto tool_decision +
-		 *                             tool_result so the trace shows
-		 *                             WHAT the tool did
-		 *   OTEL_LOG_TOOL_CONTENT=1   lifts tool input/output content
-		 *                             onto the tool.output span event;
-		 *                             active now that we set the
-		 *                             ENHANCED_TELEMETRY_BETA flag
-		 *   OTEL_LOG_RAW_API_BODIES=1 emits api_request_body +
-		 *                             api_response_body events
-		 *                             carrying the FULL JSON of every
-		 *                             API call (system prompts +
-		 *                             message history + assistant
-		 *                             text + tool_use blocks). THIS
-		 *                             is the only OTel surface that
-		 *                             carries assistant response text.
+		 *   OTEL_LOG_USER_PROMPTS=1        lifts user prompt text onto
+		 *                                  user_prompt events
+		 *   OTEL_LOG_TOOL_DETAILS=1        lifts tool_input/tool_parameters
+		 *                                  attrs (Bash command, Edit diff,
+		 *                                  file paths) onto tool_decision +
+		 *                                  tool_result so the trace shows
+		 *                                  WHAT the tool did
+		 *   OTEL_LOG_TOOL_CONTENT=1        lifts tool input/output content
+		 *                                  onto the tool.output span event;
+		 *                                  active now that we set the
+		 *                                  ENHANCED_TELEMETRY_BETA flag
+		 *   OTEL_LOG_ASSISTANT_RESPONSES=1 emits the light
+		 *                                  claude_code.assistant_response
+		 *                                  event carrying just the reply
+		 *                                  text (claude-code 2.1.193+).
+		 *                                  This is the surface we use for
+		 *                                  assistant text.
 		 *
-		 * Dropping any of USER_PROMPTS / TOOL_DETAILS / RAW_API_BODIES
-		 * silently regresses content visibility. Pin all four here so
-		 * a refactor can't quietly undo the unlock.
+		 * We deliberately do NOT set OTEL_LOG_RAW_API_BODIES: it serialises
+		 * the entire request + response JSON on every model call — avoidable
+		 * cost for content the light events already carry (#8284). Pin the
+		 * four light knobs here, and assert RAW_API_BODIES is NOT set, so a
+		 * refactor can't quietly re-add the heavy default or drop a knob.
 		 */
-		it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", async () => {
+		it("sets the four light claude OTEL_LOG_* content knobs, not raw bodies", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
 			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
 				token: "sk-lw-claude-test-token",
@@ -360,7 +359,9 @@ describe("resolveWrapperMode", () => {
 			expect(out.vars.OTEL_LOG_USER_PROMPTS).toBe("1");
 			expect(out.vars.OTEL_LOG_TOOL_DETAILS).toBe("1");
 			expect(out.vars.OTEL_LOG_TOOL_CONTENT).toBe("1");
-			expect(out.vars.OTEL_LOG_RAW_API_BODIES).toBe("1");
+			expect(out.vars.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
+			// The heavy full-body export must not be defaulted (#8284).
+			expect(out.vars.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
 			expect(out.vars.OTEL_TRACES_EXPORTER).toBe("otlp");
 			expect(out.vars.OTEL_LOGS_EXPORTER).toBe("otlp");
 			expect(out.vars.OTEL_METRICS_EXPORTER).toBe("otlp");
