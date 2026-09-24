@@ -5,6 +5,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
@@ -30,10 +31,10 @@ export function testPlan(overrides: Partial<Plan> = {}): Plan {
 /** Answers "not personal" for every team and project lookup: the scope fence
  * has its own suite in the owning feature. */
 export function testRolePrisma(): PrismaClient {
-  return {
+  return prismaDouble({
     team: { findFirst: async () => null },
     project: { findFirst: async () => null },
-  } as unknown as PrismaClient;
+  });
 }
 
 /** One binding as the authorization boundary answers it, with nothing omitted. */

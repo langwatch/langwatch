@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 /**
  * @vitest-environment node
  */
@@ -30,10 +30,7 @@ describe("PrismaDatasetRepository", () => {
           { datasetId: "a", _count: { _all: 2 } },
           { datasetId: "c", _count: { _all: 7 } },
         ]);
-        const prisma = {
-          dataset: { findMany },
-          datasetRecord: { groupBy },
-        } as unknown as PrismaClient;
+        const prisma = prismaDouble({ dataset: { findMany }, datasetRecord: { groupBy } });
 
         const listed = await PrismaDatasetRepository.create({ prisma }).findAll({
           projectId: "project-1",

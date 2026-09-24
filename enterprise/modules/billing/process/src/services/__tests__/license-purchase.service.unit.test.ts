@@ -1,3 +1,4 @@
+import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,13 +24,13 @@ function checkoutSession(): Stripe.Checkout.Session {
 }
 
 function fakeStripe(): Stripe {
-  return {
+  return stripeDouble({
     checkout: {
       sessions: {
         listLineItems: vi.fn(async () => ({ data: [{ quantity: 1 }] })),
       },
     },
-  } as unknown as Stripe;
+  });
 }
 
 function composeService(licenseFeatures?: LicenseFeaturesResolver) {

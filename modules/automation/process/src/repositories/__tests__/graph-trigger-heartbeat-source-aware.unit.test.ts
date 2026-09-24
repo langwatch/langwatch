@@ -110,17 +110,17 @@ function makeClickHouseStub(): {
   calls: QueryCall[];
 } {
   const calls: QueryCall[] = [];
-  const client = {
-    query: vi.fn(async (params: { query: string; query_params: { tenantId: string } }) => {
+  const client: ClickHouseClient = {
+    query: vi.fn(async (params: Parameters<ClickHouseClient["query"]>[0]) => {
       calls.push({
         query: params.query,
-        tenantId: params.query_params.tenantId,
+        tenantId: String(params.query_params.tenantId),
       });
       // Return null recency so EVERY candidate enqueues (the test cares
       // about query routing, not enqueue filtering).
       return { json: async () => [{ lastMs: null }] };
     }),
-  } as unknown as ClickHouseClient;
+  };
   return { client, calls };
 }
 

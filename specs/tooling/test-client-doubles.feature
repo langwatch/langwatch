@@ -39,3 +39,11 @@ Feature: One typed double per raw client, in the test harness
       Given a client double built from a script
       When it is passed where the real client type is expected
       Then it typechecks without any cast
+
+  Rule: a memory Redis double answers from its own store
+
+    @unit
+    Scenario: A memory Redis answers commands from its own store
+      Given a memory Redis double and the connections duplicated from it
+      When the code under test writes and reads keys, batches commands, or publishes
+      Then each answers from one shared in-process store, and an unimplemented command throws naming it

@@ -5,6 +5,7 @@ import {
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaBillingSubscription } from "../repositories/prisma/prisma.subscription.repository.ts";
@@ -40,11 +41,8 @@ const createMockDb = ({
       findFirstResult ? { createdAt: EPOCH, ...(findFirstResult as object) } : findFirstResult,
     );
   const findUnique = vi.fn().mockResolvedValue(orgFindUniqueResult);
-  const client = {
-    subscription: { findFirst },
-    organization: { findUnique },
-  } as unknown as PrismaClient;
-  return Object.assign(client, { mocks: { findFirst, findUnique } });
+  const db = prismaDouble({ subscription: { findFirst }, organization: { findUnique } });
+  return { db, mocks: { findFirst, findUnique } };
 };
 
 /**
@@ -52,7 +50,7 @@ const createMockDb = ({
  * Prisma's ordering would select.
  */
 type OrderableRow = { id: string; createdAt: Date };
-type OrderByClause = Record<string, "asc" | "desc">;
+type OrderByClause = object;
 
 const compareAscending = <V>(left: V, right: V): number => {
   if (left < right) return -1;
@@ -80,16 +78,16 @@ const firstUnder = <T extends OrderableRow>(rows: T[], orderBy: OrderByClause[])
 };
 
 const dbHolding = (rows: (OrderableRow & { plan: string; status: string })[]): PrismaClient =>
-  ({
+  prismaDouble({
     subscription: {
-      findFirst: vi.fn(async (query?: { orderBy?: OrderByClause[] }) =>
-        firstUnder(rows, query?.orderBy ?? []),
+      findFirst: vi.fn(async (query?: { orderBy?: OrderByClause | OrderByClause[] }) =>
+        firstUnder(rows, [query?.orderBy ?? []].flat()),
       ),
     },
     organization: {
       findUnique: vi.fn().mockResolvedValue(undefined),
     },
-  }) as unknown as PrismaClient;
+  });
 
 describe("getFreePlanLimits", () => {
   /** @scenario 'All pricing models get 50,000 events on the free tier' */
@@ -124,7 +122,7 @@ describe("createSaaSPlanProvider", () => {
     it("returns the free baseline rather than a tier nobody bought", async () => {
       mockEnv.IS_SAAS = false;
 
-      const db = createMockDb();
+      const { db } = createMockDb();
       const provider = createSaaSPlanProvider(db);
       const plan = await provider.getActivePlan("org_1");
 
@@ -141,7 +139,7 @@ describe("createSaaSPlanProvider", () => {
 
     describe("when no subscription exists", () => {
       it("returns FREE limits", async () => {
-        const db = createMockDb();
+        const { db } = createMockDb();
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -152,7 +150,7 @@ describe("createSaaSPlanProvider", () => {
       describe("when organization has SEAT_EVENT pricing model", () => {
         /** @scenario 'SEAT_EVENT organization on FREE plan gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
-          const db = createMockDb({
+          const { db } = createMockDb({
             orgFindUniqueResult: { pricingModel: "SEAT_EVENT" },
           });
           const provider = createSaaSPlanProvider(db);
@@ -166,7 +164,7 @@ describe("createSaaSPlanProvider", () => {
       describe("when organization has TIERED pricing model", () => {
         /** @scenario 'TIERED organization on FREE plan gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
-          const db = createMockDb({
+          const { db } = createMockDb({
             orgFindUniqueResult: { pricingModel: "TIERED" },
           });
           const provider = createSaaSPlanProvider(db);
@@ -180,7 +178,7 @@ describe("createSaaSPlanProvider", () => {
       describe("when organization is not found", () => {
         /** @scenario 'Organization not found gets 50,000 events per month' */
         it("returns FREE with 50,000 messages per month", async () => {
-          const db = createMockDb({
+          const { db } = createMockDb({
             orgFindUniqueResult: null,
           });
           const provider = createSaaSPlanProvider(db);
@@ -204,7 +202,7 @@ describe("createSaaSPlanProvider", () => {
           maxMessagesPerMonth: null,
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -224,7 +222,7 @@ describe("createSaaSPlanProvider", () => {
             maxMessagesPerMonth: null,
           };
 
-          const db = createMockDb({
+          const { db, mocks } = createMockDb({
             findFirstResult: subscription,
             orgFindUniqueResult: { pricingModel: "SEAT_EVENT" },
           });
@@ -232,7 +230,7 @@ describe("createSaaSPlanProvider", () => {
           const plan = await provider.getActivePlan("org_1");
 
           expect(plan.type).toBe(PlanTypes.LAUNCH);
-          expect(db.mocks.findUnique).not.toHaveBeenCalled();
+          expect(mocks.findUnique).not.toHaveBeenCalled();
         });
       });
     });
@@ -245,7 +243,7 @@ describe("createSaaSPlanProvider", () => {
           ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, 0])),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -266,7 +264,7 @@ describe("createSaaSPlanProvider", () => {
           ),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -288,7 +286,7 @@ describe("createSaaSPlanProvider", () => {
           ),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -308,7 +306,7 @@ describe("createSaaSPlanProvider", () => {
           ),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -331,7 +329,7 @@ describe("createSaaSPlanProvider", () => {
           ),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -356,7 +354,7 @@ describe("createSaaSPlanProvider", () => {
           ),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -380,7 +378,7 @@ describe("createSaaSPlanProvider", () => {
           ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -399,7 +397,7 @@ describe("createSaaSPlanProvider", () => {
           ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -417,7 +415,7 @@ describe("createSaaSPlanProvider", () => {
           ),
         };
 
-        const db = createMockDb({ findFirstResult: subscription });
+        const { db } = createMockDb({ findFirstResult: subscription });
         const provider = createSaaSPlanProvider(db);
         const plan = await provider.getActivePlan("org_1");
 
@@ -433,7 +431,7 @@ describe("createSaaSPlanProvider", () => {
             ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
           };
 
-          const db = createMockDb({
+          const { db } = createMockDb({
             findFirstResult: subscription,
             orgFindUniqueResult: { pricingModel: "SEAT_EVENT" },
           });
@@ -456,7 +454,7 @@ describe("createSaaSPlanProvider", () => {
             ),
           };
 
-          const db = createMockDb({
+          const { db } = createMockDb({
             findFirstResult: subscription,
             orgFindUniqueResult: { pricingModel: "SEAT_EVENT" },
           });
@@ -476,7 +474,7 @@ describe("createSaaSPlanProvider", () => {
         // A CANCELLED subscription must not appear in active subscription query.
         // The findFirst query filters by status: ACTIVE, so cancelled subs are excluded.
         // This regression test ensures a cancelled Growth Seat sub doesn't leak 20 maxMembers.
-        const db = createMockDb({
+        const { db, mocks } = createMockDb({
           findFirstResult: null, // cancelled sub is not returned by the ACTIVE-only query
         });
         const provider = createSaaSPlanProvider(db);
@@ -488,7 +486,7 @@ describe("createSaaSPlanProvider", () => {
         expect(plan.maxMessagesPerMonth).toBe(50_000);
 
         // Lock in the query filter: only ACTIVE subscriptions are fetched
-        expect(db.mocks.findFirst).toHaveBeenCalledWith(
+        expect(mocks.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
               status: SubscriptionStatus.ACTIVE,
@@ -504,7 +502,7 @@ describe("createSaaSPlanProvider", () => {
       mockEnv.IS_SAAS = false;
       mockEnv.ADMIN_EMAILS = "admin@example.com, other@example.com";
 
-      const db = createMockDb();
+      const { db } = createMockDb();
       const provider = createSaaSPlanProvider(db);
       const plan = await provider.getActivePlan("org_1", {
         id: "user_1",
@@ -522,7 +520,7 @@ describe("createSaaSPlanProvider", () => {
       mockEnv.IS_SAAS = false;
       mockEnv.ADMIN_EMAILS = "  admin@example.com , other@example.com  ";
 
-      const db = createMockDb();
+      const { db } = createMockDb();
       const provider = createSaaSPlanProvider(db);
       const plan = await provider.getActivePlan("org_1", {
         id: "user_1",
@@ -540,7 +538,7 @@ describe("createSaaSPlanProvider", () => {
       mockEnv.IS_SAAS = false;
       mockEnv.ADMIN_EMAILS = "admin@example.com";
 
-      const db = createMockDb();
+      const { db } = createMockDb();
       const provider = createSaaSPlanProvider(db);
       const plan = await provider.getActivePlan("org_1", {
         id: "user_1",

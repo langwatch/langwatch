@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaNotificationRepository } from "../prisma.notification.repository.ts";
@@ -27,7 +27,7 @@ const rows = [
 function makeDatabase() {
   const findMany = vi.fn<() => Promise<typeof rows>>().mockResolvedValue(rows);
   const create = vi.fn<() => Promise<(typeof rows)[number]>>().mockResolvedValue(rows[0]!);
-  const prisma = { notification: { findMany, create } } as unknown as PrismaClient;
+  const prisma = prismaDouble({ notification: { findMany, create } });
 
   return { prisma, findMany, create };
 }

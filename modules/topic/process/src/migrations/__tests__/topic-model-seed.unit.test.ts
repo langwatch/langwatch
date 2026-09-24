@@ -1,4 +1,5 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaTopicClusteringRepository } from "../../repositories/prisma/prisma.topic-clustering.repository.ts";
@@ -53,16 +54,22 @@ const topicRow = (id: string, projectId: string) => ({
  * `findUnique` the seed uses to decide "already owned?" and the per-page
  * `findMany` batch that front-runs it. Both still run the real guard.
  */
+const stringOf = (value: unknown): string => (typeof value === "string" ? value : "");
+
+const listOf = (value: unknown): string[] =>
+  typeof value === "object" && value !== null && "in" in value && Array.isArray(value.in)
+    ? value.in.filter((item) => typeof item === "string")
+    : [];
+
 const topicModelProjectionMock = (ownedProjectIds: Set<string>) => ({
-  findUnique: async (args: { where: { projectId: string } }) => {
+  findUnique: async (args: Prisma.TopicModelProjectionFindUniqueArgs) => {
     await guard(modelParams("TopicModelProjection", "findUnique", args));
-    return ownedProjectIds.has(args.where.projectId)
-      ? { id: `cursor-${args.where.projectId}` }
-      : null;
+    const projectId = stringOf(args.where.projectId);
+    return ownedProjectIds.has(projectId) ? { id: `cursor-${projectId}` } : null;
   },
-  findMany: async (args: { where: { projectId: { in: string[] } } }) => {
+  findMany: async (args?: Prisma.TopicModelProjectionFindManyArgs) => {
     await guard(modelParams("TopicModelProjection", "findMany", args));
-    return args.where.projectId.in
+    return listOf(args?.where?.projectId)
       .filter((projectId) => ownedProjectIds.has(projectId))
       .map((projectId) => ({ projectId }));
   },
@@ -84,10 +91,10 @@ const guardedPrismaStub = ({
   const pageArgs: { where?: Record<string, unknown> }[] = [];
   let pageIndex = 0;
 
-  const prisma = {
+  const prisma = prismaDouble({
     project: {
-      findMany: async (args: { where?: Record<string, unknown> }) => {
-        pageArgs.push(args);
+      findMany: async (args?: Prisma.ProjectFindManyArgs) => {
+        pageArgs.push({ where: { ...args?.where } });
         await guard(modelParams("Project", "findMany", args));
         const page = topicPages[pageIndex] ?? [];
         pageIndex++;
@@ -96,13 +103,13 @@ const guardedPrismaStub = ({
       },
     },
     topic: {
-      findMany: async (args: { where: { projectId: string } }) => {
+      findMany: async (args?: Prisma.TopicFindManyArgs) => {
         await guard(modelParams("Topic", "findMany", args));
-        return topicsByProject[args.where.projectId] ?? [];
+        return topicsByProject[stringOf(args?.where?.projectId)] ?? [];
       },
     },
     topicModelProjection: topicModelProjectionMock(ownedProjectIds),
-  } as unknown as PrismaClient;
+  });
 
   return { prisma, pageArgs };
 };
@@ -123,14 +130,12 @@ const fakeDbStub = ({
   );
   const allIds = [...projectsWithTopics, ...projectsWithoutTopics];
 
-  const prisma = {
+  const prisma = prismaDouble({
     project: {
-      findMany: async (args: {
-        where?: { id?: { gt?: string }; topics?: unknown };
-        take?: number;
-      }) => {
+      findMany: async (args?: Prisma.ProjectFindManyArgs) => {
         await guard(modelParams("Project", "findMany", args));
-        const gt: string | undefined = args?.where?.id?.gt;
+        const id = args?.where?.id;
+        const gt = typeof id === "object" && typeof id.gt === "string" ? id.gt : undefined;
         const requireTopics = Boolean(args?.where?.topics);
         const matched = allIds
           .filter((id) => (requireTopics ? topicsByProject.has(id) : true))
@@ -140,13 +145,13 @@ const fakeDbStub = ({
       },
     },
     topic: {
-      findMany: async (args: { where: { projectId: string } }) => {
+      findMany: async (args?: Prisma.TopicFindManyArgs) => {
         await guard(modelParams("Topic", "findMany", args));
-        return topicsByProject.get(args.where.projectId) ?? [];
+        return topicsByProject.get(stringOf(args?.where?.projectId)) ?? [];
       },
     },
     topicModelProjection: topicModelProjectionMock(ownedProjectIds),
-  } as unknown as PrismaClient;
+  });
 
   return { prisma };
 };

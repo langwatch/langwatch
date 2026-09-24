@@ -4,6 +4,8 @@ import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
 import { describe, expect, it } from "vitest";
@@ -21,20 +23,16 @@ import {
  * database; every read here answers "not found".
  */
 function fakeUserPrisma(): PrismaClient {
-  return {
+  return prismaDouble({
     organizationUser: { findFirst: async () => null },
     organization: { findUnique: async () => null },
     project: { findFirst: async () => null },
-  } as unknown as PrismaClient;
+  });
 }
 
 /** The fixed-window counter's own three calls, faked to always allow. */
 function fakeUserRedis(): RedisConnection {
-  return {
-    incr: async () => 1,
-    expire: async () => undefined,
-    ttl: async () => -1,
-  } as unknown as RedisConnection;
+  return redisDouble({ incr: async () => 1, expire: async () => 1, ttl: async () => -1 });
 }
 
 function process(role: "api" | "worker") {

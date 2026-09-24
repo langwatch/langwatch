@@ -1,4 +1,5 @@
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
+import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prices = {
@@ -47,18 +48,13 @@ const makeStripeSubscription = ({
   items: { data: priceIds.map((id) => ({ price: { id } })) },
 });
 
-const makeStripe = (subscription: unknown) =>
-  ({
-    subscriptions: {
-      retrieve: vi.fn().mockResolvedValue(subscription),
-      update: vi.fn().mockResolvedValue({}),
-    },
-  }) as unknown as Stripe & {
-    subscriptions: {
-      retrieve: ReturnType<typeof vi.fn>;
-      update: ReturnType<typeof vi.fn>;
-    };
-  };
+const makeStripe = (subscription: unknown) => {
+  const update = vi.fn().mockResolvedValue({});
+  const stripe = stripeDouble({
+    subscriptions: { retrieve: vi.fn().mockResolvedValue(subscription), update },
+  });
+  return { stripe, update };
+};
 
 describe("applyThreshold", () => {
   beforeEach(() => {
@@ -68,7 +64,7 @@ describe("applyThreshold", () => {
   describe("given a subscription carrying an annual events price", () => {
     /** @scenario An annual subscription gets a billing threshold after checkout completes */
     it("updates the subscription with the threshold, without moving the anchor", async () => {
-      const stripe = makeStripe(
+      const { stripe, update: stripeUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
         }),
@@ -80,7 +76,7 @@ describe("applyThreshold", () => {
       });
 
       expect(result).toBe("applied");
-      expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+      expect(stripeUpdate).toHaveBeenCalledWith("sub_stripe_1", {
         billing_thresholds: {
           amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD,
           reset_billing_cycle_anchor: false,
@@ -89,7 +85,7 @@ describe("applyThreshold", () => {
     });
 
     it("applies to grandfathered pre-March-2026 annual events prices", async () => {
-      const stripe = makeStripe(
+      const { stripe, update: stripeUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_eur_annual", "price_events_eur_annual_until_mar_2026"],
         }),
@@ -101,14 +97,14 @@ describe("applyThreshold", () => {
       });
 
       expect(result).toBe("applied");
-      expect(stripe.subscriptions.update).toHaveBeenCalled();
+      expect(stripeUpdate).toHaveBeenCalled();
     });
   });
 
   describe("given the threshold is already set", () => {
     /** @scenario Applying the threshold twice is a no-op */
     it("makes no update call", async () => {
-      const stripe = makeStripe(
+      const { stripe, update: stripeUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
           billingThresholds: { amount_gte: ANNUAL_EVENTS_BILLING_THRESHOLD },
@@ -121,14 +117,14 @@ describe("applyThreshold", () => {
       });
 
       expect(result).toBe("already_set");
-      expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+      expect(stripeUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("given a threshold set by hand to a different amount", () => {
     /** @scenario A manually configured threshold amount is never replaced */
     it("preserves the existing amount and makes no update call", async () => {
-      const stripe = makeStripe(
+      const { stripe, update: stripeUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
           billingThresholds: { amount_gte: 120_000 },
@@ -141,14 +137,14 @@ describe("applyThreshold", () => {
       });
 
       expect(result).toBe("already_set");
-      expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+      expect(stripeUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("given a threshold that resets the billing cycle anchor", () => {
     /** @scenario A threshold configured to move the billing anniversary is corrected */
     it("pins the anchor while keeping the existing amount", async () => {
-      const stripe = makeStripe(
+      const { stripe, update: stripeUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
           billingThresholds: {
@@ -164,7 +160,7 @@ describe("applyThreshold", () => {
       });
 
       expect(result).toBe("anchor_pinned");
-      expect(stripe.subscriptions.update).toHaveBeenCalledWith("sub_stripe_1", {
+      expect(stripeUpdate).toHaveBeenCalledWith("sub_stripe_1", {
         billing_thresholds: {
           amount_gte: 120_000,
           reset_billing_cycle_anchor: false,
@@ -173,7 +169,7 @@ describe("applyThreshold", () => {
     });
 
     it("reports without updating in dry-run mode", async () => {
-      const stripe = makeStripe(
+      const { stripe, update: stripeUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
           billingThresholds: {
@@ -190,18 +186,20 @@ describe("applyThreshold", () => {
       });
 
       expect(result).toBe("anchor_pinned");
-      expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+      expect(stripeUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("given a subscription with no annual events price", () => {
     it("skips monthly and non-Growth subscriptions untouched", async () => {
-      const monthly = makeStripe(
+      const { stripe: monthly, update: monthlyUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_monthly", "price_events_usd_monthly"],
         }),
       );
-      const nonGrowth = makeStripe(makeStripeSubscription({ priceIds: ["price_something_else"] }));
+      const { stripe: nonGrowth, update: nonGrowthUpdate } = makeStripe(
+        makeStripeSubscription({ priceIds: ["price_something_else"] }),
+      );
 
       await expect(
         applyThreshold({
@@ -216,14 +214,14 @@ describe("applyThreshold", () => {
         }),
       ).resolves.toBe("not_annual_events");
 
-      expect(monthly.subscriptions.update).not.toHaveBeenCalled();
-      expect(nonGrowth.subscriptions.update).not.toHaveBeenCalled();
+      expect(monthlyUpdate).not.toHaveBeenCalled();
+      expect(nonGrowthUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("given dry-run mode", () => {
     it("reports applied without calling Stripe", async () => {
-      const stripe = makeStripe(
+      const { stripe, update: stripeUpdate } = makeStripe(
         makeStripeSubscription({
           priceIds: ["price_seat_usd_annual", "price_events_usd_annual"],
         }),
@@ -236,7 +234,7 @@ describe("applyThreshold", () => {
       });
 
       expect(result).toBe("applied");
-      expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+      expect(stripeUpdate).not.toHaveBeenCalled();
     });
   });
 });

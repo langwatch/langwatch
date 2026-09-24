@@ -4,29 +4,17 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * SuiteApp reads `publicBaseUrl` off the process's own member.
  * @vitest-environment node
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { SuiteApp } from "../suite.app.ts";
 import { createSuiteTestRepositories } from "./suite.fixture.ts";
-
-/** Never reached: this test names no run and reads no run history. */
-function unreachableClickHouse(): ClickHouseQueryClient {
-  return new Proxy(
-    {},
-    {
-      get(_target, property) {
-        throw new Error(`This test did not expect to reach ClickHouse.${String(property)}`);
-      },
-    },
-  ) as unknown as ClickHouseQueryClient;
-}
 
 function buildProductionApp(
   publicBaseUrl: string | undefined,
@@ -43,7 +31,7 @@ function buildProductionApp(
       }),
       retention,
     },
-    members: { clickhouse: unreachableClickHouse(), publicBaseUrl, redis: null },
+    members: { clickhouse: clickHouseQueryClientDouble(), publicBaseUrl, redis: null },
     config: undefined,
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

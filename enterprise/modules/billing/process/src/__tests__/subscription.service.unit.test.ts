@@ -1,4 +1,5 @@
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
+import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,7 +97,7 @@ const createServiceWithSeatEventFns = ({
   BillingSubscriptionService.create({
     repository: repository as unknown as BillingSubscription,
     organizationRepository: orgRepo as unknown as BillingAccountFactsRepository,
-    stripe: stripeInstance as unknown as Stripe,
+    stripe: stripeDouble(stripeInstance),
     itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
     seatEventService,
     notifier: createMockNotifier(),
@@ -117,7 +118,7 @@ describe("BillingSubscriptionService", () => {
         repository: createMockRepository() as unknown as BillingSubscription,
         organizationRepository:
           createMockOrganizationRepository() as unknown as BillingAccountFactsRepository,
-        stripe: createMockStripe() as unknown as Stripe,
+        stripe: stripeDouble(createMockStripe()),
         itemCalculator: createMockItemCalculator() as unknown as SubscriptionItemCalculatorService,
         notifier: createMockNotifier(),
         stripeErrors: StripeErrorTranslatorService.create(),
@@ -140,7 +141,7 @@ describe("BillingSubscriptionService", () => {
     service = BillingSubscriptionService.create({
       repository: repository as unknown as BillingSubscription,
       organizationRepository: organizationRepository as unknown as BillingAccountFactsRepository,
-      stripe: stripe as unknown as Stripe,
+      stripe: stripeDouble(stripe),
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,
       notifier: createMockNotifier(),
       stripeErrors: StripeErrorTranslatorService.create(),

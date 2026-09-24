@@ -105,16 +105,16 @@ function makeClickHouseStub(maxOccurredAtMsByProject: Record<string, number | nu
   callsByProject: Record<string, number>;
 } {
   const callsByProject: Record<string, number> = {};
-  const client = {
-    query: vi.fn(async (params: { query_params: { tenantId: string } }) => {
-      const projectId = params.query_params.tenantId;
+  const client: ClickHouseClient = {
+    query: vi.fn(async (params: Parameters<ClickHouseClient["query"]>[0]) => {
+      const projectId = String(params.query_params.tenantId);
       callsByProject[projectId] = (callsByProject[projectId] ?? 0) + 1;
       const ms = maxOccurredAtMsByProject[projectId];
       return {
         json: async () => [{ lastMs: ms ?? null }],
       };
     }),
-  } as unknown as ClickHouseClient;
+  };
   return { client, callsByProject };
 }
 

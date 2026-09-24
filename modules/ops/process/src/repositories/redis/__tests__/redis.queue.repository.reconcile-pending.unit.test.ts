@@ -1,3 +1,4 @@
+import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import type { Redis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,13 +13,14 @@ const SINGLE_FLIGHT_WINDOW_MS = 55_000;
 const LEASE_MS = 30_000;
 
 /**
- * Minimal in-memory stand-in for the Redis commands a reconcile pass issues.
+ * The reconcile pass over a memory Redis, with the three cached scripts modelled and hooks
+ * a test uses to disturb the pass between its phases.
  */
-class FakeRedis {
-  readonly strings = new Map<string, string>();
-  readonly expiries = new Map<string, number>();
-  readonly zsets = new Map<string, string[]>();
-  readonly sets = new Map<string, string[]>();
+class ReconcileScene {
+  readonly store = memoryRedisStore();
+  readonly strings = this.store.strings;
+  readonly expiries = this.store.expiries;
+  private readonly plain = memoryRedisDouble({ store: this.store });
 
   /** ZCARD keys whose pipeline entry resolves to an error instead of a count. */
   readonly failingZcardKeys = new Set<string>();
@@ -29,41 +31,15 @@ class FakeRedis {
   /** Runs between the last lease re-arm and the fenced counter write. */
   onBeforeFencedWrite: (() => void) | null = null;
 
-  /**
-   * Ordered log of lease re-arms and ZCARD batches, so a test can tell which
-   * phase of the pass a re-arm belongs to.
-   */
+  /** Runs after every `sadd`, so a test can disturb a multi-batch adoption. */
+  onSadd: (() => void) | null = null;
+
+  /** How many SADD batches adoption issued, to show when it stopped. */
+  saddBatches = 0;
+
+  /** Ordered log of lease re-arms and ZCARD batches, to tell a re-arm's phase. */
   readonly events: ("lease-refresh" | "zcard-batch")[] = [];
 
-  /**
-   * Keyspace SCAN over the jobs keys the fake holds, paged like the real one.
-   * Matches on key existence, so it finds a group whatever index it is in.
-   */
-  readonly scan = vi.fn(
-    // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional scan signature
-    async (
-      cursor: string,
-      _match: "MATCH",
-      pattern: string,
-      _count: "COUNT",
-      count: number,
-    ): Promise<[string, string[]]> => {
-      const re = new RegExp(
-        `^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`,
-      );
-      // Redis drops a collection when its last member goes, so a drained group
-      // has no key for SCAN to return. Modelling that matters here: it is what
-      // stops the sweep treating an empty group as something to adopt.
-      const keys = [...this.zsets.entries()]
-        .filter(([k, members]) => members.length > 0 && re.test(k))
-        .map(([k]) => k)
-        .toSorted();
-      const offset = Number(cursor);
-      const page = keys.slice(offset, offset + count);
-      const next = offset + page.length;
-      return [next >= keys.length ? "0" : String(next), page];
-    },
-  );
   readonly evalshaCalls: {
     key: string;
     token: string;
@@ -72,95 +48,56 @@ class FakeRedis {
     isHeldByCaller: boolean;
   }[] = [];
 
-  async set(key: string, value: string, ...options: (string | number)[]): Promise<string | null> {
-    if (options.includes("NX") && this.strings.has(key)) return null;
-    this.strings.set(key, value);
-    const pxIndex = options.indexOf("PX");
-    if (pxIndex >= 0) {
-      this.expiries.set(key, Number(options[pxIndex + 1]));
-    }
-    return "OK";
-  }
+  readonly scan = vi.fn(
+    // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional scan signature
+    async (cursor: unknown, _match: unknown, pattern: unknown, _count: unknown, size: unknown) =>
+      this.plain.scan(String(cursor), "MATCH", String(pattern), "COUNT", Number(size)),
+  );
 
-  async get(key: string): Promise<string | null> {
-    return this.strings.get(key) ?? null;
-  }
-
-  /** Runs after every `sadd`, so a test can disturb a multi-batch adoption. */
-  onSadd: (() => void) | null = null;
-
-  /** How many SADD batches adoption issued, to show when it stopped. */
-  saddBatches = 0;
-
-  async sadd(key: string, ...members: string[]): Promise<number> {
-    const existing = this.sets.get(key) ?? [];
-    let added = 0;
-    for (const member of members) {
-      if (existing.includes(member)) continue;
-      existing.push(member);
-      added += 1;
-    }
-    this.sets.set(key, existing);
-    this.saddBatches += 1;
-    this.onSadd?.();
-    return added;
-  }
-
-  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional zscan signature
-  async zscan(
-    key: string,
-    cursor: string,
-    _count: "COUNT",
-    count: number,
-  ): Promise<[string, string[]]> {
-    const members = this.zsets.get(key) ?? [];
-    const [nextCursor, page] = this.page(members, cursor, count);
-    // A ZSCAN page alternates [member, score, member, score, ...].
-    return [nextCursor, page.flatMap((member) => [member, "1"])];
-  }
-
-  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional sscan signature
-  async sscan(
-    key: string,
-    cursor: string,
-    _count: "COUNT",
-    count: number,
-  ): Promise<[string, string[]]> {
-    return this.page(this.sets.get(key) ?? [], cursor, count);
-  }
-
-  private page(members: string[], cursor: string, count: number): [string, string[]] {
-    const offset = Number(cursor);
-    const page = members.slice(offset, offset + count);
-    const next = offset + page.length;
-    return [next >= members.length ? "0" : String(next), page];
-  }
-
-  pipeline() {
-    const keys: string[] = [];
-    const pipeline = {
-      zcard: (key: string) => {
-        keys.push(key);
-        return pipeline;
+  private readonly zcardRedis = memoryRedisDouble({
+    store: this.store,
+    script: {
+      zcard: async (key) => {
+        if (this.failingZcardKeys.has(String(key))) throw new Error("ZCARD failed");
+        return this.plain.zcard(key);
       },
-      exec: async (): Promise<[Error | null, unknown][]> => {
-        const results = keys.map((key): [Error | null, unknown] =>
-          this.failingZcardKeys.has(key)
-            ? [new Error("ZCARD failed"), null]
-            : [null, (this.zsets.get(key) ?? []).length],
-        );
-        this.events.push("zcard-batch");
-        this.onPipelineExec?.();
-        return results;
+    },
+  });
+
+  asRedis(): Redis {
+    return memoryRedisDouble({
+      store: this.store,
+      script: {
+        scan: this.scan,
+        sadd: async (key: unknown, ...members: unknown[]) => {
+          const added = await this.plain.sadd(String(key), ...members.flat().map(String));
+          this.saddBatches += 1;
+          this.onSadd?.();
+          return added;
+        },
+        pipeline: () => {
+          const batch = this.zcardRedis.pipeline();
+          const chain = {
+            zcard: (key: string) => {
+              batch.zcard(key);
+              return chain;
+            },
+            exec: async () => {
+              const results = await batch.exec();
+              this.events.push("zcard-batch");
+              this.onPipelineExec?.();
+              return results;
+            },
+          };
+          return chain;
+        },
+        evalsha: async (_sha: unknown, numKeys: unknown, key: unknown, ...rest: unknown[]) =>
+          this.evalsha({ numKeys: Number(numKeys), key: String(key), rest: rest.map(String) }),
       },
-    };
-    return pipeline;
+    });
   }
 
-  /**
-   * Replace the marker as another instance would: a different token, so the
-   * holder's compare-and-set no longer matches.
-   */
+  /** Replace the marker as another instance would, so the holder's compare-and-set misses. */
   stealMarker(key: string): void {
     this.strings.set(key, "other-instance-token");
   }
@@ -171,78 +108,18 @@ class FakeRedis {
     this.expiries.delete(key);
   }
 
-  /**
-   * Models the three cached scripts: fenced counter write and marker re-arm both act on the
-   * marker (separated by arity), while prune acts on the pending index.
-   */
-  // biome-ignore lint/complexity/useMaxParams: mirrors ioredis's positional evalsha signature
-  async evalsha(
-    _sha: string,
-    numKeys: number,
-    key: string,
-    ...rest: (string | number)[]
-  ): Promise<number> {
-    if (key.endsWith("pending-groups")) {
-      return this.applyPrune(key, rest as string[]);
-    }
-    // Three keys is the fenced write (marker, counter, drift); the marker re-arm
-    // takes one. Keyed on the script's own arity rather than on the argument
-    // count, so adding an argument to either does not silently reroute it here.
-    if (numKeys === 3) {
-      // Fires in the one window the fence exists for: after the last lease
-      // re-arm succeeded, before the write lands.
-      this.onBeforeFencedWrite?.();
-      const [counterKey, driftKey, token, value, drift] = rest as [
-        string,
-        string,
-        string,
-        string,
-        string,
-      ];
-      if (this.strings.get(key) !== token) return 0;
-      this.strings.set(counterKey, String(value));
-      this.strings.set(driftKey, String(drift));
-      return 1;
-    }
-    const [token, ttlMs] = rest as [string, number];
-    return this.applyMarkerTtl(key, token, Number(ttlMs));
+  /** Holds `members` as a jobs zset, each at score 1; an empty list drops the key. */
+  seedZset(key: string, members: string[]): void {
+    if (members.length === 0) this.store.sortedSets.delete(key);
+    else this.store.sortedSets.set(key, new Map(members.map((member) => [member, 1])));
   }
 
-  /** SREM each id whose jobs zset re-reads as empty, atomically per the script. */
-  private applyPrune(indexKey: string, args: string[]): number {
-    const members = this.sets.get(indexKey) ?? [];
-    let pruned = 0;
-    for (let i = 0; i < args.length; i += 2) {
-      const groupId = args[i]!;
-      const jobsKey = args[i + 1]!;
-      if ((this.zsets.get(jobsKey) ?? []).length > 0) continue;
-      const at = members.indexOf(groupId);
-      if (at >= 0) {
-        members.splice(at, 1);
-        pruned += 1;
-      }
-    }
-    this.sets.set(indexKey, members);
-    return pruned;
+  seedSet(key: string, members: string[]): void {
+    this.store.sets.set(key, new Set(members));
   }
 
-  private applyMarkerTtl(key: string, token: string, ttlMs: number): number {
-    const isHeldByCaller = this.strings.get(key) === token;
-    this.evalshaCalls.push({
-      key,
-      token,
-      ttlMs: Number(ttlMs),
-      isHeldByCaller,
-    });
-    if (Number(ttlMs) === LEASE_MS) this.events.push("lease-refresh");
-    if (!isHeldByCaller) return 0;
-    if (Number(ttlMs) <= 0) {
-      this.strings.delete(key);
-      this.expiries.delete(key);
-      return 1;
-    }
-    this.expiries.set(key, Number(ttlMs));
-    return 1;
+  setMembers(key: string): string[] {
+    return [...(this.store.sets.get(key) ?? [])];
   }
 
   /** Seeds a group with `jobCount` staged jobs, indexed under `index`. */
@@ -253,27 +130,66 @@ class FakeRedis {
     indexType: "zset" | "set";
   }): void {
     const jobs = Array.from({ length: params.jobCount }, (_, i) => `${params.groupId}-job-${i}`);
-    this.zsets.set(`${PREFIX}group:${params.groupId}:jobs`, jobs);
-    const container =
-      params.indexType === "zset"
-        ? (this.zsets.get(params.index) ?? [])
-        : (this.sets.get(params.index) ?? []);
-    container.push(params.groupId);
-    if (params.indexType === "zset") this.zsets.set(params.index, container);
-    else this.sets.set(params.index, container);
+    this.seedZset(`${PREFIX}group:${params.groupId}:jobs`, jobs);
+    if (params.indexType === "zset") {
+      const index = this.store.sortedSets.get(params.index) ?? new Map<string, number>();
+      this.store.sortedSets.set(params.index, index.set(params.groupId, 1));
+    } else {
+      const index = this.store.sets.get(params.index) ?? new Set<string>();
+      this.store.sets.set(params.index, index.add(params.groupId));
+    }
   }
 
-  asRedis(): Redis {
-    return this as unknown as Redis;
+  /** Fenced write takes three keys and re-arm one, keyed on arity; prune acts on the index. */
+  private evalsha({ numKeys, key, rest }: { numKeys: number; key: string; rest: string[] }) {
+    if (key.endsWith("pending-groups")) return this.applyPrune(key, rest);
+    if (numKeys === 3) {
+      this.onBeforeFencedWrite?.();
+      const [counterKey = "", driftKey = "", token, value, drift] = rest;
+      if (this.strings.get(key) !== token) return 0;
+      this.strings.set(counterKey, String(value));
+      this.strings.set(driftKey, String(drift));
+      return 1;
+    }
+    const [token = "", ttlMs] = rest;
+    return this.applyMarkerTtl(key, token, Number(ttlMs));
+  }
+
+  /** SREM each id whose jobs zset re-reads as empty, atomically per the script. */
+  private applyPrune(indexKey: string, args: string[]): number {
+    const members = this.store.sets.get(indexKey) ?? new Set<string>();
+    let pruned = 0;
+    for (let i = 0; i < args.length; i += 2) {
+      const groupId = args[i]!;
+      const jobsKey = args[i + 1]!;
+      const jobs = this.store.sortedSets.get(jobsKey);
+      if (jobs && jobs.size > 0) continue;
+      if (members.delete(groupId)) pruned += 1;
+    }
+    if (members.size === 0) this.store.sets.delete(indexKey);
+    return pruned;
+  }
+
+  private applyMarkerTtl(key: string, token: string, ttlMs: number): number {
+    const isHeldByCaller = this.strings.get(key) === token;
+    this.evalshaCalls.push({ key, token, ttlMs, isHeldByCaller });
+    if (ttlMs === LEASE_MS) this.events.push("lease-refresh");
+    if (!isHeldByCaller) return 0;
+    if (ttlMs <= 0) {
+      this.expireKey(key);
+      return 1;
+    }
+    this.expiries.set(key, ttlMs);
+    return 1;
   }
 }
 
 describe("QueueRedisRepository.tryReconcileTotalPending", () => {
-  let redis: FakeRedis;
+  let redis: ReconcileScene;
   let repo: QueueRedisRepository;
 
   beforeEach(() => {
-    redis = new FakeRedis();
+    redis = new ReconcileScene();
     repo = QueueRedisRepository.create({ redis: redis.asRedis() });
   });
 
@@ -291,7 +207,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         index: `${PREFIX}blocked`,
         indexType: "set",
       });
-      redis.sets.set(`${PREFIX}parked-tenants`, ["tenant-b"]);
+      redis.seedSet(`${PREFIX}parked-tenants`, ["tenant-b"]);
       redis.seedGroup({
         groupId: "tenant-b/parked-group",
         jobCount: 4,
@@ -331,7 +247,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         index: `${PREFIX}ready`,
         indexType: "zset",
       });
-      redis.sets.set(`${PREFIX}blocked`, ["tenant-a/moving-group"]);
+      redis.seedSet(`${PREFIX}blocked`, ["tenant-a/moving-group"]);
     });
 
     describe("when reconcile runs", () => {
@@ -613,7 +529,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         expect(result?.groundTruth).toBe(4);
         // Adopted on first sight, so later passes no longer depend on reading the
         // lifecycle indexes in sequence to find it.
-        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain("tenant-a/legacy");
+        expect(redis.setMembers(`${PREFIX}pending-groups`)).toContain("tenant-a/legacy");
       });
     });
   });
@@ -624,7 +540,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
       // pending index nowhere, and in no lifecycle index at the moment each of
       // those is read — unblocked into an already-scanned `ready` before
       // `blocked` was reached.
-      redis.zsets.set(`${PREFIX}group:tenant-a/mover:jobs`, ["j1", "j2", "j3", "j4", "j5"]);
+      redis.seedZset(`${PREFIX}group:tenant-a/mover:jobs`, ["j1", "j2", "j3", "j4", "j5"]);
       redis.strings.set(COUNTER_KEY, "0");
     });
 
@@ -634,7 +550,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
 
         expect(result?.groundTruth).toBe(5);
-        expect(redis.sets.get(`${PREFIX}pending-groups`)).toContain("tenant-a/mover");
+        expect(redis.setMembers(`${PREFIX}pending-groups`)).toContain("tenant-a/mover");
       });
     });
   });
@@ -718,7 +634,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
         // Arrives after the first sweep, indexed nowhere: the state a pod on the
         // previous release leaves behind mid-rollout.
-        redis.zsets.set(`${PREFIX}group:tenant-a/late:jobs`, ["j1"]);
+        redis.seedZset(`${PREFIX}group:tenant-a/late:jobs`, ["j1"]);
         vi.advanceTimersByTime(BACKSTOP_MS + 1);
         await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
         const afterAdoptingSweep = redis.scan.mock.calls.length;
@@ -737,8 +653,8 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         // Listed in ready with no jobs: adopted, pruned for being empty, and
         // found again next pass. Counting it as an adoption would answer
         // "sweep again" forever.
-        redis.zsets.set(`${PREFIX}ready`, ["tenant-a/drained"]);
-        redis.zsets.set(`${PREFIX}group:tenant-a/drained:jobs`, []);
+        redis.seedZset(`${PREFIX}ready`, ["tenant-a/drained"]);
+        redis.seedZset(`${PREFIX}group:tenant-a/drained:jobs`, []);
 
         await repo.tryReconcileTotalPending(QUEUE_NAME, 0);
         const afterFirstSweep = redis.scan.mock.calls.length;
@@ -783,8 +699,8 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
 
   describe("given a group in the pending index whose jobs have drained", () => {
     beforeEach(() => {
-      redis.sets.set(`${PREFIX}pending-groups`, ["tenant-a/drained"]);
-      redis.zsets.set(`${PREFIX}group:tenant-a/drained:jobs`, []);
+      redis.seedSet(`${PREFIX}pending-groups`, ["tenant-a/drained"]);
+      redis.seedZset(`${PREFIX}group:tenant-a/drained:jobs`, []);
       redis.strings.set(COUNTER_KEY, "3");
     });
 
@@ -793,7 +709,7 @@ describe("QueueRedisRepository.tryReconcileTotalPending", () => {
         const result = await repo.tryReconcileTotalPending(QUEUE_NAME);
 
         expect(result?.groundTruth).toBe(0);
-        expect(redis.sets.get(`${PREFIX}pending-groups`)).toEqual([]);
+        expect(redis.setMembers(`${PREFIX}pending-groups`)).toEqual([]);
       });
     });
   });
