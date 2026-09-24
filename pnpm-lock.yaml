@@ -12149,6 +12149,9 @@ importers:
       '@langwatch/suite-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
       '@tanstack/react-virtual':
         specifier: 'catalog:'
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -15067,6 +15070,9 @@ importers:
 
   packages/observability:
     dependencies:
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1

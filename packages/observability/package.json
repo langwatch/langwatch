@@ -59,6 +59,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/exporter-metrics-otlp-http": "0.221.0",
     "@opentelemetry/host-metrics": "^0.39.0",

@@ -25,6 +25,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@tanstack/react-virtual": "catalog:",
     "lucide-react": "catalog:",
     "react-feather": "catalog:",

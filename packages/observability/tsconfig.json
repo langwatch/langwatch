@@ -17,6 +17,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
       "path": "../vitest-config/tsconfig.build.json"
     }
   ]
