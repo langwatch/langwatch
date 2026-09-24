@@ -15,7 +15,7 @@ export interface AnalyticsHeaderProps {
   onTitleSave?: (newTitle: string) => void;
   extraHeaderButtons?: React.ReactNode;
   /** Hide the filter toggle for a page that binds no filters (only a period). */
-  hideFilterToggle?: boolean;
+  shouldHideFilterToggle?: boolean;
 }
 
 export function AnalyticsHeader({
@@ -23,7 +23,7 @@ export function AnalyticsHeader({
   isEditable,
   onTitleSave,
   extraHeaderButtons,
-  hideFilterToggle = false,
+  shouldHideFilterToggle = false,
 }: AnalyticsHeaderProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -102,7 +102,7 @@ export function AnalyticsHeader({
       )}
       <Spacer />
       <HStack gap={2}>
-        {!hideFilterToggle && <FilterToggle />}
+        {!shouldHideFilterToggle && <FilterToggle />}
         <PeriodSelector
           period={{ startDate, endDate }}
           mode={mode}

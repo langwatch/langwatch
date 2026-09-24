@@ -39,10 +39,10 @@ export default function AnalyticsV2Page() {
   return (
     <GraphsLayout
       title="Analytics v2"
-      analyticsHeaderProps={{ hideFilterToggle: true }}
+      analyticsHeaderProps={{ shouldHideFilterToggle: true }}
     >
       {!project || !organization || isLoading ? (
-        <Center paddingY={16} width="full">
+        <Center paddingY={16} width="full" data-testid="analytics-v2-loading">
           <Spinner />
         </Center>
       ) : isError ? (

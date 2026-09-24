@@ -178,7 +178,7 @@ describe("Top Topics widget", () => {
       }
     });
 
-    /** @scenario "A period with no traces shows an empty state, not an error" */
+    /** @scenario "Headline numbers match the legacy analytics for the same period" */
     it("filters no widget SQL on TotalDurationMs > 0 (legacy applies no duration filter, AC5 parity)", () => {
       for (const widget of ANALYTICS_V2_WIDGETS) {
         for (const query of widget.definition.queries) {

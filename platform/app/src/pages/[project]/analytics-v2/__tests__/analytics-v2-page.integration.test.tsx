@@ -188,6 +188,7 @@ describe("the Analytics v2 page", () => {
       const { default: AnalyticsV2Page } = await import("../index");
       render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
+      expect(screen.getByTestId("analytics-v2-loading")).toBeInTheDocument();
       expect(
         screen.queryByTestId("analytics-v2-lwql-disabled"),
       ).not.toBeInTheDocument();
