@@ -47,7 +47,7 @@ function makeService({
   return LangyUiActionService.create({
     redis,
     conversations: {
-      findByIdVisible: async () => ({ currentTurnId: IDS.turnId }),
+      getById: async () => ({ currentTurnId: IDS.turnId }),
     },
     buffer: {
       appendUiAction: async ({ actionId }) => {
@@ -94,7 +94,6 @@ describe("LangyUiActionService against real Redis", () => {
       ...IDS,
       kind: "workbench.duplicateTarget",
       payload: { targetId: "t1" },
-      notFound: () => new Error("not-found"),
     });
 
     // The page's side, racing the dispatch's blocking wait.
@@ -134,7 +133,6 @@ describe("LangyUiActionService against real Redis", () => {
         ...IDS,
         kind: "workbench.duplicateTarget",
         payload: { targetId: "t1" },
-        notFound: () => new Error("not-found"),
       })
       .catch((error: unknown) => error);
 
@@ -183,7 +181,6 @@ describe("LangyUiActionService against real Redis", () => {
       kind: "workbench.duplicateTarget",
       payload: { targetId: "t1" },
       experimentSlug: "my-exp",
-      notFound: () => new Error("not-found"),
     });
 
     expect(outcome).toMatchObject({

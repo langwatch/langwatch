@@ -1,4 +1,5 @@
 import { createTenantId, REHYDRATION_WINDOW_MS } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 import {
   cursorHasReachedEvent,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
@@ -80,11 +81,14 @@ export class LangyConversationReadService {
     userId: string;
   }) {
     for (let attempt = 0; attempt <= DISPATCH_LAG_ATTEMPTS; attempt++) {
-      const row = await this.deps.repository.tryFindVisibleById({
-        id,
-        projectId,
-        userId,
-      });
+      const row = await this.deps.repository
+        .getVisibleById({ id, projectId, userId })
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "langy_conversation_not_found") {
+            return null;
+          }
+          throw error;
+        });
       if (row) {
         return row;
       }

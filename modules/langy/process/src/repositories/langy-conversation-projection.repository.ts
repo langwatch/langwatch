@@ -1,4 +1,4 @@
-import type { LangyUsageCount } from "@langwatch/langy-contract";
+import { LangyConversationNotFoundError, type LangyUsageCount } from "@langwatch/langy-contract";
 
 export interface LangyConversationRow {
   id: string;
@@ -30,6 +30,12 @@ export interface LangyConversationRow {
   eventCursor?: { acceptedAt: number; eventId: string } | null;
 }
 
+/** The resume columns of one conversation's projection row; null columns are data, not absence. */
+export interface LangyConversationResumeState {
+  pendingHandoff: { token: string; turnId: string } | null;
+  runToken: string | null;
+}
+
 /** Stable keyset cursor for the recent-conversations ordering. */
 export interface LangyConversationListCursor {
   lastActivityAtMs: number | null;
@@ -44,11 +50,12 @@ export abstract class LangyConversationRepository {
     since?: number;
   }): Promise<LangyUsageCount>;
 
-  abstract tryFindVisibleById(params: {
+  /** Throws `LangyConversationNotFoundError` when missing, archived or not visible to the user. */
+  abstract getVisibleById(params: {
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<LangyConversationRow | null>;
+  }): Promise<LangyConversationRow>;
 
   abstract findOwnership(params: {
     id: string;
@@ -66,15 +73,11 @@ export abstract class LangyConversationRepository {
 
   abstract findActiveOwnedIds(params: { projectId: string; userId: string }): Promise<string[]>;
 
-  abstract tryFindPendingHandoff(params: {
+  /** Throws `LangyConversationNotFoundError` when the conversation is missing or archived. */
+  abstract getResumeState(params: {
     projectId: string;
     conversationId: string;
-  }): Promise<{ token: string; turnId: string } | null>;
-
-  abstract tryFindRunToken(params: {
-    projectId: string;
-    conversationId: string;
-  }): Promise<string | null>;
+  }): Promise<LangyConversationResumeState>;
 
   /**
    * True when this user has sent a turn on this conversation: a turn receipt
@@ -101,8 +104,8 @@ export class NullLangyConversationRepository extends LangyConversationRepository
     return { turns: 0, activeUsers: 0 };
   }
 
-  async tryFindVisibleById(): Promise<null> {
-    return null;
+  async getVisibleById({ id }: { id: string }): Promise<LangyConversationRow> {
+    throw new LangyConversationNotFoundError(id);
   }
 
   async findOwnership(): Promise<"missing"> {
@@ -117,12 +120,12 @@ export class NullLangyConversationRepository extends LangyConversationRepository
     return [];
   }
 
-  async tryFindPendingHandoff(): Promise<null> {
-    return null;
-  }
-
-  async tryFindRunToken(): Promise<null> {
-    return null;
+  async getResumeState({
+    conversationId,
+  }: {
+    conversationId: string;
+  }): Promise<LangyConversationResumeState> {
+    throw new LangyConversationNotFoundError(conversationId);
   }
 
   async hasAdmittedTurn(): Promise<boolean> {

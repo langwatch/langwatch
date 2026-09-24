@@ -1,3 +1,5 @@
+import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import {
@@ -22,15 +24,16 @@ export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
     );
   }
 
-  async tryFindProjectScope(projectId: string): Promise<{
+  async getProjectScope(projectId: string): Promise<{
     teamId: string;
     organizationId: string;
-  } | null> {
+  }> {
     const project = await this.database.project.findUnique({
       where: { id: projectId },
       select: { teamId: true, team: { select: { organizationId: true } } },
     });
-    if (!project?.team) return null;
+    if (!project?.team)
+      throw new ProjectNotFoundError("Project not found", { meta: { projectId } });
 
     return {
       teamId: project.teamId,
@@ -38,10 +41,7 @@ export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
     };
   }
 
-  async tryFindById(input: {
-    apiKeyId: string;
-    projectId: string;
-  }): Promise<LangySessionKeyRecord | null> {
+  async getById(input: { apiKeyId: string; projectId: string }): Promise<LangySessionKeyRecord> {
     const key = await this.database.apiKey.findUnique({
       where: { id: input.apiKeyId },
       select: {
@@ -55,7 +55,7 @@ export class PrismaLangySessionKeyRepository extends LangySessionKeyRepository {
         },
       },
     });
-    if (!key) return null;
+    if (!key) throw new ApiKeyNotFoundError(input.apiKeyId);
 
     return {
       id: key.id,

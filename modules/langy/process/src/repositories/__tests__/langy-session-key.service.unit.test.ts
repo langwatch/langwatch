@@ -1,4 +1,4 @@
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { ApiKeyNotFoundError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   type AuthzEffectivePermissionsInput,
   type AuthzEffectivePermissionsOutput,
@@ -23,11 +23,12 @@ class SessionKeyRepository extends LangySessionKeyRepository {
   readonly revocations: { apiKeyId: string; revokedAt: Instant }[] = [];
   readonly reaperCalls: { revokedAt: Instant; name: string }[] = [];
 
-  async tryFindProjectScope() {
+  async getProjectScope() {
     return { teamId: "team-1", organizationId: "organization-1" };
   }
 
-  async tryFindById(): Promise<LangySessionKeyRecord | null> {
+  async getById(input: { apiKeyId: string }): Promise<LangySessionKeyRecord> {
+    if (!this.key) throw new ApiKeyNotFoundError(input.apiKeyId);
     return this.key;
   }
 

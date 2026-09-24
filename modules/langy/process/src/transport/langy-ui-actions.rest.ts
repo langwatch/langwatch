@@ -15,7 +15,6 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   LangyApi,
   LangyApiRequestInvalidError,
-  LangyConversationNotFoundError,
   langyUiActionDispatchBodySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
@@ -148,7 +147,7 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
     const service = LangyUiActionService.create({
       redis,
       conversations: {
-        findByIdVisible: (args) => langy.tryFindVisible(args),
+        getById: (args) => langy.getById(args),
       },
       buffer: langy.repositories.tokenBuffer.open({ redis }),
       actions: members.actions(),
@@ -162,7 +161,6 @@ export const langyUiActionsRest = defineRestRouter(LangyApi)
       kind,
       payload: payload ?? {},
       ...(experimentSlug ? { experimentSlug } : {}),
-      notFound: () => new LangyConversationNotFoundError(conversationId),
     });
     return response.write({
       status: 200,

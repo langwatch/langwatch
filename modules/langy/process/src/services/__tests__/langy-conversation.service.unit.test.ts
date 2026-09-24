@@ -32,12 +32,11 @@ function makeRepo(
 ): LangyConversationRepository {
   const defaults: LangyConversationRepository = {
     countUsage: vi.fn(async () => ({ turns: 0, activeUsers: 0 })),
-    tryFindVisibleById: vi.fn(async () => null),
+    getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     findOwnership: vi.fn(async () => "missing" as const),
     findAllForUser: vi.fn(async () => []),
     findActiveOwnedIds: vi.fn(async () => []),
-    tryFindPendingHandoff: vi.fn(async () => null),
-    tryFindRunToken: vi.fn(async () => null),
+    getResumeState: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     hasAdmittedTurn: vi.fn(async () => false),
     turnExists: vi.fn(async () => false),
   };
@@ -97,13 +96,13 @@ describe("LangyConversationService", () => {
     it("getById waits out the projection lag and returns the row", async () => {
       vi.useFakeTimers();
       try {
-        const tryFindVisibleById = vi
+        const getVisibleById = vi
           .fn()
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce(null)
+          .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
+          .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
           .mockResolvedValue(row());
         const repo = makeRepo({
-          tryFindVisibleById,
+          getVisibleById,
           hasAdmittedTurn: vi.fn().mockResolvedValue(true),
         });
         const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
@@ -115,7 +114,7 @@ describe("LangyConversationService", () => {
         await vi.advanceTimersByTimeAsync(1_500);
         const detail = await pending;
         expect(detail.id).toBe("c1");
-        expect(tryFindVisibleById.mock.calls.length).toBeGreaterThanOrEqual(3);
+        expect(getVisibleById.mock.calls.length).toBeGreaterThanOrEqual(3);
       } finally {
         vi.useRealTimers();
       }
@@ -125,9 +124,9 @@ describe("LangyConversationService", () => {
     it("an unknown id still gives up quickly, without waiting out the window", async () => {
       vi.useFakeTimers();
       try {
-        const tryFindVisibleById = vi.fn().mockResolvedValue(null);
+        const getVisibleById = vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1"));
         const repo = makeRepo({
-          tryFindVisibleById,
+          getVisibleById,
           hasAdmittedTurn: vi.fn().mockResolvedValue(false),
         });
         const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
@@ -141,7 +140,7 @@ describe("LangyConversationService", () => {
         await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
         // A short grace, not the whole window: an id nobody is creating must
         // not pay the cost of one that is.
-        expect(tryFindVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+        expect(getVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
       } finally {
         vi.useRealTimers();
       }
@@ -154,13 +153,13 @@ describe("LangyConversationService", () => {
     it("waits when the receipt itself has not landed yet either", async () => {
       vi.useFakeTimers();
       try {
-        const tryFindVisibleById = vi
+        const getVisibleById = vi
           .fn()
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce(null)
+          .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
+          .mockRejectedValueOnce(new LangyConversationNotFoundError("c1"))
           .mockResolvedValue(row());
         const repo = makeRepo({
-          tryFindVisibleById,
+          getVisibleById,
           // Nothing to see on the first probe — the send is younger than
           // this read by a few milliseconds.
           hasAdmittedTurn: vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true),
@@ -183,7 +182,7 @@ describe("LangyConversationService", () => {
       vi.useFakeTimers();
       try {
         const repo = makeRepo({
-          tryFindVisibleById: vi.fn().mockResolvedValue(null),
+          getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
           hasAdmittedTurn: vi.fn().mockResolvedValue(true),
         });
         const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
@@ -208,7 +207,7 @@ describe("LangyConversationService", () => {
         // indistinguishable from one that does not exist, or the error becomes an
         // existence oracle across users.
         const repo = makeRepo({
-          tryFindVisibleById: vi.fn().mockResolvedValue(null),
+          getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
         });
         const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
         await expect(svc.getById({ id: "c1", projectId: "p1", userId: "alice" })).rejects.toThrow(
@@ -218,7 +217,7 @@ describe("LangyConversationService", () => {
 
       it("findByIdVisible returns null for the same case", async () => {
         const repo = makeRepo({
-          tryFindVisibleById: vi.fn().mockResolvedValue(null),
+          getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
         });
         const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
         expect(
@@ -237,7 +236,7 @@ describe("LangyConversationService", () => {
         // conversation" and "exists but not projected yet", and the stream routes
         // 404'd on the second because it looked like the first.
         const repo = makeRepo({
-          tryFindVisibleById: vi.fn().mockResolvedValue(null),
+          getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
         });
         const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
         await expect(svc.getById({ id: "c1", projectId: "p1", userId: "alice" })).rejects.toThrow(
@@ -250,7 +249,7 @@ describe("LangyConversationService", () => {
       /** @scenario "A shared conversation is visible to other project members" */
       it("returns the conversation to non-owners in the same project", async () => {
         const repo = makeRepo({
-          tryFindVisibleById: vi.fn().mockResolvedValue(row({ userId: "bob", isShared: true })),
+          getVisibleById: vi.fn().mockResolvedValue(row({ userId: "bob", isShared: true })),
         });
         const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
         const result = await svc.getById({
@@ -272,7 +271,7 @@ describe("LangyConversationService", () => {
     it("does not archive and returns false", async () => {
       const archiveConversation = vi.fn(async () => {});
       const repo = makeRepo({
-        tryFindVisibleById: vi.fn().mockResolvedValue(row({ userId: "bob", isShared: true })),
+        getVisibleById: vi.fn().mockResolvedValue(row({ userId: "bob", isShared: true })),
       });
       const svc = LangyConversationService.create({
         commands: makeCommands({ archiveConversation }),
@@ -293,7 +292,7 @@ describe("LangyConversationService", () => {
     it("dispatches an archive command and returns true", async () => {
       const archiveConversation = vi.fn(async () => {});
       const repo = makeRepo({
-        tryFindVisibleById: vi.fn().mockResolvedValue(row({ userId: "alice" })),
+        getVisibleById: vi.fn().mockResolvedValue(row({ userId: "alice" })),
       });
       const svc = LangyConversationService.create({
         commands: makeCommands({ archiveConversation }),
@@ -318,7 +317,7 @@ describe("LangyConversationService", () => {
       const archiveConversation = vi.fn(async () => {});
       const recordMessage = vi.fn(async () => {});
       const repo = makeRepo({
-        tryFindVisibleById: vi.fn().mockResolvedValue(row({ userId: "alice" })),
+        getVisibleById: vi.fn().mockResolvedValue(row({ userId: "alice" })),
       });
       const svc = LangyConversationService.create({
         commands: makeCommands({ updateConversationMetadata, archiveConversation, recordMessage }),
@@ -688,14 +687,14 @@ describe("LangyConversationService", () => {
 
     describe("when the next turn reads the pending handoff", () => {
       it("returns the token and turn threaded off the fold, then round-trips to consume", async () => {
-        const tryFindPendingHandoff = vi.fn(async () => ({
-          token: "opaque-resume-token",
-          turnId: "t1",
+        const getResumeState = vi.fn(async () => ({
+          pendingHandoff: { token: "opaque-resume-token", turnId: "t1" },
+          runToken: null,
         }));
         const consumeTurnHandoff = vi.fn(async () => {});
         const svc = LangyConversationService.create({
           commands: makeCommands({ consumeTurnHandoff }),
-          repository: makeRepo({ tryFindPendingHandoff }),
+          repository: makeRepo({ getResumeState }),
         });
 
         const pending = await svc.findPendingHandoff({
@@ -859,7 +858,7 @@ describe("LangyConversationService", () => {
 
     const visibleRepo = () =>
       makeRepo({
-        tryFindVisibleById: vi.fn().mockResolvedValue(row()),
+        getVisibleById: vi.fn().mockResolvedValue(row()),
       });
 
     const plainTurnEvent = (o: {
@@ -1245,7 +1244,7 @@ describe("LangyConversationService", () => {
     const serviceOver = (events: readonly unknown[]) =>
       LangyConversationService.create({
         commands: makeCommands(),
-        repository: makeRepo({ tryFindVisibleById: vi.fn().mockResolvedValue(row()) }),
+        repository: makeRepo({ getVisibleById: vi.fn().mockResolvedValue(row()) }),
         events: { getEventsOccurredSince: vi.fn(async () => events as never) },
       });
 

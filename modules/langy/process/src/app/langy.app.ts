@@ -409,19 +409,6 @@ export class LangyApp implements LangyApiContract {
   }
 
   /**
-   * The conversation, or null when it is not visible to this caller. Absence is a real answer
-   * here: a freshness poll of a just-started conversation runs before its fold is projected, so
-   * the throwing form would fail every first turn.
-   */
-  tryFindVisible(input: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<LangyConversationDetail | null> {
-    return this.dependencies.langy.findByIdVisible(input);
-  }
-
-  /**
    * Every card and connection state for one conversation, off the durable
    * record (ADR-129) — the live stream can't answer either for an adopted tab.
    */

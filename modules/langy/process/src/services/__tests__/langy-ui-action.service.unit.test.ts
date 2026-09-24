@@ -1,4 +1,7 @@
-import { LangyUiActionUnknownError } from "@langwatch/langy-contract";
+import {
+  LangyConversationNotFoundError,
+  LangyUiActionUnknownError,
+} from "@langwatch/langy-contract";
 /**
  * The UI-action dispatch/claim/complete protocol, against fakes (specs/langy/langy-ui-
  * actions.feature).
@@ -116,7 +119,10 @@ function makeService({
   return LangyUiActionService.create({
     redis,
     conversations: {
-      findByIdVisible: async () => (conversationExists ? { currentTurnId } : null),
+      getById: async ({ id }) => {
+        if (!conversationExists) throw new LangyConversationNotFoundError(id);
+        return { currentTurnId };
+      },
     },
     buffer: {
       appendUiAction: async ({ actionId, kind, payload }) => {
@@ -137,13 +143,12 @@ const DISPATCH = {
   projectId: "project-1",
   userId: "user-1",
   conversationId: "conv-1",
-  notFound: () => new Error("not-found"),
 };
 
 describe("LangyUiActionService", () => {
   describe("when the conversation is not visible to the key's user", () => {
     /** @scenario A conversation id from another project is refused without confirming it exists */
-    it("refuses with the caller's not-found error", async () => {
+    it("refuses with the conversation not-found error", async () => {
       const { redis } = makeRedis();
       const service = makeService({ redis, conversationExists: false });
 
@@ -153,7 +158,7 @@ describe("LangyUiActionService", () => {
           kind: "workbench.duplicateTarget",
           payload: { targetId: "t1" },
         }),
-      ).rejects.toThrow("not-found");
+      ).rejects.toMatchObject({ code: "langy_conversation_not_found" });
     });
   });
 

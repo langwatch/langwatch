@@ -1,3 +1,4 @@
+import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyMessageService } from "../../services/langy-message.service.ts";
@@ -36,12 +37,11 @@ function makeConversationRepo(
 ): LangyConversationRepository {
   return {
     countUsage: vi.fn().mockResolvedValue({ turns: 0, activeUsers: 0 }),
-    tryFindVisibleById: vi.fn().mockResolvedValue(null),
+    getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     findOwnership: vi.fn().mockResolvedValue("missing"),
     findAllForUser: vi.fn().mockResolvedValue([]),
     findActiveOwnedIds: vi.fn().mockResolvedValue([]),
-    tryFindPendingHandoff: vi.fn().mockResolvedValue(null),
-    tryFindRunToken: vi.fn().mockResolvedValue(null),
+    getResumeState: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     hasAdmittedTurn: vi.fn().mockResolvedValue(false),
     turnExists: vi.fn().mockResolvedValue(false),
     ...overrides,
@@ -70,8 +70,8 @@ describe("LangyMessageService", () => {
       ];
       const findAllByConversation = vi.fn().mockResolvedValue(rows);
       const messages = makeMessageRepo({ findAllByConversation });
-      const tryFindVisibleById = vi.fn().mockResolvedValue(conversation);
-      const conversations = makeConversationRepo({ tryFindVisibleById });
+      const getVisibleById = vi.fn().mockResolvedValue(conversation);
+      const conversations = makeConversationRepo({ getVisibleById });
       const service = LangyMessageService.create(messages, conversations);
 
       await expect(
@@ -82,7 +82,7 @@ describe("LangyMessageService", () => {
         }),
       ).resolves.toEqual(rows);
 
-      expect(tryFindVisibleById).toHaveBeenCalledWith({
+      expect(getVisibleById).toHaveBeenCalledWith({
         id: "conversation-1",
         projectId: "project-1",
         userId: "user-1",
@@ -102,7 +102,9 @@ describe("LangyMessageService", () => {
         const messages = makeMessageRepo({ findAllByConversation });
         const conversations = makeConversationRepo({
           // The visibility repository deliberately collapses private and absent.
-          tryFindVisibleById: vi.fn().mockResolvedValue(null),
+          getVisibleById: vi
+            .fn()
+            .mockRejectedValue(new LangyConversationNotFoundError("conversation-1")),
         });
         const service = LangyMessageService.create(messages, conversations);
 

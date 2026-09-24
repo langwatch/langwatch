@@ -1,5 +1,3 @@
-import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
-
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import type {
   LangyMessageRepository,
@@ -77,16 +75,13 @@ export class LangyMessageService {
     projectId: string;
     userId: string;
   }): Promise<LangyMessageRow[]> {
-    const conversation = await this.conversations.tryFindVisibleById({
+    // Missing and private-to-another-user deliberately share one not-found error so
+    // this read cannot become a cross-user conversation existence oracle.
+    await this.conversations.getVisibleById({
       id: params.conversationId,
       projectId: params.projectId,
       userId: params.userId,
     });
-    if (!conversation) {
-      // Missing and private-to-another-user deliberately share one result so
-      // this read cannot become a cross-user conversation existence oracle.
-      throw new LangyConversationNotFoundError(params.conversationId);
-    }
 
     return this.repository.findAllByConversation({
       conversationId: params.conversationId,

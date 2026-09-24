@@ -3,7 +3,6 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   expandLatestAlias,
   isCodexModel,
-  ModelNotConfiguredError,
   ModelProviderDisabledError,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
@@ -72,74 +71,22 @@ async function resolveModel({
     return expandLatestAlias(explicit);
   }
 
-  // 2. Cascade-resolved default for the given feature key.
-  const resolved = await tryResolveFeatureDefault({
+  // 2. The cascade-resolved default for the feature key. Every resolver failure propagates:
+  //    `ModelNotConfiguredError` opens the missing-model popup, anything else is unknown.
+  const resolved = await modelProviderService.resolveModelForFeature({ projectId, featureKey });
+  const providerKey = resolved.model.split("/")[0] ?? "";
+  if (modelProviders[providerKey]?.enabled) {
+    return resolved.model;
+  }
+
+  throw await disabledProviderError({
+    resolved,
+    providerKey,
     projectId,
     featureKey,
     modelProviders,
     modelProviderService,
   });
-  if (resolved) {
-    return resolved;
-  }
-
-  // 3. Find any enabled provider with a usable custom model.
-  const rescued = pickEnabledCustomModel(modelProviders);
-  if (rescued) {
-    return rescued;
-  }
-
-  // 4. Nothing available, distinguish "none configured" from "all disabled".
-  if (Object.keys(modelProviders).length > 0) {
-    throw new Error(
-      "All configured model providers are disabled or have no usable models. " +
-        "Go to Settings → Model Providers to enable one or add a model.",
-    );
-  }
-
-  throw new Error(
-    "No model providers configured for this project. Go to Settings → Model Providers to add one.",
-  );
-}
-
-/**
- * The cascade's own answer, or null when a resolver-internal failure (DB,
- * race) leaves the "any enabled provider" rescue to answer instead.
- * `ModelNotConfiguredError` MUST propagate so the frontend can open the missing-model popup.
- */
-async function tryResolveFeatureDefault({
-  projectId,
-  featureKey,
-  modelProviders,
-  modelProviderService,
-}: {
-  projectId: string;
-  featureKey: string;
-  modelProviders: Record<string, LegacyModelProviderExecution>;
-  modelProviderService: ModelProviderResolutionGateway;
-}): Promise<string | null> {
-  try {
-    const resolved = await modelProviderService.resolveModelForFeature({ projectId, featureKey });
-    const providerKey = resolved.model.split("/")[0] ?? "";
-    if (modelProviders[providerKey]?.enabled) {
-      return resolved.model;
-    }
-
-    throw await disabledProviderError({
-      resolved,
-      providerKey,
-      projectId,
-      featureKey,
-      modelProviders,
-      modelProviderService,
-    });
-  } catch (err) {
-    if (err instanceof ModelNotConfiguredError || err instanceof ModelProviderDisabledError) {
-      throw err;
-    }
-
-    return null;
-  }
 }
 
 /**
@@ -195,19 +142,6 @@ async function disabledProviderError({
         }
       : null,
   );
-}
-
-/** The conservative rescue: the first enabled provider carrying a usable custom model. */
-function pickEnabledCustomModel(
-  modelProviders: Record<string, LegacyModelProviderExecution>,
-): string | null {
-  for (const [key, provider] of Object.entries(modelProviders)) {
-    if (provider.enabled && provider.customModels?.length) {
-      return `${key}/${provider.customModels[0]?.modelId ?? ""}`;
-    }
-  }
-
-  return null;
 }
 
 /**

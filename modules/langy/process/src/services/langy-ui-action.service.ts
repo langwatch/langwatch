@@ -101,11 +101,12 @@ export interface UiActionBlockingRedis {
 
 /** The one slice of the conversation service dispatch needs. */
 export interface UiActionConversations {
-  findByIdVisible(args: {
+  /** Throws `LangyConversationNotFoundError` when the conversation is missing or not visible. */
+  getById(args: {
     id: string;
     projectId: string;
     userId: string;
-  }): Promise<{ currentTurnId: string | null } | null>;
+  }): Promise<{ currentTurnId: string | null }>;
 }
 
 /** Everything the UI-action channel needs from the process that holds it. */
@@ -153,7 +154,6 @@ export class LangyUiActionService {
     kind,
     payload,
     experimentSlug,
-    notFound,
   }: {
     projectId: string;
     userId: string;
@@ -161,16 +161,12 @@ export class LangyUiActionService {
     kind: string;
     payload: unknown;
     experimentSlug?: string;
-    notFound: () => Error;
   }): Promise<UiActionOutcome> {
-    const conversation = await this.conversations.findByIdVisible({
+    const conversation = await this.conversations.getById({
       id: conversationId,
       projectId,
       userId,
     });
-    if (!conversation) {
-      throw notFound();
-    }
 
     const turnId = conversation.currentTurnId;
     if (!turnId) {
