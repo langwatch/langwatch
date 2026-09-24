@@ -14,6 +14,11 @@ export type SessionEventLike = {
   [key: string]: unknown;
 };
 
+/** A session event field read as a number, or 0 when it is not one. */
+function numberField(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 type ContentBlock = { type?: string; text?: string };
 
 /** A session event field read as a string, or "" when it is not one. */
@@ -132,6 +137,20 @@ export class TurnEventMapper {
       }
       case "tool_execution_end":
         return this.mapToolExecutionEnd(event);
+      case "auto_retry_start":
+        return [
+          {
+            type: "retrying",
+            turnId: this.turnId,
+            attempt: numberField(event.attempt),
+            maxAttempts: numberField(event.maxAttempts),
+            delayMs: numberField(event.delayMs),
+          },
+        ];
+      case "auto_retry_end":
+        // A failed end is followed by the turn's error terminal, which is
+        // what the panel shows; only a success clears the retry line.
+        return event.success === true ? [{ type: "retry_settled", turnId: this.turnId }] : [];
       default:
         return [];
     }

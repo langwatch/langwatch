@@ -1,7 +1,7 @@
 /**
  * pi AgentSession wiring: model from the generated models.json, state under
- * the worker home, auto-compaction on, pi's own retry off (the LLM proxy
- * retries instead), and a resource loader whose only tools are inline.
+ * the worker home, auto-compaction on, pi's retry loop on with the policy in
+ * model-retry.ts, and a resource loader whose only tools are inline.
  */
 
 import { mkdirSync } from "node:fs";
@@ -21,18 +21,19 @@ import {
 import type { LangyWorkerConfig } from "./config.js";
 import { guidedSkillRefusal } from "./guided-kickoff.js";
 import { closingLineRefusal } from "./guided-turn-end.js";
+import { MODEL_RETRY_MAX_ATTEMPTS, installModelRetry } from "./model-retry.js";
 import { writeModelsJson } from "./models.js";
 import {
   CODE_ACCESS_TOOL_NAME,
   LOCAL_TOOL_NAMES,
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
-import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import {
   NOTIFY_TOOL_NAME,
   OFFER_NOTIFICATIONS_TOOL_NAME,
   createNotifyExtension,
 } from "./tools/notify.js";
+import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import { SAY_TOOL_NAME, createSayExtension, repeatedLineRefusal } from "./tools/say.js";
 import { SECRET_SNIPPET_TOOL_NAME, createSecretSnippetExtension } from "./tools/secret-snippet.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
@@ -140,7 +141,9 @@ export async function createLangySession({
 
   const settingsManager = SettingsManager.inMemory({
     compaction: { enabled: true },
-    retry: { enabled: false },
+    // pi enters its retry loop only when this is on; the attempts, the waits
+    // and which failures retry come from installModelRetry below.
+    retry: { enabled: true, maxRetries: MODEL_RETRY_MAX_ATTEMPTS },
   });
 
   const resourceLoader = new DefaultResourceLoader({
@@ -184,6 +187,8 @@ export async function createLangySession({
     settingsManager,
     tools: [...ENABLED_TOOLS],
   });
+
+  installModelRetry({ session });
 
   return { session, resumed };
 }

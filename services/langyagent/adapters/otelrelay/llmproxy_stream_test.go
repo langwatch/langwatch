@@ -187,3 +187,33 @@ func TestLLMProxyStreamCut_CleanStreamClears(t *testing.T) {
 	}
 	_, _ = io.ReadAll(final.Body)
 }
+
+// An overloaded provider failing inside a 200 stream, the way it did in the
+// prod turn that ended with a manual "Try again".
+const overloadedStream = "event: response.created\n" +
+	`data: {"type":"response.created","sequence_number":0}` + "\n\n" +
+	"event: error\n" +
+	`data: {"type":"error","error":{"type":"server_error","message":"Our servers are currently overloaded. Please try again later."},"sequence_number":1}` + "\n\n"
+
+// @scenario "An in-stream error that is not a plan limit is left to the worker's retries"
+func TestLLMProxyStreamCut_TransientInStreamErrorNeverCuts(t *testing.T) {
+	frames := overloadedStream
+	gateway := sseStreamGateway(t, &frames)
+	defer gateway.Close()
+
+	relay := startRelay(t)
+	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-stream-overloaded", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+	// More consecutive failures than the rate-limit cut allows, plus the
+	// worker's own retry budget: every call still reaches the provider.
+	for i := 0; i < rateLimitCutAfter+3; i++ {
+		resp := rateLimitCall(t, relay, token)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("call %d answered %d, want the provider's 200 stream: a transient in-stream error must not arm the cut", i+1, resp.StatusCode)
+		}
+		_, _ = io.ReadAll(resp.Body)
+		if _, ok := relay.LastLLMError(token); !ok {
+			t.Fatalf("call %d left no captured cause", i+1)
+		}
+	}
+}

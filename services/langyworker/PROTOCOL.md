@@ -74,6 +74,8 @@ Per turn, all tagged with the turn's `turnId`:
 {"type":"tool_end","turnId":"t1","id":"call_1","name":"bash","input":{"command":"ls"},"isError":false,"output":"full output"}
 {"type":"plan","turnId":"t1","items":[{"content":"Find the slowest traces","status":"in_progress"}]}
 {"type":"guided_turn","turnId":"t1","event":"guided_turn_continued","segment":1,"missing":["the branch line","the first scenario card"]}
+{"type":"retrying","turnId":"t1","attempt":2,"maxAttempts":5,"delayMs":2140}
+{"type":"retry_settled","turnId":"t1"}
 ```
 
 Event payload shapes follow pi's native session events: `delta` and `reasoning`
@@ -99,6 +101,15 @@ of their own and a small cap over the turn. `missing` names what the turn owed,
 in the guard's own words (line and card names, never the model's text). The
 manager logs it under the event name and draws no frame for it. The wrapper's
 stderr is not read by the manager, so this event is the guard's only sink.
+
+`retrying` says a model call failed for a transient reason (an overloaded
+provider, a dropped stream, a network error, a 5xx or a 429) and is made again
+after `delayMs` (`model-retry.ts`). `attempt` counts retries from 1 up to
+`maxAttempts`. The failed assistant message is dropped and the same call is made
+against the conversation as it stands, so a tool call that already ran is never
+run again. `retry_settled` follows once a retried call answers. The manager shows
+the pair as the panel's status line ("Retrying (2 of 5)", then cleared). When the
+last retry fails, the turn ends with `turn_done` `error` as before.
 
 Terminal (the LAST line ever emitted for a `turnId`; nothing follows it):
 

@@ -126,6 +126,22 @@ export type GuidedTurnEvent = {
   missing: string[];
 };
 
+/**
+ * A model call failed for a transient reason and is made again after
+ * `delayMs` (model-retry.ts). `attempt` counts retries from 1 up to
+ * `maxAttempts`; the call that failed first is not one of them.
+ */
+export type RetryingEvent = {
+  type: "retrying";
+  turnId: string;
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+};
+
+/** A retried model call answered, so the retry line the manager shows is over. */
+export type RetrySettledEvent = { type: "retry_settled"; turnId: string };
+
 export type WorkerEvent =
   | ReadyEvent
   | PongEvent
@@ -137,6 +153,8 @@ export type WorkerEvent =
   | ToolEndEvent
   | PlanEvent
   | GuidedTurnEvent
+  | RetryingEvent
+  | RetrySettledEvent
   | TurnDoneEvent
   | HandoffEvent;
 
