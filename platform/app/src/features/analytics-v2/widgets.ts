@@ -62,10 +62,20 @@ const STATE_GUARDS = `  if (isError) {
 
 /**
  * Assemble one widget's source: the recharts import line, the standard
- * `LW.useChartQuery("main")` read, the shared state guards, then the widget's
- * own row mapping and chart body.
+ * `LW.useChartQuery("main")` read, the shared state guards, the widget's own
+ * row mapping, and its bare chart element wrapped in the shared responsive
+ * container shell every chart renders inside. Each widget supplies only what
+ * differs — its `imports`, its `rows` mapping, and its `chart` element.
  */
-function widgetCode({ imports, body }: { imports: string; body: string }): string {
+function widgetCode({
+  imports,
+  rows,
+  chart,
+}: {
+  imports: string;
+  rows: string;
+  chart: string;
+}): string {
   return `import { ${imports} } from "recharts";
 
 export default function Widget() {
@@ -73,7 +83,17 @@ export default function Widget() {
 
 ${STATE_GUARDS}
 
-${body}
+${rows}
+
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ResponsiveContainer width="100%" height="100%">
+${chart}
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
 `;
 }
@@ -81,66 +101,44 @@ ${body}
 const traceCountCode = widgetCode({
   imports:
     "ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip",
-  body: `  const rows = data.map(function (row) {
+  rows: `  const rows = data.map(function (row) {
     return { bucket: String(row.bucket).slice(0, 10), traces: Number(row.traces) };
-  });
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows}>
+  });`,
+  chart: `          <LineChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
             <YAxis allowDecimals={false} />
             <Tooltip />
             <Line type="monotone" dataKey="traces" stroke="#f97316" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </LineChart>`,
 });
 
 const totalCostCode = widgetCode({
-  imports: "ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip",
-  body: `  const rows = data.map(function (row) {
+  imports:
+    "ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip",
+  rows: `  const rows = data.map(function (row) {
     return { bucket: String(row.bucket).slice(0, 10), cost: Number(row.cost || 0) };
-  });
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={rows}>
+  });`,
+  chart: `          <AreaChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
             <YAxis unit="$" />
             <Tooltip formatter={function (value) { return "$" + Number(value).toFixed(2); }} />
             <Area type="monotone" dataKey="cost" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </AreaChart>`,
 });
 
 const tokensCode = widgetCode({
   imports:
     "ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, Legend",
-  body: `  const rows = data.map(function (row) {
+  rows: `  const rows = data.map(function (row) {
     return {
       bucket: String(row.bucket).slice(0, 10),
       prompt_tokens: Number(row.prompt_tokens || 0),
       completion_tokens: Number(row.completion_tokens || 0),
     };
-  });
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={rows}>
+  });`,
+  chart: `          <AreaChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
             <YAxis allowDecimals={false} />
@@ -148,30 +146,21 @@ const tokensCode = widgetCode({
             <Legend />
             <Area type="monotone" dataKey="prompt_tokens" stackId="tokens" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.4} />
             <Area type="monotone" dataKey="completion_tokens" stackId="tokens" stroke="#f97316" fill="#f97316" fillOpacity={0.4} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </AreaChart>`,
 });
 
 const latencyCode = widgetCode({
   imports:
     "ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend",
-  body: `  const rows = data.map(function (row) {
+  rows: `  const rows = data.map(function (row) {
     return {
       bucket: String(row.bucket).slice(0, 10),
       p50: Number(row.p50),
       p90: Number(row.p90),
       p99: Number(row.p99),
     };
-  });
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows}>
+  });`,
+  chart: `          <LineChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
             <YAxis unit="ms" />
@@ -180,146 +169,97 @@ const latencyCode = widgetCode({
             <Line type="monotone" dataKey="p50" stroke="#22c55e" dot={false} />
             <Line type="monotone" dataKey="p90" stroke="#f59e0b" dot={false} />
             <Line type="monotone" dataKey="p99" stroke="#ef4444" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </LineChart>`,
 });
 
 const satisfactionCode = widgetCode({
   imports:
     "ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip",
-  body: `  const rows = data.map(function (row) {
+  rows: `  const rows = data.map(function (row) {
     return {
       bucket: String(row.bucket).slice(0, 10),
       satisfaction: Math.round(Number(row.satisfaction || 0) * 100) / 100,
     };
-  });
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows}>
+  });`,
+  chart: `          <LineChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
             <YAxis />
             <Tooltip />
             <Line type="monotone" dataKey="satisfaction" stroke="#ec4899" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </LineChart>`,
 });
 
 const evaluationPassRateCode = widgetCode({
   imports:
     "ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip",
-  body: `  const rows = data.map(function (row) {
+  rows: `  const rows = data.map(function (row) {
     const scored = Number(row.scored || 0);
     const passed = Number(row.passed || 0);
     return {
       bucket: String(row.bucket).slice(0, 10),
       pass_rate: scored > 0 ? Math.round((passed / scored) * 1000) / 10 : null,
     };
-  });
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows}>
+  });`,
+  chart: `          <LineChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
             <YAxis unit="%" domain={[0, 100]} />
             <Tooltip formatter={function (value) { return value + "%"; }} />
             <Line type="monotone" dataKey="pass_rate" stroke="#8b5cf6" dot={false} connectNulls />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </LineChart>`,
 });
 
 const avgTracesPerThreadCode = widgetCode({
   imports:
     "ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip",
-  body: `  const rows = data.map(function (row) {
+  rows: `  const rows = data.map(function (row) {
     return {
       bucket: String(row.day).slice(0, 10),
       avg_traces: Math.round(Number(row.avg_traces_per_thread || 0) * 100) / 100,
     };
-  });
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={rows}>
+  });`,
+  chart: `          <LineChart data={rows}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
             <YAxis />
             <Tooltip />
             <Line type="monotone" dataKey="avg_traces" stroke="#14b8a6" dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </LineChart>`,
 });
 
 const topModelsCode = widgetCode({
-  imports: "ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip",
-  body: `  const rows = data
+  imports:
+    "ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip",
+  rows: `  const rows = data
     .map(function (row) {
       return { model: String(row.model), traces: Number(row.traces) };
     })
-    .slice()
-    .reverse();
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={rows} layout="vertical" margin={{ left: 24 }}>
+    .reverse();`,
+  chart: `          <BarChart data={rows} layout="vertical" margin={{ left: 24 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" allowDecimals={false} />
             <YAxis type="category" dataKey="model" tick={{ fontSize: 10 }} width={140} />
             <Tooltip />
             <Bar dataKey="traces" fill="#f97316" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </BarChart>`,
 });
 
 const topTopicsCode = widgetCode({
-  imports: "ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip",
-  body: `  const rows = data
+  imports:
+    "ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip",
+  rows: `  const rows = data
     .map(function (row) {
       return { topic: String(row.topic), traces: Number(row.traces) };
     })
-    .slice()
-    .reverse();
-
-  return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={rows} layout="vertical" margin={{ left: 24 }}>
+    .reverse();`,
+  chart: `          <BarChart data={rows} layout="vertical" margin={{ left: 24 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" allowDecimals={false} />
             <YAxis type="category" dataKey="topic" tick={{ fontSize: 10 }} width={140} />
             <Tooltip />
             <Bar dataKey="traces" fill="#f97316" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );`,
+          </BarChart>`,
 });
 
 /** Build a single-query, version-1 definition with the reserved-period contract. */
@@ -375,9 +315,9 @@ ORDER BY bucket`,
     definition: definition(
       latencyCode,
       `SELECT toStartOfDay(OccurredAt) AS bucket,
-  quantile(0.5)(TotalDurationMs) AS p50,
-  quantile(0.9)(TotalDurationMs) AS p90,
-  quantile(0.99)(TotalDurationMs) AS p99
+  quantileExact(0.5)(TotalDurationMs) AS p50,
+  quantileExact(0.9)(TotalDurationMs) AS p90,
+  quantileExact(0.99)(TotalDurationMs) AS p99
 FROM trace_metrics
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
   AND TotalDurationMs > 0

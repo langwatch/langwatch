@@ -170,9 +170,7 @@ describe("the Analytics v2 page", () => {
       expect(
         screen.getByTestId("analytics-v2-lwql-disabled"),
       ).toBeInTheDocument();
-      expect(screen.queryAllByTestId(/^analytics-v2-widget-/)).toHaveLength(
-        0,
-      );
+      expect(screen.queryAllByTestId(/^analytics-v2-widget-/)).toHaveLength(0);
     });
   });
 });

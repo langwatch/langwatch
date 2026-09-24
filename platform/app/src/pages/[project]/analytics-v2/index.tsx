@@ -4,15 +4,10 @@ import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsV2Grid } from "~/features/analytics-v2/AnalyticsV2Grid";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-/**
- * The LangWatchQL surface flag (`LWQL_FLAG` in
- * `~/server/analytics/lwql/access.ts`). Analytics v2 runs entirely on
- * LangWatchQL, so the same flag that gates the workbench gates this page.
- * Referenced by its literal rather than importing the server module, which
- * would pull the flag service and Prisma into the client bundle.
- */
-const LWQL_FLAG = "release_lwql_workbench";
+// Analytics v2 runs entirely on LangWatchQL, so the same flag that gates the
+// workbench gates this page. This mirrors LWQL_FLAG in
+// ~/server/analytics/lwql/access.ts (client-safe, no server import).
+import { LWQL_WORKBENCH_FRONTEND_FLAG } from "~/server/featureFlag/frontendFeatureFlags";
 
 const LWQL_DISABLED_MESSAGE =
   "LangWatchQL is not enabled for this project. Ask your organization administrator to enable it to see Analytics v2.";
@@ -26,11 +21,14 @@ const LWQL_DISABLED_MESSAGE =
  */
 export default function AnalyticsV2Page() {
   const { project, organization } = useOrganizationTeamProject();
-  const { enabled: lwqlEnabled, isLoading } = useFeatureFlag(LWQL_FLAG, {
-    projectId: project?.id,
-    organizationId: organization?.id,
-    enabled: !!project?.id,
-  });
+  const { enabled: lwqlEnabled, isLoading } = useFeatureFlag(
+    LWQL_WORKBENCH_FRONTEND_FLAG,
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project?.id && !!organization?.id,
+    },
+  );
 
   return (
     <GraphsLayout title="Analytics v2">

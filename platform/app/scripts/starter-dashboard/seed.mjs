@@ -38,6 +38,8 @@ const DASHBOARD_NAME = "Analytics starter";
 
 // Order IS the layout: pins land at the target dashboard's next free row,
 // single column, in this order.
+// The two `pack: "starter-dashboard"` entries are JSON files co-located with
+// this seed script in this same folder, not a separate widget pack.
 const MANIFEST = [
   { pack: "north-star-widgets", file: "north-star-metric-stat.json" },
   { pack: "north-star-widgets", file: "north-star-area-timeseries.json" },

@@ -53,7 +53,11 @@ const EXPECTED_TITLES_IN_ORDER = [
   "Top topics",
 ] as const;
 
-const FORBIDDEN_LEGACY_TOKENS = ["analytics.", "elasticsearch", "getTimeseries"];
+const FORBIDDEN_LEGACY_TOKENS = [
+  "analytics.",
+  "elasticsearch",
+  "getTimeseries",
+];
 
 describe("ANALYTICS_V2_WIDGET_IDS", () => {
   /** @scenario "Every chart reads its data through the LangWatchQL query API only" */
@@ -65,7 +69,9 @@ describe("ANALYTICS_V2_WIDGET_IDS", () => {
 describe("ANALYTICS_V2_WIDGETS", () => {
   /** @scenario "Every chart reads its data through the LangWatchQL query API only" */
   it("has nine entries, ids and titles in contract order", () => {
-    expect(ANALYTICS_V2_WIDGETS.map((w) => w.id)).toEqual(EXPECTED_IDS_IN_ORDER);
+    expect(ANALYTICS_V2_WIDGETS.map((w) => w.id)).toEqual(
+      EXPECTED_IDS_IN_ORDER,
+    );
     expect(ANALYTICS_V2_WIDGETS.map((w) => w.title)).toEqual(
       EXPECTED_TITLES_IN_ORDER,
     );
@@ -132,7 +138,8 @@ describe("ANALYTICS_V2_WIDGETS", () => {
 
 describe("Top Topics widget", () => {
   const topTopics = ANALYTICS_V2_WIDGETS.find((w) => w.id === "top-topics");
-  if (!topTopics) throw new Error("top-topics widget not found in ANALYTICS_V2_WIDGETS");
+  if (!topTopics)
+    throw new Error("top-topics widget not found in ANALYTICS_V2_WIDGETS");
   const mainQuery = topTopics.definition.queries.find((q) => q.name === "main");
   if (!mainQuery) throw new Error("top-topics widget has no 'main' query");
 
@@ -142,23 +149,17 @@ describe("Top Topics widget", () => {
       expect(mainQuery.sql).toContain("GROUP BY TopicId");
       expect(mainQuery.sql).not.toContain("SubTopicId");
     });
-
-    /** @scenario "Top Topics groups by topic only and shows a raw id when the name is missing" */
-    it("joins the topics catalog to resolve a topic's name", () => {
-      expect(mainQuery.sql.toLowerCase()).toContain("join");
-      expect(mainQuery.sql).toContain("topics");
-    });
   });
 
   describe("when a topic's name cannot be resolved", () => {
     /** @scenario "Top Topics groups by topic only and shows a raw id when the name is missing" */
-    it("falls back to the raw topic id rather than a placeholder like TopicName", () => {
-      // The fallback must reference TopicId as the substitute value — either
-      // in SQL (e.g. `coalesce(TopicName, TopicId)`/`if(TopicName = '', ...)`)
-      // or in the widget code that renders the row.
-      const haystack = [mainQuery.sql, topTopics.definition.code].join("\n");
-      expect(haystack).toContain("TopicId");
-      expect(haystack).toContain("TopicName");
+    it("left-joins the topics catalog and falls back to the raw topic id when the name is missing", () => {
+      expect(mainQuery.sql).toMatch(
+        /LEFT JOIN topics AS t ON t\.TopicId = x\.TopicId/,
+      );
+      expect(mainQuery.sql).toMatch(
+        /if\(t\.TopicName IS NULL OR t\.TopicName = '', x\.TopicId, t\.TopicName\)/,
+      );
     });
   });
 

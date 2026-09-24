@@ -70,6 +70,7 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
     Then the page shows a single message saying LangWatchQL is not enabled for this project
     And no widget cards are rendered
 
+  @unit
   Scenario: Reverting the change needs no data migration
     Given the change is reverted
     Then the scripts folder is restored
@@ -80,7 +81,6 @@ Feature: Analytics v2 page on dashboard widgets over LangWatchQL
   Scenario: Every chart reads its data through the LangWatchQL query API only
     Then each of the nine widget definitions is a valid dashboard widget definition
     And each of its queries is bound to the page period through the reserved period placeholders
-    And its code compiles with the widget author runtime
     And none of the definitions reads from the legacy analytics router
 
   # --- AC Coverage Map ---

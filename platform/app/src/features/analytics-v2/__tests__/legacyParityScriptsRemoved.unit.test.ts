@@ -10,6 +10,7 @@
  * @see specs/analytics/analytics-v2.feature
  */
 
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,62 +50,50 @@ const FEATURE_FILE = path.join(
   "specs/analytics/analytics-v2.feature",
 );
 
-const SKIP_DIR_NAMES = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  ".next",
-  "build",
-  "coverage",
-]);
-const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB
 const NEEDLE = "legacy-parity-widgets";
 
 /**
- * Every file path under `dir` that contains `needle`, skipping binary-ish
- * concerns (skip dirs, oversized files) and the two paths that are allowed
- * to mention the deleted folder by name: this test file itself (it has to
- * name the folder to assert its absence) and the feature file (history of
- * the change, not a live reference).
+ * Every tracked file that contains `needle`, found with `git grep` over the
+ * repository (fast, respects .gitignore, tracks only committed/staged files),
+ * minus the two paths allowed to mention the deleted folder by name: this
+ * test file itself (it has to name the folder to assert its absence) and the
+ * feature file (history of the change, not a live reference). `git grep`
+ * exits 1 when nothing matches, which is the clean "no references" case.
  */
 function findReferences({
-  dir,
   needle,
   exclude,
 }: {
-  dir: string;
   needle: string;
   exclude: Set<string>;
 }): string[] {
-  const hits: string[] = [];
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (exclude.has(full)) continue;
-    if (entry.isDirectory()) {
-      if (SKIP_DIR_NAMES.has(entry.name)) continue;
-      hits.push(...findReferences({ dir: full, needle, exclude }));
-      continue;
-    }
-    if (!entry.isFile()) continue;
-    let stat: fs.Stats;
-    try {
-      stat = fs.statSync(full);
-    } catch {
-      continue;
-    }
-    if (stat.size > MAX_FILE_BYTES) continue;
-    let content: string;
-    try {
-      content = fs.readFileSync(full, "utf-8");
-    } catch {
-      // Not a text file (binary) — cannot contain the needle in a
-      // meaningful way for this check.
-      continue;
-    }
-    if (content.includes(needle)) hits.push(full);
+  let output: string;
+  try {
+    output = execFileSync("git", ["grep", "-l", "-F", needle], {
+      cwd: REPO_ROOT,
+      encoding: "utf-8",
+    });
+  } catch (err) {
+    if ((err as { status?: number }).status === 1) return [];
+    throw err;
   }
-  return hits;
+  return output
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((rel) => path.join(REPO_ROOT, rel))
+    .filter((full) => !exclude.has(full));
+}
+
+/** Every file path under `dir`, recursively; `[]` when `dir` does not exist. */
+function filesUnder(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...filesUnder(full));
+    else if (entry.isFile()) out.push(full);
+  }
+  return out;
 }
 
 describe("the legacy parity scripts folder", () => {
@@ -117,12 +106,73 @@ describe("the legacy parity scripts folder", () => {
     /** @scenario "The legacy parity scripts folder is gone and nothing references it" */
     it("finds no remaining reference to legacy-parity-widgets", () => {
       const hits = findReferences({
-        dir: REPO_ROOT,
         needle: NEEDLE,
         exclude: new Set([THIS_FILE, FEATURE_FILE]),
       });
       expect(hits, `unexpected references: ${hits.join(", ")}`).toEqual([]);
     });
+  });
+});
+
+describe("reverting the Analytics v2 change", () => {
+  const V2_SOURCE_DIRS = [
+    path.join(REPO_ROOT, "platform/app/src/features/analytics-v2"),
+    path.join(REPO_ROOT, "platform/app/src/pages/[project]/analytics-v2"),
+  ];
+  // A read path into any of these would mean the page touches stored data,
+  // so reverting it could no longer be a pure code revert.
+  const FORBIDDEN_DATA_IMPORTS = [
+    "~/server/db",
+    "@prisma/client",
+    "~/server/clickhouse",
+    "~/server/analytics/lwql/provisioning",
+  ];
+  const PRISMA_MIGRATIONS = path.join(
+    REPO_ROOT,
+    "platform/app/prisma/migrations",
+  );
+  const CLICKHOUSE_MIGRATIONS = path.join(
+    REPO_ROOT,
+    "platform/app/src/server/clickhouse/migrations",
+  );
+  const MIGRATION_TOKENS = ["analytics-v2", "analytics_v2"];
+
+  /** @scenario "Reverting the change needs no data migration" */
+  it("reads no stored data — the Analytics v2 source imports no database, ClickHouse, or provisioning module", () => {
+    const offenders: string[] = [];
+    for (const dir of V2_SOURCE_DIRS) {
+      for (const file of filesUnder(dir)) {
+        if (file.includes(`${path.sep}__tests__${path.sep}`)) continue;
+        const content = fs.readFileSync(file, "utf-8");
+        for (const token of FORBIDDEN_DATA_IMPORTS) {
+          if (content.includes(token)) offenders.push(`${file} -> ${token}`);
+        }
+      }
+    }
+    expect(
+      offenders,
+      `unexpected data-layer imports: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  /** @scenario "Reverting the change needs no data migration" */
+  it("adds no migration — no Prisma or ClickHouse migration mentions analytics-v2", () => {
+    const offenders: string[] = [];
+    for (const file of [
+      ...filesUnder(PRISMA_MIGRATIONS),
+      ...filesUnder(CLICKHOUSE_MIGRATIONS),
+    ]) {
+      // Use relative path so the worktree directory name (e.g., issue8296-analytics-v2-page) cannot match
+      const rel = path.relative(REPO_ROOT, file);
+      const haystack = `${rel}\n${fs.readFileSync(file, "utf-8")}`;
+      for (const token of MIGRATION_TOKENS) {
+        if (haystack.includes(token)) offenders.push(`${rel} -> ${token}`);
+      }
+    }
+    expect(
+      offenders,
+      `unexpected migration references: ${offenders.join(", ")}`,
+    ).toEqual([]);
   });
 });
 
