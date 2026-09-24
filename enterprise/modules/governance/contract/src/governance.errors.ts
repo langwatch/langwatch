@@ -312,3 +312,79 @@ export class ProviderSignInError extends Error {
     this.status = params.status ?? null;
   }
 }
+
+/**
+ * Erasure asked for with no digest secret: fatal, never defaulted, because a list hashed
+ * with an empty secret looks real and protects nothing.
+ */
+export class ErasureSecretMissingError extends Error {
+  constructor(reason: string) {
+    super(
+      `Governance erasure needs GOVERNANCE_ERASURE_PSEUDONYM_SECRET to be set to at least 32 characters (${reason}). Generate one with \`openssl rand -hex 32\`, set it once, and never change it: every digest already stored is a function of this value.`,
+    );
+    this.name = "ErasureSecretMissingError";
+  }
+}
+
+/** The erasure named a person this organization does not hold. */
+export class DiscoveredPersonNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DiscoveredPersonNotFoundError";
+  }
+}
+
+/** The suggestion is gone — confirmed already, or replaced by a later pass (ADR-128 §12). */
+export class IdentityMatchSuggestionNotFoundError extends NotFoundError {
+  declare readonly code: "identity_match_suggestion_not_found";
+
+  constructor(suggestionId: string) {
+    super("identity_match_suggestion_not_found", "Match suggestion", suggestionId);
+    this.name = "IdentityMatchSuggestionNotFoundError";
+  }
+}
+
+/** The person already holds an open link; also what a 23505 on the one-open-link index maps to. */
+export class IdentityAlreadyLinkedError extends HandledError {
+  declare readonly code: "identity_already_linked";
+
+  constructor(discoveredPersonId: string) {
+    super("identity_already_linked", "This person is already linked to an account", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { discoveredPersonId },
+    });
+    this.name = "IdentityAlreadyLinkedError";
+  }
+}
+
+/** An erased person may never carry an account again — the last guard on a stale queue click. */
+export class IdentityErasedError extends HandledError {
+  declare readonly code: "identity_erased";
+
+  constructor(discoveredPersonId: string) {
+    super("identity_erased", "This person has been erased and cannot be linked to an account", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { discoveredPersonId },
+    });
+    this.name = "IdentityErasedError";
+  }
+}
+
+/**
+ * Listings cannot run here (no event sourcing, or no governance project); no provider
+ * was reached, so no outcome is coming later. `reason` rides in meta for the log.
+ */
+export class AgentListingUnavailableError extends HandledError {
+  declare readonly code: "agent_listing_unavailable";
+
+  constructor(reason: "event_sourcing_disabled" | "no_governance_project") {
+    super("agent_listing_unavailable", "Agent sync isn't available here", {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { reason },
+    });
+    this.name = "AgentListingUnavailableError";
+  }
+}

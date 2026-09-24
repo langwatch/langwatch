@@ -14,6 +14,7 @@ import { ClickHouseAnomalySpendRepository } from "./clickhouse.anomaly-spend.rep
 import { ClickHouseGatewaySpendRepository } from "./clickhouse.gateway-spend.repository.ts";
 import { ClickHouseOcsfEventsRepository } from "./clickhouse.ocsf-events.repository.ts";
 import { ClickHousePersonalUsageRepository } from "./clickhouse.personal-usage.repository.ts";
+import { ClickHouseRollupErasureRepository } from "./clickhouse.rollup-erasure.repository.ts";
 import { ClickHouseTraceActivityRepository } from "./clickhouse.trace-activity.repository.ts";
 
 /**
@@ -130,6 +131,7 @@ export class ClickHouseGovernanceRepositories {
       traceActivity: ClickHouseTraceActivityRepository.create(clickhouse),
       personalUsage: ClickHousePersonalUsageRepository.create(clickhouse),
       gatewaySpend: ClickHouseGatewaySpendRepository.create(clickhouse),
+      rollupErasure: ClickHouseRollupErasureRepository.create(members.clickhouse),
     };
   }
 }

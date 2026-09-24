@@ -16,15 +16,22 @@ import type {
   OcsfSeatReportReader,
 } from "./clickhouse/clickhouse.ocsf-events.repository.ts";
 import type { DepartmentRepository } from "./department.repository.ts";
+import type { DiscoveredAgentRepository } from "./discovered-agent.repository.ts";
+import type { DiscoveredPersonRepository } from "./discovered-person.repository.ts";
+import type { ErasedIdentifierSuppressionRepository } from "./erased-identifier-suppression.repository.ts";
 import type { GatewaySpendRepository } from "./gateway-spend.repository.ts";
 import type { GovernanceDirectoryRepository } from "./governance-directory.repository.ts";
 import type {
   GovernanceOcsfExportRepository,
   GovernanceSetupStateRepository,
 } from "./governance-setup-state.repository.ts";
+import type { GovernanceTenantHistoryRepository } from "./governance-tenant-history.repository.ts";
+import type { IdentityMatchSuggestionRepository } from "./identity-match-suggestion.repository.ts";
+import type { IdentityMatchRepository } from "./identity-match.repository.ts";
 import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
 import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type { PersonalVirtualKeyRepository } from "./personal-virtual-key.repository.ts";
+import type { RollupErasureRepository } from "./rollup-erasure.repository.ts";
 import type { RoutingPolicyRepository } from "./routing-policy.repository.ts";
 import type { OrganizationSessionPolicyRepository } from "./session-policy.repository.ts";
 import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
@@ -45,6 +52,11 @@ export interface GovernanceRepositories {
   readonly anomalyRules: AnomalyRuleRepository;
   readonly departments: DepartmentRepository;
   readonly directory: GovernanceDirectoryRepository;
+  readonly discoveredAgents: DiscoveredAgentRepository;
+  readonly discoveredPeople: DiscoveredPersonRepository;
+  readonly erasedIdentifierSuppressions: ErasedIdentifierSuppressionRepository;
+  readonly identityMatches: IdentityMatchRepository;
+  readonly identityMatchSuggestions: IdentityMatchSuggestionRepository;
   readonly ingestionTemplates: IngestionTemplateRepository;
   readonly ocsfExports: GovernanceOcsfExportRepository;
   readonly personalVirtualKeys: PersonalVirtualKeyRepository;
@@ -53,6 +65,7 @@ export interface GovernanceRepositories {
   readonly setupState: GovernanceSetupStateRepository;
   readonly spendSpikeAnomalies: SpendSpikeAnomalyRepository;
   readonly supportContacts: OrganizationSupportContactRepository;
+  readonly tenantHistory: GovernanceTenantHistoryRepository;
 }
 
 /**
@@ -77,6 +90,7 @@ export interface GovernanceClickHouseRepositories {
   readonly traceActivity: GovernanceSetupActivityReader & QuarantineTraceActivityReader;
   readonly personalUsage: PersonalUsageReader;
   readonly gatewaySpend: GatewaySpendRepository;
+  readonly rollupErasure: RollupErasureRepository;
 }
 
 /**
