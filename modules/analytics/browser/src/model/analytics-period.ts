@@ -4,10 +4,16 @@
  * frame; `behavior/use-analytics-period.ts` is the render seam that memoises it.
  */
 
-import { differenceInCalendarDays, startOfDay, subDays } from "@langwatch/time";
+import {
+  currentTimeZone,
+  differenceInCalendarDays,
+  Temporal,
+  toEpochMs,
+  type Instant,
+} from "@langwatch/time";
 
 /** Date range used for time-based filtering across the analytics pages. */
-export type AnalyticsPeriod = { startDate: Date; endDate: Date };
+export type AnalyticsPeriod = { startDate: Instant; endDate: Instant };
 
 /**
  * Relative range presets: the key serialises into the address as
@@ -37,12 +43,19 @@ const PRESETS_BY_KEY = new Map(ANALYTICS_RELATIVE_PRESETS.map((preset) => [prese
 export const isAnalyticsPresetKey = (value: unknown): value is AnalyticsPresetKey =>
   typeof value === "string" && PRESETS_BY_KEY.has(value as AnalyticsPresetKey);
 
-export const analyticsDaysDifference = (startDate: Date, endDate: Date): number =>
-  differenceInCalendarDays(endDate, startDate) + 1;
+export const analyticsDaysDifference = (startDate: Instant, endDate: Instant): number =>
+  differenceInCalendarDays(endDate.epochMilliseconds, startDate.epochMilliseconds) + 1;
 
-const isValidDateString = (dateString: string): boolean => {
-  const parsed = new Date(dateString);
-  return parsed instanceof Date && !isNaN(parsed.getTime());
+const startOfDayDaysBefore = (now: Instant, days: number): Instant =>
+  now.toZonedDateTimeISO(currentTimeZone()).subtract({ days }).startOfDay().toInstant();
+
+const epochMsOf = (value: string | undefined): number =>
+  typeof value === "string" ? toEpochMs(value) : Number.NaN;
+
+/** A moment typed into a field, or `fallback` when the field does not hold one. */
+export const instantFromText = (text: string, fallback: Instant): Instant => {
+  const epochMs = toEpochMs(text);
+  return Number.isFinite(epochMs) ? Temporal.Instant.fromEpochMilliseconds(epochMs) : fallback;
 };
 
 /**
@@ -52,21 +65,18 @@ const isValidDateString = (dateString: string): boolean => {
  */
 export const computeRelativeWindow = (
   presetKey: AnalyticsPresetKey,
-  now: Date,
+  now: Instant,
 ): AnalyticsPeriod => {
   const preset = PRESETS_BY_KEY.get(presetKey);
   if (!preset) {
-    return { startDate: startOfDay(subDays(now, 29)), endDate: now };
+    return { startDate: startOfDayDaysBefore(now, 29), endDate: now };
   }
 
   if (preset.minutes !== null) {
-    return {
-      startDate: new Date(now.getTime() - preset.minutes * 60 * 1000),
-      endDate: now,
-    };
+    return { startDate: now.subtract({ minutes: preset.minutes }), endDate: now };
   }
 
-  return { startDate: startOfDay(subDays(now, preset.days - 1)), endDate: now };
+  return { startDate: startOfDayDaysBefore(now, preset.days - 1), endDate: now };
 };
 
 const defaultPresetForDays = (defaultNDays: number): AnalyticsPresetKey =>
@@ -91,21 +101,18 @@ export const readAnalyticsPeriod = ({
   defaultNDays = 30,
 }: {
   query: Readonly<Record<string, string | undefined>>;
-  now: Date;
+  now: Instant;
   defaultNDays?: number;
 }): AnalyticsPeriodReading => {
-  const startDate = query.startDate;
-  const endDate = query.endDate;
-  const hasAbsoluteRange =
-    typeof startDate === "string" &&
-    typeof endDate === "string" &&
-    isValidDateString(startDate) &&
-    isValidDateString(endDate);
-  if (hasAbsoluteRange) {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+  const startMs = epochMsOf(query.startDate);
+  const endMs = epochMsOf(query.endDate);
+  if (Number.isFinite(startMs) && Number.isFinite(endMs)) {
+    const end = Temporal.Instant.fromEpochMilliseconds(endMs);
     return {
-      period: { startDate: start > end ? end : start, endDate: end },
+      period: {
+        startDate: startMs > endMs ? end : Temporal.Instant.fromEpochMilliseconds(startMs),
+        endDate: end,
+      },
       mode: "absolute",
       isDefault: false,
     };
@@ -123,9 +130,9 @@ export const readAnalyticsPeriod = ({
 
 /** The preset a shown range corresponds to, for labelling the trigger. */
 export const presetForRange = (
-  startDate: Date,
-  endDate: Date,
-  now: Date,
+  startDate: Instant,
+  endDate: Instant,
+  now: Instant,
 ): (typeof ANALYTICS_RELATIVE_PRESETS)[number] | undefined => {
   if (analyticsDaysDifference(endDate, now) > 1) return void 0;
   const days = analyticsDaysDifference(startDate, endDate);

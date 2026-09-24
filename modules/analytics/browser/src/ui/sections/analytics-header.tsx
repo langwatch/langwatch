@@ -115,7 +115,7 @@ export function AnalyticsHeader({
               // (#<lens>?from=<ms>&to=<ms>), so carry the analytics period
               // over as an absolute range.
               host.navigate(
-                `/${project?.slug}/traces#all-traces?from=${startDate.getTime()}&to=${endDate.getTime()}`,
+                `/${project?.slug}/traces#all-traces?from=${startDate.epochMilliseconds}&to=${endDate.epochMilliseconds}`,
               );
             }}
           >

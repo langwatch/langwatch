@@ -18,7 +18,7 @@ import {
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
-import { format, nowInstant } from "@langwatch/time";
+import { format, nowInstant, Temporal, toEpochMs } from "@langwatch/time";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
@@ -301,13 +301,17 @@ const CustomGraph_ = React.memo(
         if (params.startDate != null) {
           filterParams.startDate =
             typeof params.startDate === "number"
-              ? new Date(params.startDate).toISOString()
+              ? Temporal.Instant.fromEpochMilliseconds(params.startDate).toString({
+                  fractionalSecondDigits: 3,
+                })
               : String(params.startDate);
         }
         if (params.endDate != null) {
           filterParams.endDate =
             typeof params.endDate === "number"
-              ? new Date(params.endDate).toISOString()
+              ? Temporal.Instant.fromEpochMilliseconds(params.endDate).toString({
+                  fractionalSecondDigits: 3,
+                })
               : String(params.endDate);
         }
 
@@ -1070,11 +1074,13 @@ const CustomGraph_ = React.memo(
                         ["bar", "stacked_bar", "horizontal_bar"].includes(input.graphType) &&
                         typeof timeScale === "number"
                       ) {
-                        const clickedDate = new Date(date);
-                        startDate = clickedDate.toISOString();
-                        // Calculate endDate by adding the timeScale in minutes
-                        const endDateObj = new Date(clickedDate.getTime() + timeScale * 60 * 1000);
-                        endDate = endDateObj.toISOString();
+                        const clickedMs = toEpochMs(date);
+                        startDate = Temporal.Instant.fromEpochMilliseconds(clickedMs).toString({
+                          fractionalSecondDigits: 3,
+                        });
+                        endDate = Temporal.Instant.fromEpochMilliseconds(
+                          clickedMs + timeScale * 60 * 1000,
+                        ).toString({ fractionalSecondDigits: 3 });
                       }
 
                       onDataPointClick({

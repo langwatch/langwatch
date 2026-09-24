@@ -1,3 +1,4 @@
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { AnalyticsComparisonWindowService } from "../analytics-comparison-window.service.ts";
@@ -8,7 +9,7 @@ const service = AnalyticsComparisonWindowService.create();
  * Midday UTC throughout: the window is counted on the reader's own calendar, so
  * a boundary near midnight would name a different day per runner time zone.
  */
-const at = (value: string) => new Date(value);
+const at = (value: string) => Temporal.Instant.from(value);
 
 describe("AnalyticsComparisonWindowService", () => {
   describe("when the window is a single day", () => {
@@ -20,7 +21,9 @@ describe("AnalyticsComparisonWindowService", () => {
       });
 
       expect(result.daysDifference).toBe(1);
-      expect(result.previousPeriodStartDate.getTime()).toBe(Date.parse("2026-06-14T12:00:00Z"));
+      expect(result.previousPeriodStartDate.epochMilliseconds).toBe(
+        Date.parse("2026-06-14T12:00:00Z"),
+      );
     });
   });
 
@@ -33,7 +36,9 @@ describe("AnalyticsComparisonWindowService", () => {
       });
 
       expect(result.daysDifference).toBe(31);
-      expect(result.previousPeriodStartDate.getTime()).toBe(Date.parse("2025-12-01T12:00:00Z"));
+      expect(result.previousPeriodStartDate.epochMilliseconds).toBe(
+        Date.parse("2025-12-01T12:00:00Z"),
+      );
     });
   });
 
@@ -46,7 +51,9 @@ describe("AnalyticsComparisonWindowService", () => {
       });
 
       expect(result.daysDifference).toBe(10);
-      expect(result.previousPeriodStartDate.getTime()).toBe(Date.parse("2026-12-26T12:00:00Z"));
+      expect(result.previousPeriodStartDate.epochMilliseconds).toBe(
+        Date.parse("2026-12-26T12:00:00Z"),
+      );
     });
   });
 
@@ -59,25 +66,27 @@ describe("AnalyticsComparisonWindowService", () => {
       });
 
       expect(result.daysDifference).toBe(4);
-      expect(result.previousPeriodStartDate.getTime()).toBe(Date.parse("2028-02-23T12:00:00Z"));
+      expect(result.previousPeriodStartDate.epochMilliseconds).toBe(
+        Date.parse("2028-02-23T12:00:00Z"),
+      );
     });
   });
 
-  describe("when the caller passes epoch milliseconds rather than a Date", () => {
+  describe("when the caller passes epoch milliseconds rather than an instant", () => {
     /** @scenario "The comparison window is the same length as the window it precedes" */
-    it("reads them as the same window a Date would give", () => {
+    it("reads them as the same window an instant would give", () => {
       const startDate = Date.parse("2026-06-10T12:00:00Z");
       const endDate = Date.parse("2026-06-16T12:00:00Z");
 
       const fromNumbers = service.currentVsPrevious({ startDate, endDate });
-      const fromDates = service.currentVsPrevious({
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+      const fromInstants = service.currentVsPrevious({
+        startDate: Temporal.Instant.fromEpochMilliseconds(startDate),
+        endDate: Temporal.Instant.fromEpochMilliseconds(endDate),
       });
 
-      expect(fromNumbers.daysDifference).toBe(fromDates.daysDifference);
-      expect(fromNumbers.previousPeriodStartDate.getTime()).toBe(
-        fromDates.previousPeriodStartDate.getTime(),
+      expect(fromNumbers.daysDifference).toBe(fromInstants.daysDifference);
+      expect(fromNumbers.previousPeriodStartDate.epochMilliseconds).toBe(
+        fromInstants.previousPeriodStartDate.epochMilliseconds,
       );
     });
   });
@@ -92,7 +101,9 @@ describe("AnalyticsComparisonWindowService", () => {
 
       expect(Number.isInteger(result.daysDifference)).toBe(true);
       expect(result.daysDifference).toBe(1);
-      expect(result.previousPeriodStartDate.getTime()).toBe(Date.parse("2026-06-14T12:00:00Z"));
+      expect(result.previousPeriodStartDate.epochMilliseconds).toBe(
+        Date.parse("2026-06-14T12:00:00Z"),
+      );
     });
   });
 
@@ -105,7 +116,7 @@ describe("AnalyticsComparisonWindowService", () => {
       );
 
       expect(Number.isInteger(result.daysDifference)).toBe(true);
-      expect(result.previousPeriodStartDate.getTime()).toBeLessThan(
+      expect(result.previousPeriodStartDate.epochMilliseconds).toBeLessThan(
         Date.parse("2026-06-15T12:00:00Z"),
       );
     });

@@ -4,6 +4,7 @@
  * Every chart keys on the two dates, so getting this wrong misqueries all.
  */
 
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,7 +15,7 @@ import {
   readAnalyticsPeriod,
 } from "../analytics-period.ts";
 
-const NOW = new Date("2026-06-15T12:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-06-15T12:00:00.000Z");
 
 describe("the analytics period", () => {
   describe("given an address that names neither a range nor a preset", () => {
@@ -64,8 +65,12 @@ describe("the analytics period", () => {
         });
 
         expect(reading.mode).toBe("absolute");
-        expect(reading.period.startDate.toISOString()).toBe("2026-06-01T00:00:00.000Z");
-        expect(reading.period.endDate.toISOString()).toBe("2026-06-08T00:00:00.000Z");
+        expect(reading.period.startDate.toString({ fractionalSecondDigits: 3 })).toBe(
+          "2026-06-01T00:00:00.000Z",
+        );
+        expect(reading.period.endDate.toString({ fractionalSecondDigits: 3 })).toBe(
+          "2026-06-08T00:00:00.000Z",
+        );
       });
 
       /**
@@ -82,8 +87,8 @@ describe("the analytics period", () => {
           now: NOW,
         });
 
-        expect(reading.period.startDate.getTime()).toBeLessThanOrEqual(
-          reading.period.endDate.getTime(),
+        expect(reading.period.startDate.epochMilliseconds).toBeLessThanOrEqual(
+          reading.period.endDate.epochMilliseconds,
         );
       });
 
@@ -104,8 +109,8 @@ describe("the analytics period", () => {
       it("ends now and looks back exactly the minutes it names", () => {
         const window = computeRelativeWindow("15m", NOW);
 
-        expect(window.endDate).toEqual(NOW);
-        expect(NOW.getTime() - window.startDate.getTime()).toBe(15 * 60 * 1000);
+        expect(window.endDate.equals(NOW)).toBe(true);
+        expect(NOW.epochMilliseconds - window.startDate.epochMilliseconds).toBe(15 * 60 * 1000);
       });
     });
   });
@@ -119,7 +124,10 @@ describe("the analytics period", () => {
       });
 
       it("names nothing for a window that ended days ago", () => {
-        const window = computeRelativeWindow("7d", new Date("2026-05-01T12:00:00.000Z"));
+        const window = computeRelativeWindow(
+          "7d",
+          Temporal.Instant.from("2026-05-01T12:00:00.000Z"),
+        );
 
         expect(presetForRange(window.startDate, window.endDate, NOW)).toBeUndefined();
       });

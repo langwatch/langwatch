@@ -136,10 +136,8 @@ export function periodMatches({
 
   if (viewPeriod.relativeDays !== undefined) {
     if (!urlStartDate || !urlEndDate) return false;
-    const start = new Date(urlStartDate);
-    const end = new Date(urlEndDate);
-    const daysDiff = differenceInCalendarDays(end, start) + 1;
-    const endIsRecent = differenceInCalendarDays(new Date(), end) <= 1;
+    const daysDiff = differenceInCalendarDays(urlEndDate, urlStartDate) + 1;
+    const endIsRecent = differenceInCalendarDays(nowInstant().epochMilliseconds, urlEndDate) <= 1;
     return daysDiff === viewPeriod.relativeDays && endIsRecent;
   }
 

@@ -25,7 +25,7 @@ const TYPED_INSTANT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})
 
 /**
  * A typed instant as epoch milliseconds, or `undefined`, read as UTC to match the database.
- * Shape alone isn't enough: `Date.UTC` silently rolls over an out-of-range part, so the parsed
+ * Shape alone isn't enough: an out-of-range part is silently clamped, so the parsed
  * instant must format back to the text that produced it, or it is refused (catches `09:60` too).
  */
 export function parseLangWatchQLTimeWindowText(text: string): number | undefined {
@@ -34,15 +34,15 @@ export function parseLangWatchQLTimeWindowText(text: string): number | undefined
   // An absent group is `undefined`, so a date with no time means midnight —
   // which is what the member reads, since that is how the fields spell it back.
   const [, year, month, day, hours = "00", minutes = "00", seconds = "00"] = match;
-  const parsed = Date.UTC(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hours),
-    Number(minutes),
-    Number(seconds),
-  );
-  if (Number.isNaN(parsed)) return void 0;
+  if (Number(month) < 1 || Number(day) < 1) return void 0;
+  const parsed = Temporal.PlainDateTime.from({
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hours),
+    minute: Number(minutes),
+    second: Number(seconds),
+  }).toZonedDateTime("UTC").epochMilliseconds;
 
   const typed = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   const spelledBack = formatLangWatchQLDateTimeParameter(

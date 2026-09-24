@@ -4,6 +4,7 @@
  * renders, or `{ startDate, endDate }` keys into an endless refetch loop.
  */
 
+import { Temporal } from "@langwatch/time";
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
@@ -38,12 +39,12 @@ describe("the analytics period, at the render seam", () => {
         const { wrapper } = harness({ period: "24h" });
         const { result, rerender } = renderHook(() => useAnalyticsPeriod(), { wrapper });
 
-        const start = result.current.period.startDate.getTime();
-        const end = result.current.period.endDate.getTime();
+        const start = result.current.period.startDate.epochMilliseconds;
+        const end = result.current.period.endDate.epochMilliseconds;
         rerender();
 
-        expect(result.current.period.startDate.getTime()).toBe(start);
-        expect(result.current.period.endDate.getTime()).toBe(end);
+        expect(result.current.period.startDate.epochMilliseconds).toBe(start);
+        expect(result.current.period.endDate.epochMilliseconds).toBe(end);
       });
     });
   });
@@ -72,8 +73,8 @@ describe("the analytics period, at the render seam", () => {
         const { result } = renderHook(() => useAnalyticsPeriod(), { wrapper });
 
         result.current.setPeriod(
-          new Date("2026-06-01T00:00:00.000Z"),
-          new Date("2026-06-08T00:00:00.000Z"),
+          Temporal.Instant.from("2026-06-01T00:00:00.000Z"),
+          Temporal.Instant.from("2026-06-08T00:00:00.000Z"),
         );
 
         expect(host.lastQuery?.period).toBeUndefined();
@@ -91,8 +92,8 @@ describe("the analytics period, at the render seam", () => {
         const { result } = renderHook(() => useAnalyticsPeriod(), { wrapper });
 
         result.current.setPeriod(
-          new Date("2026-06-08T00:00:00.000Z"),
-          new Date("2026-06-01T00:00:00.000Z"),
+          Temporal.Instant.from("2026-06-08T00:00:00.000Z"),
+          Temporal.Instant.from("2026-06-01T00:00:00.000Z"),
         );
 
         expect(host.lastQuery?.startDate).toBe("2026-06-01T00:00:00.000Z");

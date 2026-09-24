@@ -1,4 +1,4 @@
-import { format } from "@langwatch/time";
+import { format, toEpochMs } from "@langwatch/time";
 
 /**
  * Formats a date string for chart axis ticks and tooltips.
@@ -16,8 +16,8 @@ export const formatChartDate = ({
 }): string => {
   if (!date) return "";
 
-  const parsed = new Date(date);
-  const isUnparseable = isNaN(parsed.getTime());
+  const parsed = toEpochMs(date);
+  const isUnparseable = Number.isNaN(parsed);
   if (isUnparseable) return "";
 
   if (typeof timeScale === "number" && timeScale < 1440) {

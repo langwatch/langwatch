@@ -39,7 +39,7 @@ const currentStartMs = endMs - 7 * DAY_MS;
 // the trend is measured against is the one the page would have asked for.
 const previousStartMs = createAnalyticsComparisonWindow()
   .currentVsPrevious({ startDate: currentStartMs, endDate: endMs })
-  .previousPeriodStartDate.getTime();
+  .previousPeriodStartDate.epochMilliseconds;
 
 let clickHouse: ClickHouseClient;
 let queryCount = 0;

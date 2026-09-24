@@ -131,8 +131,8 @@ export function useFilterParams() {
   const filterParams: AnalyticsReadScope = useMemo(
     () => ({
       projectId: project?.id ?? "",
-      startDate: startDate.getTime(),
-      endDate: endDate.getTime(),
+      startDate: startDate.epochMilliseconds,
+      endDate: endDate.epochMilliseconds,
       filters,
       ...(typeof queryParams.query === "string" ? { query: queryParams.query } : {}),
       ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
@@ -154,7 +154,7 @@ export function useFilterParams() {
     filterCount,
     hasAnyFilters,
     queryOpts: {
-      enabled: !!project && !isNaN(startDate.getTime()) && !isNaN(endDate.getTime()),
+      enabled: !!project,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       trpc: { context: { skipBatch: true } },

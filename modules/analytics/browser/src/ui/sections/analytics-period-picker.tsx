@@ -7,12 +7,13 @@
 import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";
 import { Box, Button, Field, HStack, Input, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { format, nowInstant, toDate } from "@langwatch/time";
+import { format, nowInstant, type Instant } from "@langwatch/time";
 import { ChevronDown } from "react-feather";
 import { LuCalendar } from "react-icons/lu";
 
 import {
   ANALYTICS_RELATIVE_PRESETS,
+  instantFromText,
   presetForRange,
   type AnalyticsPeriod,
   type AnalyticsPeriodMode,
@@ -43,7 +44,7 @@ export function AnalyticsPeriodPicker({
    * applying.
    */
   label?: string;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (presetKey: AnalyticsPresetKey) => void;
   /**
    * Takes the range back off, offered as "All time". Only surfaces that show
@@ -67,15 +68,15 @@ export function AnalyticsPeriodPicker({
 
   const getDateRangeLabel = () => {
     if (mode === "relative") {
-      const matchedByDays = presetForRange(startDate, endDate, toDate(nowInstant()));
+      const matchedByDays = presetForRange(startDate, endDate, nowInstant());
       if (matchedByDays) return matchedByDays.label;
 
-      const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+      const minutes = Math.round((endDate.epochMilliseconds - startDate.epochMilliseconds) / 60000);
       const subDay = ANALYTICS_RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
       if (subDay) return subDay.label;
     }
 
-    return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
+    return `${format(startDate.epochMilliseconds, "MMM d")} - ${format(endDate.epochMilliseconds, "MMM d")}`;
   };
 
   return (
@@ -107,16 +108,20 @@ export function AnalyticsPeriodPicker({
                 <Field.Label>Start Date</Field.Label>
                 <Input
                   type="datetime-local"
-                  value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(new Date(e.target.value), endDate)}
+                  value={format(startDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(e) =>
+                    setPeriod(instantFromText(e.target.value, nowInstant()), endDate)
+                  }
                 />
               </Field.Root>
               <Field.Root>
                 <Field.Label>End Date</Field.Label>
                 <Input
                   type="datetime-local"
-                  value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) => setPeriod(startDate, new Date(e.target.value))}
+                  value={format(endDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
+                  onChange={(e) =>
+                    setPeriod(startDate, instantFromText(e.target.value, nowInstant()))
+                  }
                 />
               </Field.Root>
             </VStack>

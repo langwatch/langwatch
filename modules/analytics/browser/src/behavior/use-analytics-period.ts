@@ -4,6 +4,7 @@
  * every frame and refetches forever (see use-analytics-period.unit.test.ts).
  */
 
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { useCallback, useMemo } from "react";
 
 import { useAnalyticsHost } from "../model/analytics-host.ts";
@@ -24,7 +25,7 @@ export type AnalyticsPeriodState = {
    */
   isDefault: boolean;
   daysDifference: number;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (presetKey: AnalyticsPresetKey) => void;
 };
 
@@ -33,7 +34,7 @@ export function useAnalyticsPeriod(defaultNDays = 30): AnalyticsPeriodState {
   const { query } = host.route();
 
   // Read once per render, and NEVER a dependency of the memo below.
-  const now = new Date();
+  const now = nowInstant();
   const queryPeriod = query.period;
   const queryStartDate = query.startDate;
   const queryEndDate = query.endDate;
@@ -54,12 +55,8 @@ export function useAnalyticsPeriod(defaultNDays = 30): AnalyticsPeriodState {
   );
 
   const setPeriod = useCallback(
-    (startDate: Date, endDate: Date) => {
-      const hasValidEnd = endDate instanceof Date && !isNaN(endDate.getTime());
-      const validEnd = hasValidEnd ? endDate : new Date();
-      const hasValidStart = startDate instanceof Date && !isNaN(startDate.getTime());
-      let validStart = hasValidStart ? startDate : new Date();
-      if (validStart > validEnd) validStart = validEnd;
+    (startDate: Instant, endDate: Instant) => {
+      const validStart = Temporal.Instant.compare(startDate, endDate) > 0 ? endDate : startDate;
 
       // An absolute range and a preset are the same setting written two ways,
       // so setting one REMOVES the other. That is the whole reason the host's
@@ -67,8 +64,8 @@ export function useAnalyticsPeriod(defaultNDays = 30): AnalyticsPeriodState {
       host.setQuery({
         ...host.route().query,
         period: void 0,
-        startDate: validStart.toISOString(),
-        endDate: validEnd.toISOString(),
+        startDate: validStart.toString({ fractionalSecondDigits: 3 }),
+        endDate: endDate.toString({ fractionalSecondDigits: 3 }),
       });
     },
     [host],

@@ -372,10 +372,9 @@ function useSavedViewsInternal() {
       const endDateStr = router.query.endDate as string | undefined;
 
       if (startDateStr && endDateStr) {
-        const startDate = new Date(startDateStr);
-        const endDate = new Date(endDateStr);
-        const daysDifference = differenceInCalendarDays(endDate, startDate) + 1;
-        const endIsRecent = differenceInCalendarDays(new Date(), endDate) <= 1;
+        const daysDifference = differenceInCalendarDays(endDateStr, startDateStr) + 1;
+        const endIsRecent =
+          differenceInCalendarDays(nowInstant().epochMilliseconds, endDateStr) <= 1;
 
         if (endIsRecent) {
           period = { relativeDays: daysDifference };

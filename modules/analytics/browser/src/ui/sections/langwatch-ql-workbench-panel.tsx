@@ -22,7 +22,7 @@ export function LangWatchQLWorkbench({ projectId }: LangWatchQLWorkbenchProps) {
   const { period } = useAnalyticsPeriod();
   const { colorMode } = useColorMode();
   const pageTimeWindow = useMemo(
-    () => ({ start: period.startDate.getTime(), end: period.endDate.getTime() }),
+    () => ({ start: period.startDate.epochMilliseconds, end: period.endDate.epochMilliseconds }),
     [period.startDate, period.endDate],
   );
 

@@ -101,8 +101,8 @@ const ONE_DAY = MINUTES_IN_DAY;
 
 export interface CustomGraphFormData {
   title?: string;
-  startDate?: Date;
-  endDate?: Date;
+  startDate?: string;
+  endDate?: string;
   graphType?: {
     label: string;
     value: CustomGraphInput["graphType"];
