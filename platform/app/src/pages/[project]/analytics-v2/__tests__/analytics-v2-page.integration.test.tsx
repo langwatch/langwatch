@@ -23,7 +23,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { usePeriodSelector } from "~/components/PeriodSelector";
 import { ANALYTICS_V2_WIDGETS } from "~/features/analytics-v2/widgets";
+
+import AnalyticsV2Page from "../index";
 
 const state = vi.hoisted(() => ({
   period: {
@@ -69,23 +72,20 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   }),
 }));
 
-vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", async () => {
-  const { usePeriodSelector } = await import("~/components/PeriodSelector");
-  return {
-    DashboardWidgetFrame: (props: { id: string; graph: unknown }) => {
-      state.frameCalls.push({ id: props.id, graph: props.graph });
-      if (state.throwForId === props.id) {
-        throw new Error(`widget ${props.id} crashed`);
-      }
-      const { period } = usePeriodSelector();
-      return (
-        <div data-testid="frame">
-          {`${props.id}:${period.startDate.toISOString()}`}
-        </div>
-      );
-    },
-  };
-});
+vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", () => ({
+  DashboardWidgetFrame: (props: { id: string; graph: unknown }) => {
+    state.frameCalls.push({ id: props.id, graph: props.graph });
+    if (state.throwForId === props.id) {
+      throw new Error(`widget ${props.id} crashed`);
+    }
+    const { period } = usePeriodSelector();
+    return (
+      <div data-testid="frame">
+        {`${props.id}:${period.startDate.toISOString()}`}
+      </div>
+    );
+  },
+}));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -109,8 +109,7 @@ describe("the Analytics v2 page", () => {
 
   describe("given a project with LangWatchQL enabled", () => {
     /** @scenario "The Analytics v2 page shows the nine charts" */
-    it("shows nine widget cards, titled in contract order, each rendering its own definition", async () => {
-      const { default: AnalyticsV2Page } = await import("../index");
+    it("shows nine widget cards, titled in contract order, each rendering its own definition", () => {
       render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
       for (const widget of ANALYTICS_V2_WIDGETS) {
@@ -129,8 +128,7 @@ describe("the Analytics v2 page", () => {
 
     describe("when the member picks a different period", () => {
       /** @scenario "Changing the period re-queries every chart" */
-      it("re-renders every one of the nine widgets with the new period", async () => {
-        const { default: AnalyticsV2Page } = await import("../index");
+      it("re-renders every one of the nine widgets with the new period", () => {
         const { rerender } = render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
         const before = screen
@@ -157,9 +155,8 @@ describe("the Analytics v2 page", () => {
 
     describe("when one widget throws while rendering", () => {
       /** @scenario "One failing widget does not take the other eight down" */
-      it("shows a failure for that card and still renders the other eight", async () => {
+      it("shows a failure for that card and still renders the other eight", () => {
         state.throwForId = "top-models";
-        const { default: AnalyticsV2Page } = await import("../index");
         render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
         expect(
@@ -172,9 +169,8 @@ describe("the Analytics v2 page", () => {
 
   describe("given a project without LangWatchQL enabled", () => {
     /** @scenario "A project without LangWatchQL sees one clear message" */
-    it("shows the disabled message and renders no widget cards", async () => {
+    it("shows the disabled message and renders no widget cards", () => {
       state.lwqlEnabled = false;
-      const { default: AnalyticsV2Page } = await import("../index");
       render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
       expect(
@@ -186,9 +182,8 @@ describe("the Analytics v2 page", () => {
 
   describe("when the organization is still resolving", () => {
     /** @scenario "The page waits while the organization is still resolving" */
-    it("shows the spinner and neither the disabled message nor a widget card", async () => {
+    it("shows the spinner and neither the disabled message nor a widget card", () => {
       state.organization = undefined;
-      const { default: AnalyticsV2Page } = await import("../index");
       render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
       expect(screen.getByTestId("analytics-v2-loading")).toBeInTheDocument();
@@ -201,9 +196,8 @@ describe("the Analytics v2 page", () => {
 
   describe("when the LangWatchQL flag check fails", () => {
     /** @scenario "A failed LangWatchQL flag check offers a retry" */
-    it("shows a retryable error and clicking Try again refetches", async () => {
+    it("shows a retryable error and clicking Try again refetches", () => {
       state.lwqlIsError = true;
-      const { default: AnalyticsV2Page } = await import("../index");
       render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
       expect(screen.getByTestId("analytics-v2-flag-error")).toBeInTheDocument();
@@ -218,10 +212,9 @@ describe("the Analytics v2 page", () => {
 
   describe("when the workspace read is refused", () => {
     /** @scenario "A refused workspace read shows an error with a retry, not a spinner" */
-    it("renders the workspace error with a Try again control and no spinner, message or widget card", async () => {
+    it("renders the workspace error with a Try again control and no spinner, message or widget card", () => {
       state.workspaceError = new Error("FORBIDDEN");
       state.organization = undefined;
-      const { default: AnalyticsV2Page } = await import("../index");
       render(<AnalyticsV2Page />, { wrapper: Wrapper });
 
       expect(
