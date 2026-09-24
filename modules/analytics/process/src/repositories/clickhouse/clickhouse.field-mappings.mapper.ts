@@ -407,9 +407,9 @@ export const fieldMappings: Record<string, FieldMapping> = {
 };
 
 /**
- * Get the CH field mapping for an ES field path
+ * The CH field mapping for an ES field path, from the fixed table
  */
-export function getFieldMapping(esField: string): FieldMapping | undefined {
+export function pickFieldMapping(esField: string): FieldMapping | undefined {
   return fieldMappings[esField];
 }
 

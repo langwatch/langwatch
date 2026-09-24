@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { GATEWAY_OVERRIDES } from "../lwql-gateway-overrides.rules.ts";
-import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../lwql-view-catalog.rules.ts";
+import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -14,7 +14,7 @@ describe("given the gateway_request_spend view", () => {
     });
 
     it("carries the output gate on the built column", () => {
-      const view = lwqlViewByName("gateway_request_spend");
+      const view = pickLwqlViewByName("gateway_request_spend");
       expect(view, "gateway_request_spend must be in the catalog").toBeDefined();
       const column = view!.columns.find((c) => c.name === "MetadataMap");
       expect(column, "MetadataMap must be an exposed column").toBeDefined();

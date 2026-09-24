@@ -10,15 +10,11 @@ import { TraceCapabilityUnavailableError, type TraceSummaryData } from "@langwat
 
 import { MemberTraceClickHouseClientRepository } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
+import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { TRACE_PROCESSING_PIPELINE_NAME } from "../services/eventing.trace-pipeline.service.ts";
 import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
-import type { TraceSpanDedup } from "../services/trace-ingestion.service.ts";
 import { TraceProcessingProducerAdapter } from "../services/trace-processing-producer.service.ts";
-import {
-  RedisTraceSpanDedupAdapter,
-  type TraceSpanDedupConnection,
-} from "../services/trace-span-dedup.service.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";
 import type { TraceProcessingCommands } from "./trace.members.ts";
 
@@ -38,12 +34,8 @@ export type TraceCollaborators = Readonly<{
   fallbackVisibilityDays: number;
   processName: string;
   publicBaseUrl?: string;
-  /**
-   * The ingestion doors' duplicate claim. Always present: where the process
-   * opened no Redis it is the null claim, which records a retried span twice
-   * rather than dropping it.
-   */
-  dedup: TraceSpanDedup;
+  /** The ingestion doors' duplicate claim, so an SDK's retry is not a second span. */
+  dedup: TraceSpanDedupRepository;
 }>;
 
 /** Exactly the process members {@link buildTraceCollaborators} reads. */
@@ -51,8 +43,6 @@ export type TraceBuildMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   eventing: EventSourcing;
   logger: Logger;
-  /** What the ingestion doors claim a span id in, so a retry is not a second span. */
-  redis: TraceSpanDedupConnection;
 }>;
 
 /** The config slice the deployment states for this module. */
@@ -70,6 +60,7 @@ export type TraceBuildConfig = Readonly<{
 export function buildTraceCollaborators(input: {
   members: TraceBuildMembers;
   config: TraceBuildConfig;
+  dedup: TraceSpanDedupRepository;
 }): TraceCollaborators {
   const { members, config } = input;
   const refuse = refusalFactory(config.processName);
@@ -100,10 +91,7 @@ export function buildTraceCollaborators(input: {
           processName: config.processName,
         }),
     broadcast: refusingBroadcast(refuse),
-    dedup: RedisTraceSpanDedupAdapter.create({
-      connection: members.redis,
-      logger: members.logger,
-    }),
+    dedup: input.dedup,
     fallbackVisibilityDays: config.fallbackVisibilityDays,
     processName: config.processName,
     ...(config.publicBaseUrl === undefined ? {} : { publicBaseUrl: config.publicBaseUrl }),

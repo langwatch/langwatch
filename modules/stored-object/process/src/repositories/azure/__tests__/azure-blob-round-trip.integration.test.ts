@@ -16,6 +16,7 @@ import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3Config,
+  type StoredObjectProjectBucket,
 } from "#services/stored-object-destination-policy.service";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 import { StoredObjectsService } from "#services/stored-objects.service";
@@ -91,8 +92,8 @@ function azureOnlyRegistry(): StoredObjectStorageRegistryAdapter {
 }
 
 class NoPrivateBucket extends StoredObjectProjectS3Config {
-  async tryGet(): Promise<null> {
-    return null;
+  async resolveBucket(): Promise<StoredObjectProjectBucket> {
+    return { kind: "platform" };
   }
 }
 

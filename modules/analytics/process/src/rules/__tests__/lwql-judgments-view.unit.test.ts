@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import { lwqlViewByName } from "../lwql-view-catalog.rules.ts";
+import { pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
@@ -30,7 +30,7 @@ const NAMES: LangWatchQLNames = {
 };
 
 function judgments() {
-  const view = lwqlViewByName("judgments");
+  const view = pickLwqlViewByName("judgments");
   if (!view) throw new Error("the judgments dataset is not in the catalog");
   return view;
 }

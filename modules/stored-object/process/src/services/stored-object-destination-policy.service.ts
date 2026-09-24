@@ -13,8 +13,16 @@ export abstract class StoredObjectAzureDestination {
   abstract resolve(): Readonly<{ accountName: string; container: string }>;
 }
 
+/**
+ * A project's own (BYOC) bucket when its organization routes one, the platform's destination
+ * otherwise.
+ */
+export type StoredObjectProjectBucket =
+  | Readonly<{ kind: "byoc"; bucket: string }>
+  | Readonly<{ kind: "platform" }>;
+
 export abstract class StoredObjectProjectS3Config {
-  abstract tryGet(projectId: string): Promise<Readonly<{ bucket: string }> | null>;
+  abstract resolveBucket(projectId: string): Promise<StoredObjectProjectBucket>;
 }
 
 /** Pure BYOC-first destination policy; environment parsing stays at roots. */
@@ -34,8 +42,8 @@ export class StoredObjectDestinationPolicyAdapter extends StoredObjectProjectDes
   }
 
   async resolve(projectId: string): Promise<StoredObjectStorageDestination> {
-    const privateConfig = await this.projects.tryGet(projectId);
-    if (privateConfig?.bucket) return { kind: "s3", bucket: privateConfig.bucket };
+    const projectBucket = await this.projects.resolveBucket(projectId);
+    if (projectBucket.kind === "byoc") return { kind: "s3", bucket: projectBucket.bucket };
 
     if (this.selection.backend === "azure") {
       const azure = this.selection.azure?.resolve();

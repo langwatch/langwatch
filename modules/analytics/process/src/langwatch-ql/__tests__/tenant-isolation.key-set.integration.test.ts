@@ -6,7 +6,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { lwqlViewByName } from "../../rules/lwql-view-catalog.rules.ts";
+import { pickLwqlViewByName } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import {
@@ -203,8 +203,8 @@ describe("given the coding-agent views provisioned over the shipped migrations",
     database = harness.names.database;
     facts = harness.factDatabase;
 
-    const sessions = lwqlViewByName("coding_sessions");
-    const sessionEvents = lwqlViewByName("coding_session_events");
+    const sessions = pickLwqlViewByName("coding_sessions");
+    const sessionEvents = pickLwqlViewByName("coding_session_events");
     if (!sessions || !sessionEvents) {
       throw new Error("coding_sessions / coding_session_events are not in LWQL_VIEW_CATALOG");
     }

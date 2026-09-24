@@ -18,6 +18,7 @@ import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3Config,
+  type StoredObjectProjectBucket,
   type StoredObjectStorageSelection,
 } from "../stored-object-destination-policy.service.ts";
 import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.service.ts";
@@ -36,8 +37,8 @@ class StubProjectS3Config extends StoredObjectProjectS3Config {
     super();
   }
 
-  async tryGet(): Promise<Readonly<{ bucket: string }> | null> {
-    return this.bucket ? { bucket: this.bucket } : null;
+  async resolveBucket(): Promise<StoredObjectProjectBucket> {
+    return this.bucket ? { kind: "byoc", bucket: this.bucket } : { kind: "platform" };
   }
 }
 

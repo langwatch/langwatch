@@ -22,6 +22,15 @@ import {
 export type TraceEditIOField = "input" | "output";
 
 /**
+ * What taking a corrected field back off did: nothing to take off, the whole correction gone,
+ * or what remains.
+ */
+export type TraceEditRemoval =
+  | Readonly<{ outcome: "absent" }>
+  | Readonly<{ outcome: "cleared" }>
+  | Readonly<{ outcome: "updated"; overlay: TraceEditOverlayDto }>;
+
+/**
  * Reviewer corrections for a trace: read, replace, merge and remove. At most one correction per
  * trace, so every write is an upsert with `updatedBy` set to the current editor; a stored patch
  * this build cannot interpret reads as no correction, since a bad row must not fail a trace read.
@@ -152,18 +161,18 @@ export class TraceEditOverlayService {
     traceId: string;
     field: TraceEditIOField;
     userId: string | null;
-  }): Promise<TraceEditOverlayDto | null> {
+  }): Promise<TraceEditRemoval> {
     const existing = await this.repository.findByProjectAndTrace({
       projectId,
       traceId,
     });
     if (!existing) {
-      return null;
+      return { outcome: "absent" };
     }
 
     const current = parseTraceEditOverlayPatch(existing.patch);
     if (!current?.trace?.[field]) {
-      return null;
+      return { outcome: "absent" };
     }
 
     const { [field]: _removed, ...remainingTraceEdits } = current.trace;
@@ -178,10 +187,13 @@ export class TraceEditOverlayService {
     if (!patchHasAnyEdit(next)) {
       await this.repository.delete({ projectId, traceId });
 
-      return null;
+      return { outcome: "cleared" };
     }
 
-    return this.upsert({ projectId, traceId, patch: next, userId });
+    return {
+      outcome: "updated",
+      overlay: await this.upsert({ projectId, traceId, patch: next, userId }),
+    };
   }
 
   /**
@@ -241,19 +253,19 @@ export class TraceEditOverlayService {
     spanId: string;
     field: TraceEditIOField;
     userId: string | null;
-  }): Promise<TraceEditOverlayDto | null> {
+  }): Promise<TraceEditRemoval> {
     const existing = await this.repository.findByProjectAndTrace({
       projectId,
       traceId,
     });
     if (!existing) {
-      return null;
+      return { outcome: "absent" };
     }
 
     const current = parseTraceEditOverlayPatch(existing.patch);
     const existingSpan = current?.spans.find((span) => span.spanId === spanId);
     if (!current || existingSpan?.[field] === undefined) {
-      return null;
+      return { outcome: "absent" };
     }
 
     const { [field]: _removed, ...remainingSpanEdits } = existingSpan;
@@ -272,10 +284,13 @@ export class TraceEditOverlayService {
     if (!patchHasAnyEdit(next)) {
       await this.repository.delete({ projectId, traceId });
 
-      return null;
+      return { outcome: "cleared" };
     }
 
-    return this.upsert({ projectId, traceId, patch: next, userId });
+    return {
+      outcome: "updated",
+      overlay: await this.upsert({ projectId, traceId, patch: next, userId }),
+    };
   }
 
   async delete({ projectId, traceId }: { projectId: string; traceId: string }): Promise<void> {

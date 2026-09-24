@@ -4,16 +4,20 @@
 
 import { describe, expect, it } from "vitest";
 
-import { type TraceSpanDedup, type SpanDedupRef } from "../trace-ingestion.service.ts";
+import {
+  type SpanDedupClaim,
+  type SpanDedupRef,
+  type TraceSpanDedupRepository,
+} from "../../repositories/trace-span-dedup.repository.ts";
 
-describe("TraceSpanDedup", () => {
+describe("TraceSpanDedupRepository", () => {
   describe("given a plain object with the port's three methods", () => {
     it("is usable as the port, so a caller needs no adapter class", () => {
       const seen: SpanDedupRef[] = [];
-      const dedup: TraceSpanDedup = {
-        async tryAcquireProcessingLock(span: SpanDedupRef) {
+      const dedup: TraceSpanDedupRepository = {
+        async claimProcessing(span: SpanDedupRef): Promise<SpanDedupClaim> {
           seen.push(span);
-          return true;
+          return { outcome: "acquired" };
         },
         async confirmProcessed(span: SpanDedupRef) {
           seen.push(span);
@@ -23,7 +27,7 @@ describe("TraceSpanDedup", () => {
         },
       };
 
-      void dedup.tryAcquireProcessingLock({
+      void dedup.claimProcessing({
         tenantId: "tenant-1",
         traceId: "trace-1",
         spanId: "span-1",

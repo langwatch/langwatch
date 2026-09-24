@@ -15,7 +15,7 @@ import { ValidationError } from "@langwatch/handled-error";
 import {
   type CHTable,
   fieldMappings,
-  getFieldMapping,
+  pickFieldMapping,
   qualifiedColumn,
   tableAliases,
 } from "./clickhouse.field-mappings.mapper.ts";
@@ -414,7 +414,7 @@ function translateMappedMetric({
   metric: string;
   requiredJoins: CHTable[];
 }): MetricTranslation | null {
-  const mapping = getFieldMapping(metric);
+  const mapping = pickFieldMapping(metric);
   if (!mapping) return null;
 
   const column = qualifiedColumn(metric);

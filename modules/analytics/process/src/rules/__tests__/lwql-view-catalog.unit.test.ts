@@ -21,7 +21,7 @@ import {
   gateForContentCategory,
   isContentAttributeKey,
 } from "../lwql-content-gating.rules.ts";
-import { LWQL_VIEW_CATALOG, lwqlViewByName } from "../lwql-view-catalog.rules.ts";
+import { LWQL_VIEW_CATALOG, pickLwqlViewByName } from "../lwql-view-catalog.rules.ts";
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -242,8 +242,8 @@ describe("given the LangWatchQL view catalog", () => {
     });
 
     it("resolves a view by the name a caller writes, and nothing else", () => {
-      expect(lwqlViewByName("traces")?.sourceTable).toBe("trace_summaries");
-      expect(lwqlViewByName("trace_summaries")).toBeUndefined();
+      expect(pickLwqlViewByName("traces")?.sourceTable).toBe("trace_summaries");
+      expect(pickLwqlViewByName("trace_summaries")).toBeUndefined();
     });
 
     /**
@@ -444,7 +444,7 @@ describe("given the LangWatchQL view catalog", () => {
      */
     it("is a claim about those datasets, because the complete records do gate content", () => {
       for (const name of ["traces", "evaluations", "simulations"] as const) {
-        const view = lwqlViewByName(name);
+        const view = pickLwqlViewByName(name);
         expect(view, `${name} is not in the catalog`).toBeDefined();
         expect(
           view!.columns.filter(catalogShapes.isContentGated).length,
@@ -515,7 +515,7 @@ describe("given the LangWatchQL view catalog", () => {
      */
     /** @scenario "A pre-aggregated dataset advertises its whole bucket key as its join keys" */
     it("leaves a record dataset free to advertise a foreign key it is not unique on", () => {
-      const evaluations = lwqlViewByName("evaluations")!;
+      const evaluations = pickLwqlViewByName("evaluations")!;
       expect([...evaluations.joinKeys].toSorted()).not.toEqual(
         [...catalogShapes.grainColumns(evaluations)].toSorted(),
       );
@@ -540,7 +540,7 @@ describe("given the LangWatchQL view catalog", () => {
    * The dataset whose engine key and grain come apart.
    */
   describe("when a dataset's source sorts by a column its write path moves", () => {
-    const evaluationMetrics = lwqlViewByName("evaluation_metrics")!;
+    const evaluationMetrics = pickLwqlViewByName("evaluation_metrics")!;
 
     /** @scenario "A dataset whose sort key moves declares the strategy that deduplicates it" */
     it("deduplicates by the record rather than by the engine's key", () => {
@@ -855,7 +855,7 @@ describe("given the LangWatchQL view catalog", () => {
     });
 
     it("leaves a column's gates alone when its dataset is ungated", () => {
-      const traces = lwqlViewByName("traces")!;
+      const traces = pickLwqlViewByName("traces")!;
       for (const column of traces.columns) {
         expect(catalogShapes.columnGates({ view: traces, column })).toBe(column.gates);
       }

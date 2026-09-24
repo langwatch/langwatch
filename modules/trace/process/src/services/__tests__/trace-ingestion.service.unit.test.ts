@@ -7,10 +7,10 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  TraceIngressCommand,
-  TraceIngestionService,
-  TraceSpanDedup,
-} from "../trace-ingestion.service.ts";
+  type SpanDedupClaim,
+  TraceSpanDedupRepository,
+} from "../../repositories/trace-span-dedup.repository.ts";
+import { TraceIngressCommand, TraceIngestionService } from "../trace-ingestion.service.ts";
 import { TestCodingAgentService } from "./support/coding-agent.service.fake.ts";
 
 class TestTraceIngressCommand extends TraceIngressCommand {
@@ -21,12 +21,12 @@ class TestTraceIngressCommand extends TraceIngressCommand {
   }
 }
 
-class TestTraceSpanDedup extends TraceSpanDedup {
-  readonly acquire = vi.fn<() => Promise<boolean | null>>(async () => true);
+class TestTraceSpanDedup extends TraceSpanDedupRepository {
+  readonly acquire = vi.fn<() => Promise<SpanDedupClaim>>(async () => ({ outcome: "acquired" }));
   readonly confirm = vi.fn(async () => void 0);
   readonly release = vi.fn(async () => void 0);
 
-  tryAcquireProcessingLock(): Promise<boolean | null> {
+  claimProcessing(): Promise<SpanDedupClaim> {
     return this.acquire();
   }
 
@@ -125,7 +125,7 @@ describe("TraceIngestionService.ingestNormalizedSpan", () => {
   describe("given another worker already claimed the span", () => {
     it("does not dispatch it a second time", async () => {
       const { commands, dedup, service } = fixture();
-      dedup.acquire.mockResolvedValueOnce(false);
+      dedup.acquire.mockResolvedValueOnce({ outcome: "held" });
 
       await expect(service.ingestNormalizedSpan(input())).resolves.toEqual({
         status: "deduped",
@@ -151,7 +151,7 @@ describe("TraceIngestionService.ingestNormalizedSpan", () => {
   describe("given the dedup store is unavailable", () => {
     it("fails open and ingests the span anyway", async () => {
       const { commands, dedup, service } = fixture();
-      dedup.acquire.mockResolvedValueOnce(null);
+      dedup.acquire.mockResolvedValueOnce({ outcome: "unknown" });
 
       await expect(service.ingestNormalizedSpan(input())).resolves.toMatchObject({
         status: "collected",
@@ -307,7 +307,7 @@ describe("TraceIngestionService.handleOtlpTraceRequest", () => {
   describe("given a span dedup has already seen", () => {
     it("does not count it as rejected", async () => {
       const { dedup, service } = fixture();
-      dedup.acquire.mockResolvedValue(false);
+      dedup.acquire.mockResolvedValue({ outcome: "held" });
 
       await expect(handle(service, [span()])).resolves.toEqual({
         rejectedSpans: 0,

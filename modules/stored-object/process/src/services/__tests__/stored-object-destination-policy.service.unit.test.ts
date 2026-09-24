@@ -17,6 +17,7 @@ import {
   StoredObjectAzureDestination,
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3Config,
+  type StoredObjectProjectBucket,
 } from "../stored-object-destination-policy.service.ts";
 
 const TEST_BYTES = Buffer.from("hello");
@@ -30,8 +31,8 @@ class StubProjects extends StoredObjectProjectS3Config {
   constructor(private readonly bucket: string | null) {
     super();
   }
-  async tryGet(): Promise<Readonly<{ bucket: string }> | null> {
-    return this.bucket ? { bucket: this.bucket } : null;
+  async resolveBucket(): Promise<StoredObjectProjectBucket> {
+    return this.bucket ? { kind: "byoc", bucket: this.bucket } : { kind: "platform" };
   }
 }
 

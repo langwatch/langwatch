@@ -4,7 +4,7 @@ import {
   buildJoinClause,
   fieldMappings,
   getColumnExpression,
-  getFieldMapping,
+  pickFieldMapping,
   getFieldsRequiringTable,
   getTableAlias,
   getTableForField,
@@ -67,16 +67,16 @@ describe("field-mappings", () => {
     });
   });
 
-  describe("getFieldMapping()", () => {
+  describe("pickFieldMapping()", () => {
     it("returns mapping for known fields", () => {
-      const mapping = getFieldMapping("trace_id");
+      const mapping = pickFieldMapping("trace_id");
       expect(mapping).toBeDefined();
       expect(mapping?.table).toBe("trace_summaries");
       expect(mapping?.column).toBe("TraceId");
     });
 
     it("returns undefined for unknown fields", () => {
-      const mapping = getFieldMapping("unknown.field");
+      const mapping = pickFieldMapping("unknown.field");
       expect(mapping).toBeUndefined();
     });
   });

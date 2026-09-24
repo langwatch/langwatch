@@ -2707,6 +2707,6 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
 ];
 
 /** Looks a view up by the name a caller writes. */
-export function lwqlViewByName(name: string): LangWatchQLViewDefinition | undefined {
+export function pickLwqlViewByName(name: string): LangWatchQLViewDefinition | undefined {
   return LWQL_VIEW_CATALOG.find((view) => view.name === name);
 }

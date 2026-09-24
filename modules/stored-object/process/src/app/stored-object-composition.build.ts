@@ -27,6 +27,7 @@ import { PrometheusStoredObjectsTelemetryAdapter } from "../services/prometheus.
 import {
   StoredObjectDestinationPolicyAdapter,
   StoredObjectProjectS3Config,
+  type StoredObjectProjectBucket,
 } from "../services/stored-object-destination-policy.service.ts";
 import { StoredObjectStorageRegistryAdapter } from "../services/stored-object-storage-registry.service.ts";
 import { StoredObjectStorageRuntimeAdapter } from "../services/stored-object-storage-runtime.service.ts";
@@ -123,7 +124,10 @@ type StoredObjectS3RouteTable = Readonly<
  * Which S3 account a project's objects belong in. THE PROJECT'S ORGANIZATION
  * IS RE-READ ON EVERY RESOLUTION, deliberately.
  */
-class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
+class StoredObjectS3Targets
+  extends StoredObjectProjectS3Config
+  implements StoredObjectS3TargetResolver
+{
   private readonly projectOrganizations: PrismaStoredObjectProjectOrganizationRepository;
   private readonly storage: StoredObjectServerConfig;
   private readonly routes: StoredObjectS3RouteTable;
@@ -135,6 +139,7 @@ class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
     routes: StoredObjectS3RouteTable;
     deploymentSecrets: StoredObjectS3DeploymentSecrets;
   }) {
+    super();
     this.projectOrganizations = deps.projectOrganizations;
     this.storage = deps.storage;
     this.routes = deps.routes;
@@ -183,9 +188,9 @@ class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
   }
 
   /** The bucket half of the same answer, for the destination policy. */
-  async tryBucket(projectId: string): Promise<string | null> {
+  async resolveBucket(projectId: string): Promise<StoredObjectProjectBucket> {
     const route = await this.tryRoute(projectId);
-    return route?.bucket ?? null;
+    return route?.bucket ? { kind: "byoc", bucket: route.bucket } : { kind: "platform" };
   }
 
   private async tryRoute(projectId: string) {
@@ -193,18 +198,6 @@ class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
     const organizationId = await this.projectOrganizations.findOrganizationId(projectId);
     if (!organizationId) return null;
     return this.routes[organizationId] ?? null;
-  }
-}
-
-/** The bucket a BYOC project's new objects are minted against. */
-class StoredObjectProjectBuckets extends StoredObjectProjectS3Config {
-  constructor(private readonly targets: StoredObjectS3Targets) {
-    super();
-  }
-
-  async tryGet(projectId: string): Promise<Readonly<{ bucket: string }> | null> {
-    const bucket = await this.targets.tryBucket(projectId);
-    return bucket ? { bucket } : null;
   }
 }
 
@@ -328,7 +321,7 @@ export function buildStoredObjectInfrastructure(input: {
       ...(storage.s3.bucket ? { globalS3Bucket: storage.s3.bucket } : {}),
       localFilesystemRoot: storage.localFilesystemRoot ?? DEFAULT_LOCAL_FILESYSTEM_ROOT,
     },
-    projects: new StoredObjectProjectBuckets(targets),
+    projects: targets,
   });
 
   // ONE set of driver factories, read by both the indexed object store below

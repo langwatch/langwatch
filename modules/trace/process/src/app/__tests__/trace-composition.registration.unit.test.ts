@@ -8,7 +8,7 @@ import type { EventSourcing } from "@langwatch/eventing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
-import type { TraceSpanDedupConnection } from "../../services/trace-span-dedup.service.ts";
+import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import {
   buildTraceCollaborators,
   buildTraceProcessRegistrationCommands,
@@ -58,14 +58,6 @@ function recordingRuntime() {
   };
 }
 
-/** The dedup claim, which nothing in this suite reaches. */
-function unreachableDedupConnection(): TraceSpanDedupConnection {
-  const unreachable = () => {
-    throw new Error("this suite ingests no span, so it claims no dedup key");
-  };
-  return { set: unreachable, del: unreachable };
-}
-
 function collaboratorsFor(input: {
   eventing: EventSourcing;
   registersProcessingPipeline: boolean;
@@ -75,10 +67,8 @@ function collaboratorsFor(input: {
       clickhouse: {} as ClickHouseQueryClient,
       eventing: input.eventing,
       logger: silentLogger,
-      // This suite observes pipeline registration, and no span is ingested in
-      // it; the claim is never reached.
-      redis: unreachableDedupConnection(),
     },
+    dedup: MemoryTraceSpanDedupRepository.create(),
     config: {
       processName: input.registersProcessingPipeline ? "langwatch-api" : "langwatch:worker",
       fallbackVisibilityDays: 14,

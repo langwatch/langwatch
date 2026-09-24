@@ -4,21 +4,13 @@
  * changing it would re-ingest every span an SDK retries mid-rollout.
  */
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 
-import { TraceSpanDedup, type SpanDedupRef } from "./trace-ingestion.service.ts";
-
-/** Exactly the two Redis operations a claim is made and released with. */
-export interface TraceSpanDedupConnection {
-  set(
-    key: string,
-    value: string,
-    expiry: "EX",
-    seconds: number,
-    mode: "NX",
-  ): Promise<string | null>;
-  set(key: string, value: string, expiry: "EX", seconds: number): Promise<string | null>;
-  del(key: string): Promise<number>;
-}
+import {
+  type SpanDedupClaim,
+  type SpanDedupRef,
+  TraceSpanDedupRepository,
+} from "../trace-span-dedup.repository.ts";
 
 const SPAN_DEDUP_KEY_PREFIX = "span_dedup:";
 /** Short enough that a crashed process's lock expires before a retry needs it. */
@@ -30,30 +22,30 @@ const dedupKey = (span: SpanDedupRef): string =>
   `${SPAN_DEDUP_KEY_PREFIX}${span.tenantId}:${span.traceId}:${span.spanId}`;
 
 /**
- * The claim, over a real connection. Every failure is a warning and an
+ * The claim, over the process's Redis. Every failure is a warning and an
  * ingestion that proceeds: losing a duplicate is worse than recording one.
  */
-export class RedisTraceSpanDedupAdapter extends TraceSpanDedup {
+export class RedisTraceSpanDedupRepository extends TraceSpanDedupRepository {
   static create(input: {
-    connection: TraceSpanDedupConnection;
+    connection: ProcessMembers["redis"];
     logger?: Pick<Logger, "warn"> | undefined;
-  }): RedisTraceSpanDedupAdapter {
-    return new RedisTraceSpanDedupAdapter(
+  }): RedisTraceSpanDedupRepository {
+    return new RedisTraceSpanDedupRepository(
       input.connection,
       input.logger ?? createLogger("langwatch:trace:span-dedup"),
     );
   }
 
-  #connection: TraceSpanDedupConnection;
+  #connection: ProcessMembers["redis"];
   #logger: Pick<Logger, "warn">;
 
-  private constructor(connection: TraceSpanDedupConnection, logger: Pick<Logger, "warn">) {
+  private constructor(connection: ProcessMembers["redis"], logger: Pick<Logger, "warn">) {
     super();
     this.#connection = connection;
     this.#logger = logger;
   }
 
-  async tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null> {
+  async claimProcessing(span: SpanDedupRef): Promise<SpanDedupClaim> {
     try {
       const claimed = await this.#connection.set(
         dedupKey(span),
@@ -62,10 +54,10 @@ export class RedisTraceSpanDedupAdapter extends TraceSpanDedup {
         PROCESSING_TTL_SECONDS,
         "NX",
       );
-      return claimed === "OK";
+      return claimed === "OK" ? { outcome: "acquired" } : { outcome: "held" };
     } catch (error) {
       this.#logger.warn({ error, ...span }, "span dedup claim failed; ingesting anyway");
-      return null;
+      return { outcome: "unknown" };
     }
   }
 
@@ -83,24 +75,5 @@ export class RedisTraceSpanDedupAdapter extends TraceSpanDedup {
     } catch (error) {
       this.#logger.warn({ error, ...span }, "span dedup release failed");
     }
-  }
-}
-
-/** No Redis: every span is claimed, and a duplicate export records twice. */
-export class NullTraceSpanDedupAdapter extends TraceSpanDedup {
-  static create(): NullTraceSpanDedupAdapter {
-    return new NullTraceSpanDedupAdapter();
-  }
-
-  tryAcquireProcessingLock(): Promise<boolean | null> {
-    return Promise.resolve(true);
-  }
-
-  confirmProcessed(): Promise<void> {
-    return Promise.resolve();
-  }
-
-  releaseOnFailure(): Promise<void> {
-    return Promise.resolve();
   }
 }

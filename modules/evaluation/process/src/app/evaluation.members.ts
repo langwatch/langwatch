@@ -124,7 +124,8 @@ export interface EvaluationExecutionTelemetry {
  * compose whole — create, replicate, toggle and the evaluator graph — for a lookup by id.
  */
 export interface EvaluationMonitorLookup {
-  tryGetMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator | null>;
+  /** Throws `MonitorNotFoundError` when the monitor was deleted after the command was queued. */
+  getMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator>;
 }
 
 /**
@@ -260,8 +261,18 @@ export interface EvaluationInputOffloadAvailability {
 
 /** Resolves the Azure Safety provider credentials for an Evaluation tenant. */
 export interface EvaluationAzureSafetyCredentials {
-  tryGetForTenant(input: { tenantId: string }): Promise<Record<string, string> | null>;
+  resolveForTenant(input: {
+    tenantId: string;
+  }): Promise<EvaluationAzureSafetyCredentialsResolution>;
 }
+
+/**
+ * The tenant's Azure Safety provider credentials, or that none is configured (the evaluation is
+ * skipped).
+ */
+export type EvaluationAzureSafetyCredentialsResolution =
+  | Readonly<{ kind: "configured"; credentials: Record<string, string> }>
+  | Readonly<{ kind: "unconfigured" }>;
 
 /** Reads the Evaluation settings-recovery rollout switch. */
 export interface EvaluationSettingsRecovery {

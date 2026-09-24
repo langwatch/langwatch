@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { LWQL_SOURCE_ALIAS } from "../../rules/lwql-source-alias.rules.ts";
-import { lwqlViewByName } from "../../rules/lwql-view-catalog.rules.ts";
+import { pickLwqlViewByName } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
@@ -218,7 +218,7 @@ describe("given the shipped single-table catalog views", () => {
   describe("when each is rendered after the join fields were added", () => {
     for (const name of Object.keys(snapshot)) {
       it(`renders ${name} byte-for-byte as it did before`, () => {
-        const view = lwqlViewByName(name);
+        const view = pickLwqlViewByName(name);
         if (!view) throw new Error(`${name} is no longer in the catalog — the snapshot is stale`);
         const sql = viewStatements.viewStatement({
           names: SNAPSHOT_NAMES,
@@ -285,7 +285,7 @@ describe("given a catalog view that joins a second table", () => {
     });
 
     it("returns nothing for a single-table view", () => {
-      const traces = lwqlViewByName("traces");
+      const traces = pickLwqlViewByName("traces");
       if (!traces) throw new Error("traces is not in the catalog");
 
       expect(

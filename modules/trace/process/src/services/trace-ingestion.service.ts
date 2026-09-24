@@ -16,6 +16,7 @@ import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/a
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 
+import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 
 export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
@@ -29,30 +30,6 @@ export type TraceRequestCollectionResult = {
   rejectedSpans: number;
   errorMessage: string;
 };
-
-/**
- * The span a dedup key is built from. Named because all three operations take
- * the same triple, and three bare strings in a fixed order is a lock key you
- * can build wrong without the compiler noticing.
- */
-export type SpanDedupRef = {
-  tenantId: string;
-  traceId: string;
-  spanId: string;
-};
-
-/**
- * Redis-backed deduplication is app members, not Trace domain state. Only
- * `tryAcquireProcessingLock` answers "unknown" (null) when unreachable, so
- * the caller ingests rather than drop data; the other two are best-effort.
- */
-export abstract class TraceSpanDedup {
-  abstract tryAcquireProcessingLock(span: SpanDedupRef): Promise<boolean | null>;
-
-  abstract confirmProcessed(span: SpanDedupRef): Promise<void>;
-
-  abstract releaseOnFailure(span: SpanDedupRef): Promise<void>;
-}
 
 /** The Trace pipeline's one named command handoff. */
 export abstract class TraceIngressCommand {
@@ -126,7 +103,7 @@ export class TraceIngestionService {
   static create(options: {
     codingAgents: CodingAgentIngestFilter;
     codingAgentSpanFilterEnabled: boolean;
-    dedup: TraceSpanDedup;
+    dedup: TraceSpanDedupRepository;
     commands: TraceIngressCommand;
     payloads?: TraceIngressPayload;
   }): TraceIngestionService {
@@ -311,14 +288,14 @@ export class TraceSpanCollectionService {
 
   private constructor(
     private readonly options: {
-      dedup: TraceSpanDedup;
+      dedup: TraceSpanDedupRepository;
       commands: TraceIngressCommand;
       payloads?: TraceIngressPayload;
     },
   ) {}
 
   static create(options: {
-    dedup: TraceSpanDedup;
+    dedup: TraceSpanDedupRepository;
     commands: TraceIngressCommand;
     payloads?: TraceIngressPayload;
   }): TraceSpanCollectionService {
@@ -336,16 +313,16 @@ export class TraceSpanCollectionService {
     let lockAcquired = false;
 
     try {
-      const lockResult = await this.options.dedup.tryAcquireProcessingLock({
+      const claim = await this.options.dedup.claimProcessing({
         tenantId: input.tenantId,
         traceId: input.span.traceId,
         spanId: input.span.spanId,
       });
-      if (lockResult === false) {
+      if (claim.outcome === "held") {
         return { status: "deduped" };
       }
 
-      lockAcquired = lockResult === true;
+      lockAcquired = claim.outcome === "acquired";
 
       const commandData: RecordSpanCommandData = {
         tenantId: input.tenantId,
