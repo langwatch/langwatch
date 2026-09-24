@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   BetterAuthFederation,
   BetterAuthIdentityCeremonies,
+  BetterAuthAccountPin,
   BetterAuthStorage,
 } from "../../channels/better-auth.channel.ts";
 import {
@@ -68,7 +69,7 @@ class StubIdentity implements BetterAuthIdentityCeremonies {
   beforeUserDelete(): Promise<void> {
     return Promise.reject(new Error("unused"));
   }
-  tryBeforeAccountCreate(): Promise<{ data: { id: string } } | undefined> {
+  createAccountIdentifier(): Promise<BetterAuthAccountPin> {
     return Promise.reject(new Error("unused"));
   }
   beforeAccountDelete(): Promise<void> {

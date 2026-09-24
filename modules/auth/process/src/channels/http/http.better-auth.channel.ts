@@ -524,7 +524,8 @@ export const createAuthOptions = ({
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
           // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
-          return identity.tryBeforeAccountCreate(account);
+          const pin = await identity.createAccountIdentifier(account);
+          return pin.pinned ? { data: pin.data } : undefined;
         },
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId) return;

@@ -67,6 +67,27 @@ export class MemoryCliDeviceSessionRepository implements CliDeviceSessionReposit
     this.tokenIndexes.get(input.indexKey)?.delete(input.memberKey);
   }
 
+  async findIndexedTokens(indexKey: string): Promise<string[]> {
+    this.#expireIndex(indexKey);
+    return [...(this.tokenIndexes.get(indexKey) ?? [])];
+  }
+
+  async deleteIndexedTokens(input: {
+    indexKey: string;
+    memberKeys: readonly string[];
+  }): Promise<number> {
+    this.#expireIndex(input.indexKey);
+    const index = this.tokenIndexes.get(input.indexKey);
+    let deleted = 0;
+    for (const memberKey of input.memberKeys) {
+      this.#expireValue(memberKey);
+      if (this.values.delete(memberKey)) deleted += 1;
+      this.#valueExpiresAt.delete(memberKey);
+      index?.delete(memberKey);
+    }
+    return deleted;
+  }
+
   #expireValue(key: string): void {
     const expiresAt = this.#valueExpiresAt.get(key);
     if (expiresAt === undefined || expiresAt > this.#now()) return;

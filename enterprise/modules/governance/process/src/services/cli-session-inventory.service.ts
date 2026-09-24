@@ -1,63 +1,29 @@
-import { cliUserTokensIndexKey } from "@langwatch/auth-contract";
+import type { AuthApi, CliTokenRecordEntry } from "@langwatch/auth-contract";
 import {
   type CliSession,
-  type CliTokenRecord,
   type CliUserInput,
   type RevokeCliSessionInput,
-  cliTokenRecordSchema,
   cliUserInputSchema,
   revokeCliSessionInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 
-import type { CliTokenStore, GovernanceDiagnosticsSink } from "../app/governance.members.ts";
+type CliTokenAuth = Pick<AuthApi, "findCliTokenRecordsForUser" | "revokeCliTokens">;
 
 export class DefaultGovernanceCliSessionInventoryService {
-  private constructor(
-    private readonly store: CliTokenStore | undefined,
-    private readonly diagnostics: GovernanceDiagnosticsSink | undefined,
-  ) {}
+  private constructor(private readonly auth: CliTokenAuth) {}
 
-  static create(options: {
-    store?: CliTokenStore;
-    diagnostics?: GovernanceDiagnosticsSink;
-  }): DefaultGovernanceCliSessionInventoryService {
-    return new DefaultGovernanceCliSessionInventoryService(options.store, options.diagnostics);
+  static create(options: { auth: CliTokenAuth }): DefaultGovernanceCliSessionInventoryService {
+    return new DefaultGovernanceCliSessionInventoryService(options.auth);
   }
 
   async listForUser(input: CliUserInput): Promise<CliSession[]> {
     const parsed = cliUserInputSchema.parse(input);
-    if (!this.store) {
-      this.diagnostics?.warn("CLI token store is unavailable", {
-        userId: parsed.userId,
-      });
-
-      return [];
-    }
-
-    const memberKeys = await this.store.members(cliUserTokensIndexKey(parsed.userId));
-    const buckets = new Map<number, { tokenKeys: string[]; records: CliTokenRecord[] }>();
-    for (const memberKey of memberKeys) {
-      const raw = await this.store.tryGet(memberKey);
-      if (!raw) {
-        continue;
-      }
-
-      let json: unknown;
-      try {
-        json = JSON.parse(raw);
-      } catch {
-        continue;
-      }
-
-      const result = cliTokenRecordSchema.safeParse(json);
-      if (!result.success || result.data.user_id !== parsed.userId) {
-        continue;
-      }
-
-      const record = result.data;
-      const anchor = record.client_info?.session_started_at ?? record.issued_at;
+    const records = await this.auth.findCliTokenRecordsForUser({ userId: parsed.userId });
+    const buckets = new Map<number, { tokenKeys: string[]; records: CliTokenRecordEntry[] }>();
+    for (const record of records) {
+      const anchor = record.clientInfo?.sessionStartedAtMs ?? record.issuedAtMs;
       const bucket = buckets.get(anchor) ?? { tokenKeys: [], records: [] };
-      bucket.tokenKeys.push(memberKey);
+      bucket.tokenKeys.push(record.tokenKey);
       bucket.records.push(record);
       buckets.set(anchor, bucket);
     }
@@ -65,17 +31,17 @@ export class DefaultGovernanceCliSessionInventoryService {
     return [...buckets.entries()]
       .map(([sessionStartedAtMs, bucket]) => {
         const fresh = bucket.records.reduce((left, right) =>
-          left.issued_at >= right.issued_at ? left : right,
+          left.issuedAtMs >= right.issuedAtMs ? left : right,
         );
 
         return {
           sessionStartedAtMs,
-          deviceLabel: this.deviceLabel(fresh.client_info),
-          hostname: fresh.client_info?.hostname ?? null,
-          uname: fresh.client_info?.uname ?? null,
-          platform: fresh.client_info?.platform ?? null,
-          lastSeenMs: Math.max(...bucket.records.map(({ issued_at }) => issued_at)),
-          expiresAtMs: Math.max(...bucket.records.map(({ expires_at }) => expires_at)),
+          deviceLabel: this.deviceLabel(fresh.clientInfo),
+          hostname: fresh.clientInfo?.hostname ?? null,
+          uname: fresh.clientInfo?.uname ?? null,
+          platform: fresh.clientInfo?.platform ?? null,
+          lastSeenMs: Math.max(...bucket.records.map(({ issuedAtMs }) => issuedAtMs)),
+          expiresAtMs: Math.max(...bucket.records.map(({ expiresAtMs }) => expiresAtMs)),
           tokenKeys: bucket.tokenKeys,
         };
       })
@@ -84,10 +50,6 @@ export class DefaultGovernanceCliSessionInventoryService {
 
   async revokeSession(input: RevokeCliSessionInput): Promise<{ revokedTokens: number }> {
     const parsed = revokeCliSessionInputSchema.parse(input);
-    if (!this.store) {
-      return { revokedTokens: 0 };
-    }
-
     const sessions = await this.listForUser({ userId: parsed.userId });
     const target = sessions.find(
       ({ sessionStartedAtMs }) => sessionStartedAtMs === parsed.sessionStartedAtMs,
@@ -96,24 +58,19 @@ export class DefaultGovernanceCliSessionInventoryService {
       return { revokedTokens: 0 };
     }
 
-    let revokedTokens = 0;
-    for (const tokenKey of target.tokenKeys) {
-      revokedTokens += await this.store.delete(tokenKey);
-    }
-
-    if (target.tokenKeys.length > 0) {
-      await this.store.removeMembers(cliUserTokensIndexKey(parsed.userId), target.tokenKeys);
-    }
-
-    return { revokedTokens };
+    const { revokedCount } = await this.auth.revokeCliTokens({
+      userId: parsed.userId,
+      tokenKeys: target.tokenKeys,
+    });
+    return { revokedTokens: revokedCount };
   }
 
-  private deviceLabel(info: CliTokenRecord["client_info"]): string {
-    if (info?.device_label?.trim()) {
-      return info.device_label.trim();
+  private deviceLabel(info: CliTokenRecordEntry["clientInfo"]): string {
+    if (info?.deviceLabel?.trim()) {
+      return info.deviceLabel.trim();
     }
 
-    const platform = this.tryPlatformName(info?.platform);
+    const platform = this.mapPlatformName(info?.platform);
     const host = info?.hostname?.trim();
     if (host && platform) {
       return `${platform} (${host})`;
@@ -122,9 +79,9 @@ export class DefaultGovernanceCliSessionInventoryService {
     return host || platform || "Unknown device";
   }
 
-  private tryPlatformName(platform: string | undefined): string | null {
+  private mapPlatformName(platform: string | undefined): string | undefined {
     if (!platform) {
-      return null;
+      return undefined;
     }
 
     switch (platform.toLowerCase()) {

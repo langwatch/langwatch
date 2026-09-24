@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import type {
+  CeremonyAccountPin,
   CeremonyAccountRow,
   IdentityAccountCeremonies,
   IdentityCeremonyClock,
@@ -22,7 +23,7 @@ const logger = createLogger("langwatch:better-auth:identity-ceremonies");
  */
 export class BetterAuthCeremonyBridgeAdapter implements Pick<
   IdentityAccountCeremonies,
-  "tryBeforeAccountCreate" | "beforeAccountDelete"
+  "createAccountIdentifier" | "beforeAccountDelete"
 > {
   static create(deps: {
     ceremonies: IdentityAccountCeremonies;
@@ -38,12 +39,10 @@ export class BetterAuthCeremonyBridgeAdapter implements Pick<
     },
   ) {}
 
-  async tryBeforeAccountCreate(
-    account: Parameters<IdentityAccountCeremonies["tryBeforeAccountCreate"]>[0],
-  ): ReturnType<IdentityAccountCeremonies["tryBeforeAccountCreate"]> {
-    if (await this.deferred(account.userId)) return;
+  async createAccountIdentifier(account: CeremonyAccountRow): Promise<CeremonyAccountPin> {
+    if (await this.deferred(account.userId)) return { pinned: false };
 
-    return this.deps.ceremonies.tryBeforeAccountCreate(account);
+    return this.deps.ceremonies.createAccountIdentifier(account);
   }
 
   async beforeAccountDelete(
@@ -113,15 +112,13 @@ export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
 
   /**
    * An `Account` row is about to be created: attach the identifier it
-   * carries. Answers the row data better-auth must write — the same data
-   * with the id this ceremony pinned — or nothing, when no ceremony ran.
+   * carries. Answers the id this ceremony pinned for better-auth to write,
+   * or `pinned: false` when no ceremony ran.
    */
-  async tryBeforeAccountCreate(
-    account: CeremonyAccountRow,
-  ): Promise<{ data: { id: string } } | undefined> {
+  async createAccountIdentifier(account: CeremonyAccountRow): Promise<CeremonyAccountPin> {
     const { userId, providerId } = account;
-    if (typeof userId !== "string" || typeof providerId !== "string") return;
-    if (!(await this.isLatched({ userId }))) return;
+    if (typeof userId !== "string" || typeof providerId !== "string") return { pinned: false };
+    if (!(await this.isLatched({ userId }))) return { pinned: false };
 
     const { email: value } = await this.users.getUserEmail({ userId }).catch((error: unknown) => {
       if (HandledError.isHandled(error) && error.code === "user_not_found") return { email: null };
@@ -132,7 +129,7 @@ export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
         { userId, providerId },
         "latched user's account ceremony carries no email value; no identifier attached",
       );
-      return;
+      return { pinned: false };
     }
     // Minted the same way the schema's own `@default(nanoid())` would mint
     // it; better-auth persists a hook-supplied id (forceAllowId is always on
@@ -163,7 +160,7 @@ export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
       ceremony: { flow: "better-auth" },
       actor: { type: "user", id: userId },
     });
-    return { data: { id: accountRowId } };
+    return { pinned: true, data: { id: accountRowId } };
   }
 
   /**

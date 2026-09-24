@@ -1,65 +1,46 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthApi, CliTokenRecordEntry } from "@langwatch/auth-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CliTokenStore } from "../../app/governance.members.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../cli-session-inventory.service.ts";
-import { DefaultGovernanceCliTokenRevocationService } from "../cli-token-revocation.service.ts";
 
-class MemoryTokenStore implements CliTokenStore {
-  readonly values = new Map<string, string>();
-  readonly sets = new Map<string, Set<string>>();
-  members(key: string): Promise<string[]> {
-    return Promise.resolve(Array.from(this.sets.get(key) ?? []));
-  }
-  tryGet(key: string): Promise<string | null> {
-    return Promise.resolve(this.values.get(key) ?? null);
-  }
-  delete(key: string): Promise<number> {
-    const deleted = this.values.delete(key) || this.sets.delete(key);
-    return Promise.resolve(deleted ? 1 : 0);
-  }
-  removeMembers(key: string, members: string[]): Promise<number> {
-    const set = this.sets.get(key);
-    let deleted = 0;
-    for (const member of members) if (set?.delete(member)) deleted += 1;
-    return Promise.resolve(deleted);
-  }
+const records: CliTokenRecordEntry[] = [
+  {
+    tokenKey: "lwcli:access:a",
+    organizationId: "org",
+    issuedAtMs: 200,
+    expiresAtMs: 300,
+    clientInfo: { hostname: "host", platform: "darwin", sessionStartedAtMs: 100 },
+  },
+  {
+    tokenKey: "lwcli:refresh:r",
+    organizationId: "org",
+    issuedAtMs: 100,
+    expiresAtMs: 1_000,
+    clientInfo: { sessionStartedAtMs: 100 },
+  },
+];
+
+function inventory() {
+  const findCliTokenRecordsForUser = vi.fn<AuthApi["findCliTokenRecordsForUser"]>(
+    async () => records,
+  );
+  const revokeCliTokens = vi.fn<AuthApi["revokeCliTokens"]>(async ({ tokenKeys }) => ({
+    revokedCount: tokenKeys?.length ?? 0,
+  }));
+  const service = DefaultGovernanceCliSessionInventoryService.create({
+    auth: createApiFixture<AuthApi>({ findCliTokenRecordsForUser, revokeCliTokens }),
+  });
+  return { service, findCliTokenRecordsForUser, revokeCliTokens };
 }
 
-function seed(store: MemoryTokenStore): void {
-  store.sets.set("lwcli:user:user:tokens", new Set(["lwcli:access:a", "lwcli:refresh:r", "stale"]));
-  store.values.set(
-    "lwcli:access:a",
-    JSON.stringify({
-      user_id: "user",
-      organization_id: "org",
-      issued_at: 200,
-      expires_at: 300,
-      client_info: {
-        hostname: "host",
-        platform: "darwin",
-        session_started_at: 100,
-      },
-    }),
-  );
-  store.values.set(
-    "lwcli:refresh:r",
-    JSON.stringify({
-      user_id: "user",
-      organization_id: "org",
-      issued_at: 100,
-      expires_at: 1_000,
-      client_info: { session_started_at: 100 },
-    }),
-  );
-}
+describe("the governance CLI session inventory", () => {
+  it("groups rotated tokens into one device session", async () => {
+    const { service, findCliTokenRecordsForUser } = inventory();
 
-describe("governance CLI session services", () => {
-  it("groups rotated tokens into one portable device session", async () => {
-    const store = new MemoryTokenStore();
-    seed(store);
-    const sessions = await DefaultGovernanceCliSessionInventoryService.create({
-      store,
-    }).listForUser({ userId: "user" });
+    const sessions = await service.listForUser({ userId: "user" });
+
+    expect(findCliTokenRecordsForUser).toHaveBeenCalledWith({ userId: "user" });
     expect(sessions).toEqual([
       {
         sessionStartedAtMs: 100,
@@ -74,26 +55,24 @@ describe("governance CLI session services", () => {
     ]);
   });
 
-  it("revokes one session and scrubs its index members", async () => {
-    const store = new MemoryTokenStore();
-    seed(store);
-    const result = await DefaultGovernanceCliSessionInventoryService.create({
-      store,
-    }).revokeSession({ userId: "user", sessionStartedAtMs: 100 });
+  it("revokes one session by asking auth for exactly its tokens", async () => {
+    const { service, revokeCliTokens } = inventory();
+
+    const result = await service.revokeSession({ userId: "user", sessionStartedAtMs: 100 });
+
     expect(result).toEqual({ revokedTokens: 2 });
-    expect(await store.members("lwcli:user:user:tokens")).toEqual(["stale"]);
+    expect(revokeCliTokens).toHaveBeenCalledWith({
+      userId: "user",
+      tokenKeys: ["lwcli:access:a", "lwcli:refresh:r"],
+    });
   });
 
-  it("uses cluster-safe per-key deletes for user-wide revocation", async () => {
-    const store = new MemoryTokenStore();
-    seed(store);
-    const deleteSpy = vi.spyOn(store, "delete");
-    const result = await DefaultGovernanceCliTokenRevocationService.create({
-      store,
-    }).revokeForUser({ userId: "user" });
-    expect(result).toEqual({ revokedCount: 2 });
-    expect(deleteSpy).toHaveBeenCalledWith("lwcli:access:a");
-    expect(deleteSpy).toHaveBeenCalledWith("lwcli:refresh:r");
-    expect(deleteSpy).toHaveBeenCalledWith("lwcli:user:user:tokens");
+  it("revokes nothing for a session the person does not hold", async () => {
+    const { service, revokeCliTokens } = inventory();
+
+    const result = await service.revokeSession({ userId: "user", sessionStartedAtMs: 999 });
+
+    expect(result).toEqual({ revokedTokens: 0 });
+    expect(revokeCliTokens).not.toHaveBeenCalled();
   });
 });

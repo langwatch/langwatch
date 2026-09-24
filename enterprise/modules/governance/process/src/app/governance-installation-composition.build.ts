@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AuthApi } from "@langwatch/auth-contract";
 import type {
   GovernanceOttlGateway,
   GovernanceApi,
@@ -42,7 +43,6 @@ import { PostgresGovernanceAdapter } from "./governance-policy-composition.build
 import type {
   AdminWorkspaceViewOcsfChannel,
   CliAdminContactReader,
-  CliTokenStore,
   PersonalBudgetOverviewReader,
   GovernanceDiagnosticsSink,
   GovernanceEncryptor,
@@ -83,7 +83,7 @@ export type GovernanceInstallationOptions = {
   aiToolSlugs: AiToolSlug;
   aiToolProviders: AiToolProviderCatalog;
   cliContacts: CliAdminContactReader;
-  cliTokenStore?: CliTokenStore;
+  auth: Pick<AuthApi, "findCliTokenRecordsForUser" | "revokeCliTokens">;
   diagnostics?: GovernanceDiagnosticsSink;
   adminWorkspaceOcsf?: AdminWorkspaceViewOcsfChannel;
   adminWorkspaceDiagnostics?: GovernanceDiagnosticsSink;
@@ -189,12 +189,10 @@ export class GovernanceInstallationComposition {
       gatewayUrl: this.options.gatewayBaseUrl,
     });
     const cliSessions = DefaultGovernanceCliSessionInventoryService.create({
-      store: this.options.cliTokenStore,
-      diagnostics: this.options.diagnostics,
+      auth: this.options.auth,
     });
     const cliTokenRevocation = DefaultGovernanceCliTokenRevocationService.create({
-      store: this.options.cliTokenStore,
-      diagnostics: this.options.diagnostics,
+      auth: this.options.auth,
     });
     const adminWorkspaceViewAudit = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository: PrismaAdminWorkspaceViewAuditRepository.create(this.options.database),

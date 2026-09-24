@@ -28,6 +28,24 @@ export type CliAccessSession = Readonly<{
 }>;
 
 /**
+ * One CLI token a person holds, access or refresh, and the key that revokes
+ * it. The device-session store stays Auth-owned; a peer reads these facts.
+ */
+export type CliTokenRecordEntry = Readonly<{
+  tokenKey: string;
+  organizationId: string;
+  issuedAtMs: number;
+  expiresAtMs: number;
+  clientInfo?: Readonly<{
+    deviceLabel?: string | undefined;
+    hostname?: string | undefined;
+    uname?: string | undefined;
+    platform?: string | undefined;
+    sessionStartedAtMs?: number | undefined;
+  }>;
+}>;
+
+/**
  * What the install-wide usage report counts here (ADR-156, section 10): the
  * people signed in right now, one person on four devices counted once.
  */
@@ -86,6 +104,16 @@ export interface AuthApi {
     authorization: string | null | undefined;
     userId: string;
   }): Promise<void>;
+  /** Every CLI token this person still holds; lapsed and unreadable ones are skipped. */
+  findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]>;
+  /**
+   * Revokes the named CLI tokens of this person, or every one they hold when
+   * none are named. A key outside their own index revokes nothing.
+   */
+  revokeCliTokens(input: {
+    userId: string;
+    tokenKeys?: readonly string[] | undefined;
+  }): Promise<{ revokedCount: number }>;
   /**
    * What this person is signed in on, newest first, and how each signed in.
    * The reading half of ending a session: a list with no action on it leaves

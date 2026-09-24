@@ -90,7 +90,10 @@ function harness() {
     databaseHooks: {
       account: {
         create: {
-          before: async (account) => ceremonies.tryBeforeAccountCreate(account),
+          before: async (account) => {
+            const pin = await ceremonies.createAccountIdentifier(account);
+            return pin.pinned ? { data: pin.data } : undefined;
+          },
         },
         delete: {
           before: async (account) => {

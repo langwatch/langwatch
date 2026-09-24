@@ -17,6 +17,7 @@ import {
   type BrowserSession,
   type BrowserSessionInventoryEntry,
   type CliAccessSession,
+  type CliTokenRecordEntry,
   type InviteLanding,
   type LegacySsoAccessQuery,
   type ReleaseHeldAccountResult,
@@ -582,6 +583,17 @@ export class AuthApp implements AuthApiContract {
       authHeader: input.authorization,
       userId: input.userId,
     });
+  }
+
+  findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]> {
+    return this.#cliSessions.findTokenRecordsForUser(input);
+  }
+
+  revokeCliTokens(input: {
+    userId: string;
+    tokenKeys?: readonly string[] | undefined;
+  }): Promise<{ revokedCount: number }> {
+    return this.#cliSessions.revokeTokens(input);
   }
 
   async countUsage(input: { at: number }): Promise<AuthUsageCount> {

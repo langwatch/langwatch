@@ -89,13 +89,6 @@ export interface CliAdminContactReader {
   findAdminEmail(organizationId: string): Promise<string | null>;
 }
 
-export interface CliTokenStore {
-  members(key: string): Promise<string[]>;
-  tryGet(key: string): Promise<string | null>;
-  delete(key: string): Promise<number>;
-  removeMembers(key: string, members: string[]): Promise<number>;
-}
-
 export type GatewaySpendUsage = {
   input_tokens: number;
   output_tokens: number;

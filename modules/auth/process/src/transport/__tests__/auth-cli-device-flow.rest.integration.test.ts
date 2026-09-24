@@ -515,6 +515,17 @@ class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
 
     return Promise.resolve();
   }
+
+  findIndexedTokens(indexKey: string): Promise<string[]> {
+    return Promise.resolve([...(this.sets.get(indexKey) ?? [])]);
+  }
+
+  deleteIndexedTokens(input: { indexKey: string; memberKeys: readonly string[] }): Promise<number> {
+    const deleted = input.memberKeys.filter((key) => this.values.delete(key)).length;
+    input.memberKeys.forEach((key) => this.sets.get(input.indexKey)?.delete(key));
+
+    return Promise.resolve(deleted);
+  }
 }
 
 /** The project a `project_api_key` grant points at, as the directory answers it now. */

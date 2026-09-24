@@ -15,7 +15,8 @@ type CliDeviceSessionRedis = Readonly<{
   del(key: string): Promise<number>;
   sadd(key: string, ...members: string[]): Promise<number>;
   pexpire(key: string, ttlMs: number): Promise<number>;
-  srem(key: string, member: string): Promise<number>;
+  srem(key: string, ...members: string[]): Promise<number>;
+  smembers(key: string): Promise<string[]>;
 }>;
 
 /** The Auth-owned Redis backing store for RFC 8628 device sessions. */
@@ -58,5 +59,23 @@ export class RedisCliDeviceSessionRepository implements CliDeviceSessionReposito
 
   async removeFromIndex(input: { indexKey: string; memberKey: string }): Promise<void> {
     await this.redis.srem(input.indexKey, input.memberKey);
+  }
+
+  findIndexedTokens(indexKey: string): Promise<string[]> {
+    return this.redis.smembers(indexKey);
+  }
+
+  async deleteIndexedTokens(input: {
+    indexKey: string;
+    memberKeys: readonly string[];
+  }): Promise<number> {
+    if (input.memberKeys.length === 0) return 0;
+
+    let deleted = 0;
+    for (const memberKey of input.memberKeys) {
+      deleted += await this.redis.del(memberKey);
+    }
+    await this.redis.srem(input.indexKey, ...input.memberKeys);
+    return deleted;
   }
 }

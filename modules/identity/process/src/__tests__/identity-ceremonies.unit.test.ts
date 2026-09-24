@@ -70,7 +70,7 @@ describe("the identity ceremonies", () => {
     it("emits nothing and leaves the row write untouched", async () => {
       const { ceremonies, identity } = harness({ latched: false });
 
-      expect(await ceremonies.tryBeforeAccountCreate(accountRow())).toBeUndefined();
+      expect(await ceremonies.createAccountIdentifier(accountRow())).toEqual({ pinned: false });
       await ceremonies.beforeAccountDelete(accountRow());
       await ceremonies.beforeUserDelete({ id: USER });
 
@@ -95,11 +95,11 @@ describe("the identity ceremonies", () => {
     it("attaches the identifier and pins the row id it derived from", async () => {
       const { ceremonies, identity } = harness();
 
-      const result = await ceremonies.tryBeforeAccountCreate(accountRow());
+      const result = await ceremonies.createAccountIdentifier(accountRow());
 
       // The row keeps the id the ceremony saw, so the identifier id the
       // backfill later derives from this row is the same id.
-      expect(result).toEqual({ data: { id: "acc_1" } });
+      expect(result).toEqual({ pinned: true, data: { id: "acc_1" } });
       expect(identity.attachIdentifier).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: USER,
@@ -118,7 +118,7 @@ describe("the identity ceremonies", () => {
     it("carries better-auth's own provider id, unfolded, beside the folded one", async () => {
       const { ceremonies, identity } = harness();
 
-      await ceremonies.tryBeforeAccountCreate(
+      await ceremonies.createAccountIdentifier(
         accountRow({ providerId: "auth0", accountId: "auth0|42" }),
       );
 
@@ -134,9 +134,10 @@ describe("the identity ceremonies", () => {
     it("mints the row id when better-auth supplied none", async () => {
       const { ceremonies, identity } = harness();
 
-      const result = await ceremonies.tryBeforeAccountCreate(accountRow({ id: undefined }));
+      const result = await ceremonies.createAccountIdentifier(accountRow({ id: undefined }));
 
-      const minted = (result as { data: { id: string } }).data.id;
+      if (!result.pinned) throw new Error("expected the ceremony to pin a row id");
+      const minted = result.data.id;
       expect(minted).toBeTruthy();
       expect(identity.attachIdentifier).toHaveBeenCalledWith(
         expect.objectContaining({ accountId: minted }),
@@ -146,7 +147,7 @@ describe("the identity ceremonies", () => {
     it("attaches nothing when the user carries no email value", async () => {
       const { ceremonies, identity } = harness({ email: null });
 
-      expect(await ceremonies.tryBeforeAccountCreate(accountRow())).toBeUndefined();
+      expect(await ceremonies.createAccountIdentifier(accountRow())).toEqual({ pinned: false });
       expect(identity.attachIdentifier).not.toHaveBeenCalled();
     });
 
@@ -158,7 +159,7 @@ describe("the identity ceremonies", () => {
         },
       });
 
-      await expect(ceremonies.tryBeforeAccountCreate(accountRow())).rejects.toBeInstanceOf(
+      await expect(ceremonies.createAccountIdentifier(accountRow())).rejects.toBeInstanceOf(
         IdentityPrimaryMustDemoteFirstError,
       );
     });

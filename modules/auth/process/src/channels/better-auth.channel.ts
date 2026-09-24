@@ -45,12 +45,10 @@ export abstract class BetterAuthIdentityCeremonies {
   abstract beforeUserDelete(user: { id: string }): Promise<void>;
 
   /**
-   * Returns row data Better Auth should write to pin account id. Structural
-   * read to avoid tracking type version (identity package convention).
+   * Attaches the account's identifier and answers the row id Better Auth must
+   * write, or `pinned: false` when no ceremony ran (identity convention).
    */
-  abstract tryBeforeAccountCreate(
-    account: BetterAuthAccountRow,
-  ): Promise<{ data: { id: string } } | undefined>;
+  abstract createAccountIdentifier(account: BetterAuthAccountRow): Promise<BetterAuthAccountPin>;
 
   abstract beforeAccountDelete(account: BetterAuthAccountRow): Promise<void>;
 }
@@ -64,6 +62,9 @@ export type BetterAuthAccountRow = Readonly<{
   accountId?: unknown;
   createdAt?: unknown;
 }>;
+
+/** Whether the account-create ceremony pinned the row id Better Auth must write. */
+export type BetterAuthAccountPin = { pinned: true; data: { id: string } } | { pinned: false };
 
 /** A pending invitation for an address at a domain-matched organization. */
 export type PendingOrganizationInvite = Readonly<{

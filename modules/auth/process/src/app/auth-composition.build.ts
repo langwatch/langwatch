@@ -28,6 +28,7 @@ import {
   BetterAuthIdentityCeremonies,
   BetterAuthPendingInvite,
   BetterAuthStorage,
+  type BetterAuthAccountPin,
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
 } from "../channels/better-auth.channel.ts";
@@ -141,8 +142,8 @@ export class AbsentBetterAuthIdentityCeremonies extends BetterAuthIdentityCeremo
 
   async beforeUserDelete(): Promise<void> {}
 
-  async tryBeforeAccountCreate(): Promise<{ data: { id: string } } | undefined> {
-    return undefined;
+  async createAccountIdentifier(): Promise<BetterAuthAccountPin> {
+    return { pinned: false };
   }
 
   async beforeAccountDelete(_account: BetterAuthAccountRow): Promise<void> {}

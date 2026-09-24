@@ -303,7 +303,12 @@ export function identityStack({
     withDatabaseHooks
       ? {
           account: {
-            create: { before: (account) => bridge.tryBeforeAccountCreate(account) },
+            create: {
+              before: async (account) => {
+                const pin = await bridge.createAccountIdentifier(account);
+                return pin.pinned ? { data: pin.data } : undefined;
+              },
+            },
             delete: { before: (account) => bridge.beforeAccountDelete(account) },
           },
         }

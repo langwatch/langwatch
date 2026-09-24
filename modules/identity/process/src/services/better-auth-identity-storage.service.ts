@@ -475,7 +475,7 @@ function identityCustomAdapter({
       if (typeof userId !== "string" || typeof providerId !== "string") {
         return null;
       }
-      const pinned = await ceremonies.tryBeforeAccountCreate({
+      const pin = await ceremonies.createAccountIdentifier({
         id: canonical.id,
         userId,
         providerId,
@@ -487,8 +487,8 @@ function identityCustomAdapter({
         accountId: canonical.accountId,
         createdAt: canonical.createdAt,
       });
-      const accountId = pinned?.data.id;
-      if (accountId === undefined) return null;
+      if (!pin.pinned) return null;
+      const accountId = pin.data.id;
 
       const secrets = secretsOf(canonical);
       await accounts.createCredential({

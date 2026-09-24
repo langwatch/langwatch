@@ -8,6 +8,7 @@ import type { CliKeySelection } from "@langwatch/api-key-contract";
 import {
   CliDeviceFlowRefusedError,
   CliSessionRecordNotFoundError,
+  type CliTokenRecordEntry,
   cliAccessTokenKey,
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
@@ -537,6 +538,69 @@ export class CliDeviceSessionService {
       indexKey: cliUserTokensIndexKey(input.userId),
       memberKey: cliAccessTokenKey(token),
     });
+  }
+
+  /** Every CLI token a person still holds, read through their own index. */
+  async findTokenRecordsForUser({ userId }: { userId: string }): Promise<CliTokenRecordEntry[]> {
+    const entries: CliTokenRecordEntry[] = [];
+    for (const tokenKey of await this.store.findIndexedTokens(cliUserTokensIndexKey(userId))) {
+      const raw = await this.store.get(tokenKey).catch((error: unknown) => {
+        if (isRecordNotFound(error)) return undefined;
+        throw error;
+      });
+      const record =
+        raw === undefined
+          ? null
+          : CliDeviceSessionService.decodeSession<CliAccessTokenRecord | CliRefreshTokenRecord>(
+              raw,
+            );
+      if (!record || record.user_id !== userId) continue;
+
+      entries.push(CliDeviceSessionService.toTokenRecordEntry({ tokenKey, record }));
+    }
+    return entries;
+  }
+
+  /** Revokes a person's CLI tokens: the named ones inside their index, or all of it. */
+  async revokeTokens({
+    userId,
+    tokenKeys,
+  }: {
+    userId: string;
+    tokenKeys?: readonly string[] | undefined;
+  }): Promise<{ revokedCount: number }> {
+    const indexKey = cliUserTokensIndexKey(userId);
+    const indexed = await this.store.findIndexedTokens(indexKey);
+    const memberKeys =
+      tokenKeys === undefined ? indexed : indexed.filter((key) => tokenKeys.includes(key));
+    return { revokedCount: await this.store.deleteIndexedTokens({ indexKey, memberKeys }) };
+  }
+
+  private static toTokenRecordEntry({
+    tokenKey,
+    record,
+  }: {
+    tokenKey: string;
+    record: CliAccessTokenRecord | CliRefreshTokenRecord;
+  }): CliTokenRecordEntry {
+    const info = record.client_info;
+    return {
+      tokenKey,
+      organizationId: record.organization_id,
+      issuedAtMs: record.issued_at,
+      expiresAtMs: record.expires_at,
+      ...(info
+        ? {
+            clientInfo: {
+              deviceLabel: info.device_label,
+              hostname: info.hostname,
+              uname: info.uname,
+              platform: info.platform,
+              sessionStartedAtMs: info.session_started_at,
+            },
+          }
+        : {}),
+    };
   }
 
   /**

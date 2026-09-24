@@ -28,4 +28,10 @@ export interface CliDeviceSessionRepository {
 
   /** Removes one token key from a user's index. */
   removeFromIndex(input: { indexKey: string; memberKey: string }): Promise<void>;
+
+  /** The token keys a user's index names, lapsed ones included. */
+  findIndexedTokens(indexKey: string): Promise<string[]>;
+
+  /** Drops token records and their index entries, answering how many records were held. */
+  deleteIndexedTokens(input: { indexKey: string; memberKeys: readonly string[] }): Promise<number>;
 }

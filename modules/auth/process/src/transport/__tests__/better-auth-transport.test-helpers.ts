@@ -62,7 +62,7 @@ export function betterAuthTransportFor(
     } as never,
     identity: {
       beforeUserDelete: async () => undefined,
-      tryBeforeAccountCreate: async () => undefined,
+      createAccountIdentifier: async () => ({ pinned: false }),
       beforeAccountDelete: async () => undefined,
     } as never,
     invites: {

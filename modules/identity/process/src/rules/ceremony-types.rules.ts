@@ -18,15 +18,16 @@ export interface CeremonyAccountRow {
   createdAt?: unknown;
 }
 
+/** Whether the account-create ceremony pinned the row id better-auth must write. */
+export type CeremonyAccountPin = { pinned: true; data: { id: string } } | { pinned: false };
+
 /**
  * What the identity storage adapter needs a ceremony to do: the same two
  * ceremonies better-auth's hooks bind, reached one layer lower.
  * ADR-116 §5 moves the fact from a hook-level veto to a storage-level one.
  */
 export interface IdentityAccountCeremonies {
-  tryBeforeAccountCreate(
-    account: CeremonyAccountRow,
-  ): Promise<{ data: { id: string } } | undefined>;
+  createAccountIdentifier(account: CeremonyAccountRow): Promise<CeremonyAccountPin>;
   beforeAccountDelete(account: CeremonyAccountRow): Promise<void>;
   /**
    * A `user` update that touches `email`, on the identity branch (ADR-116
