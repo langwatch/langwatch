@@ -1,4 +1,7 @@
-import type { LangyResourceLinksRepository } from "../langy-live-turn.repository.ts";
+import type {
+  LangyResourceLinkLookup,
+  LangyResourceLinksRepository,
+} from "../langy-live-turn.repository.ts";
 
 /** Conversation-scoped Redis links used by Langy's navigate command. */
 export interface LangyLinkRedis {
@@ -26,7 +29,8 @@ export class LangyResourceLinksRedisRepository implements LangyResourceLinksRepo
     await this.redis.expire(key, 24 * 60 * 60);
   }
 
-  resolve(input: { conversationId: string; id: string }): Promise<string | null> {
-    return this.redis.hget(`langy:navlink:${input.conversationId}`, input.id);
+  async resolve(input: { conversationId: string; id: string }): Promise<LangyResourceLinkLookup> {
+    const href = await this.redis.hget(`langy:navlink:${input.conversationId}`, input.id);
+    return href === null ? { kind: "miss" } : { kind: "hit", href };
   }
 }

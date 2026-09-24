@@ -22,6 +22,11 @@ export type ConnectedWorkspace = z.infer<typeof connectedWorkspaceSchema>;
  */
 export type PresenceHeartbeat = "refreshed" | "restored" | "replaced";
 
+/** What a deregister did: cleared the caller's record, or found none it still holds. */
+export type PresenceDeregistration =
+  | { cleared: true; workspace: ConnectedWorkspace }
+  | { cleared: false };
+
 /** The connect turn a folder is owed, and whose turn it is started as. */
 export const owedConnectTurnSchema = z.object({
   projectId: z.string(),
@@ -43,14 +48,14 @@ export abstract class LangyLocalPresence {
   /** Refreshes the record on a heartbeat, and writes it again when it is gone. */
   abstract heartbeat(workspace: ConnectedWorkspace): Promise<PresenceHeartbeat>;
 
-  /** The folder connected to this conversation, or nothing when none is. */
-  abstract read(conversationId: string): Promise<ConnectedWorkspace | null>;
+  /** The folder connected to this conversation; throws `langy_local_workspace_offline` if none. */
+  abstract getByConversationId(conversationId: string): Promise<ConnectedWorkspace>;
 
   /** Clears the record, but only when the caller still holds it. */
   abstract deregister(input: {
     conversationId: string;
     instanceId?: string;
-  }): Promise<ConnectedWorkspace | null>;
+  }): Promise<PresenceDeregistration>;
 
   /** Whether the permission cards are off for this conversation. */
   abstract readPolicy(conversationId: string): Promise<boolean>;

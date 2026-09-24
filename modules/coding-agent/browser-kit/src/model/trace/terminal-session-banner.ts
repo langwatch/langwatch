@@ -1,4 +1,4 @@
-import { isModelCallSpan, readString } from "@langwatch/coding-agent-contract";
+import { isModelCallSpan, pickString } from "@langwatch/coding-agent-contract";
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 /**
@@ -74,14 +74,14 @@ export function deriveSessionBanner({
   // caller may hand spans in tree order.
   for (const span of [...spans].toSorted((a, b) => a.startTimeMs - b.startTimeMs)) {
     if (!isModelCallSpan(span.name)) continue;
-    // readString resolves dotted keys against BOTH attribute shapes — the
+    // pickString resolves dotted keys against BOTH attribute shapes — the
     // span mapper unflattens params into nested objects, so a flat lookup
     // of "gen_ai.request.model" reads nothing on real spans.
     const params = (span.params ?? {}) as Record<string, unknown>;
     const value =
-      readString(params, "gen_ai.request.model") ??
-      readString(params, "ai.model.id") ??
-      readString(params, "model");
+      pickString(params, "gen_ai.request.model") ??
+      pickString(params, "ai.model.id") ??
+      pickString(params, "model");
     if (value !== null) model = value;
   }
 

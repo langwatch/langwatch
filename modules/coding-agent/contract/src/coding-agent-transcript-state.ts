@@ -1,7 +1,7 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
 
 import { extractSystemText } from "./coding-agent-transcript-content.ts";
-import { parseMaybeJson, readString } from "./coding-agent-transcript-value.ts";
+import { parseMaybeJson, pickString } from "./coding-agent-transcript-value.ts";
 import type { CodingAgentTranscript, TranscriptEntry } from "./coding-agent-transcript.ts";
 
 export interface TranscriptLogRecord {
@@ -63,15 +63,15 @@ export function indexCodexToolLogsByCallId(
   const byCallId = new Map<string, CodexToolLogContent>();
 
   for (const log of logs) {
-    if (readString(log.attributes, "event.name") !== "codex.tool_result") continue;
+    if (pickString(log.attributes, "event.name") !== "codex.tool_result") continue;
 
-    const callId = readString(log.attributes, "call_id");
+    const callId = pickString(log.attributes, "call_id");
     if (callId === null || byCallId.has(callId)) continue;
 
     byCallId.set(callId, {
-      input: parseMaybeJson(readString(log.attributes, "arguments")),
-      output: readString(log.attributes, "output"),
-      failed: readString(log.attributes, "success") === "false",
+      input: parseMaybeJson(pickString(log.attributes, "arguments")),
+      output: pickString(log.attributes, "output"),
+      failed: pickString(log.attributes, "success") === "false",
     });
   }
 

@@ -4,6 +4,7 @@
  * provider no longer allows drops the policy and notifies via a `policy` frame.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { LocalControlRuntime } from "../repositories/redis/redis.langy-local-control-runtime.repository.ts";
@@ -64,7 +65,14 @@ export async function reconcileSkipPolicy({
 
   // The consent was one person's, so the revocation is recorded against that
   // same person: the folder's record names who approved the share.
-  const workspace = await runtime.presence.read(conversationId);
+  const workspace = await runtime.presence
+    .getByConversationId(conversationId)
+    .catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+        return null;
+      }
+      throw error;
+    });
   if (workspace) {
     await changePolicy({
       conversationId,

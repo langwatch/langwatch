@@ -9,6 +9,7 @@ import {
   recordProjectCredential,
   type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
+import { LangyLocalWorkspaceOfflineError } from "@langwatch/langy-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
@@ -86,7 +87,11 @@ function buildApi(options: { granted: boolean; own?: boolean }) {
     featureFlags: () => ({ isEnabled: async () => true }) as never,
     runtime: () =>
       ({
-        presence: { read: async () => null },
+        presence: {
+          getByConversationId: async (conversationId: string) => {
+            throw new LangyLocalWorkspaceOfflineError({ conversationId });
+          },
+        },
         requests: { findOpenForConversation: async () => [] },
       }) as never,
     commands: () => ({}) as never,

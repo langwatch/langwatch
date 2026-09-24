@@ -1,5 +1,6 @@
 import {
   type LangyFrameDedupRepository,
+  type LangyResourceLinkLookup,
   type LangyResourceLinksRepository,
   type LangyTurnAccess,
   LangyTurnAccessRepository,
@@ -101,7 +102,8 @@ export class LangyResourceLinksMemoryRepository implements LangyResourceLinksRep
     this.store.resourceLinks.set(input.conversationId, links);
   }
 
-  async resolve(input: { conversationId: string; id: string }): Promise<string | null> {
-    return this.store.resourceLinks.get(input.conversationId)?.get(input.id) ?? null;
+  async resolve(input: { conversationId: string; id: string }): Promise<LangyResourceLinkLookup> {
+    const href = this.store.resourceLinks.get(input.conversationId)?.get(input.id);
+    return href === undefined ? { kind: "miss" } : { kind: "hit", href };
   }
 }

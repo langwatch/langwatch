@@ -1,7 +1,10 @@
+import { LangyLocalWorkspaceOfflineError } from "@langwatch/langy-contract";
+
 import {
   type ConnectedWorkspace,
   LangyLocalPresence,
   type OwedConnectTurn,
+  type PresenceDeregistration,
   type PresenceHeartbeat,
 } from "../langy-local-presence.repository.ts";
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
@@ -31,20 +34,22 @@ export class LangyLocalPresenceMemoryRepository extends LangyLocalPresence {
     return "refreshed";
   }
 
-  async read(conversationId: string): Promise<ConnectedWorkspace | null> {
-    return this.store.presence.get(conversationId) ?? null;
+  async getByConversationId(conversationId: string): Promise<ConnectedWorkspace> {
+    const held = this.store.presence.get(conversationId);
+    if (!held) throw new LangyLocalWorkspaceOfflineError({ conversationId });
+    return held;
   }
 
   async deregister(input: {
     conversationId: string;
     instanceId?: string;
-  }): Promise<ConnectedWorkspace | null> {
+  }): Promise<PresenceDeregistration> {
     const held = this.store.presence.get(input.conversationId);
-    if (!held) return null;
-    if (input.instanceId && held.instanceId !== input.instanceId) return null;
+    if (!held) return { cleared: false };
+    if (input.instanceId && held.instanceId !== input.instanceId) return { cleared: false };
     this.store.presence.delete(input.conversationId);
     this.store.owedConnectTurns.delete(input.conversationId);
-    return held;
+    return { cleared: true, workspace: held };
   }
 
   async readPolicy(conversationId: string): Promise<boolean> {

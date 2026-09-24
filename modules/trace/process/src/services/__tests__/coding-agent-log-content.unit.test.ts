@@ -150,9 +150,9 @@ describe("the derivation cannot read a content attribute the table misses", () =
         readFileSync(join(process.cwd(), "../../coding-agent/contract/src", file), "utf8"),
       )
       .join("\n");
-    // `readString(attrs, "x")` / `readNumber(attrs, "x")` — the only way the
+    // `pickString(attrs, "x")` / `pickNumber(attrs, "x")` — the only way the
     // derivation reaches a log attribute by name.
-    const read = [...derivation.matchAll(/read(?:String|Number)\(attrs, "([^"]+)"\)/g)].map(
+    const read = [...derivation.matchAll(/pick(?:String|Number)\(attrs, "([^"]+)"\)/g)].map(
       (match) => match[1]!,
     );
     // A guard that matches nothing passes for the wrong reason. These are the

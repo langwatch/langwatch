@@ -3,6 +3,7 @@ import { mintRunToken, signFrame } from "@langwatch/langy-process/streaming/lang
  * frames, pins to turn, dedups replays, and fans to live buffer + durable event log. */
 import { describe, expect, it, vi } from "vitest";
 
+import type { LangyResourceLinkLookup } from "../../langy-live-turn.repository.ts";
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
@@ -114,8 +115,15 @@ function fakeResourceLinks() {
       for (const { id, href } of links) map.set(id, href);
       byConversation.set(conversationId, map);
     },
-    async resolve({ conversationId, id }: { conversationId: string; id: string }) {
-      return byConversation.get(conversationId)?.get(id) ?? null;
+    async resolve({
+      conversationId,
+      id,
+    }: {
+      conversationId: string;
+      id: string;
+    }): Promise<LangyResourceLinkLookup> {
+      const href = byConversation.get(conversationId)?.get(id);
+      return href === undefined ? { kind: "miss" } : { kind: "hit", href };
     },
   };
 }

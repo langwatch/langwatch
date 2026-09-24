@@ -4,7 +4,12 @@
  * heartbeat, so a sleeping machine reads offline with no explicit deregister.
  */
 
-import { CONNECT_TURN_OWED_TTL_MS, PRESENCE_TTL_MS } from "@langwatch/langy-contract";
+import { HandledError } from "@langwatch/handled-error";
+import {
+  CONNECT_TURN_OWED_TTL_MS,
+  LangyLocalWorkspaceOfflineError,
+  PRESENCE_TTL_MS,
+} from "@langwatch/langy-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
@@ -18,6 +23,7 @@ import {
   type ConnectedWorkspace,
   LangyLocalPresence,
   type OwedConnectTurn,
+  type PresenceDeregistration,
   owedConnectTurnSchema,
   type PresenceHeartbeat,
 } from "../langy-local-presence.repository.ts";
@@ -62,7 +68,14 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
    * answers "replaced" rather than restoring the old record.
    */
   async heartbeat(workspace: ConnectedWorkspace): Promise<PresenceHeartbeat> {
-    const current = await this.read(workspace.conversationId);
+    const current = await this.getByConversationId(workspace.conversationId).catch(
+      (error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+          return null;
+        }
+        throw error;
+      },
+    );
     if (current && current.instanceId !== workspace.instanceId) {
       return "replaced";
     }
@@ -73,15 +86,15 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
     return current ? "refreshed" : "restored";
   }
 
-  /** The folder connected to this conversation, or nothing when none is. */
-  async read(conversationId: string): Promise<ConnectedWorkspace | null> {
+  /** The folder connected to this conversation; throws `langy_local_workspace_offline` if none. */
+  async getByConversationId(conversationId: string): Promise<ConnectedWorkspace> {
     const raw = await this.store.tryGet(presenceKey(conversationId));
-    if (!raw) return null;
-    const parsed = parseConnectedWorkspace(raw);
-    if (!parsed) return null;
+    const parsed = raw ? parseConnectedWorkspace(raw) : null;
     // The key's own expiry is the primary clock. This second check is what
     // keeps a memory store, whose expiry a test drives by hand, honest.
-    if (this.now() - parsed.lastSeenAt > this.presenceTtlMs) return null;
+    if (!parsed || this.now() - parsed.lastSeenAt > this.presenceTtlMs) {
+      throw new LangyLocalWorkspaceOfflineError({ conversationId });
+    }
     return parsed;
   }
 
@@ -96,14 +109,19 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
   }: {
     conversationId: string;
     instanceId?: string;
-  }): Promise<ConnectedWorkspace | null> {
-    const current = await this.read(conversationId);
-    if (!current) return null;
-    if (instanceId && current.instanceId !== instanceId) return null;
+  }): Promise<PresenceDeregistration> {
+    const current = await this.getByConversationId(conversationId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+        return null;
+      }
+      throw error;
+    });
+    if (!current) return { cleared: false };
+    if (instanceId && current.instanceId !== instanceId) return { cleared: false };
     await this.store.del(presenceKey(conversationId));
     await this.store.del(policyKey(conversationId));
     await this.store.del(owedConnectTurnKey(conversationId));
-    return current;
+    return { cleared: true, workspace: current };
   }
 
   /** Whether the permission cards are off for this conversation. */

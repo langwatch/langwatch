@@ -15,7 +15,7 @@ export type {
   TokenType,
 } from "./coding-agent-definition.ts";
 export { codingAgentSchema } from "./coding-agent-definition.ts";
-export { isModelCallSpan, readString } from "./coding-agent-span.ts";
+export { isModelCallSpan, pickString } from "./coding-agent-span.ts";
 
 // Agent registry ordered first-match-wins; claude_cowork before claude_code
 // because only service identity distinguishes them.

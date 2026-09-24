@@ -116,13 +116,13 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
           conversationId: turn.conversationId,
           id: "link_1",
         }),
-      ).toBe("/traces/trace_1");
+      ).toEqual({ kind: "hit", href: "/traces/trace_1" });
       expect(
         await repositories.resourceLinks.resolve({
           conversationId: turn.conversationId,
           id: "link_2",
         }),
-      ).toBeNull();
+      ).toEqual({ kind: "miss" });
     });
   });
 
@@ -132,7 +132,7 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
 
       await repositories.localPresence.register(workspaceFor("instance_1"));
 
-      expect(await repositories.localPresence.read(turn.conversationId)).toEqual(
+      expect(await repositories.localPresence.getByConversationId(turn.conversationId)).toEqual(
         workspaceFor("instance_1"),
       );
     });

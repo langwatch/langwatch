@@ -10,6 +10,7 @@ import type { AddressInfo } from "node:net";
 import type { UpgradeHandler } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   LangyTurnInProgressError,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -420,6 +421,17 @@ async function shareFolder(
 }
 
 /** Nothing of this type arrived inside the window. */
+/** "connected", or the code the presence read refused with. */
+async function presenceState(pod: Pod, conversationId: string): Promise<string> {
+  return pod.runtime.presence.getByConversationId(conversationId).then(
+    () => "connected",
+    (error: unknown) => {
+      if (HandledError.isHandled(error)) return error.code;
+      throw error;
+    },
+  );
+}
+
 async function noFrame(cli: FakeCli, type: string, withinMs = 1_500): Promise<boolean> {
   const arrived = await cli
     .next(type, withinMs)
@@ -470,10 +482,10 @@ describe("given an approved control request", () => {
       const key = await approvedSessionKey(podA);
       const { cli, registered } = await shareFolder(podA, key);
 
-      const connected = await podA.runtime.presence.read(conversationId);
-      expect(connected?.workspace.root).toBe("/Users/dev/acme-app");
-      expect(connected?.hostname).toBe("rogerio-mbp");
-      expect(connected?.workspace.gitBranch).toBe("main");
+      const connected = await podA.runtime.presence.getByConversationId(conversationId);
+      expect(connected.workspace.root).toBe("/Users/dev/acme-app");
+      expect(connected.hostname).toBe("rogerio-mbp");
+      expect(connected.workspace.gitBranch).toBe("main");
       expect(registered.conversation).toMatchObject({ id: conversationId });
 
       cli.close();
@@ -486,7 +498,7 @@ describe("given an approved control request", () => {
       // Let the writes registration itself makes settle, so the baseline is
       // the record as it stands with nothing but the heartbeat left to move it.
       await new Promise((resolve) => setTimeout(resolve, 1_000));
-      const before = (await podA.runtime.presence.read(conversationId))?.lastSeenAt;
+      const before = (await podA.runtime.presence.getByConversationId(conversationId)).lastSeenAt;
       expect(before).toBeDefined();
 
       // Five ping periods of an idle but healthy socket. The presence record
@@ -494,7 +506,7 @@ describe("given an approved control request", () => {
       // heartbeat that never runs takes the folder offline mid-turn while the
       // command line is still connected.
       await new Promise((resolve) => setTimeout(resolve, 1_000));
-      const after = (await podA.runtime.presence.read(conversationId))?.lastSeenAt;
+      const after = (await podA.runtime.presence.getByConversationId(conversationId)).lastSeenAt;
       expect(after).toBeGreaterThan(before!);
 
       cli.close();
@@ -556,7 +568,7 @@ describe("given an approved control request", () => {
         .toBe(true);
 
       expect(startedTurns).toEqual([]);
-      expect(await podA.runtime.presence.read(conversationId)).not.toBeNull();
+      expect(await presenceState(podA, conversationId)).toBe("connected");
 
       cli.close();
       await cli.closed();
@@ -965,7 +977,7 @@ describe("given a folder whose socket dropped", () => {
     await first.cli.closed();
 
     // A network drop is not a decision: the folder is still shared.
-    expect(await podA.runtime.presence.read(conversationId)).not.toBeNull();
+    expect(await presenceState(podA, conversationId)).toBe("connected");
 
     const call = await podB.runtime.dispatcher.start({
       projectId,
@@ -1003,16 +1015,16 @@ describe("given a command that outlives the folder record", () => {
     // the key is gone, and no clock of its own ran while it went. The socket,
     // the command line and the command are untouched.
     await connection.del(presenceKey(conversationId));
-    expect(await podA.runtime.presence.read(conversationId)).toBeNull();
+    expect(await presenceState(podA, conversationId)).toBe("langy_local_workspace_offline");
 
     await expect
-      .poll(() => podA.runtime.presence.read(conversationId), {
+      .poll(() => presenceState(podA, conversationId), {
         timeout: 5_000,
       })
-      .not.toBeNull();
-    const restored = await podA.runtime.presence.read(conversationId);
-    expect(restored?.workspace.root).toBe("/Users/dev/acme-app");
-    expect(restored?.instanceId).toBe(cli.instanceId);
+      .toBe("connected");
+    const restored = await podA.runtime.presence.getByConversationId(conversationId);
+    expect(restored.workspace.root).toBe("/Users/dev/acme-app");
+    expect(restored.instanceId).toBe(cli.instanceId);
 
     cli.send({
       type: "result",
@@ -1053,10 +1065,10 @@ describe("given a folder the developer stops sharing", () => {
     await cli.closed();
 
     await expect
-      .poll(() => podA.runtime.presence.read(conversationId), {
+      .poll(() => presenceState(podA, conversationId), {
         timeout: 5_000,
       })
-      .toBeNull();
+      .toBe("langy_local_workspace_offline");
     const answer = await podA.runtime.dispatcher.poll({
       callId: call.callId,
       holdMs: 2_000,

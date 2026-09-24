@@ -6,6 +6,7 @@
 
 import { setTimeout as sleep } from "node:timers/promises";
 
+import { HandledError } from "@langwatch/handled-error";
 import {
   CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
@@ -199,7 +200,14 @@ export class LocalCallDispatcherService {
       return;
     }
 
-    const workspace = await this.presence.read(call.conversationId);
+    const workspace = await this.presence
+      .getByConversationId(call.conversationId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+          return null;
+        }
+        throw error;
+      });
     await buffer.appendStatus({
       conversationId: call.conversationId,
       turnId: call.turnId,
@@ -416,18 +424,25 @@ export class LocalCallDispatcherService {
    */
   private async requireWorkspace(conversationId: string): Promise<void> {
     const until = this.now() + this.offlineWaitMs;
-    let workspace = await this.presence.read(conversationId);
-    while (!workspace && this.now() < until) {
+    while (!(await this.isConnected(conversationId))) {
+      if (this.now() >= until) {
+        logger.info({ conversationId }, "no local folder answered the call");
+        throw new LangyLocalWorkspaceOfflineError({ conversationId });
+      }
       await sleep(this.pollIntervalMs);
-      workspace = await this.presence.read(conversationId);
     }
-    if (workspace) {
-      return;
-    }
+  }
 
-    logger.info({ conversationId }, "no local folder answered the call");
-
-    throw new LangyLocalWorkspaceOfflineError({ conversationId });
+  private async isConnected(conversationId: string): Promise<boolean> {
+    return this.presence.getByConversationId(conversationId).then(
+      () => true,
+      (error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+          return false;
+        }
+        throw error;
+      },
+    );
   }
 
   private async settle(call: StoredLocalCall): Promise<StoredLocalCall> {

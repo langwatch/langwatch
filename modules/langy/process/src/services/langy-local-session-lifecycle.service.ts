@@ -1,9 +1,10 @@
-import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
 /**
  * The folder's comings and goings: announcing it when it registers, retiring it when it goes,
  * and reacting to what another pod says about it. Retiring fails the calls it was working on,
  * so the worker's poll answers at once rather than at the deadline.
  */
+import { HandledError } from "@langwatch/handled-error";
+import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
 import {
@@ -61,18 +62,17 @@ export class LocalControlLifecycleService {
     session: ControlSession,
     reason: "cli_exit" | "panel" | "presence_lost",
   ): Promise<void> {
-    // Read before the deregister, so the line written below can name the
-    // folder that is going rather than whatever answers afterwards.
-    const workspace = await this.deps.presence.read(session.conversationId);
-    const cleared = await this.deps.presence.deregister({
+    // The cleared record names the folder that is going, not whatever answers afterwards.
+    const deregistration = await this.deps.presence.deregister({
       conversationId: session.conversationId,
       instanceId: session.instanceId,
     });
     // A socket replaced by a newer share clears nothing, and must not cancel
     // the calls the new folder is already running.
-    if (!cleared) {
+    if (!deregistration.cleared) {
       return;
     }
+    const { workspace } = deregistration;
 
     for (const call of await this.deps.dispatcher.listPendingForConversation(
       session.conversationId,
@@ -93,7 +93,7 @@ export class LocalControlLifecycleService {
     });
     await this.deps.requests.revokeKeyBinding(session.apiKeyId);
     await this.announceWorkspace(session, "disconnected");
-    await this.recordDisconnect(session, workspace?.workspace);
+    await this.recordDisconnect(session, workspace.workspace);
   }
 
   /**
@@ -146,7 +146,14 @@ export class LocalControlLifecycleService {
       return;
     }
 
-    const workspace = await this.deps.presence.read(session.conversationId);
+    const workspace = await this.deps.presence
+      .getByConversationId(session.conversationId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+          return null;
+        }
+        throw error;
+      });
     await this.deps.buffer().appendLocalWorkspace({
       conversationId: session.conversationId,
       turnId,

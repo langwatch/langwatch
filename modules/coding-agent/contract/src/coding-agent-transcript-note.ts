@@ -1,4 +1,4 @@
-import { readNumber, readString } from "./coding-agent-transcript-value.ts";
+import { pickNumber, pickString } from "./coding-agent-transcript-value.ts";
 import type { TranscriptEntry } from "./coding-agent-transcript.ts";
 
 type NoteEntry = Extract<TranscriptEntry, { kind: "note" }>;
@@ -32,7 +32,7 @@ export function buildTranscriptNoteEntry({
         atMs,
         level: "error",
         event,
-        text: readString(attrs, "error") ?? "The session hit an error.",
+        text: pickString(attrs, "error") ?? "The session hit an error.",
       });
     case "api_refusal":
       return note({ atMs, level: "error", event, text: "The model refused to answer." });
@@ -62,9 +62,9 @@ function note({
 }
 
 function compactionEntry(attrs: Record<string, unknown>, atMs: number): NoteEntry {
-  const pre = readNumber(attrs, "pre_tokens");
-  const post = readNumber(attrs, "post_tokens");
-  const trigger = readString(attrs, "trigger") ?? "auto";
+  const pre = pickNumber(attrs, "pre_tokens");
+  const post = pickNumber(attrs, "post_tokens");
+  const trigger = pickString(attrs, "trigger") ?? "auto";
   const text =
     pre !== null && post !== null
       ? `Context compacted (${trigger}): ${formatTokenCount(pre)} → ${formatTokenCount(post)} tokens`
@@ -74,28 +74,28 @@ function compactionEntry(attrs: Record<string, unknown>, atMs: number): NoteEntr
 }
 
 function approvalModeText(attrs: Record<string, unknown>): string {
-  const mode = readString(attrs, "to_mode") ?? "unknown";
+  const mode = pickString(attrs, "to_mode") ?? "unknown";
   return `Approval mode changed to ${mode}.`;
 }
 
 function apiErrorText(attrs: Record<string, unknown>): string {
-  const status = readString(attrs, "status_code");
+  const status = pickString(attrs, "status_code");
   if (status === "429") return "Rate limited by the provider.";
   return `The request failed${status ? ` (${status})` : ""}.`;
 }
 
 function subtaskText(attrs: Record<string, unknown>): string {
-  const description = readString(attrs, "description");
+  const description = pickString(attrs, "description");
   return description ? `Sub-agent spawned: ${description}` : "A sub-agent was spawned.";
 }
 
 function commitText(attrs: Record<string, unknown>): string {
-  const message = readString(attrs, "message");
+  const message = pickString(attrs, "message");
   return message ? `Commit created: ${message}` : "A commit was created.";
 }
 
 function skillText(attrs: Record<string, unknown>): string {
-  const skill = readString(attrs, "skill_name") ?? readString(attrs, "skill");
+  const skill = pickString(attrs, "skill_name") ?? pickString(attrs, "skill");
   return skill ? `Skill activated: ${skill}` : "A skill was activated.";
 }
 

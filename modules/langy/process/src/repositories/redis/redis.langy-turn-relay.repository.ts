@@ -852,17 +852,19 @@ export class RedisLangyTurnRelayRepository {
     // The conversation's remembered link first; on a miss, the platform's own
     // verified lookup (project-scoped) — the cache is an optimization, not
     // the source of truth for what the id addresses.
+    const remembered = await this.deps.resourceLinks.resolve({
+      conversationId: at.conversationId,
+      id: invocation.resourceId,
+    });
     const platformUrl =
-      (await this.deps.resourceLinks.resolve({
-        conversationId: at.conversationId,
-        id: invocation.resourceId,
-      })) ??
-      (this.deps.resolveResourceUrl
-        ? await this.deps.resolveResourceUrl({
-            projectId,
-            resourceId: invocation.resourceId,
-          })
-        : null);
+      remembered.kind === "hit"
+        ? remembered.href
+        : this.deps.resolveResourceUrl
+          ? await this.deps.resolveResourceUrl({
+              projectId,
+              resourceId: invocation.resourceId,
+            })
+          : null;
     if (!platformUrl) return { status: "applied" }; // not resolvable in this project — drop
 
     const href = toRelativeSameOriginHref({

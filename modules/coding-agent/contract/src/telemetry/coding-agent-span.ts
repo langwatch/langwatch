@@ -15,7 +15,7 @@ export function isModelCallSpan(spanName: string): boolean {
   return spanName.startsWith("chat ");
 }
 
-export function readString(
+export function pickString(
   attributes: Record<string, unknown> | null | undefined,
   key: string,
 ): string | null {

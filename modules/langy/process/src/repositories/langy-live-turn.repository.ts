@@ -89,8 +89,11 @@ export interface LangyFrameDedupRepository {
   }): Promise<boolean>;
 }
 
+/** A remembered link, or a miss the caller answers from the platform's own lookup. */
+export type LangyResourceLinkLookup = { kind: "hit"; href: string } | { kind: "miss" };
+
 /** Conversation-scoped links Langy's navigate command resolves an id against. */
 export interface LangyResourceLinksRepository {
   remember(input: { conversationId: string; links: { id: string; href: string }[] }): Promise<void>;
-  resolve(input: { conversationId: string; id: string }): Promise<string | null>;
+  resolve(input: { conversationId: string; id: string }): Promise<LangyResourceLinkLookup>;
 }

@@ -49,7 +49,7 @@ describe("given a folder connected to the conversation", () => {
       now += 10_000;
 
       expect(await presence.heartbeat(workspace())).toBe("refreshed");
-      expect((await presence.read(conversationId))?.lastSeenAt).toBe(now);
+      expect((await presence.getByConversationId(conversationId)).lastSeenAt).toBe(now);
     });
   });
 
@@ -62,12 +62,14 @@ describe("given a folder connected to the conversation", () => {
       await store.del(presenceKey(conversationId));
       now += 31_000;
 
-      expect(await presence.read(conversationId)).toBeNull();
+      await expect(presence.getByConversationId(conversationId)).rejects.toMatchObject({
+        code: "langy_local_workspace_offline",
+      });
       expect(await presence.heartbeat(workspace())).toBe("restored");
 
-      const restored = await presence.read(conversationId);
-      expect(restored?.instanceId).toBe("lci_1");
-      expect(restored?.workspace.root).toBe("/Users/dev/acme-app");
+      const restored = await presence.getByConversationId(conversationId);
+      expect(restored.instanceId).toBe("lci_1");
+      expect(restored.workspace.root).toBe("/Users/dev/acme-app");
       expect(restored?.lastSeenAt).toBe(now);
     });
   });
@@ -78,7 +80,7 @@ describe("given a folder connected to the conversation", () => {
       now += 1_000;
 
       expect(await presence.heartbeat(workspace("lci_1"))).toBe("replaced");
-      expect((await presence.read(conversationId))?.instanceId).toBe("lci_2");
+      expect((await presence.getByConversationId(conversationId)).instanceId).toBe("lci_2");
     });
   });
 });

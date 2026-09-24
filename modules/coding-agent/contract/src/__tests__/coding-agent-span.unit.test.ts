@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isModelCallSpan, readString } from "../index.ts";
+import { isModelCallSpan, pickString } from "../index.ts";
 
 describe("coding-agent span vocabulary", () => {
   it("recognises model calls without counting nested provider calls", () => {
@@ -11,8 +11,8 @@ describe("coding-agent span vocabulary", () => {
   });
 
   it("reads dotted attributes from flat and unflattened span shapes", () => {
-    expect(readString({ "gen_ai.request.model": "flat" }, "gen_ai.request.model")).toBe("flat");
-    expect(readString({ gen_ai: { request: { model: "nested" } } }, "gen_ai.request.model")).toBe(
+    expect(pickString({ "gen_ai.request.model": "flat" }, "gen_ai.request.model")).toBe("flat");
+    expect(pickString({ gen_ai: { request: { model: "nested" } } }, "gen_ai.request.model")).toBe(
       "nested",
     );
   });

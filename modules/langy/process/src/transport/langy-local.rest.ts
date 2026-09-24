@@ -12,6 +12,7 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   BASH_DEFAULT_TIMEOUT_MS,
   CALL_POLL_HOLD_MS,
@@ -217,7 +218,14 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     await conversation({ app, conversationId, projectId: auth.projectId, userId: auth.userId });
 
     const runtime = members.runtime();
-    const connected = await runtime.presence.read(conversationId);
+    const connected = await runtime.presence
+      .getByConversationId(conversationId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+          return null;
+        }
+        throw error;
+      });
     const [pendingRequest] = await runtime.requests.findOpenForConversation({
       projectId: auth.projectId,
       userId: auth.userId,

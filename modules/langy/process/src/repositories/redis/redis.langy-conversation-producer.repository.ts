@@ -91,7 +91,7 @@ function buildLangyConversationProducerPipeline(input: {
   const titleGenerator: LangyTitleGenerator = refuse("generate a conversation title");
   const localConnectTurn = {
     presence: () => ({
-      read: refuse("read a folder's presence"),
+      getByConversationId: refuse("read a folder's presence"),
       readOwedConnectTurn: refuse("read an owed connect turn"),
       settleOwedConnectTurn: refuse("settle an owed connect turn"),
     }),

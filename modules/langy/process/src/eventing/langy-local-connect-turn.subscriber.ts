@@ -37,7 +37,7 @@ export interface LocalConnectTurnConversationReader {
 
 export type LocalConnectTurnPresence = Pick<
   LangyLocalPresence,
-  "read" | "readOwedConnectTurn" | "settleOwedConnectTurn"
+  "getByConversationId" | "readOwedConnectTurn" | "settleOwedConnectTurn"
 >;
 
 export interface LocalConnectTurnSubscriberDeps {
@@ -96,7 +96,12 @@ async function owedTurnOf(
 ): Promise<OwedConnectTurn | null> {
   const owed = await presence.readOwedConnectTurn(conversationId);
   if (!owed) return null;
-  const folder = await presence.read(conversationId);
+  const folder = await presence.getByConversationId(conversationId).catch((error: unknown) => {
+    if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+      return null;
+    }
+    throw error;
+  });
   if (folder && folder.requestId === owed.requestId) return owed;
   await presence.settleOwedConnectTurn(conversationId);
   return null;

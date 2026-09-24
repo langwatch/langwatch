@@ -5,6 +5,7 @@
  */
 
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   LangyTurnInProgressError,
   PRESENCE_HEARTBEAT_MS,
@@ -344,7 +345,14 @@ export class LocalControlSessionCoreService {
    * reads as in flight (folded events), the connect turn is owed and starts when that turn ends.
    */
   async afterRegister(session: ControlSession): Promise<void> {
-    const workspace = await this.presence.read(session.conversationId);
+    const workspace = await this.presence
+      .getByConversationId(session.conversationId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+          return null;
+        }
+        throw error;
+      });
     if (!workspace) {
       return;
     }
@@ -411,7 +419,14 @@ export class LocalControlSessionCoreService {
    * record does not.
    */
   private async isCurrentConnection(session: ControlSession): Promise<boolean> {
-    const workspace = await this.presence.read(session.conversationId);
+    const workspace = await this.presence
+      .getByConversationId(session.conversationId)
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
+          return null;
+        }
+        throw error;
+      });
 
     return !workspace || workspace.instanceId === session.instanceId;
   }

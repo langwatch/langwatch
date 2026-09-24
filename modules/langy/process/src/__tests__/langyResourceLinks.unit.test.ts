@@ -39,15 +39,15 @@ describe("langyResourceLinkStore", () => {
         ],
       });
 
-      expect(await store.resolve({ conversationId: "conv-1", id: "batch_1" })).toBe(href);
-      expect(await store.resolve({ conversationId: "conv-1", id: "run_1" })).toBe(href);
+      expect(await store.resolve({ conversationId: "conv-1", id: "batch_1" })).toEqual({ kind: "hit", href });
+      expect(await store.resolve({ conversationId: "conv-1", id: "run_1" })).toEqual({ kind: "hit", href });
     });
 
-    it("returns null for a resource this conversation never surfaced", async () => {
+    it("answers a miss for a resource this conversation never surfaced", async () => {
       const { redis } = fakeRedis();
       const store = LangyResourceLinksRedisRepository.create({ redis });
 
-      expect(await store.resolve({ conversationId: "conv-1", id: "unknown" })).toBeNull();
+      expect(await store.resolve({ conversationId: "conv-1", id: "unknown" })).toEqual({ kind: "miss" });
     });
   });
 
@@ -60,7 +60,7 @@ describe("langyResourceLinkStore", () => {
         links: [{ id: "run_1", href: "https://app.langwatch.ai/a/x" }],
       });
 
-      expect(await store.resolve({ conversationId: "conv-2", id: "run_1" })).toBeNull();
+      expect(await store.resolve({ conversationId: "conv-2", id: "run_1" })).toEqual({ kind: "miss" });
     });
   });
 

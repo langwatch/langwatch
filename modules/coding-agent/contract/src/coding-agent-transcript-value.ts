@@ -1,8 +1,8 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
 
-import { readString } from "./telemetry/coding-agent-span.ts";
+import { pickString } from "./telemetry/coding-agent-span.ts";
 
-export { readString } from "./telemetry/coding-agent-span.ts";
+export { pickString } from "./telemetry/coding-agent-span.ts";
 
 export function readUnknown(
   attrs: Record<string, unknown> | null | undefined,
@@ -21,7 +21,7 @@ export function readUnknown(
   return cursor;
 }
 
-export function readNumber(
+export function pickNumber(
   attrs: Record<string, unknown> | null | undefined,
   key: string,
 ): number | null {
@@ -48,8 +48,8 @@ export function parseMaybeJson(raw: string | null): unknown {
 
 export function pickModel(span: SpanDetail): string | null {
   return (
-    readString(span.params, "gen_ai.request.model") ??
-    readString(span.params, "ai.model.id") ??
-    readString(span.params, "model")
+    pickString(span.params, "gen_ai.request.model") ??
+    pickString(span.params, "ai.model.id") ??
+    pickString(span.params, "model")
   );
 }

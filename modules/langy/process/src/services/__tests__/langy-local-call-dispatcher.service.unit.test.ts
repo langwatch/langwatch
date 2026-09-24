@@ -347,7 +347,9 @@ describe("given a folder whose machine went to sleep", () => {
       await presence.register(workspace());
       now += 31_000;
 
-      expect(await presence.read(conversationId)).toBeNull();
+      await expect(presence.getByConversationId(conversationId)).rejects.toMatchObject({
+        code: "langy_local_workspace_offline",
+      });
       await expect(
         dispatcher.start({
           projectId,
