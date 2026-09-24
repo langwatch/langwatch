@@ -1,8 +1,5 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type {
-  ReportTraceRow,
-  AutomationEvaluationSubscriberService as AutomationEvaluationSubscriber,
-} from "@langwatch/automation-contract";
+import type { ReportTraceRow } from "@langwatch/automation-contract";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { defineServerModule } from "@langwatch/kernel";
 import type { TraceListItem } from "@langwatch/trace-contract";
@@ -194,7 +191,7 @@ export function createAutomationEvaluationSubscriber(input: {
   /** The trace summary a match is confirmed against, and how its query is read. */
   traces: AutomationEvaluationTraceSummary & AutomationEvaluationQueryClassification;
   triggerMatches: AutomationTriggerMatchRecorder;
-}): AutomationEvaluationSubscriber {
+}): AutomationEvaluationSubscriberService {
   return AutomationEvaluationSubscriberService.create({
     triggers: input.triggers,
     graphActivity: input.graphActivity,

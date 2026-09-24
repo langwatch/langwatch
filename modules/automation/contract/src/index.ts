@@ -10,7 +10,7 @@ export * from "./automation.errors.ts";
 export * from "./automation-filters.ts";
 export * from "./automation.queries.ts";
 export * from "./automation.api.ts";
-export * from "./automation-evaluation-subscriber.service.ts";
+export * from "./automation-evaluation-subscriber.ts";
 export {
   alertTypeSchema,
   notificationCadenceSchema,

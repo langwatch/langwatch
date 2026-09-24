@@ -29,20 +29,3 @@ export const automationEvaluationActivityContextSchema = z.object({ tenantId: z.
 export type AutomationEvaluationActivityContext = z.infer<
   typeof automationEvaluationActivityContextSchema
 >;
-
-/**
- * Automation's event-subscriber lifecycle for terminal Evaluation events.
- * It is separate from request-facing AutomationService because Eventing owns
- * redelivery, delay, and deduplication of these operations.
- */
-export abstract class AutomationEvaluationSubscriberService {
-  abstract handleEvaluationTriggerMatch(
-    event: AutomationEvaluationSubscriberEvent,
-    context: AutomationEvaluationSubscriberContext,
-  ): Promise<void>;
-
-  abstract handleEvaluationGraphTriggerActivity(
-    event: AutomationEvaluationSubscriberEvent,
-    context: AutomationEvaluationActivityContext,
-  ): Promise<void>;
-}

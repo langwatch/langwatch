@@ -1,8 +1,7 @@
-import {
-  AutomationEvaluationSubscriberService as AutomationEvaluationSubscriberCapability,
-  type AutomationEvaluationActivityContext,
-  type AutomationEvaluationSubscriberContext,
-  type AutomationEvaluationSubscriberEvent,
+import type {
+  AutomationEvaluationActivityContext,
+  AutomationEvaluationSubscriberContext,
+  AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
 
 import type {
@@ -19,7 +18,7 @@ import type { AutomationTraceTriggerCatalogue } from "../repositories/automation
  * Evaluation event subscribers using four narrow ports instead of two capability
  * services, enabling different composition for application vs. background contexts.
  */
-export class AutomationEvaluationSubscriberService extends AutomationEvaluationSubscriberCapability {
+export class AutomationEvaluationSubscriberService {
   static create(input: {
     triggers: AutomationTraceTriggerCatalogue;
     graphActivity: AutomationGraphActivity;
@@ -38,9 +37,7 @@ export class AutomationEvaluationSubscriberService extends AutomationEvaluationS
       evaluationFilters: AutomationEvaluationTriggerFilter;
       triggerMatches: AutomationTriggerMatchRecorder;
     },
-  ) {
-    super();
-  }
+  ) {}
 
   handleEvaluationTriggerMatch(
     event: AutomationEvaluationSubscriberEvent,

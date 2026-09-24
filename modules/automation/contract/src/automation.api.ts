@@ -6,7 +6,7 @@ import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberContext,
   AutomationEvaluationSubscriberEvent,
-} from "./automation-evaluation-subscriber.service.ts";
+} from "./automation-evaluation-subscriber.ts";
 import type {
   AutomationListRow,
   AutomationPersistCapStatus,
