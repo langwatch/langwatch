@@ -5,8 +5,10 @@
  */
 import type { Readable } from "node:stream";
 
+import { browserCallerOfRequest } from "@langwatch/api/rest";
+import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import type { ProcessMembers, RateLimiter } from "@langwatch/process-stores/members";
 import { StoredObjectApi, storedObjectConfig } from "@langwatch/stored-object-contract";
 import type {
   DeleteProjectStoredObjectsResult,
@@ -30,9 +32,16 @@ import type {
   StoredObjectStorageDestination,
   StoredObjectStorageUsage,
 } from "@langwatch/stored-object-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
+import type {
+  StoredObjectFileAllowance,
+  StoredObjectFileApi,
+  StoredObjectFileCaller,
+  StoredObjectFileViewPermission,
+} from "../transport/stored-object-file.rest.ts";
 import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
 import type {
   StoredObjectDelivery,
@@ -73,11 +82,14 @@ export type StoredObjectInfrastructure = Readonly<{
   owners: StoredObjectOwnerResolver;
 }>;
 
-/** {@link StoredObjectSetup}'s members, once built into what the app composes over. */
-type StoredObjectDependencies = Record<never, never>;
+/** The person's project permission the byte door asks, answered by its owner. */
+type StoredObjectDependencies = Readonly<{ permissions: typeof AuthzApi }>;
 
 /** `nodeEnvironment` is the process's own fact (§6), for the Azure insecure-token-endpoint gate. */
-type StoredObjectMembers = Pick<ProcessMembers, "prisma" | "clickhouse" | "logger" | "secrets"> &
+type StoredObjectMembers = Pick<
+  ProcessMembers,
+  "prisma" | "clickhouse" | "logger" | "secrets" | "rateLimiter"
+> &
   Readonly<{ nodeEnvironment: string | undefined }>;
 
 type StoredObjectSetup = FeatureSetup<
@@ -87,12 +99,19 @@ type StoredObjectSetup = FeatureSetup<
   StoredObjectRepositories
 >;
 
-export class StoredObjectApp implements StoredObjectApi {
+export class StoredObjectApp implements StoredObjectApi, StoredObjectFileApi {
   static readonly contract = StoredObjectApi;
-  static readonly dependencies = {};
+  static readonly dependencies = { permissions: AuthzApi };
   static readonly config = storedObjectConfig;
   /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["prisma", "clickhouse", "logger", "secrets", "nodeEnvironment"] as const;
+  static readonly reads = [
+    "prisma",
+    "clickhouse",
+    "logger",
+    "secrets",
+    "rateLimiter",
+    "nodeEnvironment",
+  ] as const;
 
   /**
    * Builds this process's own {@link StoredObjectInfrastructure} from the
@@ -109,6 +128,8 @@ export class StoredObjectApp implements StoredObjectApi {
     return StoredObjectApp.fromInfrastructure({
       infrastructure,
       repositories: setup.repositories,
+      permissions: setup.dependencies.permissions,
+      rateLimiter: setup.members.rateLimiter,
     });
   }
 
@@ -120,11 +141,13 @@ export class StoredObjectApp implements StoredObjectApi {
   static fromInfrastructure(setup: {
     infrastructure: StoredObjectInfrastructure;
     repositories: StoredObjectRepositories;
+    permissions: AuthzApi;
+    rateLimiter: RateLimiter;
   }): StoredObjectApp {
     const { infrastructure: members, repositories } = setup;
 
-    return new StoredObjectApp(
-      StoredObjectService.create({
+    return new StoredObjectApp({
+      storage: StoredObjectService.create({
         records: repositories.records,
         storage: members.storage,
         delivery: members.delivery,
@@ -133,23 +156,65 @@ export class StoredObjectApp implements StoredObjectApi {
         maximumUploadBytes: members.maximumUploadBytes,
         uploadExpiryMs: members.uploadExpiryMs,
       }),
-      members.files,
-      members.owners,
-    );
+      files: members.files,
+      owners: members.owners,
+      permissions: setup.permissions,
+      rateLimiter: setup.rateLimiter,
+    });
   }
 
-  #storage: StoredObjectService;
-  #files: StoredObjectFileReader;
-  #owners: StoredObjectOwnerResolver;
+  readonly #storage: StoredObjectService;
+  readonly #files: StoredObjectFileReader;
+  readonly #owners: StoredObjectOwnerResolver;
+  readonly #permissions: AuthzApi;
+  readonly #rateLimiter: RateLimiter;
 
-  private constructor(
-    storedObjects: StoredObjectService,
-    files: StoredObjectFileReader,
-    owners: StoredObjectOwnerResolver,
-  ) {
-    this.#storage = storedObjects;
-    this.#files = files;
-    this.#owners = owners;
+  private constructor(parts: {
+    storage: StoredObjectService;
+    files: StoredObjectFileReader;
+    owners: StoredObjectOwnerResolver;
+    permissions: AuthzApi;
+    rateLimiter: RateLimiter;
+  }) {
+    this.#storage = parts.storage;
+    this.#files = parts.files;
+    this.#owners = parts.owners;
+    this.#permissions = parts.permissions;
+    this.#rateLimiter = parts.rateLimiter;
+  }
+
+  /** Who the process's own browser verifier admitted on this request, before the handler ran. */
+  async identify({ request }: { request: Request }): Promise<StoredObjectFileCaller> {
+    const userId = browserCallerOfRequest(request)?.userId;
+
+    return userId ? { userId } : {};
+  }
+
+  /** One fixed-window count of the caller's reads, on the process's own limiter. */
+  async countRead(input: {
+    key: string;
+    windowSeconds: number;
+    max: number;
+  }): Promise<StoredObjectFileAllowance> {
+    const decision = await this.#rateLimiter.check(input.key, {
+      requests: input.max,
+      seconds: input.windowSeconds,
+    });
+    const retryAfterSeconds = decision.retryAfterSeconds ?? input.windowSeconds;
+
+    return {
+      allowed: decision.allowed,
+      resetAt: nowInstant().epochMilliseconds + retryAfterSeconds * 1000,
+    };
+  }
+
+  /** Refuses with the authz module's own denial unless the person holds the permission. */
+  assertProjectPermission(input: {
+    userId: string;
+    projectId: string;
+    permission: StoredObjectFileViewPermission;
+  }): Promise<void> {
+    return this.#permissions.authorizeProjectPermission(input);
   }
 
   /** Begins an upload and answers where to put the bytes. */

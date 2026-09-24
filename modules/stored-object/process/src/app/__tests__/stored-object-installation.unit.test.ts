@@ -6,6 +6,8 @@ import { join } from "node:path";
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-objects.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
@@ -48,6 +50,8 @@ function installation(role: "api" | "worker" | "tasks") {
       },
     })
     .withMember("nodeEnvironment", undefined)
+    .withMembers({ rateLimiter: createApiFixture({}) })
+    .provide({ authz: createApiFixture<AuthzApi>({}) })
     .withRelational(unavailable("relational store"))
     .withAnalytical(unavailable("analytical store"))
     .withSecrets(resolvedSecrets({}))

@@ -3,6 +3,9 @@
  * a token codec that remembers what it minted, a fixed delivery capability,
  * and the row-and-stream reads the byte surface performs.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import {
   StoredObjectNotFoundError,
   type StoredObjectDeliveryCapability,
@@ -170,5 +173,7 @@ export function createStoredObjectTestApp(
   return StoredObjectApp.fromInfrastructure({
     repositories: input.repositories ?? MemoryStoredObjectRepositories.create(),
     infrastructure: createStoredObjectTestInfrastructure(input.members ?? {}),
+    permissions: createApiFixture<AuthzApi>({}),
+    rateLimiter: createApiFixture<RateLimiter>({}),
   });
 }
