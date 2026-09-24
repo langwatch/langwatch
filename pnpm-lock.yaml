@@ -6339,6 +6339,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/topic-contract':
         specifier: workspace:*
         version: link:../../topic/contract
@@ -6421,6 +6424,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -12457,6 +12463,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

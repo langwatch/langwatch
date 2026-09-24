@@ -22,6 +22,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

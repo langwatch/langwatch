@@ -25,6 +25,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "zod": "catalog:"
   },
