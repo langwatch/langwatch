@@ -12,60 +12,22 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import type { ClusteringErrorCode } from "~/server/app-layer/topic-clustering/clustering-error";
-import type {
-  TopicClusteringRunMode,
-  TopicClusteringSkipReason,
-} from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import SettingsLayout from "../../components/SettingsLayout";
+import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-
-/**
- * Fixed copy per failure code. The classifier's code is the ONLY thing the
- * server sends about a failure — never the provider's response body, which is
- * a langevals/provider payload (tracebacks, internal hostnames, echoed key
- * prefixes) and not something to put in front of a customer.
- *
- * A code with no entry here is treated as ours to fix, which is also what an
- * unrecognised or mis-scoped classification degrades to.
- */
-/**
- * The server sends bare strings for codes/reasons/modes; these lookups narrow
- * them back onto the canonical unions so an unknown value falls through to
- * each call site's fallback instead of silently rendering nothing new.
- */
-function copyFor<K extends string, V>(
-  map: Partial<Record<K, V>>,
-  key: string | null,
-): V | undefined {
-  return key ? map[key as K] : undefined;
-}
-
-// Deliberately Partial: a code with no entry is treated as ours to fix (see
-// the doc above), so exhaustiveness would defeat the fallback.
-const CLUSTERING_FAILURE_GUIDANCE: Partial<
-  Record<ClusteringErrorCode, { title: string; description: string }>
-> = {
-  model_not_configured: {
-    title: "No model is set up for topic clustering",
-    description:
-      "Choose a default model and embeddings for topic clustering in Settings → Model Providers → Default Models, then run it again.",
-  },
-  model_provider_auth: {
-    title: "Your model provider rejected the credentials",
-    description:
-      "Check the API key for your topic clustering model in Settings → Model Providers, then run topic clustering again.",
-  },
-  model_provider_quota: {
-    title: "Your model provider refused the request",
-    description:
-      "This usually means the account is out of quota or credit. Check your limits and billing with the provider, then run topic clustering again.",
-  },
-};
+import {
+  CLUSTERING_FAILURE_GUIDANCE,
+  copyFor,
+  MODEL_PROVIDERS_HREF,
+  RUN_MODE_COPY,
+  runDetail,
+  SKIP_REASON_COPY,
+  showsModelProvidersLink,
+} from "./topic-clustering-copy";
 
 function TopicClusteringSettings() {
   const { project } = useOrganizationTeamProject({
@@ -188,21 +150,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   );
 }
 
-// Exhaustive over the union on purpose: adding a skip reason without copy for
-// it is a compile error here, not a blank line in the UI.
-const SKIP_REASON_COPY: Record<TopicClusteringSkipReason, string> = {
-  recently_clustered:
-    "Skipped, your topics were rebuilt recently so this run was not needed yet",
-  not_enough_traces: "Skipped, not enough new traces to group yet",
-  not_configured: "Skipped, no topic clustering model is set up",
-};
-
-/** What each run mode did, in the customer's terms rather than the enum's. */
-const RUN_MODE_COPY: Record<TopicClusteringRunMode, string> = {
-  batch: "Rebuilt all topics",
-  incremental: "Sorted new traces into your existing topics",
-};
-
 function outcomeBadge(outcome: string | null, isRunInFlight: boolean) {
   if (isRunInFlight) return <Badge colorPalette="blue">Running</Badge>;
   switch (outcome) {
@@ -311,6 +258,14 @@ function ClusteringStatusCard({
                       <Alert.Description>
                         {guidance.description}
                       </Alert.Description>
+                      <Link
+                        href={MODEL_PROVIDERS_HREF}
+                        color="fg.muted"
+                        fontSize="sm"
+                        fontWeight="medium"
+                      >
+                        Open Model Providers
+                      </Link>
                     </Alert.Content>
                   </Alert.Root>
                 ) : (
@@ -335,46 +290,6 @@ function ClusteringStatusCard({
       </Card.Body>
     </Card.Root>
   );
-}
-
-/**
- * What one history row says about its run, in the customer's terms. The
- * server never sends raw error text (ADR-051 §8) — a failed run's detail is
- * the same fixed guidance the status card uses.
- */
-function runDetail(run: {
-  outcome: string;
-  mode: string | null;
-  skippedReason: string | null;
-  errorCode: string | null;
-  isErrorUserActionable: boolean;
-  tracesProcessed: number;
-  topicsCount: number;
-  subtopicsCount: number;
-}): string {
-  switch (run.outcome) {
-    case "completed": {
-      const modeCopy = copyFor(RUN_MODE_COPY, run.mode);
-      const summary = `Organized ${run.tracesProcessed} traces into ${run.topicsCount} topics and ${run.subtopicsCount} subtopics.`;
-      return modeCopy ? `${modeCopy}. ${summary}` : summary;
-    }
-    case "skipped":
-      return `${copyFor(SKIP_REASON_COPY, run.skippedReason) ?? "Skipped"}.`;
-    case "failed": {
-      const guidance = run.isErrorUserActionable
-        ? copyFor(CLUSTERING_FAILURE_GUIDANCE, run.errorCode)
-        : undefined;
-      return guidance
-        ? guidance.title
-        : "Failed on our side. It retries automatically at the next scheduled run.";
-    }
-    case "running":
-      return "Working through your recent traces…";
-    case "abandoned":
-      return "The run was interrupted; the next scheduled run starts fresh.";
-    default:
-      return "";
-  }
 }
 
 function RunHistoryCard({ projectId }: { projectId: string }) {
@@ -420,9 +335,21 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
                   </Table.Cell>
                   <Table.Cell>{outcomeBadge(run.outcome, false)}</Table.Cell>
                   <Table.Cell>
-                    <Text fontSize="sm" color="fg.muted">
-                      {runDetail(run)}
-                    </Text>
+                    <VStack align="start" gap={1}>
+                      <Text fontSize="sm" color="fg.muted">
+                        {runDetail(run)}
+                      </Text>
+                      {showsModelProvidersLink(run) && (
+                        <Link
+                          href={MODEL_PROVIDERS_HREF}
+                          color="fg.muted"
+                          fontSize="sm"
+                          fontWeight="medium"
+                        >
+                          Open Model Providers
+                        </Link>
+                      )}
+                    </VStack>
                   </Table.Cell>
                 </Table.Row>
               ))}

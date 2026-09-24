@@ -587,6 +587,12 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   // retries through the outbox, and the run records run_failed with the
   // user-actionable model_not_configured code (surfaced as guidance on
   // the settings page).
+  //
+  // It can also throw ModelRestrictedForFeatureError when the only configured
+  // value is a codex model: FAST=codex resolves for coding assists, but topic
+  // clustering runs through langevals/litellm (never the gateway), so the
+  // resolver skips codex for this feature. That surfaces as the user-actionable
+  // model_restricted code with its own guidance (issue #8287).
   const resolved = await resolveModelForFeature(
     "analytics.topic_clustering_llm",
     { prisma, projectId: project.id },

@@ -86,10 +86,15 @@ Feature: Codex, the sign-in-with-OpenAI model provider
 
   # ── Where Codex may be used ────────────────────────────────────────────────
 
+  # Topic clustering is a fast assist by role, but it runs through
+  # langevals/litellm rather than the gateway, so codex cannot execute it. It
+  # is excluded per-feature while the Fast role default stays codex — see
+  # specs/topic-clustering/model-resolution.feature (issue #8287).
   Scenario: Codex models exist only on the allowed surfaces
     Given Codex is connected
     Then codex models are offered in Langy's model picker
     And in the default-model slots of the fast assists (search, titles, autocomplete, translations, generators)
+    But not topic clustering, which runs outside the gateway
     But not in the prompt playground, evaluations, workflows or any other model picker
 
   Scenario: The server refuses Codex outside the allowed surfaces
