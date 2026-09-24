@@ -23,12 +23,6 @@ Steps to reproduce the behavior:
 2. Click on '....'
 3. See error
 
-**Observed vs expected**
-
-| | Observed | Expected |
-|---|---|---|
-| [surface, e.g. API response / UI copy / log line] | ... | ... |
-
 **Evidence**
 Logs, screenshots, queries, or event ids that show the failure. Link, don't paste secrets.
 
