@@ -1,4 +1,5 @@
 import type { IdentifierFact, IdentityHeads } from "@langwatch/identity-contract";
+import { IdentityIdentifierNotFoundError } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
@@ -55,11 +56,11 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
     };
   }
 
-  async tryFindActiveIdentifierByValue({
+  async getActiveIdentifierByValue({
     normalizedValue,
   }: {
     normalizedValue: string;
-  }): Promise<{ userId: string; identifierId: string } | null> {
+  }): Promise<{ userId: string; identifierId: string }> {
     const row = await this.database.identifier.findFirst({
       where: {
         value: normalizedValue,
@@ -67,28 +68,31 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
       },
       select: { id: true, userId: true },
     });
-    return row === null ? null : { userId: row.userId, identifierId: row.id };
+    if (row === null) throw new IdentityIdentifierNotFoundError(`nobody holds ${normalizedValue}`);
+    return { userId: row.userId, identifierId: row.id };
   }
 
-  async tryFindIdentifier({
+  async getIdentifier({
     userId,
     identifierId,
   }: {
     userId: string;
     identifierId: string;
-  }): Promise<IdentifierFact | null> {
+  }): Promise<IdentifierFact> {
     const row = await this.database.identifier.findFirst({
       where: { id: identifierId, userId },
     });
-    return row === null ? null : identifierRowToFact(row);
+    if (row === null)
+      throw new IdentityIdentifierNotFoundError(`${userId} holds no identifier ${identifierId}`);
+    return identifierRowToFact(row);
   }
 
   /**
    * By pinned account id first, then VERBATIM `providerId` — never the
    * folded `provider`, which would let unlinking one enterprise IdP detach
-   * another. `take: 2` answers null on any ambiguity, never a guess.
+   * another. `take: 2` refuses any ambiguity as not found, never a guess.
    */
-  async tryFindIdentifierIdForAccount({
+  async getIdentifierIdForAccount({
     userId,
     accountId,
     providerId,
@@ -96,7 +100,7 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
     userId: string;
     accountId: string;
     providerId: string;
-  }): Promise<string | null> {
+  }): Promise<string> {
     const byAccount = await this.database.identifier.findFirst({
       where: { userId, accountId },
       select: { id: true },
@@ -107,6 +111,12 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
       select: { id: true },
       take: 2,
     });
-    return byProvider.length === 1 ? (byProvider[0]?.id ?? null) : null;
+    const [only, ...others] = byProvider;
+    if (!only || others.length > 0) {
+      throw new IdentityIdentifierNotFoundError(
+        `no single identifier mirrors account ${accountId}`,
+      );
+    }
+    return only.id;
   }
 }

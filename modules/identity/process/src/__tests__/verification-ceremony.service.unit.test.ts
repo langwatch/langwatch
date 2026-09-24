@@ -1,6 +1,7 @@
 import {
   emptyIdentityHeads,
   IdentityEmailInUseError,
+  IdentityIdentifierNotFoundError,
   IdentityVerificationInvalidError,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity-contract";
@@ -84,21 +85,27 @@ function harness(options?: {
   const service = VerificationCeremonyService.create({
     store,
     heads: {
-      tryFindIdentifier: async ({ identifierId }) =>
-        identifierId === WORK || identifierId === PERSONAL
-          ? fact({
-              identifierId,
-              provider: options?.identifierProvider ?? "email",
-              state: projection.state,
-            })
-          : null,
+      getIdentifier: async ({ identifierId }) => {
+        if (identifierId !== WORK && identifierId !== PERSONAL) {
+          throw new IdentityIdentifierNotFoundError(`no identifier ${identifierId}`);
+        }
+        return fact({
+          identifierId,
+          provider: options?.identifierProvider ?? "email",
+          state: projection.state,
+        });
+      },
       // The ceremony reads exactly one head; the rest of the port is
       // present so the double is the contract, not a slice of it.
       tryFindUserHashKey: async () => null,
       hasFolded: async () => true,
       findHeads: async ({ userId }) => emptyIdentityHeads({ userId }),
-      tryFindActiveIdentifierByValue: async () => null,
-      tryFindIdentifierIdForAccount: async () => null,
+      getActiveIdentifierByValue: async () => {
+        throw new IdentityIdentifierNotFoundError("nobody holds it");
+      },
+      getIdentifierIdForAccount: async () => {
+        throw new IdentityIdentifierNotFoundError("no identifier mirrors it");
+      },
     },
     identity: { verifyIdentifier: verifyIdentifier as never },
     deps: {

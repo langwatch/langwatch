@@ -1,4 +1,4 @@
-import type { SsoConnectionState } from "@langwatch/identity-contract";
+import { SsoConnectionNotFoundError, type SsoConnectionState } from "@langwatch/identity-contract";
 
 import { ownedVerifiedDomains } from "../../rules/sso-domain-ownership.rules.ts";
 import type {
@@ -98,8 +98,10 @@ export class MemorySsoConnectionBackofficeRepository implements SsoConnectionBac
     return { states: matched.slice(start, start + args.pageSize), total: matched.length };
   }
 
-  async tryFindById(args: { connectionId: string }): Promise<SsoConnectionState | null> {
-    return this.store.ssoConnections.get(args.connectionId) ?? null;
+  async getById(args: { connectionId: string }): Promise<SsoConnectionState> {
+    const connection = this.store.ssoConnections.get(args.connectionId);
+    if (!connection) throw new SsoConnectionNotFoundError(`no connection ${args.connectionId}`);
+    return connection;
   }
 
   async findOrganizationNames(args: { organizationIds: string[] }): Promise<Map<string, string>> {

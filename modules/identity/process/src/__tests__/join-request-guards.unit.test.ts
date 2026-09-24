@@ -4,6 +4,7 @@ import {
   JOIN_EXPIRED_EVENT_TYPE,
   JOIN_REQUESTED_EVENT_TYPE,
   type JoinRequestAggregateState,
+  JoinRequestNotFoundError,
   type JoinRequestState,
 } from "@langwatch/identity-contract";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -22,11 +23,13 @@ class FakeRequests implements JoinRequestReadRepository {
   held: JoinRequestAggregateState | null = null;
   pending: JoinRequestAggregateState | null = null;
 
-  async tryFindRequest(): Promise<JoinRequestAggregateState | null> {
+  async getRequest(): Promise<JoinRequestAggregateState> {
+    if (!this.held) throw new JoinRequestNotFoundError("no such request");
     return this.held;
   }
 
-  async tryFindPendingRequest(): Promise<JoinRequestAggregateState | null> {
+  async getPendingRequest(): Promise<JoinRequestAggregateState> {
+    if (!this.pending) throw new JoinRequestNotFoundError("nothing pending");
     return this.pending;
   }
 }

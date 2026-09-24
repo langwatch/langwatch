@@ -12,15 +12,14 @@ import type { Instant } from "@langwatch/time";
 
 /** The folded head of one request — the `JoinRequest` projection row. */
 export abstract class JoinRequestReadRepository {
-  abstract tryFindRequest(args: {
-    joinRequestId: string;
-  }): Promise<JoinRequestAggregateState | null>;
+  /** Throws `JoinRequestNotFoundError` when no request carries this id. */
+  abstract getRequest(args: { joinRequestId: string }): Promise<JoinRequestAggregateState>;
 
-  /** The one-open-request-per-person-per-organization check. */
-  abstract tryFindPendingRequest(args: {
+  /** The one open request per person per organization; `JoinRequestNotFoundError` when none. */
+  abstract getPendingRequest(args: {
     userId: string;
     organizationId: string;
-  }): Promise<JoinRequestAggregateState | null>;
+  }): Promise<JoinRequestAggregateState>;
 }
 
 /**
@@ -28,11 +27,8 @@ export abstract class JoinRequestReadRepository {
  * rejection, and the two waiting-list queries the request and inbox surfaces are served from.
  */
 export abstract class JoinRequestListReadRepository extends JoinRequestReadRepository {
-  /** When this person was last rejected by this organization, if ever. */
-  abstract tryFindLastRejectionAt(args: {
-    userId: string;
-    organizationId: string;
-  }): Promise<Instant | null>;
+  /** When this person was last rejected here; `JoinRequestNotFoundError` when never. */
+  abstract getLastRejectionAt(args: { userId: string; organizationId: string }): Promise<Instant>;
 
   /** Everything waiting on one organization, newest ask first. */
   abstract findPendingForOrganization(args: {
@@ -66,10 +62,10 @@ export abstract class JoinCandidateRepository {
   }): Promise<JoinCandidateOrganization[]>;
 
   /** One organization's own candidacy, for the "you named it directly" path.
-   *  Null when it does not exist — which the boundary answers exactly as it
-   *  answers an organization that exists and is closed. */
-  abstract tryFindCandidateOrganization(args: {
+   *  Throws `JoinNotAvailableError` when it does not exist — the refusal an
+   *  organization that exists and is closed produces. */
+  abstract getCandidateOrganization(args: {
     organizationId: string;
     domain: string;
-  }): Promise<JoinCandidateOrganization | null>;
+  }): Promise<JoinCandidateOrganization>;
 }

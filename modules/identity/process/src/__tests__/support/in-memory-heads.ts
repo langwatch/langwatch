@@ -4,6 +4,7 @@ import {
   type IdentityFact,
   type IdentityFactInput,
   type IdentityHeads,
+  IdentityIdentifierNotFoundError,
   reduceIdentity,
 } from "@langwatch/identity-contract";
 
@@ -39,10 +40,9 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     return this.heads.get(userId) ?? emptyIdentityHeads({ userId });
   }
 
-  async tryFindActiveIdentifierByValue({ normalizedValue }: { normalizedValue: string }) {
-    if (this.activeByValue.has(normalizedValue)) {
-      return this.activeByValue.get(normalizedValue) ?? null;
-    }
+  async getActiveIdentifierByValue({ normalizedValue }: { normalizedValue: string }) {
+    const held = this.activeByValue.get(normalizedValue);
+    if (held) return held;
     for (const heads of this.heads.values()) {
       for (const head of Object.values(heads.identifiers)) {
         if (
@@ -53,20 +53,23 @@ export class InMemoryHeads implements IdentityHeadsRepository {
         }
       }
     }
-    return null;
+    throw new IdentityIdentifierNotFoundError(`nobody holds ${normalizedValue}`);
   }
 
-  async tryFindIdentifier({
+  async getIdentifier({
     userId,
     identifierId,
   }: {
     userId: string;
     identifierId: string;
-  }): Promise<IdentifierFact | null> {
-    return this.heads.get(userId)?.identifiers[identifierId] ?? null;
+  }): Promise<IdentifierFact> {
+    const fact = this.heads.get(userId)?.identifiers[identifierId];
+    if (!fact)
+      throw new IdentityIdentifierNotFoundError(`${userId} holds no identifier ${identifierId}`);
+    return fact;
   }
 
-  async tryFindIdentifierIdForAccount({
+  async getIdentifierIdForAccount({
     userId,
     accountId,
     providerId,
@@ -74,14 +77,20 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     userId: string;
     accountId: string;
     providerId: string;
-  }): Promise<string | null> {
+  }): Promise<string> {
     const heads = Object.values(this.heads.get(userId)?.identifiers ?? {});
     const byAccount = heads.find((head) => head.accountId === accountId);
     if (byAccount) return byAccount.identifierId;
     const byProvider = heads.filter(
       (head) => head.providerId === providerId && head.detachedAtMs === null,
     );
-    return byProvider.length === 1 ? (byProvider[0]?.identifierId ?? null) : null;
+    const [only, ...others] = byProvider;
+    if (!only || others.length > 0) {
+      throw new IdentityIdentifierNotFoundError(
+        `no single identifier mirrors account ${accountId}`,
+      );
+    }
+    return only.identifierId;
   }
 
   /** Fold facts into a user's heads, the way the app's projection would. */

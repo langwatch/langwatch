@@ -4,7 +4,9 @@ import {
   type DomainJoinSetting,
   isPublicEmailDomain,
   type JoinCandidateOrganization,
+  JoinNotAvailableError,
   type JoinRequestAggregateState,
+  JoinRequestNotFoundError,
   qualifySsoDomainOwnership,
   ssoConnectionSourceSchema,
   ssoDomainVerificationSchema,
@@ -60,46 +62,53 @@ export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepos
 
   constructor(private readonly prisma: PrismaClient) {}
 
-  async tryFindRequest({
+  async getRequest({
     joinRequestId,
   }: {
     joinRequestId: string;
-  }): Promise<JoinRequestAggregateState | null> {
+  }): Promise<JoinRequestAggregateState> {
     const row = await this.prisma.joinRequest.findUnique({
       where: { id: joinRequestId },
     });
-    return row ? PrismaJoinRequestProjectionRepository.rowToJoinRequest(row) : null;
+    if (!row) throw new JoinRequestNotFoundError(`join request ${joinRequestId} does not exist`);
+    return PrismaJoinRequestProjectionRepository.rowToJoinRequest(row);
   }
 
-  async tryFindPendingRequest({
+  async getPendingRequest({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<JoinRequestAggregateState | null> {
+  }): Promise<JoinRequestAggregateState> {
     const row = await this.prisma.joinRequest.findFirst({
       where: { userId, organizationId, state: "PENDING" },
       orderBy: { createdAt: "desc" },
     });
-    return row ? PrismaJoinRequestProjectionRepository.rowToJoinRequest(row) : null;
+    if (!row) {
+      throw new JoinRequestNotFoundError(`${userId} has no pending request to ${organizationId}`);
+    }
+    return PrismaJoinRequestProjectionRepository.rowToJoinRequest(row);
   }
 
   /** The cool-down read: when this person was last told no by this
-   *  organization. Null when they never were. */
-  async tryFindLastRejectionAt({
+   *  organization. Empty when they never were. */
+  async getLastRejectionAt({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<Instant | null> {
+  }): Promise<Instant> {
     const row = await this.prisma.joinRequest.findFirst({
       where: { userId, organizationId, state: "REJECTED" },
       orderBy: { resolvedAt: "desc" },
       select: { resolvedAt: true },
     });
-    return row?.resolvedAt ? fromDate(row.resolvedAt) : null;
+    if (!row?.resolvedAt) {
+      throw new JoinRequestNotFoundError(`${organizationId} never rejected ${userId}`);
+    }
+    return fromDate(row.resolvedAt);
   }
 
   /** Everything waiting on one organization, newest ask first. */
@@ -208,15 +217,18 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     });
   }
 
-  async tryFindCandidateOrganization({
+  async getCandidateOrganization({
     organizationId,
     domain,
   }: {
     organizationId: string;
     domain: string;
-  }): Promise<JoinCandidateOrganization | null> {
+  }): Promise<JoinCandidateOrganization> {
     const candidates = await this.findCandidateOrganizations({ domain });
-    return candidates.find((candidate) => candidate.organizationId === organizationId) ?? null;
+    const candidate = candidates.find((row) => row.organizationId === organizationId);
+    if (!candidate)
+      throw new JoinNotAvailableError(`${organizationId} is not a candidate for ${domain}`);
+    return candidate;
   }
 
   private async describe({

@@ -6,6 +6,7 @@ import type {
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
   emptyIdentityHeads,
+  IdentityIdentifierNotFoundError,
   reduceIdentity,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -56,8 +57,8 @@ class ProjectionHeads implements IdentityHeadsRepository {
     return true;
   }
 
-  async tryFindActiveIdentifierByValue() {
-    return null;
+  async getActiveIdentifierByValue(): Promise<{ userId: string; identifierId: string }> {
+    throw new IdentityIdentifierNotFoundError("nobody holds it");
   }
 
   async findHeads({ userId }: { userId: string }) {
@@ -67,12 +68,15 @@ class ProjectionHeads implements IdentityHeadsRepository {
       : emptyIdentityHeads({ userId });
   }
 
-  async tryFindIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
-    return this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null;
+  async getIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
+    const fact = this.store.stored.get(userId)?.state.identifiers[identifierId];
+    if (!fact)
+      throw new IdentityIdentifierNotFoundError(`${userId} holds no identifier ${identifierId}`);
+    return fact;
   }
 
-  async tryFindIdentifierIdForAccount() {
-    return null;
+  async getIdentifierIdForAccount(): Promise<string> {
+    throw new IdentityIdentifierNotFoundError("no identifier mirrors it");
   }
 }
 

@@ -18,25 +18,23 @@ export abstract class IdentityHeadsRepository {
    */
   abstract hasFolded(args: { userId: string }): Promise<boolean>;
   /** An ACTIVE (VERIFIED or PRIMARY) identifier holding this normalized
-   *  value, whoever holds it — the cross-user uniqueness guard's read. */
-  abstract tryFindActiveIdentifierByValue(args: {
+   *  value, whoever holds it — the cross-user uniqueness guard's read.
+   *  `IdentityIdentifierNotFoundError` when nobody holds it. */
+  abstract getActiveIdentifierByValue(args: {
     normalizedValue: string;
-  }): Promise<{ userId: string; identifierId: string } | null>;
-  /** One head of this user's, or null — the verification mint's guard. */
-  abstract tryFindIdentifier(args: {
-    userId: string;
-    identifierId: string;
-  }): Promise<IdentifierFact | null>;
+  }): Promise<{ userId: string; identifierId: string }>;
+  /** One head of this user's — the verification mint's guard. */
+  abstract getIdentifier(args: { userId: string; identifierId: string }): Promise<IdentifierFact>;
   /**
    * The identifier a protocol `Account` row mirrors, by accountId first.
    * Falls back to `providerId`, never the folded `provider` vocabulary,
-   * which collapses every OIDC connection into `oidc`.
+   * which collapses every OIDC connection into `oidc`. Not found when ambiguous.
    */
-  abstract tryFindIdentifierIdForAccount(args: {
+  abstract getIdentifierIdForAccount(args: {
     userId: string;
     accountId: string;
     providerId: string;
-  }): Promise<string | null>;
+  }): Promise<string>;
 }
 
 /**

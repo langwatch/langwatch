@@ -1,8 +1,9 @@
 import {
+  type BackfillIdentifierRow,
   emptyIdentityHeads,
   type IdentifierFact,
   type IdentityHeads,
-  type BackfillIdentifierRow,
+  IdentityIdentifierNotFoundError,
 } from "@langwatch/identity-contract";
 import { Temporal } from "@langwatch/time";
 import type { Instant } from "@langwatch/time";
@@ -59,30 +60,32 @@ export class MemoryIdentityHeadsRepository implements IdentityHeadsRepository {
     return heads;
   }
 
-  async tryFindActiveIdentifierByValue(args: {
+  async getActiveIdentifierByValue(args: {
     normalizedValue: string;
-  }): Promise<{ userId: string; identifierId: string } | null> {
+  }): Promise<{ userId: string; identifierId: string }> {
     const match = [...this.store.identifiers.values()].find(
       (fact) => fact.value === args.normalizedValue && ACTIVE_STATES.has(fact.state),
     );
 
-    return match ? { userId: match.userId, identifierId: match.identifierId } : null;
+    if (!match) throw new IdentityIdentifierNotFoundError(`nobody holds ${args.normalizedValue}`);
+    return { userId: match.userId, identifierId: match.identifierId };
   }
 
-  async tryFindIdentifier(args: {
-    userId: string;
-    identifierId: string;
-  }): Promise<IdentifierFact | null> {
+  async getIdentifier(args: { userId: string; identifierId: string }): Promise<IdentifierFact> {
     const fact = this.store.identifiers.get(args.identifierId);
-
-    return fact && fact.userId === args.userId ? fact : null;
+    if (!fact || fact.userId !== args.userId) {
+      throw new IdentityIdentifierNotFoundError(
+        `${args.userId} holds no identifier ${args.identifierId}`,
+      );
+    }
+    return fact;
   }
 
-  async tryFindIdentifierIdForAccount(args: {
+  async getIdentifierIdForAccount(args: {
     userId: string;
     accountId: string;
     providerId: string;
-  }): Promise<string | null> {
+  }): Promise<string> {
     const own = this.store.findIdentifiersForUser(args);
     const byAccount = own.find((fact) => fact.accountId === args.accountId);
     if (byAccount) return byAccount.identifierId;
@@ -93,7 +96,13 @@ export class MemoryIdentityHeadsRepository implements IdentityHeadsRepository {
       (fact) => fact.providerId === args.providerId && ACTIVE_STATES.has(fact.state),
     );
 
-    return onProvider.length === 1 ? (onProvider[0]?.identifierId ?? null) : null;
+    const [only, ...others] = onProvider;
+    if (!only || others.length > 0) {
+      throw new IdentityIdentifierNotFoundError(
+        `no single identifier mirrors account ${args.accountId}`,
+      );
+    }
+    return only.identifierId;
   }
 }
 

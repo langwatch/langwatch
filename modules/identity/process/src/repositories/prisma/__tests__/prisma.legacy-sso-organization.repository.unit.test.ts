@@ -11,14 +11,14 @@ function repositoryOver(findUniqueImpl: () => Promise<unknown>) {
 }
 
 describe("PrismaLegacySsoOrganizationRepository", () => {
-  describe("tryFindLegacySso()", () => {
+  describe("getLegacySso()", () => {
     it("answers the domain and provider when both are set", async () => {
       const { repository } = repositoryOver(async () => ({
         ssoDomain: "acme.example",
         ssoProvider: "okta",
       }));
 
-      const result = await repository.tryFindLegacySso({ organizationId: "org-1" });
+      const result = await repository.getLegacySso({ organizationId: "org-1" });
 
       expect(result).toEqual({ ssoDomain: "acme.example", ssoProvider: "okta" });
     });
@@ -29,13 +29,13 @@ describe("PrismaLegacySsoOrganizationRepository", () => {
       ["neither", { ssoDomain: null, ssoProvider: null }],
       ["no organization at all", null],
     ])(
-      "answers null for %s — half a configuration is not something to grandfather",
+      "refuses %s as not found — half a configuration is not something to grandfather",
       async (_case, row) => {
         const { repository } = repositoryOver(async () => row);
 
-        const result = await repository.tryFindLegacySso({ organizationId: "org-1" });
-
-        expect(result).toBeNull();
+        await expect(repository.getLegacySso({ organizationId: "org-1" })).rejects.toMatchObject({
+          code: "sso_connection_not_found",
+        });
       },
     );
   });

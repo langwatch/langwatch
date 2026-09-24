@@ -3,6 +3,7 @@ import {
   emptyIdentityHeads,
   type IdentifierFact,
   type IdentityHeads,
+  IdentityIdentifierNotFoundError,
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
@@ -58,16 +59,18 @@ class HeadsOf implements IdentityHeadsRepository {
     return this.heads;
   }
 
-  async tryFindActiveIdentifierByValue() {
-    return null;
+  async getActiveIdentifierByValue(): Promise<{ userId: string; identifierId: string }> {
+    throw new IdentityIdentifierNotFoundError("nobody holds it");
   }
 
-  async tryFindIdentifier({ identifierId }: { identifierId: string }) {
-    return this.heads.identifiers[identifierId] ?? null;
+  async getIdentifier({ identifierId }: { identifierId: string }) {
+    const fact = this.heads.identifiers[identifierId];
+    if (!fact) throw new IdentityIdentifierNotFoundError(`no identifier ${identifierId}`);
+    return fact;
   }
 
-  async tryFindIdentifierIdForAccount() {
-    return null;
+  async getIdentifierIdForAccount(): Promise<string> {
+    throw new IdentityIdentifierNotFoundError("no identifier mirrors it");
   }
 }
 

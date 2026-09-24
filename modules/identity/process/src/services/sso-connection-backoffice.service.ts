@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   type SsoArrivalPolicy,
   type SsoConnectionHistoryEntryView,
@@ -113,7 +114,11 @@ export class SsoConnectionBackofficeService {
   }: {
     connectionId: string;
   }): Promise<BackofficeSsoConnection | null> {
-    const state = await this.deps.reads.tryFindById({ connectionId });
+    const state = await this.deps.reads.getById({ connectionId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "sso_connection_not_found")
+        return undefined;
+      throw error;
+    });
     if (!state) {
       return null;
     }
@@ -138,7 +143,11 @@ export class SsoConnectionBackofficeService {
     connectionId: string;
     limit?: number;
   }): Promise<SsoConnectionHistoryEntryView[] | null> {
-    const state = await this.deps.reads.tryFindById({ connectionId });
+    const state = await this.deps.reads.getById({ connectionId }).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "sso_connection_not_found")
+        return undefined;
+      throw error;
+    });
     if (!state) {
       return null;
     }

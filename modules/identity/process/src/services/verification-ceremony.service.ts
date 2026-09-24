@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   IdentityEmailInUseError,
   IdentityVerificationExpiredError,
@@ -90,7 +91,13 @@ export class VerificationCeremonyService {
     codeChallenge: string;
   }): Promise<MintedEmailVerification> {
     const { userId, identifierId, codeChallenge } = args;
-    const head = await this.heads.tryFindIdentifier({ userId, identifierId });
+    const head = await this.heads
+      .getIdentifier({ userId, identifierId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "identity_identifier_not_found")
+          return undefined;
+        throw error;
+      });
     if (head?.provider !== "email" || head.state !== "ATTACHED") {
       logger.warn(
         { userId, identifierId, state: head?.state ?? "missing" },
@@ -191,7 +198,13 @@ export class VerificationCeremonyService {
     // decided (ADR-135): trusting this thread's own verdict could tell
     // someone their address belongs to a stranger, or a dead-ended address
     // is theirs — only the recorded state is conclusive.
-    const recorded = await this.heads.tryFindIdentifier({ userId, identifierId });
+    const recorded = await this.heads
+      .getIdentifier({ userId, identifierId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "identity_identifier_not_found")
+          return undefined;
+        throw error;
+      });
 
     if (recorded?.state === "DEAD_END") {
       this.deadEnd({ userId, identifierId, verificationId });

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { identifierProviderFor } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
@@ -192,13 +193,19 @@ export class IdentityCeremoniesAdapter implements IdentityAccountCeremonies {
       return;
     }
     if (!(await this.isLatched({ userId }))) return;
-    const identifierId = await this.heads.tryFindIdentifierIdForAccount({
-      userId,
-      accountId: id,
-      // better-auth's own id, verbatim: the fallback inside must not match
-      // across two enterprise IdPs that fold to one vocabulary.
-      providerId,
-    });
+    const identifierId = await this.heads
+      .getIdentifierIdForAccount({
+        userId,
+        accountId: id,
+        // better-auth's own id, verbatim: the fallback inside must not match
+        // across two enterprise IdPs that fold to one vocabulary.
+        providerId,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "identity_identifier_not_found")
+          return null;
+        throw error;
+      });
     if (identifierId === null) {
       // Nothing in the projection mirrors this row (adopted before the
       // projection carried accountIds, or ambiguous). The row delete must

@@ -104,7 +104,7 @@ function grandfatherOf({
   return SsoConnectionGrandfatherService.create({
     connections: serviceOf(connections),
     legacy: {
-      tryFindLegacySso: async () => ({ ssoDomain, ssoProvider: "okta" }),
+      getLegacySso: async () => ({ ssoDomain, ssoProvider: "okta" }),
     },
     legacyRouting,
     connectionRouting,

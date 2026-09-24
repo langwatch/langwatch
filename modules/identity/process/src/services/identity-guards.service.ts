@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   type AttachIdentifierCommandData,
   arrivalStateForProvider,
@@ -298,9 +299,13 @@ export class IdentityGuardsService {
     const holder =
       head.value === null
         ? null
-        : await this.heads.tryFindActiveIdentifierByValue({
-            normalizedValue: head.value,
-          });
+        : await this.heads
+            .getActiveIdentifierByValue({ normalizedValue: head.value })
+            .catch((error: unknown) => {
+              if (HandledError.isHandled(error) && error.code === "identity_identifier_not_found")
+                return null;
+              throw error;
+            });
     if (holder && holder.userId !== userId) {
       throw new IdentityEmailInUseError(
         "verify_identifier: another user already holds this address as a proven identifier",

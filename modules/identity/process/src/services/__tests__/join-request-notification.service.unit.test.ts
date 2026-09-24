@@ -1,3 +1,4 @@
+import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestMail } from "../../app/identity.members.ts";
@@ -24,8 +25,10 @@ class Audience extends JoinRequestAudience {
     super();
   }
 
-  async tryFindRequesterId(): Promise<string | null> {
-    return "requesterId" in this.answers ? (this.answers.requesterId ?? null) : REQUESTER;
+  async getRequesterId(): Promise<string> {
+    if (!("requesterId" in this.answers)) return REQUESTER;
+    if (!this.answers.requesterId) throw new JoinRequestNotFoundError("no such request");
+    return this.answers.requesterId;
   }
 
   async tryFindOrganizationName(): Promise<string | null> {

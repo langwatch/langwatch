@@ -22,8 +22,8 @@ export abstract class SsoConnectionBackofficeRepository {
     pageSize: number;
     search?: string;
   }): Promise<SsoConnectionBackofficePage>;
-  /** One connection's state, or null when no row carries that id. */
-  abstract tryFindById(args: { connectionId: string }): Promise<SsoConnectionState | null>;
+  /** One connection's state; `SsoConnectionNotFoundError` when no row carries that id. */
+  abstract getById(args: { connectionId: string }): Promise<SsoConnectionState>;
   /** The display names of the organizations a page names, by id. */
   abstract findOrganizationNames(args: { organizationIds: string[] }): Promise<Map<string, string>>;
 }

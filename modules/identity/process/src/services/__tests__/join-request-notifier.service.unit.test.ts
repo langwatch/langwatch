@@ -1,3 +1,4 @@
+import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
@@ -43,7 +44,9 @@ function recordingMail() {
 
 function fakeAudience(): JoinRequestAudience {
   return {
-    tryFindRequesterId: vi.fn(async () => null),
+    getRequesterId: vi.fn(async () => {
+      throw new JoinRequestNotFoundError("no such request");
+    }),
     tryFindOrganizationName: vi.fn(async () => "Acme Corp"),
     findAdminEmails: vi.fn(async () => ["priya@acme.example"]),
     tryFindDisplayName: vi.fn(async () => "Morgan Ellis"),

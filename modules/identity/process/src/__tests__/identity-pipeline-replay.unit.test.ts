@@ -6,7 +6,11 @@ import {
   type StoredProjection,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { emptyIdentityHeads, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
+import {
+  emptyIdentityHeads,
+  IdentityIdentifierNotFoundError,
+  USER_IDENTITY_AGGREGATE_TYPE,
+} from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
@@ -52,8 +56,8 @@ class ProjectionHeads implements IdentityHeadsRepository {
     return true;
   }
 
-  async tryFindActiveIdentifierByValue() {
-    return null;
+  async getActiveIdentifierByValue(): Promise<{ userId: string; identifierId: string }> {
+    throw new IdentityIdentifierNotFoundError("nobody holds it");
   }
 
   async findHeads({ userId }: { userId: string }) {
@@ -62,12 +66,15 @@ class ProjectionHeads implements IdentityHeadsRepository {
     return { userId, identifiers: stored.state.identifiers };
   }
 
-  async tryFindIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
-    return this.store.stored.get(userId)?.state.identifiers[identifierId] ?? null;
+  async getIdentifier({ userId, identifierId }: { userId: string; identifierId: string }) {
+    const fact = this.store.stored.get(userId)?.state.identifiers[identifierId];
+    if (!fact)
+      throw new IdentityIdentifierNotFoundError(`${userId} holds no identifier ${identifierId}`);
+    return fact;
   }
 
-  async tryFindIdentifierIdForAccount() {
-    return null;
+  async getIdentifierIdForAccount(): Promise<string> {
+    throw new IdentityIdentifierNotFoundError("no identifier mirrors it");
   }
 }
 

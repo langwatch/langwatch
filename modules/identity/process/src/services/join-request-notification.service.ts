@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { JoinRequestMail } from "../app/identity.members.ts";
@@ -41,7 +42,13 @@ export class JoinRequestNotificationService {
     joinRequestId: string;
     organizationId: string;
   }): Promise<void> {
-    const requesterUserId = await this.audience.tryFindRequesterId({ joinRequestId });
+    const requesterUserId = await this.audience
+      .getRequesterId({ joinRequestId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "join_request_not_found")
+          return undefined;
+        throw error;
+      });
 
     if (!requesterUserId) {
       return;

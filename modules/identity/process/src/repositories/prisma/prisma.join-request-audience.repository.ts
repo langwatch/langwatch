@@ -1,3 +1,4 @@
+import { JoinRequestNotFoundError } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { JoinRequestAudience } from "../join-request-audience.repository.ts";
@@ -22,12 +23,14 @@ export class PrismaJoinRequestAudienceRepository extends JoinRequestAudience {
     super();
   }
 
-  async tryFindRequesterId({ joinRequestId }: { joinRequestId: string }): Promise<string | null> {
+  async getRequesterId({ joinRequestId }: { joinRequestId: string }): Promise<string> {
     const request = await this.database.joinRequest.findUnique({
       where: { id: joinRequestId },
       select: { userId: true },
     });
-    return request?.userId ?? null;
+    if (!request)
+      throw new JoinRequestNotFoundError(`join request ${joinRequestId} does not exist`);
+    return request.userId;
   }
 
   async tryFindOrganizationName({

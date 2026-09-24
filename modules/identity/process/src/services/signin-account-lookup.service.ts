@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { isLiveIdentifierState, type AccountSignInMethods } from "@langwatch/identity-contract";
 
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
@@ -28,7 +29,13 @@ export class SignInAccountLookupService implements SignInAccountLookup {
   }: {
     normalizedValue: string;
   }): Promise<AccountSignInMethods | null> {
-    const holder = await this.deps.heads.tryFindActiveIdentifierByValue({ normalizedValue });
+    const holder = await this.deps.heads
+      .getActiveIdentifierByValue({ normalizedValue })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "identity_identifier_not_found")
+          return undefined;
+        throw error;
+      });
     if (!holder) {
       return this.legacyMethods({ normalizedValue });
     }

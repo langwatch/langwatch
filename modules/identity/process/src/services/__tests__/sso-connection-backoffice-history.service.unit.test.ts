@@ -4,7 +4,11 @@
  * history is read under comes off the connection's own projection.
  * Corresponds to specs/identity/sso-connection-history.feature.
  */
-import { type SsoConnectionState, emptySsoConnection } from "@langwatch/identity-contract";
+import {
+  emptySsoConnection,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { SsoConnectionBackofficeRepository } from "../../repositories/sso-connection-backoffice.repository.ts";
@@ -22,7 +26,10 @@ function backofficeOver(state: SsoConnectionState | null) {
   }
   class StubReads extends SsoConnectionBackofficeRepository {
     findPage = vi.fn().mockResolvedValue({ states: [], total: 0 });
-    tryFindById = vi.fn().mockResolvedValue(state);
+    getById = vi.fn(async () => {
+      if (!state) throw new SsoConnectionNotFoundError("no connection");
+      return state;
+    });
     findOrganizationNames = vi.fn().mockResolvedValue(new Map<string, string>());
   }
   return {

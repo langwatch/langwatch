@@ -1,4 +1,7 @@
-import { IdentityEngineUnavailableError } from "@langwatch/identity-contract";
+import {
+  IdentityEngineUnavailableError,
+  IdentityIdentifierNotFoundError,
+} from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IdentityBirthLedger } from "../../app/identity.members.ts";
@@ -29,9 +32,15 @@ function harness(overrides?: {
       userId,
       identifiers: {},
     }),
-    tryFindActiveIdentifierByValue: async () => null,
-    tryFindIdentifier: async () => null,
-    tryFindIdentifierIdForAccount: async () => null,
+    getActiveIdentifierByValue: async () => {
+      throw new IdentityIdentifierNotFoundError("nobody holds it");
+    },
+    getIdentifier: async () => {
+      throw new IdentityIdentifierNotFoundError("no identifier");
+    },
+    getIdentifierIdForAccount: async () => {
+      throw new IdentityIdentifierNotFoundError("no identifier mirrors it");
+    },
   };
 
   const ledger = {
