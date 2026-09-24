@@ -73,7 +73,7 @@ function isNode(value: unknown): value is SqlAstNode {
   );
 }
 
-export function positionOf(node: SqlAstNode): SqlSourcePosition | undefined {
+export function extractPosition(node: SqlAstNode): SqlSourcePosition | undefined {
   const start = (node as { location?: { start?: unknown } }).location?.start;
   if (typeof start !== "object" || start === null) return undefined;
   const { line, column } = start as { line?: unknown; column?: unknown };
@@ -102,7 +102,7 @@ function report({
   extra?: ViolationExtra;
 }): void {
   if (ctx.violations.length >= MAX_VIOLATIONS) return;
-  const at = node ? positionOf(node) : undefined;
+  const at = node ? extractPosition(node) : undefined;
   ctx.violations.push({
     code,
     clause: frame.isInSubquery ? "subquery" : frame.clause,
@@ -140,7 +140,7 @@ function refuseUnrecognised({ ctx, frame, node }: NodeArgs): void {
 const TOO_DEEP_MESSAGE = "This query nests too deeply. Flatten it and try again.";
 
 /** The rule for a node kind, or `undefined` — which is the refusal. */
-function ruleFor(type: string): NodeRule | undefined {
+function pickRule(type: string): NodeRule | undefined {
   return Object.hasOwn(NODE_RULES, type) ? NODE_RULES[type] : undefined;
 }
 
@@ -160,7 +160,7 @@ export function walkNode(node: SqlAstNode, frame: Frame, ctx: WalkContext): void
     return;
   }
 
-  const rule = ruleFor(node.type);
+  const rule = pickRule(node.type);
   if (!rule) {
     refuseUnrecognised({ node, frame: here, ctx });
     return;
@@ -344,7 +344,7 @@ function gateColumnReference({
 /**
  * A projection list, walked like any other node list except for a direct element calling an app
  * function — the one position an app function is allowed in. Wildcards go through the same
- * `walkChildNode` every list uses, where {@link enterColumnSet} refuses them in any position.
+ * `walkChildNode` every list uses, where {@link visitColumnSet} refuses them in any position.
  */
 function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
   if (!Array.isArray(value)) {
@@ -773,8 +773,8 @@ function limitLiteralValue(limit: unknown): number {
 function recordTopLevelLimit({ node, frame, ctx }: NodeArgs): void {
   if (frame.isInSubquery) return;
   const { limit, offset } = node;
-  const at = isNode(limit) ? positionOf(limit) : undefined;
-  const offsetAt = isNode(offset) ? positionOf(offset) : undefined;
+  const at = isNode(limit) ? extractPosition(limit) : undefined;
+  const offsetAt = isNode(offset) ? extractPosition(offset) : undefined;
   const rows = limitLiteralValue(limit);
   const isStaticRowCount = Number.isInteger(rows) && rows >= 0;
   ctx.topLevelLimits.push({
@@ -898,7 +898,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
 }
 
 /** Descends one query level, or refuses when that would pass the ceiling. */
-function enterSubquery({ node, frame, ctx }: NodeArgs): Frame | null {
+function visitSubquery({ node, frame, ctx }: NodeArgs): Frame | null {
   const subqueryDepth = frame.subqueryDepth + 1;
   const isTooDeep = subqueryDepth > ctx.policy.limits.maxSubqueryDepth;
   if (isTooDeep) {
@@ -925,7 +925,7 @@ interface LiteralTableReference {
 /**
  * Reads a table reference, or reports `null` for one whose parts are not literal names.
  */
-function readTableReference(node: SqlAstNode): LiteralTableReference | null {
+function parseTableReference(node: SqlAstNode): LiteralTableReference | null {
   const { name, database, alias } = node;
   if (typeof name !== "string") return null;
   if (database !== undefined && typeof database !== "string") return null;
@@ -938,8 +938,8 @@ function readTableReference(node: SqlAstNode): LiteralTableReference | null {
 }
 
 /** Checks a table reference against the reserved schemas, then the catalog. */
-function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
-  const reference = readTableReference(node);
+function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
+  const reference = parseTableReference(node);
   if (!reference) {
     report({
       ctx,
@@ -1006,7 +1006,7 @@ function enterTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 const MAX_JOIN_KEY_SCAN_NODES = 200;
 
 /** The name a side of a join equality was written with, or `null` if not a plain reference. */
-function joinSideName(value: unknown): string | null {
+function extractJoinSideName(value: unknown): string | null {
   if (!isNode(value) || value.type !== "Identifier") return null;
   return typeof value.name === "string" ? value.name : null;
 }
@@ -1026,7 +1026,7 @@ function collectJoinEdges({ node, block }: { node: SqlAstNode; block: BlockAccum
 function collectUsingEdges({ using, block }: { using: unknown; block: BlockAccumulator }): void {
   if (!Array.isArray(using)) return;
   for (const element of using) {
-    const name = joinSideName(element);
+    const name = extractJoinSideName(element);
     if (name !== null) block.joins.push({ left: name, right: name });
   }
 }
@@ -1043,19 +1043,19 @@ function collectOnEdges({ on, block }: { on: unknown; block: BlockAccumulator })
     visited += 1;
     const current = pending.pop();
 
-    const conjuncts = conjunctArguments(current);
+    const conjuncts = extractConjunctArguments(current);
     if (conjuncts !== null) {
       pending.push(...conjuncts);
       continue;
     }
 
-    const edge = readEqualityEdge(current);
+    const edge = parseEqualityEdge(current);
     if (edge !== null) block.joins.push(edge);
   }
 }
 
 /** The operands of an `AND`, or `null` for any other node. */
-function conjunctArguments(node: unknown): unknown[] | null {
+function extractConjunctArguments(node: unknown): unknown[] | null {
   if (!isNode(node) || node.type !== "Function") return null;
   if (node.name !== "and" || !Array.isArray(node.arguments)) return null;
   return node.arguments;
@@ -1066,12 +1066,12 @@ function conjunctArguments(node: unknown): unknown[] | null {
  * to a name: an equality against an expression is not a key two datasets line up on, and
  * recording half of one would claim a match that was never written.
  */
-function readEqualityEdge(node: unknown): { left: string; right: string } | null {
+function parseEqualityEdge(node: unknown): { left: string; right: string } | null {
   if (!isNode(node) || node.type !== "Function") return null;
   if (node.name !== "equals" || !Array.isArray(node.arguments)) return null;
   if (node.arguments.length !== 2) return null;
-  const left = joinSideName(node.arguments[0]);
-  const right = joinSideName(node.arguments[1]);
+  const left = extractJoinSideName(node.arguments[0]);
+  const right = extractJoinSideName(node.arguments[1]);
   return left !== null && right !== null ? { left, right } : null;
 }
 
@@ -1086,7 +1086,7 @@ function enterTableJoin({ node, frame }: NodeArgs): Frame {
  * descending rather than cutting the subtree off, so that a caller who used a refused function
  * *and* a restricted field hears about both in one round trip.
  */
-function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
+function visitFunction({ node, frame, ctx }: NodeArgs): Frame | null {
   const { name } = node;
   if (typeof name !== "string") {
     refuseUnrecognised({ node, frame, ctx });
@@ -1152,7 +1152,7 @@ const WILDCARD_NOT_ALLOWED_MESSAGE =
  * Refuses a wildcard or regexp `COLUMNS()` matcher in any position for a caller with restricted
  * fields, and does not walk the subtree. The star of a bare `count(*)` is exempt.
  */
-function enterColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
+function visitColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
   if (!UNRESOLVABLE_COLUMN_SETS.includes(node.type)) return frame;
   if (ctx.policy.gatedColumns.size === 0) return frame;
   if (frame.isBareCountStarArgument === true) return frame;
@@ -1164,7 +1164,7 @@ function enterColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
  * A `COLUMNS(a, b)` list matcher: walked when every member is an identifier, so each is gated
  * like any reference; refused like a wildcard when a member is not (`COLUMNS('a', 'b')`).
  */
-function enterColumnListMatcher({ node, frame, ctx }: NodeArgs): Frame | null {
+function visitColumnListMatcher({ node, frame, ctx }: NodeArgs): Frame | null {
   if (ctx.policy.gatedColumns.size === 0) return frame;
   const members = node.columns;
   const isEveryMemberNamed =
@@ -1225,7 +1225,7 @@ function walkApplyFunctionName({ value, node, frame, ctx }: FieldArgs): void {
 }
 
 /** Applies the content gate to a column reference. */
-function enterIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
+function visitIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
   const { name, name_parts: nameParts } = node;
   if (typeof name !== "string") {
     refuseUnrecognised({ node, frame, ctx });
@@ -1274,7 +1274,7 @@ function noteColumnPosition({ name, frame }: { name: string; frame: Frame }): vo
  * Records a bound parameter. Parameters are *values*, and values are permitted — but an
  * `Identifier`-typed one is not a value, and is refused.
  */
-function enterQueryParameter({ node, frame, ctx }: NodeArgs): Frame | null {
+function visitQueryParameter({ node, frame, ctx }: NodeArgs): Frame | null {
   const { name, param_type: paramType } = node;
   if (typeof name !== "string" || typeof paramType !== "string") {
     refuseUnrecognised({ node, frame, ctx });
@@ -1370,7 +1370,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   Subquery: {
-    enter: enterSubquery,
+    enter: visitSubquery,
     fields: { query: { kind: "node" }, alias: SCALAR },
   },
   WithElement: {
@@ -1407,7 +1407,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   TableIdentifier: {
-    enter: enterTableIdentifier,
+    enter: visitTableIdentifier,
     fields: { name: SCALAR, database: SCALAR, alias: SCALAR },
   },
   TableJoin: {
@@ -1477,7 +1477,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
 
   // ---- expressions ----
   Identifier: {
-    enter: enterIdentifier,
+    enter: visitIdentifier,
     fields: { name: SCALAR, name_parts: SCALAR, alias: SCALAR },
   },
   Literal: {
@@ -1492,7 +1492,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     // On `enter` rather than as a rule for the `name` field, because a field
     // rule only fires when the field is present: a `Function` node that
     // arrived without a name would walk straight past a name check hung there.
-    enter: enterFunction,
+    enter: visitFunction,
     fields: {
       name: SCALAR,
       arguments: { kind: "custom", walk: walkFunctionArguments },
@@ -1518,21 +1518,21 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   QueryParameter: {
-    enter: enterQueryParameter,
+    enter: visitQueryParameter,
     fields: { name: SCALAR, param_type: SCALAR, alias: SCALAR },
   },
   ExpressionList: { fields: { children: { kind: "nodes" } } },
 
   // ---- column sets ----
   Asterisk: {
-    enter: enterColumnSet,
+    enter: visitColumnSet,
     fields: {
       transformers: { kind: "nodes" },
       expression: { kind: "node" },
     },
   },
   QualifiedAsterisk: {
-    enter: enterColumnSet,
+    enter: visitColumnSet,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },
@@ -1540,15 +1540,15 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   ColumnsRegexpMatcher: {
-    enter: enterColumnSet,
+    enter: visitColumnSet,
     fields: { pattern: SCALAR, transformers: { kind: "nodes" } },
   },
   ColumnsListMatcher: {
-    enter: enterColumnListMatcher,
+    enter: visitColumnListMatcher,
     fields: { columns: { kind: "nodes" }, transformers: { kind: "nodes" } },
   },
   QualifiedColumnsRegexpMatcher: {
-    enter: enterColumnSet,
+    enter: visitColumnSet,
     fields: {
       pattern: SCALAR,
       qualifier: { kind: "identifierRef" },
@@ -1556,7 +1556,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
     },
   },
   QualifiedColumnsListMatcher: {
-    enter: enterColumnListMatcher,
+    enter: visitColumnListMatcher,
     fields: {
       qualifier: { kind: "identifierRef" },
       columns: { kind: "nodes" },

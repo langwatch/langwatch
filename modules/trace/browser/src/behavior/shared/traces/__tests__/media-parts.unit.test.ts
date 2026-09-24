@@ -5,7 +5,7 @@ import {
   collectAudioParts,
   collectMediaParts,
   isSafeMediaUrl,
-  mediaPartToMediaData,
+  convertMediaPartToMediaData,
   parseNotCapturedMedia,
 } from "../media-parts.ts";
 
@@ -310,11 +310,11 @@ describe("collectAudioParts", () => {
   });
 });
 
-describe("mediaPartToMediaData", () => {
+describe("convertMediaPartToMediaData", () => {
   describe("given an image_url part", () => {
     it("maps externalized and data-URI urls to an image source", () => {
       expect(
-        mediaPartToMediaData({
+        convertMediaPartToMediaData({
           type: "image_url",
           image_url: { url: "/api/files/p1/i1" },
         }),
@@ -333,18 +333,20 @@ describe("mediaPartToMediaData", () => {
         url: "/api/files/p1/f1",
         filename: "report.pdf",
       };
-      expect(mediaPartToMediaData(part)).toEqual(part);
+      expect(convertMediaPartToMediaData(part)).toEqual(part);
     });
 
     it("returns null for a binary with no payload at all", () => {
-      expect(mediaPartToMediaData({ type: "binary", mimeType: "application/pdf" })).toBeNull();
+      expect(
+        convertMediaPartToMediaData({ type: "binary", mimeType: "application/pdf" }),
+      ).toBeNull();
     });
   });
 
   describe("given an AG-UI document part", () => {
     it("maps a url source to an attachment binary", () => {
       expect(
-        mediaPartToMediaData({
+        convertMediaPartToMediaData({
           type: "document",
           source: {
             type: "url",
@@ -370,7 +372,7 @@ describe("mediaPartToMediaData", () => {
           mimeType: "video/mp4",
         },
       };
-      expect(mediaPartToMediaData(part)).toEqual(part);
+      expect(convertMediaPartToMediaData(part)).toEqual(part);
     });
   });
 });
@@ -493,7 +495,7 @@ describe("collectMediaParts", () => {
       // An id-only reference has no fetchable payload: src/href would
       // resolve to "" — the current document URL.
       expect(
-        mediaPartToMediaData({
+        convertMediaPartToMediaData({
           type: "binary",
           mimeType: "application/pdf",
           id: "obj1",
@@ -504,7 +506,7 @@ describe("collectMediaParts", () => {
 
   describe("given an image part with an inline data source and no mimeType", () => {
     it("defaults to an image mime so the data URI renders", () => {
-      const result = mediaPartToMediaData({
+      const result = convertMediaPartToMediaData({
         type: "image",
         source: { type: "data", value: "QUJD" },
       });

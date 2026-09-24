@@ -42,11 +42,13 @@ export function contentToText(content: unknown): string {
  * first description line per tool — where MCP servers and skills show up in
  * what the session pays for. Previously the whole array was silently dropped.
  */
-export function toolDefinitionsMessage(tools: unknown): { role: string; content: string } | null {
+export function buildToolDefinitionsMessage(
+  tools: unknown,
+): { role: string; content: string } | null {
   if (!Array.isArray(tools)) {
     return null;
   }
-  const lines = tools.map(toolDefinitionLine).filter((line): line is string => line !== null);
+  const lines = tools.map(formatToolDefinitionLine).filter((line): line is string => line !== null);
   if (lines.length === 0) {
     return null;
   }
@@ -61,7 +63,7 @@ export function toolDefinitionsMessage(tools: unknown): { role: string; content:
 }
 
 /** One tool as `name: first description line`, or null if it has no name. */
-function toolDefinitionLine(tool: unknown): string | null {
+function formatToolDefinitionLine(tool: unknown): string | null {
   if (!isRecord(tool)) {
     return null;
   }

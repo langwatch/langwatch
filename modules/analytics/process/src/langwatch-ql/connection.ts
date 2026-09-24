@@ -66,7 +66,7 @@ function disagreesWithDerivedServer({
  * credentials and path) and the database it names. Every failure to yield both is refused and
  * logged here, so the caller carries one "unconfigured" branch instead of six.
  */
-function derivedAdminTarget({
+function deriveAdminTarget({
   env,
 }: {
   env: NodeJS.ProcessEnv;
@@ -118,7 +118,7 @@ function derivedAdminTarget({
  * The database is the admin URL's own -- views sit beside fact tables, row policies reference it
  * -- so a different `LWQL_DATABASE`/`_URL` is refused: a mismatch is a silent outage.
  */
-export function lwqlDerivedConnectionFromEnv(
+export function deriveLwqlConnectionFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): LangWatchQLConnection | null {
   if (env.LWQL_SELF_PROVISION !== "true") return null;
@@ -131,7 +131,7 @@ export function lwqlDerivedConnectionFromEnv(
     return null;
   }
 
-  const target = derivedAdminTarget({ env });
+  const target = deriveAdminTarget({ env });
   if (!target) return null;
 
   if (

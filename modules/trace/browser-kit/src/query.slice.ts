@@ -16,7 +16,7 @@ import {
   swapOperatorAtLocation,
   toggleEvaluatorSubFilterInQuery,
   toggledFacetQuery,
-  validateAst,
+  describeAstProblem,
 } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import type { StateCreator } from "zustand";
@@ -208,7 +208,7 @@ function safeParseAndSerialize(text: string): ParseResult {
   }
   try {
     const ast = parse(trimmed);
-    const semanticError = validateAst(ast);
+    const semanticError = describeAstProblem(ast);
     if (semanticError) {
       return { ast: EMPTY_AST, queryText: text, parseError: semanticError };
     }

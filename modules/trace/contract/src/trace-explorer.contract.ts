@@ -60,7 +60,7 @@ export type ChangeTraceNameRejectionMeta = {
  * contract because the shape is the server's; the customer-facing words are
  * the browser's, and stay there.
  */
-export function readChangeTraceNameRejection(
+export function parseChangeTraceNameRejection(
   meta: unknown,
 ): ChangeTraceNameRejectionMeta | undefined {
   if (typeof meta !== "object" || meta === null) return void 0;

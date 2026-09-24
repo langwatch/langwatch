@@ -25,7 +25,7 @@ export function findStringParam(
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export function nonEmptyOrNull(value: string | undefined): string | null {
+export function toNonEmptyOrNull(value: string | undefined): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 

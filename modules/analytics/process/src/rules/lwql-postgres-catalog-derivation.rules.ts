@@ -11,7 +11,10 @@ import type {
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { defaultColumnGates } from "./lwql-dataset-derivation.rules.ts";
 import type { FieldProtection } from "./lwql-field-protection.rules.ts";
-import { type PostgresSkipMap, postgresSkipReason } from "./lwql-postgres-skipped-models.rules.ts";
+import {
+  type PostgresSkipMap,
+  derivePostgresSkipReason,
+} from "./lwql-postgres-skipped-models.rules.ts";
 import { prismaManifestModel } from "./lwql-prisma-manifest.rules.ts";
 import type { PrismaField, PrismaManifest, PrismaModel } from "./lwql-prisma-schema.rules.ts";
 import {
@@ -150,15 +153,15 @@ const DEFAULT_DECIMAL = "Decimal(65, 30)";
  * The ClickHouse type a Prisma field maps to, or `null` when the column cannot be queried at all
  * (`Bytes`/`Unsupported`) and is stripped with a reason.
  */
-export function clickHouseTypeFor(field: PrismaField): string | null {
-  const base = baseClickHouseType(field);
+export function toClickHouseType(field: PrismaField): string | null {
+  const base = toBaseClickHouseType(field);
   if (base === null) return null;
   if (field.isList) return `Array(${base})`;
   if (field.isOptional) return `Nullable(${base})`;
   return base;
 }
 
-function baseClickHouseType(field: PrismaField): string | null {
+function toBaseClickHouseType(field: PrismaField): string | null {
   if (field.kind === "unsupported") return null;
   if (field.kind === "enum") return "String";
   switch (field.type) {
@@ -201,7 +204,7 @@ const SECRET_SUFFIX = /(token|hash|key|keys|hashes|secrets|passwords|credentials
 /**
  * The reason a column is stripped by the safe defaults, or `undefined` when it is safe to expose.
  */
-export function isStrippedByDefault(name: string): string | undefined {
+export function detectDefaultStripReason(name: string): string | undefined {
   const lower = name.toLowerCase();
   if (SECRET_CONTAINS.test(lower)) return "secret material, never exposed";
   if (SECRET_SUFFIX.test(lower) && !lower.endsWith("id")) {
@@ -234,7 +237,7 @@ function postgresColumnGates({
 }
 
 /** The unit a column measures in, by the same rules the catalog guard checks. */
-function defaultColumnUnit(
+function inferColumnUnit(
   exposedName: string,
   description: string,
 ): LangWatchQLColumnUnit | undefined {
@@ -308,7 +311,7 @@ export interface TenantResolveContext {
 }
 
 /** The field whose `columnName` is `column`, or `undefined`. */
-function fieldByColumn(model: PrismaModel, column: string): PrismaField | undefined {
+function pickFieldByColumn(model: PrismaModel, column: string): PrismaField | undefined {
   return model.fields.find(
     (field) => (field.kind === "scalar" || field.kind === "enum") && field.columnName === column,
   );
@@ -323,7 +326,7 @@ export function resolveTenantScope(
   override: PostgresDatasetOverride | undefined,
   context?: TenantResolveContext,
 ): TenantScope {
-  return directTenantScope(model) ?? parentTenantScope(model, override, context);
+  return deriveDirectTenantScope(model) ?? parentTenantScope(model, override, context);
 }
 
 /**
@@ -331,7 +334,7 @@ export function resolveTenantScope(
  * own `id`, else the narrowest of `projectId`/`teamId`/`organizationId`.
  * `undefined` when the model carries none, leaving it to a `tenantVia` parent.
  */
-function directTenantScope(model: PrismaModel): TenantScope | undefined {
+function deriveDirectTenantScope(model: PrismaModel): TenantScope | undefined {
   if (model.name === "Project") {
     return {
       kind: "project",
@@ -341,7 +344,7 @@ function directTenantScope(model: PrismaModel): TenantScope | undefined {
     };
   }
   for (const column of TENANT_COLUMNS) {
-    const field = fieldByColumn(model, column);
+    const field = pickFieldByColumn(model, column);
     if (!field) continue;
     if (column === "projectId") {
       return {
@@ -393,7 +396,7 @@ function parentTenantScope(
         `the manifest; call resolveTenantScope with a context`,
     );
   }
-  const foreignKey = fieldByColumn(model, via.foreignKey);
+  const foreignKey = pickFieldByColumn(model, via.foreignKey);
   if (!foreignKey) {
     throw new Error(
       `lwql postgres catalog: model "${model.name}" tenantVia names foreign ` +
@@ -428,7 +431,7 @@ interface ResolvedColumn {
   readonly skip?: { readonly source: string; readonly reason: string };
 }
 
-function resolveColumn({
+function deriveColumn({
   model,
   field,
   scope,
@@ -445,7 +448,7 @@ function resolveColumn({
   if (field.name === scope.consumedField) return null;
 
   const source = field.columnName;
-  const type = clickHouseTypeFor(field);
+  const type = toClickHouseType(field);
   const exposedName =
     aliasByColumn.get(source) ??
     exposedColumnName({
@@ -454,7 +457,7 @@ function resolveColumn({
       primaryKey: model.primaryKey,
     });
 
-  const reason = columnSkipReason({
+  const reason = deriveColumnSkipReason({
     source,
     type,
     exposedName,
@@ -464,7 +467,7 @@ function resolveColumn({
   if (reason !== undefined) return { skip: { source, reason } };
 
   return {
-    // `type` is non-null here: `columnSkipReason` returns the binary reason
+    // `type` is non-null here: `deriveColumnSkipReason` returns the binary reason
     // when it is null, so a null would have short-circuited above.
     column: buildColumn({ source, type: type!, exposedName, field, override }),
   };
@@ -475,7 +478,7 @@ function resolveColumn({
  * `skipColumns` entry, an unqueryable binary type, a name colliding with the real `TenantId` (an
  * internal `tenantId`, never the owning project), or a safe-default strip with no re-admit.
  */
-function columnSkipReason({
+function deriveColumnSkipReason({
   source,
   type,
   exposedName,
@@ -494,7 +497,7 @@ function columnSkipReason({
   if (exposedName === TENANT_COLUMN) {
     return "internal tenant id (process-manager/migration plumbing), not the owning project";
   }
-  const stripReason = isStrippedByDefault(field.name);
+  const stripReason = detectDefaultStripReason(field.name);
   const reAdmit = override.reAdmit?.[exposedName];
   if (stripReason !== undefined && reAdmit === undefined) return stripReason;
   return undefined;
@@ -517,7 +520,7 @@ function buildColumn({
   const description = override.descriptions?.[exposedName] ?? columnDescription(field, exposedName);
   const gates =
     override.columnGates?.[exposedName] ?? postgresColumnGates({ field, exposedName, type });
-  const unit = override.columnUnits?.[exposedName] ?? defaultColumnUnit(exposedName, description);
+  const unit = override.columnUnits?.[exposedName] ?? inferColumnUnit(exposedName, description);
 
   return {
     name: exposedName,
@@ -618,7 +621,7 @@ function buildColumns({
   const columns: LangWatchQLViewColumn[] = [tenantColumn(scope)];
   const skipColumns: Record<string, string> = {};
   for (const field of model.fields) {
-    const resolved = resolveColumn({
+    const resolved = deriveColumn({
       model,
       field,
       scope,
@@ -653,7 +656,7 @@ function deriveKeyColumns({
 }
 
 /**
- * Scope resolves before columns build: {@link resolveColumn} needs `scope.consumedField` to leave
+ * Scope resolves before columns build: {@link deriveColumn} needs `scope.consumedField` to leave
  * the field the tenant path already consumes out of the exposed columns, so a
  * project/team/organization id is never exposed twice under two names.
  */
@@ -686,7 +689,7 @@ function deriveModel({
   const name = override.name ?? postgresDatasetName(model.name);
   const grain = override.grain ?? defaultGrain({ isFannedOut, scope, keyColumns });
   const exposedNames = new Set(columns.map((column) => column.name));
-  const timeColumn = override.timeColumn ?? defaultTimeColumn({ columns });
+  const timeColumn = override.timeColumn ?? pickDefaultTimeColumn({ columns });
   const joinKeys = override.joinKeys ?? defaultJoinKeys(columns);
 
   assertOverride({ name, model, override, exposedNames });
@@ -743,7 +746,7 @@ function fanOutRowSentence(kind: TenantScope["kind"]): string {
  * The partition-pruning column: `CreatedAt` if exposed, else the first exposed `DateTime64` column,
  * else `undefined`.
  */
-function defaultTimeColumn({
+function pickDefaultTimeColumn({
   columns,
 }: {
   columns: readonly LangWatchQLViewColumn[];
@@ -860,6 +863,6 @@ export function derivePostgresCatalog({
 }): DerivedPostgresView[] {
   const context: TenantResolveContext = { manifest, overrides };
   return manifest.models
-    .filter((model) => postgresSkipReason(model.name, skip) === undefined)
+    .filter((model) => derivePostgresSkipReason(model.name, skip) === undefined)
     .map((model) => deriveModel({ model, override: overrides[model.name] ?? {}, context }));
 }

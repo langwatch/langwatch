@@ -3,7 +3,7 @@
  * A column we wrote that no longer parses is corruption, not absence, so it
  * throws rather than reading back as "this row had no inputs".
  */
-export function safeJsonParse(json: string | null): Record<string, unknown> | null {
+export function parseJsonSafely(json: string | null): Record<string, unknown> | null {
   if (!json) {
     return null;
   }

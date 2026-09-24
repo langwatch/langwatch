@@ -9,7 +9,7 @@ import {
 import {
   CLAUDE_SPAN_NAME_PREFIX,
   isInteractionSpan,
-  nonEmptyOrNull,
+  toNonEmptyOrNull,
   parseBoolAttr,
   parseNumberAttr,
   findStringParam,
@@ -91,7 +91,7 @@ function findContentBody(
   codingAgents?: CodingAgentApi,
 ): string | null {
   for (const key of codingAgents?.contentAttrKeys(eventName) ?? contentAttrKeys(eventName)) {
-    const value = nonEmptyOrNull(attrs[key]);
+    const value = toNonEmptyOrNull(attrs[key]);
     if (value !== null) {
       return value;
     }
@@ -220,14 +220,14 @@ export class ClaudeCodeLogEnrichmentService {
 
       return {
         eventName,
-        requestId: nonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
-        querySource: nonEmptyOrNull(attrs[QUERY_SOURCE_ATTR]),
+        requestId: toNonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
+        querySource: toNonEmptyOrNull(attrs[QUERY_SOURCE_ATTR]),
         timeUnixMs: row.timeUnixMs,
         body: findContentBody(eventName, attrs, codingAgents),
         // Parsed out of the raw body once, at ingest, so the read path can skip
         // re-parsing it. Absent on records ingested before that existed, which is
         // why every consumer keeps its parse as a fallback.
-        derivedOutputText: nonEmptyOrNull(attrs[DERIVED_ATTRS.OUTPUT_TEXT]),
+        derivedOutputText: toNonEmptyOrNull(attrs[DERIVED_ATTRS.OUTPUT_TEXT]),
         derivedToolCallCount: Number.isFinite(toolCallCount) ? toolCallCount : null,
       };
     });
@@ -323,14 +323,14 @@ export class ClaudeCodeLogEnrichmentService {
 
       out.push({
         eventName,
-        toolUseId: nonEmptyOrNull(attrs[TOOL_USE_ID_ATTR]),
-        toolName: nonEmptyOrNull(attrs[TOOL_NAME_ATTR]),
-        toolParameters: nonEmptyOrNull(attrs[TOOL_PARAMETERS_ATTR]),
-        toolInput: nonEmptyOrNull(attrs[TOOL_INPUT_ATTR]),
-        decision: nonEmptyOrNull(attrs[DECISION_ATTR]),
+        toolUseId: toNonEmptyOrNull(attrs[TOOL_USE_ID_ATTR]),
+        toolName: toNonEmptyOrNull(attrs[TOOL_NAME_ATTR]),
+        toolParameters: toNonEmptyOrNull(attrs[TOOL_PARAMETERS_ATTR]),
+        toolInput: toNonEmptyOrNull(attrs[TOOL_INPUT_ATTR]),
+        decision: toNonEmptyOrNull(attrs[DECISION_ATTR]),
         decisionSource:
-          nonEmptyOrNull(attrs[RESULT_DECISION_SOURCE_ATTR]) ??
-          nonEmptyOrNull(attrs[DECISION_SOURCE_ATTR]),
+          toNonEmptyOrNull(attrs[RESULT_DECISION_SOURCE_ATTR]) ??
+          toNonEmptyOrNull(attrs[DECISION_SOURCE_ATTR]),
         success: parseBoolAttr(attrs[SUCCESS_ATTR]),
         durationMs: parseNumberAttr(attrs[DURATION_MS_ATTR]),
         resultSizeBytes: parseNumberAttr(attrs[RESULT_SIZE_ATTR]),

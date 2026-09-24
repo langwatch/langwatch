@@ -2,8 +2,8 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 import type { ExtractorContext } from "../services/canonical-attributes.service.ts";
 import { recordValueType } from "./canonical-extraction.rules.ts";
-import { asNumber, isNonEmptyString, isRecord, safeJsonParse } from "./canonical-guard.rules.ts";
-import { convertGeminiContent, systemInstructionText } from "./gemini-content.rules.ts";
+import { asNumber, isNonEmptyString, isRecord, parseJsonSafely } from "./canonical-guard.rules.ts";
+import { convertGeminiContent, extractSystemInstructionText } from "./gemini-content.rules.ts";
 import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules.ts";
 
 /** The request's `contents` become the canonical input messages, when nothing set them first. */
@@ -24,7 +24,7 @@ function recordInputMessages(ctx: ExtractorContext, contents: unknown): void {
 }
 
 function recordSystemInstruction(ctx: ExtractorContext, config: Record<string, unknown>): void {
-  const sysInstruction = systemInstructionText(config.system_instruction);
+  const sysInstruction = extractSystemInstructionText(config.system_instruction);
   if (sysInstruction === null) return;
   if (!setIfMissing({ ctx, key: ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, value: sysInstruction })) {
     return;
@@ -74,7 +74,7 @@ function recordRequestModel(ctx: ExtractorContext, request: Record<string, unkno
 export function canonicaliseVertexAdkRequest(ctx: ExtractorContext): void {
   const { attrs } = ctx.bag;
 
-  const request = safeJsonParse(attrs.get(VERTEX_ADK_KEYS.LLM_REQUEST));
+  const request = parseJsonSafely(attrs.get(VERTEX_ADK_KEYS.LLM_REQUEST));
   if (!isRecord(request)) {
     return;
   }

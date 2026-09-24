@@ -39,7 +39,7 @@ const tokenCache = new Map<string, CacheEntry>();
  */
 const AADSTS_CODE = /\bAADSTS\d{4,6}\b/;
 
-function aadstsCodeOf(error: unknown): string | undefined {
+function extractAadstsCode(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
   return AADSTS_CODE.exec(error.message)?.[0];
 }
@@ -118,7 +118,7 @@ async function exchangeToken(credentials: TokenModeCredentials): Promise<Exchang
     // one thing that tells an operator which knob is wrong.
     throw new AzureTokenExchangeError(
       error instanceof Error ? error.name : undefined,
-      aadstsCodeOf(error),
+      extractAadstsCode(error),
     );
   }
   if (!accessToken) {

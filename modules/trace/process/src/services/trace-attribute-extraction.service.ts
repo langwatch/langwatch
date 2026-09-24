@@ -23,7 +23,7 @@ export const RESERVED_CAUSALITY_DEPTH = "langwatch.reserved.causality_depth";
 
 /** Arrives as an int on the OTLP path and a string on others; anything else,
  *  including blank or fractional strings, is not a depth. */
-function causalityDepthOf(raw: unknown): number | undefined {
+function parseCausalityDepth(raw: unknown): number | undefined {
   if (typeof raw === "number") return Number.isInteger(raw) ? raw : undefined;
   if (typeof raw !== "string" || raw.trim() === "") return undefined;
   const parsed = Number(raw);
@@ -262,7 +262,7 @@ export class TraceAttributeExtractionService {
     // Depth of the evaluator causality chain, stamped by nlpgo's baggage span
     // processor. Blank/fractional values are dropped rather than coerced,
     // since Number("") is a finite 0 and a depth counts evaluator hops.
-    const depth = causalityDepthOf(spanAttrs[RESERVED_CAUSALITY_DEPTH]);
+    const depth = parseCausalityDepth(spanAttrs[RESERVED_CAUSALITY_DEPTH]);
     if (depth !== undefined) {
       result[RESERVED_CAUSALITY_DEPTH] = String(depth);
     }

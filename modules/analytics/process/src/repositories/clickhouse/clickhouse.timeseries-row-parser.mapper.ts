@@ -12,7 +12,7 @@ const aliasFor = (index: number, series: AnalyticsSeries): string => {
   return parts.join("__");
 };
 
-const numberOrNull = (value: unknown): number | null => {
+const toNumberOrNull = (value: unknown): number | null => {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value !== "string" || value.length === 0) return null;
   const parsed = Number(value);
@@ -47,7 +47,7 @@ function bucketRowsByPeriod(input: Parameters<typeof parseTimeseriesRows>[0]): {
         ] ??= {})
       : bucket;
     for (const [index, series] of input.series.entries()) {
-      const value = numberOrNull(row[aliasFor(index, series)]);
+      const value = toNumberOrNull(row[aliasFor(index, series)]);
       if (value !== null) target[buildSeriesName(series, index)] = value;
     }
   }

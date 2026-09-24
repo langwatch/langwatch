@@ -1,4 +1,4 @@
-import { mediaPartToMediaData } from "../trace-media-part.collector.ts";
+import { convertMediaPartToMediaData } from "../trace-media-part.collector.ts";
 import { parseJSON } from "./content-format.ts";
 import { isRecord } from "./record.ts";
 import type { ChatMessage, ContentBlock } from "./types.ts";
@@ -209,7 +209,7 @@ function appendContentPart(out: ContentBlock[], obj: Record<string, unknown>): v
     case "image":
     case "video":
     case "document": {
-      const media = mediaPartToMediaData(obj);
+      const media = convertMediaPartToMediaData(obj);
       if (media) {
         out.push({ kind: "media", part: media });
         break;

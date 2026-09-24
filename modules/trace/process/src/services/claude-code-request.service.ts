@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { contentToText, toolDefinitionsMessage } from "../rules/claude-code-content.rules.ts";
+import { contentToText, buildToolDefinitionsMessage } from "../rules/claude-code-content.rules.ts";
 import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 import { ClaudeCodeTruncatedRequestService } from "./claude-code-truncated-request.service.ts";
 
@@ -71,7 +71,7 @@ export class ClaudeCodeRequestService {
       }
     }
 
-    const toolsMessage = toolDefinitionsMessage(parsed.tools);
+    const toolsMessage = buildToolDefinitionsMessage(parsed.tools);
     if (toolsMessage !== null) {
       out.push(toolsMessage);
     }
@@ -130,7 +130,9 @@ export class ClaudeCodeRequestService {
       return this.buildInputMessages(parsed);
     }
 
-    return typeof raw === "string" ? claudeCodeTruncatedRequestService.salvage(raw) : null;
+    return typeof raw === "string"
+      ? claudeCodeTruncatedRequestService.parseTruncatedMessages(raw)
+      : null;
   }
 
   deriveClaudeRequestBody(raw: unknown): {
@@ -146,7 +148,10 @@ export class ClaudeCodeRequestService {
     }
 
     return {
-      messages: typeof raw === "string" ? claudeCodeTruncatedRequestService.salvage(raw) : null,
+      messages:
+        typeof raw === "string"
+          ? claudeCodeTruncatedRequestService.parseTruncatedMessages(raw)
+          : null,
       toolResults: new Map(),
     };
   }

@@ -10,7 +10,7 @@ export { parseJsonStringAttrs };
 /**
  * Creates a real ExtractorContext for extractor unit tests: real stores,
  * with recordRule/setAttr/setAttrIfAbsent wrapped in vi.fn(). JSON strings
- * auto-parse; pass skipJsonParsing to exercise the safeJsonParse fallback.
+ * auto-parse; pass skipJsonParsing to exercise the parseJsonSafely fallback.
  */
 export function createExtractorContext(
   attrs: Record<string, unknown>,

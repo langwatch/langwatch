@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   derivePostgresCatalog,
-  isStrippedByDefault,
+  detectDefaultStripReason,
   resolveTenantScope,
   sanitizeDescription,
 } from "../lwql-postgres-catalog-derivation.rules.ts";
@@ -107,7 +107,7 @@ describe("given the derived Postgres catalog", () => {
         for (const column of view.columns) {
           for (const source of column.sourceColumns) {
             expect(
-              isStrippedByDefault(source),
+              detectDefaultStripReason(source),
               `${view.name}.${column.name} exposes secret material`,
             ).toBeUndefined();
           }
@@ -120,25 +120,25 @@ describe("given the derived Postgres catalog", () => {
     });
 
     it("classifies secret, email and surviving names", () => {
-      expect(isStrippedByDefault("apiKey")).toBeDefined();
-      expect(isStrippedByDefault("hashedSecret")).toBeDefined();
-      expect(isStrippedByDefault("ingestSecretHash")).toBeDefined();
-      expect(isStrippedByDefault("lwqlKey")).toBeDefined();
-      expect(isStrippedByDefault("s3AccessKeyId")).toBeDefined();
+      expect(detectDefaultStripReason("apiKey")).toBeDefined();
+      expect(detectDefaultStripReason("hashedSecret")).toBeDefined();
+      expect(detectDefaultStripReason("ingestSecretHash")).toBeDefined();
+      expect(detectDefaultStripReason("lwqlKey")).toBeDefined();
+      expect(detectDefaultStripReason("s3AccessKeyId")).toBeDefined();
       // A plural key/hash suffix is a secret even with no secret word in it.
-      expect(isStrippedByDefault("customKeys")).toBeDefined();
-      expect(isStrippedByDefault("email")).toBeDefined();
-      expect(isStrippedByDefault("reviewerEmail")).toBeDefined();
+      expect(detectDefaultStripReason("customKeys")).toBeDefined();
+      expect(detectDefaultStripReason("email")).toBeDefined();
+      expect(detectDefaultStripReason("reviewerEmail")).toBeDefined();
       // A name merely containing "email" is stripped too, not just an exact
       // match or `Email` suffix.
-      expect(isStrippedByDefault("reviewer_email")).toBeDefined();
-      expect(isStrippedByDefault("notificationEmails")).toBeDefined();
-      expect(isStrippedByDefault("emailAddress")).toBeDefined();
-      expect(isStrippedByDefault("parentId")).toBeUndefined();
+      expect(detectDefaultStripReason("reviewer_email")).toBeDefined();
+      expect(detectDefaultStripReason("notificationEmails")).toBeDefined();
+      expect(detectDefaultStripReason("emailAddress")).toBeDefined();
+      expect(detectDefaultStripReason("parentId")).toBeUndefined();
       // `tokens` is a count, not a credential — kept.
-      expect(isStrippedByDefault("promptTokens")).toBeUndefined();
-      expect(isStrippedByDefault("completionTokens")).toBeUndefined();
-      expect(isStrippedByDefault("userId")).toBeUndefined();
+      expect(detectDefaultStripReason("promptTokens")).toBeUndefined();
+      expect(detectDefaultStripReason("completionTokens")).toBeUndefined();
+      expect(detectDefaultStripReason("userId")).toBeUndefined();
     });
 
     /** @scenario "Identity tables are skipped and person columns stay opaque" */

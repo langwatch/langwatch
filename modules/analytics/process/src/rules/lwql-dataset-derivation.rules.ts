@@ -12,7 +12,7 @@ import {
 } from "./lwql-columns-manifest.rules.ts";
 import { contentFilteredMapSql } from "./lwql-content-gating.rules.ts";
 import type { FieldProtection } from "./lwql-field-protection.rules.ts";
-import { skipReason } from "./lwql-skipped-tables.rules.ts";
+import { deriveSkipReason } from "./lwql-skipped-tables.rules.ts";
 
 /** How a derived view deduplicates, mirroring {@link LangWatchQLViewDedup}. */
 export interface DerivedDatasetDedup {
@@ -161,10 +161,10 @@ function parseAggregateFunctionType(
 
 /**
  * The finalised type an `AggregateFunction`'s `-Merge` combinator reads back,
- * by function name — or `null` for a func {@link aggregateStateSpec} does not
+ * by function name — or `null` for a func {@link parseAggregateStateSpec} does not
  * know how to finalise.
  */
-function mergedFinalizedType(name: string, valueType: string | undefined): string | null {
+function deriveMergedFinalizedType(name: string, valueType: string | undefined): string | null {
   if (name === "sum") return valueType ? summedType(valueType) : null;
   if (VALUE_PRESERVING_AGGREGATES.has(name)) return valueType ?? null;
   if (COUNT_LIKE_AGGREGATES.has(name)) return "UInt64";
@@ -177,7 +177,7 @@ function mergedFinalizedType(name: string, valueType: string | undefined): strin
  * How a source column's aggregate-function state is read back, or `null` when the column is not an
  * aggregate state at all.
  */
-function aggregateStateSpec(type: string): AggregateStateSpec | null {
+function parseAggregateStateSpec(type: string): AggregateStateSpec | null {
   const simple = /^SimpleAggregateFunction\(\s*([A-Za-z0-9_]+)\s*,\s*(.+)\)$/.exec(type);
   if (simple) {
     return {
@@ -188,7 +188,7 @@ function aggregateStateSpec(type: string): AggregateStateSpec | null {
   }
   const parsed = parseAggregateFunctionType(type);
   if (!parsed) return null;
-  const finalized = mergedFinalizedType(parsed.name, parsed.valueType);
+  const finalized = deriveMergedFinalizedType(parsed.name, parsed.valueType);
   if (!finalized) return null;
   return {
     combinator: `${parsed.name}Merge${parsed.params}`,
@@ -218,7 +218,7 @@ function projectColumn({
   aggregating: boolean;
   tableName: string;
 }): ProjectedColumn {
-  const state = aggregateStateSpec(type);
+  const state = parseAggregateStateSpec(type);
   if (state) {
     if (!aggregating) {
       throw new Error(
@@ -827,7 +827,7 @@ export function deriveDefaultCatalog({
 }): LangWatchQLViewDefinition[] {
   const handWrittenSet = new Set(handWritten);
   const candidates = manifest.tables.filter(
-    (table) => !handWrittenSet.has(table.name) && skipReason(table.name, skip) === undefined,
+    (table) => !handWrittenSet.has(table.name) && deriveSkipReason(table.name, skip) === undefined,
   );
   const sharedColumns = columnsSharedAcrossTables(candidates);
 

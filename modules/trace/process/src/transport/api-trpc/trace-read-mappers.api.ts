@@ -810,7 +810,7 @@ function findHiddenDerivedKeys(
  * The audience label only means something when ONE category was withheld: a record that shed
  * both sides has no single audience to name.
  */
-function onlyHiddenCategory(
+function pickOnlyHiddenCategory(
   input: Readonly<{
     hiddenKeys: readonly { category: LogContentCategory }[];
     hiddenDerivedKeys: readonly string[];
@@ -836,7 +836,7 @@ function onlyHiddenCategory(
   return hiddenCategories.size === 1 ? ([...hiddenCategories][0] ?? null) : null;
 }
 
-function visibleToLabel(
+function formatVisibleToLabel(
   onlyHidden: LogContentCategory | null,
   protections: LogVisibility,
 ): string | null {
@@ -888,7 +888,7 @@ export function redactTraceLogContent({
   for (const entry of hiddenKeys) delete attributes[entry.key];
   for (const key of hiddenDerivedKeys) delete attributes[key];
 
-  const onlyHidden = onlyHiddenCategory({
+  const onlyHidden = pickOnlyHiddenCategory({
     hiddenKeys,
     hiddenDerivedKeys,
     shouldHideBody,
@@ -901,7 +901,7 @@ export function redactTraceLogContent({
     body: shouldHideBody ? "" : row.body,
     attributes,
     bodyRedacted: true,
-    bodyVisibleTo: visibleToLabel(onlyHidden, protections),
+    bodyVisibleTo: formatVisibleToLabel(onlyHidden, protections),
   };
 }
 

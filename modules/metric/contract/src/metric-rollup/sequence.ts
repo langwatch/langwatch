@@ -15,7 +15,7 @@ function bigint(value: string | null | undefined): bigint {
   }
 }
 
-function numberValue(point: MetricRollupSourcePoint): number | null {
+function toNumberValue(point: MetricRollupSourcePoint): number | null {
   if (point.valueType === "double") return point.valueDouble;
   if (point.valueType === "int" && point.valueInt !== null) {
     const value = Number(point.valueInt);
@@ -110,7 +110,7 @@ function usesPredecessor(point: MetricSequencePoint): boolean {
   return point.metricKind === "summary" || point.aggregationTemporality === "cumulative";
 }
 
-function previousPoint(
+function pickPreviousPoint(
   all: MetricRollupSourcePoint[],
   index: number,
 ): MetricRollupSourcePoint | undefined {
@@ -122,8 +122,8 @@ export {
   comparePoints,
   floorBucket,
   isGap,
-  numberValue,
-  previousPoint,
+  toNumberValue,
+  pickPreviousPoint,
   startsNewSequence,
   usesPredecessor,
 };

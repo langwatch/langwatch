@@ -9,7 +9,7 @@ import {
   LWQL_DERIVED_CATALOG,
   LWQL_HAND_WRITTEN_SOURCE_TABLES,
 } from "../lwql-derived-view-catalog.rules.ts";
-import { LWQL_CATALOG_SKIPPED_TABLES, skipReason } from "../lwql-skipped-tables.rules.ts";
+import { LWQL_CATALOG_SKIPPED_TABLES, deriveSkipReason } from "../lwql-skipped-tables.rules.ts";
 // `lwqlViews` is imported before `derivedViews` deliberately — see the same
 // note in tenantTableCoverage.unit.test.ts: both sit in one ESM cycle, and
 // only entering it through lwqlViews resolves cleanly.
@@ -176,7 +176,7 @@ describe("given the opt-out catalog over the committed manifest", () => {
       .filter(
         (name) =>
           !handWritten.includes(name) &&
-          skipReason(name, LWQL_CATALOG_SKIPPED_TABLES) === undefined,
+          deriveSkipReason(name, LWQL_CATALOG_SKIPPED_TABLES) === undefined,
       );
     expect([...bySource.keys()].toSorted()).toEqual([...expected].toSorted());
     const catalogSourceTables = new Set(LWQL_VIEW_CATALOG.map((view) => view.sourceTable));
@@ -192,7 +192,7 @@ describe("given the opt-out catalog over the committed manifest", () => {
   it("excludes hand-written and skipped tables", () => {
     for (const source of bySource.keys()) {
       expect(handWritten).not.toContain(source);
-      expect(skipReason(source, LWQL_CATALOG_SKIPPED_TABLES)).toBeUndefined();
+      expect(deriveSkipReason(source, LWQL_CATALOG_SKIPPED_TABLES)).toBeUndefined();
     }
   });
 

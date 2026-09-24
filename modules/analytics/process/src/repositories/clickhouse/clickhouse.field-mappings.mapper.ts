@@ -437,7 +437,7 @@ export function getColumnExpression(esField: string): string {
 /**
  * Check if a field requires a JOIN to a different table
  */
-export function requiresJoin(esField: string): CHTable | null {
+export function detectRequiredJoin(esField: string): CHTable | null {
   const table = getTableForField(esField);
   return table !== "trace_summaries" ? table : null;
 }

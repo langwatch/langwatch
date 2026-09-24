@@ -7,7 +7,7 @@ import {
   LWQL_DERIVED_CATALOG,
   LWQL_HAND_WRITTEN_SOURCE_TABLES,
 } from "../lwql-derived-view-catalog.rules.ts";
-import { LWQL_CATALOG_SKIPPED_TABLES, skipReason } from "../lwql-skipped-tables.rules.ts";
+import { LWQL_CATALOG_SKIPPED_TABLES, deriveSkipReason } from "../lwql-skipped-tables.rules.ts";
 // `lwqlViews` is imported before `derivedViews` deliberately: both sit in one ESM cycle (lwqlViews
 // -> derivedViews -> overrides/coding -> provisioning/catalogStatements -> lwqlViews), and
 // whichever of the two this file touches first becomes the cycle's entry point.
@@ -33,7 +33,7 @@ describe("given every table in the committed ClickHouse columns manifest", () =>
       const buckets = [
         handWritten.includes(table),
         derivedSourceTables.has(table),
-        skipReason(table, LWQL_CATALOG_SKIPPED_TABLES) !== undefined,
+        deriveSkipReason(table, LWQL_CATALOG_SKIPPED_TABLES) !== undefined,
       ].filter(Boolean).length;
       expect(buckets, `"${table}" should land in exactly one bucket`).toBe(1);
     }
@@ -42,7 +42,7 @@ describe("given every table in the committed ClickHouse columns manifest", () =>
   it("pins the current split with literal counts, so drift is visible", () => {
     const handWrittenChTables = manifestTableNames.filter((table) => handWritten.includes(table));
     const skippedTables = manifestTableNames.filter(
-      (table) => skipReason(table, LWQL_CATALOG_SKIPPED_TABLES) !== undefined,
+      (table) => deriveSkipReason(table, LWQL_CATALOG_SKIPPED_TABLES) !== undefined,
     );
 
     expect(handWrittenChTables.length).toBe(HAND_WRITTEN_TABLE_COUNT);

@@ -68,7 +68,7 @@ export function checkedInteger({
   return parsed;
 }
 
-export function timestampDecimal(value: unknown): string | null {
+export function toTimestampDecimal(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   const decimal = integerDecimal(value);
   return /^\d+$/.test(decimal) ? decimal : null;
@@ -82,7 +82,7 @@ export function timestampMs(decimal: string): number {
   return ms;
 }
 
-export function finiteNumber(value: unknown): number | null {
+export function toFiniteNumber(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string" && value.trim() !== "") {
     const parsed = Number(value);
@@ -104,7 +104,7 @@ export function checkedOptionalDouble({
   label: string;
 }): number | null {
   if (value === undefined || value === null) return null;
-  const parsed = finiteNumber(value);
+  const parsed = toFiniteNumber(value);
   if (parsed === null) throw new Error(`${label} must be a finite number`);
   return parsed;
 }
@@ -121,6 +121,8 @@ export function integerDecimals(values: unknown): string[] {
 
 export function finiteNumbers(values: unknown): number[] {
   return Array.isArray(values)
-    ? values.map((value) => finiteNumber(value)).filter((value): value is number => value !== null)
+    ? values
+        .map((value) => toFiniteNumber(value))
+        .filter((value): value is number => value !== null)
     : [];
 }

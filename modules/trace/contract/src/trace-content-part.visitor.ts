@@ -6,7 +6,7 @@ export type {
 } from "./trace-content-part.types.ts";
 
 export {
-  inlineDataToMediaPart,
+  convertInlineDataToMediaPart,
   isInlineDataCarrier,
   normalizeContentSource,
 } from "./trace-content-part.provider-source.ts";

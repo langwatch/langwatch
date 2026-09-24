@@ -431,7 +431,7 @@ export class ClickhouseTraceQueryEvaluationRepository {
     // from the value rather than a static `FieldDef.needs`.
     if (fieldName === "has" || fieldName === "none") {
       try {
-        const need = traceQueryMetaFieldsRepository.existenceNeeds(
+        const need = traceQueryMetaFieldsRepository.classifyExistenceSource(
           traceQueryValuesRepository.extractStringValue(tag),
         );
         if (need) {

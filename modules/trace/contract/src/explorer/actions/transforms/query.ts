@@ -1,4 +1,4 @@
-import { getFacetValueState, validateAst } from "../../../trace-query-analysis.ts";
+import { getFacetValueState, describeAstProblem } from "../../../trace-query-analysis.ts";
 import type { FacetState } from "../../../trace-query-metadata.ts";
 import {
   addSameFieldOrValue,
@@ -33,7 +33,7 @@ function canonicalQuery(text: string): string {
       meta: { query: trimmed },
     });
   }
-  const refusal = validateAst(ast);
+  const refusal = describeAstProblem(ast);
   if (refusal) {
     throw new ExplorerTransformError({
       code: "filter_invalid",

@@ -150,7 +150,7 @@ function field(partial: Omit<ResolvedField, "path"> & { path: string }): Resolve
  */
 const FORBIDDEN_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
 
-function resolveEventField({ path, rest }: { path: string; rest: string }): ResolvedField | null {
+function mapEventField({ path, rest }: { path: string; rest: string }): ResolvedField | null {
   if (rest === "type") {
     return field({
       path,
@@ -230,13 +230,7 @@ function resolveEventField({ path, rest }: { path: string; rest: string }): Reso
   return null;
 }
 
-function resolveAnnotationField({
-  path,
-  rest,
-}: {
-  path: string;
-  rest: string;
-}): ResolvedField | null {
+function mapAnnotationField({ path, rest }: { path: string; rest: string }): ResolvedField | null {
   const scalar = ANNOTATION_FIELDS[rest];
   if (scalar) {
     return field({
@@ -288,7 +282,7 @@ export class TraceProjectionCatalogService {
    * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
    * path is not in the allowlist (the caller collects nulls into a 400).
    */
-  static resolveField(path: string): ResolvedField | null {
+  static mapField(path: string): ResolvedField | null {
     // Reject prototype-pollution segments anywhere in the path (defense in depth
     // alongside the projector's setPath guard).
     const hasForbiddenSegment = path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment));
@@ -352,11 +346,11 @@ export class TraceProjectionCatalogService {
     }
 
     if (path.startsWith(PREFIX.events)) {
-      return resolveEventField({ path, rest: path.slice(PREFIX.events.length) });
+      return mapEventField({ path, rest: path.slice(PREFIX.events.length) });
     }
 
     if (path.startsWith(PREFIX.annotations)) {
-      return resolveAnnotationField({
+      return mapAnnotationField({
         path,
         rest: path.slice(PREFIX.annotations.length),
       });

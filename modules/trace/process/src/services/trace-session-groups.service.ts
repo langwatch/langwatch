@@ -58,7 +58,7 @@ function decodeSessionGroupsCursor(encoded: string): SessionGroupsCursor {
   return result.data;
 }
 
-function keysetCursorFor({
+function buildKeysetCursor({
   encoded,
   sortColumn,
   sortDirection,
@@ -130,7 +130,7 @@ const DEFAULT_SORT: { column: SessionGroupSortColumn; direction: "desc" } = {
 const ENRICHMENT_CONCURRENCY = 10;
 
 /** A session row stores "nothing reported this" as an empty string. */
-const emptyToNull = (value: string | null | undefined): string | null =>
+const normalizeEmptyToNull = (value: string | null | undefined): string | null =>
   value === null || value === undefined || value === "" ? null : value;
 
 /**
@@ -218,7 +218,7 @@ export class SessionGroupsService {
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
       limit: params.pageSize + 1,
-      cursor: keysetCursorFor({
+      cursor: buildKeysetCursor({
         encoded: params.cursor,
         sortColumn,
         sortDirection,
@@ -302,12 +302,12 @@ export class SessionGroupsService {
                     subAgents: session.subAgents,
                     // The row stores "unset" as an empty string; the lens
                     // renders absence, so it reads back as null here.
-                    repositoryHost: emptyToNull(session.repositoryHost),
-                    repositoryOwner: emptyToNull(session.repositoryOwner),
-                    repositoryName: emptyToNull(session.repositoryName),
-                    gitBranch: emptyToNull(session.gitBranch),
-                    gitWorktree: emptyToNull(session.gitWorktree),
-                    title: emptyToNull(session.title),
+                    repositoryHost: normalizeEmptyToNull(session.repositoryHost),
+                    repositoryOwner: normalizeEmptyToNull(session.repositoryOwner),
+                    repositoryName: normalizeEmptyToNull(session.repositoryName),
+                    gitBranch: normalizeEmptyToNull(session.gitBranch),
+                    gitWorktree: normalizeEmptyToNull(session.gitWorktree),
+                    title: normalizeEmptyToNull(session.title),
                     // Filled in by linkPullRequests, in one batched lookup for
                     // the whole page rather than one per row.
                     pullRequest: null,
@@ -400,7 +400,7 @@ export class SessionGroupsService {
       errorCount: row.errorCount,
       warningCount: row.warningCount,
       totalSpans: row.totalSpans,
-      lastTraceId: emptyToNull(row.lastTraceId),
+      lastTraceId: normalizeEmptyToNull(row.lastTraceId),
       input: row.input,
       output: row.output,
       codingAgent,

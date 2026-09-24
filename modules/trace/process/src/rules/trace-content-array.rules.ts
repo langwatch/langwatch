@@ -5,7 +5,7 @@ const HEX_DIGIT = /[0-9a-fA-F]/;
  * quote flipping and bare-identifier replacement only fire outside string literals — a naive
  * replace broke on payloads like "i'm at a cafe". `\xHH` escapes become `\u00HH` for JSON.parse.
  */
-function readPythonHexEscape(
+function decodePythonHexEscape(
   input: string,
   offset: number,
 ): { json: string; consumed: number } | null {
@@ -90,7 +90,7 @@ function stepInSingleQuoted(input: string, i: number): ReprStep {
       return { emit: '\\"', consumed: 2 };
     }
 
-    const hex = readPythonHexEscape(input, i);
+    const hex = decodePythonHexEscape(input, i);
     if (hex !== null) {
       return { emit: hex.json, consumed: hex.consumed };
     }
@@ -112,7 +112,7 @@ function stepInSingleQuoted(input: string, i: number): ReprStep {
 function stepInDoubleQuoted(input: string, i: number): ReprStep {
   const c = input[i] ?? "";
   if (c === "\\") {
-    const hex = readPythonHexEscape(input, i);
+    const hex = decodePythonHexEscape(input, i);
     if (hex !== null) {
       return { emit: hex.json, consumed: hex.consumed };
     }

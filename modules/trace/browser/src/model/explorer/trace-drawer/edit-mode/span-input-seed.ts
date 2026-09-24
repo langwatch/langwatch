@@ -1,4 +1,4 @@
-import { readSystemInstructions } from "@langwatch/trace-contract";
+import { extractSystemInstructions } from "@langwatch/trace-contract";
 
 function isSystemMessageFor({
   message,
@@ -25,7 +25,7 @@ export function capturedInputForEditing({
   params: Record<string, unknown> | null | undefined;
 }): string | null {
   if (text === null) return null;
-  const instructions = readSystemInstructions(params);
+  const instructions = extractSystemInstructions(params);
   if (!instructions) return text;
 
   let messages: unknown;

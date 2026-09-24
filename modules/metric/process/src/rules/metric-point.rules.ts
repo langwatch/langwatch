@@ -9,7 +9,7 @@ import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import { canonicalAttributes } from "./metric-attributes.rules.ts";
 import { correlations } from "./metric-correlations.rules.ts";
 import { aggregation } from "./metric-kinds.rules.ts";
-import { integerDecimal, timestampDecimal, timestampMs } from "./metric-numbers.rules.ts";
+import { integerDecimal, toTimestampDecimal, timestampMs } from "./metric-numbers.rules.ts";
 import {
   isRecord,
   sha256,
@@ -28,7 +28,7 @@ function canonicalExemplars(exemplars: unknown): unknown[] {
   if (!Array.isArray(exemplars)) return [];
   return exemplars.map((raw) => {
     const exemplar = isRecord(raw) ? raw : {};
-    const time = timestampDecimal(exemplar.timeUnixNano) ?? "0";
+    const time = toTimestampDecimal(exemplar.timeUnixNano) ?? "0";
     const value =
       exemplar.asInt !== undefined
         ? {
@@ -69,9 +69,9 @@ export function buildPoint(args: {
   const { point, metric, metricData, kind } = args;
   validatePointShape({ point, kind });
 
-  const timeUnixNano = timestampDecimal(point.timeUnixNano);
+  const timeUnixNano = toTimestampDecimal(point.timeUnixNano);
   if (!timeUnixNano) throw new Error("data point is missing timeUnixNano");
-  const startTimeUnixNano = timestampDecimal(point.startTimeUnixNano) ?? "0";
+  const startTimeUnixNano = toTimestampDecimal(point.startTimeUnixNano) ?? "0";
   const occurredAt = timestampMs(timeUnixNano);
 
   const name = typeof metric.name === "string" ? metric.name : "";

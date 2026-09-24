@@ -18,7 +18,7 @@ export function safeUnflatten(flat: Record<string, unknown>): Record<string, unk
       result[key] = value;
       continue;
     }
-    const current = descendToParent(result, parts);
+    const current = visitParentContainers(result, parts);
     if (current === null) continue;
     const leaf = parts[parts.length - 1]!;
     if (DANGEROUS_KEYS.has(leaf)) continue;
@@ -31,7 +31,7 @@ export function safeUnflatten(flat: Record<string, unknown>): Record<string, unk
  * Walks (creating as it goes) the containers the leaf hangs under, replacing anything
  * that is not a plain object. Null when a segment is one of the prototype-poisoning keys.
  */
-function descendToParent(
+function visitParentContainers(
   result: Record<string, unknown>,
   parts: string[],
 ): Record<string, unknown> | null {

@@ -624,7 +624,7 @@ async function handleEvaluatorCall({
   }
 
   const isGuardrail = !!(asGuardrail || params.as_guardrail);
-  const disabled = disabledGuardrailAnswer({ monitor, isGuardrail });
+  const disabled = buildDisabledGuardrailAnswer({ monitor, isGuardrail });
 
   if (disabled) return disabled;
 
@@ -658,7 +658,7 @@ async function handleEvaluatorCall({
     return answer({ error: sentenceFor(error) }, 400);
   }
 
-  const missing = missingRequiredField({ evaluatorDefinition, data, projectId });
+  const missing = detectMissingRequiredField({ evaluatorDefinition, data, projectId });
 
   if (missing) return missing;
 
@@ -679,7 +679,7 @@ async function handleEvaluatorCall({
  * A guardrail whose monitor an operator has switched off does not block the
  * request it was guarding: it skips, and says it passed.
  */
-function disabledGuardrailAnswer({
+function buildDisabledGuardrailAnswer({
   monitor,
   isGuardrail,
 }: {
@@ -822,7 +822,7 @@ async function mergeEvaluatorSettings({
 }
 
 /** The first required field this input does not carry, as its own refusal. */
-function missingRequiredField({
+function detectMissingRequiredField({
   evaluatorDefinition,
   data,
   projectId,

@@ -31,7 +31,7 @@ type RoleResolution = Readonly<{
  * a sentinel for the chain in progress so a parent cycle (customer-emitted bad parent links)
  * terminates instead of recursing forever.
  */
-function effectiveRole(resolution: RoleResolution, spanId: string): string | null {
+function deriveEffectiveRole(resolution: RoleResolution, spanId: string): string | null {
   const cached = resolution.cache[spanId];
   if (cached !== undefined) return cached;
 
@@ -40,22 +40,25 @@ function effectiveRole(resolution: RoleResolution, spanId: string): string | nul
   const span = resolution.bySpanId[spanId];
   if (!span) return null;
 
-  const resolved = declaredRole(span) ?? inheritedRole(resolution, span);
+  const resolved = extractDeclaredRole(span) ?? deriveInheritedRole(resolution, span);
   resolution.cache[spanId] = resolved;
 
   return resolved;
 }
 
 /** The role a span declares itself, or none when it declares nothing. */
-function declaredRole(span: ScenarioRoleSpanInput): string | null {
+function extractDeclaredRole(span: ScenarioRoleSpanInput): string | null {
   return span.role !== undefined && span.role !== "" ? span.role : null;
 }
 
-function inheritedRole(resolution: RoleResolution, span: ScenarioRoleSpanInput): string | null {
+function deriveInheritedRole(
+  resolution: RoleResolution,
+  span: ScenarioRoleSpanInput,
+): string | null {
   if (!span.parentSpanId) return null;
   if (resolution.bySpanId[span.parentSpanId] === undefined) return null;
 
-  return effectiveRole(resolution, span.parentSpanId);
+  return deriveEffectiveRole(resolution, span.parentSpanId);
 }
 
 export function aggregateScenarioRoleMetrics(spans: ScenarioRoleSpanInput[]): ScenarioRoleMetrics {
@@ -70,13 +73,13 @@ export function aggregateScenarioRoleMetrics(spans: ScenarioRoleSpanInput[]): Sc
 
   for (const span of spans) {
     if (span.cost > 0) {
-      const role = effectiveRole(resolution, span.spanId);
+      const role = deriveEffectiveRole(resolution, span.spanId);
       if (role) {
         scenarioRoleCosts[role] = (scenarioRoleCosts[role] ?? 0) + span.cost;
       }
     }
 
-    const declared = declaredRole(span);
+    const declared = extractDeclaredRole(span);
     if (declared) {
       scenarioRoleLatencies[declared] = (scenarioRoleLatencies[declared] ?? 0) + span.durationMs;
     }

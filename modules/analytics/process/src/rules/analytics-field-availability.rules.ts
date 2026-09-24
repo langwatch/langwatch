@@ -12,7 +12,7 @@ export type AnalyticsMetricSource = "trace" | "evaluation";
  * group (`evaluations.*` is eval-domain, else trace-domain); `undefined`
  * means a legacy-only group with no fast-path mapping.
  */
-export function getMetricSource(metricKey: string): AnalyticsMetricSource | undefined {
+export function classifyMetricSource(metricKey: string): AnalyticsMetricSource | undefined {
   const TRACE_METRIC_PREFIXES = ["performance.", "metadata.", "topics.", "traces."];
   const TRACE_METRIC_KEYS = ["models", "trace_name"];
   const isTraceMetric =

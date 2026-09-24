@@ -20,7 +20,7 @@ export const TEASER_MAX_CHARS = 300;
  */
 export const TEASER_ELLIPSIS = " …";
 
-const teaserOfError = (error: ErrorCapture | null | undefined): ErrorCapture | null | undefined => {
+const toErrorTeaser = (error: ErrorCapture | null | undefined): ErrorCapture | null | undefined => {
   if (!error) {
     return error;
   }
@@ -36,7 +36,7 @@ const teaserOfError = (error: ErrorCapture | null | undefined): ErrorCapture | n
   };
 };
 
-const teaserOfSpanIO = (
+const toSpanIOTeaser = (
   io: SpanInputOutput | null | undefined,
 ): SpanInputOutput | null | undefined => {
   if (!io) {
@@ -71,7 +71,7 @@ const teaserOfSpanIO = (
       if (!Array.isArray(io.value)) {
         return teaserAsRaw();
       }
-      return { ...io, value: io.value.map((item) => teaserOfSpanIO(item)!) };
+      return { ...io, value: io.value.map((item) => toSpanIOTeaser(item)!) };
     default:
       // json / raw / guardrail / evaluation results: tease the serialized
       // value and return it as a raw string — the head is where system
@@ -134,7 +134,7 @@ const teaseParamValue = (value: unknown): unknown => {
   return value;
 };
 
-const teaserOfParams = (
+const toParamsTeaser = (
   params: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> | null | undefined => {
   if (!params) {
@@ -222,7 +222,7 @@ export class VisibilityWindowService {
         typeof context.content === "string" ? context.content : JSON.stringify(context.content),
       ),
     })),
-    error: teaserOfError(trace.error),
+    error: toErrorTeaser(trace.error),
     spans: trace.spans?.map(VisibilityWindowService.redactSpanContent),
     redacted_by_visibility_window: true,
   });
@@ -230,9 +230,9 @@ export class VisibilityWindowService {
   /** Redacts a span's content fields to teasers (pure — returns a copy). */
   static redactSpanContent = <T extends Span>(span: T): T => ({
     ...span,
-    input: teaserOfSpanIO(span.input),
-    output: teaserOfSpanIO(span.output),
-    error: teaserOfError(span.error),
-    params: teaserOfParams(span.params as Record<string, unknown> | null),
+    input: toSpanIOTeaser(span.input),
+    output: toSpanIOTeaser(span.output),
+    error: toErrorTeaser(span.error),
+    params: toParamsTeaser(span.params as Record<string, unknown> | null),
   });
 }

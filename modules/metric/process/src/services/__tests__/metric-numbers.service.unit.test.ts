@@ -10,7 +10,7 @@ import {
   checkedDouble,
   checkedInteger,
   checkedOptionalDouble,
-  finiteNumber,
+  toFiniteNumber,
   finiteNumbers,
   MAX_INT32,
   MAX_INT64,
@@ -85,24 +85,24 @@ describe("checkedInteger", () => {
   });
 });
 
-describe("finiteNumber", () => {
+describe("toFiniteNumber", () => {
   it("reads a number, and a number written as text", () => {
-    expect(finiteNumber(1.25)).toBe(1.25);
-    expect(finiteNumber("1.25")).toBe(1.25);
+    expect(toFiniteNumber(1.25)).toBe(1.25);
+    expect(toFiniteNumber("1.25")).toBe(1.25);
   });
 
   it("answers null rather than propagating a non-finite value", () => {
     // NaN and Infinity survive arithmetic silently and land in a chart as a
     // gap nobody can account for.
-    expect(finiteNumber(Number.NaN)).toBeNull();
-    expect(finiteNumber(Number.POSITIVE_INFINITY)).toBeNull();
-    expect(finiteNumber("not a number")).toBeNull();
-    expect(finiteNumber("")).toBeNull();
-    expect(finiteNumber(undefined)).toBeNull();
+    expect(toFiniteNumber(Number.NaN)).toBeNull();
+    expect(toFiniteNumber(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(toFiniteNumber("not a number")).toBeNull();
+    expect(toFiniteNumber("")).toBeNull();
+    expect(toFiniteNumber(undefined)).toBeNull();
   });
 
   it("keeps zero, which is a measurement and not an absent one", () => {
-    expect(finiteNumber(0)).toBe(0);
+    expect(toFiniteNumber(0)).toBe(0);
   });
 });
 

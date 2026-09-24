@@ -8,7 +8,7 @@ import {
   countFilterNodes,
   FILTER_TOO_COMPLEX_MESSAGE,
   MAX_FILTER_NODE_COUNT,
-  validateAst,
+  describeAstProblem,
 } from "../trace-query-analysis.ts";
 import {
   combineQueries,
@@ -139,7 +139,7 @@ describe("requoteBareTerms", () => {
     });
 
     it("produces a query under the ceiling", () => {
-      expect(validateAst(parse(requoteBareTerms(words(30))))).toBeNull();
+      expect(describeAstProblem(parse(requoteBareTerms(words(30))))).toBeNull();
     });
   });
 
@@ -152,7 +152,7 @@ describe("requoteBareTerms", () => {
   });
 });
 
-describe("validateAst node ceiling", () => {
+describe("describeAstProblem node ceiling", () => {
   describe("given eleven bare words", () => {
     /** @scenario "The client refuses a sentence past the term ceiling before sending it" */
     it("refuses with the same copy the server answers with", () => {
@@ -160,19 +160,19 @@ describe("validateAst node ceiling", () => {
 
       expect(countFilterNodes(ast)).toBe(21);
       expect(countFilterNodes(ast)).toBeGreaterThan(MAX_FILTER_NODE_COUNT);
-      expect(validateAst(ast)).toBe(FILTER_TOO_COMPLEX_MESSAGE);
+      expect(describeAstProblem(ast)).toBe(FILTER_TOO_COMPLEX_MESSAGE);
     });
   });
 
   describe("given ten bare words", () => {
     it("passes: nineteen nodes is under the ceiling", () => {
-      expect(validateAst(parse(words(10)))).toBeNull();
+      expect(describeAstProblem(parse(words(10)))).toBeNull();
     });
   });
 
   describe("given the same sentence quoted", () => {
     it("is one node and passes", () => {
-      expect(validateAst(parse(`"${words(11)}"`))).toBeNull();
+      expect(describeAstProblem(parse(`"${words(11)}"`))).toBeNull();
     });
   });
 });

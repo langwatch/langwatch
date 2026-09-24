@@ -64,7 +64,7 @@ function mergeMap(target: BucketMap, source: BucketMap): void {
   }
 }
 
-function subtractMaps({
+function computeMapDifference({
   current,
   previous,
 }: {
@@ -168,5 +168,5 @@ export {
   denseBuckets,
   downscaleBuckets,
   mergeMap,
-  subtractMaps,
+  computeMapDifference,
 };

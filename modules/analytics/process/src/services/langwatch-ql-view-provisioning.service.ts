@@ -156,7 +156,7 @@ export class LangWatchQLViewProvisioningService {
       // The joined side of a two-table view: its own column-scoped grant, since
       // an INVOKER view reads that table as the caller too.
       ...views.flatMap((view) => {
-        const grant = viewStatements.joinSourceColumnGrantStatement({
+        const grant = viewStatements.buildJoinSourceColumnGrantStatement({
           names,
           sourceDatabase,
           view,

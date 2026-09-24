@@ -7,7 +7,7 @@ import {
   getFacetIcon,
   getRangeFormatter,
 } from "@langwatch/trace-browser-kit";
-import { getFacetValueState, getRangeValue } from "@langwatch/trace-contract";
+import { getFacetValueState, extractRangeValue } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
@@ -305,7 +305,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
       );
     }
 
-    const current = getRangeValue(ast, section.key);
+    const current = extractRangeValue(ast, section.key);
     return (
       <RangeSection
         title={section.label}

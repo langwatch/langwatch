@@ -104,7 +104,7 @@ const CODEX_LOGS = [
 ];
 
 /** The audience label a `restrict` rule carries onto a hidden placeholder. */
-function restrictLabelFor(category: ResolvedCategory): string | null {
+function formatRestrictLabel(category: ResolvedCategory): string | null {
   return category.disposition === "restrict"
     ? describeAudience(category.audience, { groups: {} })
     : null;
@@ -143,7 +143,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
         category,
         {
           canSee: isContentVisibleToPublic(resolved.categories[category]),
-          restrictVisibleTo: restrictLabelFor(resolved.categories[category]),
+          restrictVisibleTo: formatRestrictLabel(resolved.categories[category]),
         },
       ]),
     ) as NonNullable<Protections["contentCategories"]>;

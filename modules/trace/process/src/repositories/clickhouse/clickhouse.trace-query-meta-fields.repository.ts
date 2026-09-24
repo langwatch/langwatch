@@ -485,7 +485,7 @@ export class ClickHouseTraceQueryMetaFieldsRepository {
   /**
    * Which auxiliary collection a has/none filter reads, or null for trace summary.
    */
-  existenceNeeds(value: string): "evaluations" | "events" | null {
+  classifyExistenceSource(value: string): "evaluations" | "events" | null {
     if (value === "eval") return "evaluations";
     if (value === "feedback") return "events";
     return null;

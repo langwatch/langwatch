@@ -54,7 +54,7 @@ function validateTenant(tenantId: string, operation: string): void {
   EventUtils.validateTenantId({ tenantId }, operation);
 }
 
-function numberOrNull(value: number | string | null): number | null {
+function toNumberOrNull(value: number | string | null): number | null {
   return value === null ? null : Number(value);
 }
 
@@ -387,9 +387,9 @@ export class EvaluationRunClickHouseReadRepository {
           ? { inputs: parseObject(row.Inputs) }
           : {}),
         timestamps: {
-          scheduledAt: numberOrNull(row.ScheduledAt),
-          startedAt: numberOrNull(row.StartedAt),
-          completedAt: numberOrNull(row.CompletedAt),
+          scheduledAt: toNumberOrNull(row.ScheduledAt),
+          startedAt: toNumberOrNull(row.StartedAt),
+          completedAt: toNumberOrNull(row.CompletedAt),
         },
       });
       (output[row.TraceId] ??= []).push(traceEvaluation);
@@ -477,10 +477,10 @@ export class EvaluationRunClickHouseReadRepository {
       createdAt: Number(row.CreatedAt),
       updatedAt: Number(row.UpdatedAt),
       LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
-      archivedAt: numberOrNull(row.ArchivedAt),
-      scheduledAt: numberOrNull(row.ScheduledAt),
-      startedAt: numberOrNull(row.StartedAt),
-      completedAt: numberOrNull(row.CompletedAt),
+      archivedAt: toNumberOrNull(row.ArchivedAt),
+      scheduledAt: toNumberOrNull(row.ScheduledAt),
+      startedAt: toNumberOrNull(row.StartedAt),
+      completedAt: toNumberOrNull(row.CompletedAt),
       costId: row.CostId,
     });
   }

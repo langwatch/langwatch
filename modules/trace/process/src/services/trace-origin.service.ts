@@ -2,7 +2,7 @@ import { ATTR_KEYS, type NormalizedSpan, type TraceSummaryData } from "@langwatc
 
 import { parseJsonStringArray } from "../rules/trace-summary-attributes.rules.ts";
 
-function nonEmptyString(value: unknown): string | undefined {
+function toNonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value : void 0;
 }
 
@@ -178,7 +178,7 @@ export class TraceOriginService {
     // origin is explicit too, resolving deterministically rather than decaying.
     const spanOrigin = span.spanAttributes["langwatch.origin"];
     const resourceOrigin = span.resourceAttributes["langwatch.origin"];
-    const explicitOrigin = nonEmptyString(spanOrigin) ?? nonEmptyString(resourceOrigin);
+    const explicitOrigin = toNonEmptyString(spanOrigin) ?? toNonEmptyString(resourceOrigin);
 
     if (explicitOrigin) {
       mergedAttributes["langwatch.origin"] = this.#resolveExplicitOrigin({
@@ -206,7 +206,7 @@ export class TraceOriginService {
     mergedAttributes: Record<string, string>;
   }): void {
     const isRootSpan = span.parentSpanId === null;
-    const explicitSource = nonEmptyString(span.spanAttributes["langwatch.origin.source"]);
+    const explicitSource = toNonEmptyString(span.spanAttributes["langwatch.origin.source"]);
     if (explicitSource) {
       if (isRootSpan) {
         mergedAttributes["langwatch.origin.source"] = explicitSource;

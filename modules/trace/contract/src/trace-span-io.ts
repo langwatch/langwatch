@@ -5,7 +5,7 @@ import type { Span, SpanInputOutput } from "./trace-format.schemas.ts";
  * is a string, otherwise the `content` (or `text`) of a content block. An entry
  * carrying neither contributes nothing.
  */
-function instructionEntryText(entry: unknown): string | null {
+function extractInstructionEntryText(entry: unknown): string | null {
   if (typeof entry === "string") return entry;
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
   const block = entry as Record<string, unknown>;
@@ -14,10 +14,10 @@ function instructionEntryText(entry: unknown): string | null {
 }
 
 /** Content blocks read as one prompt, or null when none of them carry text. */
-function joinInstructionEntries(entries: unknown[]): string | null {
+function formatInstructionEntries(entries: unknown[]): string | null {
   const parts: string[] = [];
   for (const entry of entries) {
-    const text = instructionEntryText(entry);
+    const text = extractInstructionEntryText(entry);
     if (text !== null) parts.push(text);
   }
   const joined = parts.join("\n");
@@ -29,14 +29,14 @@ function joinInstructionEntries(entries: unknown[]): string | null {
  * array of content blocks, or that array JSON-encoded when the transport
  * can't carry structured values — all folded into text the same way.
  */
-function systemInstructionsText(value: unknown): string | null {
-  if (Array.isArray(value)) return joinInstructionEntries(value);
+function extractSystemInstructionsText(value: unknown): string | null {
+  if (Array.isArray(value)) return formatInstructionEntries(value);
   if (typeof value !== "string" || value.trim().length === 0) return null;
   const looksLikeJsonArray = value.trimStart().startsWith("[");
   if (!looksLikeJsonArray) return value;
   try {
     const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? joinInstructionEntries(parsed) : value;
+    return Array.isArray(parsed) ? formatInstructionEntries(parsed) : value;
   } catch {
     return value;
   }
@@ -46,15 +46,15 @@ function systemInstructionsText(value: unknown): string | null {
  * Read system instructions from OTel split `gen_ai.system_instructions`,
  * tolerating both flat-dotted and nested shapes. Matches drawable prompt.
  */
-export function readSystemInstructions(
+export function extractSystemInstructions(
   params: Record<string, unknown> | null | undefined,
 ): string | null {
   if (!params) return null;
-  const flat = systemInstructionsText(params["gen_ai.system_instructions"]);
+  const flat = extractSystemInstructionsText(params["gen_ai.system_instructions"]);
   if (flat !== null) return flat;
   const genAi = params.gen_ai;
   if (genAi && typeof genAi === "object" && !Array.isArray(genAi)) {
-    return systemInstructionsText((genAi as Record<string, unknown>).system_instructions);
+    return extractSystemInstructionsText((genAi as Record<string, unknown>).system_instructions);
   }
   return null;
 }
@@ -67,7 +67,7 @@ export function readSystemInstructions(
 export function buildDisplayInput(span: Pick<Span, "input" | "params">): string | null {
   const io = span.input;
   if (io && io.type === "chat_messages" && Array.isArray(io.value)) {
-    const system = readSystemInstructions(span.params ?? null);
+    const system = extractSystemInstructions(span.params ?? null);
     const alreadyHasSystem = io.value.some(
       (m) => !!m && typeof m === "object" && "role" in m && m.role === "system",
     );

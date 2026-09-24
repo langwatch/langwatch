@@ -133,7 +133,7 @@ function providerMediaToMediaData(
  * DELIBERATE DIFFERENCE: application wraps raw PCM audio into playable WAV
  * (byte work). This package omits it; reference collection ignores data: anyway.
  */
-function inputAudioToMediaData(
+function convertInputAudioToMediaData(
   p: Readonly<{ data?: string; url?: string; format?: string; mimeType?: string }>,
 ): MediaPartData | null {
   if (p.data && isRawPcmFormat(p.format, p.mimeType)) return null;
@@ -146,7 +146,7 @@ function inputAudioToMediaData(
 }
 
 /** Map a single raw content part to `MediaPartData`, or null when it is not media. */
-export function mediaPartToMediaData(part: unknown): MediaPartData | null {
+export function convertMediaPartToMediaData(part: unknown): MediaPartData | null {
   const result = visitContentPart<MediaPartData | null>(part, {
     text: () => null,
     media: providerMediaToMediaData,
@@ -158,7 +158,7 @@ export function mediaPartToMediaData(part: unknown): MediaPartData | null {
     toolResult: () => null,
     imageUrl: (url) => ({ type: "image", source: { type: "url", value: url } }),
     bareImage: (src) => ({ type: "image", source: { type: "url", value: src } }),
-    inputAudio: inputAudioToMediaData,
+    inputAudio: convertInputAudioToMediaData,
     unknown: () => null,
   });
 
@@ -194,7 +194,7 @@ function containsRenderableMediaHints(value: string): boolean {
  * A string whose ENTIRE value is one media reference — a base64 `data:` URI
  * or an externalized `/api/files/` URL — synthesized into a renderable part.
  */
-function bareStringToMediaData(value: string): MediaPartData | null {
+function convertBareStringToMediaData(value: string): MediaPartData | null {
   const trimmed = value.trim();
   if (trimmed.length === 0 || /\s/.test(trimmed)) return null;
   if (trimmed.startsWith("data:")) {
@@ -261,7 +261,7 @@ function emitCollected(walk: CollectWalk, media: MediaPartData): void {
 
 /** A string is either a bare media payload, or an envelope with media nested inside its JSON. */
 function collectFromString(walk: CollectWalk, value: string): void {
-  const bare = bareStringToMediaData(value);
+  const bare = convertBareStringToMediaData(value);
   if (bare) {
     emitCollected(walk, bare);
     return;
@@ -288,7 +288,7 @@ function collectFromString(walk: CollectWalk, value: string): void {
  * typed values, tool results) resolve to null and are walked generically.
  */
 function collectFromObject(walk: CollectWalk, value: object): void {
-  const media = mediaPartToMediaData(value);
+  const media = convertMediaPartToMediaData(value);
   if (media) {
     emitCollected(walk, media);
     return;

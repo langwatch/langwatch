@@ -7,7 +7,7 @@ import {
   extractOutputMessages,
   extractUsageTokens,
   recordValueType,
-  spanTypeToGenAiOperationName,
+  mapSpanTypeToGenAiOperationName,
 } from "../rules/canonical-extraction.rules.ts";
 import {
   asBoolean,
@@ -40,7 +40,7 @@ export class GenAiSpanService {
 
     if (!attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME)) {
       const spanType = attrs.get(ATTR_KEYS.SPAN_TYPE) ?? attrs.get(ATTR_KEYS.TYPE);
-      const operationName = spanTypeToGenAiOperationName(spanType);
+      const operationName = mapSpanTypeToGenAiOperationName(spanType);
       if (operationName) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_OPERATION_NAME, operationName);
         ctx.recordRule(`${GEN_AI_RULE_PREFIX}:operation.name`);

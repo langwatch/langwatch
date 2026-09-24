@@ -1,5 +1,5 @@
 import { useInvalidateProcedure } from "@langwatch/api/web";
-import { readChangeTraceNameRejection } from "@langwatch/trace-contract";
+import { parseChangeTraceNameRejection } from "@langwatch/trace-contract";
 
 import { traceApi } from "../../../behavior/trace-api.ts";
 
@@ -51,7 +51,7 @@ export function useRenameTrace(): UseRenameTraceResult {
         await mutation.mutateAsync(input);
         return { ok: true };
       } catch (error) {
-        const rejection = readChangeTraceNameRejection(
+        const rejection = parseChangeTraceNameRejection(
           (error as { data?: { error?: { meta?: unknown } } })?.data?.error?.meta,
         );
         if (!rejection) return { ok: false, reason: "unknown", error };

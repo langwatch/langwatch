@@ -80,7 +80,7 @@ function readableFieldValue({
 }
 
 /** The span edits this viewer may read, or null when none of them survive. */
-function redactSpanPatch({
+function deriveRedactedSpanPatch({
   spanPatch,
   isDeniedByCategory,
   hiddenAttributes,
@@ -141,7 +141,7 @@ export type TraceMetadataEdits = NonNullable<
  * attribute paths the trace was ingested with, so the map is put back into that spelling to be
  * matched and read out of it again, keeping one definition of which attributes are hidden.
  */
-function redactMetadataEdits({
+function deriveRedactedMetadataEdits({
   metadata,
   hiddenAttributes,
 }: {
@@ -195,7 +195,7 @@ function readableTraceFieldValue({
   }
 
   if (field === "metadata") {
-    return redactMetadataEdits({
+    return deriveRedactedMetadataEdits({
       metadata: traceEdits.metadata ?? null,
       hiddenAttributes,
     });
@@ -285,7 +285,7 @@ export class TraceEditOverlayRedactionService {
 
     const spans: TraceEditSpanPatch[] = [];
     for (const spanPatch of patch.spans) {
-      const redacted = redactSpanPatch({
+      const redacted = deriveRedactedSpanPatch({
         spanPatch,
         isDeniedByCategory,
         hiddenAttributes,

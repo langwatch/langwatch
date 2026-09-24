@@ -5,7 +5,7 @@ import {
   isRecord,
   isUnknownArray,
   type MessageLike,
-  safeStringify,
+  stringifySafely,
 } from "./canonical-guard.rules.ts";
 
 /**
@@ -63,7 +63,7 @@ const extractTextsFromParts = (parts: unknown[]): string[] => {
 
 /** A tool call's input, stringified, or nothing when it will not serialise. */
 const toolInputTexts = (input: unknown): string[] => {
-  const text = safeStringify(input);
+  const text = stringifySafely(input);
 
   return text === null ? [] : [text];
 };
@@ -114,7 +114,7 @@ const extractBedrockToolResult = (blocks: unknown[]): string[] => {
   return blocks.flatMap((block) => {
     // Key presence matters: `{ json: null }` is a valid union member.
     if (isRecord(block) && "json" in block) {
-      const json = safeStringify(block.json);
+      const json = stringifySafely(block.json);
       return json === null ? [] : [json];
     }
 
@@ -148,7 +148,7 @@ export const extractLastUserMessageText = (messages: unknown): string | null => 
  * Extracts text from a content block, handling both standard ({type:"text", text:"..."})
  * and pi-ai/Vercel AI SDK style ({type:"text", content:"..."}).
  */
-const textFromBlock = (p: unknown): string | null => {
+const extractTextFromBlock = (p: unknown): string | null => {
   if (!isRecord(p)) {
     return null;
   }
@@ -188,7 +188,7 @@ export const extractSystemInstructionFromMessages = (messages: unknown): string 
   }
 
   if (isUnknownArray(content)) {
-    const texts = content.map(textFromBlock).filter((p): p is string => p !== null);
+    const texts = content.map(extractTextFromBlock).filter((p): p is string => p !== null);
 
     const extracted = texts.join("");
     return extracted.length > 0 ? extracted : null;

@@ -1,5 +1,5 @@
 import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
-import { mediaPartToMediaData } from "../../../behavior/shared/traces/media-parts.ts";
+import { convertMediaPartToMediaData } from "../../../behavior/shared/traces/media-parts.ts";
 /**
  * Decoding one message's `content` into display parts. Split from the
  * message-level walk so each file answers one question: this is "what is
@@ -116,9 +116,9 @@ function partVisitor(context: PartContext): ContentPartVisitor<DisplayPart | und
       // Reuse the one mapping instead of casting. The visitor accepts
       // `document`, `MediaPartData` does not have it, and the cast let a
       // document through wearing a type no renderer handles.
-      // `mediaPartToMediaData` already folds a document into the binary
+      // `convertMediaPartToMediaData` already folds a document into the binary
       // member, which is what draws it as an attachment chip.
-      const part = mediaPartToMediaData(media);
+      const part = convertMediaPartToMediaData(media);
       if (!part) return undefined;
       return {
         kind: "media" as const,

@@ -7,7 +7,7 @@
 
 import {
   LWQL_CONNECTION_DEFAULTS,
-  lwqlDerivedConnectionFromEnv,
+  deriveLwqlConnectionFromEnv,
 } from "../langwatch-ql/connection.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
@@ -95,7 +95,7 @@ export class LangWatchQLSelfProvisioningService {
    */
   request({ source }: { source: Record<string, string | undefined> }): LwqlSelfProvisionRequest {
     if (source.LWQL_SELF_PROVISION !== "true") return { requested: false };
-    const connection = lwqlDerivedConnectionFromEnv(source);
+    const connection = deriveLwqlConnectionFromEnv(source);
     if (!connection) {
       return { requested: true, complete: false, missing: "the restricted connection" };
     }

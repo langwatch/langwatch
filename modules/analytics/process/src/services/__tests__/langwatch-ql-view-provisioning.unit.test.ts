@@ -276,7 +276,7 @@ describe("given a catalog view that joins a second table", () => {
   describe("when the joined-side grant is built", () => {
     it("grants exactly the join's declared source columns on the joined table", () => {
       expect(
-        viewStatements.joinSourceColumnGrantStatement({
+        viewStatements.buildJoinSourceColumnGrantStatement({
           names: SNAPSHOT_NAMES,
           sourceDatabase: SOURCE_DATABASE,
           view: JOIN_VIEW,
@@ -289,7 +289,7 @@ describe("given a catalog view that joins a second table", () => {
       if (!traces) throw new Error("traces is not in the catalog");
 
       expect(
-        viewStatements.joinSourceColumnGrantStatement({
+        viewStatements.buildJoinSourceColumnGrantStatement({
           names: SNAPSHOT_NAMES,
           sourceDatabase: SOURCE_DATABASE,
           view: traces,
@@ -348,7 +348,7 @@ describe("given a view whose predicate reads columns no projection does", () => 
 
   it("grants the on-only column on the joined table", () => {
     expect(
-      viewStatements.joinSourceColumnGrantStatement({
+      viewStatements.buildJoinSourceColumnGrantStatement({
         names: SNAPSHOT_NAMES,
         sourceDatabase: SOURCE_DATABASE,
         view: predicateOnlyView,

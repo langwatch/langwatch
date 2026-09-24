@@ -209,7 +209,7 @@ export function detectFoldedCausalityLoop(params: {
  * AnyValue is a union — string/int/bool/double/array. We accept any
  * encoding that parses to a positive finite integer.
  */
-function readNumericAttrValue(value: unknown): number | undefined {
+function parseNumericAttrValue(value: unknown): number | undefined {
   let raw: unknown = value;
   if (value && typeof value === "object") {
     // Handle OTLP AnyValue: { intValue?, stringValue?, doubleValue? }
@@ -227,7 +227,7 @@ function extractCausalityDepthFromOtlpAttrs(
   if (!Array.isArray(attrs)) return 0;
   for (const attr of attrs) {
     if (attr?.key !== CAUSALITY_DEPTH_ATTR) continue;
-    const n = readNumericAttrValue(attr.value);
+    const n = parseNumericAttrValue(attr.value);
     if (n !== undefined && n > 0) return n;
   }
   return 0;

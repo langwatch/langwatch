@@ -54,7 +54,7 @@ const indexKey = (prefix: string, i: number): string =>
   prefix ? `${prefix}${SEP}${i}` : String(i);
 
 /** An `intValue` sent as a protobuf long, split into its high and low halves. */
-const longToNumber = (intValue: unknown): number | undefined => {
+const convertLongToNumber = (intValue: unknown): number | undefined => {
   const hasHighLowParts =
     typeof intValue === "object" && intValue !== null && "high" in intValue && "low" in intValue;
   if (!hasHighLowParts) {
@@ -66,7 +66,7 @@ const longToNumber = (intValue: unknown): number | undefined => {
   return Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
 };
 
-const bytesScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+const decodeBytesScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   if (!("bytesValue" in v) || !v.bytesValue) {
     return void 0;
   }
@@ -74,7 +74,7 @@ const bytesScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   return typeof v.bytesValue === "string" ? Buffer.from(v.bytesValue, "base64") : v.bytesValue;
 };
 
-const boolScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+const decodeBoolScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   if (!("boolValue" in v) || v.boolValue === null) {
     return void 0;
   }
@@ -84,7 +84,7 @@ const boolScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     : v.boolValue;
 };
 
-const intScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+const decodeIntScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   // Absence, not falsiness. A counter sent as `intValue: 0` is a reading, and a
   // falsy guard here drops it as though the attribute had never been sent - so
   // "zero errors" and "errors never measured" become the same trace.
@@ -96,10 +96,10 @@ const intScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     return parseInt(v.intValue, 10);
   }
 
-  return longToNumber(v.intValue) ?? (v.intValue as AttributeScalar);
+  return convertLongToNumber(v.intValue) ?? (v.intValue as AttributeScalar);
 };
 
-const doubleScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+const decodeDoubleScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   // As above: `0` and `0.0` are measurements, not missing attributes.
   if (!("doubleValue" in v) || v.doubleValue == null) {
     return void 0;
@@ -108,19 +108,19 @@ const doubleScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   return typeof v.doubleValue === "string" ? parseFloat(v.doubleValue) : v.doubleValue;
 };
 
-const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
+const decodeScalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   if ("stringValue" in v && typeof v.stringValue === "string") {
     return v.stringValue;
   }
 
   if ("arrayValue" in v && v.arrayValue && Array.isArray(v.arrayValue?.values)) {
-    return JSON.stringify(v.arrayValue.values.map((item) => scalar(item) ?? item));
+    return JSON.stringify(v.arrayValue.values.map((item) => decodeScalar(item) ?? item));
   }
 
-  return bytesScalar(v) ?? boolScalar(v) ?? intScalar(v) ?? doubleScalar(v);
+  return decodeBytesScalar(v) ?? decodeBoolScalar(v) ?? decodeIntScalar(v) ?? decodeDoubleScalar(v);
 };
 
-const isScalar = (v: OtlpAnyValue): boolean => scalar(v) !== void 0;
+const isScalar = (v: OtlpAnyValue): boolean => decodeScalar(v) !== void 0;
 
 const normalizeOtlpId = (id: string | Uint8Array): string => {
   if (id instanceof Uint8Array) {
@@ -228,7 +228,7 @@ const walkArrayValue = (
     setFlattened(
       out,
       prefix,
-      vs.map((x) => scalar(x)!).filter((x): x is AttributeScalar => x !== void 0),
+      vs.map((x) => decodeScalar(x)!).filter((x): x is AttributeScalar => x !== void 0),
     );
 
     return;
@@ -240,7 +240,7 @@ const walkArrayValue = (
 };
 
 const walkOtlpValue = (out: FlattenResult, v: OtlpAnyValue, prefix: string): void => {
-  const s = scalar(v);
+  const s = decodeScalar(v);
   if (s !== void 0) {
     setFlattened(out, prefix, s);
 
@@ -266,7 +266,7 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
   const out: FlattenResult = {};
 
   // Scalar root has no natural key, so only keep it if rootKey provided.
-  const rootScalar = scalar(root);
+  const rootScalar = decodeScalar(root);
   if (rootScalar !== void 0) {
     if (rootKey) {
       setFlattened(out, rootKey, rootScalar);

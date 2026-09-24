@@ -8,7 +8,7 @@ import type { AnalyticsSeries, AnalyticsAggregation } from "@langwatch/analytics
 
 import {
   type AnalyticsMetricSource,
-  getMetricSource,
+  classifyMetricSource,
 } from "../../rules/analytics-field-availability.rules.ts";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
@@ -329,7 +329,7 @@ export function pickAnalyticsTable(input: PickAnalyticsTableInput): AnalyticsTab
 
   // Determine the source. All series must agree.
   const sources = new Set<AnalyticsMetricSource | undefined>(
-    input.series.map((s) => getMetricSource(s.metric)),
+    input.series.map((s) => classifyMetricSource(s.metric)),
   );
   // Mixed source or unknown → conservative fallback to the legacy trace
   // table; the legacy builder is the only path that can mix trace + eval

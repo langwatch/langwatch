@@ -172,7 +172,7 @@ Rule: Strongly typed filter field registry
 
   Scenario: Unknown field rejected at parse time
     When the user types "modle:gpt-4o" in the search bar
-    Then `validateAst` reports an unknown-field error
+    Then `describeAstProblem` reports an unknown-field error
     And the search bar shows the inline parse error (red outline + message)
     And the trace table does NOT clear (the previous debouncedQueryText keeps driving the list)
 

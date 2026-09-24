@@ -394,7 +394,7 @@ const ALLOWED_FUNCTION_NAMES: NameLookup = nameLookup(
 /**
  * The allowlist as the schema and a `FUNCTION_NOT_ALLOWED` refusal publish it: deduplicated and
  * sorted case-insensitively, first spelling wins. Combinator forms (`countIf`) are admitted by
- * `aggregateBaseOf` and deliberately not enumerated.
+ * `extractAggregateBase` and deliberately not enumerated.
  */
 export const LWQL_ALLOWED_FUNCTION_NAMES: readonly string[] = canonicalFunctionNames();
 
@@ -426,7 +426,7 @@ const MAX_COMBINATORS = 4;
  * The aggregate a name resolves to once its combinator suffixes are removed, or
  * `null` when it is not a combinator form of an allowed aggregate.
  */
-function aggregateBaseOf(lowercased: string): string | null {
+function extractAggregateBase(lowercased: string): string | null {
   let name = lowercased;
   for (let pass = 0; pass <= MAX_COMBINATORS; pass += 1) {
     if (isListed(AGGREGATE_BASE_NAMES, name)) return name;
@@ -446,7 +446,7 @@ function aggregateBaseOf(lowercased: string): string | null {
 export function isAllowedLangWatchQLFunction(name: string): boolean {
   const lowercased = name.trim().toLowerCase();
   if (isListed(ALLOWED_FUNCTION_NAMES, lowercased)) return true;
-  return aggregateBaseOf(lowercased) !== null;
+  return extractAggregateBase(lowercased) !== null;
 }
 
 /**
@@ -454,5 +454,5 @@ export function isAllowedLangWatchQLFunction(name: string): boolean {
  * combinator form as well, because `countIf` aggregates exactly as `count` does.
  */
 export function isLangWatchQLAggregateFunction(name: string): boolean {
-  return aggregateBaseOf(name.trim().toLowerCase()) !== null;
+  return extractAggregateBase(name.trim().toLowerCase()) !== null;
 }

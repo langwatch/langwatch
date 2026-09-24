@@ -9,8 +9,8 @@ import {
   evaluationReportedEventSchema,
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
-  verdictPassedOf,
-  verdictScoreOf,
+  deriveVerdictPassed,
+  deriveVerdictScore,
 } from "@langwatch/evaluation-contract";
 import {
   type FoldProjectionStore,
@@ -142,8 +142,8 @@ export class EvaluationRunFoldProjection
       status: event.data.status,
       // Verdicts are gated on status === "processed" (#6833) — shared with
       // the slim fold so the documented slim<->runs parity holds.
-      score: verdictScoreOf(event.data),
-      passed: verdictPassedOf(event.data),
+      score: deriveVerdictScore(event.data),
+      passed: deriveVerdictPassed(event.data),
       label: event.data.label ?? null,
       details: event.data.details ?? null,
       inputs: event.data.inputs ?? null,
@@ -169,8 +169,8 @@ export class EvaluationRunFoldProjection
       status: event.data.status,
       // Verdicts are gated on status === "processed" (#6833) — shared with
       // the slim fold so the documented slim<->runs parity holds.
-      score: verdictScoreOf(event.data),
-      passed: verdictPassedOf(event.data),
+      score: deriveVerdictScore(event.data),
+      passed: deriveVerdictPassed(event.data),
       label: event.data.label ?? null,
       details: event.data.details ?? null,
       inputs: event.data.inputs ?? null,

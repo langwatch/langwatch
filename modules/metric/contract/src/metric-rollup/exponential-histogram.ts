@@ -7,13 +7,13 @@ import {
   downscaleBuckets,
   MAX_DENSE_BUCKET_SPAN,
   mergeMap,
-  subtractMaps,
+  computeMapDifference,
 } from "./exponential-bucket.ts";
 import { type BucketEntry, extendExtrema, resetOrGap } from "./rollup-row.ts";
 import {
   bigint,
   type MetricRollupSourcePoint,
-  previousPoint,
+  pickPreviousPoint,
   startsNewSequence,
 } from "./sequence.ts";
 
@@ -127,18 +127,18 @@ function normalizePoint({
 }
 
 /** Delta between two normalized points, or null when the sequence reset. */
-function differenceExponentialPoint({
+function computeExponentialPointDifference({
   current,
   previous,
 }: {
   current: NormalizedPoint;
   previous: NormalizedPoint;
 }): NormalizedPoint | null {
-  const positive = subtractMaps({
+  const positive = computeMapDifference({
     current: current.positive,
     previous: previous.positive,
   });
-  const negative = subtractMaps({
+  const negative = computeMapDifference({
     current: current.negative,
     previous: previous.negative,
   });
@@ -154,7 +154,7 @@ function differenceExponentialPoint({
   };
 }
 
-function usablePredecessor({
+function pickUsablePredecessor({
   point,
   all,
   index,
@@ -164,7 +164,7 @@ function usablePredecessor({
   index: number;
 }): MetricRollupSourcePoint | undefined {
   if (point.aggregationTemporality !== "cumulative") return undefined;
-  const previous = previousPoint(all, index);
+  const previous = pickPreviousPoint(all, index);
   if (previous?.metricKind !== "exponential_histogram") {
     return undefined;
   }
@@ -181,7 +181,7 @@ function collectContributors({
 }): Map<string, MetricRollupSourcePoint> {
   const predecessors = new Map<string, MetricRollupSourcePoint>();
   for (const { point, index } of entries) {
-    const previous = usablePredecessor({ point, all, index });
+    const previous = pickUsablePredecessor({ point, all, index });
     if (previous) predecessors.set(previous.pointId, previous);
   }
   return new Map<string, MetricRollupSourcePoint>([
@@ -218,11 +218,11 @@ function buildExponentialHistogramRow({
     let usesWholePoint = point.aggregationTemporality !== "cumulative";
 
     if (point.aggregationTemporality === "cumulative") {
-      const previousRaw = usablePredecessor({ point, all, index });
+      const previousRaw = pickUsablePredecessor({ point, all, index });
       // Both sides share a threshold, so a mid-series threshold change no
       // longer forces the whole point to be counted as a reset.
       const delta = previousRaw
-        ? differenceExponentialPoint({
+        ? computeExponentialPointDifference({
             current,
             previous: normalizePoint({ point: previousRaw, layout }),
           })
@@ -230,7 +230,7 @@ function buildExponentialHistogramRow({
       if (!delta) {
         resetOrGap({
           row,
-          previous: previousPoint(all, index),
+          previous: pickPreviousPoint(all, index),
           current: point,
         });
         usesWholePoint = true;

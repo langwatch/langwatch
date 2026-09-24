@@ -1,6 +1,6 @@
 import {
   traceAttributeKeyForMetadata,
-  traceMetadataKeyForAttribute,
+  mapAttributeToTraceMetadataKey,
 } from "@langwatch/trace-contract";
 import { useCallback, useMemo } from "react";
 
@@ -46,7 +46,7 @@ export function useTraceMetadataEditing({
   const baselineMetadata = useMemo(() => {
     const captured: Record<string, unknown> = {};
     for (const [attributeKey, value] of Object.entries(capturedAttributes)) {
-      const key = traceMetadataKeyForAttribute(attributeKey);
+      const key = mapAttributeToTraceMetadataKey(attributeKey);
       if (key !== null) captured[key] = value;
     }
     return selectTraceMetadataBaseline({ basePatch, captured });
@@ -62,7 +62,7 @@ export function useTraceMetadataEditing({
 
   const onEditAttribute = useCallback(
     ({ key, value }: { key: string; value: unknown }) => {
-      const metadataKey = traceMetadataKeyForAttribute(key);
+      const metadataKey = mapAttributeToTraceMetadataKey(key);
       if (metadataKey === null) return;
       setTraceMetadata({ key: metadataKey, value, baselineMetadata });
     },
@@ -71,7 +71,7 @@ export function useTraceMetadataEditing({
 
   const onResetAttribute = useCallback(
     (key: string) => {
-      const metadataKey = traceMetadataKeyForAttribute(key);
+      const metadataKey = mapAttributeToTraceMetadataKey(key);
       if (metadataKey === null) return;
       resetTraceMetadata(metadataKey);
     },
@@ -79,7 +79,7 @@ export function useTraceMetadataEditing({
   );
 
   const isKeyEditable = useCallback(
-    (key: string) => traceMetadataKeyForAttribute(key) !== null,
+    (key: string) => mapAttributeToTraceMetadataKey(key) !== null,
     [],
   );
 

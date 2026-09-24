@@ -12,7 +12,7 @@ type StringRef = {
 };
 
 /** The attribute an OTLP KeyValue node names, when this node is one. */
-function otlpAttributeName(value: UnknownRecord): string | undefined {
+function extractOtlpAttributeName(value: UnknownRecord): string | undefined {
   return typeof value.key === "string" && "value" in value ? value.key : undefined;
 }
 
@@ -44,7 +44,7 @@ function collectStringRefs({
     return;
   }
   if (!isRecord(value)) return;
-  const ownName = otlpAttributeName(value) ?? attributeName;
+  const ownName = extractOtlpAttributeName(value) ?? attributeName;
   for (const [key, child] of Object.entries(value)) {
     const path = prefix ? `${prefix}.${key}` : key;
     if (key === "stringValue" && typeof child === "string") {

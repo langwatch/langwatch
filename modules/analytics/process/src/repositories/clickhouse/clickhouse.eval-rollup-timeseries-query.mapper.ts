@@ -33,7 +33,7 @@ function isEvalRollupGroupByKey(groupBy: string): groupBy is EvalRollupGroupByKe
   return groupBy === "evaluations.evaluator_type" || groupBy === "evaluations.evaluation_status";
 }
 
-function evalRollupGroupByExpression(groupBy?: string): string | null {
+function buildEvalRollupGroupByExpression(groupBy?: string): string | null {
   if (!groupBy) return null;
   if (!isEvalRollupGroupByKey(groupBy)) {
     throw new Error(
@@ -140,7 +140,7 @@ export function buildEvalRollupTimeseriesQuery(
     selectExprs.push(`${dateTrunc(`${ra}.BucketStart`, input.timeScale, timeZone)} AS date`);
   }
 
-  const groupByColumn = evalRollupGroupByExpression(input.groupBy);
+  const groupByColumn = buildEvalRollupGroupByExpression(input.groupBy);
   if (groupByColumn) {
     selectExprs.push(`${groupByColumn} AS group_key`);
   }

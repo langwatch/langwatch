@@ -71,7 +71,7 @@ export const COMMON_TEXT_KEYS = [
 export const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
 
 /** The text one known key carries directly, or nothing when it carries none. */
-function scalarText(val: unknown): string | null {
+function extractScalarText(val: unknown): string | null {
   if (typeof val === "string") return val.length > 0 ? val : null;
   if (typeof val === "number" || typeof val === "boolean") return String(val);
 
@@ -83,12 +83,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /** The first of the known text keys that carries text, directly or one level down. */
-function textFromCommonKeys(obj: Record<string, unknown>, depth: number): string | null {
+function extractTextFromCommonKeys(obj: Record<string, unknown>, depth: number): string | null {
   for (const key of COMMON_TEXT_KEYS) {
     const val = obj[key];
     if (val === undefined) continue;
 
-    const scalar = scalarText(val);
+    const scalar = extractScalarText(val);
     if (scalar !== null) return scalar;
 
     // Nested object with a known key (e.g. { inputs: { input: "hello" } })
@@ -105,7 +105,10 @@ function textFromCommonKeys(obj: Record<string, unknown>, depth: number): string
  * wrapper key like `{ data: {…} }`, `{ result: {…} }`, `{ response: {…} }`. Recursing into the
  * inner object gives the known-key scan a chance to find `content`/`answer`/`text`/… inside.
  */
-function textFromSingleKeyWrapper(obj: Record<string, unknown>, depth: number): string | null {
+function extractTextFromSingleKeyWrapper(
+  obj: Record<string, unknown>,
+  depth: number,
+): string | null {
   const entries = Object.entries(obj);
   if (entries.length !== 1) return null;
 
@@ -125,7 +128,7 @@ export function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0
     return null;
   }
 
-  const known = textFromCommonKeys(obj, depth);
+  const known = extractTextFromCommonKeys(obj, depth);
   if (known) return known;
 
   // LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
@@ -135,7 +138,7 @@ export function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0
     if (nested) return nested;
   }
 
-  return textFromSingleKeyWrapper(obj, depth);
+  return extractTextFromSingleKeyWrapper(obj, depth);
 }
 
 /**
@@ -291,7 +294,7 @@ export function normalizeChatPayload(
   return value;
 }
 
-export function messagesToText(
+export function convertMessagesToText(
   messages: unknown,
   mode: "input" | "output",
   traceCanonicalisation: TraceCanonicalisationService,
@@ -305,7 +308,7 @@ export function messagesToText(
     try {
       const parsed: unknown = JSON.parse(messages);
       if (typeof parsed === "object" && parsed !== null) {
-        return messagesToText(parsed, mode, traceCanonicalisation);
+        return convertMessagesToText(parsed, mode, traceCanonicalisation);
       }
     } catch {
       // Not JSON — return the string as-is

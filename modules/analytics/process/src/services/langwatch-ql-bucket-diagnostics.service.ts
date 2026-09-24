@@ -21,7 +21,7 @@ const MIN_BUCKETS_FOR_GAP_DETECTION = 3;
 const BUCKET_ALIGNMENT_TOLERANCE = 0.15;
 
 function timeBucketDiagnostics(input: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
-  const axis = timeBucketAxis(input);
+  const axis = deriveTimeBucketAxis(input);
   if (!axis) {
     return [];
   }
@@ -41,7 +41,7 @@ function timeBucketDiagnostics(input: LangWatchQLDiagnosticsInput): LangWatchQLD
 /**
  * The result's time axis, or nothing when the query has none.
  */
-function timeBucketAxis({
+function deriveTimeBucketAxis({
   validation,
   columns,
   rows,

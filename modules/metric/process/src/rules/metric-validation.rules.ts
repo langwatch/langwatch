@@ -3,7 +3,7 @@ import type { MetricKind } from "@langwatch/metric-contract";
 import {
   checkedInteger,
   checkedOptionalDouble,
-  finiteNumber,
+  toFiniteNumber,
   MAX_INT32,
   MAX_INT64,
   MAX_UINT32,
@@ -47,7 +47,7 @@ function validateExplicitHistogram(point: UnknownRecord): void {
   if (!Array.isArray(point.explicitBounds)) {
     throw new Error("histogram explicitBounds must be an array");
   }
-  const bounds = point.explicitBounds.map((value) => finiteNumber(value));
+  const bounds = point.explicitBounds.map((value) => toFiniteNumber(value));
   if (bounds.some((value) => value === null)) {
     throw new Error("histogram explicitBounds must contain finite numbers");
   }
@@ -127,7 +127,7 @@ function validateExponentialHistogram(point: UnknownRecord): void {
       max: "exponential histogram max",
     },
   });
-  const zeroThreshold = finiteNumber(point.zeroThreshold ?? 0);
+  const zeroThreshold = toFiniteNumber(point.zeroThreshold ?? 0);
   if (zeroThreshold === null || zeroThreshold < 0) {
     throw new Error("exponential histogram zeroThreshold must be a finite non-negative number");
   }
@@ -177,7 +177,7 @@ function validateSummary(point: UnknownRecord): void {
     min: 0n,
     max: MAX_UINT64,
   });
-  if (finiteNumber(point.sum) === null) {
+  if (toFiniteNumber(point.sum) === null) {
     throw new Error("summary sum must be a finite number");
   }
 }

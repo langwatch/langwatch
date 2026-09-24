@@ -260,7 +260,7 @@ function requestForDecompression(request: Request, bytes: Uint8Array): Request {
  * the HTTP host. The marker is stamped in-process, so a customer header cannot
  * impersonate a corrected request in the receiver's diagnostic log.
  */
-function correctedOtlpRequest(request: Request): Request | null {
+function deriveCorrectedOtlpRequest(request: Request): Request | null {
   const url = new URL(request.url);
   const originalPath = url.pathname;
   const canonicalPath = canonicalOtlpPath(originalPath);
@@ -547,7 +547,7 @@ async function handleOtlpPathAlias({
   raw: Uint8Array;
   request: Request;
 }): Promise<OtlpAnswer> {
-  const corrected = correctedOtlpRequest(request);
+  const corrected = deriveCorrectedOtlpRequest(request);
   if (!corrected) return jsonAnswer({ error: "Not Found" }, 404);
 
   switch (new URL(corrected.url).pathname) {

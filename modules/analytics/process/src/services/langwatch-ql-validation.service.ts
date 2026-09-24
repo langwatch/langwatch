@@ -19,7 +19,7 @@ import {
   sortedUnique,
 } from "../rules/langwatch-ql-policy.rules.ts";
 import {
-  positionOf,
+  extractPosition,
   reportRowLimitViolations,
   ROOT_FRAME,
   rowLimitAppend,
@@ -159,7 +159,7 @@ export class LangWatchQLValidationService {
         code: "STATEMENT_NOT_ALLOWED",
         message:
           "Only a single SELECT statement, optionally with a WITH clause, can be submitted here.",
-        at: positionOf(statement),
+        at: extractPosition(statement),
       });
     }
 

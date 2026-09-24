@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  clickHouseTypeFor,
+  toClickHouseType,
   exposedColumnName,
   postgresDatasetName,
 } from "../lwql-postgres-catalog-derivation.rules.ts";
@@ -62,31 +62,29 @@ describe("given the Postgres catalog naming helpers", () => {
 
   describe("when a Prisma type becomes a ClickHouse type", () => {
     it("maps each scalar, wraps lists and optionals, strips binary", () => {
-      expect(clickHouseTypeFor(scalarField({ type: "String" }))).toBe("String");
-      expect(clickHouseTypeFor(scalarField({ type: "Int" }))).toBe("Int32");
-      expect(clickHouseTypeFor(scalarField({ type: "BigInt" }))).toBe("Int64");
-      expect(clickHouseTypeFor(scalarField({ type: "Float" }))).toBe("Float64");
-      expect(clickHouseTypeFor(scalarField({ type: "Boolean" }))).toBe("Bool");
-      expect(clickHouseTypeFor(scalarField({ type: "DateTime" }))).toBe("DateTime64(3)");
-      expect(clickHouseTypeFor(scalarField({ type: "Json" }))).toBe("String");
-      expect(clickHouseTypeFor(scalarField({ kind: "enum", type: "MyEnum" }))).toBe("String");
+      expect(toClickHouseType(scalarField({ type: "String" }))).toBe("String");
+      expect(toClickHouseType(scalarField({ type: "Int" }))).toBe("Int32");
+      expect(toClickHouseType(scalarField({ type: "BigInt" }))).toBe("Int64");
+      expect(toClickHouseType(scalarField({ type: "Float" }))).toBe("Float64");
+      expect(toClickHouseType(scalarField({ type: "Boolean" }))).toBe("Bool");
+      expect(toClickHouseType(scalarField({ type: "DateTime" }))).toBe("DateTime64(3)");
+      expect(toClickHouseType(scalarField({ type: "Json" }))).toBe("String");
+      expect(toClickHouseType(scalarField({ kind: "enum", type: "MyEnum" }))).toBe("String");
       expect(
-        clickHouseTypeFor(
+        toClickHouseType(
           scalarField({
             type: "Decimal",
             decimal: { precision: 10, scale: 2 },
           }),
         ),
       ).toBe("Decimal(10, 2)");
-      expect(clickHouseTypeFor(scalarField({ type: "Decimal" }))).toBe("Decimal(65, 30)");
-      expect(clickHouseTypeFor(scalarField({ type: "String", isOptional: true }))).toBe(
+      expect(toClickHouseType(scalarField({ type: "Decimal" }))).toBe("Decimal(65, 30)");
+      expect(toClickHouseType(scalarField({ type: "String", isOptional: true }))).toBe(
         "Nullable(String)",
       );
-      expect(clickHouseTypeFor(scalarField({ type: "String", isList: true }))).toBe(
-        "Array(String)",
-      );
-      expect(clickHouseTypeFor(scalarField({ type: "Bytes" }))).toBeNull();
-      expect(clickHouseTypeFor(scalarField({ kind: "unsupported", type: "geo" }))).toBeNull();
+      expect(toClickHouseType(scalarField({ type: "String", isList: true }))).toBe("Array(String)");
+      expect(toClickHouseType(scalarField({ type: "Bytes" }))).toBeNull();
+      expect(toClickHouseType(scalarField({ kind: "unsupported", type: "geo" }))).toBeNull();
     });
   });
 });
