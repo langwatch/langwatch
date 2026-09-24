@@ -267,6 +267,20 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
     return app.readSampleTraces({ query: input, protections, pageSize: 10 });
   })
 
+  .procedure("getSampleTraces")
+  .withPermission("traces:view")
+  .handle(({ app, input, actor }) => {
+    const { evaluatorType, preconditions, expectedResults, ...query } = input;
+
+    return app.readPreconditionSampleTraces({
+      query,
+      viewerUserId: actor.id,
+      evaluatorType,
+      preconditions,
+      expectedResults,
+    });
+  })
+
   .procedure("getFieldNames")
   .withPermission("traces:view")
   .handle(async ({ app, input }) =>

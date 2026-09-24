@@ -219,6 +219,13 @@ export interface TraceApi extends TraceOtlpIngestApi {
     protections: unknown;
     pageSize: number;
   }): Promise<Trace[]>;
+  /**
+   * Main's `traces.getSampleTraces`: up to `expectedResults` sampled traces a check would run on,
+   * topped up with ones it would not while fewer than ten pass.
+   */
+  readPreconditionSampleTraces(
+    input: TracePreconditionSampleInput,
+  ): Promise<(Trace & { passesPreconditions: boolean })[]>;
   readForViewer(input: {
     projectId: string;
     userId: string;
@@ -607,5 +614,14 @@ export interface TraceApi extends TraceOtlpIngestApi {
     projectIds: string[];
   }): Promise<{ projectId: string; count: number }[]>;
 }
+
+/** `preconditions` is evaluator's to parse; this contract cannot name its schema. */
+export type TracePreconditionSampleInput = {
+  query: TraceLegacyListInput;
+  viewerUserId: string;
+  evaluatorType: string;
+  preconditions: unknown;
+  expectedResults: number;
+};
 
 export const TraceApi = moduleApi<TraceApi>()("trace");

@@ -173,11 +173,8 @@ export class EvaluatorService {
 
   async createWithDefaults(input: EvaluatorCreateInput): Promise<Evaluator> {
     const config = evaluatorConfigSchema.parse(input.config);
-    const evaluatorConfig = evaluatorConfigSchema.safeParse(config);
     const evaluatorType =
-      evaluatorConfig.success && typeof evaluatorConfig.data.evaluatorType === "string"
-        ? evaluatorConfig.data.evaluatorType
-        : undefined;
+      typeof config.evaluatorType === "string" ? config.evaluatorType : undefined;
     const definition = evaluatorType
       ? AVAILABLE_EVALUATORS[evaluatorType as keyof typeof AVAILABLE_EVALUATORS]
       : undefined;

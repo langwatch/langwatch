@@ -8,6 +8,7 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -43,6 +44,7 @@ export const traceDependencies = {
   dataRetention: DataRetentionApi,
   plans: EntitlementApi,
   evaluations: EvaluationApi,
+  evaluators: EvaluatorApi,
   experiments: ExperimentApi,
   featureFlags: FeatureFlagApi,
   instantEvals: InstantEvalApi,

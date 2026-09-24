@@ -128,6 +128,7 @@ import {
   traceConfig,
   TraceIdAmbiguousError,
   TraceNotFoundError,
+  type TracePreconditionSampleInput,
 } from "@langwatch/trace-contract";
 import {
   buildParsedTurns,
@@ -180,6 +181,7 @@ import type { TraceIngestCredentialService } from "../services/trace-ingest-cred
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import { TraceProcessingPipelineService } from "../services/trace-processing-pipeline.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
@@ -677,6 +679,10 @@ export class TraceApp implements TraceApi, CollectorApp {
       projects: input.dependencies.projects,
       usageCount: input.repositories.usageCount,
     });
+    app.#preconditionSamples = TracePreconditionSampleService.create({
+      traces: app,
+      evaluators: input.dependencies.evaluators,
+    });
     const tokenizer = tokenCounterChannels.live.create(input.config.tokenizer);
     input.resources.own("Trace tokenizer", () => tokenizer.close());
     app.#processing = TraceProcessingPipelineService.create({
@@ -696,6 +702,16 @@ export class TraceApp implements TraceApi, CollectorApp {
   #processing: TraceProcessingPipelineService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
+  #preconditionSamples: TracePreconditionSampleService | null = null;
+
+  readPreconditionSampleTraces(
+    input: TracePreconditionSampleInput,
+  ): Promise<(Trace & { passesPreconditions: boolean })[]> {
+    if (!this.#preconditionSamples) {
+      throw new TraceCapabilityUnavailableError("this process", "the precondition sample");
+    }
+    return this.#preconditionSamples.readSample(input);
+  }
 
   async countTracesByProjects(input: {
     organizationId: string;

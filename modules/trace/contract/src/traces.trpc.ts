@@ -213,6 +213,20 @@ export const tracesTrpc = defineTrpcContract("traces")
   .withInput(z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape }))
   .withOutput(traceSchema.array())
 
+  // Loose where main named evaluator's schemas: evaluator-contract depends on this package.
+  .query("getSampleTraces")
+  .withInput(
+    z.object({
+      ...traceFilterInputSchema.shape,
+      ...sampleExtrasSchema.shape,
+      query: z.string().optional(),
+      evaluatorType: z.string(),
+      preconditions: z.array(z.unknown()),
+      expectedResults: z.number(),
+    }),
+  )
+  .withOutput(z.object({ ...traceSchema.shape, passesPreconditions: z.boolean() }).array())
+
   .query("getFieldNames")
   .withInput(z.object({ projectId: z.string(), startDate: z.number(), endDate: z.number() }))
   .withOutput(distinctFieldNamesResultSchema)

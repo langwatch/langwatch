@@ -32,16 +32,20 @@ import {
   type ResolvedEvaluatorExecution,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import { checkPreconditionsSchema } from "@langwatch/evaluator-contract/evaluation-types";
+import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
 import { EvaluatorGraphAdapter } from "../repositories/prisma/prisma.evaluator-graph.repository.ts";
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
+import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
@@ -561,6 +565,29 @@ export class EvaluatorApp implements EvaluatorApi {
 
     return evaluatorPlatformUrl({ publicBaseUrl: this.#dependencies.publicBaseUrl, ...input });
   }
+
+  /** Main accepted a catalogue or a `custom/` evaluator and refused any other as invalid input. */
+  async findTraceIdsPassingPreconditions(input: {
+    evaluatorType: string;
+    preconditions: unknown;
+    traces: readonly Trace[];
+  }): Promise<string[]> {
+    const { evaluatorType, traces } = input;
+    if (
+      !Object.hasOwn(AVAILABLE_EVALUATORS, evaluatorType) &&
+      !evaluatorType.startsWith("custom/")
+    ) {
+      throw new ValidationError("The evaluator type names no known evaluator");
+    }
+    const preconditions = checkPreconditionsSchema.safeParse(input.preconditions);
+    if (!preconditions.success) throw new ValidationError("A precondition is not valid");
+
+    return findTraceIdsPassingPreconditions({
+      evaluatorType,
+      preconditions: preconditions.data,
+      traces,
+    });
+  }
 }
 
 /** Whether the evaluator type's own settings declare an embeddings model. */
@@ -576,7 +603,7 @@ function usesEmbeddingsModel(config: EvaluatorConfig): boolean {
 
 /** Code evaluators carry their program on `config`; nothing else can run one. */
 function assertCodeEvaluatorConfig(evaluatorId: string, config: unknown): void {
-  if (codeEvaluatorConfigSchema.safeParse(config).success) return;
+  if (codeEvaluatorConfigSchema.validate(config)) return;
 
   throw new EvaluatorInvalidConfigError(evaluatorId);
 }

@@ -37,6 +37,7 @@ export {
   type TraceAnnotationCommands,
   type TraceAnnotationMarker,
   type TraceMessagesSide,
+  type TracePreconditionSampleInput,
   type TraceRenderedSpanMessages,
   type TraceSuggestionTarget,
   type TraceUsageCount,

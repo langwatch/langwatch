@@ -21,15 +21,15 @@ describe("given Zod schemas are the single source of truth", () => {
 
     /** @scenario The collector validates an incoming trace against the span schema */
     it("accepts a well-formed span and rejects one missing required fields", () => {
-      expect(langWatchSpanSchema.safeParse(validSpan).success).toBe(true);
-      expect(collectorRESTParamsSchema.safeParse({ spans: [validSpan] }).success).toBe(true);
+      expect(langWatchSpanSchema.validate(validSpan)).toBe(true);
+      expect(collectorRESTParamsSchema.validate({ spans: [validSpan] })).toBe(true);
       // span_id is required
       expect(
-        langWatchSpanSchema.safeParse({
+        langWatchSpanSchema.validate({
           trace_id: "t1",
           type: "span",
           timestamps: { started_at: 1, finished_at: 2 },
-        }).success,
+        }),
       ).toBe(false);
     });
 
@@ -41,12 +41,12 @@ describe("given Zod schemas are the single source of truth", () => {
           { type: "list", value: [{ type: "json", value: { x: 1 } }] },
         ],
       };
-      expect(spanInputOutputSchema.safeParse(nested).success).toBe(true);
+      expect(spanInputOutputSchema.validate(nested)).toBe(true);
       expect(
-        spanInputOutputSchema.safeParse({
+        spanInputOutputSchema.validate({
           type: "list",
           value: [{ type: "not-a-real-type" }],
-        }).success,
+        }),
       ).toBe(false);
     });
   });
@@ -84,9 +84,9 @@ describe("given Zod schemas are the single source of truth", () => {
     });
 
     it("accepts catalog and custom evaluator type identifiers", () => {
-      expect(evaluatorTypesSchema.safeParse("langevals/basic").success).toBe(true);
-      expect(evaluatorTypesSchema.safeParse("custom/my_eval").success).toBe(true);
-      expect(evaluatorTypesSchema.safeParse(123).success).toBe(false);
+      expect(evaluatorTypesSchema.validate("langevals/basic")).toBe(true);
+      expect(evaluatorTypesSchema.validate("custom/my_eval")).toBe(true);
+      expect(evaluatorTypesSchema.validate(123)).toBe(false);
     });
   });
 

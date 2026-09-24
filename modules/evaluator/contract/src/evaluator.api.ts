@@ -4,6 +4,7 @@
  * here binds both; callers arrive as `actorId`, never a session.
  */
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Trace } from "@langwatch/trace-contract";
 
 import type { CodeEvaluatorExecutionInput } from "./code-evaluator.ts";
 import type { EvaluatorIdOrSlugInput, ResolvedEvaluatorExecution } from "./evaluator-execution.ts";
@@ -140,6 +141,15 @@ export interface EvaluatorApi {
    * static with no request-scoped builder, so the app composes the link.
    */
   platformUrl(input: { projectSlug: string; path: string }): string;
+  /**
+   * The ids of the traces a check would run on: its required fields present and every
+   * precondition passing. `preconditions` is parsed here, as the caller cannot name its schema.
+   */
+  findTraceIdsPassingPreconditions(input: {
+    evaluatorType: string;
+    preconditions: unknown;
+    traces: readonly Trace[];
+  }): Promise<string[]>;
 }
 
 export const EvaluatorApi = moduleApi<EvaluatorApi>()("evaluator");

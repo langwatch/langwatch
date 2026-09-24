@@ -6,7 +6,6 @@
 import {
   EvaluatorNotFoundError,
   EvaluatorWorkflowVersionRequiredError,
-  evaluatorTypeSchema,
   newEvaluatorId,
   type Evaluator,
 } from "@langwatch/evaluator-contract";
@@ -89,7 +88,7 @@ export class EvaluatorReplicationService {
         id: copyId,
         projectId: targetProjectId,
         name: source.name,
-        type: evaluatorTypeSchema.parse(source.type),
+        type: source.type,
         config: source.config === null ? {} : (source.config as Record<string, unknown>),
         workflowId: newWorkflowId ?? undefined,
         copiedFromEvaluatorId: source.id,
