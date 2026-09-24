@@ -24,6 +24,7 @@ import {
   type RoleBindingScopeType,
 } from "@langwatch/organization-contract";
 import type { RoleApi } from "@langwatch/role-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {
   OrganizationInviteMail,
@@ -230,7 +231,8 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   }): Promise<number> {
     const invite = this.invitesById.get(inviteId);
     const notExpired =
-      invite?.expiration === null || (invite?.expiration ?? new Date(0)) > new Date();
+      invite?.expiration === null ||
+      (invite?.expiration?.epochMilliseconds ?? 0) > nowInstant().epochMilliseconds;
     if (!invite) return 0;
     const matches = invite.organizationId === organizationId && invite.inviteCode === inviteCode;
     if (!matches || invite.status !== "PENDING" || !notExpired) {
@@ -296,8 +298,8 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
       subscriptionId: null,
       acceptedByUserId: null,
       acceptedViaIdentifierId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: nowInstant(),
+      updatedAt: nowInstant(),
     };
     this.invitesById.set(invite.id, invite);
 
@@ -321,8 +323,8 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
       subscriptionId: input.subscriptionId,
       acceptedByUserId: null,
       acceptedViaIdentifierId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: nowInstant(),
+      updatedAt: nowInstant(),
     };
     this.invitesById.set(invite.id, invite);
 
@@ -356,7 +358,7 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   }: {
     inviteId: string;
     organizationId: string;
-    expiration: Date;
+    expiration: Instant;
   }): Promise<OrganizationInvite> {
     const invite = this.invitesById.get(inviteId);
     if (!invite || invite.organizationId !== organizationId) {
@@ -430,7 +432,7 @@ export class FakeOrganizationInviteRepository implements OrganizationInviteRepos
   }: {
     inviteId: string;
     organizationId: string;
-    expiration: Date;
+    expiration: Instant;
   }): Promise<number> {
     const invite = this.invitesById.get(inviteId);
     if (!invite || invite.organizationId !== organizationId || invite.status !== "PENDING") {
@@ -514,8 +516,8 @@ export function makeOrganization(overrides: Partial<Organization> = {}): Organiz
     name: "Acme",
     phoneNumber: null,
     slug: "acme",
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: nowInstant(),
+    updatedAt: nowInstant(),
     usageSpendingMaxLimit: null,
     maxSessionDurationDays: 30,
     mfaRequired: false,
@@ -550,7 +552,7 @@ export function makeInvite(overrides: Partial<OrganizationInvite> = {}): Organiz
     id: "invite-seed-1",
     email: "sam@acme.com",
     inviteCode: "code-seed-1",
-    expiration: new Date(Date.now() + 86_400_000),
+    expiration: nowInstant().add({ milliseconds: 86_400_000 }),
     status: "PENDING",
     organizationId: "org-1",
     teamIds: "team-1",
@@ -560,8 +562,8 @@ export function makeInvite(overrides: Partial<OrganizationInvite> = {}): Organiz
     subscriptionId: null,
     acceptedByUserId: null,
     acceptedViaIdentifierId: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: nowInstant(),
+    updatedAt: nowInstant(),
     ...overrides,
   } as OrganizationInvite;
 }

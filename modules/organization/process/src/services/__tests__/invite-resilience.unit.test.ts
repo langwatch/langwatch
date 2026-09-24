@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { InviteNotFoundError } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
@@ -17,6 +18,11 @@ const ledger = {
   revokeBindingsWhere: vi.fn(),
 };
 
+const ROW_TIMESTAMPS = {
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+};
+
 function makePendingInvite(overrides: Record<string, unknown> = {}) {
   return {
     id: "inv-race-1",
@@ -30,6 +36,7 @@ function makePendingInvite(overrides: Record<string, unknown> = {}) {
     role: "MEMBER",
     requestedBy: "user-inviter",
     subscriptionId: null,
+    ...ROW_TIMESTAMPS,
     ...overrides,
   } as any;
 }
@@ -187,7 +194,7 @@ describe("InviteService resilience", () => {
       mockPrisma.organizationInvite.findFirst.mockResolvedValue({
         ...makePendingInvite(),
         expiration: new Date(Date.now() - 1000),
-        organization: { id: "org-1", name: "Acme" },
+        organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
       });
     });
 
@@ -222,7 +229,9 @@ describe("InviteService resilience", () => {
           }),
         );
         expect(invite.inviteCode).not.toBe("code-race-1");
-        expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now() + 13 * 24 * 60 * 60 * 1000);
+        expect(invite.expiration!.epochMilliseconds).toBeGreaterThan(
+          Date.now() + 13 * 24 * 60 * 60 * 1000,
+        );
       });
 
       it("loses quietly when another admin's resend claimed the row first", async () => {
@@ -242,7 +251,7 @@ describe("InviteService resilience", () => {
         mockPrisma.organizationInvite.findFirst.mockResolvedValue({
           ...makePendingInvite(),
           status: "REVOKED",
-          organization: { id: "org-1", name: "Acme" },
+          organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
         });
 
         await expect(
@@ -261,7 +270,7 @@ describe("InviteService resilience", () => {
       mockPrisma.organizationInvite.findFirst.mockResolvedValue({
         ...makePendingInvite(),
         expiration: new Date(Date.now() - 1000),
-        organization: { id: "org-1", name: "Acme" },
+        organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
       });
     });
 
@@ -284,7 +293,9 @@ describe("InviteService resilience", () => {
           data: { expiration: expect.any(Date) },
         });
         expect(invite.inviteCode).toBe("code-race-1");
-        expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now() + 13 * 24 * 60 * 60 * 1000);
+        expect(invite.expiration!.epochMilliseconds).toBeGreaterThan(
+          Date.now() + 13 * 24 * 60 * 60 * 1000,
+        );
       });
 
       it("loses quietly when the invite stopped being pending under it", async () => {
@@ -304,7 +315,7 @@ describe("InviteService resilience", () => {
         mockPrisma.organizationInvite.findFirst.mockResolvedValue({
           ...makePendingInvite(),
           status: "REVOKED",
-          organization: { id: "org-1", name: "Acme" },
+          organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
         });
 
         await expect(
@@ -325,7 +336,7 @@ describe("InviteService resilience", () => {
         mockPrisma.organizationInvite.findFirst.mockResolvedValue({
           ...makePendingInvite(),
           expiration: new Date(Date.now() - 1000),
-          organization: { id: "org-1", name: "Acme" },
+          organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
         });
         mockPrisma.organizationInvite.updateMany.mockResolvedValueOnce({ count: 1 });
 
@@ -357,7 +368,7 @@ describe("InviteService resilience", () => {
   describe("given the states a person sees", () => {
     describe("when an invitation's expiry has passed", () => {
       it("derives EXPIRED from a PENDING row past its expiration", () => {
-        const past = new Date(Date.now() - 1000);
+        const past = nowInstant().subtract({ milliseconds: 1000 });
         expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: past })).toBe("EXPIRED");
       });
 
@@ -372,12 +383,12 @@ describe("InviteService resilience", () => {
 
         expect(invites).toHaveLength(1);
         expect(invites[0]!.displayStatus).toBe("EXPIRED");
-        expect(invites[0]!.expiration).toEqual(past);
+        expect(invites[0]!.expiration?.epochMilliseconds).toBe(past.getTime());
       });
 
       it("leaves every other state alone", () => {
-        const past = new Date(Date.now() - 1000);
-        const future = new Date(Date.now() + 1000);
+        const past = nowInstant().subtract({ milliseconds: 1000 });
+        const future = nowInstant().add({ milliseconds: 1000 });
         expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: future })).toBe(
           "PENDING",
         );

@@ -113,10 +113,6 @@ import { UserApi } from "@langwatch/user-contract";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
-import {
-  organizationMemberDatesFromDate,
-  organizationProvisioningSummaryFromDate,
-} from "../rules/organization-time-boundary.rules.ts";
 import type { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
@@ -658,23 +654,14 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     offset?: number;
     limit?: number;
   }): Promise<{ members: OrganizationRestMemberSummary[]; totalCount: number }> {
-    return this.#dependencies.membership.listMembers(input).then((result) => ({
-      ...result,
-      members: result.members.map((member) => ({
-        ...member,
-        ...organizationMemberDatesFromDate(member),
-      })),
-    }));
+    return this.#dependencies.membership.listMembers(input);
   }
 
   getMember(input: {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationRestMemberSummary & { teams: OrganizationRestMemberTeamBinding[] }> {
-    return this.#dependencies.membership.getMember(input).then((member) => ({
-      ...member,
-      ...organizationMemberDatesFromDate(member),
-    }));
+    return this.#dependencies.membership.getMember(input);
   }
 
   createForProvisioning(input: { name: string; slug?: string }): Promise<{
@@ -685,17 +672,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
-    return this.#dependencies.membership
-      .listProvisioningSummaries()
-      .then((summaries) => summaries.map(organizationProvisioningSummaryFromDate));
+    return this.#dependencies.membership.listProvisioningSummaries();
   }
 
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null> {
-    return this.#dependencies.membership
-      .findProvisioningSummary(organizationId)
-      .then((summary) =>
-        summary === null ? null : organizationProvisioningSummaryFromDate(summary),
-      );
+    return this.#dependencies.membership.findProvisioningSummary(organizationId);
   }
 
   getMemberAccessBreakdown(

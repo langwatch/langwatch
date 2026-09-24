@@ -5,8 +5,20 @@ import type { AuthzDeclaration } from "@langwatch/authz-contract";
 import {
   OrganizationApi,
   organizationTrpc,
+  type CustomRole,
+  type EnrichedAuditLog,
+  type FullyLoadedOrganization,
+  type Organization,
+  type OrganizationAuditLogPage,
   type OrganizationCaller,
+  type OrganizationUser,
+  type OrganizationWithMembersAndTheirTeams,
+  type ProjectRow,
+  type Team,
+  type TeamUser,
+  type User,
 } from "@langwatch/organization-contract";
+import { toDate } from "@langwatch/time";
 import { z } from "zod";
 
 /** The signed-in person as the process's session carries them, beside their id. */
@@ -100,7 +112,9 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .withFacts(organizationSessionPersonFact)
   .noPermission(BEFORE_MEMBERSHIP)
   .handle(({ app, input, actor }, person) =>
-    app.listVisibleOrganizations({ isDemo: input?.isDemo ?? false }, callerOf(actor, person)),
+    app
+      .listVisibleOrganizations({ isDemo: input?.isDemo ?? false }, callerOf(actor, person))
+      .then((organizations) => organizations.map(fullyLoadedOrganizationOnWire)),
   )
 
   .procedure("update")
@@ -133,13 +147,15 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:view")
   .handle(({ app, input, actor }, person) =>
-    app.getOrganizationWithMembersForPicker(
-      {
-        organizationId: input.organizationId,
-        includeDeactivated: input.includeDeactivated ?? false,
-      },
-      callerOf(actor, person),
-    ),
+    app
+      .getOrganizationWithMembersForPicker(
+        {
+          organizationId: input.organizationId,
+          includeDeactivated: input.includeDeactivated ?? false,
+        },
+        callerOf(actor, person),
+      )
+      .then(organizationWithMembersOnWire),
   )
 
   /**
@@ -149,7 +165,9 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .procedure("getMemberById")
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:manage")
-  .handle(({ app, input, actor }, person) => app.getMemberOrRefuse(input, callerOf(actor, person)))
+  .handle(({ app, input, actor }, person) =>
+    app.getMemberOrRefuse(input, callerOf(actor, person)).then(memberWithUserOnWire),
+  )
 
   /** Bounded by the organization's own membership, never a caller-supplied id list. */
   .procedure("getMemberProvenance")
@@ -209,7 +227,11 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
    */
   .procedure("getAllOrganizationMembers")
   .withPermission("organization:manage")
-  .handle(({ app, input }) => app.getAllMembers({ organizationId: input.organizationId }))
+  .handle(({ app, input }) =>
+    app
+      .getAllMembers({ organizationId: input.organizationId })
+      .then((users) => users.map(userOnWire)),
+  )
 
   .procedure("updateMemberRole")
   .withFacts(organizationSessionPersonFact)
@@ -239,5 +261,118 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .procedure("getAuditLogs")
   .withFacts(organizationSessionPersonFact)
   .withPermission(AUDIT_LOG_VIEW)
-  .handle(({ app, input, actor }, person) => app.readAuditLogs(input, callerOf(actor, person)))
+  .handle(({ app, input, actor }, person) =>
+    app.readAuditLogs(input, callerOf(actor, person)).then(auditLogPageOnWire),
+  )
   .build();
+
+function userOnWire(user: User) {
+  return {
+    ...user,
+    createdAt: toDate(user.createdAt),
+    updatedAt: toDate(user.updatedAt),
+    lastLoginAt: user.lastLoginAt && toDate(user.lastLoginAt),
+    deactivatedAt: user.deactivatedAt && toDate(user.deactivatedAt),
+    tracesExplorerTourDismissedAt:
+      user.tracesExplorerTourDismissedAt && toDate(user.tracesExplorerTourDismissedAt),
+    passkeyNudgeDismissedAt: user.passkeyNudgeDismissedAt && toDate(user.passkeyNudgeDismissedAt),
+  };
+}
+
+function auditLogPageOnWire(page: {
+  auditLogs: EnrichedAuditLog[];
+  totalCount: number;
+}): OrganizationAuditLogPage {
+  return {
+    ...page,
+    auditLogs: page.auditLogs.map((log) => ({ ...log, createdAt: toDate(log.createdAt) })),
+  };
+}
+
+function organizationOnWire(organization: Organization) {
+  return {
+    ...organization,
+    createdAt: toDate(organization.createdAt),
+    updatedAt: toDate(organization.updatedAt),
+    sentPlanLimitAlert: organization.sentPlanLimitAlert && toDate(organization.sentPlanLimitAlert),
+    licenseExpiresAt: organization.licenseExpiresAt && toDate(organization.licenseExpiresAt),
+    licenseLastValidatedAt:
+      organization.licenseLastValidatedAt && toDate(organization.licenseLastValidatedAt),
+  };
+}
+
+function organizationUserOnWire(member: OrganizationUser) {
+  return {
+    ...member,
+    createdAt: toDate(member.createdAt),
+    updatedAt: toDate(member.updatedAt),
+    disabledAt: member.disabledAt && toDate(member.disabledAt),
+  };
+}
+
+function teamOnWire(team: Team) {
+  return {
+    ...team,
+    createdAt: toDate(team.createdAt),
+    updatedAt: toDate(team.updatedAt),
+    archivedAt: team.archivedAt && toDate(team.archivedAt),
+  };
+}
+
+function teamUserOnWire(membership: TeamUser & { assignedRole?: CustomRole | null }) {
+  return {
+    ...membership,
+    createdAt: toDate(membership.createdAt),
+    updatedAt: toDate(membership.updatedAt),
+    assignedRole: membership.assignedRole && {
+      ...membership.assignedRole,
+      createdAt: toDate(membership.assignedRole.createdAt),
+      updatedAt: toDate(membership.assignedRole.updatedAt),
+    },
+  };
+}
+
+function projectOnWire(project: ProjectRow) {
+  return {
+    ...project,
+    createdAt: toDate(project.createdAt),
+    updatedAt: toDate(project.updatedAt),
+    archivedAt: project.archivedAt && toDate(project.archivedAt),
+    lastCodingAgentSessionAt:
+      project.lastCodingAgentSessionAt && toDate(project.lastCodingAgentSessionAt),
+    lastCodingAgentPullRequestAt:
+      project.lastCodingAgentPullRequestAt && toDate(project.lastCodingAgentPullRequestAt),
+  };
+}
+
+function fullyLoadedOrganizationOnWire(organization: FullyLoadedOrganization) {
+  return {
+    ...organizationOnWire(organization),
+    members: organization.members.map(organizationUserOnWire),
+    teams: organization.teams.map((team) => ({
+      ...teamOnWire(team),
+      projects: team.projects.map(projectOnWire),
+      members: team.members.map(teamUserOnWire),
+    })),
+  };
+}
+
+function memberWithUserOnWire(member: OrganizationWithMembersAndTheirTeams["members"][number]) {
+  return {
+    ...organizationUserOnWire(member),
+    user: {
+      ...userOnWire(member.user),
+      teamMemberships: member.user.teamMemberships.map((membership) => ({
+        ...teamUserOnWire(membership),
+        team: teamOnWire(membership.team),
+      })),
+    },
+  };
+}
+
+function organizationWithMembersOnWire(organization: OrganizationWithMembersAndTheirTeams) {
+  return {
+    ...organizationOnWire(organization),
+    members: organization.members.map(memberWithUserOnWire),
+  };
+}

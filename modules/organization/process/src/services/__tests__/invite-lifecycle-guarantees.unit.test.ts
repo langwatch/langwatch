@@ -1,4 +1,5 @@
 import { InviteThrottledError } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 /**
  * @see modules/organization/specs/invitations.feature
  * Two guarantees `InviteLifecycleService` makes outside the accept path itself: a re-request
@@ -33,7 +34,7 @@ describe("given an invitation already sent its fill of re-requests for this wind
         makeInvite({
           id: "invite-expired",
           inviteCode: "code-expired",
-          expiration: new Date(Date.now() + 1000),
+          expiration: nowInstant().add({ milliseconds: 1000 }),
         }),
       );
       invites.seedOrganization(makeOrganization());
@@ -101,7 +102,7 @@ describe("given two PAYMENT_PENDING invites bought on the same subscription", ()
       for (const invite of approved) {
         expect(invite.status).toBe("PENDING");
         expect(invite.expiration).not.toBeNull();
-        expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now());
+        expect(invite.expiration!.epochMilliseconds).toBeGreaterThan(Date.now());
       }
       expect(mail.sentInvites.map((sent) => sent.email).toSorted()).toEqual([
         "a@acme.com",

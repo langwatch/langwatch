@@ -18,7 +18,7 @@ import {
   type OrganizationInvite,
   type OrganizationUser,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 import type { OrganizationInviteMail } from "../app/organization.members.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
@@ -214,7 +214,7 @@ export class InviteCreationService {
     return this.invites.createPendingInvite({
       email: input.email,
       inviteCode: generate(INVITE_CODE_KSUID_RESOURCE).toString(),
-      expiration: toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS })),
+      expiration: nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS }),
       organizationId: input.organizationId,
       teamIds: input.teamIds,
       ...(input.teamAssignments && input.teamAssignments.length > 0

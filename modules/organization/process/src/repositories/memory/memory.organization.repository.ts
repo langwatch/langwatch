@@ -50,7 +50,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   }): Promise<OrganizationUsageCount> {
     const joined = this.memory.organizationUsers
       .filter((row) => organizationIds.includes(row.organizationId))
-      .map((row) => row.createdAt.getTime())
+      .map((row) => row.createdAt.epochMilliseconds)
       .toSorted((left, right) => left - right);
     const second = joined[1];
     return {
@@ -62,7 +62,13 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
 
   async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
     const organization = this.memory.organizations.get(organizationId);
-    return organization ? { ...organization } : null;
+    return organization
+      ? {
+          ...organization,
+          createdAt: toDate(organization.createdAt),
+          updatedAt: toDate(organization.updatedAt),
+        }
+      : null;
   }
 
   async getJoinSetting({
@@ -156,12 +162,12 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
       organization.s3SecretAccessKey = input.s3SecretAccessKey;
     }
     if (input.s3Bucket !== undefined) organization.s3Bucket = input.s3Bucket || null;
-    organization.updatedAt = toDate(nowInstant());
+    organization.updatedAt = nowInstant();
   }
 
   async getOldestTeamId(organizationId: string): Promise<string> {
     const oldest = this.teamsOf(organizationId).toSorted(
-      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+      (a, b) => a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds,
     )[0];
     if (!oldest) throw new OrganizationHasNoTeamError(organizationId);
     return oldest.id;
@@ -210,7 +216,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
 
     const displayLabel =
       input.workspace.displayName?.trim() || input.workspace.displayEmail?.split("@")[0] || "user";
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     const team: MemoryTeamRow = {
       id: input.resources.teamId,
       name: `${displayLabel}'s Workspace`,
@@ -301,14 +307,14 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
         id: team.id,
         name: team.name,
         slug: team.slug,
-        createdAtMs: team.createdAt.getTime(),
+        createdAtMs: team.createdAt.epochMilliseconds,
       },
       project: {
         id: project.id,
         name: project.name,
         slug: project.slug,
         apiKey: project.apiKey,
-        createdAtMs: project.createdAt.getTime(),
+        createdAtMs: project.createdAt.epochMilliseconds,
       },
     };
   }

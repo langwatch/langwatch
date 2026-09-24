@@ -14,12 +14,14 @@ import {
   type OrganizationApiCreateInvitationsInput,
   type OrganizationApiInviteScope,
   type OrganizationCaller,
+  type OrganizationInvite,
   type OrganizationInviteAccepted,
   type OrganizationInviteCreated,
   type OrganizationInviteResent,
   type OrganizationListedInvite,
   type OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
+import { toDate } from "@langwatch/time";
 
 import type {
   OrganizationInvitations,
@@ -84,6 +86,7 @@ export class OrganizationInvitationDoorService {
     const created = await this.#createOrRefuse(input);
     const withUrls = created.invites.map((record) => ({
       ...record,
+      invite: inviteOnWire(record.invite),
       inviteUrl: this.deps.invitations.acceptUrl(record.invite.inviteCode),
     }));
 
@@ -122,11 +125,16 @@ export class OrganizationInvitationDoorService {
 
     const { invite, emailNotSent } = await this.deps.invitations.resend(input);
 
-    return { invite, emailNotSent, inviteUrl: this.deps.invitations.acceptUrl(invite.inviteCode) };
+    return {
+      invite: inviteOnWire(invite),
+      emailNotSent,
+      inviteUrl: this.deps.invitations.acceptUrl(invite.inviteCode),
+    };
   }
 
   async list(input: Readonly<{ organizationId: string }>): Promise<OrganizationListedInvite[]> {
-    return [...(await this.deps.invitations.list(input))];
+    const invites = await this.deps.invitations.list(input);
+    return invites.map((invite) => ({ ...invite, ...inviteOnWire(invite) }));
   }
 
   /**
@@ -202,7 +210,7 @@ export class OrganizationInvitationDoorService {
 
     return {
       success: true,
-      invite,
+      invite: { ...invite, ...inviteOnWire(invite) },
       project: projectSlug ? { slug: projectSlug } : null,
     } as OrganizationInviteAccepted;
   }
@@ -320,4 +328,13 @@ function extractSeatLimit(
   }
 
   return { limitType: meta.limitType, current: meta.current, max: meta.max };
+}
+
+function inviteOnWire(invite: OrganizationInvite): OrganizationInviteCreated["invite"] {
+  return {
+    ...invite,
+    expiration: invite.expiration === null ? null : toDate(invite.expiration),
+    createdAt: toDate(invite.createdAt),
+    updatedAt: toDate(invite.updatedAt),
+  };
 }

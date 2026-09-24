@@ -17,11 +17,11 @@ import {
   OrganizationNotFoundError,
   OrganizationSlugTakenError,
 } from "@langwatch/organization-contract";
+import type { User } from "@langwatch/organization-contract";
 import type {
   Organization,
   OrganizationIntent,
   PrismaClient,
-  User,
 } from "@langwatch/prisma-client/generated";
 import {
   OrganizationUserRole,
@@ -29,8 +29,18 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 
 import { PrismaEffectiveTeamAdminsRepository } from "./prisma.effective-team-admins.repository.ts";
+import {
+  customRoleFromRecord,
+  organizationFromRecord,
+  organizationUserFromRecord,
+  projectFromRecord,
+  teamFromRecord,
+  teamUserFromRecord,
+  userFromRecord,
+} from "./prisma.organization.mapper.ts";
 import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
 
 /** The two shared read helpers this repository leans on. Stateless; the client rides each call. */
@@ -468,10 +478,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
-    return this.prisma.organization.findMany({
+    const organizations = await this.prisma.organization.findMany({
       select: { id: true, name: true, slug: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });
+    return organizations.map((organization) => ({
+      ...organization,
+      createdAt: fromDate(organization.createdAt),
+    }));
   }
 
   async markSelfHostedCustomer(organizationId: string): Promise<void> {
@@ -549,7 +563,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       select: { id: true, name: true, slug: true, createdAt: true },
     });
     if (organization === null) throw new OrganizationNotFoundError(organizationId);
-    return organization;
+    return { ...organization, createdAt: fromDate(organization.createdAt) };
   }
 
   async findAllForUser(params: {
@@ -560,7 +574,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }): Promise<FullyLoadedOrganization[]> {
     const { userId, isDemo, demoProjectId } = params;
 
-    return this.prisma.organization.findMany({
+    const organizations = await this.prisma.organization.findMany({
       where: {
         OR: [
           ...(isDemo
@@ -619,7 +633,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           },
         },
       },
-    }) as Promise<FullyLoadedOrganization[]>;
+    });
+    return organizations.map(fullyLoadedOrganizationFromRecord);
   }
 
   async findOrganizationWithMembers(params: {
@@ -629,7 +644,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }): Promise<OrganizationWithMembersAndTheirTeams | null> {
     const { organizationId, userId, includeDeactivated } = params;
 
-    return this.prisma.organization.findFirst({
+    const organization = await this.prisma.organization.findFirst({
       where: {
         id: organizationId,
         // The caller must hold an active membership to see the organization.
@@ -661,7 +676,13 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           },
         },
       },
-    }) as Promise<OrganizationWithMembersAndTheirTeams | null>;
+    });
+    if (organization === null) return null;
+    const { members, ...record } = organization;
+    return {
+      ...organizationFromRecord(record),
+      members: members.map(memberWithUserFromRecord),
+    };
   }
 
   async findMemberById(params: {
@@ -683,7 +704,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       return null;
     }
 
-    return this.prisma.organizationUser.findFirst({
+    const member = await this.prisma.organizationUser.findFirst({
       where: {
         organizationId,
         userId,
@@ -701,7 +722,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           },
         },
       },
-    }) as Promise<OrganizationMemberWithUser | null>;
+    });
+    return member === null ? null : memberWithUserFromRecord(member);
   }
 
   async findMemberUserIds({ organizationId }: { organizationId: string }): Promise<string[]> {
@@ -729,7 +751,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async findActiveMemberUsers(organizationId: string): Promise<User[]> {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: {
         deactivatedAt: null,
         orgMemberships: {
@@ -740,6 +762,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         },
       },
     });
+    return users.map(userFromRecord);
   }
 
   async getMembership(params: {
@@ -760,7 +783,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       },
     });
     if (!membership) throw new MemberNotFoundError(userId);
-    return membership;
+    return memberSummaryFromRecord(membership);
   }
 
   async findActiveAdministratorIds(params: { organizationId: string }): Promise<string[]> {
@@ -807,7 +830,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       this.prisma.organizationUser.count({ where }),
     ]);
 
-    return { members, totalCount };
+    return { members: members.map(memberSummaryFromRecord), totalCount };
   }
 
   async findMemberTeamBindings(params: {
@@ -1710,7 +1733,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       const isGateway = log.action.startsWith("gateway.");
       return {
         id: log.id,
-        createdAt: log.createdAt,
+        createdAt: fromDate(log.createdAt),
         userId: log.userId,
         organizationId: log.organizationId,
         projectId: log.projectId,
@@ -1732,4 +1755,71 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
     return { auditLogs, totalCount };
   }
+}
+
+type MemberWithUserRecord = Prisma.OrganizationUserGetPayload<{
+  include: {
+    user: { include: { teamMemberships: { include: { team: true; assignedRole: true } } } };
+  };
+}>;
+
+function memberWithUserFromRecord({
+  user: { teamMemberships, ...user },
+  ...member
+}: MemberWithUserRecord): OrganizationMemberWithUser {
+  return {
+    ...organizationUserFromRecord(member),
+    user: {
+      ...userFromRecord(user),
+      teamMemberships: teamMemberships.map(({ team, assignedRole, ...membership }) => ({
+        ...teamUserFromRecord(membership),
+        team: teamFromRecord(team),
+        assignedRole: assignedRole === null ? null : customRoleFromRecord(assignedRole),
+      })),
+    },
+  };
+}
+
+type FullyLoadedOrganizationRecord = Prisma.OrganizationGetPayload<{
+  include: {
+    members: true;
+    teams: { include: { members: { include: { assignedRole: true } }; projects: true } };
+  };
+}>;
+
+function fullyLoadedOrganizationFromRecord({
+  members,
+  teams,
+  ...organization
+}: FullyLoadedOrganizationRecord): FullyLoadedOrganization {
+  return {
+    ...organizationFromRecord(organization),
+    members: members.map(organizationUserFromRecord),
+    teams: teams.map(({ members: teamMembers, projects, ...team }) => ({
+      ...teamFromRecord(team),
+      projects: projects.map(projectFromRecord),
+      members: teamMembers.map(({ assignedRole, ...teamMember }) => ({
+        ...teamUserFromRecord(teamMember),
+        assignedRole: assignedRole === null ? null : customRoleFromRecord(assignedRole),
+      })),
+    })),
+  };
+}
+
+type MemberSummaryRecord = Omit<
+  OrganizationMemberSummary,
+  "disabledAt" | "createdAt" | "updatedAt"
+> & {
+  disabledAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function memberSummaryFromRecord(record: MemberSummaryRecord): OrganizationMemberSummary {
+  return {
+    ...record,
+    disabledAt: record.disabledAt && fromDate(record.disabledAt),
+    createdAt: fromDate(record.createdAt),
+    updatedAt: fromDate(record.updatedAt),
+  };
 }

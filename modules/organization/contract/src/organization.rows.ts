@@ -3,6 +3,8 @@
  * no port, service or transport names the generated client. Each mirrors
  * `packages/prisma-client/prisma/schema.prisma` and moves with it.
  */
+import type { Instant } from "@langwatch/time";
+
 import type { OrganizationIntent } from "./organization.ts";
 
 /** A Json column's value, mirroring the generated client's own shape. */
@@ -59,8 +61,8 @@ export type Organization = {
   name: string;
   phoneNumber: string | null;
   slug: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
   usageSpendingMaxLimit: number | null;
   maxSessionDurationDays: number;
   mfaRequired: boolean;
@@ -74,7 +76,7 @@ export type Organization = {
   s3SecretAccessKey: string | null;
   s3Bucket: string | null;
   useCustomS3: boolean;
-  sentPlanLimitAlert: Date | null;
+  sentPlanLimitAlert: Instant | null;
   ssoDomain: string | null;
   ssoProvider: string | null;
   domainJoin: string;
@@ -88,15 +90,15 @@ export type Organization = {
   currency: OrganizationCurrency;
   pricingModel: PricingModel;
   license: string | null;
-  licenseExpiresAt: Date | null;
-  licenseLastValidatedAt: Date | null;
+  licenseExpiresAt: Instant | null;
+  licenseLastValidatedAt: Instant | null;
 };
 
 export type OrganizationInvite = {
   id: string;
   email: string;
   inviteCode: string;
-  expiration: Date | null;
+  expiration: Instant | null;
   status: InviteStatus;
   organizationId: string;
   teamIds: string;
@@ -106,18 +108,18 @@ export type OrganizationInvite = {
   subscriptionId: string | null;
   acceptedByUserId: string | null;
   acceptedViaIdentifierId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 };
 
 export type OrganizationUser = {
   userId: string;
   organizationId: string;
   role: OrganizationUserRole;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
   departmentId: string | null;
-  disabledAt: Date | null;
+  disabledAt: Instant | null;
 };
 
 export type User = {
@@ -129,13 +131,13 @@ export type User = {
   pendingSsoSetup: boolean;
   userHashKey: string | null;
   twoFactorEnabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  lastLoginAt: Date | null;
-  deactivatedAt: Date | null;
+  createdAt: Instant;
+  updatedAt: Instant;
+  lastLoginAt: Instant | null;
+  deactivatedAt: Instant | null;
   lastHomePath: string | null;
-  tracesExplorerTourDismissedAt: Date | null;
-  passkeyNudgeDismissedAt: Date | null;
+  tracesExplorerTourDismissedAt: Instant | null;
+  passkeyNudgeDismissedAt: Instant | null;
 };
 
 export type Team = {
@@ -143,9 +145,9 @@ export type Team = {
   name: string;
   slug: string;
   organizationId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  archivedAt: Date | null;
+  createdAt: Instant;
+  updatedAt: Instant;
+  archivedAt: Instant | null;
   isPersonal: boolean;
   ownerUserId: string | null;
   departmentId: string | null;
@@ -156,8 +158,8 @@ export type TeamUser = {
   teamId: string;
   role: TeamUserRole;
   assignedRoleId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 };
 
 export type CustomRole = {
@@ -167,8 +169,8 @@ export type CustomRole = {
   description: string | null;
   permissions: OrganizationJsonValue;
   kind: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 };
 
 export type ProjectRow = {
@@ -183,8 +185,8 @@ export type ProjectRow = {
   kind: string;
   firstMessage: boolean;
   integrated: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
   userLinkTemplate: string | null;
   traceSharingEnabled: boolean;
   presenceEnabled: boolean;
@@ -192,12 +194,12 @@ export type ProjectRow = {
   s3AccessKeyId: string | null;
   s3SecretAccessKey: string | null;
   s3Bucket: string | null;
-  archivedAt: Date | null;
+  archivedAt: Instant | null;
   isPersonal: boolean;
   ownerUserId: string | null;
   personalFeatures: OrganizationJsonValue;
   departmentId: string | null;
   langyEgressAllowlist: OrganizationJsonValue | null;
-  lastCodingAgentSessionAt: Date | null;
-  lastCodingAgentPullRequestAt: Date | null;
+  lastCodingAgentSessionAt: Instant | null;
+  lastCodingAgentPullRequestAt: Instant | null;
 };

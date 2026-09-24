@@ -19,8 +19,8 @@ function toGroup(row: MemoryGroupRow): OrganizationGroup {
     slug: row.slug,
     externalId: row.externalId,
     scimSource: row.scimSource,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
   };
 }
 
@@ -119,7 +119,7 @@ export class MemoryGroupRepository extends GroupRepository {
     slug: string;
     memberIds: string[];
   }): Promise<OrganizationGroup> {
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     const row: MemoryGroupRow = {
       id: input.groupId,
       organizationId: input.organizationId,
@@ -145,7 +145,7 @@ export class MemoryGroupRepository extends GroupRepository {
     if (!row) throw new GroupNotFoundError(input.groupId);
     row.name = input.name;
     row.slug = input.slug;
-    row.updatedAt = toDate(nowInstant());
+    row.updatedAt = nowInstant();
     return toGroup(row);
   }
 
@@ -201,7 +201,7 @@ export class MemoryGroupRepository extends GroupRepository {
     }
     for (const userId of input.memberUserIdsToRemove) row.memberIds.delete(userId);
     for (const userId of input.memberUserIdsToAdd) row.memberIds.add(userId);
-    row.updatedAt = toDate(nowInstant());
+    row.updatedAt = nowInstant();
   }
 
   private groupsOf(organizationId: string): MemoryGroupRow[] {

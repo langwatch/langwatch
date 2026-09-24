@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 export const organizationIdSchema = z.string().min(1);
@@ -104,7 +105,7 @@ export type ClaimOrganizationBillingCustomerInput = z.infer<
 /** Audit log row with resolved actor and project; nullable userId for system actors. */
 export type EnrichedAuditLog = {
   id: string;
-  createdAt: Date;
+  createdAt: Instant;
   /** Nullable to support system-actor writes (background jobs, migrations). */
   userId: string | null;
   organizationId: string | null;

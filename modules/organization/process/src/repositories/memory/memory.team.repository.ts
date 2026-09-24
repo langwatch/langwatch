@@ -6,13 +6,18 @@ import {
   type OrganizationTeam,
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import { TeamRepository } from "../team.repository.ts";
 import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
 
 function toOrganizationTeam(row: MemoryTeamRow): OrganizationTeam {
-  return { ...row };
+  return {
+    ...row,
+    archivedAt: row.archivedAt === null ? null : toDate(row.archivedAt),
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
+  };
 }
 
 /** In-memory `TeamRepository`, for tests and a memory-backed boot. */
@@ -55,7 +60,7 @@ export class MemoryTeamRepository extends TeamRepository {
     limit: number;
   }): Promise<OrganizationTeamPage> {
     const all = this.activeTeamsOf(input.organizationId).toSorted(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      (a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds,
     );
     const start = (input.page - 1) * input.limit;
     return {
@@ -87,7 +92,7 @@ export class MemoryTeamRepository extends TeamRepository {
       (row) => row.slug === input.slug,
     );
     if (duplicate) throw new TeamSlugConflictError();
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     const team: MemoryTeamRow = {
       id: input.teamId,
       name: input.name,
@@ -112,7 +117,7 @@ export class MemoryTeamRepository extends TeamRepository {
     const row = this.memory.teams.get(team.id);
     if (!row) throw new TeamNotFoundError(input.teamId);
     if (input.name !== undefined) row.name = input.name;
-    row.updatedAt = toDate(nowInstant());
+    row.updatedAt = nowInstant();
     return toOrganizationTeam(row);
   }
 
@@ -120,7 +125,7 @@ export class MemoryTeamRepository extends TeamRepository {
     const team = await this.get(input);
     const row = this.memory.teams.get(team.id);
     if (!row) throw new TeamNotFoundError(input.teamId);
-    row.archivedAt = toDate(nowInstant());
+    row.archivedAt = nowInstant();
     return toOrganizationTeam(row);
   }
 
@@ -180,18 +185,18 @@ export class MemoryTeamRepository extends TeamRepository {
   async fenceMembershipChange(input: {
     teamId: string;
     organizationId: string;
-    expectedUpdatedAt: OrganizationTeam["updatedAt"];
+    expectedUpdatedAt: Instant;
     name?: string;
   }): Promise<OrganizationTeam> {
     const row = this.memory.teams.get(input.teamId);
     if (!row || row.organizationId !== input.organizationId || row.archivedAt) {
       throw new TeamNotFoundError(input.teamId);
     }
-    if (row.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()) {
+    if (row.updatedAt.epochMilliseconds !== input.expectedUpdatedAt.epochMilliseconds) {
       throw new TeamMembershipChangedError(input.teamId);
     }
     if (input.name !== undefined) row.name = input.name;
-    row.updatedAt = toDate(nowInstant());
+    row.updatedAt = nowInstant();
     return toOrganizationTeam(row);
   }
 

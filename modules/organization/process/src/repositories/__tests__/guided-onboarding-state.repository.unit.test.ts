@@ -1,5 +1,6 @@
 import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryOrganizationDatabase } from "../memory/memory.organization.database.ts";
@@ -17,7 +18,7 @@ let database: MemoryOrganizationDatabase;
 let repository: MemoryOrganizationRepository;
 
 function seedOrganization(signupData?: Record<string, unknown>): void {
-  const now = new Date();
+  const now = nowInstant();
   database.organizations.set(ORGANIZATION_ID, {
     id: ORGANIZATION_ID,
     name: "Acme",

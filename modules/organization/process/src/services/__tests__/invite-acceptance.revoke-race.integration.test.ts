@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { raceOnOneRow } from "../../repositories/prisma/__tests__/support/row-lock-race.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+import { inviteFromRecord } from "../../repositories/prisma/prisma.organization.mapper.ts";
 import type { InviteServiceDependencies } from "../../rules/invite-contracts.rules.ts";
 import { InviteAcceptanceService } from "../invite-acceptance.service.ts";
 
@@ -58,16 +59,18 @@ describe.skipIf(!DB_URL)("accepting an invitation on Postgres", () => {
   describe("given a pending invitation an admin revokes as the invitee accepts it", () => {
     /** @scenario "A revocation landing during an acceptance stands" */
     it("refuses the acceptance and writes no membership, because the claim re-reads the row it waited for", async () => {
-      const invite: OrganizationInvite = await prisma.organizationInvite.create({
-        data: {
-          email: `invitee-${ns}@acme.test`,
-          inviteCode: `code-${ns}`,
-          organizationId,
-          teamIds: "",
-          role: "MEMBER",
-          expiration: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
-      });
+      const invite: OrganizationInvite = inviteFromRecord(
+        await prisma.organizationInvite.create({
+          data: {
+            email: `invitee-${ns}@acme.test`,
+            inviteCode: `code-${ns}`,
+            organizationId,
+            teamIds: "",
+            role: "MEMBER",
+            expiration: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        }),
+      );
 
       const answers = await raceOnOneRow<string>({
         prisma,

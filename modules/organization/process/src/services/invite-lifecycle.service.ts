@@ -10,7 +10,7 @@ import {
   OrganizationNotFoundError,
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 import type { OrganizationInviteMail } from "../app/organization.members.ts";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
@@ -68,7 +68,7 @@ export class InviteLifecycleService {
     }
 
     const freshCode = generate(INVITE_CODE_KSUID_RESOURCE).toString();
-    const freshExpiration = toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS }));
+    const freshExpiration = nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS });
     const claimed = await this.invites.rotateInviteCode({
       inviteId: existing.id,
       organizationId,
@@ -117,7 +117,7 @@ export class InviteLifecycleService {
       throw new InviteNotFoundError("Invitation not found");
     }
 
-    const freshExpiration = toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS }));
+    const freshExpiration = nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS });
     const claimed = await this.invites.extendInviteExpiration({
       inviteId: existing.id,
       organizationId,
@@ -261,7 +261,7 @@ export class InviteLifecycleService {
       const updatedInvite = await this.invites.approvePaymentPendingInvite({
         inviteId: invite.id,
         organizationId,
-        expiration: toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS })),
+        expiration: nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS }),
       });
 
       if (invite.organization) {

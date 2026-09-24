@@ -7,6 +7,7 @@ import {
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
 
 import { TeamRepository } from "../team.repository.ts";
 
@@ -231,7 +232,7 @@ export class PrismaTeamRepository extends TeamRepository {
   async fenceMembershipChange(input: {
     teamId: string;
     organizationId: string;
-    expectedUpdatedAt: Date;
+    expectedUpdatedAt: Instant;
     name?: string;
     removeLegacyUserId?: string;
   }): Promise<OrganizationTeam> {
@@ -246,7 +247,7 @@ export class PrismaTeamRepository extends TeamRepository {
           id: input.teamId,
           organizationId: input.organizationId,
           archivedAt: null,
-          updatedAt: input.expectedUpdatedAt,
+          updatedAt: toDate(input.expectedUpdatedAt),
         },
         data: {
           ...(input.name === undefined ? {} : { name: input.name }),

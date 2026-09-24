@@ -5,6 +5,7 @@ import type {
   PersonalFeatures,
   TeamUserRole,
 } from "@langwatch/organization-contract";
+import type { Instant } from "@langwatch/time";
 
 /** One organization row, the fields the organization repository owns. */
 export interface MemoryOrganizationRow {
@@ -26,8 +27,8 @@ export interface MemoryOrganizationRow {
   /** How colleagues on a matching domain get in; absent reads as asking. */
   domainJoin?: JoinRequestJoining["domainJoin"];
   joinDomains?: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 /** One team row, personal or shared. */
@@ -38,9 +39,9 @@ export interface MemoryTeamRow {
   organizationId: string;
   isPersonal: boolean;
   ownerUserId: string | null;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  archivedAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 /** One organization-level membership row. */
@@ -48,9 +49,9 @@ export interface MemoryOrganizationUserRow {
   userId: string;
   organizationId: string;
   role: OrganizationUserRole;
-  disabledAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  disabledAt: Instant | null;
+  createdAt: Instant;
+  updatedAt: Instant;
   /** The grant intent an unfinished automatic admission is resumed from. */
   pendingSsoGrantId?: string | null;
 }
@@ -60,7 +61,7 @@ export interface MemoryUserRow {
   id: string;
   name: string | null;
   email: string | null;
-  deactivatedAt: Date | null;
+  deactivatedAt: Instant | null;
 }
 
 /** One team-scoped membership row (the `TeamUser` join table). */
@@ -69,8 +70,8 @@ export interface MemoryTeamUserRow {
   userId: string;
   role: TeamUserRole;
   customRoleId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 /** One custom role, the fields a seat's assignability check reads. */
@@ -85,7 +86,7 @@ export interface MemoryCustomRoleRow {
 /** One audit-trail entry, platform or gateway shaped (ADR consolidated). */
 export interface MemoryAuditLogRow {
   id: string;
-  createdAt: Date;
+  createdAt: Instant;
   userId: string | null;
   organizationId: string | null;
   projectId: string | null;
@@ -111,8 +112,8 @@ export interface MemoryProjectRow {
   isPersonal: boolean;
   ownerUserId: string | null;
   organizationId: string | null;
-  archivedAt: Date | null;
-  createdAt: Date;
+  archivedAt: Instant | null;
+  createdAt: Instant;
   personalFeatures: PersonalFeatures | null;
 }
 
@@ -125,8 +126,8 @@ export interface MemoryGroupRow {
   externalId: string | null;
   scimSource: string | null;
   memberIds: Set<string>;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 /**

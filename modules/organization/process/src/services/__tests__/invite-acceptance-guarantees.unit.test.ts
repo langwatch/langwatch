@@ -1,4 +1,5 @@
 import { InviteNotFoundError, InviteNotReadyError } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 /**
  * @see modules/organization/specs/invitations.feature
  * The four guarantees `InviteAcceptanceService.applyInvite` makes about what an accepted
@@ -115,7 +116,7 @@ describe("given an invitation whose expiry has already passed", () => {
       const grants = new FakeAuthzGrantsService();
       const invite = makeInvite({
         id: "invite-expired",
-        expiration: new Date(Date.now() - 1000),
+        expiration: nowInstant().subtract({ milliseconds: 1000 }),
       });
       invites.seedInvite(invite);
       const service = InviteAcceptanceService.create(makeInviteDeps({ invites, grants }));

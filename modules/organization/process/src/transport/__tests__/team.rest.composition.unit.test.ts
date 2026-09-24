@@ -1,10 +1,11 @@
+import type { Project } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * The `/api/teams` family against the real composed application, not a
  * stub — the prior version lost its only caller silently and every
  * operation 404'd for a stretch. Spec: specs/teams/teams-rest-api.feature
  */
-import type { Project } from "@langwatch/project-contract";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { ServerOrganizationApp } from "../../app/organization.app.ts";
@@ -45,7 +46,7 @@ const PERSONAL_TEAM_ID = "team_personal";
 const ARCHIVED_TEAM_ID = "team_archived";
 const COLLEAGUE_ID = "user-colleague";
 const OUTSIDER_ID = "user-outsider";
-const NOW = new Date("2026-09-01T00:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-09-01T00:00:00.000Z");
 
 const passthroughSecrets: OrganizationSettingsSecret = {
   encrypt: (value) => value,
@@ -85,7 +86,7 @@ function teamRow(
     organizationId: string;
     isPersonal: boolean;
     ownerUserId: string | null;
-    archivedAt: Date | null;
+    archivedAt: Instant | null;
   }> = {},
 ) {
   return {
@@ -116,8 +117,8 @@ function projectRow(overrides: Partial<Project> = {}): Project {
     kind: "application",
     firstMessage: false,
     integrated: false,
-    createdAt: NOW,
-    updatedAt: NOW,
+    createdAt: toDate(NOW),
+    updatedAt: toDate(NOW),
     userLinkTemplate: null,
     traceSharingEnabled: false,
     presenceEnabled: false,
@@ -188,7 +189,7 @@ function application() {
       id: ARCHIVED_TEAM_ID,
       name: "Retired Team",
       slug: "retired-team",
-      archivedAt: new Date("2026-08-01T00:00:00.000Z"),
+      archivedAt: Temporal.Instant.from("2026-08-01T00:00:00.000Z"),
     }),
   );
 
@@ -419,6 +420,8 @@ describe("given the teams REST family over the application the composition build
         id: SHARED_TEAM_ID,
         name: "Shared Team",
         organizationId: ORGANIZATION_ID,
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
       });
     });
 

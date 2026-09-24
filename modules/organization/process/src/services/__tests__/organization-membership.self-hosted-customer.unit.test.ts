@@ -1,4 +1,5 @@
 /** Spec: specs/self-hosting/connected-services/license-registry.feature */
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -127,8 +128,8 @@ describe("OrganizationMembershipService.findRepresentatives", () => {
         organizationId: acme.id,
         role: "MEMBER" as const,
         disabledAt: null,
-        createdAt: new Date(at),
-        updatedAt: new Date(at),
+        createdAt: Temporal.Instant.from(at),
+        updatedAt: Temporal.Instant.from(at),
       });
       memory.organizationUsers.push(
         joined("user-late", "2026-03-01T00:00:00Z"),

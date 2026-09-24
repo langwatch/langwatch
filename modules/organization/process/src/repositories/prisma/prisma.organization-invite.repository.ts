@@ -4,10 +4,10 @@ import type {
   OrganizationInvite,
   OrganizationUser,
   OrganizationUserRole,
-  Prisma,
-  PrismaClient,
   RoleBindingScopeType,
-} from "@langwatch/prisma-client/generated";
+} from "@langwatch/organization-contract";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
 
 import {
   OrganizationInviteRepository,
@@ -15,6 +15,11 @@ import {
   type InviteWithRequester,
   type WriteInviteInput,
 } from "../organization-invite.repository.ts";
+import {
+  inviteFromRecord,
+  organizationFromRecord,
+  organizationUserFromRecord,
+} from "./prisma.organization.mapper.ts";
 import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
 
 /** A root client, or the transaction-scoped client `$transaction` hands back. */
@@ -119,7 +124,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
     if (organization === null) throw new OrganizationNotFoundError();
 
-    return organization;
+    return organizationFromRecord(organization);
   }
 
   async getOrganizationWithMembers({
@@ -133,7 +138,10 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
     if (organization === null) throw new OrganizationNotFoundError();
 
-    return organization;
+    return {
+      ...organizationFromRecord(organization),
+      members: organization.members.map(organizationUserFromRecord),
+    };
   }
 
   findPersonalTeamsInScopes({
@@ -147,12 +155,12 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
   }
 
-  createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite> {
-    return this.prisma.organizationInvite.create({
+  async createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite> {
+    const invite = await this.prisma.organizationInvite.create({
       data: {
         email: input.email,
         inviteCode: input.inviteCode,
-        expiration: input.expiration,
+        expiration: input.expiration && toDate(input.expiration),
         organizationId: input.organizationId,
         teamIds: input.teamIds,
         teamAssignments: toInviteJson(input.teamAssignments),
@@ -160,16 +168,18 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         status: "PENDING",
       },
     });
+
+    return inviteFromRecord(invite);
   }
 
-  createPaymentPendingInvite(
+  async createPaymentPendingInvite(
     input: WriteInviteInput & { subscriptionId: string },
   ): Promise<OrganizationInvite> {
-    return this.prisma.organizationInvite.create({
+    const invite = await this.prisma.organizationInvite.create({
       data: {
         email: input.email,
         inviteCode: input.inviteCode,
-        expiration: input.expiration,
+        expiration: input.expiration && toDate(input.expiration),
         organizationId: input.organizationId,
         teamIds: input.teamIds,
         teamAssignments: toInviteJson(input.teamAssignments),
@@ -178,18 +188,25 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         subscriptionId: input.subscriptionId,
       },
     });
+
+    return inviteFromRecord(invite);
   }
 
-  findListableInvites({
+  async findListableInvites({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<InviteWithRequester[]> {
-    return this.prisma.organizationInvite.findMany({
+    const invites = await this.prisma.organizationInvite.findMany({
       where: { organizationId, status: { in: ["PENDING", "REVOKED"] } },
       include: { requestedByUser: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: "desc" },
     });
+
+    return invites.map(({ requestedByUser, ...invite }) => ({
+      ...inviteFromRecord(invite),
+      requestedByUser,
+    }));
   }
 
   /**
@@ -227,7 +244,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
     if (invite === null) throw new InviteNotFoundError("Invitation not found");
 
-    return invite;
+    return inviteWithOrganizationFromRecord(invite);
   }
 
   async rotateInviteCode({
@@ -241,7 +258,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
     expectedInviteCode: string;
     inviteCode: string;
-    expiration: Date;
+    expiration: Instant;
   }): Promise<number> {
     const { count } = await this.prisma.organizationInvite.updateMany({
       where: {
@@ -250,7 +267,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
         status: "PENDING",
         inviteCode: expectedInviteCode,
       },
-      data: { inviteCode, expiration },
+      data: { inviteCode, expiration: toDate(expiration) },
     });
 
     return count;
@@ -263,11 +280,11 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
   }: {
     inviteId: string;
     organizationId: string;
-    expiration: Date;
+    expiration: Instant;
   }): Promise<number> {
     const { count } = await this.prisma.organizationInvite.updateMany({
       where: { id: inviteId, organizationId, status: "PENDING" },
-      data: { expiration },
+      data: { expiration: toDate(expiration) },
     });
 
     return count;
@@ -284,7 +301,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
     if (invite === null) throw new InviteNotFoundError("Invitation not found");
 
-    return invite;
+    return inviteWithOrganizationFromRecord(invite);
   }
 
   async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
@@ -337,7 +354,7 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     });
     if (invite === null) throw new InviteNotFoundError();
 
-    return invite;
+    return inviteFromRecord(invite);
   }
 
   async claimInviteForAcceptance({
@@ -408,31 +425,47 @@ export class PrismaOrganizationInviteRepository extends OrganizationInviteReposi
     return membership != null;
   }
 
-  findPaymentPendingInvites({
+  async findPaymentPendingInvites({
     subscriptionId,
     organizationId,
   }: {
     subscriptionId: string;
     organizationId: string;
   }): Promise<InviteWithOrganization[]> {
-    return this.prisma.organizationInvite.findMany({
+    const invites = await this.prisma.organizationInvite.findMany({
       where: { subscriptionId, organizationId, status: "PAYMENT_PENDING" },
       include: { organization: true },
     });
+
+    return invites.map(inviteWithOrganizationFromRecord);
   }
 
-  approvePaymentPendingInvite({
+  async approvePaymentPendingInvite({
     inviteId,
     organizationId,
     expiration,
   }: {
     inviteId: string;
     organizationId: string;
-    expiration: Date;
+    expiration: Instant;
   }): Promise<OrganizationInvite> {
-    return this.prisma.organizationInvite.update({
+    const invite = await this.prisma.organizationInvite.update({
       where: { id: inviteId, organizationId },
-      data: { status: "PENDING", expiration },
+      data: { status: "PENDING", expiration: toDate(expiration) },
     });
+
+    return inviteFromRecord(invite);
   }
+}
+
+function inviteWithOrganizationFromRecord({
+  organization,
+  ...invite
+}: Prisma.OrganizationInviteGetPayload<{
+  include: { organization: true };
+}>): InviteWithOrganization {
+  return {
+    ...inviteFromRecord(invite),
+    organization: organization === null ? null : organizationFromRecord(organization),
+  };
 }

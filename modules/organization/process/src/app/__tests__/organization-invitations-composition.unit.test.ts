@@ -6,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { InviteNotFoundError, type OrganizationInvite } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -71,8 +72,8 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
         subscriptionId: null,
         acceptedByUserId: null,
         acceptedViaIdentifierId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: nowInstant(),
+        updatedAt: nowInstant(),
       };
       invites.set(invite.id, invite);
 

@@ -11,10 +11,22 @@ import { InviteService } from "../invite.service.ts";
 
 const ORGANIZATION_ID = "organization-1";
 
+const ROW_TIMESTAMPS = {
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+};
+
 function serviceWithInviteWriter() {
   const createPendingInvite = vi.fn(async () => ({ id: "invite-1" }));
   const prisma = {
-    organization: { findFirst: vi.fn(async () => ({ id: ORGANIZATION_ID, name: "Acme" })) },
+    organization: {
+      findFirst: vi.fn(async () => ({
+        id: ORGANIZATION_ID,
+        name: "Acme",
+        members: [],
+        ...ROW_TIMESTAMPS,
+      })),
+    },
     organizationInvite: { create: createPendingInvite },
   };
   const invites = PrismaOrganizationInviteRepository.create({ database: prisma as never });

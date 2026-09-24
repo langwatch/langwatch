@@ -295,7 +295,11 @@ export interface OrganizationInvitations {
   resend(
     input: Readonly<{ organizationId: string; inviteId: string }>,
   ): Promise<Readonly<{ invite: OrganizationInvite; emailNotSent: boolean }>>;
-  list(input: Readonly<{ organizationId: string }>): Promise<readonly OrganizationListedInvite[]>;
+  list(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<
+    readonly (OrganizationInvite & Omit<OrganizationListedInvite, keyof OrganizationInvite>)[]
+  >;
   findByCode(
     input: Readonly<{ inviteCode: string }>,
   ): Promise<OrganizationInviteWithOrganization | null>;

@@ -1,8 +1,9 @@
+import { MemberNotFoundError } from "@langwatch/organization-contract";
+import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 /**
  * The membership half's rules, over doubled ports.
  */
-import { MemberNotFoundError } from "@langwatch/organization-contract";
-import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
+import { nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -328,8 +329,8 @@ describe("OrganizationMembershipService", () => {
       organizationId: "org-123",
       role: OrganizationUserRole.MEMBER,
       disabledAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: nowInstant(),
+      updatedAt: nowInstant(),
       user: { id: "user-456", name: "Member", email: "member@example.com" },
     };
 
@@ -435,8 +436,8 @@ describe("OrganizationMembershipService", () => {
         organizationId: "org-123",
         role: OrganizationUserRole.MEMBER,
         disabledAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: nowInstant(),
+        updatedAt: nowInstant(),
         user: { id: "user-456", name: null, email: null },
       };
 
@@ -461,7 +462,7 @@ describe("OrganizationMembershipService", () => {
       it("revokes nothing when the seat is given back", async () => {
         vi.mocked(mockRepo.getMembership).mockResolvedValue({
           ...activeMember,
-          disabledAt: new Date("2026-08-01T00:00:00Z"),
+          disabledAt: Temporal.Instant.from("2026-08-01T00:00:00Z"),
         });
         mockCheckLimit.mockResolvedValue({
           allowed: true,
@@ -520,8 +521,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
           disabledAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
           user: { id: "user-456", name: null, email: null },
         });
 
@@ -543,9 +544,9 @@ describe("OrganizationMembershipService", () => {
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
-          disabledAt: new Date("2026-08-01T00:00:00Z"),
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          disabledAt: Temporal.Instant.from("2026-08-01T00:00:00Z"),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
           user: { id: "user-456", name: null, email: null },
         });
         mockCheckLimit.mockResolvedValue({
@@ -573,8 +574,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
           disabledAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
           user: { id: "user-456", name: null, email: null },
         });
 
@@ -604,9 +605,9 @@ describe("OrganizationMembershipService", () => {
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
-          disabledAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          disabledAt: nowInstant(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
           user: { id: "user-456", name: null, email: null },
         });
         mockCheckLimit.mockResolvedValue({
@@ -636,9 +637,9 @@ describe("OrganizationMembershipService", () => {
           userId: "user-456",
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
-          disabledAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          disabledAt: nowInstant(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
           user: { id: "user-456", name: null, email: null },
         });
         mockCheckLimit.mockResolvedValue({
@@ -682,8 +683,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           role: OrganizationUserRole.MEMBER,
           disabledAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
           user: { id: "user-456", name: "Member", email: "m@example.com" },
         });
         vi.mocked(mockRepo.findMemberTeamBindings).mockResolvedValue([

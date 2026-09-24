@@ -24,7 +24,7 @@ export function resolveInviteDisplayStatus(
   if (
     invite.status === "PENDING" &&
     invite.expiration !== null &&
-    invite.expiration.getTime() <= nowMs
+    invite.expiration.epochMilliseconds <= nowMs
   ) {
     return "EXPIRED";
   }

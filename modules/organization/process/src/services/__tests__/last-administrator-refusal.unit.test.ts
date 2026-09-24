@@ -1,9 +1,10 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import { OrganizationUserRole } from "@langwatch/organization-contract";
 /**
  * The one lockout nothing inside the product can undo: a directory that
  * deprovisions the last administrator who can sign in.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { OrganizationUserRole } from "@langwatch/organization-contract";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type {
@@ -22,7 +23,7 @@ let memory: MemoryOrganizationDatabase;
 let service: OrganizationMembershipService;
 
 function seedMember(userId: string, role: OrganizationUserRole, disabled = false): void {
-  const now = new Date(0);
+  const now = Temporal.Instant.fromEpochMilliseconds(0);
   memory.organizationUsers.push({
     userId,
     organizationId: ORGANIZATION,

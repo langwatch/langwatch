@@ -13,7 +13,7 @@ import {
   type TeamUserRole,
   type User,
 } from "@langwatch/organization-contract";
-import { nowInstant, Temporal, toDate } from "@langwatch/time";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 import type {
   AuditLogFilters,
@@ -91,8 +91,8 @@ function toUser(row: MemoryUserRow): User {
     pendingSsoSetup: false,
     userHashKey: null,
     twoFactorEnabled: false,
-    createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
-    updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
+    createdAt: Temporal.Instant.fromEpochMilliseconds(0),
+    updatedAt: Temporal.Instant.fromEpochMilliseconds(0),
     lastLoginAt: null,
     deactivatedAt: row.deactivatedAt,
     lastHomePath: null,
@@ -137,7 +137,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (this.findOrganizationBySlug(input.orgSlug)) {
       throw new OrganizationSlugTakenError(input.orgSlug);
     }
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     this.memory.organizations.set(input.orgId, {
       id: input.orgId,
       name: input.orgName,
@@ -187,7 +187,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (this.findOrganizationBySlug(input.orgSlug)) {
       throw new OrganizationSlugTakenError(input.orgSlug);
     }
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     this.memory.organizations.set(input.orgId, {
       id: input.orgId,
       name: input.orgName,
@@ -219,7 +219,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
 
   async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return [...this.memory.organizations.values()]
-      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
       .map((organization) => ({
         id: organization.id,
         name: organization.name,
@@ -261,7 +261,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const organization = this.memory.organizations.get(organizationId);
     const [oldest] = this.memory.organizationUsers
       .filter((row) => row.organizationId === organizationId)
-      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+      .toSorted(
+        (left, right) => left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds,
+      );
     if (!organization || !oldest) return [];
     return [{ userId: oldest.userId, organizationName: organization.name }];
   }
@@ -427,7 +429,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const { organizationId, userId, pendingAdmissionId } = input;
     if (this.membershipRow({ organizationId, userId })) return "already-present";
 
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     this.memory.organizationUsers.push({
       userId,
       organizationId,
@@ -460,7 +462,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       ...this.memory.teamUsers.filter((candidate) => candidate.userId !== userId),
     );
 
-    const archivedAt = toDate(nowInstant());
+    const archivedAt = nowInstant();
     for (const team of this.teamsOf(organizationId)) {
       if (team.ownerUserId !== userId || !team.isPersonal || team.archivedAt) continue;
       team.archivedAt = archivedAt;
@@ -477,8 +479,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       const activeAdmins = this.activeAdminCount(input.organizationId);
       if (activeAdmins <= 1) throw new CannotDisableLastAdminError();
     }
-    row.disabledAt = input.disabled ? toDate(nowInstant()) : null;
-    row.updatedAt = toDate(nowInstant());
+    row.disabledAt = input.disabled ? nowInstant() : null;
+    row.updatedAt = nowInstant();
   }
 
   async findPersonalTeamsInScopes(params: {
@@ -544,7 +546,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       }
     }
     row.role = role;
-    row.updatedAt = toDate(nowInstant());
+    row.updatedAt = nowInstant();
 
     const teamsLeftWithoutAdmin: { id: string; name: string }[] = [];
     for (const update of effectiveTeamRoleUpdates) {
@@ -554,7 +556,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       if (!teamUser) continue;
       teamUser.role = update.role as TeamUserRole;
       teamUser.customRoleId = update.customRoleId ?? null;
-      teamUser.updatedAt = toDate(nowInstant());
+      teamUser.updatedAt = nowInstant();
     }
 
     if (this.activeAdminCount(organizationId, { includeDisabled: true }) === 0) {
@@ -574,7 +576,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (!teamUser) throw new MemberNotFoundError(userId);
     teamUser.role = (customRoleId ? "CUSTOM" : role) as TeamUserRole;
     teamUser.customRoleId = customRoleId ?? null;
-    teamUser.updatedAt = toDate(nowInstant());
+    teamUser.updatedAt = nowInstant();
   }
 
   async getAuditLogs(
@@ -587,7 +589,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .filter((row) => !filters.action || row.action.includes(filters.action))
       .filter((row) => !filters.targetKind || row.targetKind === filters.targetKind)
       .filter((row) => !filters.targetId || row.targetId === filters.targetId)
-      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds);
     const page = rows.slice(filters.pageOffset, filters.pageOffset + filters.pageSize);
 
     return {
@@ -639,9 +641,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
-    disabledAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
+    disabledAt: Instant | null;
+    createdAt: Instant;
+    updatedAt: Instant;
   }): OrganizationMemberSummary {
     const user = this.userRow(row.userId);
     return {
@@ -659,9 +661,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
-    disabledAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
+    disabledAt: Instant | null;
+    createdAt: Instant;
+    updatedAt: Instant;
   }): OrganizationMemberWithUser {
     const user = toUser(this.userRow(row.userId));
     const teamMemberships = this.memory.teamUsers
@@ -734,9 +736,9 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     userId: string;
     organizationId: string;
     role: OrganizationUserRole;
-    disabledAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
+    disabledAt: Instant | null;
+    createdAt: Instant;
+    updatedAt: Instant;
   }) {
     return { ...row, departmentId: null };
   }
@@ -765,8 +767,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     isPersonal: boolean;
     ownerUserId: string | null;
     organizationId: string | null;
-    archivedAt: Date | null;
-    createdAt: Date;
+    archivedAt: Instant | null;
+    createdAt: Instant;
   }) {
     return {
       id: project.id,
@@ -828,7 +830,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     slug: string;
     organizationId: string;
   }): MemoryTeamRow {
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     const team: MemoryTeamRow = {
       id: input.teamId,
       name: input.name,
@@ -849,7 +851,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     member,
   }: {
     organizationId: string;
-    member: { role: OrganizationUserRole; disabledAt: Date | null };
+    member: { role: OrganizationUserRole; disabledAt: Instant | null };
   }): Promise<void> {
     if (member.role !== OrganizationUserRole.ADMIN || member.disabledAt !== null) return;
     if (this.activeAdminCount(organizationId) <= 1) throw new CannotRemoveLastAdminError();

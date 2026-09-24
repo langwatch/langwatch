@@ -135,6 +135,11 @@ describe("given one invitation and the two routes that mail it", () => {
   });
 });
 
+const ROW_TIMESTAMPS = {
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+};
+
 describe("given an expired invitation", () => {
   const expired = {
     id: "inv-expired-1",
@@ -143,7 +148,8 @@ describe("given an expired invitation", () => {
     status: "PENDING",
     expiration: new Date("2026-08-01T00:00:00Z"),
     organizationId: "org-1",
-    organization: { name: "Acme", slug: "acme" },
+    ...ROW_TIMESTAMPS,
+    organization: { name: "Acme", slug: "acme", ...ROW_TIMESTAMPS },
   };
 
   let prisma: any;

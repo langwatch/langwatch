@@ -37,6 +37,7 @@ import {
   type RemoveOrganizationTeamMemberInput,
   type UpdateOrganizationTeamWithMembersInput,
 } from "@langwatch/organization-contract";
+import { fromDate } from "@langwatch/time";
 
 import type { TeamIdentity } from "../app/organization.members.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
@@ -137,7 +138,7 @@ export class OrganizationTeamMembersService {
     await this.deps.teams.fenceMembershipChange({
       teamId: team.id,
       organizationId: team.organizationId,
-      expectedUpdatedAt: team.updatedAt,
+      expectedUpdatedAt: fromDate(team.updatedAt),
       removeLegacyUserId: parsed.userId,
     });
     await this.deps.grants.revokeBindings({
@@ -262,7 +263,7 @@ export class OrganizationTeamMembersService {
     await this.deps.teams.fenceMembershipChange({
       teamId: team.id,
       organizationId: team.organizationId,
-      expectedUpdatedAt: team.updatedAt,
+      expectedUpdatedAt: fromDate(team.updatedAt),
       name: parsed.name,
     });
     await this.emitTeamMembershipPlan({

@@ -6,6 +6,7 @@ import {
   GroupNotFoundError,
   type OrganizationIntent,
 } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 /** Repositories contract: memory tier tested here, Prisma tier in prisma/__tests__/. */
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -39,7 +40,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
     it("finds its stored settings and returns empty S3 config by default", async () => {
       const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
 
-      const now = new Date();
+      const now = nowInstant();
       database.organizations.set(ORGANIZATION_ID, {
         id: ORGANIZATION_ID,
         name: "Test Organization",
@@ -75,7 +76,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
   describe("when organization settings are updated", () => {
     it("persists changes and updates the timestamp", async () => {
       const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
-      const now = new Date();
+      const now = nowInstant();
 
       database.organizations.set(ORGANIZATION_ID, {
         id: ORGANIZATION_ID,
@@ -349,7 +350,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
   describe("when tenant directory checks ownership", () => {
     it("reports when an organization exists", async () => {
       const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
-      const now = new Date();
+      const now = nowInstant();
 
       database.organizations.set(ORGANIZATION_ID, {
         id: ORGANIZATION_ID,
@@ -393,7 +394,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
 
     it("reports when a project belongs to an organization", async () => {
       const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
-      const now = new Date();
+      const now = nowInstant();
 
       await repositories.team.create({
         teamId: TEAM_ID,
@@ -455,7 +456,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
   describe("when billing profile is retrieved", () => {
     it("returns organization name and current customer id", async () => {
       const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
-      const now = new Date();
+      const now = nowInstant();
 
       database.organizations.set(ORGANIZATION_ID, {
         id: ORGANIZATION_ID,
@@ -487,7 +488,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
   describe("when claiming a billing customer id", () => {
     it("claims an unclaimed customer id and returns true", async () => {
       const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
-      const now = new Date();
+      const now = nowInstant();
 
       database.organizations.set(ORGANIZATION_ID, {
         id: ORGANIZATION_ID,
@@ -519,7 +520,7 @@ describe.each(backends)("given the $name organization repositories", ({ create }
 
     it("rejects a second claim and returns false", async () => {
       const database = (repositories.organization as any).memory as MemoryOrganizationDatabase;
-      const now = new Date();
+      const now = nowInstant();
 
       database.organizations.set(ORGANIZATION_ID, {
         id: ORGANIZATION_ID,

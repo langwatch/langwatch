@@ -4,6 +4,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
@@ -33,8 +34,8 @@ function organizationMember(member: TestOrganizationMember): User {
     pendingSsoSetup: false,
     userHashKey: null,
     twoFactorEnabled: false,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
+    createdAt: Temporal.Instant.fromEpochMilliseconds(0),
+    updatedAt: Temporal.Instant.fromEpochMilliseconds(0),
     lastLoginAt: null,
     deactivatedAt: null,
     lastHomePath: null,
