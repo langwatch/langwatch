@@ -415,14 +415,14 @@ export class GithubApp implements GithubApiContract {
   registerInstallNonce(input: { nonce: string; ttlSec: number }): Promise<boolean> {
     return this.#service.registerInstallNonce(input);
   }
-  consumeInstallNonce(nonce: string): Promise<boolean | null> {
+  consumeInstallNonce(nonce: string): Promise<"consumed" | "spent" | "unavailable"> {
     return this.#service.consumeInstallNonce(nonce);
   }
   signInstallState(payload: GithubInstallStatePayload): string {
     return this.#service.signInstallState(payload);
   }
-  verifyInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
-    return this.#service.verifyInstallState(token);
+  parseInstallState(token: string | null | undefined): GithubInstallStatePayload | null {
+    return this.#service.parseInstallState(token);
   }
   popupResponseHtml(login: string): string {
     return this.#service.popupResponseHtml(login);

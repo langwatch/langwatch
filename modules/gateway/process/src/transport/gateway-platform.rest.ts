@@ -73,19 +73,19 @@ function actorUserIdOf(actor: GatewayCaller): string {
   throw new Error("gateway platform route resolved no actor id");
 }
 
-function cursorInstant(part: unknown): Instant | null {
+function parseCursorInstant(part: unknown): Instant | null {
   const epochMs = Number(part);
   if (!Number.isFinite(epochMs) || Math.abs(epochMs) > MAX_EPOCH_MS) return null;
   return Temporal.Instant.fromEpochMilliseconds(epochMs);
 }
 
-function createdAtIdCursor(
+function decodeCreatedAtIdCursor(
   encoded: string | undefined,
 ): { createdAt: Instant; id: string } | null | undefined {
   if (encoded === undefined) return undefined;
   const parts = decodePageCursor(encoded, 2);
   if (!parts) return null;
-  const createdAt = cursorInstant(parts[0]);
+  const createdAt = parseCursorInstant(parts[0]);
   return createdAt ? { createdAt, id: String(parts[1]) } : null;
 }
 
@@ -93,7 +93,7 @@ function createdAtIdCursor(
  * A PATCH field's tri-state carried through: absent means no change, `null`
  * means clear it, a date means set it.
  */
-function expiresAtPatchValue(expiresAt: Date | null | undefined): Instant | null | undefined {
+function toExpiresAtPatchValue(expiresAt: Date | null | undefined): Instant | null | undefined {
   if (expiresAt === undefined) return undefined;
   if (expiresAt === null) return null;
   return Temporal.Instant.fromEpochMilliseconds(expiresAt.getTime());
@@ -172,7 +172,7 @@ function scopeFromWire(
 }
 
 /** Translates the snake budget wire onto the SAME schema tRPC's create validates with. */
-function budgetFromWire(
+function parseBudgetWire(
   app: GatewayApi,
   budget: z.infer<typeof gatewayBudgetWireSchema> | null | undefined,
 ): VirtualKeyBudgetInput | null | undefined {
@@ -211,7 +211,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const cursor = createdAtIdCursor(input.cursor);
+    const cursor = decodeCreatedAtIdCursor(input.cursor);
     if (cursor === null) throw new Error("invalid_cursor");
     const rows = await app.getVirtualKeyPage({
       organizationId,
@@ -271,7 +271,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       expiresAt: input.expires_at
         ? Temporal.Instant.fromEpochMilliseconds(input.expires_at.getTime())
         : null,
-      budget: budgetFromWire(app, input.budget),
+      budget: parseBudgetWire(app, input.budget),
       config: input.config,
       externalId: input.external_id,
       metadata: input.metadata,
@@ -370,8 +370,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       traceProjectId: input.trace_project_id,
       routingPolicyId: input.routing_policy_id,
       routingMode: input.routing_mode && toStoredEnum(input.routing_mode),
-      expiresAt: expiresAtPatchValue(input.expires_at),
-      budget: budgetFromWire(app, input.budget),
+      expiresAt: toExpiresAtPatchValue(input.expires_at),
+      budget: parseBudgetWire(app, input.budget),
       config: input.config,
       externalId: input.external_id,
       metadata: input.metadata,
@@ -503,7 +503,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const cursor = createdAtIdCursor(input.cursor);
+    const cursor = decodeCreatedAtIdCursor(input.cursor);
     if (cursor === null) throw new Error("invalid_cursor");
     const scopeTypes =
       input.scope_type !== undefined
@@ -707,7 +707,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     const parts = input.cursor !== undefined ? decodePageCursor(input.cursor, 3) : undefined;
     if (input.cursor !== undefined && !parts) throw new Error("invalid_cursor");
     const priority = parts ? Number(parts[0]) : undefined;
-    const createdAt = parts ? cursorInstant(parts[1]) : undefined;
+    const createdAt = parts ? parseCursorInstant(parts[1]) : undefined;
     if (parts && (priority === undefined || Number.isNaN(priority) || !createdAt)) {
       throw new Error("invalid_cursor");
     }

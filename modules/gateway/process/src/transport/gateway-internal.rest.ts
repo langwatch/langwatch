@@ -160,7 +160,7 @@ interface KeyAuthRejection {
  * not a VirtualKeyCryptoError is a bug rather than a bad credential, so it
  * rethrows.
  */
-function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
+function detectVirtualKeyParseRejection(presented: string): KeyAuthRejection | null {
   try {
     VirtualKeyCryptoService.parseSecret(presented);
 
@@ -173,12 +173,14 @@ function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
 }
 
 /** Null if the key may serve; each rejection carries its own code so callers can branch on it. */
-function virtualKeyStatusRejection({
+function detectVirtualKeyStatusRejection({
   status,
   expiresAt,
+  now,
 }: {
   status: string;
   expiresAt: Instant | null;
+  now: Instant;
 }): KeyAuthRejection | null {
   if (status === "REVOKED") {
     return {
@@ -196,7 +198,7 @@ function virtualKeyStatusRejection({
       message: "virtual key is disabled; it can be re-enabled by an administrator",
     };
   }
-  if (expiresAt && expiresAt.epochMilliseconds <= nowInstant().epochMilliseconds) {
+  if (expiresAt && expiresAt.epochMilliseconds <= now.epochMilliseconds) {
     return {
       status: 403,
       type: "virtual_key_expired",
@@ -271,7 +273,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       );
     }
 
-    const parseRejection = virtualKeyParseRejection(presented.data.key_presented);
+    const parseRejection = detectVirtualKeyParseRejection(presented.data.key_presented);
     if (parseRejection) {
       logAuthDecision({
         request: headers["x-langwatch-gateway-node"],
@@ -297,9 +299,10 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       });
     }
 
-    const statusRejection = virtualKeyStatusRejection({
+    const statusRejection = detectVirtualKeyStatusRejection({
       status: vk.status,
       expiresAt: vk.expiresAt,
+      now: nowInstant(),
     });
     if (statusRejection) {
       logAuthDecision({
@@ -332,7 +335,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
     }
 
     const result = await app.refreshCodex({ providerRowId: parsed.data.provider_row_id });
-    if (!result) {
+    if (result.status === "unavailable") {
       // Refused by name rather than reported as a dead session: telling a
       // customer to sign in to Codex again would send them round a loop that
       // cannot end, because this deployment composes no provider service to
@@ -492,13 +495,13 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       });
     }
 
-    const verdict = await app.checkGuardrails({
+    const check = await app.checkGuardrails({
       projectId: parsed.data.project_id,
       guardrailIds: parsed.data.guardrail_ids,
       direction: parsed.data.direction,
       content: parsed.data.content,
     });
-    if (!verdict) {
+    if (check.status === "unavailable") {
       // Refused, never allowed. A guardrail whose evaluator cannot produce a
       // verdict falls to its own failure mode rather than passing, and the same
       // rule holds one level up: a deployment with no evaluator runtime says so
@@ -509,6 +512,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
         message: "this deployment composes no evaluator runtime to check a guardrail with",
       });
     }
+    const { verdict } = check;
 
     if (verdict.decision !== "allow") {
       logger.info(
@@ -620,7 +624,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       traceId: body.trace_id,
       requestedModel: body.requested_model,
     });
-    if (!result) return realtimeSessionsUnavailable();
+    if (!result.ok && result.reason === "unavailable") return realtimeSessionsUnavailable();
     if (!result.ok) {
       return refuse(429, {
         type: "rate_limited",
@@ -664,17 +668,17 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
         projectId: body.project_id,
         vendorConversationId: body.vendor_conversation_id,
       });
-      if (correlated === null) return realtimeSessionsUnavailable();
-      applied = correlated;
+      if (correlated === "unavailable") return realtimeSessionsUnavailable();
+      applied = correlated === "applied";
     }
     if (body.status) {
-      applied =
-        (await app.releaseRealtimeSession({
-          sessionId,
-          projectId: body.project_id,
-          status: body.status,
-          reason: body.reason ?? "released by the gateway",
-        })) || applied;
+      const released = await app.releaseRealtimeSession({
+        sessionId,
+        projectId: body.project_id,
+        status: body.status,
+        reason: body.reason ?? "released by the gateway",
+      });
+      applied = released === "applied" || applied;
     }
     if (!applied) {
       return refuse(404, {
@@ -714,7 +718,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayApi)
       virtualKeyId: parsed.data.virtual_key_id,
       usage: parsed.data.usage,
     });
-    if (outcome === null) return realtimeSessionsUnavailable();
+    if (outcome === "unavailable") return realtimeSessionsUnavailable();
     if (outcome === "not_found") {
       return refuse(404, {
         type: "not_found",

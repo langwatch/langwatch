@@ -1,4 +1,5 @@
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
+import { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -52,9 +53,9 @@ export interface RealtimeSessionReconciliationRepository {
 }
 
 export interface ElevenLabsCredentialReader {
-  tryGetApiCredential(input: {
+  getApiCredential(input: {
     modelProviderId: string;
-  }): Promise<{ apiKey: string; baseUrl: string } | null>;
+  }): Promise<{ apiKey: string; baseUrl: string }>;
 }
 
 export interface ElevenLabsConversationReader {
@@ -212,9 +213,12 @@ export class GatewayRealtimeSessionReconciliationService {
       return false;
     }
 
-    const credential = await this.credentials.tryGetApiCredential({
-      modelProviderId: session.modelProviderId,
-    });
+    const credential = await this.credentials
+      .getApiCredential({ modelProviderId: session.modelProviderId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "voice_key_missing") return undefined;
+        throw error;
+      });
     if (!credential) {
       return false;
     }

@@ -232,7 +232,8 @@ export type GatewayBudgetOverviewForUser = {
 export type GatewayInternalCodexRefreshResult =
   | { status: "refreshed"; accessToken: string; accountId: string }
   | { status: "not_connected" }
-  | { status: "session_expired" };
+  | { status: "session_expired" }
+  | { status: "unavailable" };
 
 export type GatewayInternalSpendSubmission =
   | { status: "unavailable" }
@@ -289,7 +290,7 @@ export interface GatewayInternalProtocol {
     connect_services?: string[];
   }): { jwt: string; expiresAt: number };
   touchVirtualKeyUsage(id: string): Promise<void>;
-  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> | null;
+  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult>;
   findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null>;
   configVersionToken(input: VirtualKeyWithScopes): Promise<string>;
   materialiseConfig(input: VirtualKeyWithScopes): Promise<unknown>;
@@ -320,12 +321,18 @@ export interface GatewayInternalProtocol {
       tools?: unknown;
       mcps?: unknown;
     };
-  }): Promise<{
-    decision: "allow" | "block" | "modify";
-    reason: string | null;
-    modified_content: Record<string, unknown> | null;
-    policies_triggered: string[];
-  }> | null;
+  }): Promise<
+    | { status: "unavailable" }
+    | {
+        status: "evaluated";
+        verdict: {
+          decision: "allow" | "block" | "modify";
+          reason: string | null;
+          modified_content: Record<string, unknown> | null;
+          policies_triggered: string[];
+        };
+      }
+  >;
   budgetBucketSpend(input: {
     budgetId: string;
     endUserId: string;
@@ -348,25 +355,27 @@ export interface GatewayInternalProtocol {
     traceId?: string;
     requestedModel?: string;
   }): Promise<
-    { ok: true } | { ok: false; reason: "session_limit"; open: number; limit: number } | null
+    | { ok: true }
+    | { ok: false; reason: "session_limit"; open: number; limit: number }
+    | { ok: false; reason: "unavailable" }
   >;
   correlateRealtimeSession(input: {
     sessionId: string;
     projectId: string;
     vendorConversationId: string;
-  }): Promise<boolean | null>;
+  }): Promise<"applied" | "not_found" | "unavailable">;
   releaseRealtimeSession(input: {
     sessionId: string;
     projectId: string;
     status: "FAILED" | "EXPIRED";
     reason: string;
-  }): Promise<boolean | null>;
+  }): Promise<"applied" | "not_found" | "unavailable">;
   reportRealtimeSessionUsage(input: {
     sessionId: string;
     projectId: string;
     virtualKeyId: string;
     usage: SpendUsage;
-  }): Promise<"already_closed" | "closed" | "not_found" | null>;
+  }): Promise<"already_closed" | "closed" | "not_found" | "unavailable">;
 }
 
 /**

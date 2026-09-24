@@ -3,7 +3,7 @@ import type { GithubPullRequestLiveStatus as ContractLiveStatus } from "@langwat
  * Live pull-request status.
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
-import { ValidationError } from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate, toEpochMs, type Instant } from "@langwatch/time";
 
@@ -188,10 +188,17 @@ export class GithubPullRequestStatusService {
     organizationId: string;
     ref: GithubPullRequestRef;
   }): Promise<GithubPullRequestSummary | null> {
-    const covering = await this.deps.installations.resolveInstallationForRepository({
-      organizationId,
-      repositoryFullName: ref.repositoryFullName,
-    });
+    const covering = await this.deps.installations
+      .getInstallationForRepository({
+        organizationId,
+        repositoryFullName: ref.repositoryFullName,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "github_repo_not_accessible") {
+          return undefined;
+        }
+        throw error;
+      });
     if (!covering) {
       return null;
     }

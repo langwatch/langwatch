@@ -34,25 +34,25 @@ describe.each(backends)("given the $name installation nonces", (backend) => {
     });
 
     it("consumes it once", async () => {
-      await expect(nonces.consumeNonce(NONCE)).resolves.toBe(true);
+      await expect(nonces.consumeNonce(NONCE)).resolves.toBe("consumed");
     });
 
     it("refuses the second consume of the same nonce", async () => {
       await nonces.consumeNonce(NONCE);
 
-      await expect(nonces.consumeNonce(NONCE)).resolves.toBe(false);
+      await expect(nonces.consumeNonce(NONCE)).resolves.toBe("spent");
     });
 
     it("leaves another nonce untouched", async () => {
       await nonces.consumeNonce(NONCE);
 
-      await expect(nonces.consumeNonce(OTHER_NONCE)).resolves.toBe(false);
+      await expect(nonces.consumeNonce(OTHER_NONCE)).resolves.toBe("spent");
     });
   });
 
   describe("when the nonce was never registered", () => {
     it("refuses to consume it", async () => {
-      await expect(nonces.consumeNonce(NONCE)).resolves.toBe(false);
+      await expect(nonces.consumeNonce(NONCE)).resolves.toBe("spent");
     });
   });
 
@@ -60,7 +60,7 @@ describe.each(backends)("given the $name installation nonces", (backend) => {
     it("refuses to consume it", async () => {
       await nonces.registerNonce({ nonce: NONCE, ttlSec: 0 });
 
-      await expect(nonces.consumeNonce(NONCE)).resolves.toBe(false);
+      await expect(nonces.consumeNonce(NONCE)).resolves.toBe("spent");
     });
   });
 });

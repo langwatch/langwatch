@@ -10,7 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 /** The expiry a request carries, as the application reads it. */
-function expiryInstant(value: TimeInput | null | undefined): Instant | null | undefined {
+function toExpiryInstant(value: TimeInput | null | undefined): Instant | null | undefined {
   return value === undefined || value === null
     ? value
     : Temporal.Instant.fromEpochMilliseconds(toEpochMs(value));
@@ -207,7 +207,7 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
       traceProjectId: input.traceProjectId ?? null,
       routingPolicyId: input.routingPolicyId ?? null,
       routingMode: input.routingMode,
-      expiresAt: expiryInstant(input.expiresAt) ?? null,
+      expiresAt: toExpiryInstant(input.expiresAt) ?? null,
       budget: input.budget ?? null,
       config: input.config,
       actorUserId: actor.id,
@@ -245,7 +245,7 @@ export const virtualKeyTrpcTransport = defineTrpcRouter(GatewayApi, virtualKeyTr
       traceProjectId: input.traceProjectId,
       routingPolicyId: input.routingPolicyId,
       routingMode: input.routingMode,
-      expiresAt: expiryInstant(input.expiresAt),
+      expiresAt: toExpiryInstant(input.expiresAt),
       budget: input.budget,
       config: input.config,
       actorUserId: actor.id,

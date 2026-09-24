@@ -4,6 +4,7 @@ import {
   bucketScopeIdFor,
   GATEWAY_INTERNAL_SPEND_COMMANDS,
   type GatewayBudget,
+  type GatewayInternalCodexRefreshResult,
   type GatewayInternalSpendCommandName,
   type GatewayInternalSpendCommandRecord,
   type GatewayInternalProtocol,
@@ -170,8 +171,10 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return this.#members.virtualKeys.touchUsage(id);
   }
 
-  refreshCodex(input: { providerRowId: string }) {
-    return this.#members.refreshCodex?.(input) ?? null;
+  async refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> {
+    const refresh = this.#members.refreshCodex;
+    if (!refresh) return { status: "unavailable" };
+    return refresh(input);
   }
 
   findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null> {
@@ -220,8 +223,10 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return this.#members.changes.currentRevision(organizationId);
   }
 
-  checkGuardrails(input: Parameters<GatewayGuardrailEvaluationService["check"]>[0]) {
-    return this.#members.guardrails?.check(input) ?? null;
+  async checkGuardrails(input: Parameters<GatewayGuardrailEvaluationService["check"]>[0]) {
+    const guardrails = this.#members.guardrails;
+    if (!guardrails) return { status: "unavailable" } as const;
+    return { status: "evaluated", verdict: await guardrails.check(input) } as const;
   }
 
   async budgetBucketSpend(input: { budgetId: string; endUserId: string }): Promise<
@@ -270,8 +275,8 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
       admits: perCommand.admitSpend,
       outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
     });
-    const unregistered = await sendSpendCommands(pipeline.commands, perCommand);
-    if (unregistered) return { status: "unregistered", command: unregistered } as const;
+    const sent = await sendSpendCommands(pipeline.commands, perCommand);
+    if (!sent.sent) return { status: "unregistered", command: sent.unregistered } as const;
     return { status: "accepted", accepted: records.length - rejected.length, rejected } as const;
   }
 
@@ -295,9 +300,8 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     >,
   ) {
     const collaborators = this.#members.realtimeSessions;
-    return collaborators
-      ? realtimeSessionService.reserveRealtimeSession({ collaborators, ...input })
-      : null;
+    if (!collaborators) return { ok: false, reason: "unavailable" } as const;
+    return realtimeSessionService.reserveRealtimeSession({ collaborators, ...input });
   }
 
   async correlateRealtimeSession(
@@ -307,9 +311,12 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     >,
   ) {
     const collaborators = this.#members.realtimeSessions;
-    return collaborators
-      ? realtimeSessionService.correlateRealtimeSession({ collaborators, ...input })
-      : null;
+    if (!collaborators) return "unavailable" as const;
+    const correlated = await realtimeSessionService.correlateRealtimeSession({
+      collaborators,
+      ...input,
+    });
+    return correlated ? ("applied" as const) : ("not_found" as const);
   }
 
   async releaseRealtimeSession(
@@ -319,9 +326,12 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     >,
   ) {
     const collaborators = this.#members.realtimeSessions;
-    return collaborators
-      ? realtimeSessionService.releaseRealtimeSession({ collaborators, ...input })
-      : null;
+    if (!collaborators) return "unavailable" as const;
+    const released = await realtimeSessionService.releaseRealtimeSession({
+      collaborators,
+      ...input,
+    });
+    return released ? ("applied" as const) : ("not_found" as const);
   }
 
   async reportRealtimeSessionUsage(
@@ -331,9 +341,8 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     >,
   ) {
     const collaborators = this.#members.realtimeSessions;
-    return collaborators
-      ? realtimeSessionService.reportRealtimeSessionUsage({ collaborators, ...input })
-      : null;
+    if (!collaborators) return "unavailable" as const;
+    return realtimeSessionService.reportRealtimeSessionUsage({ collaborators, ...input });
   }
 }
 
@@ -705,13 +714,13 @@ async function enrichAttributedCommands({
 async function sendSpendCommands(
   commands: Record<string, GatewaySpendCommandSender | undefined>,
   perCommand: Record<GatewayInternalSpendCommandName, Record<string, unknown>[]>,
-): Promise<GatewayInternalSpendCommandName | null> {
+): Promise<{ sent: true } | { sent: false; unregistered: GatewayInternalSpendCommandName }> {
   for (const name of GATEWAY_INTERNAL_SPEND_COMMANDS) {
     const batch = perCommand[name];
     if (batch.length === 0) continue;
 
     const sender = commands[name];
-    if (!sender) return name;
+    if (!sender) return { sent: false, unregistered: name };
 
     if (sender.sendBatch) {
       await sender.sendBatch(batch);
@@ -722,7 +731,7 @@ async function sendSpendCommands(
     }
   }
 
-  return null;
+  return { sent: true };
 }
 
 function refuse(code: GatewayLicenseTokenRefusal): GatewayLicenseTokenResolution {

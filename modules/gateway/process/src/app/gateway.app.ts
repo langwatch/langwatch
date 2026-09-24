@@ -481,19 +481,15 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     organizationId: string;
     traceProjectId: string | null | undefined;
   }): Promise<void>;
-  /** Refuses a guardrail attachment the caller may not make in this project. */
+  /** Refuses a guardrail attachment the caller may not make in the key's guardrail project. */
   assertGuardrailAttachmentsAllowed(input: {
     actor: GatewayActor;
-    projectId: string | null;
-    attachments: readonly GuardrailAttachment[] | undefined;
-  }): Promise<void>;
-  /** The project a key's guardrail attachments are judged against. */
-  resolveVirtualKeyProjectId(input: {
     organizationId: string;
     virtualKeyId: string | null;
     scopes: readonly GatewayVirtualKeyScope[] | undefined;
     traceProjectId: string | null;
-  }): Promise<string | null>;
+    attachments: readonly GuardrailAttachment[] | undefined;
+  }): Promise<void>;
 
   // ── Projections and spend ────────────────────────────────────────────────
 
@@ -1662,15 +1658,12 @@ export class GatewayApp implements GatewayApi {
         callerProjectId: input.callerProjectId,
       });
     }
-    const projectId = await this.#dependencies.resolveVirtualKeyProjectId({
+    await this.#dependencies.assertGuardrailAttachmentsAllowed({
+      actor,
       organizationId,
       virtualKeyId: null,
       scopes,
       traceProjectId: traceProjectId ?? null,
-    });
-    await this.#dependencies.assertGuardrailAttachmentsAllowed({
-      actor,
-      projectId,
       attachments: guardrailAttachments,
     });
   }
@@ -1714,19 +1707,20 @@ export class GatewayApp implements GatewayApi {
       }
     }
 
-    const projectId = await this.#dependencies.resolveVirtualKeyProjectId({
-      organizationId,
-      virtualKeyId: id,
-      scopes,
-      traceProjectId:
-        input.traceProjectId !== undefined ? input.traceProjectId : existing.traceProjectId,
-    });
     const attachments =
       guardrailAttachments ??
       (scopes !== undefined
         ? parseVirtualKeyConfig(existing.config).guardrailAttachments
         : undefined);
-    await this.#dependencies.assertGuardrailAttachmentsAllowed({ actor, projectId, attachments });
+    await this.#dependencies.assertGuardrailAttachmentsAllowed({
+      actor,
+      organizationId,
+      virtualKeyId: id,
+      scopes,
+      traceProjectId:
+        input.traceProjectId !== undefined ? input.traceProjectId : existing.traceProjectId,
+      attachments,
+    });
 
     return existing;
   }

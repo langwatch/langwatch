@@ -1,3 +1,6 @@
+/** A lock this caller now holds, with the token that releases it, or one someone else holds. */
+export type GithubLockAcquisition = { acquired: true; token: string } | { acquired: false };
+
 /**
  * The installation-token rows the GitHub App keeps outside Postgres: a minted
  * token, an installation's liveness verdict, and the two locks that keep one
@@ -17,11 +20,11 @@ export abstract class GithubTokenCacheRepository {
     value: "alive" | "backoff";
     ttlSec: number;
   }): Promise<void>;
-  abstract acquireLivenessLock(installationId: string): Promise<string | null>;
+  abstract acquireLivenessLock(installationId: string): Promise<GithubLockAcquisition>;
   abstract acquireMintLock(input: {
     installationId: string;
     scopeKey: string;
-  }): Promise<string | null>;
+  }): Promise<GithubLockAcquisition>;
   abstract releaseLivenessLock(input: { installationId: string; token: string }): Promise<void>;
   abstract releaseMintLock(input: {
     installationId: string;

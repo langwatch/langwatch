@@ -352,19 +352,24 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
       virtualKeyAuthorization.assertScopesBelongToOrg({ organizationId, scopes: [...scopes] }),
     assertTraceProjectBelongsToOrganization: ({ organizationId, traceProjectId }) =>
       virtualKeyAuthorization.assertTraceProjectBelongsToOrg({ organizationId, traceProjectId }),
-    assertGuardrailAttachmentsAllowed: ({ actor, projectId, attachments }) =>
+    assertGuardrailAttachmentsAllowed: ({
+      actor,
+      organizationId,
+      virtualKeyId,
+      scopes,
+      traceProjectId,
+      attachments,
+    }) =>
       virtualKeyAuthorization.assertGuardrailAttachmentsAllowed(
         { permissions, actor: gatewayVirtualKeyActor(actor) },
-        projectId,
+        {
+          organizationId,
+          vkId: virtualKeyId,
+          inputScopes: scopes ? [...scopes] : undefined,
+          traceProjectId,
+        },
         attachments ? [...attachments] : undefined,
       ),
-    resolveVirtualKeyProjectId: ({ organizationId, virtualKeyId, scopes, traceProjectId }) =>
-      virtualKeyAuthorization.tryResolveVkProjectId({
-        organizationId,
-        vkId: virtualKeyId,
-        inputScopes: scopes ? [...scopes] : undefined,
-        traceProjectId,
-      }),
 
     // One read of the destinations for a whole page, in both casings: a
     // listing must not cost a query per key to say where its traffic goes.

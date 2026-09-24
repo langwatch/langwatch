@@ -175,11 +175,11 @@ export class GithubInstallationsService {
     return this.access.listRepositoriesForOrganization(organizationId);
   }
 
-  resolveInstallationForRepository(input: {
+  getInstallationForRepository(input: {
     organizationId: string;
     repositoryFullName: string;
-  }): Promise<{ installationId: string; repositoryId: string } | null> {
-    return this.access.resolveInstallationForRepository(input);
+  }): Promise<{ installationId: string; repositoryId: string }> {
+    return this.access.getInstallationForRepository(input);
   }
 
   coversRepository(input: {

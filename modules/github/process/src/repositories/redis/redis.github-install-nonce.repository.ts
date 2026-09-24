@@ -28,16 +28,16 @@ export class GithubInstallNonceRedisRepository extends GithubInstallNonceReposit
     }
   }
 
-  async consumeNonce(nonce: string): Promise<boolean | null> {
+  async consumeNonce(nonce: string): Promise<"consumed" | "spent" | "unavailable"> {
     if (!this.redis) {
-      return null;
+      return "unavailable";
     }
 
     try {
       const key = nonceKey(nonce);
       const deleted = await this.redis.getDelete(key);
       if (deleted !== null) {
-        return true;
+        return "consumed";
       }
 
       const result = await this.redis.evaluate(
@@ -46,18 +46,18 @@ export class GithubInstallNonceRedisRepository extends GithubInstallNonceReposit
         key,
       );
       if (result !== null) {
-        return result === 1 || result === "1";
+        return result === 1 || result === "1" ? "consumed" : "spent";
       }
 
       const value = await this.redis.get(key);
       if (value === null) {
-        return false;
+        return "spent";
       }
 
       await this.redis.delete(key);
-      return true;
+      return "consumed";
     } catch {
-      return null;
+      return "unavailable";
     }
   }
 }

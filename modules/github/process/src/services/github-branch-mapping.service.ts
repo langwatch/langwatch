@@ -2,6 +2,7 @@ import {
   GITHUB_LINKING_PULL_REQUEST_ACTIONS,
   type GithubPullRequestEvent,
 } from "@langwatch/github-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
@@ -124,10 +125,17 @@ export class GithubBranchMappingService {
       return 0;
     }
 
-    const covering = await this.deps.installations.resolveInstallationForRepository({
-      organizationId: scope.organizationId,
-      repositoryFullName: scope.repositoryFullName,
-    });
+    const covering = await this.deps.installations
+      .getInstallationForRepository({
+        organizationId: scope.organizationId,
+        repositoryFullName: scope.repositoryFullName,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "github_repo_not_accessible") {
+          return undefined;
+        }
+        throw error;
+      });
     if (!covering || !(await this.claim(scope, target.origin))) {
       return 0;
     }

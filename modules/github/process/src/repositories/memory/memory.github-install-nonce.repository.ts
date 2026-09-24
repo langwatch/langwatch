@@ -26,15 +26,15 @@ export class MemoryGithubInstallNonceRepository extends GithubInstallNonceReposi
     return true;
   }
 
-  async consumeNonce(nonce: string): Promise<boolean | null> {
+  async consumeNonce(nonce: string): Promise<"consumed" | "spent" | "unavailable"> {
     const row = this.memory.expiring.get(key(nonce));
     if (!row) {
-      return false;
+      return "spent";
     }
 
     this.memory.expiring.delete(key(nonce));
 
-    return row.expiresAt > nowInstant().epochMilliseconds;
+    return row.expiresAt > nowInstant().epochMilliseconds ? "consumed" : "spent";
   }
 }
 

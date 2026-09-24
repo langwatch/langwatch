@@ -59,15 +59,15 @@ export class TestGithubService implements GithubApi {
     return true;
   }
 
-  async consumeInstallNonce(): Promise<boolean | null> {
-    return true;
+  async consumeInstallNonce(): Promise<"consumed" | "spent" | "unavailable"> {
+    return "consumed";
   }
 
   signInstallState(): string {
     return "state";
   }
 
-  verifyInstallState(): GithubInstallStatePayload | null {
+  parseInstallState(): GithubInstallStatePayload | null {
     return null;
   }
 

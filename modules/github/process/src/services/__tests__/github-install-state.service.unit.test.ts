@@ -39,7 +39,7 @@ function verifyGithubInstallState(
   return GithubInstallStateService.create({
     signingKey,
     nonces: noNonceStore(),
-  }).verify(token);
+  }).parse(token);
 }
 
 afterEach(() => {
