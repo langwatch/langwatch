@@ -2,10 +2,9 @@
 
 import type {
   OnboardingInitializeOrganizationInput,
-  OrganizationCaller,
   OrganizationInitialized,
-  OrganizationIntent,
-} from "@langwatch/organization-contract";
+} from "@langwatch/onboarding-contract";
+import type { OrganizationCaller, OrganizationIntent } from "@langwatch/organization-contract";
 import { OnboardingProjectNotCreatedError } from "@langwatch/organization-contract";
 
 import type { OrganizationCeremony, OrganizationSignals } from "../app/organization.members.ts";

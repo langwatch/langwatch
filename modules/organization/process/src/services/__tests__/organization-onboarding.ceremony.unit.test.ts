@@ -4,10 +4,8 @@
  * Sign-up ceremony: intent-driven step selection, failure isolation, response.
  * @see specs/features/onboarding/intent-fork.feature
  */
-import type {
-  OnboardingInitializeOrganizationInput,
-  OrganizationCaller,
-} from "@langwatch/organization-contract";
+import type { OnboardingInitializeOrganizationInput } from "@langwatch/onboarding-contract";
+import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationCeremony, OrganizationSignals } from "../../app/organization.members.ts";

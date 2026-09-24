@@ -92,7 +92,7 @@ export const serverModuleMembers = {
   webhook: ["rateLimiter"],
   workflow: ["encryption", "prisma"],
   billing: ["isSaas", "nodeEnvironment"],
-  governance: ["prisma"],
+  governance: ["encryption", "prisma"],
   licensing: ["logger", "prisma"],
   "managed-provider": [],
   saas: ["isSaas"],

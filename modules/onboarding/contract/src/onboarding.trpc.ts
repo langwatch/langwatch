@@ -8,6 +8,7 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import { onboardingVariantSchema, guidedOnboardingStateSchema } from "./onboarding-schemas.ts";
+import { onboardingWriteAckSchema, organizationInitializedSchema } from "./onboarding.responses.ts";
 
 const organizationIdInputSchema = z.object({ organizationId: z.string() }).strict();
 
@@ -39,6 +40,45 @@ export const guidedStateWithInstanceOutputSchema = z.object({
 export const guidedStateWithVariantOutputSchema = z.object({
   ...guidedStateWithInstanceOutputSchema.shape,
   variant: onboardingVariantSchema.nullable(),
+});
+
+/** The sign-up questionnaire, forwarded opaque: the questions are the deployment's. */
+const signUpAnswersSchema = z.record(z.string(), z.unknown());
+
+/**
+ * The four keys the "pick your flavour" screen offers. The traits they map to
+ * are the deployment's marketing vocabulary rather than this feature's, so
+ * only the keys are named here.
+ */
+export const onboardingIntegrationMethodSchema = z.enum([
+  "via-claude-code",
+  "via-platform",
+  "via-claude-desktop",
+  "manually",
+]);
+export type OnboardingIntegrationMethod = z.infer<typeof onboardingIntegrationMethodSchema>;
+
+/**
+ * The whole sign-up ceremony in one request. `primaryIntent` stays optional
+ * for rolling-deploy tolerance (ADR-038), and names the organization's intents
+ * here because the organization's contract depends on this one.
+ */
+export const onboardingInitializeOrganizationInputSchema = z.object({
+  orgName: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  signUpData: signUpAnswersSchema.optional(),
+  primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
+
+  projectName: z.string().optional(),
+  language: z.string().default("other"),
+  framework: z.string().default("other"),
+});
+export type OnboardingInitializeOrganizationInput = z.infer<
+  typeof onboardingInitializeOrganizationInputSchema
+>;
+
+const setIntegrationMethodInputSchema = z.object({
+  integrationMethod: onboardingIntegrationMethodSchema,
 });
 
 export const onboardingTrpc = defineTrpcContract("onboarding")
@@ -77,4 +117,17 @@ export const onboardingTrpc = defineTrpcContract("onboarding")
   .mutation("attachConversation")
   .withInput(attachConversationInputSchema)
   .withOutput(guidedStateOutputSchema)
+
+  /** The sign-up ceremony: it runs before the caller belongs to any organization. */
+  .mutation("initializeOrganization")
+  .withInput(onboardingInitializeOrganizationInputSchema)
+  .withOutput(organizationInitializedSchema)
+
+  /**
+   * Records the flavour the customer picked, separately from the ceremony:
+   * the organization is created before that screen is shown.
+   */
+  .mutation("setIntegrationMethod")
+  .withInput(setIntegrationMethodInputSchema)
+  .withOutput(onboardingWriteAckSchema)
   .build();

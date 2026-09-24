@@ -8,6 +8,9 @@ import {
   type GuidedOnboardingStateWithInstance,
   type GuidedOnboardingStateWithVariant,
   type OnboardingCallerInput,
+  type OnboardingInitializeOrganizationInput,
+  type OnboardingSignUpCaller,
+  type OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -31,15 +34,21 @@ export class OnboardingApp implements OnboardingApiContract {
   readonly #guided: GuidedOnboardingService;
   readonly #permissions: AuthzApi;
   readonly #gateway: Pick<GatewayApi, "getDeploymentAddresses">;
+  readonly #organizations: Pick<
+    OrganizationApi,
+    "initializeOrganization" | "recordIntegrationMethod"
+  >;
 
-  private constructor(
-    guided: GuidedOnboardingService,
-    permissions: AuthzApi,
-    gateway: Pick<GatewayApi, "getDeploymentAddresses">,
-  ) {
-    this.#guided = guided;
-    this.#permissions = permissions;
-    this.#gateway = gateway;
+  private constructor(parts: {
+    guided: GuidedOnboardingService;
+    permissions: AuthzApi;
+    gateway: Pick<GatewayApi, "getDeploymentAddresses">;
+    organizations: Pick<OrganizationApi, "initializeOrganization" | "recordIntegrationMethod">;
+  }) {
+    this.#guided = parts.guided;
+    this.#permissions = parts.permissions;
+    this.#gateway = parts.gateway;
+    this.#organizations = parts.organizations;
   }
 
   static create(setup: OnboardingSetup): OnboardingApp {
@@ -53,7 +62,12 @@ export class OnboardingApp implements OnboardingApiContract {
       events,
     });
 
-    return new OnboardingApp(guided, setup.dependencies.permissions, setup.dependencies.gateway);
+    return new OnboardingApp({
+      guided,
+      permissions: setup.dependencies.permissions,
+      gateway: setup.dependencies.gateway,
+      organizations: setup.dependencies.organizations,
+    });
   }
 
   async getGuidedState(input: {
@@ -136,6 +150,17 @@ export class OnboardingApp implements OnboardingApiContract {
     return this.#guided.attachConversation(this.actorOf(input), {
       conversationId: input.conversationId,
     });
+  }
+
+  initializeOrganization(
+    input: OnboardingInitializeOrganizationInput,
+    by: OnboardingSignUpCaller,
+  ): Promise<OrganizationInitialized> {
+    return this.#organizations.initializeOrganization(input, by);
+  }
+
+  recordIntegrationMethod(input: { userId: string; selection: string }): void {
+    this.#organizations.recordIntegrationMethod(input);
   }
 
   private actorOf(input: OnboardingCallerInput): { organizationId: string; userId: string } {

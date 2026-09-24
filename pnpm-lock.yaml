@@ -9755,6 +9755,9 @@ importers:
       posthog-node:
         specifier: 'catalog:'
         version: 5.48.1(rxjs@7.8.2)
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       '@langwatch/api-fixture':
         specifier: workspace:*

@@ -8,12 +8,9 @@ import type {
   GuidedOnboardingState as GuidedState,
   GuidedOnboardingStateWithInstance as GuidedStateWithInstance,
   GuidedOnboardingStateWithVariant as GuidedStateWithVariant,
-} from "@langwatch/onboarding-contract";
-import type {
-  joinRequestTrpc,
   OrganizationInitialized,
-  OrganizationIntent,
-} from "@langwatch/organization-contract";
+} from "@langwatch/onboarding-contract";
+import type { joinRequestTrpc, OrganizationIntent } from "@langwatch/organization-contract";
 import type { TimeInput } from "@langwatch/time";
 
 /** What a signing-up reader told us about themselves, verbatim. */

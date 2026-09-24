@@ -11,6 +11,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import {
   EMPTY_GUIDED_ONBOARDING_STATE,
   type GuidedOnboardingRecord,
+  type OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -21,6 +22,14 @@ import { OnboardingApp } from "../onboarding.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const USER_ID = "user_1";
+const INITIALIZED: OrganizationInitialized = {
+  success: true,
+  teamSlug: "acme-team",
+  teamName: "ACME",
+  teamId: "team_1",
+  organizationId: ORGANIZATION_ID,
+  projectSlug: "acme-project",
+};
 
 function buildApp(
   options: {
@@ -39,6 +48,8 @@ function buildApp(
     record = input.record;
     return record;
   });
+  const initializeOrganization = vi.fn(async () => INITIALIZED);
+  const recordIntegrationMethod = vi.fn();
 
   const app = OnboardingApp.create({
     dependencies: {
@@ -46,6 +57,8 @@ function buildApp(
       organizations: createApiFixture<OrganizationApi>({
         readGuidedOnboardingState,
         writeGuidedOnboardingState,
+        initializeOrganization,
+        recordIntegrationMethod,
       }),
       ops: createApiFixture<OpsApi>({ findProductAnalyticsTargets: () => [] }),
       gateway: createApiFixture<GatewayApi>({
@@ -62,7 +75,14 @@ function buildApp(
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
-  return { app, hasPermission, readGuidedOnboardingState, writeGuidedOnboardingState };
+  return {
+    app,
+    hasPermission,
+    readGuidedOnboardingState,
+    writeGuidedOnboardingState,
+    initializeOrganization,
+    recordIntegrationMethod,
+  };
 }
 
 describe("OnboardingApp", () => {
@@ -121,5 +141,32 @@ describe("OnboardingApp", () => {
     });
 
     expect(state.gatewayUrl).toBe("https://gw.example.com/v1");
+  });
+
+  it("hands the sign-up ceremony to the organization module with its caller", async () => {
+    const { app, initializeOrganization } = buildApp();
+    const caller = { id: USER_ID, name: "Ada", email: "ada@acme.com" };
+    const input = {
+      orgName: "ACME",
+      primaryIntent: "LLM_OPS" as const,
+      language: "python",
+      framework: "other",
+    };
+
+    const initialized = await app.initializeOrganization(input, caller);
+
+    expect(initializeOrganization).toHaveBeenCalledWith(input, caller);
+    expect(initialized).toEqual(INITIALIZED);
+  });
+
+  it("forwards the picked integration method to the organization module", () => {
+    const { app, recordIntegrationMethod } = buildApp();
+
+    app.recordIntegrationMethod({ userId: USER_ID, selection: "via-claude-code" });
+
+    expect(recordIntegrationMethod).toHaveBeenCalledWith({
+      userId: USER_ID,
+      selection: "via-claude-code",
+    });
   });
 });
