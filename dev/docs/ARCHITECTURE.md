@@ -1489,9 +1489,10 @@ config and declares its own datastore needs. **Tests live beside what they
 test, in a colocated `__tests__/` folder — never in a root `tests/` directory
 next to `src/`.**
 
-A raw client (Prisma, ClickHouse, ioredis, Stripe) or a class with private members is never
-cast into a test: its typed double lives once in `@langwatch/test-harness`, throwing by name on
-anything unscripted, and every test uses that one (Alex, 2026-09-24).
+A raw client (Prisma, ClickHouse, ioredis, Stripe) is never cast into a test: its typed double
+lives once in `@langwatch/test-harness`, throwing by name on anything unscripted, and every test
+uses that one (Alex, 2026-09-24). A module class with private members is built for real over its
+memory twins, or reached through its `*Api` with `createApiFixture` — never cast.
 
 The installation test is the same chain as production:
 
